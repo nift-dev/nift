@@ -1,5 +1,14 @@
 # Nift C++ Rewrite — Release Notes
 
+## v1.0.10
+
+### Parsed tracked content compatibility fix
+
+- Fixed a fundamental parser regression where `@content` appended tracked content as raw text instead of parsing it as Nift source.
+- Nift expressions inside tracked content now work as intended, including `@pathto(...)`, `@input(...)`, `$[...]`, `@getenv(...)`, `@ent(...)` and `@dep(...)`.
+- Tracked content now participates in the parser input stack so content/input recursion is detected cleanly.
+- Added focused regression coverage for expressions and nested inputs inside tracked content.
+
 ## v1.0.9
 
 ### Installation and Makefile portability

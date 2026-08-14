@@ -191,6 +191,8 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
         return result_;
     }
 
+    const int base_code_block_depth = code_block_depth_;
+    std::size_t open_code_offset = 0;
     std::string output;
     output.reserve(source.size() + 64);
     for (std::size_t i = 0; i < source.size() && result_.ok;) {
@@ -218,23 +220,44 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             continue;
         }
 
-        if (source.compare(i, 6, "</pre>") == 0) {
-            fail(source_path, source, i, "close tag has no preceding <pre>");
-            break;
+
+        // Match stripped Nift's <pre*> handling. While inside a pre block,
+        // literal '<' characters are escaped except for <code>/</code> tags and
+        // the outer </pre>. Nift expressions still parse normally, so \@ / \$
+        // remain the way to show Nift syntax literally in code examples.
+        if (source.compare(i, 4, "<!--") == 0) {
+            ++html_comment_depth_;
         }
-        if (source.compare(i, 5, "<pre>") == 0) {
-            const auto end = source.find("</pre>", i + 5);
-            if (end == std::string::npos) { fail(source_path, source, i, "<pre> has no following </pre> close tag"); break; }
-            const std::string body = source.substr(i + 5, end - i - 5);
-            std::string escaped;
-            for (std::size_t j = 0; j < body.size(); ++j) {
-                if (body.compare(j, 6, "<code>") == 0) { escaped += "<code>"; j += 5; }
-                else if (body.compare(j, 7, "</code>") == 0) { escaped += "</code>"; j += 6; }
-                else if (body[j] == '<') escaped += "&lt;";
-                else escaped += body[j];
+        if (source.compare(i, 3, "-->") == 0 && html_comment_depth_ > 0) {
+            --html_comment_depth_;
+        }
+        if (source[i] == '<' && html_comment_depth_ == 0) {
+            const bool closes_pre = source.compare(i + 1, 4, "/pre") == 0 &&
+                i + 5 < source.size() && source[i + 5] == '>';
+            const bool opens_pre = source.compare(i + 1, 3, "pre") == 0 &&
+                i + 4 < source.size() &&
+                (source[i + 4] == '>' || source[i + 4] == ' ' || source[i + 4] == '\t' ||
+                 source[i + 4] == '\r' || source[i + 4] == '\n');
+
+            if (closes_pre) {
+                --code_block_depth_;
+                if (code_block_depth_ < base_code_block_depth) {
+                    fail(source_path, source, i, "</pre> close tag has no preceding <pre*> open tag");
+                    code_block_depth_ = base_code_block_depth;
+                    break;
+                }
             }
-            output += "<pre>" + escaped + "</pre>";
-            i = end + 6;
+
+            const bool code_tag = source.compare(i + 1, 4, "code") == 0 ||
+                                  source.compare(i + 1, 5, "/code") == 0;
+            if (code_block_depth_ > 0 && !code_tag) output += "&lt;";
+            else output.push_back('<');
+
+            if (opens_pre) {
+                if (code_block_depth_ == base_code_block_depth) open_code_offset = i;
+                ++code_block_depth_;
+            }
+            ++i;
             continue;
         }
 
@@ -300,11 +323,23 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
 
             if (function == "content") {
                 if (has_parameters && !parameters.empty()) { fail(source_path, source, i, "content: expected 0 parameters"); break; }
-                const auto content_path = project_.content_path(tracked_info_);
-                const std::string content_source = filesystem::read_file(content_path);
-                append_indented(output, content_source, indent);
-                result_.content_used = true;
+
+                const fs::path content_path = fs::absolute(project_.content_path(tracked_info_)).lexically_normal();
+                if (std::find(input_stack_.begin(), input_stack_.end(), content_path) != input_stack_.end()) {
+                    fail(source_path, source, i, "@content would result in an input loop through " + content_path.generic_string());
+                    break;
+                }
+
+                input_stack_.push_back(content_path);
                 result_.dependencies.insert(project_.relative(content_path));
+                const std::string content_source = filesystem::read_file(content_path);
+                const auto nested = parse(content_source, content_path, depth + 1);
+                input_stack_.pop_back();
+
+                if (!nested.ok) break;
+
+                append_indented(output, nested.output, indent);
+                result_.content_used = true;
                 i = end;
                 continue;
             }
@@ -384,6 +419,11 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             output.append(source, i, end - i);
             i = end;
         }
+    }
+
+    if (result_.ok && code_block_depth_ > base_code_block_depth) {
+        fail(source_path, source, open_code_offset, "<pre*> open tag has no following </pre> close tag");
+        code_block_depth_ = base_code_block_depth;
     }
 
     result_.output = output;
