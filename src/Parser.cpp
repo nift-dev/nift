@@ -48,7 +48,7 @@ std::vector<std::string> parse_parameters(const std::string& text, bool& ok) {
 }
 
 void append_indented(std::string& output, const std::string& text, const std::string& indent,
-                     bool trim_trailing_newline = true) {
+                     int initial_code_block_depth = 0, bool trim_trailing_newline = true) {
     std::size_t size = text.size();
     if (trim_trailing_newline && size && text[size - 1] == '\n') {
         --size;
@@ -56,18 +56,46 @@ void append_indented(std::string& output, const std::string& text, const std::st
     }
     if (size == 0) return;
 
-    std::size_t start = 0;
-    while (start < size) {
-        const std::size_t newline = text.find('\n', start);
-        if (newline == std::string::npos || newline >= size) {
-            output.append(text, start, size - start);
-            break;
+    int code_block_depth = initial_code_block_depth;
+    int html_comment_depth = 0;
+
+    auto is_pre_open = [&](std::size_t pos) {
+        if (pos + 4 > size || text.compare(pos, 4, "<pre") != 0) return false;
+        if (pos + 4 == size) return false;
+        const char next = text[pos + 4];
+        return next == '>' || next == ' ' || next == '\t' || next == '\r' || next == '\n';
+    };
+    auto is_pre_close = [&](std::size_t pos) {
+        return pos + 6 <= size && text.compare(pos, 6, "</pre>") == 0;
+    };
+
+    std::size_t segment_start = 0;
+    for (std::size_t i = 0; i < size; ++i) {
+        if (text.compare(i, 4, "<!--") == 0) {
+            ++html_comment_depth;
+        } else if (text.compare(i, 3, "-->") == 0 && html_comment_depth > 0) {
+            --html_comment_depth;
         }
-        output.append(text, start, newline - start + 1);
-        if (newline + 1 < size) output += indent;
-        start = newline + 1;
+
+        if (html_comment_depth == 0) {
+            if (is_pre_close(i) && code_block_depth > 0) {
+                --code_block_depth;
+            } else if (is_pre_open(i)) {
+                ++code_block_depth;
+            }
+        }
+
+        if (text[i] != '\n') continue;
+
+        output.append(text, segment_start, i - segment_start + 1);
+        if (i + 1 < size && code_block_depth == 0) output += indent;
+        segment_start = i + 1;
     }
+
+    if (segment_start < size)
+        output.append(text, segment_start, size - segment_start);
 }
+
 
 std::string entity(const std::string& value, bool& ok) {
     static const std::vector<std::pair<std::string, std::string>> entities = {
@@ -202,12 +230,6 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             continue;
         }
 
-        if (source.compare(i, 4, "@#--") == 0) {
-            const auto end = source.find("--#", i + 4);
-            if (end == std::string::npos) { fail(source_path, source, i, "open comment #-- has no close --#"); break; }
-            i = end + 3;
-            continue;
-        }
         if (source.compare(i, 4, "<#--") == 0) {
             const auto end = source.find("--#>", i + 4);
             if (end == std::string::npos) { fail(source_path, source, i, "open comment '<#--' has no close '--#>'"); break; }
@@ -332,13 +354,14 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
 
                 input_stack_.push_back(content_path);
                 result_.dependencies.insert(project_.relative(content_path));
+                const int insertion_code_block_depth = code_block_depth_;
                 const std::string content_source = filesystem::read_file(content_path);
                 const auto nested = parse(content_source, content_path, depth + 1);
                 input_stack_.pop_back();
 
                 if (!nested.ok) break;
 
-                append_indented(output, nested.output, indent);
+                append_indented(output, nested.output, indent, insertion_code_block_depth);
                 result_.content_used = true;
                 i = end;
                 continue;
@@ -359,11 +382,12 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 }
                 input_stack_.push_back(input_path);
                 result_.dependencies.insert(project_.relative(input_path));
+                const int insertion_code_block_depth = code_block_depth_;
                 const auto input_source = project_.read_shared_source(input_path);
                 const auto nested = parse(*input_source, input_path, depth + 1);
                 input_stack_.pop_back();
                 if (!nested.ok) break;
-                append_indented(output, nested.output, indent);
+                append_indented(output, nested.output, indent, insertion_code_block_depth);
                 i = end;
                 continue;
             }

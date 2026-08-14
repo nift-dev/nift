@@ -1,5 +1,24 @@
 # Nift C++ Rewrite — Release Notes
 
+## v1.0.12
+
+### Simplified comments
+
+- Removed parsed block comments from the language.
+- `@#-- ... --#` is no longer recognized as a special parsed-comment form.
+- Nift comments are now consistently non-executing: `<#-- ... --#>` for raw multiline comments and `@# ...` / `@// ...` for raw single-line comments.
+- Normal HTML `<!-- ... -->` comments remain part of generated HTML.
+- This removes surprising “commented text still executes” behaviour and simplifies the parser.
+
+## v1.0.11
+
+### Preformatted indentation compatibility
+
+- Fixed indentation leaking from an `@content`/`@input` insertion point into `<pre*>` block contents.
+- Insertion now preserves stripped Nift's rule: normal lines inherit the caller's indentation, while newlines inside a preformatted block do not receive template indentation.
+- The fix applies equally to tracked content and recursively parsed input files.
+- Added focused regression coverage for `<pre class="...">` and ordinary `<pre>` blocks through both `@content` and `@input`.
+
 ## v1.0.10
 
 ### Parsed tracked content compatibility fix

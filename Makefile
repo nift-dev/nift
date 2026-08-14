@@ -38,6 +38,9 @@ test-json:
 test-content: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/parser_content_smoke.sh
 
+test-comments: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/comments_smoke.sh
+
 install: $(TARGET)
 	mkdir -p "$(DESTDIR)$(BINDIR)"
 	$(INSTALL_PROGRAM) "$(TARGET)" "$(DESTDIR)$(BINDIR)/$(TARGET)"
@@ -51,4 +54,4 @@ clean:
 	rm -f $(OBJECTS) "$(TARGET)"
 	rm -rf "$(TEST_DIR)"
 
-.PHONY: all clean test-json test-content install uninstall
+.PHONY: all clean test-json test-content test-comments install uninstall

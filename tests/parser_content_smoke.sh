@@ -90,4 +90,70 @@ if "$NIFT_BIN" build-all >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "Tracked content parser smoke test passed"
+
+# Verify template indentation does not leak into <pre*> contents from @content or @input.
+cd "$TMP"
+rm -rf .nift content templates public data
+mkdir -p .nift content templates public
+
+cat > .nift/config.json <<'JSON'
+{
+  "config": {
+    "content-dir": "content/",
+    "content-ext": ".html",
+    "output-dir": "public/",
+    "output-ext": ".html",
+    "default-template": "templates/template.html",
+    "build-threads": -1,
+    "incremental-mode": "modified"
+  }
+}
+JSON
+
+cat > .nift/tracked.json <<'JSON'
+{
+  "tracked": [
+    {
+      "name": "/",
+      "title": "Pre indentation test",
+      "template": "templates/template.html"
+    }
+  ]
+}
+JSON
+
+cat > templates/template.html <<'EOF'
+<body>
+	<main>
+		@content
+	</main>
+</body>
+EOF
+
+cat > content/index.html <<'EOF'
+<pre class="example"><code>first
+  second
+third</code></pre>
+@input('fragment.html')
+EOF
+
+cat > content/fragment.html <<'EOF'
+<pre><code>alpha
+    beta
+gamma</code></pre>
+EOF
+
+"$NIFT_BIN" build-all >/dev/null
+
+python3 - <<'PY'
+from pathlib import Path
+text = Path("public/index.html").read_text()
+expected_content = '<pre class="example"><code>first\n  second\nthird</code></pre>'
+expected_input = '<pre><code>alpha\n    beta\ngamma</code></pre>'
+if expected_content not in text:
+    raise SystemExit("template indentation leaked into @content <pre> block")
+if expected_input not in text:
+    raise SystemExit("template/content indentation leaked into @input <pre> block")
+PY
+
+echo "Tracked content/input parser smoke test passed"

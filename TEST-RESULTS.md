@@ -1,22 +1,38 @@
-# Test results — Nift C++ rewrite 1.0.7
+# Test results — Nift C++ rewrite 1.0.12
 
-The optimized rewrite was validated against the current 280-assertion deep regression
-suite. The suite was run in explicit checkpoints to avoid the long-running build-auto
-process and accumulated mtime sleeps obscuring completion:
+Nift 1.0.12 was clean-built and validated against the v6 deep regression
+suite in one complete run.
 
-- tests 1–229: PASS
-- hash-mode build-auto state-refresh test: PASS
-- tests 231–264: PASS
-- tests 265–280: PASS
+## Result
 
-The two historical `info` presentation assertions were updated to parse the rewrite's
-intentional JSON-formatted `info` output rather than grep the previous line-oriented
-presentation. Their underlying contracts (deduplicated names and exact backslash title
-round-trip) remain unchanged.
+```text
+PASS: 279 assertions/tests
+```
 
-Additional checks:
+The count is intentionally one lower than the previous 280-test baseline because
+parsed block comments were removed from the language in 1.0.12. The obsolete
+parsed-comment assertion was removed with the feature.
 
-- clean `-Wall -Wextra -pedantic` build: PASS
-- standalone custom JSON smoke test: PASS
-- 10,000-page modified/hash benchmark fixture: PASS
-- generated representative HTML compared byte-for-byte between stripped and rewrite: PASS
+Two older `info` assertions in the suite were also modernised to validate the
+JSON result semantically rather than grep legacy presentation text:
+
+- multiple requested names must appear exactly once each;
+- titles containing backslashes must round-trip to the exact original string.
+
+These were test-harness updates only; the corresponding Nift behaviour was
+already correct.
+
+Additional validation performed on this source tree:
+
+- clean `-std=c++17 -O2 -Wall -Wextra -pedantic -pthread` build: PASS
+- tracked-content / nested-`@input` parser smoke test: PASS
+- Nift comment semantics smoke test: PASS
+- standalone JSON smoke test: PASS
+- complete v6 deep regression suite: PASS (279/279)
+
+The full-suite run covered parser behaviour, content/input composition,
+metadata and escaping, raw comments, preformatted blocks, tracking and watch
+state, malformed persistent JSON, path traversal, build failure propagation,
+modified/hash/hybrid incremental behaviour, user dependencies, recursive
+directory dependencies, `build-auto`, status/info commands and CLI mutation
+operations.
