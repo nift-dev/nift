@@ -47,4 +47,20 @@ ln -s "$TMP/outside-target.txt" "$P/public/assets/link.txt"
 (cd "$P" && "$NIFT_BIN" status >status.log)
 grep -Fq 'page build metadata has an invalid requirement' "$P/status.log"
 
+
+# The optimized metadata containment cache is parent-directory based. Retargeting
+# a directory symlink outside the project between invocations must still be
+# rejected, not just retargeting the final leaf symlink.
+P="$TMP/retarget-parent"; mkproj "$P"
+mkdir -p "$P/public/inside-dir" "$TMP/outside-dir"
+printf 'inside\n' >"$P/public/inside-dir/file.txt"
+printf 'outside\n' >"$TMP/outside-dir/file.txt"
+ln -s "inside-dir" "$P/public/linkdir"
+printf '<a href="@pathto('"'"'public/linkdir/file.txt'"'"')">x</a>\n' >"$P/content/index.html"
+(cd "$P" && "$NIFT_BIN" build-all >/dev/null)
+rm "$P/public/linkdir"
+ln -s "$TMP/outside-dir" "$P/public/linkdir"
+(cd "$P" && "$NIFT_BIN" status >status.log)
+grep -Fq 'page build metadata has an invalid requirement' "$P/status.log"
+
 echo "Metadata safety smoke test passed"

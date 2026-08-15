@@ -1,8 +1,8 @@
 CXX ?= g++
 CXXFLAGS ?= -std=c++17 -O2 -Wall -Wextra -pedantic -pthread
-CPPFLAGS ?= -Isrc -Isift/include -Isift/src
+CPPFLAGS ?= -Isrc -Iminifypp/include -Iminifypp/src
 
-SOURCES := src/nift.cpp src/CLI.cpp src/FileSystem.cpp src/JsonFile.cpp src/JsonSchema.cpp sift/src/Sift.cpp src/Parser.cpp src/ProjectInfo.cpp src/WatchList.cpp src/BuildProgress.cpp
+SOURCES := src/nift.cpp src/CLI.cpp src/FileSystem.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp src/Parser.cpp src/ProjectInfo.cpp src/WatchList.cpp src/BuildProgress.cpp
 OBJECTS := $(SOURCES:.cpp=.o)
 DEPFILES := $(OBJECTS:.o=.d)
 
@@ -45,7 +45,7 @@ test-json-schema:
 	"$(JSON_SCHEMA_TEST)"
 
 test-minify:
-	$(MAKE) -C sift test-smoke
+	$(MAKE) -C minifypp test-smoke
 
 test-json-schema-integration: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/json_schema_integration_smoke.sh
@@ -86,9 +86,9 @@ uninstall:
 clean:
 	rm -f $(OBJECTS) $(DEPFILES) "$(TARGET)"
 	rm -rf "$(TEST_DIR)"
-	$(MAKE) -C sift clean
+	$(MAKE) -C minifypp clean
 
-.PHONY: all clean test-json test-json-schema test-minify test-json-schema-integration test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety install uninstall
+.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling all clean test-json test-json-schema test-minify test-json-schema-integration test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety install uninstall
 
 
 test-cross-feature: $(TARGET)
@@ -108,17 +108,29 @@ test-minify-integration: $(TARGET)
 
 
 test-minify-node:
-	$(MAKE) -C sift test-node
+	$(MAKE) -C minifypp test-node
 
 test-minify-generated:
-	$(MAKE) -C sift test-generated
+	$(MAKE) -C minifypp test-generated
 
 test-minify-jsx-generated:
-	$(MAKE) -C sift test-jsx
+	$(MAKE) -C minifypp test-jsx
 
 
 test-minify-formats:
-	$(MAKE) -C sift test-formats
+	$(MAKE) -C minifypp test-formats
 
 test-minify-cli:
-	$(MAKE) -C sift test-cli
+	$(MAKE) -C minifypp test-cli
+
+
+test-tracking-scaling: $(TARGET)
+	python3 tests/tracking_scaling_benchmark.py --nift "$(CURDIR)/$(TARGET)"
+
+
+benchmark-10k: $(TARGET)
+	python3 benchmarks/performance_10k.py --nift "$(CURDIR)/$(TARGET)"
+
+
+benchmark-memory-10k: $(TARGET)
+	python3 tests/memory_10k_benchmark.py --nift "$(CURDIR)/$(TARGET)"

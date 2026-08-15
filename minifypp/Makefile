@@ -2,17 +2,17 @@ CXX ?= g++
 CXXFLAGS ?= -std=c++17 -O2 -Wall -Wextra -pedantic
 CPPFLAGS ?= -Iinclude -Isrc
 
-TARGET := sift
-LIBSRC := src/Sift.cpp
+TARGET := minify
+LIBSRC := src/Minify.cpp
 TESTDIR := .build
-SMOKE := $(TESTDIR)/minify-smoke
+SMOKE := $(TESTDIR)/minifypp-smoke
 
 all: $(TARGET)
 
-$(TARGET): cli/main.cpp $(LIBSRC) include/sift/Sift.h src/Json.h
+$(TARGET): cli/main.cpp $(LIBSRC) include/minify/Minify.h src/Json.h
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) cli/main.cpp $(LIBSRC) -o $@
 
-test: test-smoke test-node test-generated test-jsx test-formats test-cli
+test: test-smoke test-node test-generated test-jsx test-formats test-cross-format test-cli
 
 test-smoke:
 	mkdir -p $(TESTDIR)
@@ -34,7 +34,11 @@ test-cli: $(TARGET)
 clean:
 	rm -rf $(TESTDIR) $(TARGET)
 
-.PHONY: all test test-smoke test-node test-generated test-jsx test-formats test-cli clean
+.PHONY: all test test-smoke test-node test-generated test-jsx test-formats test-cross-format test-cli clean
 
 test-formats:
 	bash tests/minify_format_idempotence.sh
+
+
+test-cross-format:
+	bash tests/cross_format_adversarial.sh

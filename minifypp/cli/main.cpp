@@ -1,4 +1,4 @@
-#include <sift/Sift.h>
+#include <minify/Minify.h>
 
 #include <filesystem>
 #include <fstream>
@@ -33,8 +33,8 @@ fs::path minified_path(const fs::path& input) {
 
 void help() {
     std::cout
-        << "sift - conservative multi-format minifier\n\n"
-        << "Usage: sift [--in-place|-i] <files...>\n\n"
+        << "minify - conservative multi-format minifier\n\n"
+        << "Usage: minify [--in-place|-i] <files...>\n\n"
         << "By default foo.js is written to foo.min.js.\n"
         << "Use --in-place (or -i) to overwrite the source file.\n";
 }
@@ -47,12 +47,12 @@ int main(int argc, char** argv) {
         const std::string arg = argv[i];
         if (arg == "--help" || arg == "-h") { help(); return 0; }
         if (arg == "--version" || arg == "-v") {
-            std::cout << "sift 1.0.3\n";
+            std::cout << "Minify++ 1.1.0\n";
             return 0;
         }
         if (arg == "--in-place" || arg == "-i") { in_place = true; continue; }
         if (!arg.empty() && arg[0] == '-') {
-            std::cerr << "sift: unknown option '" << arg << "'\n";
+            std::cerr << "minify: unknown option '" << arg << "'\n";
             return 2;
         }
         files.emplace_back(arg);
@@ -63,23 +63,23 @@ int main(int argc, char** argv) {
     for (const auto& input : files) {
         std::error_code ec;
         if (!fs::is_regular_file(input, ec)) {
-            std::cerr << "sift: cannot read '" << input.string() << "'\n";
+            std::cerr << "minify: cannot read '" << input.string() << "'\n";
             failed = true; continue;
         }
-        sift::Format format;
-        if (!sift::format_for_extension(input.extension().string(), format)) {
-            std::cerr << "sift: unsupported extension '" << input.extension().string() << "'\n";
+        minify::Format format;
+        if (!minify::format_for_extension(input.extension().string(), format)) {
+            std::cerr << "minify: unsupported extension '" << input.extension().string() << "'\n";
             failed = true; continue;
         }
         const std::string source = read_file(input);
         std::string output, error;
-        if (!sift::run(format, source, output, error)) {
-            std::cerr << "sift: " << input.string() << ": " << error << "\n";
+        if (!minify::run(format, source, output, error)) {
+            std::cerr << "minify: " << input.string() << ": " << error << "\n";
             failed = true; continue;
         }
         const fs::path destination = in_place ? input : minified_path(input);
         if (!write_file(destination, output)) {
-            std::cerr << "sift: cannot write '" << destination.string() << "'\n";
+            std::cerr << "minify: cannot write '" << destination.string() << "'\n";
             failed = true; continue;
         }
         std::cout << input.string() << " -> " << destination.string() << "\n";

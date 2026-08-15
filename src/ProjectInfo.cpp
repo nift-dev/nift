@@ -1,5 +1,5 @@
 #include "ProjectInfo.h"
-#include <sift/Sift.h>
+#include <minify/Minify.h>
 #include "BuildProgress.h"
 #include "Console.h"
 #include "FileSystem.h"
@@ -109,8 +109,8 @@ bool ProjectInfo::load_config() {
                 console::error(console::path(relative(path), true) + ": every minify-exts entry must be an extension string beginning with '.'");
                 return false;
             }
-            sift::Format format;
-            if (!sift::format_for_extension(item.string, format)) {
+            minify::Format format;
+            if (!minify::format_for_extension(item.string, format)) {
                 console::error(console::path(relative(path), true) + ": unsupported minify-exts entry: " + item.string);
                 return false;
             }
@@ -196,22 +196,13 @@ bool ProjectInfo::load_tracking() {
                 entry_error = "tracked content-ext/output-ext overrides must begin with '.' and cannot contain path separators";
                 return false;
             }
-            if (std::any_of(tracked.begin(), tracked.end(), [&](const TrackedInfo& existing) { return existing.name == info.name; })) {
-                entries_valid = false;
-                entry_error = "duplicate tracked name '" + info.name + "'";
-                return false;
-            }
+
             const fs::path derived_content = content_path(info).lexically_normal();
             const fs::path derived_output = output_path(info).lexically_normal();
             const fs::path template_path = (root / info.template_path).lexically_normal();
             if (!info.template_path.empty() && (derived_content == template_path || derived_output == template_path)) {
                 entries_valid = false;
                 entry_error = "tracked template path cannot be the same as its content or output path";
-                return false;
-            }
-            if (conflicts_with_tracked_path(info)) {
-                entries_valid = false;
-                entry_error = "tracked entries resolve to the same content or output path";
                 return false;
             }
             tracked.emplace_back(std::move(info));
@@ -225,9 +216,63 @@ bool ProjectInfo::load_tracking() {
         tracked.clear();
         return false;
     }
+
+    // Parsing no longer needs the tracked.json source. Release it before the
+    // uniqueness/path pass so the source buffer does not overlap the largest
+    // temporary validation allocation.
+    source.clear();
+    source.shrink_to_fit();
+
+    // Validate uniqueness after parsing using compact sortable vectors rather
+    // than three node-based hash sets. This keeps validation O(n log n), avoids
+    // the historical O(n^2) scans, and materially lowers peak RSS on large
+    // projects. Only one derived-path vector exists at a time.
+    {
+        std::vector<const std::string*> names;
+        names.reserve(tracked.size());
+        for (const auto& info : tracked) names.push_back(&info.name);
+        std::sort(names.begin(), names.end(),
+                  [](const std::string* a, const std::string* b) { return *a < *b; });
+        for (std::size_t i = 1; i < names.size(); ++i) {
+            if (*names[i - 1] == *names[i]) {
+                console::error(console::path(relative(path), true) +
+                               ": invalid tracked.json (duplicate tracked name '" +
+                               *names[i] + "')");
+                tracked.clear();
+                return false;
+            }
+        }
+    }
+
+    {
+        std::vector<std::string> paths;
+        paths.reserve(tracked.size());
+        for (const auto& info : tracked)
+            paths.push_back(content_path(info).lexically_normal().generic_string());
+        std::sort(paths.begin(), paths.end());
+        if (std::adjacent_find(paths.begin(), paths.end()) != paths.end()) {
+            console::error(console::path(relative(path), true) +
+                           ": invalid tracked.json (tracked entries resolve to the same content or output path)");
+            tracked.clear();
+            return false;
+        }
+
+        paths.clear();
+        for (const auto& info : tracked)
+            paths.push_back(output_path(info).lexically_normal().generic_string());
+        std::sort(paths.begin(), paths.end());
+        if (std::adjacent_find(paths.begin(), paths.end()) != paths.end()) {
+            console::error(console::path(relative(path), true) +
+                           ": invalid tracked.json (tracked entries resolve to the same content or output path)");
+            tracked.clear();
+            return false;
+        }
+    }
+
     rebuild_tracked_index();
     return true;
 }
+
 
 bool ProjectInfo::save_tracking() const {
     rebuild_tracked_index();
@@ -441,13 +486,46 @@ void ProjectInfo::refresh_hash_once(const fs::path& dependency) {
     filesystem::write_stored_hash(root, normalized);
 }
 
-bool ProjectInfo::dependency_changed(const fs::path& dependency, const fs::path& page_info_path) const {
+bool ProjectInfo::metadata_path_is_safe(const fs::path& path) const {
+    const fs::path normalized_root = root.lexically_normal();
+    const fs::path normalized = path.lexically_normal();
+    const fs::path lexical = normalized.lexically_relative(normalized_root);
+    if (lexical.empty()) {
+        if (normalized != normalized_root) return false;
+    } else if (*lexical.begin() == "..") {
+        return false;
+    }
+
+    const fs::path parent = normalized.parent_path();
+    const std::string parent_key = parent.generic_string();
+    bool parent_safe = false;
+    {
+        std::lock_guard<std::mutex> lock(metadata_path_mutex_);
+        const auto it = metadata_parent_safety_cache_.find(parent_key);
+        if (it != metadata_parent_safety_cache_.end()) parent_safe = it->second;
+        else {
+            parent_safe = filesystem::path_within(root, parent);
+            metadata_parent_safety_cache_.emplace(parent_key, parent_safe);
+        }
+    }
+    if (!parent_safe) return false;
+
+    // A safe parent plus a non-symlink leaf cannot escape the project. Only a
+    // symlink leaf needs the more expensive canonical containment check.
+    std::error_code error;
+    const fs::file_status status = fs::symlink_status(normalized, error);
+    if (error && error != std::errc::no_such_file_or_directory) return false;
+    if (!error && fs::is_symlink(status)) return filesystem::path_within(root, normalized);
+    return true;
+}
+
+bool ProjectInfo::dependency_changed(const fs::path& dependency, fs::file_time_type page_info_mtime) const {
     if (!filesystem::path_exists(dependency)) return true;
     if (config.incremental_mode == "modified")
-        return filesystem::modified_time(dependency) > filesystem::modified_time(page_info_path);
+        return filesystem::modified_time(dependency) > page_info_mtime;
     if (config.incremental_mode == "hash")
         return hash_changed_cached(dependency);
-    return filesystem::modified_time(dependency) > filesystem::modified_time(page_info_path) ||
+    return filesystem::modified_time(dependency) > page_info_mtime ||
            hash_changed_cached(dependency);
 }
 
@@ -491,7 +569,8 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
         ? *info.minify
         : config.minify_exts.count(current_output_extension) != 0;
     if (document["minify"].boolean != current_minify) reasons.push_back("minification setting changed");
-    const int expected_minify_version = current_minify ? sift::format_version : 0;
+    const fs::file_time_type page_info_mtime = filesystem::modified_time(page_info);
+    const int expected_minify_version = current_minify ? minify::format_version : 0;
     if (!std::isfinite(document["minify-version"].num) ||
         std::floor(document["minify-version"].num) != document["minify-version"].num ||
         document["minify-version"].num != expected_minify_version)
@@ -504,13 +583,13 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
         }
 
         const fs::path dependency = (root / value.string).lexically_normal();
-        if (!filesystem::path_within(root, dependency)) {
+        if (!metadata_path_is_safe(dependency)) {
             reasons.push_back("page build metadata has an invalid dependency");
             continue;
         }
         if (!filesystem::path_exists(dependency))
             reasons.push_back("dependency removed: " + value.string);
-        else if (dependency_changed(dependency, page_info))
+        else if (dependency_changed(dependency, page_info_mtime))
             reasons.push_back("dependency changed: " + value.string);
     }
 
@@ -520,7 +599,7 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
             continue;
         }
         const fs::path requirement = (root / value.string).lexically_normal();
-        if (!filesystem::path_within(root, requirement)) {
+        if (!metadata_path_is_safe(requirement)) {
             reasons.push_back("page build metadata has an invalid requirement");
             continue;
         }
@@ -544,7 +623,7 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
             const fs::path dependency = root / dependency_name;
             if (!filesystem::path_exists(dependency))
                 reasons.push_back(removed);
-            else if (dependency_changed(dependency, page_info))
+            else if (dependency_changed(dependency, page_info_mtime))
                 reasons.push_back(reason);
         }
     }
@@ -605,7 +684,7 @@ bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::s
     output += "\",\n  \"minify\": ";
     output += effective_minify ? "true" : "false";
     output += ",\n  \"minify-version\": ";
-    output += std::to_string(effective_minify ? sift::format_version : 0);
+    output += std::to_string(effective_minify ? minify::format_version : 0);
     output += ",\n  \"dependencies\": [";
 
     if (!dependencies.empty()) output.push_back('\n');
@@ -655,13 +734,13 @@ bool ProjectInfo::build_one(TrackedInfo& info) {
         ? *info.minify
         : config.minify_exts.count(normalized_extension) != 0;
     if (should_minify) {
-        sift::Format format;
-        if (!sift::format_for_extension(extension, format)) {
+        minify::Format format;
+        if (!minify::format_for_extension(extension, format)) {
             print_build_error({info.name, output, 0, "no minifier is available for output extension " + extension});
             return false;
         }
         std::string minified, minify_error;
-        if (!sift::run(format, result.output, minified, minify_error)) {
+        if (!minify::run(format, result.output, minified, minify_error)) {
             print_build_error({info.name, output, 0, "minification failed" +
                                (minify_error.empty() ? std::string() : ": " + minify_error)});
             return false;

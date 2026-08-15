@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-BIN="$ROOT/sift"
+BIN="$ROOT/minify"
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/nift-minifier-cli.XXXXXX")
 trap 'rm -rf "$TMP"' EXIT
 
@@ -28,5 +28,5 @@ if "$BIN" --wat "$TMP/app.js" >"$TMP/option.log" 2>&1; then
 fi
 grep -Fq "unknown option '--wat'" "$TMP/option.log"
 
-test "$($BIN --version)" = 'sift 1.0.3'
+test "$($BIN --version)" = 'Minify++ 1.1.0'
 echo 'Standalone minifier CLI smoke test passed'

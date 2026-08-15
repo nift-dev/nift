@@ -2,7 +2,7 @@
 #include "Console.h"
 #include "FileSystem.h"
 #include "JsonFile.h"
-#include <sift/Sift.h>
+#include <minify/Minify.h>
 #include <map>
 #include "ProjectInfo.h"
 #include "WatchList.h"
@@ -28,7 +28,7 @@
 namespace fs = std::filesystem;
 
 namespace {
-constexpr const char* version_text = "Nift v4.0.0 (C++ rewrite 1.0.39)";
+constexpr const char* version_text = "Nift v4.0.0 (C++ rewrite 1.0.42)";
 constexpr auto build_auto_poll_interval = std::chrono::milliseconds(200);
 constexpr const char* build_auto_log_path = ".nift/build-auto.log";
 
@@ -446,15 +446,15 @@ int run_cli(int argc, char** argv) {
                 failed = true;
                 continue;
             }
-            sift::Format format;
-            if (!sift::format_for_extension(path.extension().string(), format)) {
+            minify::Format format;
+            if (!minify::format_for_extension(path.extension().string(), format)) {
                 console::error("cannot minify '" + path.string() + "': unsupported extension " + path.extension().string());
                 failed = true;
                 continue;
             }
             const std::string source = filesystem::read_file(path);
             std::string output, error;
-            if (!sift::run(format, source, output, error)) {
+            if (!minify::run(format, source, output, error)) {
                 console::error("cannot minify '" + path.string() + "'" +
                                (error.empty() ? std::string() : ": " + error));
                 failed = true;

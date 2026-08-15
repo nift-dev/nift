@@ -5,15 +5,15 @@ if ! command -v node >/dev/null 2>&1; then
   echo "Node not installed; minifier semantic differential test skipped"
   exit 0
 fi
-TMP=$(mktemp -d "${TMPDIR:-/tmp}/sift-node.XXXXXX")
+TMP=$(mktemp -d "${TMPDIR:-/tmp}/minify-node.XXXXXX")
 trap 'rm -rf "$TMP"' EXIT
 cat > "$TMP/driver.cpp" <<'CPP'
-#include <sift/Sift.h>
+#include <minify/Minify.h>
 #include <iostream>
 #include <sstream>
-int main(){std::ostringstream s;s<<std::cin.rdbuf();std::string o,e;if(!sift::javascript(s.str(),o,e)){std::cerr<<e;return 2;}std::cout<<o;}
+int main(){std::ostringstream s;s<<std::cin.rdbuf();std::string o,e;if(!minify::javascript(s.str(),o,e)){std::cerr<<e;return 2;}std::cout<<o;}
 CPP
-${CXX:-g++} -std=c++17 -O2 -I"$ROOT/include" -I"$ROOT/src" "$TMP/driver.cpp" "$ROOT/src/Sift.cpp" -o "$TMP/minjs"
+${CXX:-g++} -std=c++17 -O2 -I"$ROOT/include" -I"$ROOT/src" "$TMP/driver.cpp" "$ROOT/src/Minify.cpp" -o "$TMP/minjs"
 run_case(){
   local name="$1" source="$2"
   printf '%s' "$source" >"$TMP/$name.js"

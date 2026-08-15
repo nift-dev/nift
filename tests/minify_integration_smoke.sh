@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 NIFT_BIN="${NIFT_BIN:-$(pwd)/nift}"
-TMP="$(mktemp -d "${TMPDIR:-/tmp}/sift-integration.XXXXXX")"
+TMP="$(mktemp -d "${TMPDIR:-/tmp}/minifypp-integration.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
 
 mkproj() {

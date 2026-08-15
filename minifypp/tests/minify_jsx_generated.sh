@@ -5,15 +5,15 @@ if ! command -v tsc >/dev/null 2>&1; then
   echo "tsc not installed; generated JSX minifier corpus skipped"
   exit 0
 fi
-TMP=$(mktemp -d "${TMPDIR:-/tmp}/sift-jsx.XXXXXX")
+TMP=$(mktemp -d "${TMPDIR:-/tmp}/minify-jsx.XXXXXX")
 trap 'rm -rf "$TMP"' EXIT
 cat >"$TMP/driver.cpp" <<'CPP'
-#include <sift/Sift.h>
+#include <minify/Minify.h>
 #include <iostream>
 #include <sstream>
-int main(){std::ostringstream s;s<<std::cin.rdbuf();std::string o,e;if(!sift::jsx(s.str(),o,e)){std::cerr<<e;return 2;}std::cout<<o;}
+int main(){std::ostringstream s;s<<std::cin.rdbuf();std::string o,e;if(!minify::jsx(s.str(),o,e)){std::cerr<<e;return 2;}std::cout<<o;}
 CPP
-${CXX:-g++} -std=c++17 -O2 -I"$ROOT/include" -I"$ROOT/src" "$TMP/driver.cpp" "$ROOT/src/Sift.cpp" -o "$TMP/minjsx"
+${CXX:-g++} -std=c++17 -O2 -I"$ROOT/include" -I"$ROOT/src" "$TMP/driver.cpp" "$ROOT/src/Minify.cpp" -o "$TMP/minjsx"
 
 cases=(
 'const x=<div>hello  world</div>;'

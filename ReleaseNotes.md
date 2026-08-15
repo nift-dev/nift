@@ -1,26 +1,52 @@
+# Nift — Release Notes
+
+## v1.0.42
+
+- Renamed the embedded standalone minifier project to **Minify++**. Its standalone executable is `minify`; Nift's opt-in `minify-exts`/`minify` build contract is unchanged.
+
+- Memory-performance checkpoint for large tracked projects.
+- Replaced the three node-based `unordered_set<string>` validation tables used while loading `tracked.json` with compact post-parse sorted validation. Duplicate names and derived content/output collisions remain rejected, while temporary validation memory is substantially lower.
+- Releases the raw `tracked.json` source buffer before derived-path uniqueness validation so the two largest temporary allocations do not overlap.
+- On the deterministic 10,000-page modified-mode fixture, peak RSS fell from roughly 13 MiB in v1.0.41 to roughly 10.5–11.5 MiB depending on the build case, bringing the rewrite back to the retained stripped-Nift 10k memory range.
+- Added `benchmark-memory-10k`, with a deliberately conservative 16 MiB peak-RSS regression guard on Linux.
+
+## v1.0.41
+
+- Continued the 10,000-page performance recovery after the v1.0.40 O(n²) tracking-loader fix. Incremental metadata containment checks now cache canonical safety at the parent-directory level and perform the expensive full canonical check only for symlink leaves. This preserves the symlink-retargeting safety invariant while avoiding repeated canonicalisation of every ordinary content/template file.
+- Reused each page-info modification timestamp while checking its dependencies instead of restatting the same page-info file for every dependency.
+- Added `benchmark-10k`, a reproducible full/no-op/single-page/shared-template benchmark fixture alongside the existing tracked-loader scaling guard.
+- Embedded Minify++ is synchronized to standalone Minify++ 1.0.5; the Nift integration still consumes it only through the public Minify++ API and remains opt-in through configured minification extensions.
+- On the development host, the 10k modified-mode checkpoint measured roughly 0.21–0.26 s median full builds, 0.09–0.10 s no-op incremental checks, 0.09–0.11 s single-page updates and 0.31–0.35 s rebuilds after a shared-template change across the final profiling runs. These are checkpoint measurements, not portable guarantees.
+
+## v1.0.40
+
+- Restored near-linear tracked-project loading by replacing repeated duplicate/collision scans in `load_tracking()` with indexed `unordered_set` validation for names, derived content paths and derived output paths. This fixes the 10,000-page O(n²) regression introduced by safety validation.
+- Added `test-tracking-scaling`, a synthetic 2k/10k project-open benchmark with a scaling-ratio guard so quadratic tracking validation cannot silently return.
+- Began a dedicated incremental-performance pass. The remaining no-op/single-page gap is now isolated from project loading and points primarily at per-page metadata/dependency validation.
+
 ## v1.0.39
 
-- Embedded Sift updated exactly to standalone Sift 1.0.3, including its new non-JS idempotence gate and larger JavaScript/JSX adversarial corpora.
-- Nift integration continues to consume Sift only through the public `<sift/Sift.h>` API.
+- Embedded Minify++ updated exactly to standalone Minify++ 1.0.3, including its new non-JS idempotence gate and larger JavaScript/JSX adversarial corpora.
+- Nift integration continues to consume Minify++ only through the public `<minify/Minify.h>` API.
 - Website dark-mode palette rebalanced from residual navy/teal surfaces toward near-black graphite cards/chrome with brighter emerald/lime Nift accents.
 
 ## v1.0.38
 
-- Continued embedding Sift through its standalone public API; embedded transformation behavior remains aligned with Sift 1.0.1.
-- Nift documentation now delegates detailed minifier correctness evidence to Sift while retaining integration/config/incremental safety coverage.
+- Continued embedding Minify++ through its standalone public API; embedded transformation behavior remains aligned with Minify++ 1.0.1.
+- Nift documentation now delegates detailed minifier correctness evidence to Minify++ while retaining integration/config/incremental safety coverage.
 - No change to the safe `nift minify` contract: sibling `.min.*` output by default, explicit `-i` / `--in-place` replacement.
 
 ## v1.0.37
 
-- Renamed the independent embedded minifier project to **Sift**. The embedded project now lives under `sift/`, exposes `<sift/Sift.h>`, uses the `sift` namespace, and builds the standalone `sift` CLI.
-- Nift continues to expose `nift minify` as a convenience command while consuming Sift only through its public library API.
-- Sift remains non-destructive by default (`file.js` -> `file.min.js`) with explicit `-i` / `--in-place` replacement.
-- Expanded Sift's generated executable JavaScript semantic corpus to 7,407 programs and JSX/TSX syntax/idempotence corpus to 140 programs.
+- Renamed the independent embedded minifier project to **Minify++**. The embedded project now lives under `minifypp/`, exposes `<minify/Minify.h>`, uses the `minify` namespace, and builds the standalone `minify` CLI.
+- Nift continues to expose `nift minify` as a convenience command while consuming Minify++ only through its public library API.
+- Minify++ remains non-destructive by default (`file.js` -> `file.min.js`) with explicit `-i` / `--in-place` replacement.
+- Expanded Minify++'s generated executable JavaScript semantic corpus to 7,407 programs and JSX/TSX syntax/idempotence corpus to 140 programs.
 - Fixed JSX-expression recognition of TSX generic arrows such as `<T,>(x:T) => ...`, which could otherwise be mistaken for nested JSX.
 
 ## v1.0.36
 
-- Re-architected the minifier as a self-contained embedded subproject under `sift/`, with its own public include tree, implementation, private JSON parser, standalone CLI, Makefile and test entry points. Nift now consumes the minifier only through its public library API.
+- Re-architected the minifier as a self-contained embedded subproject under `minifypp/`, with its own public include tree, implementation, private JSON parser, standalone CLI, Makefile and test entry points. Nift now consumes the minifier only through its public library API.
 - Changed `nift minify file.ext` to the safe default `file.min.ext`; added `-i` / `--in-place` for explicit source overwrite.
 - Added standalone CLI regression coverage for default sibling output, in-place mode, malformed transactional failure and unknown options.
 - Expanded the executable JavaScript semantic differential matrix from 3,363 to 4,705 programs.
@@ -133,8 +159,6 @@
 - Page metadata now records effective minification state and a minifier format version so changes to configuration or future minifier semantics can invalidate incremental output safely.
 - Added focused persistence/concurrency/failed-build-state coverage and integrated-minification coverage, plus additional ruthless black-box regressions.
 - Hardened JSX attribute scanning for comparisons and nested expressions inside `{...}`.
-
-# Nift — Release Notes
 
 ## v1.0.21
 

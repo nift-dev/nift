@@ -1,9 +1,9 @@
-#ifndef SIFT_SIFT_H
-#define SIFT_SIFT_H
+#ifndef MINIFYPP_MINIFY_H
+#define MINIFYPP_MINIFY_H
 
 #include <string>
 
-namespace sift {
+namespace minify {
 
 inline constexpr int format_version = 1;
 
@@ -20,6 +20,6 @@ bool svg(const std::string& input, std::string& output, std::string& error);
 bool format_for_extension(const std::string& extension, Format& format);
 bool run(Format format, const std::string& input, std::string& output, std::string& error);
 
-} // namespace sift
+} // namespace minify
 
 #endif

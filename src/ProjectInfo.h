@@ -58,6 +58,8 @@ private:
     mutable std::unordered_map<std::string, std::unique_ptr<const std::string>> shared_source_cache_;
     mutable std::mutex json_cache_mutex_;
     mutable std::unordered_map<std::string, std::shared_ptr<const json::Document>> shared_json_cache_;
+    mutable std::mutex metadata_path_mutex_;
+    mutable std::unordered_map<std::string, bool> metadata_parent_safety_cache_;
     std::mutex build_output_mutex_;
 
     struct BuildJob {
@@ -67,7 +69,8 @@ private:
 
     void rebuild_tracked_index() const;
     bool load_user_dependencies(const TrackedInfo& info, std::set<std::string>& dependencies, BuildError* error = nullptr) const;
-    bool dependency_changed(const std::filesystem::path& dependency, const std::filesystem::path& info_path) const;
+    bool dependency_changed(const std::filesystem::path& dependency, std::filesystem::file_time_type info_mtime) const;
+    bool metadata_path_is_safe(const std::filesystem::path& path) const;
     bool hash_changed_cached(const std::filesystem::path& dependency) const;
     void reset_build_caches();
     void refresh_hash_once(const std::filesystem::path& dependency);

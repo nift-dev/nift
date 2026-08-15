@@ -1,4 +1,4 @@
-#include <sift/Sift.h>
+#include <minify/Minify.h>
 #include "Json.h"
 
 #include <algorithm>
@@ -7,7 +7,7 @@
 #include <unordered_set>
 #include <vector>
 
-namespace sift {
+namespace minify {
 namespace {
 
 bool ws(char c) {
@@ -950,7 +950,7 @@ static bool find_jsx_expression_end(const std::string& input, std::size_t start,
         if (c == '<' && can_start_regex && looks_like_jsx_start(input, i)) {
             if (looks_like_tsx_generic_arrow(input, i, limit)) {
                 // TypeScript generic arrow syntax is JavaScript-expression
-                // context for Sift; do not reinterpret `<T,>` as markup.
+                // context for Minify++; do not reinterpret `<T,>` as markup.
                 ++i;
                 can_start_regex = true;
                 continue;
@@ -1250,4 +1250,4 @@ bool run(Format format, const std::string& input, std::string& output, std::stri
     return false;
 }
 
-} // namespace sift
+} // namespace minify

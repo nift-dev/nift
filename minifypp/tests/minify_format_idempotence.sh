@@ -1,26 +1,26 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-TMP=$(mktemp -d "${TMPDIR:-/tmp}/sift-formats.XXXXXX")
+TMP=$(mktemp -d "${TMPDIR:-/tmp}/minify-formats.XXXXXX")
 trap 'rm -rf "$TMP"' EXIT
 
 cat >"$TMP/driver.cpp" <<'CPP'
-#include <sift/Sift.h>
+#include <minify/Minify.h>
 #include <iostream>
 #include <sstream>
 #include <string>
 int main(int argc,char**argv){
   if(argc!=2) return 64;
-  sift::Format f;
+  minify::Format f;
   std::string ext=argv[1],in,out,err;
-  if(!sift::format_for_extension(ext,f)){std::cerr<<"unknown format";return 65;}
+  if(!minify::format_for_extension(ext,f)){std::cerr<<"unknown format";return 65;}
   std::ostringstream ss;ss<<std::cin.rdbuf();in=ss.str();
-  if(!sift::run(f,in,out,err)){std::cerr<<err;return 2;}
+  if(!minify::run(f,in,out,err)){std::cerr<<err;return 2;}
   std::cout<<out;
 }
 CPP
 ${CXX:-g++} -std=c++17 -O2 -I"$ROOT/include" -I"$ROOT/src" \
-  "$TMP/driver.cpp" "$ROOT/src/Sift.cpp" -o "$TMP/minify"
+  "$TMP/driver.cpp" "$ROOT/src/Minify.cpp" -o "$TMP/minify"
 
 check_idempotent(){
   local ext=$1 src=$2
@@ -95,6 +95,55 @@ for x in "${css_cases[@]}";  do check_idempotent .css  "$x"; count=$((count+1));
 for x in "${json_cases[@]}"; do check_idempotent .json "$x"; count=$((count+1)); done
 for x in "${xml_cases[@]}";  do check_idempotent .xml  "$x"; count=$((count+1)); done
 for x in "${svg_cases[@]}";  do check_idempotent .svg  "$x"; count=$((count+1)); done
+
+# Generated cross-product cases make the non-JavaScript gate scale beyond a
+# short hand-written list while retaining deterministic inputs.
+html_wrappers=('div' 'section' 'article' 'aside')
+html_payloads=(
+  '<span>A</span> <span>B</span>'
+  '<b>bold</b> text <i>italic</i>'
+  '<code>a  b</code><em>c</em>'
+  '<template><p>x</p></template>'
+  '<p data-x="a > b">héllo 世界</p>'
+)
+for tag in "${html_wrappers[@]}"; do
+  for payload in "${html_payloads[@]}"; do
+    check_idempotent .html "<$tag>  $payload  </$tag>"
+    count=$((count+1))
+  done
+done
+
+css_selectors=('.a' '#app' ':where(.a,.b)' '.card:has(> img)' '@media(width > 30rem){.a')
+css_values=(
+  'margin: 0  1rem;'
+  'width: calc(100% - 2rem);'
+  'color: rgb(10 20 30 / .5);'
+  'grid-template-columns: minmax(0,1fr) auto;'
+  '--tokens: alpha  beta / gamma;'
+  'background: linear-gradient(45deg,red,blue);'
+)
+for sel in "${css_selectors[@]}"; do
+  for decl in "${css_values[@]}"; do
+    if [[ "$sel" == @media* ]]; then src="$sel{$decl}}}"; else src="$sel{$decl}"; fi
+    check_idempotent .css "$src"
+    count=$((count+1))
+  done
+done
+
+xml_names=('root' 'doc' 'x:item')
+xml_texts=('A  B' '世界 😀' 'A &amp; B' 'before <![CDATA[x < y]]> after')
+for name in "${xml_names[@]}"; do
+  for body in "${xml_texts[@]}"; do
+    if [[ "$name" == x:* ]]; then src="<root xmlns:x=\"urn:x\"><$name>$body</$name></root>"; else src="<$name>$body</$name>"; fi
+    check_idempotent .xml "$src"
+    count=$((count+1))
+  done
+done
+
+for i in $(seq 0 9); do
+  check_idempotent .svg "<svg viewBox=\"0 0 20 20\"><text x=\"$i\"> A  B </text><path d=\"M $i 0 L 20 20\"/></svg>"
+  count=$((count+1))
+done
 
 # JSON gets an additional structural semantic oracle.
 node - "$TMP/minify" <<'JS'

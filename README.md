@@ -147,4 +147,4 @@ Copyright © Nicholas Ham and Nift contributors.
 
 The stripped rewrite is guided by an explicit design checklist in [`ARCHITECTURE_RULES.md`](ARCHITECTURE_RULES.md). The short version is that Nift owns dependency-aware build-time composition and may optionally optimise final outputs, while source-language compilation, arbitrary shell execution and neighbouring tool domains remain external.
 
-The embedded `sift/` subtree follows the same boundary: it is a self-contained library/CLI/test project that Nift consumes through a public header, so it can be extracted later without depending on Nift's project model.
+The embedded `minifypp/` subtree follows the same boundary: it is a self-contained library/CLI/test project that Nift consumes through a public header, so it can be extracted later without depending on Nift's project model.
