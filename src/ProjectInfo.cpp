@@ -1,4 +1,5 @@
 #include "ProjectInfo.h"
+#include <sift/Sift.h>
 #include "BuildProgress.h"
 #include "Console.h"
 #include "FileSystem.h"
@@ -7,6 +8,8 @@
 #include "WatchList.h"
 
 #include <algorithm>
+#include <cmath>
+#include <limits>
 #include <iostream>
 #include <map>
 #include <thread>
@@ -32,6 +35,13 @@ fs::path find_project_root(fs::path path = fs::current_path()) {
 bool string_field(const json::Document& object, const std::string& key, std::string& destination) {
     if (object.has(key) && object[key].is_string()) destination = object[key].string;
     return !object.has(key) || object[key].is_string();
+}
+
+bool valid_tracked_name(const std::string& name) {
+    if (name == "/") return true;
+    if (name.empty()) return false;
+    const fs::path path(name);
+    return !path.is_absolute() && !filesystem::has_parent_component(name);
 }
 }
 
@@ -68,12 +78,47 @@ bool ProjectInfo::load_config() {
         return false;
     }
 
+    if (config.content_dir.empty()) {
+        console::error(console::path(relative(path), true) + ": content-dir must be non-empty");
+        return false;
+    }
+    if (!filesystem::valid_extension(config.content_ext) || !filesystem::valid_extension(config.output_ext)) {
+        console::error(console::path(relative(path), true) + ": content-ext and output-ext must begin with '.' and cannot contain path separators");
+        return false;
+    }
+
     if (value.has("build-threads")) {
-        if (!value["build-threads"].is_number()) {
+        if (!value["build-threads"].is_number() || !std::isfinite(value["build-threads"].num) ||
+            std::floor(value["build-threads"].num) != value["build-threads"].num ||
+            value["build-threads"].num < static_cast<double>(std::numeric_limits<int>::min()) ||
+            value["build-threads"].num > static_cast<double>(std::numeric_limits<int>::max())) {
             console::error(console::path(relative(path), true) + ": build-threads must be an integer");
             return false;
         }
         config.build_threads = value["build-threads"].as_int();
+    }
+
+    config.minify_exts.clear();
+    if (value.has("minify-exts")) {
+        if (!value["minify-exts"].is_array()) {
+            console::error(console::path(relative(path), true) + ": minify-exts must be an array of extension strings");
+            return false;
+        }
+        for (const auto& item : value["minify-exts"].array) {
+            if (!item.is_string() || !filesystem::valid_extension(item.string)) {
+                console::error(console::path(relative(path), true) + ": every minify-exts entry must be an extension string beginning with '.'");
+                return false;
+            }
+            sift::Format format;
+            if (!sift::format_for_extension(item.string, format)) {
+                console::error(console::path(relative(path), true) + ": unsupported minify-exts entry: " + item.string);
+                return false;
+            }
+            std::string normalized_extension = item.string;
+            std::transform(normalized_extension.begin(), normalized_extension.end(), normalized_extension.begin(),
+                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+            config.minify_exts.insert(std::move(normalized_extension));
+        }
     }
 
     if (config.incremental_mode != "modified" && config.incremental_mode != "hash" && config.incremental_mode != "hybrid") {
@@ -114,7 +159,7 @@ bool ProjectInfo::load_tracking() {
                 std::move(entry["name"].string),
                 std::move(entry["title"].string),
                 std::move(entry["template"].string),
-                "", ""
+                "", "", std::nullopt
             };
             if (entry.has("content-ext")) {
                 if (!entry["content-ext"].is_string()) {
@@ -131,6 +176,43 @@ bool ProjectInfo::load_tracking() {
                     return false;
                 }
                 info.output_ext = std::move(entry["output-ext"].string);
+            }
+            if (entry.has("minify")) {
+                if (!entry["minify"].is_bool()) {
+                    entries_valid = false;
+                    entry_error = "tracked minify override must be a boolean";
+                    return false;
+                }
+                info.minify = entry["minify"].boolean;
+            }
+            if (!valid_tracked_name(info.name)) {
+                entries_valid = false;
+                entry_error = "tracked names must be project-relative and cannot contain '..' path components";
+                return false;
+            }
+            if ((!info.content_ext.empty() && !filesystem::valid_extension(info.content_ext)) ||
+                (!info.output_ext.empty() && !filesystem::valid_extension(info.output_ext))) {
+                entries_valid = false;
+                entry_error = "tracked content-ext/output-ext overrides must begin with '.' and cannot contain path separators";
+                return false;
+            }
+            if (std::any_of(tracked.begin(), tracked.end(), [&](const TrackedInfo& existing) { return existing.name == info.name; })) {
+                entries_valid = false;
+                entry_error = "duplicate tracked name '" + info.name + "'";
+                return false;
+            }
+            const fs::path derived_content = content_path(info).lexically_normal();
+            const fs::path derived_output = output_path(info).lexically_normal();
+            const fs::path template_path = (root / info.template_path).lexically_normal();
+            if (!info.template_path.empty() && (derived_content == template_path || derived_output == template_path)) {
+                entries_valid = false;
+                entry_error = "tracked template path cannot be the same as its content or output path";
+                return false;
+            }
+            if (conflicts_with_tracked_path(info)) {
+                entries_valid = false;
+                entry_error = "tracked entries resolve to the same content or output path";
+                return false;
             }
             tracked.emplace_back(std::move(info));
             return true;
@@ -158,6 +240,7 @@ bool ProjectInfo::save_tracking() const {
         entry["template"] = info.template_path;
         if (!info.content_ext.empty()) entry["content-ext"] = info.content_ext;
         if (!info.output_ext.empty()) entry["output-ext"] = info.output_ext;
+        if (info.minify.has_value()) entry["minify"] = *info.minify;
         document["tracked"].push_back(entry);
     }
     return save_json_file(root / ".nift/tracked.json", document);
@@ -180,6 +263,18 @@ const TrackedInfo* ProjectInfo::find(const std::string& name) const {
     if (tracked_index_size_ != tracked.size()) rebuild_tracked_index();
     const auto it = tracked_index_.find(name);
     return it == tracked_index_.end() ? nullptr : &tracked[it->second];
+}
+
+bool ProjectInfo::conflicts_with_tracked_path(const TrackedInfo& candidate, const std::string& ignored_name) const {
+    const fs::path candidate_content = content_path(candidate).lexically_normal();
+    const fs::path candidate_output = output_path(candidate).lexically_normal();
+    for (const auto& existing : tracked) {
+        if (!ignored_name.empty() && existing.name == ignored_name) continue;
+        if (content_path(existing).lexically_normal() == candidate_content ||
+            output_path(existing).lexically_normal() == candidate_output)
+            return true;
+    }
+    return false;
 }
 
 void ProjectInfo::invalidate_tracked_index() {
@@ -237,6 +332,29 @@ const std::string* ProjectInfo::read_shared_source(const fs::path& path) const {
     return result;
 }
 
+std::shared_ptr<const json::Document> ProjectInfo::read_shared_json(const fs::path& path, std::string& error) const {
+    const fs::path normalized = fs::absolute(path).lexically_normal();
+    const std::string key = normalized.generic_string();
+
+    std::lock_guard<std::mutex> lock(json_cache_mutex_);
+    const auto existing = shared_json_cache_.find(key);
+    if (existing != shared_json_cache_.end()) return existing->second;
+
+    if (!filesystem::path_exists(normalized)) {
+        error = "JSON file does not exist";
+        return {};
+    }
+
+    const std::string source = filesystem::read_file(normalized);
+    auto document = std::make_shared<json::Document>();
+    if (!json::Document::parse(source, *document, error)) return {};
+
+    std::shared_ptr<const json::Document> immutable = document;
+    shared_json_cache_.emplace(key, immutable);
+    return immutable;
+}
+
+
 bool ProjectInfo::load_user_dependencies(const TrackedInfo& info, std::set<std::string>& dependencies, BuildError* build_error) const {
     fs::path path = content_path(info);
     path.replace_extension(".deps.json");
@@ -249,12 +367,18 @@ bool ProjectInfo::load_user_dependencies(const TrackedInfo& info, std::set<std::
         return false;
     }
 
+    dependencies.insert(relative(path));
     for (const auto& value : document["dependencies"].array) {
         if (!value.is_string()) {
             if (build_error) *build_error = {info.name, path, 0, "'dependencies' array contains a non-string member"};
             return false;
         }
-        if (!filesystem::path_exists(root / value.string)) {
+        const fs::path dependency_name(value.string);
+        if (dependency_name.is_absolute() || filesystem::has_parent_component(value.string)) {
+            if (build_error) *build_error = {info.name, path, 0, "dependency must be a project-relative path: " + value.string};
+            return false;
+        }
+        if (!filesystem::path_exists(root / dependency_name)) {
             if (build_error) *build_error = {info.name, path, 0, "dependency does not exist: " + value.string};
             return false;
         }
@@ -292,6 +416,10 @@ void ProjectInfo::reset_build_caches() {
     {
         std::lock_guard<std::mutex> lock(source_cache_mutex_);
         shared_source_cache_.clear();
+    }
+    {
+        std::lock_guard<std::mutex> lock(json_cache_mutex_);
+        shared_json_cache_.clear();
     }
 }
 
@@ -337,10 +465,37 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
     json::Document document;
     std::string error;
     if (!load_json_file(page_info, document, error) || !document.is_object() ||
-        !document.has("dependencies") || !document["dependencies"].is_array()) {
-        reasons.push_back("page build metadata is invalid");
+        !document.has("dependencies") || !document["dependencies"].is_array() ||
+        !document.has("reqs") || !document["reqs"].is_array() ||
+        !document.has("name") || !document["name"].is_string() ||
+        !document.has("title") || !document["title"].is_string() ||
+        !document.has("template") || !document["template"].is_string() ||
+        !document.has("content") || !document["content"].is_string() ||
+        !document.has("output") || !document["output"].is_string() ||
+        !document.has("minify") || !document["minify"].is_bool() ||
+        !document.has("minify-version") || !document["minify-version"].is_number()) {
+        reasons.push_back("page build metadata is invalid or from an older metadata format");
         return reasons;
     }
+
+    if (document["name"].string != info.name) reasons.push_back("tracked name changed");
+    if (document["title"].string != info.title) reasons.push_back("tracked title changed");
+    if (document["template"].string != info.template_path) reasons.push_back("tracked template changed");
+    if (document["content"].string != relative(content_path(info))) reasons.push_back("tracked content path changed");
+    if (document["output"].string != relative(output_path(info))) reasons.push_back("tracked output path changed");
+
+    std::string current_output_extension = info.output_ext.empty() ? config.output_ext : info.output_ext;
+    std::transform(current_output_extension.begin(), current_output_extension.end(), current_output_extension.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    const bool current_minify = info.minify.has_value()
+        ? *info.minify
+        : config.minify_exts.count(current_output_extension) != 0;
+    if (document["minify"].boolean != current_minify) reasons.push_back("minification setting changed");
+    const int expected_minify_version = current_minify ? sift::format_version : 0;
+    if (!std::isfinite(document["minify-version"].num) ||
+        std::floor(document["minify-version"].num) != document["minify-version"].num ||
+        document["minify-version"].num != expected_minify_version)
+        reasons.push_back("minifier version changed");
 
     for (const auto& value : document["dependencies"].array) {
         if (!value.is_string()) {
@@ -348,11 +503,29 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
             continue;
         }
 
-        const fs::path dependency = root / value.string;
+        const fs::path dependency = (root / value.string).lexically_normal();
+        if (!filesystem::path_within(root, dependency)) {
+            reasons.push_back("page build metadata has an invalid dependency");
+            continue;
+        }
         if (!filesystem::path_exists(dependency))
             reasons.push_back("dependency removed: " + value.string);
         else if (dependency_changed(dependency, page_info))
             reasons.push_back("dependency changed: " + value.string);
+    }
+
+    for (const auto& value : document["reqs"].array) {
+        if (!value.is_string()) {
+            reasons.push_back("page build metadata has an invalid requirement");
+            continue;
+        }
+        const fs::path requirement = (root / value.string).lexically_normal();
+        if (!filesystem::path_within(root, requirement)) {
+            reasons.push_back("page build metadata has an invalid requirement");
+            continue;
+        }
+        if (!filesystem::path_exists(requirement))
+            reasons.push_back("required path missing: " + value.string);
     }
 
     // A user .deps.json file can itself be added or become invalid between builds.
@@ -404,9 +577,18 @@ void ProjectInfo::print_build_error(const BuildError& error) const {
     }
 }
 
-bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::string>& dependencies) const {
-    std::size_t estimated_size = 96 + info.name.size() + info.title.size() + info.template_path.size();
+bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::string>& dependencies, const std::set<std::string>& reqs) const {
+    const std::string content_name = relative(content_path(info));
+    const std::string output_name = relative(output_path(info));
+    std::string output_extension = info.output_ext.empty() ? config.output_ext : info.output_ext;
+    std::transform(output_extension.begin(), output_extension.end(), output_extension.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    const bool effective_minify = info.minify.has_value()
+        ? *info.minify
+        : config.minify_exts.count(output_extension) != 0;
+    std::size_t estimated_size = 140 + info.name.size() + info.title.size() + info.template_path.size() + content_name.size() + output_name.size();
     for (const auto& dependency : dependencies) estimated_size += dependency.size() + 10;
+    for (const auto& requirement : reqs) estimated_size += requirement.size() + 10;
 
     std::string output;
     output.reserve(estimated_size);
@@ -416,7 +598,15 @@ bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::s
     json::Document::append_escaped_string(output, info.title);
     output += "\",\n  \"template\": \"";
     json::Document::append_escaped_string(output, info.template_path);
-    output += "\",\n  \"dependencies\": [";
+    output += "\",\n  \"content\": \"";
+    json::Document::append_escaped_string(output, content_name);
+    output += "\",\n  \"output\": \"";
+    json::Document::append_escaped_string(output, output_name);
+    output += "\",\n  \"minify\": ";
+    output += effective_minify ? "true" : "false";
+    output += ",\n  \"minify-version\": ";
+    output += std::to_string(effective_minify ? sift::format_version : 0);
+    output += ",\n  \"dependencies\": [";
 
     if (!dependencies.empty()) output.push_back('\n');
     std::size_t index = 0;
@@ -428,6 +618,17 @@ bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::s
         output.push_back('\n');
     }
     if (!dependencies.empty()) output += "  ";
+    output += "],\n  \"reqs\": [";
+    if (!reqs.empty()) output.push_back('\n');
+    index = 0;
+    for (const auto& requirement : reqs) {
+        output += "    \"";
+        json::Document::append_escaped_string(output, requirement);
+        output.push_back('\"');
+        if (++index != reqs.size()) output.push_back(',');
+        output.push_back('\n');
+    }
+    if (!reqs.empty()) output += "  ";
     output += "]\n}\n";
 
     return filesystem::write_readonly_file(info_path(info), output);
@@ -446,6 +647,28 @@ bool ProjectInfo::build_one(TrackedInfo& info) {
     if (!load_user_dependencies(info, result.dependencies, &result.error)) { print_build_error(result.error); return false; }
 
     const fs::path output = output_path(info);
+    const std::string extension = info.output_ext.empty() ? config.output_ext : info.output_ext;
+    std::string normalized_extension = extension;
+    std::transform(normalized_extension.begin(), normalized_extension.end(), normalized_extension.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    const bool should_minify = info.minify.has_value()
+        ? *info.minify
+        : config.minify_exts.count(normalized_extension) != 0;
+    if (should_minify) {
+        sift::Format format;
+        if (!sift::format_for_extension(extension, format)) {
+            print_build_error({info.name, output, 0, "no minifier is available for output extension " + extension});
+            return false;
+        }
+        std::string minified, minify_error;
+        if (!sift::run(format, result.output, minified, minify_error)) {
+            print_build_error({info.name, output, 0, "minification failed" +
+                               (minify_error.empty() ? std::string() : ": " + minify_error)});
+            return false;
+        }
+        result.output = std::move(minified);
+    }
+
     if (!filesystem::write_readonly_file(output, result.output)) {
         print_build_error({info.name, output, 0, "failed to write generated output"});
         return false;
@@ -458,7 +681,7 @@ bool ProjectInfo::build_one(TrackedInfo& info) {
         }
     }
 
-    if (!write_page_info(info, result.dependencies)) {
+    if (!write_page_info(info, result.dependencies, result.reqs)) {
         print_build_error({info.name, info_path(info), 0, "failed to write page build metadata"});
         return false;
     }
@@ -476,7 +699,7 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& jobs, bool targeted, bo
     }
 
     const unsigned hardware = std::max(1u, std::thread::hardware_concurrency());
-    std::size_t thread_count = config.build_threads < 0 ? static_cast<std::size_t>(-config.build_threads) * hardware : (config.build_threads == 0 ? hardware : static_cast<std::size_t>(config.build_threads));
+    std::size_t thread_count = config.build_threads < 0 ? static_cast<std::size_t>(-static_cast<long long>(config.build_threads)) * hardware : (config.build_threads == 0 ? hardware : static_cast<std::size_t>(config.build_threads));
     thread_count = std::max<std::size_t>(1, std::min(thread_count, jobs.size()));
 
     std::atomic<std::size_t> next{0};
@@ -500,7 +723,8 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& jobs, bool targeted, bo
 
     std::size_t successful_count = 0;
     for (unsigned char success : succeeded) if (success) ++successful_count;
-    const std::size_t failed_count = jobs.size() - successful_count;
+    const std::size_t missing_requested = targeted && requested_count > jobs.size() ? requested_count - jobs.size() : 0;
+    const std::size_t failed_count = jobs.size() - successful_count + missing_requested;
 
     std::lock_guard<std::mutex> lock(console::output_mutex);
 
@@ -545,7 +769,7 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& jobs, bool targeted, bo
     if (targeted) {
         // Keep the historical wording because scripts and the regression suite rely on it.
         if (failed_count == 0) std::cout << console::good("📦") << " all " << successful_count << " specified files built successfully\n";
-        else std::cout << successful_count << " specified files built successfully\n";
+        else std::cout << successful_count << " of " << requested_count << " specified files built successfully\n";
     } else if (failed_count == 0) {
         const bool incremental = !jobs.empty() && !jobs.front().reasons.empty();
         std::cout << console::good("📦") << ' ' << successful_count << ' '
@@ -574,7 +798,7 @@ int ProjectInfo::build_all(bool force, bool explain) {
         }
     } else {
         const unsigned hardware = std::max(1u, std::thread::hardware_concurrency());
-        std::size_t thread_count = config.build_threads < 0 ? static_cast<std::size_t>(-config.build_threads) * hardware : (config.build_threads == 0 ? hardware : static_cast<std::size_t>(config.build_threads));
+        std::size_t thread_count = config.build_threads < 0 ? static_cast<std::size_t>(-static_cast<long long>(config.build_threads)) * hardware : (config.build_threads == 0 ? hardware : static_cast<std::size_t>(config.build_threads));
         thread_count = std::max<std::size_t>(1, std::min(thread_count, tracked.size()));
 
         std::vector<std::vector<std::string>> reasons(tracked.size());
@@ -601,6 +825,13 @@ int ProjectInfo::build_all(bool force, bool explain) {
 int ProjectInfo::build_names(const std::vector<std::string>& names, bool, bool explain) {
     if (!reconcile_watch()) return 1;
     reset_build_caches();
+    std::unordered_set<std::string> seen_names;
+    for (const auto& name : names) {
+        if (!seen_names.insert(name).second) {
+            console::error("duplicate tracked name requested for build: '" + name + "'");
+            return 1;
+        }
+    }
     std::vector<BuildJob> jobs;
     for (const auto& name : names) {
         if (TrackedInfo* info = find(name)) jobs.push_back({info, {}});

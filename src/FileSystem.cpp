@@ -125,39 +125,67 @@ bool has_parent_component(std::string path) {
     return false;
 }
 
-std::time_t modified_time(const fs::path& path) {
-    struct stat info {};
-#ifdef _WIN32
-    return ::stat(path.string().c_str(), &info) == 0 ? info.st_mtime : 0;
-#else
-    return ::stat(path.c_str(), &info) == 0 ? info.st_mtime : 0;
-#endif
+bool valid_extension(const std::string& extension) {
+    return !extension.empty() && extension.front() == '.' &&
+           extension.find('/') == std::string::npos &&
+           extension.find('\\') == std::string::npos;
 }
 
-std::uint32_t hash_bytes(const std::string& contents) {
-    std::uint32_t hash = 2166136261u;
-    for (unsigned char c : contents) { hash ^= c; hash *= 16777619u; }
+bool path_within(const fs::path& base, const fs::path& candidate) {
+    const fs::path normalized_base = fs::absolute(base).lexically_normal();
+    const fs::path normalized_candidate = fs::absolute(candidate).lexically_normal();
+
+    // Reject obvious lexical escapes first.
+    const fs::path lexical_relative = normalized_candidate.lexically_relative(normalized_base);
+    if (lexical_relative.empty()) {
+        if (normalized_candidate != normalized_base) return false;
+    } else if (*lexical_relative.begin() == "..") {
+        return false;
+    }
+
+    // Then resolve existing prefixes/symlinks. weakly_canonical also handles a
+    // non-existent leaf while resolving any symlinked parent directories.
+    std::error_code error;
+    const fs::path canonical_base = fs::weakly_canonical(normalized_base, error);
+    if (error) return false;
+    const fs::path canonical_candidate = fs::weakly_canonical(normalized_candidate, error);
+    if (error) return false;
+
+    const fs::path canonical_relative = canonical_candidate.lexically_relative(canonical_base);
+    if (canonical_relative.empty()) return canonical_candidate == canonical_base;
+    return *canonical_relative.begin() != "..";
+}
+
+fs::file_time_type modified_time(const fs::path& path) {
+    std::error_code error;
+    const auto value = fs::last_write_time(path, error);
+    return error ? fs::file_time_type::min() : value;
+}
+
+std::uint64_t hash_bytes(const std::string& contents) {
+    std::uint64_t hash = 14695981039346656037ull;
+    for (unsigned char c : contents) { hash ^= c; hash *= 1099511628211ull; }
     return hash;
 }
 
-static std::uint32_t hash_directory(const fs::path& directory) {
+static std::uint64_t hash_directory(const fs::path& directory) {
     std::vector<fs::path> children;
     std::error_code error;
     for (const auto& entry : fs::directory_iterator(directory, error)) children.push_back(entry.path().filename());
     std::sort(children.begin(), children.end());
 
-    std::uint32_t hash = 2166136261u;
+    std::uint64_t hash = 14695981039346656037ull;
     for (const auto& name : children) {
         const std::string relative_name = name.generic_string();
         hash ^= hash_bytes(relative_name);
-        hash *= 16777619u;
+        hash *= 1099511628211ull;
         hash ^= hash_path(directory / name);
-        hash *= 16777619u;
+        hash *= 1099511628211ull;
     }
     return hash;
 }
 
-std::uint32_t hash_path(const fs::path& path) {
+std::uint64_t hash_path(const fs::path& path) {
     std::error_code error;
     if (fs::is_directory(path, error)) return hash_directory(path);
     return hash_bytes(read_file(path));
@@ -174,8 +202,10 @@ bool stored_hash_changed(const fs::path& root, const fs::path& path) {
     if (!file_exists(hash_path_file)) return true;
     const std::string stored = read_file(hash_path_file);
     char* end = nullptr;
-    const auto stored_hash = static_cast<std::uint32_t>(std::strtoul(stored.c_str(), &end, 10));
+    const auto stored_hash = static_cast<std::uint64_t>(std::strtoull(stored.c_str(), &end, 10));
     if (end == stored.c_str()) return true;
+    while (*end == ' ' || *end == '\t' || *end == '\r' || *end == '\n') ++end;
+    if (*end != '\0') return true;
     return stored_hash != hash_path(path);
 }
 

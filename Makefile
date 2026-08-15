@@ -1,9 +1,10 @@
 CXX ?= g++
 CXXFLAGS ?= -std=c++17 -O2 -Wall -Wextra -pedantic -pthread
-CPPFLAGS ?= -Isrc
+CPPFLAGS ?= -Isrc -Isift/include -Isift/src
 
-SOURCES := src/nift.cpp src/CLI.cpp src/FileSystem.cpp src/JsonFile.cpp src/Parser.cpp src/ProjectInfo.cpp src/WatchList.cpp src/BuildProgress.cpp
+SOURCES := src/nift.cpp src/CLI.cpp src/FileSystem.cpp src/JsonFile.cpp src/JsonSchema.cpp sift/src/Sift.cpp src/Parser.cpp src/ProjectInfo.cpp src/WatchList.cpp src/BuildProgress.cpp
 OBJECTS := $(SOURCES:.cpp=.o)
+DEPFILES := $(OBJECTS:.o=.d)
 
 ifeq ($(OS),Windows_NT)
 	EXEEXT := .exe
@@ -21,6 +22,7 @@ DESTDIR ?=
 
 TEST_DIR := .build
 JSON_TEST := $(TEST_DIR)/nift-json-smoke$(EXEEXT)
+JSON_SCHEMA_TEST := $(TEST_DIR)/nift-json-schema-smoke$(EXEEXT)
 
 all: $(TARGET)
 
@@ -28,18 +30,49 @@ $(TARGET): $(OBJECTS)
 	$(CXX) $(CXXFLAGS) $(OBJECTS) -o $@
 
 %.o: %.cpp
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -c $< -o $@
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -MMD -MP -c $< -o $@
+
+-include $(DEPFILES)
 
 test-json:
 	mkdir -p "$(TEST_DIR)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/json_smoke.cpp -o "$(JSON_TEST)"
 	"$(JSON_TEST)"
 
+test-json-schema:
+	mkdir -p "$(TEST_DIR)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/json_schema_smoke.cpp src/JsonSchema.cpp -o "$(JSON_SCHEMA_TEST)"
+	"$(JSON_SCHEMA_TEST)"
+
+test-minify:
+	$(MAKE) -C sift test-smoke
+
+test-json-schema-integration: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/json_schema_integration_smoke.sh
+
 test-content: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/parser_content_smoke.sh
 
 test-comments: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/comments_smoke.sh
+
+test-json-binding: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/json_binding_smoke.sh
+
+test-control-flow: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/control_flow_smoke.sh
+
+test-requirements: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/requirements_smoke.sh
+
+test-path-security: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/path_security_smoke.sh
+
+test-path-safety: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/path_safety_smoke.sh
+
+test-metadata-safety: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/metadata_safety_smoke.sh
 
 install: $(TARGET)
 	mkdir -p "$(DESTDIR)$(BINDIR)"
@@ -51,7 +84,41 @@ uninstall:
 	@echo "Removed $(DESTDIR)$(BINDIR)/$(TARGET)"
 
 clean:
-	rm -f $(OBJECTS) "$(TARGET)"
+	rm -f $(OBJECTS) $(DEPFILES) "$(TARGET)"
 	rm -rf "$(TEST_DIR)"
+	$(MAKE) -C sift clean
 
-.PHONY: all clean test-json test-content test-comments install uninstall
+.PHONY: all clean test-json test-json-schema test-minify test-json-schema-integration test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety install uninstall
+
+
+test-cross-feature: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/cross_feature_smoke.sh
+
+
+test-incremental-new-features: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/incremental_new_features_smoke.sh
+
+
+test-state-concurrency: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/persistence_concurrency_failure_smoke.sh
+
+
+test-minify-integration: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/minify_integration_smoke.sh
+
+
+test-minify-node:
+	$(MAKE) -C sift test-node
+
+test-minify-generated:
+	$(MAKE) -C sift test-generated
+
+test-minify-jsx-generated:
+	$(MAKE) -C sift test-jsx
+
+
+test-minify-formats:
+	$(MAKE) -C sift test-formats
+
+test-minify-cli:
+	$(MAKE) -C sift test-cli

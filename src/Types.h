@@ -5,6 +5,8 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <set>
+#include <optional>
 
 struct Config {
     std::string content_dir = "content/";
@@ -13,6 +15,7 @@ struct Config {
     std::string output_ext = ".html";
     std::string default_template = "templates/template.html";
     std::string incremental_mode = "modified";
+    std::set<std::string> minify_exts;
     int build_threads = -1;
 };
 
@@ -22,6 +25,7 @@ struct TrackedInfo {
     std::string template_path;
     std::string content_ext;
     std::string output_ext;
+    std::optional<bool> minify;
 };
 
 struct BuildError {
@@ -45,6 +49,7 @@ struct RenderResult {
     std::string output;
     BuildError error;
     std::set<std::string> dependencies;
+    std::set<std::string> reqs;
 };
 
 struct WatchExtension {

@@ -36,7 +36,15 @@ bool WatchList::load(const fs::path& project_root) {
         }
 
         WatchDirectory directory;
-        directory.path = watched_value.string;
+        directory.path = filesystem::normalise_slashes(watched_value.string);
+        if (fs::path(directory.path).is_absolute() || filesystem::has_parent_component(directory.path)) {
+            console::error(console::path(watched_path.generic_string(), true) + ": watched directories must be project-relative and cannot contain '..'");
+            return false;
+        }
+        if (std::any_of(directories.begin(), directories.end(), [&](const WatchDirectory& prior) { return prior.path == directory.path; })) {
+            console::error(console::path(watched_path.generic_string(), true) + ": duplicate watched directory '" + directory.path + "'");
+            return false;
+        }
         const fs::path extension_path = project_root / ".nift/.watch" / fs::path(directory.path) / "exts.json";
         json::Document extensions;
         parse_error.clear();
@@ -52,6 +60,10 @@ bool WatchList::load(const fs::path& project_root) {
                 !require_string(value, "template", extension.template_path) ||
                 !require_string(value, "output-ext", extension.output_ext)) {
                 console::error(console::path(extension_path.generic_string(), true) + ": each 'exts' member must be an object with string content-ext/template/output-ext fields");
+                return false;
+            }
+            if (!filesystem::valid_extension(extension.content_ext) || !filesystem::valid_extension(extension.output_ext)) {
+                console::error(console::path(extension_path.generic_string(), true) + ": watched content/output extensions must begin with '.' and cannot contain path separators");
                 return false;
             }
             if (!seen_extensions.insert(extension.content_ext).second) {
@@ -97,7 +109,6 @@ bool WatchList::reconcile(ProjectInfo& project) {
     bool tracking_changed = false;
     for (const auto& directory : directories) {
         const fs::path watched_directory = project.root / directory.path;
-        if (!filesystem::path_exists(watched_directory)) continue;
 
         std::set<std::string> seen_names;
         for (const auto& extension : directory.extensions) {
@@ -107,9 +118,22 @@ bool WatchList::reconcile(ProjectInfo& project) {
                 std::string relative = fs::relative(entry.path(), project.root / project.config.content_dir, error).generic_string();
                 if (error || relative.size() < extension.content_ext.size()) continue;
                 relative.resize(relative.size() - extension.content_ext.size());
-                seen_names.insert(relative);
-                if (!project.find(relative)) {
-                    project.tracked.push_back({relative, fs::path(relative).filename().string(), extension.template_path, extension.content_ext, extension.output_ext});
+                if (!seen_names.insert(relative).second) {
+                    console::error("multiple watched files resolve to the same tracked name '" + relative + "'");
+                    return false;
+                }
+                if (TrackedInfo* existing_info = project.find(relative)) {
+                    if (project.content_path(*existing_info).lexically_normal() != entry.path().lexically_normal()) {
+                        console::error("watched file '" + project.relative(entry.path()) + "' conflicts with tracked name '" + relative + "'");
+                        return false;
+                    }
+                } else {
+                    TrackedInfo candidate{relative, fs::path(relative).filename().string(), extension.template_path, extension.content_ext, extension.output_ext, std::nullopt};
+                    if (project.conflicts_with_tracked_path(candidate)) {
+                        console::error("watched file '" + relative + "' resolves to a content/output path already managed by another tracked name");
+                        return false;
+                    }
+                    project.tracked.push_back(std::move(candidate));
                     project.invalidate_tracked_index();
                     tracking_changed = true;
                 }
@@ -129,11 +153,25 @@ bool WatchList::reconcile(ProjectInfo& project) {
                     console::error(console::path(state_path.generic_string(), true) + ": 'tracked' must contain strings");
                     return false;
                 }
+                const fs::path claimed_content_stem = project.root / project.config.content_dir / fs::path(value.string);
+                if (fs::path(value.string).is_absolute() || filesystem::has_parent_component(value.string) ||
+                    !filesystem::path_within(watched_directory, claimed_content_stem)) {
+                    console::error(console::path(state_path.generic_string(), true) + ": tracked watch state contains a name outside its watched directory");
+                    return false;
+                }
                 if (!seen_names.count(value.string)) {
                     auto it = std::find_if(project.tracked.begin(), project.tracked.end(), [&](const TrackedInfo& info) { return info.name == value.string; });
                     if (it != project.tracked.end()) {
                         std::error_code error;
                         fs::remove(project.output_path(*it), error);
+                        error.clear();
+                        fs::remove(project.info_path(*it), error);
+                        error.clear();
+                        fs::remove(filesystem::hash_file_path(project.root, project.content_path(*it)), error);
+                        fs::path sidecar = project.content_path(*it);
+                        sidecar.replace_extension(".deps.json");
+                        error.clear();
+                        fs::remove(filesystem::hash_file_path(project.root, sidecar), error);
                         project.tracked.erase(it);
                         project.invalidate_tracked_index();
                         tracking_changed = true;
@@ -153,8 +191,18 @@ bool WatchList::reconcile(ProjectInfo& project) {
 
 bool WatchList::add(ProjectInfo& project, std::string directory, const WatchExtension& extension) {
     directory = filesystem::normalise_slashes(directory);
-    if (filesystem::has_parent_component(directory)) {
-        console::error("watch directory cannot contain a '..' path component");
+    if (directory.empty() || fs::path(directory).is_absolute() || filesystem::has_parent_component(directory)) {
+        console::error("watch directory must be project-relative and cannot contain a '..' path component");
+        return false;
+    }
+    if (!filesystem::valid_extension(extension.content_ext) || !filesystem::valid_extension(extension.output_ext)) {
+        console::error("watched content/output extensions must begin with '.' and cannot contain path separators");
+        return false;
+    }
+    const fs::path watched_path = project.root / directory;
+    const fs::path content_root = project.root / project.config.content_dir;
+    if (!filesystem::path_within(content_root, watched_path)) {
+        console::error("watch directory must be inside the configured content directory");
         return false;
     }
     if (!directory.empty() && directory.back() != '/') directory += '/';

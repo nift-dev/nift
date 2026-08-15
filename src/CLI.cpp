@@ -2,6 +2,7 @@
 #include "Console.h"
 #include "FileSystem.h"
 #include "JsonFile.h"
+#include <sift/Sift.h>
 #include <map>
 #include "ProjectInfo.h"
 #include "WatchList.h"
@@ -27,7 +28,7 @@
 namespace fs = std::filesystem;
 
 namespace {
-constexpr const char* version_text = "Nift v4.0.0 (C++ rewrite 1.0.12)";
+constexpr const char* version_text = "Nift v4.0.0 (C++ rewrite 1.0.39)";
 constexpr auto build_auto_poll_interval = std::chrono::milliseconds(200);
 constexpr const char* build_auto_log_path = ".nift/build-auto.log";
 
@@ -210,6 +211,12 @@ json::Document tracked_entry_json(const ProjectInfo& project, const TrackedInfo&
     entry["template-path"] = info.template_path;
     entry["content-ext"] = info.content_ext.empty() ? project.config.content_ext : info.content_ext;
     entry["output-ext"] = info.output_ext.empty() ? project.config.output_ext : info.output_ext;
+    std::string output_extension = info.output_ext.empty() ? project.config.output_ext : info.output_ext;
+    std::transform(output_extension.begin(), output_extension.end(), output_extension.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    entry["minify"] = info.minify.has_value()
+        ? *info.minify
+        : project.config.minify_exts.count(output_extension) != 0;
     return entry;
 }
 
@@ -258,7 +265,7 @@ void print_commands() {
     row("build(-updated)", "[options]", "Build files that need updating");
     row("build-all", "[options]", "Build every tracked file");
     row("build-names", "[options] <names>", "Build selected tracked names");
-    row("build-auto", "[-s]", "Continuously build changed files");
+    row("build-auto", "[options]", "Continuously build changed files");
 
     std::cout << '\n' << console::dim("Project") << '\n';
     row("track", "<name> [title] [template]", "Track a new file");
@@ -275,6 +282,7 @@ void print_commands() {
 
     std::cout << '\n' << console::dim("General") << '\n';
     row("init", "[.ext]", "Create a Nift project");
+    row("minify", "[-i|--in-place] <files...>", "Minify to *.min.ext by default; -i overwrites sources");
     row("about", "", "About Nift and where to learn more");
     row("version", "", "Show version information");
     row("commands", "", "Show this command reference");
@@ -294,6 +302,40 @@ bool has_option(int argc, char** argv, int start, const std::string& option) {
     return false;
 }
 
+bool options_only(int argc, char** argv, int start) {
+    if (!valid_options(argc, argv, start)) return false;
+    for (int i = start; i < argc; ++i) {
+        const std::string value = argv[i];
+        if (value.empty() || value[0] != '-') return false;
+    }
+    return true;
+}
+
+fs::path user_dependencies_path(const ProjectInfo& project, const TrackedInfo& info) {
+    fs::path path = project.content_path(info);
+    path.replace_extension(".deps.json");
+    return path;
+}
+
+void remove_page_build_state(const ProjectInfo& project, const TrackedInfo& info, bool remove_content_files) {
+    std::error_code error;
+    if (remove_content_files) {
+        fs::permissions(project.content_path(info), fs::perms::owner_write, fs::perm_options::add, error);
+        error.clear();
+        fs::remove(project.content_path(info), error);
+        error.clear();
+        fs::remove(user_dependencies_path(project, info), error);
+    }
+    error.clear();
+    fs::remove(project.output_path(info), error);
+    error.clear();
+    fs::remove(project.info_path(info), error);
+    error.clear();
+    fs::remove(filesystem::hash_file_path(project.root, project.content_path(info)), error);
+    error.clear();
+    fs::remove(filesystem::hash_file_path(project.root, user_dependencies_path(project, info)), error);
+}
+
 bool initialise_project(const std::string& extension) {
     if (fs::exists(".nift")) {
         console::error("cannot initialise project");
@@ -301,8 +343,8 @@ bool initialise_project(const std::string& extension) {
         return false;
     }
 
-    if (extension.empty() || extension.find('"') != std::string::npos) {
-        console::error("init extension must be a non-empty string without quotes");
+    if (!filesystem::valid_extension(extension)) {
+        console::error("init extension must begin with '.' and cannot contain path separators");
         return false;
     }
 
@@ -321,6 +363,7 @@ bool initialise_project(const std::string& extension) {
     config["config"]["default-template"] = "templates/template.html";
     config["config"]["build-threads"] = -1;
     config["config"]["incremental-mode"] = "modified";
+    config["config"]["minify-exts"] = json::Document::make_array();
     if (!save_json_file(".nift/config.json", config)) return false;
 
     json::Document tracked = json::Document::make_object();
@@ -367,8 +410,74 @@ int run_cli(int argc, char** argv) {
         return 0;
     }
     if (command == "init" || command == "init-html") {
+        if ((command == "init" && argc > 3) || (command == "init-html" && argc > 2)) {
+            console::error(command + " received too many arguments");
+            return 1;
+        }
         const std::string extension = command == "init-html" ? ".html" : (argc > 2 ? argv[2] : ".html");
         return initialise_project(extension) ? 0 : 1;
+    }
+
+    if (command == "minify") {
+        bool in_place = false;
+        std::vector<fs::path> files;
+        for (int i = 2; i < argc; ++i) {
+            const std::string arg = argv[i];
+            if (arg == "-i" || arg == "--in-place") {
+                in_place = true;
+                continue;
+            }
+            if (!arg.empty() && arg[0] == '-') {
+                console::error("unknown minify option '" + arg + "'");
+                std::cerr << "  supported option: -i, --in-place\n";
+                return 1;
+            }
+            files.emplace_back(arg);
+        }
+        if (files.empty()) {
+            console::error("minify requires at least one file");
+            return 1;
+        }
+        bool failed = false;
+        std::size_t minified_count = 0;
+        for (const auto& path : files) {
+            if (!filesystem::file_exists(path)) {
+                console::error("cannot minify '" + path.string() + "': file does not exist or is not a regular file");
+                failed = true;
+                continue;
+            }
+            sift::Format format;
+            if (!sift::format_for_extension(path.extension().string(), format)) {
+                console::error("cannot minify '" + path.string() + "': unsupported extension " + path.extension().string());
+                failed = true;
+                continue;
+            }
+            const std::string source = filesystem::read_file(path);
+            std::string output, error;
+            if (!sift::run(format, source, output, error)) {
+                console::error("cannot minify '" + path.string() + "'" +
+                               (error.empty() ? std::string() : ": " + error));
+                failed = true;
+                continue;
+            }
+            fs::path destination = path;
+            if (!in_place) {
+                destination = path.parent_path() / path.stem();
+                destination += ".min" + path.extension().string();
+            }
+            if (!filesystem::write_file(destination, output)) {
+                console::error("cannot minify '" + path.string() + "': failed to write '" + destination.string() + "'");
+                failed = true;
+                continue;
+            }
+            std::cout << console::good("✓") << ' ' << path.string();
+            if (!in_place) std::cout << " -> " << destination.string();
+            std::cout << '\n';
+            ++minified_count;
+        }
+        if (minified_count > 1)
+            std::cout << console::dim(std::to_string(minified_count) + " files minified") << '\n';
+        return failed ? 1 : 0;
     }
 
     const std::set<std::string> project_commands = {
@@ -390,11 +499,11 @@ int run_cli(int argc, char** argv) {
     if (!project.open()) return 1;
 
     if (command == "build-all") {
-        if (!valid_options(argc, argv, 2)) { console::error("unknown build-all option"); return 1; }
+        if (!options_only(argc, argv, 2)) { console::error("build-all accepts options only"); return 1; }
         return project.build_all(true, has_option(argc, argv, 2, "-p"));
     }
     if (command == "build-updated" || (command == "build" && argc == 2)) {
-        if (!valid_options(argc, argv, 2)) { console::error("unknown build-updated option"); return 1; }
+        if (!options_only(argc, argv, 2)) { console::error("build-updated accepts options only"); return 1; }
         return project.build_all(false, has_option(argc, argv, 2, "-p"));
     }
     if (command == "build" || command == "build-names") {
@@ -405,6 +514,7 @@ int run_cli(int argc, char** argv) {
         return project.build_names(names, true, has_option(argc, argv, 2, "-p"));
     }
     if (command == "build-auto") {
+        if (!options_only(argc, argv, 2)) { console::error("build-auto accepts options only"); return 1; }
         BuildAutoQuitKey quit_key;
         std::cout << console::heading("Nift build-auto") << '\n';
         std::cout << console::dim("watching for changes every 200 ms") << '\n';
@@ -453,15 +563,22 @@ int run_cli(int argc, char** argv) {
 
     if (command == "track") {
         if (argc < 3) { console::error("track requires a name"); return 1; }
+        if (argc > 5) { console::error("track received too many arguments"); return 1; }
         const std::string name = argv[2];
-        if (name.empty() || filesystem::has_parent_component(name)) { console::error("tracked name cannot contain a '..' path component"); return 1; }
+        if (name.empty() || (name != "/" && fs::path(name).is_absolute()) || filesystem::has_parent_component(name)) { console::error("tracked name must stay inside the configured content/output directories"); return 1; }
         if (project.find(name)) { console::error("already tracking '" + name + "'"); return 1; }
         const std::string title = argc > 3 ? argv[3] : fs::path(name).filename().string();
         const std::string templ = argc > 4 ? argv[4] : project.config.default_template;
         if (title.empty() || templ.empty()) { console::error("name, title and template path must be non-empty"); return 1; }
-        project.tracked.push_back({name, title, templ, "", ""});
+        TrackedInfo candidate{name, title, templ, "", "", std::nullopt};
+        if (project.conflicts_with_tracked_path(candidate)) {
+            console::error("tracked name resolves to a content/output path already managed by another tracked name");
+            return 1;
+        }
+        project.tracked.push_back(std::move(candidate));
         project.invalidate_tracked_index();
-        if (!filesystem::write_file(project.content_path(project.tracked.back()), "")) return 1;
+        const fs::path new_content = project.content_path(project.tracked.back());
+        if (!filesystem::path_exists(new_content) && !filesystem::write_file(new_content, "")) return 1;
         return project.save_tracking() ? 0 : 1;
     }
 
@@ -472,12 +589,7 @@ int run_cli(int argc, char** argv) {
             auto it = std::find_if(project.tracked.begin(), project.tracked.end(), [&](const TrackedInfo& info) { return info.name == name; });
             if (it == project.tracked.end()) continue;
             const TrackedInfo value = *it;
-            if (command != "untrack") {
-                std::error_code error;
-                fs::permissions(project.content_path(value), fs::perms::owner_write, fs::perm_options::add, error);
-                fs::remove(project.content_path(value), error);
-                fs::remove(project.output_path(value), error);
-            }
+            if (command != "untrack") remove_page_build_state(project, value, true);
             project.tracked.erase(it);
             project.invalidate_tracked_index();
         }
@@ -485,33 +597,75 @@ int run_cli(int argc, char** argv) {
     }
 
     if (command == "cp" || command == "copy" || command == "mv" || command == "move") {
-        if (argc < 4) return 1;
+        if (argc != 4) { console::error(command + " requires exactly a source and destination name"); return 1; }
         const std::string source_name = argv[2];
         const std::string destination_name = argv[3];
-        if (filesystem::has_parent_component(destination_name)) { console::error("destination name cannot contain '..'"); return 1; }
+        if ((destination_name != "/" && fs::path(destination_name).is_absolute()) || filesystem::has_parent_component(destination_name)) {
+            console::error("destination name must stay inside the configured content/output directories");
+            return 1;
+        }
         TrackedInfo* source = project.find(source_name);
-        if (!source || project.find(destination_name)) return 1;
+        if (!source) { console::error("not tracking source name '" + source_name + "'"); return 1; }
+        if (project.find(destination_name)) { console::error("already tracking destination name '" + destination_name + "'"); return 1; }
+
         const TrackedInfo source_copy = *source;
         TrackedInfo destination = source_copy;
         destination.name = destination_name;
-        project.tracked.push_back(destination);
-        project.invalidate_tracked_index();
-        const fs::path destination_content = project.content_path(project.tracked.back());
+        if (project.conflicts_with_tracked_path(destination)) {
+            console::error("destination name resolves to a content/output path already managed by another tracked name");
+            return 1;
+        }
+
+        const fs::path source_content = project.content_path(source_copy);
+        const fs::path destination_content = project.content_path(destination);
+        const fs::path source_sidecar = user_dependencies_path(project, source_copy);
+        const fs::path destination_sidecar = user_dependencies_path(project, destination);
+        if (filesystem::path_exists(destination_content) || filesystem::path_exists(destination_sidecar)) {
+            console::error("destination content or dependency sidecar already exists and is not tracked");
+            return 1;
+        }
+
         std::error_code error;
         fs::create_directories(destination_content.parent_path(), error);
-        fs::copy_file(project.content_path(source_copy), destination_content, fs::copy_options::overwrite_existing, error);
-        if (error) return 1;
+        error.clear();
+        fs::copy_file(source_content, destination_content, error);
+        if (error) { console::error("failed to copy source content"); return 1; }
+
+        const bool has_sidecar = filesystem::path_exists(source_sidecar);
+        if (has_sidecar) {
+            fs::create_directories(destination_sidecar.parent_path(), error);
+            error.clear();
+            fs::copy_file(source_sidecar, destination_sidecar, error);
+            if (error) {
+                fs::remove(destination_content, error);
+                console::error("failed to copy dependency sidecar");
+                return 1;
+            }
+        }
+
+        project.tracked.push_back(destination);
+        project.invalidate_tracked_index();
         if (command == "mv" || command == "move") {
-            fs::remove(project.content_path(source_copy), error);
-            fs::remove(project.output_path(source_copy), error);
             project.tracked.erase(std::remove_if(project.tracked.begin(), project.tracked.end(), [&](const TrackedInfo& info) { return info.name == source_name; }), project.tracked.end());
             project.invalidate_tracked_index();
         }
-        return project.save_tracking() ? 0 : 1;
+
+        if (!project.save_tracking()) {
+            fs::remove(destination_content, error);
+            if (has_sidecar) fs::remove(destination_sidecar, error);
+            return 1;
+        }
+
+        if (command == "mv" || command == "move") remove_page_build_state(project, source_copy, true);
+        return 0;
     }
 
     if (command == "info" || command == "info-all" || command == "info-names" || command == "info-tracking" || command == "status") {
         if (argc > 2 && !valid_options(argc, argv, 2)) return 1;
+        if (command != "info" && !options_only(argc, argv, 2)) {
+            console::error(command + " accepts options only");
+            return 1;
+        }
 
         if (command == "status") {
             struct StatusEntry {
@@ -528,7 +682,7 @@ int run_cli(int argc, char** argv) {
                 }
             } else {
                 const unsigned hardware = std::max(1u, std::thread::hardware_concurrency());
-                std::size_t thread_count = project.config.build_threads < 0 ? static_cast<std::size_t>(-project.config.build_threads) * hardware : (project.config.build_threads == 0 ? hardware : static_cast<std::size_t>(project.config.build_threads));
+                std::size_t thread_count = project.config.build_threads < 0 ? static_cast<std::size_t>(-static_cast<long long>(project.config.build_threads)) * hardware : (project.config.build_threads == 0 ? hardware : static_cast<std::size_t>(project.config.build_threads));
                 thread_count = std::max<std::size_t>(1, std::min(thread_count, project.tracked.size()));
                 std::vector<std::vector<std::string>> reasons(project.tracked.size());
                 std::atomic<std::size_t> next{0};
@@ -641,6 +795,7 @@ int run_cli(int argc, char** argv) {
 
     if (command == "watch") {
         if (argc < 3) return 1;
+        if (argc > 6) { console::error("watch received too many arguments"); return 1; }
         WatchExtension extension{
             argc > 3 ? argv[3] : project.config.content_ext,
             argc > 4 ? argv[4] : project.config.default_template,
@@ -649,10 +804,11 @@ int run_cli(int argc, char** argv) {
         return project.watch_list().add(project, argv[2], extension) ? 0 : 1;
     }
     if (command == "unwatch") {
-        if (argc < 3) return 1;
+        if (argc != 3) { console::error("unwatch requires exactly one directory"); return 1; }
         return project.watch_list().remove(project, argv[2]) ? 0 : 1;
     }
     if (command == "info-watching") {
+        if (argc != 2) { console::error("info-watching does not accept additional arguments"); return 1; }
         print_json_document(watch_json(project.watch_list()), "Watching information",
                             "Directories Nift scans automatically and the extension rules applied to each one.");
         return 0;
