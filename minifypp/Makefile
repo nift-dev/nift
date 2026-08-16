@@ -14,6 +14,10 @@ $(TARGET): cli/main.cpp $(LIBSRC) include/minify/Minify.h src/Json.h
 
 test: test-smoke test-node test-generated test-jsx test-formats test-cross-format test-cli
 
+check-nift-sync:
+	@test -n "$(NIFT_MINIFYPP_DIR)" || { echo "set NIFT_MINIFYPP_DIR to Nift's minifypp directory" >&2; exit 2; }
+	bash scripts/check-nift-sync.sh "$(NIFT_MINIFYPP_DIR)"
+
 test-smoke:
 	mkdir -p $(TESTDIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/minify_smoke.cpp $(LIBSRC) -o $(SMOKE)
@@ -34,7 +38,7 @@ test-cli: $(TARGET)
 clean:
 	rm -rf $(TESTDIR) $(TARGET)
 
-.PHONY: all test test-smoke test-node test-generated test-jsx test-formats test-cross-format test-cli clean
+.PHONY: all test check-nift-sync test-smoke test-node test-generated test-jsx test-formats test-cross-format test-cli clean
 
 test-formats:
 	bash tests/minify_format_idempotence.sh
