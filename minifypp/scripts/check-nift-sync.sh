@@ -12,6 +12,7 @@ EMBEDDED="$(cd "$1" 2>/dev/null && pwd)" || {
 }
 
 FILES=(
+  benchmarks/minify_benchmark.cpp
   LICENSE
   Makefile
   README.md
@@ -23,6 +24,7 @@ FILES=(
   src/Minify.cpp
   tests/cli_smoke.sh
   tests/cross_format_adversarial.sh
+  tests/fuzz_smoke.cpp
   tests/minify_format_idempotence.sh
   tests/minify_generated_semantics.sh
   tests/minify_jsx_generated.sh

@@ -13,6 +13,8 @@ Supported formats in format version 1 are HTML, CSS, JavaScript, JSX, JSON, XML 
 ```bash
 make
 make test
+ASAN_OPTIONS=detect_leaks=0 make test-sanitize # use only where LSan is unavailable
+make benchmark
 ./minify app.js        # app.min.js
 ./minify -i app.js     # overwrite app.js
 ```
@@ -29,6 +31,7 @@ silently replaced.
 - 15,459 executable JavaScript semantic programs.
 - 180 JSX/TSX syntax + idempotence programs.
 - 111 generated non-JavaScript idempotence documents.
+- 70,000 deterministic mutation cases across all seven formats.
 - standalone CLI smoke tests and format-specific C++ smoke tests.
 
 The latest JSX fix distinguishes valid TSX generic arrows such as `<T,>(x:T) => ...` from nested JSX roots.

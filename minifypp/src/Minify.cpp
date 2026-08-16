@@ -39,8 +39,12 @@ bool starts_ci(const std::string& s, std::size_t pos, const std::string& needle)
 
 void emit_pending_space(std::string& out, bool& pending, char next) {
     if (!pending) return;
-    if (!out.empty() && !ws(out.back()) && word_char(out.back()) && word_char(next))
-        out.push_back(' ');
+    if (!out.empty() && !ws(out.back())) {
+        const bool joins_words = word_char(out.back()) && word_char(next);
+        const bool creates_comment_delimiter =
+            (out.back() == '/' && next == '*') || (out.back() == '*' && next == '/');
+        if (joins_words || creates_comment_delimiter) out.push_back(' ');
+    }
     pending = false;
 }
 
@@ -252,9 +256,12 @@ bool html(const std::string& input, std::string& output, std::string& error) {
                 } else if (ws(c)) {
                     tag_space = true;
                 } else {
+                    const bool after_tag_prefix = !output.empty() &&
+                        (output.back() == '<' ||
+                         (output.back() == '/' && output.size() >= 2 && output[output.size() - 2] == '<'));
                     if (tag_space && !output.empty() &&
-                        output.back() != '<' && output.back() != '/' &&
-                        c != '>' && c != '/') output.push_back(' ');
+                        (after_tag_prefix || (output.back() != '/' && c != '>' && c != '/')))
+                        output.push_back(' ');
                     tag_space = false;
                     output.push_back(c);
                 }
@@ -295,7 +302,8 @@ bool html(const std::string& input, std::string& output, std::string& error) {
 // JavaScript minification is intentionally conservative. It removes comments
 // and redundant horizontal whitespace, but preserves every significant newline
 // so automatic-semicolon-insertion behavior cannot be changed.
-bool javascript(const std::string& input, std::string& output, std::string& error) {
+static bool minify_javascript(const std::string& input, std::string& output,
+                              std::string& error, bool preserve_jsx_boundaries) {
     output.clear();
     output.reserve(input.size());
 
@@ -323,6 +331,8 @@ bool javascript(const std::string& input, std::string& output, std::string& erro
                     (output.back() == '+' && next == '+') ||
                     (output.back() == '-' && next == '-') ||
                     (output.back() == '/' && next == '/') ||
+                    (preserve_jsx_boundaries && output.back() == '<' &&
+                     (std::isalpha(static_cast<unsigned char>(next)) || next == '>' || next == '/')) ||
                     (std::isdigit(static_cast<unsigned char>(output.back())) && next == '.'))) {
             output.push_back(' ');
         }
@@ -629,6 +639,9 @@ bool javascript(const std::string& input, std::string& output, std::string& erro
     return true;
 }
 
+bool javascript(const std::string& input, std::string& output, std::string& error) {
+    return minify_javascript(input, output, error, false);
+}
 
 static bool minify_xml_like(const std::string& input, std::string& output,
                             std::string& error, bool svg_mode) {
@@ -703,8 +716,11 @@ static bool minify_xml_like(const std::string& input, std::string& output,
                 } else if (ws(c)) {
                     ws_pending = true;
                 } else {
-                    if (ws_pending && !output.empty() && output.back() != '<' &&
-                        output.back() != '/' && c != '>' && c != '/')
+                    const bool after_tag_prefix = !output.empty() &&
+                        (output.back() == '<' ||
+                         (output.back() == '/' && output.size() >= 2 && output[output.size() - 2] == '<'));
+                    if (ws_pending && !output.empty() &&
+                        (after_tag_prefix || (output.back() != '/' && c != '>' && c != '/')))
                         output.push_back(' ');
                     ws_pending = false;
                     output.push_back(c);
@@ -1024,7 +1040,7 @@ bool jsx(const std::string& input, std::string& output, std::string& error) {
     auto flush_js = [&](std::size_t end) -> bool {
         if (end <= js_start) return true;
         std::string part, e;
-        if (!javascript(input.substr(js_start, end - js_start), part, e)) {
+        if (!minify_javascript(input.substr(js_start, end - js_start), part, e, true)) {
             error = e;
             return false;
         }

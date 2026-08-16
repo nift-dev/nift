@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-BIN="$ROOT/minify"
+BIN="${MINIFY_BIN:-$ROOT/minify}"
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/nift-minifier-cli.XXXXXX")
 trap 'rm -rf "$TMP"' EXIT
 

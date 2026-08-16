@@ -26,6 +26,9 @@ int main() {
     expect(minify::css("/*!license*/ .x { content: \"a  b\"; }", out, err), err);
     expect(out.find("/*!license*/") != std::string::npos, "CSS license comment removed");
     expect(out.find("\"a  b\"") != std::string::npos, "CSS string whitespace changed");
+    expect(minify::css("@laye/ *{.a{value:* /}}", out, err), err);
+    expect(out.find("/ *") != std::string::npos, "CSS whitespace removal created a comment opener");
+    expect(out.find("* /") != std::string::npos, "CSS whitespace removal created a comment closer");
 
     expect(minify::html("  <div   class=\"a  b\">  hello   world <!-- gone --> <span> x </span> </div>  ", out, err), err);
     eq(out, "<div class=\"a  b\"> hello world <span> x </span> </div>", "html basic");
@@ -67,6 +70,11 @@ int main() {
            "native CSS nesting damaged");
     expect(out.find("--tokens:") != std::string::npos, "CSS custom-property token stream damaged");
 
+    expect(minify::jsx("const x=< mp<Map<string,number>> value={a} />;", out, err), err);
+    expect(out.find("< mp") != std::string::npos,
+           "JSX-mode whitespace removal manufactured a JSX opener");
+    { std::string jsx_second; expect(minify::jsx(out, jsx_second, err), err); }
+
     // HTML: preserve whitespace text nodes rather than guessing display mode,
     // preserve raw-text comments literally, malformed input must fail cleanly.
     expect(minify::html("<span>a</span> <span>b</span><div> c </div>", out, err), err);
@@ -87,6 +95,13 @@ int main() {
     expect(minify::html("<script type=\"module\">const s='<!--'; const t='-->'; </script>", out, err), err);
     expect(out.find("const s='<!--'; const t='-->';") != std::string::npos,
            "HTML module-script raw text damaged");
+    expect(minify::html("< !-- not-a-comment -->", out, err), err);
+    expect(out.find("< !--") != std::string::npos,
+           "HTML whitespace removal manufactured comment syntax");
+
+    expect(minify::xml("< ![CDATA[a < b]]_>", out, err), err);
+    expect(out.find("< ![CDATA[") != std::string::npos,
+           "XML whitespace removal manufactured CDATA syntax");
 
     // JS/TS/JSX: retain semicolons (while(cond); is an empty loop body), ASI
     // newlines, regex syntax, nested template expressions and JSX text.

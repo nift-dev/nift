@@ -10,7 +10,12 @@
 - Hardened CLI file handling: read failures are distinct from valid empty input,
   output is prepared before destination replacement, existing permission bits are
   preserved, and symbolic-link destinations are rejected explicitly.
-- Added a machine-checkable 16-file standalone/Nift synchronization gate.
+- Added a machine-checkable 18-file standalone/Nift synchronization gate.
+- Added repeatable deterministic fuzz-smoke, ASan/UBSan, and per-format
+  throughput/output-size/RSS benchmark targets.
+- Prevented whitespace removal from manufacturing CSS comment delimiters, JSX
+  openers, or HTML/XML comment/CDATA-like syntax. These boundary families were
+  discovered by the new 70,000-case mutation gate and retained as focused tests.
 
 ## v1.0.5
 

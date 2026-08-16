@@ -6,6 +6,8 @@
 *.pdb
 /.build/
 /nift
+/minifypp/.build/
+/minifypp/minify
 
 # Local diagnostics
 *.log
