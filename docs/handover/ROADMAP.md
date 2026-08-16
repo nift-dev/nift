@@ -1,18 +1,5 @@
 # Nift production-readiness roadmap
 
-## Deferred website documentation after v4.0.1
-
-The implementation following v4.0.0 allows a `.nift/tracked.json` entry to omit
-its `template` field. The content file then becomes the top-level Nift source and
-is fully parsed; it is not copied literally. A present-but-empty `template`
-remains invalid, while existing templates using `@content` remain compatible.
-
-Do not update the separate public Nift website documentation for this behavior
-until a release later than v4.0.1 that contains it is publicly available. At that
-point, add the tracked-entry examples, explain templated versus template-less
-rendering, and remove any recommendation to create identity CSS/JavaScript
-templates containing only `@content`.
-
 ## Living-roadmap rule
 
 This is a maintained risk assessment, not a fixed launch checklist. Review it at

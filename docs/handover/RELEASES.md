@@ -42,13 +42,16 @@ Proportionately include:
 4. Relevant ASan/UBSan and platform checks.
 5. Current scaling, performance, and memory guards.
 6. Exact embedded Minify++ synchronization and its relevant standalone gates.
-7. Build the Nift website with the exact candidate binary.
-8. Validate representative templates/downloadable examples where relevant.
-9. Reconcile README, docs, website, AI context, release notes, decisions, and
+7. Review `PENDING-WEBSITE.md`; complete every item targeted at this release in
+   the website source, verify the built result, and remove or explicitly retarget
+   each queue entry before tagging.
+8. Build the updated Nift website with the exact candidate binary.
+9. Validate representative templates/downloadable examples where relevant.
+10. Reconcile README, docs, website, AI context, release notes, decisions, and
    production roadmap.
-10. Build the actual package/archive, extract it freshly, build/use it, run the
+11. Build the actual package/archive, extract it freshly, build/use it, run the
     external suite against it, and verify version/help/license/expected files.
-11. Inspect repository state for generated/debug residue.
+12. Inspect repository state for generated/debug residue.
 
 Repository tests passing does not prove a release archive is usable.
 
@@ -62,6 +65,12 @@ output as the source of truth.
 
 Building locally is authorized as validation. Pushing the generated branch or
 deploying publicly requires approval.
+
+Implementation-driven website changes that must coincide with a future Nift
+release belong in `PENDING-WEBSITE.md`. This queue does not freeze the website:
+unrelated website content and improvements can continue through their normal
+development and publication flow. The release gate applies only to queued items
+whose target version is the candidate being prepared.
 
 ## Version and notes
 

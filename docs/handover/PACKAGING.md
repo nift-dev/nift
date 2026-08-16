@@ -277,16 +277,19 @@ evidence for the release report.
    `src/CLI.cpp`, `snap/snapcraft.yaml`, release notes and affected public docs.
 3. Confirm the user-facing `about`, `version` and help output are release-ready
    and contain no temporary checkpoint identity.
-4. Complete the release-candidate validation in `RELEASES.md`, including the full
+4. Review `PENDING-WEBSITE.md`. Implement and verify every website change targeted
+   at `X.Y.Z`, then remove the completed entries or explicitly retarget approved
+   deferrals. The queue must contain no unresolved item for `X.Y.Z` before tagging.
+5. Complete the release-candidate validation in `RELEASES.md`, including the full
    test suites, sanitizers/platform checks where applicable, the real Nift
    website build, embedded Minify++ synchronization, and residue inspection.
-5. Build the same archive layouts the workflow will publish. Extract them into
+6. Build the same archive layouts the workflow will publish. Extract them into
    clean temporary directories and test the contained executable rather than
    relying only on the repository build.
-6. On Windows, confirm the release executable has no MinGW runtime dependency on
+7. On Windows, confirm the release executable has no MinGW runtime dependency on
    `libgcc`, `libstdc++` or `libwinpthread`. Exercise a representative real Nift
    project on every release platform available for validation.
-7. Commit and push all approved release-preparation changes. Recheck that `main`
+8. Commit and push all approved release-preparation changes. Recheck that `main`
    and the intended release commit are exactly the state that was validated.
 
 ### 2. Create the GitHub release
