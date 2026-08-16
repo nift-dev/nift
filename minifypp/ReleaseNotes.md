@@ -8,6 +8,9 @@
   function/value lists, media conditions, and percentage/component boundaries.
 - Added an independent PostCSS semantic-tree differential gate for representative
   modern CSS alongside expanded focused and generated idempotence regressions.
+- Kept Node-based CSS/JSON oracles process-supervision independent: the shell
+  invokes native drivers and Node parses completed files, allowing clean-package
+  validation in restricted desktop and CI wrappers without skipping evidence.
 - Prevented JavaScript minification from manufacturing `/*` or `*/` across
   authored whitespace.
 - Prevented the JSX root finder from interpreting JSX-like text inside JavaScript

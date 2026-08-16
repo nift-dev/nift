@@ -150,19 +150,18 @@ for i in $(seq 0 9); do
 done
 
 # JSON gets an additional structural semantic oracle.
-node - "$TMP/minify" <<'JS'
-const {spawnSync}=require("child_process");
-const exe=process.argv[2];
-const cases=[
- '{"a": 1, "b": [true,false,null], "s":"a b"}',
- '{"unicode":"世界 😀","escaped":"a\\nb\\t\\\"c"}',
- '[{"x":1},{"x":2},{"nested":{"a":[1,2,3]}}]',
- '{"n":-1.25e10,"zero":0,"small":0.00001}',
-];
-for(const src of cases){
-  const p=spawnSync(exe,['.json'],{input:src,encoding:'utf8'});
-  if(p.status!==0) throw new Error(p.stderr);
-  if(JSON.stringify(JSON.parse(src))!==JSON.stringify(JSON.parse(p.stdout)))
+for i in "${!json_cases[@]}"; do
+  printf '%s' "${json_cases[$i]}" >"$TMP/original-$i.json"
+  "$TMP/minify" .json <"$TMP/original-$i.json" >"$TMP/minified-$i.json"
+done
+node - "$TMP" "${#json_cases[@]}" <<'JS'
+const fs=require("fs");
+const directory=process.argv[2];
+const caseCount=Number(process.argv[3]);
+for(let i=0;i<caseCount;++i){
+  const src=fs.readFileSync(`${directory}/original-${i}.json`,"utf8");
+  const output=fs.readFileSync(`${directory}/minified-${i}.json`,"utf8");
+  if(JSON.stringify(JSON.parse(src))!==JSON.stringify(JSON.parse(output)))
     throw new Error("JSON semantic mismatch");
 }
 JS
