@@ -43,7 +43,8 @@ jobs:
           $checksum = '0' * 64
           if ('${{ github.event_name }}' -ne 'pull_request') {
             $asset = "nift-$version-windows-x86_64.zip"
-            Invoke-WebRequest "https://github.com/nift-dev/nift/releases/download/v$version/$asset" -OutFile $asset
+            Invoke-WebRequest "https://github.com/nift-dev/nift/releases/download/v$version/$asset" -OutFile $asset `
+              -MaximumRetryCount 5 -RetryIntervalSec 5
             $checksum = (Get-FileHash $asset -Algorithm SHA256).Hash.ToLowerInvariant()
             Expand-Archive $asset -DestinationPath smoke
             $reported = (& (Get-ChildItem smoke -Recurse -Filter nift.exe | Select-Object -First 1).FullName version)
