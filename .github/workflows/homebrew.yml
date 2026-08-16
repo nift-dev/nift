@@ -35,7 +35,7 @@ jobs:
       - name: Set up Homebrew
         uses: Homebrew/actions/setup-homebrew@df4b09108a1de9d6f995fe68f302b3f68bd6d2ef # 2026.07.20.1
         with:
-          core: false
+          core: true
           cask: false
       - name: Resolve formula
         id: formula
@@ -59,13 +59,9 @@ jobs:
         env:
           HOMEBREW_NO_AUTO_UPDATE: '1'
           HOMEBREW_NO_INSTALL_FROM_API: '1'
-          GIT_AUTHOR_NAME: Nift CI
-          GIT_AUTHOR_EMAIL: ci@nift.dev
-          GIT_COMMITTER_NAME: Nift CI
-          GIT_COMMITTER_EMAIL: ci@nift.dev
           GIT_CONFIG_GLOBAL: /dev/null
         run: |
-          brew tap-new nift-dev/nift-ci
+          brew tap-new --no-git nift-dev/nift-ci
           tap_dir="$(brew --repository nift-dev/nift-ci)"
           cp .build/homebrew/nift.rb "$tap_dir/Formula/nift.rb"
           brew install --build-from-source nift-dev/nift-ci/nift
