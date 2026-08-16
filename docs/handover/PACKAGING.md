@@ -81,6 +81,14 @@ The workflow creates the GitHub release only after all platform jobs succeed.
 This is build automation, not evidence that every release-candidate gate has
 been performed; record that evidence before tagging.
 
+Published release assets are immutable inputs to downstream package managers.
+Once a GitHub release exists, `release.yml` deliberately leaves its assets
+unchanged on a rerun. Never restore `gh release upload --clobber`, replace an
+archive, or otherwise mutate a published asset after Homebrew, Chocolatey,
+Flathub or another consumer has recorded its checksum. If a release is partial
+or defective, investigate it explicitly; do not repair it by silently replacing
+files at the same URLs.
+
 ## Snap
 
 The Snap is named `nift` and supports every architecture currently listed by
@@ -105,6 +113,16 @@ release job succeeds. Without the secret the workflow builds and uploads the
 ownership and channel promotion as external state that must be checked in the
 Snap Store.
 
+The Snap Store can also build a connected GitHub repository through its own
+Launchpad integration. That is a separate publication path from `snap.yml` and
+does not use the GitHub Actions secret. Decide which path owns publication for a
+release so that both do not promote independently. In particular, `snap.yml`
+publishes directly to `stable` when the credential is present; leave the secret
+absent if builds should remain under manual edge/candidate review and promote
+them deliberately in the Snap Store instead. Connected builds commonly land in
+`edge`, and completion may vary substantially by architecture; `riscv64` can
+take much longer than the other builders.
+
 Before a stable release, install the produced `.snap` on a clean representative
 host and exercise version/help, project creation, a real build, dependency
 tracking, and filesystem behavior under classic confinement.
@@ -128,6 +146,22 @@ do not download or publish a release. Before pushing, test install, upgrade and
 uninstall in a disposable Windows VM, including command shimming and a small real
 Nift project. The Chocolatey Community Repository may also hold a submission for
 moderation; workflow success does not imply approval or public availability.
+
+Chocolatey package versions remain replaceable while they are still under
+moderation. If automated testing finds a genuine package defect, manually run
+`chocolatey.yml` against the release version with `resubmit: true`. This rebuilds
+and pushes the exact same version instead of skipping it as an existing feed
+entry. Use this only while the version is unapproved and Chocolatey's review
+instructions request an exact-version resubmission. Normal runs retain duplicate
+submission protection.
+
+If verification fails, inspect its public test log before acting. Requesting a
+verifier rerun is appropriate only when the package is already correct and the
+test environment produced a spurious result. If the `.nupkg` contains a wrong
+URL, checksum or script, fix it and resubmit the exact version during moderation.
+Allow for Chocolatey's CDN/moderation delay before concluding that a replacement
+was ignored. Questions or recovery explanations belong in the package page's
+**Add to Review Comments** box, not email replies, Disqus, or Gist comments.
 
 The historical package embedded `nift.exe` and a duplicate `nsm.exe`, depended on
 Git, and included hand-maintained verification checksums. The rewrite instead
@@ -155,6 +189,12 @@ removing LuaJIT, the legacy patches, and `nsm` expectations. Homebrew's own CI
 and maintainers build and attach official bottles. Once the canonical formula
 points to the new repository, its automatic bump service should be able to find
 later tags, but verify every update rather than assuming it occurred.
+
+The first rewritten formula update was submitted as
+`Homebrew/homebrew-core#299162`. Check that pull request's current state before
+opening a replacement or duplicate. Until it is merged, the external canonical
+formula may still describe the legacy release even though the in-repository
+template and CI are current.
 
 ## Flatpak and Flathub
 
@@ -223,21 +263,165 @@ target, platform validation, public name availability, and website/docs. Reuse
 the release architecture here once that repository has its own approved release
 contract; do not source a public Minify++ package from Nift's embedded copy.
 
-## Release sequence
+## Step-by-step release guide
 
-```text
-validated release candidate
-  -> reconcile public version and package recipe
-  -> create and push approved signed/annotated tag
-  -> GitHub artifacts and checksums complete
-  -> install/test the actual archives
-  -> Snap build/install test and approved channel publication
-  -> Chocolatey VM test and approved submission
-  -> Homebrew generated-formula test and homebrew-core update
-  -> Flathub external-manifest update, lint, review and publication
-  -> record exact URLs, identities, checksums, outcomes and remaining limits
-```
+Use this order for a normal `X.Y.Z` production release. Stop at any failed gate,
+fix the problem before tagging where possible, and retain exact command/workflow
+evidence for the release report.
 
-Store publications are downstream results and may complete at different times.
+### 1. Prepare the release candidate
+
+1. Start from the intended clean `main` commit and review unrelated working-tree
+   changes before touching release files.
+2. Choose `X.Y.Z` with Nick's approval. Update the public version reported by
+   `src/CLI.cpp`, `snap/snapcraft.yaml`, release notes and affected public docs.
+3. Confirm the user-facing `about`, `version` and help output are release-ready
+   and contain no temporary checkpoint identity.
+4. Complete the release-candidate validation in `RELEASES.md`, including the full
+   test suites, sanitizers/platform checks where applicable, the real Nift
+   website build, embedded Minify++ synchronization, and residue inspection.
+5. Build the same archive layouts the workflow will publish. Extract them into
+   clean temporary directories and test the contained executable rather than
+   relying only on the repository build.
+6. On Windows, confirm the release executable has no MinGW runtime dependency on
+   `libgcc`, `libstdc++` or `libwinpthread`. Exercise a representative real Nift
+   project on every release platform available for validation.
+7. Commit and push all approved release-preparation changes. Recheck that `main`
+   and the intended release commit are exactly the state that was validated.
+
+### 2. Create the GitHub release
+
+1. Obtain explicit approval for the public release action.
+2. Create the approved signed or annotated `vX.Y.Z` tag at the validated commit
+   and push that tag to `nift-dev/nift`.
+3. Watch `.github/workflows/release.yml`. All Linux, macOS and Windows artifact
+   jobs must succeed before the GitHub release is created.
+4. Confirm the release contains exactly the expected four platform archives and
+   `SHA256SUMS`, and that each archive name and embedded executable version match
+   `X.Y.Z`.
+5. Download at least the checksums and representative archives from the public
+   release URL, verify them independently, and record the release URL, tag commit,
+   workflow run and final checksums.
+6. From this point, treat every published asset as immutable. Never replace an
+   archive at the same URL. A workflow rerun should leave an existing release
+   untouched.
+
+### 3. Publish and verify Snap
+
+1. Decide before publication whether the connected Snap Store/Launchpad build or
+   GitHub Actions owns this release. Avoid running both publication paths without
+   a deliberate reason.
+2. For connected builds, confirm the store points at `nift-dev/nift`, select the
+   release tag/commit as appropriate, and let builds enter `edge` for all current
+   supported architectures: amd64, arm64, armhf, ppc64el, riscv64 and s390x.
+3. For GitHub Actions publication, configure `SNAPCRAFT_STORE_CREDENTIALS` only
+   when direct publication to `stable` is intended. Without it, `snap.yml` builds
+   artifacts but does not publish them.
+4. Wait for every architecture to reach a terminal result; `riscv64` may take
+   substantially longer. Legacy i386 is not a supported core24/Launchpad target.
+5. Install the exact `edge` or candidate revision on a clean representative host
+   and test version/help, project creation, a real build, dependency tracking and
+   filesystem access under classic confinement.
+6. Promote to candidate/stable only with explicit approval. Confirm `snap info
+   nift` reports `X.Y.Z` on the intended channel and perform a fresh store install.
+
+### 4. Publish and verify Chocolatey
+
+1. Confirm the final Windows ZIP is publicly downloadable and will no longer be
+   replaced. `chocolatey.yml` derives its checksum from that release asset.
+2. Let the tag-triggered release call the Chocolatey workflow, or manually run
+   `chocolatey.yml` with `version: X.Y.Z`. `CHOCOLATEY_API_KEY` must be configured
+   to push; otherwise only the `.nupkg` artifact is produced.
+3. Inspect the workflow result and retain the generated `.nupkg`. When practical,
+   test install, shimmed `nift` execution, a real project, upgrade and uninstall
+   in a disposable clean Windows VM.
+4. Confirm the package page shows the submission, then wait for validation,
+   verification and moderation. Workflow success means submitted, not approved.
+5. If automated verification fails, read its public log. For a real package
+   defect while the version is still unapproved, fix the workflow/template and
+   manually dispatch the exact same version with `resubmit: true`.
+6. Use a verifier-only rerun only for a spurious test result against an already
+   correct package. Put any maintainer response in **Add to Review Comments** on
+   the package page.
+7. Declare Chocolatey availability only after approval and a fresh
+   `choco install nift --version X.Y.Z` succeeds from the community repository.
+
+### 5. Update Homebrew
+
+1. Download the resolved formula artifact from `homebrew.yml` and confirm its URL
+   and SHA-256 refer to the immutable `nift-dev/nift` tagged source archive.
+2. Confirm the workflow tested the formula on both supported macOS and Linux
+   runners. Do not copy legacy LuaJIT, patch or `nsm` behavior into the formula.
+3. Check Homebrew's automatic bump service and existing pull requests before
+   opening anything manually. Do not submit a duplicate update.
+4. If needed, fork/update `Homebrew/homebrew-core`, change `Formula/n/nift.rb`,
+   run the required formula audit/tests, and submit the normal upstream pull
+   request. Homebrew CI and maintainers own official bottles.
+5. After merge and bottle publication, run `brew update`, install/upgrade Nift
+   from Homebrew, verify `nift version`, and record the merged PR and formula URL.
+
+### 6. Update Flathub
+
+1. Work in the external `flathub/cc.nift.nsm` repository; do not create a new app
+   or change the established `cc.nift.nsm` app ID.
+2. Point the manifest source at the immutable `nift-dev/nift` `vX.Y.Z` archive
+   and set its exact SHA-256.
+3. Update AppStream `bugtracker` and `vcs-browser` fields to `nift-dev/nift` when
+   migrating from the legacy repository. Preserve the established desktop, icon
+   and AppStream assets unless the update deliberately changes them.
+4. Reconcile the command with `nift` and remove legacy Git, LuaRocks, patches and
+   source inputs only after verifying they are no longer required.
+5. Build the complete external manifest with `flatpak-builder` or
+   `org.flatpak.Builder`, run Flathub lint, and test Nift against host project
+   files.
+6. Submit the external pull request and wait for Flathub review/build/publication.
+   Verify a fresh Flathub install reports `X.Y.Z` before calling it available.
+
+### 7. Close the release
+
+1. Record the exact tag/commit, GitHub release and workflow URLs, final checksums,
+   package-manager PRs/builds/revisions/channels, installation tests and known
+   limitations in the release handover.
+2. Report each downstream separately as built, submitted, verified, approved or
+   publicly installable. These services may finish days apart.
+3. Update the website/download instructions only with availability that has been
+   confirmed from the public store.
+4. Track incomplete downstream work explicitly rather than reopening or mutating
+   the GitHub release.
+
 Never describe a release as available through a package manager until its public
 store entry resolves to the intended version and a fresh installation succeeds.
+
+## v4.0.0 publication record
+
+The first release through this consolidated pipeline is
+[`v4.0.0`](https://github.com/nift-dev/nift/releases/tag/v4.0.0), tagged at
+`aa2b11794c79456df447397ea73ee9f71f46b6f1`. Its final Windows x86-64 archive
+SHA-256 is
+`25b271c8fe0bf7ab9e31eb7533b2f7b49d923ccb99771dea6e80acb6f5bfce5a`.
+Do not replace that archive.
+
+During recovery, a release rerun replaced the Windows ZIP after the first
+Chocolatey package had recorded checksum
+`fe8671922fb702bfda6ead5a1348d076053e4899849572ce5447c2055e06b980`.
+Chocolatey correctly rejected the stale checksum. Commit `6d59d75` made existing
+GitHub release assets immutable on rerun and added the explicit Chocolatey
+moderation-resubmission input. The corrected exact-version submission succeeded
+in [Chocolatey workflow run 31972761587](https://github.com/nift-dev/nift/actions/runs/31972761587);
+store verification and approval remain separate downstream states.
+
+The generated Homebrew formula passed the repository's macOS and Linux tests and
+was submitted as
+[`Homebrew/homebrew-core#299162`](https://github.com/Homebrew/homebrew-core/pull/299162).
+The connected Snap Store build published 4.0.0 to `latest/edge` while stable was
+still 3.0.3; most architectures completed quickly, while `riscv64` remained in
+progress much longer. Record the eventual channel/architecture result rather
+than inferring it from workflow success. The external Flathub update remains
+authoritative in `flathub/cc.nift.nsm` and must be recorded by its actual commit
+and publication result.
+
+GitHub currently warns that `actions/checkout@v4` and
+`actions/upload-artifact@v4` target the deprecated Node.js 20 action runtime and
+are being forced onto Node.js 24. This did not invalidate the v4.0.0 workflows,
+but future maintenance should upgrade those actions when supported; do not treat
+the warning alone as a reason to alter release artifacts.

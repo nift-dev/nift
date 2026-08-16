@@ -80,3 +80,15 @@ For packaged releases, also record artifact checksums, the installed package
 version tested from each store, the store/channel publication state, and the
 external Flathub manifest commit where applicable. A successful workflow upload
 is not evidence that a store has published or served the package.
+
+Treat these as separate states and report them precisely:
+
+1. packaging workflow succeeded;
+2. package was submitted to the store;
+3. automated verification passed;
+4. human review/approval completed where applicable; and
+5. the intended version is publicly installable from the intended channel.
+
+Do not collapse those states into “released”. A GitHub Actions success can prove
+that a package was built or submitted, but it cannot by itself prove store
+approval or availability.
