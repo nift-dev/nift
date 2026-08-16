@@ -22,6 +22,7 @@ on:
 jobs:
   formula:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - runner: macos-15
@@ -58,9 +59,12 @@ jobs:
         env:
           HOMEBREW_NO_AUTO_UPDATE: '1'
           HOMEBREW_NO_INSTALL_FROM_API: '1'
+          GIT_AUTHOR_NAME: Nift CI
+          GIT_AUTHOR_EMAIL: ci@nift.dev
+          GIT_COMMITTER_NAME: Nift CI
+          GIT_COMMITTER_EMAIL: ci@nift.dev
+          GIT_CONFIG_GLOBAL: /dev/null
         run: |
-          git config --global user.name "Nift CI"
-          git config --global user.email "ci@nift.dev"
           brew tap-new nift-dev/nift-ci
           tap_dir="$(brew --repository nift-dev/nift-ci)"
           cp .build/homebrew/nift.rb "$tap_dir/Formula/nift.rb"
