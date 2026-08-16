@@ -15,6 +15,7 @@ make
 make test
 ASAN_OPTIONS=detect_leaks=0 make test-sanitize # use only where LSan is unavailable
 make benchmark
+make distcheck       # from a clean committed standalone checkout
 ./minify app.js        # app.min.js
 ./minify -i app.js     # overwrite app.js
 ```
@@ -35,6 +36,14 @@ silently replaced.
 - standalone CLI smoke tests and format-specific C++ smoke tests.
 
 The latest JSX fix distinguishes valid TSX generic arrows such as `<T,>(x:T) => ...` from nested JSX roots.
+
+## Readiness
+
+The current checkpoint is production-ready for the documented conservative
+format/API/CLI contract on the directly validated Linux toolchain. It is not a
+claim of universal equivalence for all future web syntax, maximum compression,
+or direct macOS/Windows validation. See the standalone project's living readiness
+assessment for the evidence and limitations.
 
 
 ## v1.0.1 hardening checkpoint

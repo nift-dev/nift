@@ -46,6 +46,9 @@ benchmark:
 	  $(TESTDIR)/minifypp-benchmark $(BENCH_REPETITIONS) $(BENCH_ITERATIONS); \
 	fi
 
+distcheck:
+	bash scripts/distcheck.sh
+
 test-smoke:
 	mkdir -p $(TESTDIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/minify_smoke.cpp $(LIBSRC) -o $(SMOKE)
@@ -66,7 +69,7 @@ test-cli: $(TARGET)
 clean:
 	rm -rf $(TESTDIR) $(TARGET)
 
-.PHONY: all test check-nift-sync test-smoke test-node test-generated test-jsx test-formats test-cross-format test-cli test-fuzz test-sanitize benchmark clean
+.PHONY: all test check-nift-sync test-smoke test-node test-generated test-jsx test-formats test-cross-format test-cli test-fuzz test-sanitize benchmark distcheck clean
 
 test-formats:
 	bash tests/minify_format_idempotence.sh

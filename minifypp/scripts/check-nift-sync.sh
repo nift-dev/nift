@@ -20,6 +20,7 @@ FILES=(
   cli/main.cpp
   include/minify/Minify.h
   scripts/check-nift-sync.sh
+  scripts/distcheck.sh
   src/Json.h
   src/Minify.cpp
   tests/cli_smoke.sh

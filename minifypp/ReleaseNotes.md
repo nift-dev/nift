@@ -16,6 +16,8 @@
 - Prevented whitespace removal from manufacturing CSS comment delimiters, JSX
   openers, or HTML/XML comment/CDATA-like syntax. These boundary families were
   discovered by the new 70,000-case mutation gate and retained as focused tests.
+- Added a clean committed source-package `distcheck` and completed the Linux
+  production-readiness review with bounded platform/syntax limitations documented.
 
 ## v1.0.5
 
