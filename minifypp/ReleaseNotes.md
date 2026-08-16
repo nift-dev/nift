@@ -7,6 +7,10 @@
 - Renamed the public C++ API from the old project namespace/header identity to `namespace minify` and `<minify/Minify.h>`.
 - Renamed the implementation source to `src/Minify.cpp`; the Makefile now produces `minify`.
 - Minification semantics and format version remain unchanged from the v1.0.5 hardening checkpoint.
+- Hardened CLI file handling: read failures are distinct from valid empty input,
+  output is prepared before destination replacement, existing permission bits are
+  preserved, and symbolic-link destinations are rejected explicitly.
+- Added a machine-checkable 16-file standalone/Nift synchronization gate.
 
 ## v1.0.5
 

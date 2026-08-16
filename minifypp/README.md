@@ -19,6 +19,11 @@ make test
 
 The library API accepts strings and returns strings/errors. File naming and destructive/non-destructive behavior belong to the calling CLI rather than the minification engine.
 
+CLI output is prepared in a sibling temporary directory and committed only after
+a complete successful write. Replacing an existing regular file preserves its
+permission bits. Symbolic-link destinations are rejected rather than followed or
+silently replaced.
+
 ## Current adversarial gates
 
 - 15,459 executable JavaScript semantic programs.
