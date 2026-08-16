@@ -61,4 +61,7 @@ jobs:
       - name: Publish to Chocolatey Community Repository
         if: github.event_name != 'pull_request' && env.CHOCOLATEY_API_KEY != ''
         shell: pwsh
-        run: choco push .build/packages/*.nupkg --source https://push.chocolatey.org/ --api-key $env:CHOCOLATEY_API_KEY
+        run: |
+          $package = Get-ChildItem .build/packages -Filter *.nupkg | Select-Object -First 1
+          if (-not $package) { throw 'Chocolatey package artifact was not found' }
+          choco push $package.FullName --source https://push.chocolatey.org/ --api-key $env:CHOCOLATEY_API_KEY
