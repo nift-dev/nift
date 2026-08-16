@@ -1,0 +1,17 @@
+class Nift < Formula
+  desc "Fast dependency-aware website generator"
+  homepage "https://nift.dev/"
+  url "@URL@"
+  sha256 "@SHA256@"
+  license "MIT"
+
+  def install
+    system "make"
+    system "make", "install", "PREFIX=#{prefix}"
+  end
+
+  test do
+    system bin/"nift", "init", ".html"
+    assert_path_exists testpath/"public/index.html"
+  end
+end

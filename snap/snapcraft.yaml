@@ -1,0 +1,39 @@
+name: nift
+title: Nift
+version: '4.0.0'
+summary: Fast dependency-aware website generator
+description: |
+  Nift is a fast, lightweight and flexible website generator. It tracks
+  content, templates and dependencies so that it can rebuild only the files
+  affected by a change.
+
+base: core24
+grade: stable
+confinement: classic
+license: MIT
+website: https://nift.dev
+source-code: https://github.com/nift-dev/nift
+issues: https://github.com/nift-dev/nift/issues
+
+platforms:
+  amd64:
+  arm64:
+  armhf:
+  ppc64el:
+  riscv64:
+  s390x:
+
+apps:
+  nift:
+    command: usr/bin/nift
+
+parts:
+  nift:
+    plugin: nil
+    source: .
+    build-packages:
+      - g++
+      - make
+    override-build: |
+      make -j"${CRAFT_PARALLEL_BUILD_COUNT}"
+      make install DESTDIR="$CRAFT_PART_INSTALL" PREFIX=/usr

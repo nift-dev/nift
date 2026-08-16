@@ -1,0 +1,62 @@
+name: Homebrew
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Existing GitHub release version, with or without v prefix
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Existing GitHub release version, with or without v prefix
+        required: true
+  pull_request:
+    paths:
+      - 'packaging/homebrew/**'
+      - 'Makefile'
+      - 'src/**'
+      - '.github/workflows/homebrew.yml'
+
+jobs:
+  formula:
+    strategy:
+      matrix:
+        include:
+          - runner: macos-15
+            platform: macos-arm64
+          - runner: ubuntu-latest
+            platform: linux-x86_64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve formula
+        id: formula
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            version="4.0.0"
+            archive_url="https://github.com/nift-dev/nift/archive/${GITHUB_SHA}.tar.gz"
+          else
+            version="${{ inputs.version }}"
+            version="${version#v}"
+            archive_url="https://github.com/nift-dev/nift/archive/refs/tags/v${version}.tar.gz"
+          fi
+          mkdir -p .build/homebrew
+          curl --fail --location --retry 3 "$archive_url" --output .build/homebrew/source.tar.gz
+          checksum="$(shasum -a 256 .build/homebrew/source.tar.gz | awk '{print $1}')"
+          sed -e "s|@URL@|$archive_url|g" -e "s/@SHA256@/$checksum/g" \
+            packaging/homebrew/nift.rb.in > .build/homebrew/nift.rb
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Build and test formula
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          HOMEBREW_NO_INSTALL_FROM_API: '1'
+        run: |
+          brew install --build-from-source .build/homebrew/nift.rb
+          brew test .build/homebrew/nift.rb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nift-homebrew-${{ matrix.platform }}
+          path: .build/homebrew/nift.rb

@@ -1,0 +1,15 @@
+VERIFICATION
+
+This package is maintained by the Nift project and downloads the official
+Windows x86-64 release archive from:
+
+https://github.com/nift-dev/nift/releases/download/v__VERSION__/nift-__VERSION__-windows-x86_64.zip
+
+The SHA-256 checksum calculated from that archive and embedded in
+chocolateyInstall.ps1 is:
+
+__CHECKSUM64__
+
+The release also publishes SHA256SUMS at:
+
+https://github.com/nift-dev/nift/releases/download/v__VERSION__/SHA256SUMS

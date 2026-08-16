@@ -20,7 +20,7 @@ whether it is a regression.
 ## Current identity
 
 - Product: **Nift**, a website generator and dependency-aware website build layer.
-- Current executable identity: `Nift v4.0.0 (C++ rewrite 1.0.42)`.
+- Current executable identity: `Nift v4.0.0`.
 - Language/toolchain: C++17 and Make.
 - Output convention for modern projects: `public/`.
 - Current branch: `main` in this checkout.
@@ -80,6 +80,8 @@ themselves. Nift owns the small build-time job it can perform precisely.
 - `docs/handover/TESTING.md`: validation architecture and historical bug lessons.
 - `docs/handover/DECISIONS.md`: settled, rejected, and unresolved decisions.
 - `docs/handover/RELEASES.md`: release-candidate and public-action guidance.
+- `docs/handover/PACKAGING.md`: release artifacts, package recipes, store
+  publication workflows, credentials, and the external Flathub relationship.
 - `docs/handover/ROADMAP.md`: living production-readiness risk assessment.
 
 ### Detailed subject handovers

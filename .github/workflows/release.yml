@@ -1,0 +1,100 @@
+name: Release artifacts
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  unix:
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            platform: linux-x86_64
+          - runner: macos-15
+            platform: macos-arm64
+          - runner: macos-15-intel
+            platform: macos-x86_64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and smoke test
+        run: |
+          make -j2
+          ./nift version
+      - name: Stage archive
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          test "$(./nift version | sed -E 's/^Nift v([^ ]+).*/\1/')" = "$version"
+          root="nift-$version-${{ matrix.platform }}"
+          mkdir "$root"
+          cp nift README.md LICENSE "$root/"
+          tar -czf "$root.tar.gz" "$root"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}
+          path: nift-*.tar.gz
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: make mingw-w64-ucrt-x86_64-gcc
+      - name: Build and stage archive
+        shell: msys2 {0}
+        run: |
+          make -j2
+          version="${GITHUB_REF_NAME#v}"
+          test "$(./nift.exe version | sed -E 's/^Nift v([^ ]+).*/\1/')" = "$version"
+          root="nift-$version-windows-x86_64"
+          mkdir "$root"
+          cp nift.exe README.md LICENSE "$root/"
+          powershell.exe -NoProfile -Command "Compress-Archive -Path '$root' -DestinationPath '$root.zip'"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-x86_64
+          path: nift-*.zip
+
+  publish:
+    if: github.event_name == 'push'
+    needs: [unix, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Create checksums
+        working-directory: dist
+        run: sha256sum nift-* > SHA256SUMS
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --generate-notes
+
+  chocolatey:
+    needs: publish
+    uses: ./.github/workflows/chocolatey.yml
+    with:
+      version: ${{ github.ref_name }}
+    secrets: inherit
+
+  snap:
+    needs: publish
+    uses: ./.github/workflows/snap.yml
+    secrets: inherit
+
+  homebrew:
+    needs: publish
+    uses: ./.github/workflows/homebrew.yml
+    with:
+      version: ${{ github.ref_name }}

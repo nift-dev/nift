@@ -1,0 +1,66 @@
+name: Chocolatey
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Existing GitHub release version, with or without v prefix
+        required: true
+        type: string
+  pull_request:
+    paths:
+      - 'packaging/chocolatey/**'
+      - '.github/workflows/chocolatey.yml'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Existing GitHub release version without the v prefix
+        required: true
+
+jobs:
+  package:
+    runs-on: windows-latest
+    env:
+      CHOCOLATEY_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve release version
+        id: version
+        shell: pwsh
+        run: |
+          $version = if ('${{ github.event_name }}' -eq 'workflow_call' -or '${{ github.event_name }}' -eq 'workflow_dispatch') {
+            '${{ inputs.version }}'.TrimStart('v')
+          } else {
+            '0.0.0'
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+      - name: Stage package source
+        shell: pwsh
+        run: |
+          New-Item .build/chocolatey -ItemType Directory -Force | Out-Null
+          Copy-Item packaging/chocolatey/* .build/chocolatey -Recurse
+          $version = '${{ steps.version.outputs.version }}'
+          $checksum = '0' * 64
+          if ('${{ github.event_name }}' -ne 'pull_request') {
+            $asset = "nift-$version-windows-x86_64.zip"
+            Invoke-WebRequest "https://github.com/nift-dev/nift/releases/download/v$version/$asset" -OutFile $asset
+            $checksum = (Get-FileHash $asset -Algorithm SHA256).Hash.ToLowerInvariant()
+            Expand-Archive $asset -DestinationPath smoke
+            $reported = (& (Get-ChildItem smoke -Recurse -Filter nift.exe | Select-Object -First 1).FullName version)
+            if ($reported -notmatch "^Nift v$([regex]::Escape($version))( |$)") { throw "Version mismatch: $reported" }
+          }
+          Get-ChildItem .build/chocolatey -Recurse -File | ForEach-Object {
+            $text = Get-Content $_.FullName -Raw
+            $text.Replace('__VERSION__', $version).Replace('__CHECKSUM64__', $checksum) | Set-Content $_.FullName -Encoding utf8
+          }
+      - name: Pack
+        shell: pwsh
+        run: choco pack .build/chocolatey/nift.nuspec --outputdirectory .build/packages
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nift-chocolatey
+          path: .build/packages/*.nupkg
+      - name: Publish to Chocolatey Community Repository
+        if: github.event_name != 'pull_request' && env.CHOCOLATEY_API_KEY != ''
+        shell: pwsh
+        run: choco push .build/packages/*.nupkg --source https://push.chocolatey.org/ --api-key $env:CHOCOLATEY_API_KEY

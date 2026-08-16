@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>nift</id>
+    <version>__VERSION__</version>
+    <title>Nift</title>
+    <authors>Nicholas Ham</authors>
+    <owners>Nicholas Ham</owners>
+    <projectUrl>https://nift.dev</projectUrl>
+    <packageSourceUrl>https://github.com/nift-dev/nift/tree/main/packaging/chocolatey</packageSourceUrl>
+    <projectSourceUrl>https://github.com/nift-dev/nift</projectSourceUrl>
+    <docsUrl>https://nift.dev</docsUrl>
+    <bugTrackerUrl>https://github.com/nift-dev/nift/issues</bugTrackerUrl>
+    <licenseUrl>https://github.com/nift-dev/nift/blob/main/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>Nift is a fast, lightweight and flexible dependency-aware website generator.</description>
+    <summary>Fast dependency-aware website generator</summary>
+    <releaseNotes>https://github.com/nift-dev/nift/releases/tag/v__VERSION__</releaseNotes>
+    <copyright>Copyright Nicholas Ham and Nift contributors</copyright>
+    <tags>nift static-site-generator website-generator cli</tags>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>

@@ -1,0 +1,28 @@
+{
+  "app-id": "cc.nift.nsm",
+  "runtime": "org.freedesktop.Platform",
+  "runtime-version": "25.08",
+  "sdk": "org.freedesktop.Sdk",
+  "command": "nift",
+  "finish-args": [
+    "--filesystem=host",
+    "--share=network"
+  ],
+  "modules": [
+    {
+      "name": "nift",
+      "buildsystem": "simple",
+      "build-commands": [
+        "make -j${FLATPAK_BUILDER_N_JOBS}",
+        "make install DESTDIR=/app PREFIX="
+      ],
+      "sources": [
+        {
+          "type": "archive",
+          "url": "https://github.com/nift-dev/nift/archive/refs/tags/v@VERSION@.tar.gz",
+          "sha256": "@SHA256@"
+        }
+      ]
+    }
+  ]
+}

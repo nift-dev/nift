@@ -1,11 +1,16 @@
 # Nift release and publication handover
 
+Package-manager recipes, GitHub release workflows, store credentials, artifact
+names, and the existing Flathub update path are documented in `PACKAGING.md`.
+This document owns release readiness; `PACKAGING.md` owns how an approved release
+is packaged and published.
+
 ## Authority and current state
 
-The executable currently reports `Nift v4.0.0 (C++ rewrite 1.0.42)`. Exact tag,
-artifact, and public release conventions are not fully formalized by the retained
-history. Do not invent them. Reconcile actual Git history and Nick's intended
-release before the next public release.
+The executable currently reports `Nift v4.0.0`. The retained rewrite checkpoint
+identity remains documented in project history and release notes, but it is not
+part of the public product version. Exact tag, artifact, and public release
+conventions must follow `PACKAGING.md` and actual Git/release evidence.
 
 A website content checkpoint, regression-suite checkpoint, and executable version
 are distinct identities. Do not synchronize version numbers mechanically.
@@ -71,3 +76,7 @@ Record exact source/suite/site identities, commands, outcomes, environment where
 material, package contents, known limitations, and publication status. Separate
 facts from interpretation and avoid universal performance claims from one host.
 
+For packaged releases, also record artifact checksums, the installed package
+version tested from each store, the store/channel publication state, and the
+external Flathub manifest commit where applicable. A successful workflow upload
+is not evidence that a store has published or served the package.
