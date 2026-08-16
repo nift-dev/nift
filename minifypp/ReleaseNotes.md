@@ -11,6 +11,9 @@
 - Kept Node-based CSS/JSON oracles process-supervision independent: the shell
   invokes native drivers and Node parses completed files, allowing clean-package
   validation in restricted desktop and CI wrappers without skipping evidence.
+- Revalidated the scoped production-readiness decision only after the committed
+  clean source archive passed the complete suite and the repaired website passed
+  fresh-browser layout and content checks.
 - Prevented JavaScript minification from manufacturing `/*` or `*/` across
   authored whitespace.
 - Prevented the JSX root finder from interpreting JSX-like text inside JavaScript
