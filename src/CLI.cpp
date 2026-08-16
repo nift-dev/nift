@@ -242,10 +242,9 @@ json::Document watch_json(const WatchList& watch) {
 void print_about() {
     std::cout
         << console::heading("Nift") << " ⚡\n"
-        << console::dim("Fast, lightweight website generation in C++") << "\n\n"
-        << "Nift tracks content, templates and dependencies, then rebuilds only what\n"
-        << "needs rebuilding. Use it for simple sites, documentation, generated assets,\n"
-        << "or as a small build layer alongside the frontend/backend tools you prefer.\n\n"
+        << console::dim("Production-grade, dependency-aware website builds") << "\n\n"
+        << "Fast incremental and parallel builds, precise transitive dependency tracking,\n"
+        << "structured data and validation, with framework-agnostic output.\n\n"
         << console::dim(version_text) << '\n'
         << "Website: " << console::path("https://nift.dev") << '\n'
         << "License: MIT\n";
