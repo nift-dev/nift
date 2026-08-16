@@ -66,7 +66,7 @@ PYMTIME
 grep -Fq '"public/assets/a.txt"' "$P/.nift/public/index.info.json"
 ! grep -Fq '"public/assets/b.txt"' "$P/.nift/public/index.info.json"
 
-# Sorting + schema + nested input + req collection.
+# Sorting + schema + nested input + interpolated req collection.
 P="$TMP/sorted-input"; mkproj "$P"
 mkdir -p "$P/templates/parts" "$P/public/assets"
 printf A >"$P/public/assets/a.txt"; printf B >"$P/public/assets/b.txt"
@@ -87,11 +87,11 @@ cat >"$P/templates/parts/item.html" <<'EOF'
 <span>$[loop.index]:$[item.name]:@pathto('public/assets/$[item.name].txt')</span>
 EOF
 printf '\n' >"$P/content/index.html"
-if (cd "$P" && "$NIFT_BIN" build-all >log 2>&1); then
-  echo "dynamic-looking pathto parameter unexpectedly accepted interpolation inside quoted parameter" >&2
-  exit 1
-fi
-grep -Fq "is neither a tracked name nor a file that exists" "$P/log"
+(cd "$P" && "$NIFT_BIN" build-all >/dev/null)
+grep -Fq '<span>1:a:assets/a.txt</span>' "$P/public/index.html"
+grep -Fq '<span>2:b:assets/b.txt</span>' "$P/public/index.html"
+grep -Fq '"public/assets/a.txt"' "$P/.nift/public/index.info.json"
+grep -Fq '"public/assets/b.txt"' "$P/.nift/public/index.info.json"
 
 # Tracked output req disappears, both producer and consumer should be candidates;
 # build-updated must recreate producer and then allow consumer to succeed.

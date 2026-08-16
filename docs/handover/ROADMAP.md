@@ -20,9 +20,10 @@ a reproducible release process—not merely a version number.
 
 1. Reconcile current repository, local tests, external suite, website, and
    retained benchmark evidence.
-2. Specify `$[...]` parameter-level value resolution in the external contract.
-3. Implement it without making operations nestable expressions.
-4. Prove lexical scope, escaping, type behavior, source-bound argument boundaries,
+2. Preserve the now-green `$[...]` parameter-level contract and its strict
+   value/operation boundary.
+3. Extend source-guided adversarial testing around parser/value/dependency edges.
+4. Continue proving lexical scope, escaping, type behavior, source-bound argument boundaries,
    non-recursion, path-safety parity, and failure transactionality.
 5. Prove A→B lifecycle replacement for dynamic inputs, dependencies, JSON sources,
    and requirements where supported, across relevant incremental modes/watch.
@@ -35,12 +36,13 @@ a reproducible release process—not merely a version number.
 11. Resolve release-blocking findings and formalize the release candidate process.
 12. Decide with Nick whether evidence justifies production publication.
 
-Repository reconciliation and a clean 14-module independent contract run were
-completed on 2026-08-16. This establishes the pre-feature behavioral baseline;
-it does not complete sanitizer, performance, website, release, or new
-parameter-interpolation work. Source inspection also confirmed that parameter
-interpolation is not partly implemented: `$[...]` is resolved in rendered text,
-while directive parameters currently remain plain parsed strings.
+Repository reconciliation and a clean 14-module pre-feature contract run were
+completed on 2026-08-16. The parameter feature was then implemented and the
+expanded suite passed all 15 modules, including its 73-check focused contract.
+Local integration tests, an ASan/UBSan candidate run, a disposable 40-page Nift
+website build, and the retained 10k performance fixture also passed. LeakSanitizer
+could not run under the desktop environment's ptrace supervision; retain that as
+a future native-environment check rather than claiming leak coverage here.
 
 If the feature exposes deeper dependency-state or parser architecture defects,
 expand the roadmap rather than promoting the candidate prematurely.

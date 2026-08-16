@@ -32,7 +32,14 @@ std::vector<std::string> parse_parameters(const std::string& text, bool& ok) {
     for (std::size_t i = 0; i < text.size(); ++i) {
         const char c = text[i];
         if (quoted) {
-            if (c == '\\' && i + 1 < text.size()) current += text[++i];
+            if (c == '\\' && i + 1 < text.size()) {
+                const char escaped = text[++i];
+                // Preserve escaped-dollar intent until the interpolation pass.
+                // Other quoted escapes retain the established logical-string
+                // behavior of dropping the source escape character.
+                if (escaped == '$') current += '\\';
+                current += escaped;
+            }
             else if (c == quote) quoted = false;
             else current += c;
         } else if (c == '\'' || c == '"') {
@@ -67,6 +74,15 @@ bool reserved_binding_name(const std::string& name) {
         // `loop` is the lexical metadata object injected by @for. Reserving it
         // prevents user data aliases from becoming ambiguous with $[loop.*].
         "loop"
+    };
+    return names.count(name) != 0;
+}
+
+bool built_in_metadata_name(const std::string& name) {
+    static const std::unordered_set<std::string> names = {
+        "title", "name", "content-path", "output-path", "template-path",
+        "build-timezone", "build-time", "build-UTC-time", "build-date",
+        "build-UTC-date", "build-YYYY", "build-YY", "build-OS"
     };
     return names.count(name) != 0;
 }
@@ -524,6 +540,62 @@ bool Parser::json_value(const std::string& expression, std::string& value, std::
     return true;
 }
 
+bool Parser::interpolate_parameter(const std::string& parameter,
+                                   std::string& resolved,
+                                   std::string& error) const {
+    resolved.clear();
+    resolved.reserve(parameter.size());
+
+    for (std::size_t i = 0; i < parameter.size();) {
+        if (parameter[i] == '\\' && i + 1 < parameter.size() && parameter[i + 1] == '$') {
+            resolved.push_back('$');
+            i += 2;
+            continue;
+        }
+        if (parameter.compare(i, 2, "$[") != 0) {
+            const auto next = parameter.find_first_of("\\$", i + 1);
+            const std::size_t end = next == std::string::npos ? parameter.size() : next;
+            resolved.append(parameter, i, end - i);
+            i = end;
+            continue;
+        }
+
+        std::size_t end = i + 2;
+        std::size_t nested_brackets = 0;
+        for (; end < parameter.size(); ++end) {
+            if (parameter[end] == '[') {
+                ++nested_brackets;
+            } else if (parameter[end] == ']') {
+                if (nested_brackets == 0) break;
+                --nested_brackets;
+            }
+        }
+        if (end == parameter.size()) {
+            error = "unterminated parameter value expression";
+            return false;
+        }
+
+        const std::string expression = parameter.substr(i + 2, end - i - 2);
+        if (built_in_metadata_name(expression)) {
+            resolved += metadata(expression);
+        } else {
+            std::string value;
+            std::string value_error;
+            if (!json_value(expression, value, value_error)) {
+                error = "unknown parameter value $[" + expression + "]";
+                return false;
+            }
+            if (!value_error.empty()) {
+                error = std::move(value_error);
+                return false;
+            }
+            resolved += value;
+        }
+        i = end + 1;
+    }
+    return true;
+}
+
 bool Parser::scalar_literal(const std::string& text, json::Document& value, std::string& error) const {
     const std::string trimmed = trim_copy(text);
     if (trimmed.empty()) {
@@ -824,13 +896,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             if (end < source.size()) {
                 const std::string key = source.substr(i + 2, end - i - 2);
                 const std::string metadata_value = metadata(key);
-                const bool known_metadata =
-                    key == "title" || key == "name" || key == "content-path" ||
-                    key == "output-path" || key == "template-path" ||
-                    key == "build-timezone" || key == "build-time" ||
-                    key == "build-UTC-time" || key == "build-date" ||
-                    key == "build-UTC-date" || key == "build-YYYY" ||
-                    key == "build-YY" || key == "build-OS";
+                const bool known_metadata = built_in_metadata_name(key);
 
                 if (known_metadata) {
                     output += metadata_value;
@@ -1399,6 +1465,11 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
 
             if (function == "input") {
                 if (!has_parameters || parameters.size() != 1) { fail(source_path, source, i, "input: expected 1 parameter"); break; }
+                std::string resolved, interpolation_error;
+                if (!interpolate_parameter(parameters[0], resolved, interpolation_error)) {
+                    fail(source_path, source, i, "input: " + interpolation_error); break;
+                }
+                parameters[0] = std::move(resolved);
                 fs::path input_path = parameters[0];
                 if (input_path.is_relative()) {
                     const fs::path relative_to_source = source_path.parent_path() / input_path;
@@ -1424,6 +1495,11 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
 
             if (function == "pathto" || function == "pathtofile") {
                 if (!has_parameters || parameters.size() != 1) { fail(source_path, source, i, "@" + function + " expects exactly one path/name"); break; }
+                std::string resolved, interpolation_error;
+                if (!interpolate_parameter(parameters[0], resolved, interpolation_error)) {
+                    fail(source_path, source, i, function + ": " + interpolation_error); break;
+                }
+                parameters[0] = std::move(resolved);
 
                 if (!project_.find(parameters[0])) {
                     const fs::path target_path = (project_.root / parameters[0]).lexically_normal();
@@ -1445,6 +1521,11 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
 
             if (function == "getenv") {
                 if (!has_parameters || parameters.size() != 1) { fail(source_path, source, i, "getenv: expected 1 parameter"); break; }
+                std::string resolved, interpolation_error;
+                if (!interpolate_parameter(parameters[0], resolved, interpolation_error)) {
+                    fail(source_path, source, i, "getenv: " + interpolation_error); break;
+                }
+                parameters[0] = std::move(resolved);
                 if (const char* value = std::getenv(parameters[0].c_str())) output += value;
                 i = end;
                 continue;
@@ -1452,6 +1533,11 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
 
             if (function == "ent") {
                 if (!has_parameters || parameters.size() != 1) { fail(source_path, source, i, "@ent expects exactly one entity"); break; }
+                std::string resolved, interpolation_error;
+                if (!interpolate_parameter(parameters[0], resolved, interpolation_error)) {
+                    fail(source_path, source, i, "ent: " + interpolation_error); break;
+                }
+                parameters[0] = std::move(resolved);
                 bool known = false;
                 output += entity(parameters[0], known);
                 if (!known) { fail(source_path, source, i, "do not currently have an entity value for '" + parameters[0] + "'"); break; }
@@ -1463,6 +1549,19 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 if (!has_parameters || (parameters.size() != 2 && parameters.size() != 3)) {
                     fail(source_path, source, i, "json: expected 2 or 3 parameters (path, name[, schema])");
                     break;
+                }
+
+                std::string resolved_path, interpolation_error;
+                if (!interpolate_parameter(parameters[0], resolved_path, interpolation_error)) {
+                    fail(source_path, source, i, "json: " + interpolation_error); break;
+                }
+                parameters[0] = std::move(resolved_path);
+                if (parameters.size() == 3) {
+                    std::string resolved_schema;
+                    if (!interpolate_parameter(parameters[2], resolved_schema, interpolation_error)) {
+                        fail(source_path, source, i, "json: " + interpolation_error); break;
+                    }
+                    parameters[2] = std::move(resolved_schema);
                 }
 
                 const std::string& json_path_argument = parameters[0];
@@ -1543,7 +1642,13 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
 
             if (function == "dep") {
                 if (!has_parameters || parameters.empty()) { fail(source_path, source, i, "dep: expected parameters"); break; }
-                for (const auto& dependency : parameters) {
+                for (auto& dependency : parameters) {
+                    std::string resolved, interpolation_error;
+                    if (!interpolate_parameter(dependency, resolved, interpolation_error)) {
+                        fail(source_path, source, i, "dep: " + interpolation_error);
+                        break;
+                    }
+                    dependency = std::move(resolved);
                     const fs::path dependency_path = (project_.root / dependency).lexically_normal();
                     if (!filesystem::path_within(project_.root, dependency_path)) {
                         fail(source_path, source, i, "dep: path must stay inside the Nift project: " + dependency);

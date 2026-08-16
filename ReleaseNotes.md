@@ -2,6 +2,10 @@
 
 ## v1.0.42
 
+- Textual directive parameters now support single-pass `$[...]` interpolation for `@input`, `@dep`, `@pathto`/`@pathtofile`, `@json` source/schema paths, `@getenv`, and `@ent`. Binding names and control-flow grammar remain static; substituted `@...` or `$[...]` text is data and is never recursively parsed.
+- Dynamic parameter-selected inputs, dependencies, requirements, and JSON sources participate in the existing incremental and transactional contracts.
+- Added an independent 73-check parameter-interpolation contract covering scalar types, escaping, lexical scope, injection boundaries, path safety, A-to-B dependency replacement, and failed-build recovery.
+
 - Renamed the embedded standalone minifier project to **Minify++**. Its standalone executable is `minify`; Nift's opt-in `minify-exts`/`minify` build contract is unchanged.
 
 - Memory-performance checkpoint for large tracked projects.

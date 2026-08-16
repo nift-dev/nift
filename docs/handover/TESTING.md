@@ -82,8 +82,8 @@ dynamic external assets plus requirements.
 
 ## Parameter interpolation contract family
 
-The `$[...]` textual-parameter feature should be specified externally before
-implementation. Required categories include whole values, literal/value mixing,
+The `$[...]` textual-parameter feature is specified externally and implemented.
+Its protected categories include whole values, literal/value mixing,
 multiple and adjacent values, both quote styles, exact existing escaping, nested
 value paths, loop scope/shadowing, skipped branches, missing/wrong types,
 malformed expressions, and no accidental output emission.
@@ -107,6 +107,12 @@ repair recovers without manual state deletion
 Apply the analogous test to dependencies, requirements, and dynamic JSON sources
 where supported. Verify failed builds preserve prior output/metadata according to
 the existing transaction contract.
+
+The independent suite owns this contract in
+`contract/parameter_interpolation_smoke.sh`. It now passes 73 checks against the
+implementation. All 15 contract modules, including the 578-assertion historical
+layer, are green. The suite runner's temporary-directory isolation was also
+hardened with `mktemp -d` after PID reuse exposed stale-directory collisions.
 
 ## Sanitizers and fuzzing
 

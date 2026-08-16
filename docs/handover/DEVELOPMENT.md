@@ -33,6 +33,22 @@ For bugs, reduce and preserve the reproducer. Look for siblings in the same
 failure family. Prefer root-cause lifecycle/parser/state fixes over one-off
 special cases.
 
+## Reference checkpoint: textual parameter interpolation
+
+The 2026-08-16 `$[...]` textual-parameter checkpoint is a representative example
+of this workflow working in practice. It began with an independent intentionally
+red contract, added a narrow one-pass value interpolation seam without making
+parameters recursive Nift templates, and then validated focused semantics,
+historical behavior, high-risk dependency/requirement transitions, native safety,
+the real Nift website, performance, and memory before reconciling release notes,
+decisions, roadmaps, and handovers.
+
+Use it as an example of checkpoint-quality development, not as fixed ceremony.
+Choose evidence in proportion to the change: filesystem work needs stronger
+containment and lifecycle validation, parser restructuring may justify fuzzing,
+and documentation-only work has a different risk profile. Revise or replace this
+example when later checkpoints establish a better process.
+
 ## Checkpoint vocabulary
 
 - **WORKING**: implementation exists; material validation remains.
@@ -114,4 +130,3 @@ Every substantial checkpoint must ask whether architecture, tests, website,
 handover knowledge, production confidence, or the next priority changed. Update
 durable principles rather than appending a diary entry. Roadmaps may grow,
 shrink, reorder, or change scope as evidence changes.
-

@@ -88,12 +88,19 @@ Use semantic filesystem containment. String-prefix containment is rejected.
 
 ## Parameter interpolation
 
-**Status:** ACTIVE/PREFERRED; SETTLE AFTER IMPLEMENTATION CHECKPOINT
+**Status:** SETTLED/CURRENT
 
 Textual directive arguments should accept direct `$[...]` values and quoted
 literal-plus-value interpolation. Argument boundaries come from source; resolved
 data is not reparsed. Interpolation is one pass and side-effect-free. Arbitrary
 `@...` operations and dynamic binding identifiers remain outside the feature.
+
+Eligible textual positions are `@input`, every `@dep` argument,
+`@pathto`/`@pathtofile`, `@getenv`, `@ent`, and the `@json` source and optional
+schema. The `@json` binding identifier, `@content`, `@if`, and `@for` grammar are
+not interpolated. Scalars become text; arrays, objects, malformed expressions,
+and unknown roots fail through controlled parser errors. `\$` preserves a
+literal dollar in quoted parameters.
 
 **Revisit if:** a real use case demonstrates the need for a richer coherent value
 model. Do not respond by recursively evaluating full Nift templates in arguments.
@@ -147,4 +154,3 @@ rewrite.
 
 Prepare and validate locally. Pushes, tags, releases, deployments, public version
 changes, and destructive restructuring require explicit approval.
-
