@@ -59,8 +59,9 @@ jobs:
           HOMEBREW_NO_AUTO_UPDATE: '1'
           HOMEBREW_NO_INSTALL_FROM_API: '1'
         run: |
-          brew install --build-from-source .build/homebrew/nift.rb
-          brew test .build/homebrew/nift.rb
+          formula_path="$PWD/.build/homebrew/nift.rb"
+          brew install --build-from-source "$formula_path"
+          brew test "$formula_path"
       - uses: actions/upload-artifact@v4
         with:
           name: nift-homebrew-${{ matrix.platform }}

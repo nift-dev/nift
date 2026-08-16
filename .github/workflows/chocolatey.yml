@@ -28,11 +28,8 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          $version = if ('${{ github.event_name }}' -eq 'workflow_call' -or '${{ github.event_name }}' -eq 'workflow_dispatch') {
-            '${{ inputs.version }}'.TrimStart('v')
-          } else {
-            '0.0.0'
-          }
+          $inputVersion = '${{ inputs.version }}'
+          $version = if ($inputVersion) { $inputVersion.TrimStart('v') } else { '0.0.0' }
           "version=$version" >> $env:GITHUB_OUTPUT
       - name: Stage package source
         shell: pwsh
