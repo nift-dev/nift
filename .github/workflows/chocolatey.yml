@@ -64,4 +64,10 @@ jobs:
         run: |
           $package = Get-ChildItem .build/packages -Filter *.nupkg | Select-Object -First 1
           if (-not $package) { throw 'Chocolatey package artifact was not found' }
-          choco push $package.FullName --source https://push.chocolatey.org/ --api-key $env:CHOCOLATEY_API_KEY
+          $published = Invoke-WebRequest "https://community.chocolatey.org/api/v2/package/nift/${{ steps.version.outputs.version }}" `
+            -Method Head -SkipHttpErrorCheck
+          if ($published.StatusCode -eq 200) {
+            Write-Host "Chocolatey package ${{ steps.version.outputs.version }} already exists; skipping duplicate push"
+          } else {
+            choco push $package.FullName --source https://push.chocolatey.org/ --api-key $env:CHOCOLATEY_API_KEY
+          }

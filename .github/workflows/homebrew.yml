@@ -59,6 +59,8 @@ jobs:
           HOMEBREW_NO_AUTO_UPDATE: '1'
           HOMEBREW_NO_INSTALL_FROM_API: '1'
         run: |
+          git config --global user.name "Nift CI"
+          git config --global user.email "ci@nift.dev"
           brew tap-new nift-dev/nift-ci
           tap_dir="$(brew --repository nift-dev/nift-ci)"
           cp .build/homebrew/nift.rb "$tap_dir/Formula/nift.rb"
