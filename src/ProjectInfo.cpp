@@ -149,16 +149,22 @@ bool ProjectInfo::load_tracking() {
         [&](json::Document&& entry) {
             if (!entry.is_object() || !entry.has("name") || !entry["name"].is_string() ||
                 !entry.has("title") || !entry["title"].is_string() ||
-                !entry.has("template") || !entry["template"].is_string()) {
+                (entry.has("template") && !entry["template"].is_string())) {
                 entries_valid = false;
-                entry_error = "every tracked entry must be an object with string name/title/template fields";
+                entry_error = "every tracked entry must be an object with string name/title fields and an optional non-empty string template field";
+                return false;
+            }
+
+            if (entry.has("template") && entry["template"].string.empty()) {
+                entries_valid = false;
+                entry_error = "tracked template must be omitted for a template-less entry, not set to an empty string";
                 return false;
             }
 
             TrackedInfo info{
                 std::move(entry["name"].string),
                 std::move(entry["title"].string),
-                std::move(entry["template"].string),
+                entry.has("template") ? std::move(entry["template"].string) : std::string{},
                 "", "", std::nullopt
             };
             if (entry.has("content-ext")) {
@@ -282,7 +288,7 @@ bool ProjectInfo::save_tracking() const {
         json::Document entry = json::Document::make_object();
         entry["name"] = info.name;
         entry["title"] = info.title;
-        entry["template"] = info.template_path;
+        if (!info.template_path.empty()) entry["template"] = info.template_path;
         if (!info.content_ext.empty()) entry["content-ext"] = info.content_ext;
         if (!info.output_ext.empty()) entry["output-ext"] = info.output_ext;
         if (info.minify.has_value()) entry["minify"] = *info.minify;

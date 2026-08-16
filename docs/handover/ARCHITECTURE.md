@@ -222,9 +222,13 @@ system would suggest implementation at the wrong layer.
 ### Operations and scope
 
 @content expresses the structural relationship between a tracked page and its
-template. @input both contributes rendered bytes and records a content dependency;
-included-file state may prevent recursive cycles. @dep records an external content
-dependency without rendering it. @json loads build-time data, establishes a
+template. A tracked entry may instead omit `template`; in that case its content
+file is parsed directly as the top-level source, and no template dependency is
+created or retained. An explicit empty template value is invalid so omission is
+deliberate and unambiguous. @input both contributes rendered bytes and records a
+content dependency; included-file state may prevent recursive cycles. @dep
+records an external content dependency without rendering it. @json loads
+build-time data, establishes a
 lexical binding, and records the data file as a dependency. @pathto commonly
 records a requirement rather than a content dependency.
 

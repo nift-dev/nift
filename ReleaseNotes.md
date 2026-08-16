@@ -1,5 +1,12 @@
 # Nift — Release Notes
 
+## Unreleased
+
+- Tracked entries may omit `template`; Nift then fully parses the content file
+  itself as the top-level source. Explicit empty template strings remain invalid,
+  existing `@content` templates remain compatible, and new project scaffolds no
+  longer create identity CSS/JavaScript templates.
+
 ## v1.0.42
 
 - Textual directive parameters now support single-pass `$[...]` interpolation for `@input`, `@dep`, `@pathto`/`@pathtofile`, `@json` source/schema paths, `@getenv`, and `@ent`. Binding names and control-flow grammar remain static; substituted `@...` or `$[...]` text is data and is never recursively parsed.

@@ -1713,7 +1713,7 @@ RenderResult Parser::render() {
     const auto content_size = fs::file_size(content_path, content_size_error);
     if (result.ok && !result.content_used && !content_size_error && content_size > 0) {
         result.ok = false;
-        result.error = {tracked_info_.name, template_path, 0, "content has not been used as a dependency; add @content to the template or use an empty template path"};
+        result.error = {tracked_info_.name, template_path, 0, "content has not been used as a dependency; add @content to the template or omit the tracked template field"};
     }
     return result;
 }

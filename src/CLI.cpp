@@ -208,7 +208,7 @@ json::Document tracked_entry_json(const ProjectInfo& project, const TrackedInfo&
     entry["title"] = info.title;
     entry["content-path"] = project.relative(project.content_path(info));
     entry["output-path"] = project.relative(project.output_path(info));
-    entry["template-path"] = info.template_path;
+    if (!info.template_path.empty()) entry["template-path"] = info.template_path;
     entry["content-ext"] = info.content_ext.empty() ? project.config.content_ext : info.content_ext;
     entry["output-ext"] = info.output_ext.empty() ? project.config.output_ext : info.output_ext;
     std::string output_extension = info.output_ext.empty() ? project.config.output_ext : info.output_ext;
@@ -369,14 +369,15 @@ bool initialise_project(const std::string& extension) {
     tracked["tracked"] = json::Document::make_array();
     auto add = [&](const std::string& name, const std::string& title, const std::string& templ, const std::string& ce = "", const std::string& oe = "") {
         json::Document value = json::Document::make_object();
-        value["name"] = name; value["title"] = title; value["template"] = templ;
+        value["name"] = name; value["title"] = title;
+        if (!templ.empty()) value["template"] = templ;
         if (!ce.empty()) value["content-ext"] = ce;
         if (!oe.empty()) value["output-ext"] = oe;
         tracked["tracked"].push_back(value);
     };
     add("/", "index", "templates/template.html");
-    add("assets/css/style", "style", "templates/template.css", ".css", ".css");
-    add("assets/js/script", "script", "templates/template.js", ".js", ".js");
+    add("assets/css/style", "style", "", ".css", ".css");
+    add("assets/js/script", "script", "", ".js", ".js");
     if (!save_json_file(".nift/tracked.json", tracked)) return false;
 
     filesystem::write_file("content/index" + extension, "");
@@ -384,8 +385,6 @@ bool initialise_project(const std::string& extension) {
     filesystem::write_file("content/assets/js/script.js", "");
     filesystem::write_file("templates/head.html", "<meta charset=\"utf-8\">\n");
     filesystem::write_file("templates/template.html", "<!doctype html>\n<html lang=\"en\">\n\t<head>\n\t\t@input(\"templates/head.html\")\n\t</head>\n\t<body>\n\t\t@content\n\t</body>\n</html>\n");
-    filesystem::write_file("templates/template.css", "@content\n");
-    filesystem::write_file("templates/template.js", "@content\n");
 
     ProjectInfo project;
     return project.open() && project.build_all(true) == 0;
