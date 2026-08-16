@@ -1,5 +1,23 @@
 # Minify++ — Release Notes
 
+## Unreleased
+
+- Reopened the production-readiness audit after a real Minify++ website build
+  exposed unsafe CSS whitespace removal. CSS token-boundary handling now protects
+  leading-decimal value lists, descendant selectors, adjacent quoted values,
+  function/value lists, media conditions, and percentage/component boundaries.
+- Added an independent PostCSS semantic-tree differential gate for representative
+  modern CSS alongside expanded focused and generated idempotence regressions.
+- Prevented JavaScript minification from manufacturing `/*` or `*/` across
+  authored whitespace.
+- Prevented the JSX root finder from interpreting JSX-like text inside JavaScript
+  comments as live markup, and made escaped JSX attribute quotes explicit.
+- CSS, HTML, XML, SVG, and JSX now reject affected unterminated quoted constructs
+  instead of accepting partial lexical output.
+- Raised the adversarial validation campaign to 7,000,000 deterministic mutations
+  across the seven formats under both ordinary and ASan/UBSan builds; all
+  successful first-pass outputs remained accepted on the second pass.
+
 ## v1.1.0
 
 - Renamed the project to **Minify++**.

@@ -63,6 +63,10 @@ css_cases=(
 '.a { background: linear-gradient(45deg, red 0%, blue 100%); }'
 '.a { grid-template: "a a" 1fr "b c" 2fr / minmax(0, 1fr) auto; }'
 '.a { font-family: "A B", system-ui; animation: foo 1s steps(2, jump-none); }'
+'.grid { grid-template-columns: 1.15fr .85fr; font: 700 .75rem sans-serif; padding: .1em .3em; }'
+'.a .b, .a #id, .a :hover, .a [data-x], * .item { color: red; }'
+'.a { font-family: "A B" serif; content: "a" "b"; transform: translateX(1px) scale(2); }'
+'.a { color: color-mix(in srgb, var(--bg) 92%, transparent); }'
 )
 
 json_cases=(

@@ -30,6 +30,40 @@ int main() {
     expect(out.find("/ *") != std::string::npos, "CSS whitespace removal created a comment opener");
     expect(out.find("* /") != std::string::npos, "CSS whitespace removal created a comment closer");
 
+    // Authored CSS whitespace can separate tokens even when neither side is an
+    // identifier character. These are public semantic contracts, not preferred
+    // output spellings: removing the spaces changes or invalidates the CSS.
+    expect(minify::css(".grid { grid-template-columns: 1.15fr .85fr; font: 700 .75rem sans-serif; padding: .1em .3em; }", out, err), err);
+    expect(out.find("1.15fr .85fr") != std::string::npos,
+           "CSS dimension whitespace removed before leading decimal");
+    expect(out.find("700 .75rem") != std::string::npos,
+           "CSS font whitespace removed before leading decimal");
+    expect(out.find(".1em .3em") != std::string::npos,
+           "CSS value-list whitespace removed before leading decimal");
+    expect(minify::css(".a .b, .a #id, .a :hover, .a [data-x], .a * { color: red; }", out, err), err);
+    expect(out.find(".a .b") != std::string::npos, "CSS descendant class selector merged");
+    expect(out.find(".a #id") != std::string::npos, "CSS descendant ID selector merged");
+    expect(out.find(".a :hover") != std::string::npos, "CSS descendant pseudo selector merged");
+    expect(out.find(".a [data-x]") != std::string::npos, "CSS descendant attribute selector merged");
+    expect(out.find(".a *") != std::string::npos, "CSS descendant universal selector merged");
+    expect(minify::css("@media screen and (width > 10px) { .x { transform: translateX(1px) scale(2); color: color-mix(in srgb, var(--bg) 92%, transparent); } }", out, err), err);
+    expect(out.find("and (") != std::string::npos, "CSS media condition whitespace removed");
+    expect(out.find(") scale(") != std::string::npos, "CSS transform-list whitespace removed");
+    expect(out.find("var(--bg) 92%") != std::string::npos,
+           "CSS color percentage whitespace removed");
+    expect(minify::css("@media (prefers-color-scheme: dark) { .x { color: red; } }", out, err), err);
+    expect(out.find("@media (") != std::string::npos,
+           "CSS at-rule name merged with parenthesized prelude");
+    expect(minify::css(R"CSS(.fonts { font-family: "A B" serif; content: "a" "b"; } * .item, [data-x] button { color: red; })CSS", out, err), err);
+    expect(out.find("\"A B\" serif") != std::string::npos,
+           "CSS quoted font-family boundary merged");
+    expect(out.find("\"a\" \"b\"") != std::string::npos,
+           "CSS adjacent string values merged");
+    expect(out.find("* .item") != std::string::npos,
+           "CSS universal descendant selector merged");
+    expect(out.find("] button") != std::string::npos,
+           "CSS attribute descendant type selector merged");
+
     expect(minify::html("  <div   class=\"a  b\">  hello   world <!-- gone --> <span> x </span> </div>  ", out, err), err);
     eq(out, "<div class=\"a  b\"> hello world <span> x </span> </div>", "html basic");
     expect(minify::html("<pre>  a\n    b </pre><script> const x = ` a  b `;\n</script>", out, err), err);
@@ -46,6 +80,11 @@ int main() {
     expect(out.find("` a  b `") != std::string::npos, "JS template damaged");
     expect(minify::javascript("return\n  value;", out, err), err);
     expect(out.find("return\n") != std::string::npos, "ASI-sensitive newline removed");
+    expect(minify::javascript("const x = value / *ptr; const y = left * /re/.test(s);", out, err), err);
+    expect(out.find("/ *") != std::string::npos,
+           "JS whitespace removal created a block-comment opener");
+    expect(out.find("* /") != std::string::npos,
+           "JS whitespace removal created a block-comment closer");
 
 
     // CSS: future at-rules should be treated as ordinary syntax rather than a
@@ -150,12 +189,33 @@ int main() {
     expect(minify::jsx("const x=<p>https://example.com/a // literal text</p>;\n", out, err), err);
     expect(out.find("https://example.com/a // literal text") != std::string::npos,
            "JSX text was mistaken for a JavaScript comment");
+    expect(minify::jsx(R"JSX(const el = <Widget className="card" data-id={value} aria-label="say \"hello\"">text</Widget>;)JSX", out, err), err);
+    expect(out.find(R"JSX(<Widget className="card" data-id={value} aria-label="say \"hello\"">)JSX") != std::string::npos,
+           "JSX tag or escaped attribute spelling damaged");
+
+    const std::string adversarial_jsx =
+        "cons//.test(s)}t x=Comp<Map<strin,number>> value={<a?.b ?? /[<>]a?.b ?? /[<>]//.test(s)} />;";
+    if (minify::jsx(adversarial_jsx, once, err)) {
+        expect(minify::jsx(once, twice, err),
+               "successful adversarial JSX output rejected on second pass: " + err +
+               "\nfirst output: " + once);
+        eq(twice, once, "adversarial JSX idempotence");
+    }
 
     // Malformed lexical constructs should fail cleanly rather than silently
     // emitting a half-minified program.
     expect(!minify::javascript("const x = 'unterminated", out, err), "unterminated JS string accepted");
     expect(!minify::javascript("const x = `unterminated", out, err), "unterminated JS template accepted");
     expect(!minify::css("a{/* unterminated", out, err), "unterminated CSS comment accepted");
+    expect(!minify::css("a{content:\"unterminated}", out, err), "unterminated CSS string accepted");
+    expect(!minify::html("<div data-x=\"unterminated>", out, err),
+           "unterminated HTML attribute accepted");
+    expect(!minify::xml("<node data-x=\"unterminated>", out, err),
+           "unterminated XML attribute accepted");
+    expect(!minify::svg("<svg data-x=\"unterminated>", out, err),
+           "unterminated SVG attribute accepted");
+    expect(!minify::jsx("const x=<Thing label=\"unterminated>;", out, err),
+           "unterminated JSX attribute accepted");
 
     // More difficult template literal: nested template followed by raw text that
     // resembles a JS comment must remain template text.

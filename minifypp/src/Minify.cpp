@@ -37,15 +37,69 @@ bool starts_ci(const std::string& s, std::size_t pos, const std::string& needle)
     return true;
 }
 
-void emit_pending_space(std::string& out, bool& pending, char next) {
+bool css_needs_space(char left, char right) {
+    if ((word_char(left) && word_char(right)) ||
+        (left == '/' && right == '*') || (left == '*' && right == '/')) return true;
+
+    // A leading decimal, class/ID/attribute selector, universal selector or
+    // parenthesized construct can begin a distinct CSS token even though it is
+    // not word-like. Joining it to the previous token can invalidate a value
+    // list or turn a descendant selector into a compound selector.
+    if ((word_char(left) || left == '*' || left == '\'' || left == '"') &&
+        (right == '.' || right == '#' || right == '[' || right == '(' || right == '*')) return true;
+
+    // Function/attribute/percentage results followed by another value token
+    // require separation (for example transform lists and color percentages).
+    if ((left == ')' || left == ']' || left == '%' || left == '*' ||
+         left == '\'' || left == '"') &&
+        (word_char(right) || right == '.' || right == '#' || right == '[' ||
+         right == '(' || right == '*' || right == '\'' || right == '"')) return true;
+
+    // Adjacent strings are separate component values, as are identifiers or
+    // functions followed by a string (font-family and generated-content lists
+    // are common examples). Concatenating them is not CSS token compaction.
+    if ((word_char(left) || left == ')' || left == ']' || left == '%') &&
+        (right == '\'' || right == '"')) return true;
+
+    return false;
+}
+
+void emit_pending_css_space(std::string& out, bool& pending, char next) {
     if (!pending) return;
-    if (!out.empty() && !ws(out.back())) {
-        const bool joins_words = word_char(out.back()) && word_char(next);
-        const bool creates_comment_delimiter =
-            (out.back() == '/' && next == '*') || (out.back() == '*' && next == '/');
-        if (joins_words || creates_comment_delimiter) out.push_back(' ');
-    }
+    if (!out.empty() && !ws(out.back()) && css_needs_space(out.back(), next)) out.push_back(' ');
     pending = false;
+}
+
+bool css_colon_precedes_rule_block(const std::string& input, std::size_t colon) {
+    std::size_t parens = 0;
+    std::size_t brackets = 0;
+    bool quoted = false;
+    bool escaped = false;
+    char quote = 0;
+    for (std::size_t i = colon + 1; i < input.size(); ++i) {
+        const char c = input[i];
+        if (quoted) {
+            if (escaped) escaped = false;
+            else if (c == '\\') escaped = true;
+            else if (c == quote) quoted = false;
+            continue;
+        }
+        if (c == '\'' || c == '"') { quoted = true; quote = c; continue; }
+        if (c == '/' && i + 1 < input.size() && input[i + 1] == '*') {
+            const auto end = input.find("*/", i + 2);
+            if (end == std::string::npos) return false;
+            i = end + 1;
+            continue;
+        }
+        if (c == '(') { ++parens; continue; }
+        if (c == ')' && parens) { --parens; continue; }
+        if (c == '[') { ++brackets; continue; }
+        if (c == ']' && brackets) { --brackets; continue; }
+        if (parens || brackets) continue;
+        if (c == '{') return true;
+        if (c == ';' || c == '}') return false;
+    }
+    return false;
 }
 
 } // namespace
@@ -88,17 +142,23 @@ bool css(const std::string& input, std::string& output, std::string& error) {
         const char c = input[i];
 
         if (c == '\'' || c == '"') {
-            emit_pending_space(output, pending_space, c);
+            emit_pending_css_space(output, pending_space, c);
             const char quote = c;
             output.push_back(c);
             ++i;
             bool escaped = false;
+            bool closed = false;
             while (i < input.size()) {
                 const char q = input[i++];
                 output.push_back(q);
                 if (escaped) escaped = false;
                 else if (q == '\\') escaped = true;
-                else if (q == quote) break;
+                else if (q == quote) { closed = true; break; }
+            }
+            if (!closed) {
+                error = "unterminated CSS string";
+                output.clear();
+                return false;
             }
             continue;
         }
@@ -112,7 +172,7 @@ bool css(const std::string& input, std::string& output, std::string& error) {
                 return false;
             }
             if (preserve) {
-                emit_pending_space(output, pending_space, '/');
+                emit_pending_css_space(output, pending_space, '/');
                 output.append(input, i, end + 2 - i);
             } else {
                 pending_space = true;
@@ -130,8 +190,16 @@ bool css(const std::string& input, std::string& output, std::string& error) {
         const bool punctuation = c == '{' || c == '}' || c == ':' ||
                                  c == ';' || c == ',';
         if (punctuation) {
+            // Whitespace before ':' can distinguish a descendant pseudo-class
+            // selector (`.a :hover`) from a compound selector (`.a:hover`).
+            // Preserve authored spacing universally rather than guessing
+            // declaration context in this intentionally lightweight scanner.
+            const bool preserve_before_colon = c == ':' && pending_space &&
+                                               css_colon_precedes_rule_block(input, i) &&
+                                               !output.empty() && output.back() != ' ';
             pending_space = false;
             while (!output.empty() && output.back() == ' ') output.pop_back();
+            if (preserve_before_colon) output.push_back(' ');
             output.push_back(c);
         } else {
             // CSS math functions require whitespace around binary + and -.
@@ -143,7 +211,7 @@ bool css(const std::string& input, std::string& output, std::string& error) {
                      (output.back() == '+' || output.back() == '-') && output.back() != ' ')
                 output.push_back(' ');
             else
-                emit_pending_space(output, pending_space, c);
+                emit_pending_css_space(output, pending_space, c);
             pending_space = false;
             output.push_back(c);
         }
@@ -232,7 +300,7 @@ bool html(const std::string& input, std::string& output, std::string& error) {
                     break;
                 }
             }
-            if (j > input.size() || input[j - 1] != '>') {
+            if (quoted || j > input.size() || input[j - 1] != '>') {
                 error = "unterminated HTML tag";
                 output.clear();
                 return false;
@@ -331,6 +399,8 @@ static bool minify_javascript(const std::string& input, std::string& output,
                     (output.back() == '+' && next == '+') ||
                     (output.back() == '-' && next == '-') ||
                     (output.back() == '/' && next == '/') ||
+                    (output.back() == '/' && next == '*') ||
+                    (output.back() == '*' && next == '/') ||
                     (preserve_jsx_boundaries && output.back() == '<' &&
                      (std::isalpha(static_cast<unsigned char>(next)) || next == '>' || next == '/')) ||
                     (std::isdigit(static_cast<unsigned char>(output.back())) && next == '.'))) {
@@ -695,7 +765,7 @@ static bool minify_xml_like(const std::string& input, std::string& output,
                     quoted = true; quote = c;
                 } else if (c == '>') { ++j; break; }
             }
-            if (j > input.size() || j == 0 || input[j - 1] != '>') {
+            if (quoted || j > input.size() || j == 0 || input[j - 1] != '>') {
                 error = "unterminated XML tag";
                 output.clear();
                 return false;
@@ -898,7 +968,7 @@ static bool find_nested_jsx_end(const std::string& input, std::size_t start,
                 }
                 ++j;
             }
-            if (j > limit || j == 0 || input[j - 1] != '>') { error = "unterminated nested JSX tag"; return false; }
+            if (quoted || j > limit || j == 0 || input[j - 1] != '>') { error = "unterminated nested JSX tag"; return false; }
             std::size_t k = j >= 2 ? j - 2 : 0;
             while (k > p && ws(input[k])) --k;
             const bool self_closing = input[k] == '/';
@@ -1049,6 +1119,25 @@ bool jsx(const std::string& input, std::string& output, std::string& error) {
     };
 
     while (i < input.size()) {
+        // JSX-looking bytes inside JavaScript comments are not markup roots.
+        // Leave the comment itself for the JavaScript minifier in flush_js(),
+        // but advance this outer root finder past its contents.
+        if (input[i] == '/' && i + 1 < input.size() && input[i + 1] == '/') {
+            i += 2;
+            while (i < input.size() && input[i] != '\n' && input[i] != '\r') ++i;
+            continue;
+        }
+        if (input[i] == '/' && i + 1 < input.size() && input[i + 1] == '*') {
+            const auto close = input.find("*/", i + 2);
+            if (close == std::string::npos) {
+                error = "unterminated JavaScript block comment";
+                output.clear();
+                return false;
+            }
+            i = close + 2;
+            continue;
+        }
+
         // Skip JavaScript regex literals before looking for JSX roots. Without
         // this, `<`/`>` inside a regex character class (for example
         // `/[{}<>]/`) can be mistaken for a JSX fragment.
@@ -1158,7 +1247,7 @@ bool jsx(const std::string& input, std::string& output, std::string& error) {
                         ++j; break;
                     }
                 }
-                if (j > input.size() || input[j - 1] != '>') {
+                if (quoted || j > input.size() || input[j - 1] != '>') {
                     error = "unterminated JSX tag"; output.clear(); return false;
                 }
                 const bool self_closing = j >= 2 && input[j - 2] == '/';
@@ -1166,12 +1255,15 @@ bool jsx(const std::string& input, std::string& output, std::string& error) {
                 // inside attribute braces.
                 {
                     bool attr_quote = false;
+                    bool attr_escaped = false;
                     char attr_q = 0;
                     for (std::size_t k = p; k < j;) {
                         const char tc = input[k];
                         if (attr_quote) {
                             output.push_back(tc);
-                            if (tc == attr_q) attr_quote = false;
+                            if (attr_escaped) attr_escaped = false;
+                            else if (tc == '\\') attr_escaped = true;
+                            else if (tc == attr_q) attr_quote = false;
                             ++k;
                             continue;
                         }

@@ -27,6 +27,7 @@ FILES=(
   tests/cross_format_adversarial.sh
   tests/fuzz_smoke.cpp
   tests/minify_format_idempotence.sh
+  tests/minify_css_postcss_semantics.sh
   tests/minify_generated_semantics.sh
   tests/minify_jsx_generated.sh
   tests/minify_node_semantics.sh

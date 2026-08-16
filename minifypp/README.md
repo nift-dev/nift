@@ -39,11 +39,11 @@ The latest JSX fix distinguishes valid TSX generic arrows such as `<T,>(x:T) => 
 
 ## Readiness
 
-The current checkpoint is production-ready for the documented conservative
-format/API/CLI contract on the directly validated Linux toolchain. It is not a
-claim of universal equivalence for all future web syntax, maximum compression,
-or direct macOS/Windows validation. See the standalone project's living readiness
-assessment for the evidence and limitations.
+The production-readiness decision is currently reopened after a real website CSS
+failure. The repaired candidate passes substantially expanded focused, semantic,
+fuzz, sanitizer, and embedded-integration evidence, but still awaits clean-package
+and final browser close-out checks. See the living readiness assessment for the
+evidence and limitations; do not infer universal future-syntax or platform support.
 
 
 ## v1.0.1 hardening checkpoint
