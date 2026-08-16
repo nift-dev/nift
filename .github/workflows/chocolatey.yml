@@ -7,6 +7,11 @@ on:
         description: Existing GitHub release version, with or without v prefix
         required: true
         type: string
+      resubmit:
+        description: Replace the same package version while it is still under moderation
+        required: false
+        default: false
+        type: boolean
   pull_request:
     paths:
       - 'packaging/chocolatey/**'
@@ -16,6 +21,11 @@ on:
       version:
         description: Existing GitHub release version without the v prefix
         required: true
+      resubmit:
+        description: Replace the same package version while it is still under moderation
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   package:
@@ -66,8 +76,12 @@ jobs:
           if (-not $package) { throw 'Chocolatey package artifact was not found' }
           $published = Invoke-WebRequest "https://community.chocolatey.org/api/v2/package/nift/${{ steps.version.outputs.version }}" `
             -Method Head -SkipHttpErrorCheck
-          if ($published.StatusCode -eq 200) {
+          $resubmit = '${{ inputs.resubmit }}' -eq 'true'
+          if ($published.StatusCode -eq 200 -and -not $resubmit) {
             Write-Host "Chocolatey package ${{ steps.version.outputs.version }} already exists; skipping duplicate push"
           } else {
+            if ($resubmit) {
+              Write-Host "Resubmitting Chocolatey package ${{ steps.version.outputs.version }} for moderation"
+            }
             choco push $package.FullName --source https://push.chocolatey.org/ --api-key $env:CHOCOLATEY_API_KEY
           }
