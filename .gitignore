@@ -1,0 +1,16 @@
+# Native build products
+*.o
+*.obj
+*.d
+*.exe
+*.pdb
+/.build/
+/nift
+
+# Local diagnostics
+*.log
+*.tmp
+*.swp
+*~
+.DS_Store
+Thumbs.db
