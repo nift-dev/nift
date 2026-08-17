@@ -47,21 +47,14 @@ Use this compact shape for new entries:
 
 ## Open items
 
-### Template-less tracked entries
-
-- Status: pending
-- Earliest release: first release after 4.0.1 containing commit `4ebbef6`
-- Website scope: tracked-entry/configuration documentation, introductory examples,
-  and any CSS/JavaScript setup instructions that recommend identity templates
-- Required update: explain that omitting `template` makes the content file the
-  fully parsed top-level Nift source; contrast this with a genuine template using
-  `@content`; describe omission as preferred while noting that the historical
-  empty-string form remains compatible; remove any instruction to create
-  `template.css` or `template.js` containing only `@content`
-- Timing: do not publish this behavior on the website until a publicly available
-  Nift release supports it
+None currently.
 
 ## Completed items
 
 Move durable historical context to the relevant release record when useful; do
 not let this file become a second changelog.
+
+The template-less tracked-entry documentation was completed in the website
+source/generated checkpoints for Nift 4.0.1. It covers direct parsed content,
+ordinary `@content` templates, historical empty-string compatibility, dependency
+replacement, and removal of identity CSS/JavaScript template guidance.

@@ -1,6 +1,6 @@
 name: nift
 title: Nift
-version: '4.0.0'
+version: '4.0.1'
 summary: Fast dependency-aware website generator
 description: |
   Nift is a fast, lightweight and flexible website generator. It tracks
