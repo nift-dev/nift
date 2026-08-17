@@ -154,3 +154,15 @@ rewrite.
 
 Prepare and validate locally. Pushes, tags, releases, deployments, public version
 changes, and destructive restructuring require explicit approval.
+
+## Project contracts
+
+**Status:** SETTLED/CURRENT
+
+Project-wide declarative contracts are configured explicitly as a `contracts` object in `.nift/config.json`, mapping identifier namespaces to project-relative JSON sources. They reuse the existing `$[...]` value resolver rather than adding route-specific directives, dynamic `@...` functions, filesystem discovery, or a second contract expression syntax.
+
+Configured contract namespaces are reserved project-wide and cannot be shadowed by `@json` or `@for` bindings. Contract sources load lazily; only referenced contracts become output dependencies. Referencing a contract records both its source and `.nift/config.json`, so source edits and config remapping participate in incremental invalidation.
+
+The design rule is contract-first: state the guarantee, prove Nift can enforce it simply, check whether existing primitives already satisfy it, and only then add the smallest feature. Generalize contract philosophy before generic contract syntax.
+
+**Revisit if:** real projects demonstrate a need for richer contract source validation or a second contract class whose semantics cannot be expressed cleanly through this mechanism. Do not add arbitrary dynamic directives merely for extensibility.

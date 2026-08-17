@@ -147,3 +147,7 @@ should become deterministic regressions.
 Use `PERFORMANCE.md` and current scripts. Prefer scaling ratios and repeated
 checkpoint measurements to brittle absolute thresholds. Never weaken validation,
 containment, or dependency checking merely to improve a benchmark.
+
+## Project-contract checkpoint (2026-08-17)
+
+Project contracts are tested as an observable guarantee rather than only as a parser feature. The focused `tests/contracts_smoke.sh` module is mirrored into the standalone suite and covers successful resolution, lazy loading, dependency/config remapping, parameter/control-flow integration, missing/malformed sources, missing members, render-type errors, local JSON compatibility, namespace collisions, invalid declarations, traversal, and symlink escape. Preserve those failure families and add permanent reproducers for any new contract defect.

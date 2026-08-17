@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added config-declared project contracts. Optional `config.contracts` entries map stable project-wide namespaces to JSON sources, and `$[...]` references lazily load those sources through the existing immutable JSON cache. Referenced outputs track both the contract source and `.nift/config.json` as dependencies.
+- Contract namespaces are reserved project-wide: `@json` and `@for` bindings cannot shadow them. Missing/malformed sources, missing members, invalid declarations, and unsafe contract paths fail with controlled diagnostics.
+- Added focused and standalone contract coverage for lazy loading, dependency/config remapping, parameter/control-flow integration, collision rules, path safety, and failure behavior.
+
 - Tracked entries may omit `template`; Nift then fully parses the content file
   itself as the top-level source. Historical empty template strings remain a
   compatible alias, existing `@content` templates remain compatible, and new

@@ -7,6 +7,7 @@
 #include <vector>
 #include <set>
 #include <optional>
+#include <map>
 
 struct Config {
     std::string content_dir = "content/";
@@ -16,6 +17,7 @@ struct Config {
     std::string default_template = "templates/template.html";
     std::string incremental_mode = "modified";
     std::set<std::string> minify_exts;
+    std::map<std::string, std::string> contracts;
     int build_threads = -1;
 };
 

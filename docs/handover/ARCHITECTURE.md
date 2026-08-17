@@ -53,6 +53,8 @@ document is the agreed next design, not shipped behavior. It must reuse the same
 value resolver after source argument boundaries are fixed and must not recursively
 parse the resolved data.
 
+Project contracts add a third checked relationship at the value layer: configured namespaces map to immutable JSON sources and resolve through the same `$[...]` machinery as explicit JSON bindings. Contract resolution is lazy and records both the source plus `.nift/config.json` as dependencies; configured names are globally protected from local binding shadowing.
+
 Dependencies and requirements are separate contracts. Content, templates,
 `@input`, JSON/schema sources, `@dep`, and user `.deps.json` data contribute to
 dependency invalidation. `@pathto`/`@pathtofile` add requirements whose continued

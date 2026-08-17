@@ -79,6 +79,9 @@ test-metadata-safety: $(TARGET)
 test-template-optional: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/template_optional_smoke.sh
 
+test-contracts: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/contracts_smoke.sh
+
 install: $(TARGET)
 	mkdir -p "$(DESTDIR)$(BINDIR)"
 	$(INSTALL_PROGRAM) "$(TARGET)" "$(DESTDIR)$(BINDIR)/$(TARGET)"
@@ -93,7 +96,7 @@ clean:
 	rm -rf "$(TEST_DIR)"
 	$(MAKE) -C minifypp clean
 
-.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling all clean test-json test-json-schema test-minify test-json-schema-integration test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional install uninstall
+.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling all clean test-json test-json-schema test-minify test-json-schema-integration test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts install uninstall
 
 
 test-cross-feature: $(TARGET)

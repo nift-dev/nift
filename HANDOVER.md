@@ -96,6 +96,7 @@ matrices, and implementation cautions:
 - `ARCHITECTURE.md`: durable codebase model and concrete orientation exercise.
 - `PARAMETER-INTERPOLATION.md`: `$[...]` behavioral contract and task context.
 - `PARAMETER-INTERPOLATION-IMPLEMENTATION.md`: source-aware implementation plan.
+- `PROJECT-CONTRACTS.md`: config-declared project contract semantics, rejected alternatives, route-contract distinction, and required executable evidence.
 - `CHECKPOINTS.md`: evidence-based development checkpoint methodology.
 - `WEBSITE-CHECKPOINTS.md`: website work coordinated with product checkpoints.
 - `HANDOVER-MAINTENANCE.md`: document ownership and maintenance architecture.

@@ -430,7 +430,7 @@ bool Parser::find_balanced(const std::string& source,
 
 bool Parser::resolve_json_value(const std::string& expression,
                                 std::shared_ptr<const json::Document>& value,
-                                std::string& error) const {
+                                std::string& error) {
     std::size_t position = 0;
 
     auto identifier = [&](std::string& result) -> bool {
@@ -450,10 +450,46 @@ bool Parser::resolve_json_value(const std::string& expression,
     std::string root_name;
     if (!identifier(root_name)) return false;
 
+    std::shared_ptr<const json::Document> current;
+    bool contract_binding = false;
     const auto binding = json_bindings_.find(root_name);
-    if (binding == json_bindings_.end()) return false;
+    if (binding != json_bindings_.end()) {
+        current = binding->second;
+    } else {
+        const auto contract = project_.config.contracts.find(root_name);
+        if (contract == project_.config.contracts.end()) return false;
+        contract_binding = true;
 
-    std::shared_ptr<const json::Document> current = binding->second;
+        const std::string& contract_path_argument = contract->second;
+        const fs::path contract_path = (project_.root / contract_path_argument).lexically_normal();
+        if (!filesystem::path_within(project_.root, contract_path)) {
+            error = "contract '" + root_name + "': path must stay inside the Nift project: " +
+                    contract_path_argument;
+            return true;
+        }
+        if (!filesystem::path_exists(contract_path)) {
+            error = "contract '" + root_name + "': file does not exist: " + contract_path_argument;
+            return true;
+        }
+
+        const auto cached = contract_bindings_.find(root_name);
+        if (cached != contract_bindings_.end()) {
+            current = cached->second;
+        } else {
+            std::string contract_error;
+            auto document = project_.read_shared_json(contract_path, contract_error);
+            if (!document) {
+                error = "contract '" + root_name + "': failed to parse " + contract_path_argument +
+                        (contract_error.empty() ? "" : " (" + contract_error + ")");
+                return true;
+            }
+            contract_bindings_.emplace(root_name, document);
+            current = std::move(document);
+        }
+
+        result_.dependencies.insert(project_.relative(project_.root / ".nift/config.json"));
+        result_.dependencies.insert(project_.relative(contract_path));
+    }
 
     while (position < expression.size()) {
         if (expression[position] == '.') {
@@ -468,8 +504,14 @@ bool Parser::resolve_json_value(const std::string& expression,
                 return true;
             }
             if (!current->has(member)) {
-                error = "JSON value '" + expression.substr(0, position - member.size() - 1) +
-                        "' has no member '" + member + "'";
+                if (contract_binding) {
+                    const std::string key = expression.size() > root_name.size() + 1
+                        ? expression.substr(root_name.size() + 1) : std::string{};
+                    error = "contract '" + root_name + "' has no entry '" + key + "'";
+                } else {
+                    error = "JSON value '" + expression.substr(0, position - member.size() - 1) +
+                            "' has no member '" + member + "'";
+                }
                 return true;
             }
 
@@ -523,7 +565,7 @@ bool Parser::resolve_json_value(const std::string& expression,
     return true;
 }
 
-bool Parser::json_value(const std::string& expression, std::string& value, std::string& error) const {
+bool Parser::json_value(const std::string& expression, std::string& value, std::string& error) {
     std::shared_ptr<const json::Document> document;
     if (!resolve_json_value(expression, document, error)) return false;
     if (!error.empty()) return true;
@@ -542,7 +584,7 @@ bool Parser::json_value(const std::string& expression, std::string& value, std::
 
 bool Parser::interpolate_parameter(const std::string& parameter,
                                    std::string& resolved,
-                                   std::string& error) const {
+                                   std::string& error) {
     resolved.clear();
     resolved.reserve(parameter.size());
 
@@ -641,7 +683,7 @@ bool Parser::scalar_literal(const std::string& text, json::Document& value, std:
     return false;
 }
 
-bool Parser::evaluate_condition(const std::string& expression, bool& value, std::string& error) const {
+bool Parser::evaluate_condition(const std::string& expression, bool& value, std::string& error) {
     std::string condition = trim_copy(expression);
     if (condition.empty()) {
         error = "@if condition cannot be empty";
@@ -1174,6 +1216,11 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                          "@for binding '" + binding_part + "' conflicts with built-in metadata");
                     break;
                 }
+                if (project_.config.contracts.count(binding_part)) {
+                    fail(source_path, source, i,
+                         "@for binding '" + binding_part + "' conflicts with configured contract namespace");
+                    break;
+                }
 
                 if (!sort_expression.empty() &&
                     !(sort_expression == binding_part ||
@@ -1285,6 +1332,11 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 if (reserved_binding_name(key_name) || reserved_binding_name(value_name)) {
                     fail(source_path, source, i,
                          "@for bindings cannot conflict with built-in metadata");
+                    break;
+                }
+                if (project_.config.contracts.count(key_name) || project_.config.contracts.count(value_name)) {
+                    fail(source_path, source, i,
+                         "@for bindings cannot conflict with configured contract namespaces");
                     break;
                 }
 
@@ -1578,6 +1630,10 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 }
                 if (reserved_binding_name(binding_name)) {
                     fail(source_path, source, i, "json: name '" + binding_name + "' conflicts with built-in metadata/reserved bindings");
+                    break;
+                }
+                if (project_.config.contracts.count(binding_name)) {
+                    fail(source_path, source, i, "json: name '" + binding_name + "' conflicts with configured contract namespace");
                     break;
                 }
                 if (json_bindings_.count(binding_name)) {

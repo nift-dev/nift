@@ -22,18 +22,19 @@ private:
     int code_block_depth_ = 0;
     int html_comment_depth_ = 0;
     std::unordered_map<std::string, std::shared_ptr<const json::Document>> json_bindings_;
+    std::unordered_map<std::string, std::shared_ptr<const json::Document>> contract_bindings_;
     std::vector<std::vector<std::string>> json_binding_scopes_;
 
     RenderResult parse(const std::string& source, const std::filesystem::path& source_path, int depth);
     std::string metadata(const std::string& key) const;
-    bool json_value(const std::string& expression, std::string& value, std::string& error) const;
+    bool json_value(const std::string& expression, std::string& value, std::string& error);
     bool interpolate_parameter(const std::string& parameter,
                                std::string& resolved,
-                               std::string& error) const;
+                               std::string& error);
     bool resolve_json_value(const std::string& expression,
                             std::shared_ptr<const json::Document>& value,
-                            std::string& error) const;
-    bool evaluate_condition(const std::string& expression, bool& value, std::string& error) const;
+                            std::string& error);
+    bool evaluate_condition(const std::string& expression, bool& value, std::string& error);
     bool scalar_literal(const std::string& text, json::Document& value, std::string& error) const;
     std::string trim_copy(const std::string& text) const;
     void push_json_scope();

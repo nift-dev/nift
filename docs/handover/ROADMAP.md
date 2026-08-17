@@ -47,6 +47,10 @@ a future native-environment check rather than claiming leak coverage here.
 If the feature exposes deeper dependency-state or parser architecture defects,
 expand the roadmap rather than promoting the candidate prematurely.
 
+## Current project-contract checkpoint
+
+Config-declared project contracts were implemented on 2026-08-17 using the existing JSON/value/dependency architecture. Focused tests cover lazy resolution, dependency and config-remapping invalidation, control-flow/parameter integration, non-shadowable namespaces, controlled failures, and path safety; the same module is part of the standalone contract suite. Treat the full suite, real website self-build, documentation reconciliation, and source/generated Git review as required evidence before promoting this checkpoint.
+
 ## Broader evidence-building work
 
 - realistic JSON/Schema-driven catalogue using nested control flow and sorting;

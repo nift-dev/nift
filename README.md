@@ -9,7 +9,7 @@ For documentation, examples and downloads, visit **[nift.dev](https://nift.dev)*
 ## Features
 
 - Fast, multithreaded builds and incremental rebuilds
-- Simple templating with `@content`, `@input(...)`, `@pathto(...)`, `@dep(...)`, `@getenv(...)`, `@ent(...)` and structured JSON data via `@json(...)`, plus constrained `@for(...){...}` / `@if(...){...}` control flow
+- Simple templating with `@content`, `@input(...)`, `@pathto(...)`, `@dep(...)`, `@getenv(...)`, `@ent(...)` and structured JSON data via `@json(...)`, config-declared project contracts via `$[...]`, plus constrained `@for(...){...}` / `@if(...){...}` control flow
 - Modified-time, hash and hybrid incremental build modes
 - File and directory dependency tracking
 - Automatic and explicit dependency support

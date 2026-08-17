@@ -37,6 +37,24 @@ bool string_field(const json::Document& object, const std::string& key, std::str
     return !object.has(key) || object[key].is_string();
 }
 
+
+bool valid_contract_name(const std::string& name) {
+    if (name.empty()) return false;
+    if (!(std::isalpha(static_cast<unsigned char>(name[0])) || name[0] == '_')) return false;
+    return std::all_of(name.begin() + 1, name.end(), [](char c) {
+        return std::isalnum(static_cast<unsigned char>(c)) || c == '_';
+    });
+}
+
+bool reserved_contract_name(const std::string& name) {
+    static const std::unordered_set<std::string> names = {
+        "title", "name", "content-path", "output-path", "template-path",
+        "build-timezone", "build-time", "build-UTC-time", "build-date",
+        "build-UTC-date", "build-YYYY", "build-YY", "build-OS", "loop"
+    };
+    return names.count(name) != 0;
+}
+
 bool valid_tracked_name(const std::string& name) {
     if (name == "/") return true;
     if (name.empty()) return false;
@@ -96,6 +114,36 @@ bool ProjectInfo::load_config() {
             return false;
         }
         config.build_threads = value["build-threads"].as_int();
+    }
+
+    config.contracts.clear();
+    if (value.has("contracts")) {
+        if (!value["contracts"].is_object()) {
+            console::error(console::path(relative(path), true) + ": contracts must be an object mapping names to project-relative JSON paths");
+            return false;
+        }
+        for (const auto& entry : value["contracts"].object) {
+            const std::string& name = entry.first;
+            const auto& source = entry.second;
+            if (!valid_contract_name(name)) {
+                console::error(console::path(relative(path), true) + ": contract name '" + name + "' must be an identifier using letters, digits and underscores");
+                return false;
+            }
+            if (reserved_contract_name(name)) {
+                console::error(console::path(relative(path), true) + ": contract name '" + name + "' conflicts with built-in metadata/reserved bindings");
+                return false;
+            }
+            if (!source.is_string() || source.string.empty()) {
+                console::error(console::path(relative(path), true) + ": contract '" + name + "' must map to a non-empty JSON path string");
+                return false;
+            }
+            const fs::path contract_path = (root / source.string).lexically_normal();
+            if (!filesystem::path_within(root, contract_path)) {
+                console::error(console::path(relative(path), true) + ": contract '" + name + "' path must stay inside the Nift project: " + source.string);
+                return false;
+            }
+            config.contracts.emplace(name, source.string);
+        }
     }
 
     config.minify_exts.clear();
