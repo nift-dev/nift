@@ -6,8 +6,9 @@ nift=$(cd "$1" && pwd)
 files=(
   .gitignore HANDOVER.md LICENSE Makefile README.md ReleaseNotes.md
   include/json.h
-  tests/json_smoke.cpp tests/json_adversarial.cpp
-  scripts/check-nift-sync.sh scripts/check-minify-sync.sh
+  tests/json_smoke.cpp tests/json_adversarial.cpp tests/json_memory_lifetime.cpp
+  scripts/check-nift-sync.sh scripts/check-minify-sync.sh scripts/memory_safety.py
+  docs/MEMORY-SAFETY.md
   docs/handover/ARCHITECTURE.md docs/handover/DEVELOPMENT.md docs/handover/TESTING.md
   docs/handover/DECISIONS.md docs/handover/ROADMAP.md docs/handover/PROJECT-HISTORY.md
 )
