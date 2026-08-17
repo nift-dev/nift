@@ -42,7 +42,7 @@ jobs:
         shell: bash
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            version="4.0.0"
+            version="4.0.2"
             archive_url="https://github.com/nift-dev/nift/archive/${GITHUB_SHA}.tar.gz"
           else
             version="${{ inputs.version }}"

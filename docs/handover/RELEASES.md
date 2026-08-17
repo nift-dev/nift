@@ -7,7 +7,7 @@ is packaged and published.
 
 ## Authority and current state
 
-The executable currently reports `Nift v4.0.1`. The retained rewrite checkpoint
+The executable currently reports `Nift v4.0.2`. The retained rewrite checkpoint
 identity remains documented in project history and release notes, but it is not
 part of the public product version. Exact tag, artifact, and public release
 conventions must follow `PACKAGING.md` and actual Git/release evidence.
@@ -85,8 +85,10 @@ Do not leave the working tree identifying itself as the version that was just
 released: keeping the development identity current prevents the next bump from
 becoming a release-day memory task. Update any regression assertion that checks
 the executable version as part of the same post-release checkpoint. Packaging
-metadata that intentionally describes the last published store version is separate
-and should only change when preparing/publishing the corresponding package.
+metadata that intentionally records a published store version is separate and
+must remain historical. Packaging source recipes that participate in development
+and release validation, including `snap/snapcraft.yaml`, advance with the
+executable identity so the next release cannot inherit a stale version.
 
 ## Release report
 
