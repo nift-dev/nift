@@ -23,6 +23,10 @@ BINDIR ?= $(PREFIX)/bin
 DESTDIR ?=
 
 TEST_DIR := .build
+SANITIZER_FLAGS ?= -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined
+SAN_TARGET := $(TEST_DIR)/nift-sanitize$(EXEEXT)
+SAN_OBJECTS := $(patsubst %.cpp,$(TEST_DIR)/san/%.o,$(SOURCES))
+MEMORY_SMOKE := $(TEST_DIR)/nift-memory-san$(EXEEXT)
 JSON_TEST := $(TEST_DIR)/nift-json-smoke$(EXEEXT)
 JSON_SCHEMA_TEST := $(TEST_DIR)/nift-json-schema-smoke$(EXEEXT)
 
@@ -104,7 +108,7 @@ clean:
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
-.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling all clean test-jsonic test-jsonic-sync test-json test-json-schema test-minify test-json-schema-integration test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts install uninstall
+.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-minify test-json-schema-integration test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts install uninstall
 
 
 test-cross-feature: $(TARGET)
@@ -150,3 +154,23 @@ benchmark-10k: $(TARGET)
 
 benchmark-memory-10k: $(TARGET)
 	python3 tests/memory_10k_benchmark.py --nift "$(CURDIR)/$(TARGET)"
+
+
+$(TEST_DIR)/san/%.o: %.cpp
+	mkdir -p "$(dir $@)"
+	$(CXX) $(CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(SANITIZER_FLAGS) -c "$<" -o "$@"
+
+$(SAN_TARGET): $(SAN_OBJECTS)
+	mkdir -p "$(TEST_DIR)"
+	$(CXX) -std=c++17 -pthread $(SANITIZER_FLAGS) $(SAN_OBJECTS) -o "$@"
+
+test-sanitize: $(SAN_TARGET)
+	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(SAN_TARGET)" --version
+
+$(MEMORY_SMOKE): tests/json_smoke.cpp src/Json.h
+	mkdir -p "$(TEST_DIR)"
+	$(CXX) $(CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic $(SANITIZER_FLAGS) tests/json_smoke.cpp -o "$@"
+
+memory-safety-smoke: $(MEMORY_SMOKE)
+	mkdir -p "$(TEST_DIR)/memory-safety"
+	python3 scripts/memory_safety.py --project nift --mode sanitizer --output "$(TEST_DIR)/memory-safety/checkpoint-0.json" --iterations 2 --command './$(MEMORY_SMOKE)'
