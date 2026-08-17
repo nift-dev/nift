@@ -428,3 +428,60 @@ GitHub currently warns that `actions/checkout@v4` and
 are being forced onto Node.js 24. This did not invalidate the v4.0.0 workflows,
 but future maintenance should upgrade those actions when supported; do not treat
 the warning alone as a reason to alter release artifacts.
+
+## v4.0.1 publication record
+
+[`v4.0.1`](https://github.com/nift-dev/nift/releases/tag/v4.0.1) is an annotated
+tag at `6088856529366688539aae6f88b6a44d74244c4b`. The complete
+[release workflow](https://github.com/nift-dev/nift/actions/runs/32021660432)
+succeeded, including Linux x86-64, macOS arm64, macOS x86-64, Windows x86-64,
+publication, Homebrew formula tests, Chocolatey submission, and the GitHub Snap
+jobs. The published release contains exactly the four platform archives and
+`SHA256SUMS`; all four archives were downloaded and verified against that file:
+
+- Linux x86-64: `34a6785adab50e678978377bbd70690f44e1cd081a6e921fb282c81c968b9177`
+- macOS arm64: `4325ef0a0794713a59b1157995ab0a8e948931f736d29697ec128e5f99def1ad`
+- macOS x86-64: `391f97c7bddab37e2bfd9896f58b9af1f411e405c7e24b98c1abf539c9d5f581`
+- Windows x86-64: `fa075b86fb535b2ca97252968658bbd8936414750412d0aee79e4a542a1b519f`
+
+The immutable tagged source archive used by source-based package managers has
+SHA-256 `0724c8e6518ea9ace4275e8f96da39680916d157df1afb4bfbb003678bcdfb52`.
+The Linux release archive was extracted and its binary reported `Nift v4.0.1`
+with the intended `about` output.
+
+Pre-release validation passed the clean local build and full test matrix, the
+external regression suite (17 modules and 575 historical assertions), scaling
+and memory guards, the ASan/UBSan build and relevant tests, and an exact website
+candidate build of all 46 pages. LeakSanitizer itself could not run in the Codex
+desktop ptrace environment, so the sanitizer checks used
+`ASAN_OPTIONS=detect_leaks=0`; this is an environment limitation, not a claimed
+LeakSanitizer pass.
+
+Downstream state recorded on 2026-08-17:
+
+- The public Snap metadata showed 4.0.1 revision 450 on `latest/stable`, with
+  candidate and beta following stable. This confirms channel metadata only; a
+  fresh store installation was not performed. `latest/edge` still showed 4.0.0
+  revision 443 at the time of inspection.
+- Chocolatey workflow submission succeeded and
+  [`nift/4.0.1`](https://community.chocolatey.org/packages/nift/4.0.1) was in
+  `Submitted`/`Pending` state. It was not yet approved or fresh-install tested.
+- The generated Homebrew update was submitted as
+  [`Homebrew/homebrew-core#299226`](https://github.com/Homebrew/homebrew-core/pull/299226).
+  The formula retains the official bottle block and changes the source to the
+  v4.0.1 archive and checksum. The pull request was open with upstream checks
+  pending when this record was written; Homebrew merge, bottles, and fresh
+  installation remain outstanding.
+- The consolidated Flathub migration was submitted as
+  [`flathub/cc.nift.nsm#12`](https://github.com/flathub/cc.nift.nsm/pull/12).
+  It changes the legacy `nsm` build to the current `nift` source and command,
+  removes obsolete bundled dependencies and patching, and updates AppStream
+  project links. Manifest validation passed. An initial build exposed a typo in
+  the preserved 256px icon checksum; commit
+  `16c53050308024405bd1361ce421acca598ae7d4` corrected it and triggered a new
+  build. Review, successful publication, and a fresh Flathub installation remain
+  outstanding.
+
+Re-check and append the final Homebrew merge/bottle, Chocolatey approval, and
+Flathub build/publication/install evidence when those asynchronous services
+finish. Do not rewrite the v4.0.1 GitHub release to close a downstream task.
