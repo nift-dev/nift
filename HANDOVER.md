@@ -27,6 +27,7 @@ whether it is a regression.
 - Public documentation: the separate `nifty-site-manager.github.io` repository.
 - External contract: the separate `nift-regression-suite` repository.
 - Embedded minifier: `minifypp/`, synchronized with standalone Minify++.
+- Embedded JSON parser: `jsonic/json.h`, synchronized with standalone Jsonic++; `src/Json.h` is a compatibility wrapper.
 
 Do not habitually reduce Nift to “a static site generator.” Nift generates
 website artifacts, but those artifacts may contain client applications, consume
@@ -60,7 +61,10 @@ themselves. Nift owns the small build-time job it can perform precisely.
    of C++ internals.
 4. Standalone Minify++ owns the independent minifier identity. Nift consumes it
    through `<minify/Minify.h>` and minification remains opt-in.
-5. Green tests are the start of confidence, not permission to stop reasoning.
+5. Standalone Jsonic++ owns the independent JSON-parser identity. Nift vendors its
+   exact `include/json.h` as `jsonic/json.h`; parser changes originate in Jsonic++,
+   synchronize into Nift, and then pass Nift JSON/schema/parser/incremental contracts.
+6. Green tests are the start of confidence, not permission to stop reasoning.
    Read relevant implementation, attack assumptions, preserve reproducers, and
    test interactions.
 
@@ -70,6 +74,7 @@ themselves. Nift owns the small build-time job it can perform precisely.
 - `tests/`: implementation-local focused and integration tests.
 - `benchmarks/`: reproducible large-project performance fixtures.
 - `minifypp/`: embedded standalone-style Minify++ subtree.
+- `jsonic/`: vendored Jsonic++ public header used by Nift core.
 - `ARCHITECTURE_RULES.md`: concise current architectural review checklist.
 - `PERFORMANCE.md`: retained performance rationale and checkpoint evidence.
 - `ReleaseNotes.md`: public implementation checkpoint history.
@@ -153,6 +158,17 @@ candidate preparation are normal development work. Do not push, tag, publish a
 release, deploy a website, alter public versions, or perform destructive
 repository restructuring without Nick's explicit approval. Do not create commits
 unless requested.
+
+## Jsonic++ synchronization
+
+Nift no longer treats `src/Json.h` as an independently owned parser. The canonical
+parser is standalone Jsonic++ `include/json.h`; Nift vendors that exact header at
+`jsonic/json.h`, while `src/Json.h` remains a compatibility include for existing
+Nift source. After any Jsonic++ parser change, run standalone Jsonic++ tests and
+`make check-nift-sync NIFT_DIR=/path/to/nift`, then Nift `test-json`, schema, JSON
+binding, contracts and affected full integration gates. Minify++ also vendors the
+same parser privately and must be reconciled separately before the ecosystem
+checkpoint is complete.
 
 ## Maintaining this handover
 

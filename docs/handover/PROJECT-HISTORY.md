@@ -3625,3 +3625,7 @@ It is to make sure you know why the project looks the way it does before you sta
 That is the comprehensive context handover I’d give Codex.
 
 I deliberately **haven’t folded the `$[...]` parameter-resolution implementation brief into it**, because Codex was exactly right about the ordering: this gives it the broad mental model first, then we can give it a much tighter second handover containing the exact semantics, edge cases, type behavior, parser cautions, dependency implications, tests, and implementation boundaries for the parameter-resolution change while that detail is freshest.
+
+## 2026-08-18 — Jsonic++ extraction
+
+The JSON implementation shared byte-for-byte by Nift core and Minify++ was given an independent canonical home as Jsonic++. Nift now vendors Jsonic++ `include/json.h` at `jsonic/json.h`; `src/Json.h` is a compatibility include. Parser semantics should originate in Jsonic++, synchronize into Nift, and then pass Nift JSON/schema/parser/project-contract integration before a checkpoint is complete.
