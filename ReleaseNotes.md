@@ -1,6 +1,6 @@
 # Nift — Release Notes
 
-## v4.0.1 (unreleased)
+## v4.0.1
 
 Nift 4.0.1 strengthens the v4 model of checked, dependency-aware website composition. The headline addition is project contracts: project-wide JSON-backed values that use the existing `$[...]` syntax while participating in Nift's dependency and incremental-build guarantees. The release also removes unnecessary template boilerplate for tracked files that do not need a separate template.
 
