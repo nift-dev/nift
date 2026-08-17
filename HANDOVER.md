@@ -165,4 +165,7 @@ append-only diaries: individual defects normally belong in tests and Git history
 the handover should retain the durable lesson.
 
 A substantial checkpoint is not complete until handover impact and the living
-production roadmap have been considered.
+production roadmap have been considered. When the checkpoint changes protected
+behavior, regression coverage, test families, or validation evidence, also review
+the website's Battle Tested page and related public reliability claims before
+calling the Nift work complete.

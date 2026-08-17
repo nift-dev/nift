@@ -192,7 +192,9 @@ full suite
         ↓
 sanitizers / benchmarks where relevant
         ↓
-update docs
+update docs + living handovers
+        ↓
+reconcile Battle Tested / public reliability claims when evidence changed
         ↓
 update website where claims/behavior changed
         ↓
