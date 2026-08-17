@@ -36,6 +36,9 @@ $(TARGET): $(OBJECTS)
 
 -include $(DEPFILES)
 
+test-jsonic:
+	$(MAKE) -C jsonic test
+
 test-jsonic-sync:
 	@test -n "$(JSONIC_DIR)" || (echo "JSONIC_DIR=/path/to/jsonic is required" >&2; exit 2)
 	$(MAKE) -C "$(JSONIC_DIR)" check-nift-sync NIFT_DIR="$(CURDIR)"
@@ -100,7 +103,7 @@ clean:
 	rm -rf "$(TEST_DIR)"
 	$(MAKE) -C minifypp clean
 
-.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling all clean test-jsonic-sync test-json test-json-schema test-minify test-json-schema-integration test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts install uninstall
+.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling all clean test-jsonic test-jsonic-sync test-json test-json-schema test-minify test-json-schema-integration test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts install uninstall
 
 
 test-cross-feature: $(TARGET)

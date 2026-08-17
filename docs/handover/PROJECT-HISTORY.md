@@ -3628,4 +3628,4 @@ I deliberately **haven’t folded the `$[...]` parameter-resolution implementati
 
 ## 2026-08-18 — Jsonic++ extraction
 
-The JSON implementation shared byte-for-byte by Nift core and Minify++ was given an independent canonical home as Jsonic++. Nift now vendors Jsonic++ `include/json.h` at `jsonic/json.h`; `src/Json.h` is a compatibility include. Parser semantics should originate in Jsonic++, synchronize into Nift, and then pass Nift JSON/schema/parser/project-contract integration before a checkpoint is complete.
+The JSON implementation shared byte-for-byte by Nift core and Minify++ was given an independent canonical home as Jsonic++. Nift now vendors Jsonic++ `include/json.h` at `jsonic/include/json.h`; `src/Json.h` is a compatibility include. Parser semantics should originate in Jsonic++, synchronize into Nift, and then pass Nift JSON/schema/parser/project-contract integration before a checkpoint is complete.

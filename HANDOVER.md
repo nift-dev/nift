@@ -27,7 +27,7 @@ whether it is a regression.
 - Public documentation: the separate `nifty-site-manager.github.io` repository.
 - External contract: the separate `nift-regression-suite` repository.
 - Embedded minifier: `minifypp/`, synchronized with standalone Minify++.
-- Embedded JSON parser: `jsonic/json.h`, synchronized with standalone Jsonic++; `src/Json.h` is a compatibility wrapper.
+- Embedded JSON parser: `jsonic/include/json.h`, synchronized with standalone Jsonic++; `src/Json.h` is a compatibility wrapper.
 
 Do not habitually reduce Nift to “a static site generator.” Nift generates
 website artifacts, but those artifacts may contain client applications, consume
@@ -62,7 +62,7 @@ themselves. Nift owns the small build-time job it can perform precisely.
 4. Standalone Minify++ owns the independent minifier identity. Nift consumes it
    through `<minify/Minify.h>` and minification remains opt-in.
 5. Standalone Jsonic++ owns the independent JSON-parser identity. Nift vendors its
-   exact `include/json.h` as `jsonic/json.h`; parser changes originate in Jsonic++,
+   exact `include/json.h` as `jsonic/include/json.h`; parser changes originate in Jsonic++,
    synchronize into Nift, and then pass Nift JSON/schema/parser/incremental contracts.
 6. Green tests are the start of confidence, not permission to stop reasoning.
    Read relevant implementation, attack assumptions, preserve reproducers, and
@@ -162,8 +162,8 @@ unless requested.
 ## Jsonic++ synchronization
 
 Nift no longer treats `src/Json.h` as an independently owned parser. The canonical
-parser is standalone Jsonic++ `include/json.h`; Nift vendors that exact header at
-`jsonic/json.h`, while `src/Json.h` remains a compatibility include for existing
+parser is standalone Jsonic++ `include/json.h`; Nift mirrors the standalone project under `jsonic/` and consumes its public header at
+`jsonic/include/json.h`, while `src/Json.h` remains a compatibility include for existing
 Nift source. After any Jsonic++ parser change, run standalone Jsonic++ tests and
 `make check-nift-sync NIFT_DIR=/path/to/nift`, then Nift `test-json`, schema, JSON
 binding, contracts and affected full integration gates. Minify++ also vendors the
