@@ -1,15 +1,29 @@
 # Nift — Release Notes
 
-## Unreleased
+## v4.0.1 (unreleased)
 
-- Added config-declared project contracts. Optional `config.contracts` entries map stable project-wide namespaces to JSON sources, and `$[...]` references lazily load those sources through the existing immutable JSON cache. Referenced outputs track both the contract source and `.nift/config.json` as dependencies.
-- Contract namespaces are reserved project-wide: `@json` and `@for` bindings cannot shadow them. Missing/malformed sources, missing members, invalid declarations, and unsafe contract paths fail with controlled diagnostics.
-- Added focused and standalone contract coverage for lazy loading, dependency/config remapping, parameter/control-flow integration, collision rules, path safety, and failure behavior.
+Nift 4.0.1 strengthens the v4 model of checked, dependency-aware website composition. The headline addition is project contracts: project-wide JSON-backed values that use the existing `$[...]` syntax while participating in Nift's dependency and incremental-build guarantees. The release also removes unnecessary template boilerplate for tracked files that do not need a separate template.
 
-- Tracked entries may omit `template`; Nift then fully parses the content file
-  itself as the top-level source. Historical empty template strings remain a
-  compatible alias, existing `@content` templates remain compatible, and new
-  project scaffolds no longer create identity CSS/JavaScript templates.
+### Project contracts
+
+- Added config-declared project contracts. `config.contracts` maps stable project-wide namespaces to JSON sources, so a project can declare a contract such as `routes` once and use values such as `$[routes.users.list]` throughout templates.
+- Contract sources are loaded lazily through Nift's existing immutable JSON machinery. An output that references a contract tracks both the contract source and `.nift/config.json`, so edits and contract remapping participate in incremental invalidation.
+- Contract namespaces are reserved project-wide. `@json`, loop variables, and other bindings cannot shadow or overload a configured contract name; ambiguous precedence is rejected instead.
+- Missing or malformed contract sources, missing members, invalid declarations, namespace collisions, and unsafe contract paths fail with controlled diagnostics.
+- Added focused and standalone behavioral-contract coverage for lazy loading, source/config invalidation, remapping, parameter interpolation, control flow, collision rules, path safety, and failure behavior.
+
+### Simpler tracked entries
+
+- Tracked entries may now omit `template`. Nift then parses the content file itself as the top-level source, which is useful for CSS, JavaScript, standalone HTML, and other files that do not benefit from an identity template.
+- Historical `"template": ""` entries remain compatible, and ordinary `@content`-based templates are unchanged.
+- New project scaffolds no longer create unnecessary identity CSS/JavaScript templates.
+- Added focused compatibility coverage for omitted templates, explicit empty templates, switching between real and template-less entries, and dependency cleanup.
+
+### Reliability and development evidence
+
+- Project contracts were developed as explicit behavioral guarantees rather than only happy-path examples, with regression/adversarial coverage for the failure and incremental-build semantics above.
+- Nift's checkpoint process now explicitly requires relevant handover material and public Battle Tested/reliability claims to be reconciled when protected behavior or testing evidence changes.
+- The public documentation now separates the general contract philosophy, generic Project Contracts mechanism, and route-contract pattern, while keeping Nift route contracts distinct from deployment/runtime routing systems such as Vercel routes.
 
 ## v1.0.42
 

@@ -7,7 +7,7 @@ is packaged and published.
 
 ## Authority and current state
 
-The executable currently reports `Nift v4.0.0`. The retained rewrite checkpoint
+The executable currently reports `Nift v4.0.1`. The retained rewrite checkpoint
 identity remains documented in project history and release notes, but it is not
 part of the public product version. Exact tag, artifact, and public release
 conventions must follow `PACKAGING.md` and actual Git/release evidence.
@@ -76,8 +76,17 @@ whose target version is the candidate being prepared.
 
 User-visible behavioral changes, correctness fixes, and language capabilities may
 justify version/release-note changes. Tests or prose alone do not automatically
-require a binary version bump. Exact versioning policy remains partly unresolved;
-follow established Git/release evidence and ask before assigning a public version.
+require a binary version bump. Follow established Git/release evidence and ask
+before assigning a public release version.
+
+Immediately after a public release is completed, advance the executable/source
+identity to the next development version before beginning further development.
+Do not leave the working tree identifying itself as the version that was just
+released: keeping the development identity current prevents the next bump from
+becoming a release-day memory task. Update any regression assertion that checks
+the executable version as part of the same post-release checkpoint. Packaging
+metadata that intentionally describes the last published store version is separate
+and should only change when preparing/publishing the corresponding package.
 
 ## Release report
 
