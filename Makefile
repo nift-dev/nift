@@ -102,6 +102,7 @@ clean:
 	rm -f $(OBJECTS) $(DEPFILES) "$(TARGET)"
 	rm -rf "$(TEST_DIR)"
 	$(MAKE) -C minifypp clean
+	$(MAKE) -C jsonic clean
 
 .PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling all clean test-jsonic test-jsonic-sync test-json test-json-schema test-minify test-json-schema-integration test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts install uninstall
 
