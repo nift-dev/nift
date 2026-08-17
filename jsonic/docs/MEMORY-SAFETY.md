@@ -42,3 +42,22 @@ A run passes only when every recorded process exits successfully and the runner 
 ## Checkpoint-0 smoke gate
 
 `make memory-safety-smoke` proves that this repository can build an instrumented workload and emit the common evidence shape. It is infrastructure validation only, **not** the project's dedicated leak campaign or production memory-safety verdict.
+
+## Checkpoint 1A — lifetime corpus and sanitizer/RSS soak
+
+Validated 2026-08-18 against Jsonic++ commit `702c6c46e0dca757ef8d1ca9a51ef7f79c39bb3d` on Linux x86_64 with GCC 14.2.0.
+
+The maintained `tests/json_memory_lifetime.cpp` workload repeatedly exercises valid scalar/object/array parse + dump round trips, a 2,048-item large document, 128-level nesting, malformed inputs including failures after substantial partial allocation, object/array mutation, copy/move assignment, large string ownership transitions, named-array streaming, callback early termination, and streaming failure after 2,048 successful items.
+
+Evidence from the checkpoint:
+
+- ordinary smoke and adversarial tests: pass;
+- ASan + LSan + UBSan lifetime corpus: 120 in-process iterations, zero sanitizer findings;
+- non-sanitized lifetime/RSS corpus: 400 in-process iterations, pass;
+- non-sanitized current RSS: 10,624 KiB after warm-up, 10,688 KiB at midpoint, 10,688 KiB at completion on this run;
+- process peak RSS for the non-sanitized run: 10,676 KiB as reported by `/usr/bin/time -v`;
+- exact standalone/Nift mirror synchronization: pass; Minify++ vendored-header synchronization: pass.
+
+The RSS result is evidence of a settled operating band for this workload, not a general leak proof. The sanitizer run's much larger RSS reflects sanitizer allocator/quarantine behavior and is not used as the steady-state memory baseline.
+
+No parser defect or lifetime failure was found in Checkpoint 1A, so no production parser change was required. Checkpoint 1B remains open because Valgrind is unavailable in the current environment; independent Valgrind confirmation and public website publication should happen together on a suitable Linux environment.
