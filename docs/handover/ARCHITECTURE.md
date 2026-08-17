@@ -224,8 +224,9 @@ system would suggest implementation at the wrong layer.
 @content expresses the structural relationship between a tracked page and its
 template. A tracked entry may instead omit `template`; in that case its content
 file is parsed directly as the top-level source, and no template dependency is
-created or retained. An explicit empty template value is invalid so omission is
-deliberate and unambiguous. @input both contributes rendered bytes and records a
+created or retained. Omission is the preferred representation; the historical
+explicit empty-string form remains a backward-compatible alias. @input both
+contributes rendered bytes and records a
 content dependency; included-file state may prevent recursive cycles. @dep
 records an external content dependency without rendering it. @json loads
 build-time data, establishes a

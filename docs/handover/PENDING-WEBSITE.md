@@ -55,9 +55,9 @@ Use this compact shape for new entries:
   and any CSS/JavaScript setup instructions that recommend identity templates
 - Required update: explain that omitting `template` makes the content file the
   fully parsed top-level Nift source; contrast this with a genuine template using
-  `@content`; state that an explicitly empty `template` is invalid; remove any
-  instruction to create `template.css` or `template.js` containing only
-  `@content`
+  `@content`; describe omission as preferred while noting that the historical
+  empty-string form remains compatible; remove any instruction to create
+  `template.css` or `template.js` containing only `@content`
 - Timing: do not publish this behavior on the website until a publicly available
   Nift release supports it
 

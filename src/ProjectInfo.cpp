@@ -151,13 +151,7 @@ bool ProjectInfo::load_tracking() {
                 !entry.has("title") || !entry["title"].is_string() ||
                 (entry.has("template") && !entry["template"].is_string())) {
                 entries_valid = false;
-                entry_error = "every tracked entry must be an object with string name/title fields and an optional non-empty string template field";
-                return false;
-            }
-
-            if (entry.has("template") && entry["template"].string.empty()) {
-                entries_valid = false;
-                entry_error = "tracked template must be omitted for a template-less entry, not set to an empty string";
+                entry_error = "every tracked entry must be an object with string name/title fields and an optional string template field";
                 return false;
             }
 

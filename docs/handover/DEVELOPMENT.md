@@ -33,6 +33,20 @@ For bugs, reduce and preserve the reproducer. Look for siblings in the same
 failure family. Prefer root-cause lifecycle/parser/state fixes over one-off
 special cases.
 
+Before calling a user-visible behavior checkpoint complete, perform explicit
+coverage accounting across both repositories:
+
+```text
+changed behavior or invariant
+  -> implementation-local test and Makefile target in nift
+  -> black-box contract module registered by nift-regression-suite/run-contract.sh
+```
+
+Add both layers when they apply and run the external suite against the candidate
+executable. Do not assume that adding a shell test under `nift/tests` updates the
+independent contract repository. If one layer genuinely does not apply, record
+the reason in the checkpoint report; an unexamined omission is not completion.
+
 ## Reference checkpoint: textual parameter interpolation
 
 The 2026-08-16 `$[...]` textual-parameter checkpoint is a representative example
@@ -110,6 +124,7 @@ Scope and objective
 Baseline branch/commit/status and known failures
 Implementation and rationale
 Tests added/changed
+Local/external coverage map, including any justified one-layer exceptions
 Focused validation
 Full local and external validation
 Sanitizers/safety

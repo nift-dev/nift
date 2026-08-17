@@ -53,7 +53,7 @@ printf '<body>changed</body>\n' >"$P/templates/page.html"
 (cd "$P" && "$NIFT_BIN" status >status.log)
 ! grep -Fq 'needs rebuilding' "$P/status.log"
 
-# Empty is invalid; omission is the unambiguous template-less form.
+# The historical empty-string form remains a compatible template-less alias.
 python3 -S - "$P/.nift/tracked.json" <<'PY'
 import json, sys
 p = sys.argv[1]
@@ -61,11 +61,8 @@ d = json.load(open(p))
 d["tracked"][0]["template"] = ""
 json.dump(d, open(p, "w"))
 PY
-if (cd "$P" && "$NIFT_BIN" status >empty.log 2>&1); then
-  echo "empty tracked template was accepted" >&2
-  exit 1
-fi
-grep -Fq 'template must be omitted' "$P/empty.log"
+(cd "$P" && "$NIFT_BIN" status >empty.log)
+! grep -Fq 'needs rebuilding' "$P/empty.log"
 
 # New CSS and JavaScript entries no longer use identity templates.
 S="$TMP/scaffold"

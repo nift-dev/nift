@@ -3,9 +3,9 @@
 ## Unreleased
 
 - Tracked entries may omit `template`; Nift then fully parses the content file
-  itself as the top-level source. Explicit empty template strings remain invalid,
-  existing `@content` templates remain compatible, and new project scaffolds no
-  longer create identity CSS/JavaScript templates.
+  itself as the top-level source. Historical empty template strings remain a
+  compatible alias, existing `@content` templates remain compatible, and new
+  project scaffolds no longer create identity CSS/JavaScript templates.
 
 ## v1.0.42
 

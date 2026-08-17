@@ -40,6 +40,26 @@ The focused shell modules exist both under the implementation repository's
 `tests/` and the independent suite's `contract/`. Their ownership/synchronization
 policy should be made machine-checkable so copied tests do not silently diverge.
 
+## Mandatory local/external coverage review
+
+Every new externally observable behavior must be mapped deliberately to both
+test layers before checkpoint completion. This includes syntax and configuration
+changes, generated scaffold contents, CLI output/status, filesystem effects, and
+incremental dependency transitions—not only parser output.
+
+1. Add or update the focused implementation-local test and expose it through an
+   appropriate Makefile target.
+2. Add independent black-box coverage to `nift-regression-suite/contract/` and
+   register the module in that repository's `run-contract.sh`.
+3. Run the local focused/high-risk tests and the complete external contract
+   against the same candidate executable.
+4. Record both test locations in the checkpoint report. If one layer cannot
+   reasonably test the change, document the specific reason.
+
+A test present only in one repository is not automatically mirrored coverage,
+and an external module not registered by `run-contract.sh` is not part of the
+canonical contract run.
+
 ## Testing principles
 
 - Test failure families, not vanity counts.
