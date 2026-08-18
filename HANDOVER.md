@@ -287,3 +287,14 @@ calling the Nift work complete.
 - Failed output writes do not refresh page metadata. Failed metadata writes leave the page stale so `status`/`build-updated` can repair it.
 - Claim scope is intentionally limited to the tested Linux failure classes. Direct ENOSPC and platform-specific Windows/macOS permission/locking semantics remain outside this checkpoint and belong in later platform evidence.
 - Checkpoint 9 remains appropriate and distinct: fuzz/sanitizer the n++ parser and explicit resource/depth boundaries, without duplicating standalone Jsonic++ or Minify++ parser campaigns.
+
+## Checkpoint 9 complete — parser fuzz/resource boundaries (2026-08-18)
+
+- Maintained gate: `make checkpoint-9-parser-fuzz`.
+- Commit under test: `45d96ba`; exact evidence is retained at `docs/evidence/checkpoint-9/parser-fuzz.json`.
+- Sanitizer-backed corpus: 1,200 grammar-aware generated/mutated n++ cases across seeds 9001/17713/424242 plus 17 explicit resource/depth boundaries.
+- Final outcomes: 1,217 total cases; 234 successful builds; 983 controlled Nift errors; 0 timeouts; 0 crashes/signals; 0 ASan/LSan/UBSan findings.
+- Boundary coverage included recursive control flow around the 64-level parser guard, 8 MiB literal templates, multi-megabyte comments/content, 1 MiB parameters/interpolations, 100k balanced parentheses and high-volume Unicode.
+- The 64-level parser-depth boundary was verified directly: 16/32/63/64 succeeded for the nested fixture; 65/80/128 failed cleanly. The diagnostic was clarified from `maximum @input depth` to `maximum template parse depth` because the limit covers recursive parser entry generally.
+- No n++ crash/memory bug was found in this campaign. Existing parser/content, comments, control-flow, template-optional, Contracts, Checkpoint 7 and Checkpoint 8 gates remain green.
+- Checkpoint 10 still makes sense and is now the final deliberate-hardening campaign: cross-platform behavioural equivalence via normalized Linux/macOS/Windows CI evidence, not merely compilation.
