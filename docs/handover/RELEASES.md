@@ -50,7 +50,10 @@ Proportionately include:
 10. Reconcile README, docs, website, AI context, release notes, decisions, and
    production roadmap.
 11. Build the actual package/archive, extract it freshly, build/use it, run the
-    external suite against it, and verify version/help/license/expected files.
+    external suite against it, and verify `nift version`, `nift about`, and
+    `nift commands`, plus the license and expected files. Confirm unknown and
+    help-like invocations produce the intended diagnostic and direct users to
+    `nift commands`; a separate `nift help` command is not part of the contract.
 12. Inspect repository state for generated/debug residue.
 
 Repository tests passing does not prove a release archive is usable.

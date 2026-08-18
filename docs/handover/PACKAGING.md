@@ -184,11 +184,14 @@ release and uploads the resolved formula as an artifact; it does not push to
 `homebrew-core` or manufacture bottle checksums.
 
 The rewrite has now reached the canonical Homebrew formula, so future ordinary
-release work should use Homebrew's supported automatic version-bump path rather
-than recreating the original migration manually. Homebrew's own CI and
-maintainers own official bottles. Always verify the public formula and a fresh
-installation after propagation rather than inferring availability from Nift's
-in-repository formula tests.
+release work must use Homebrew's supported automatic version-bump path rather
+than recreating the original migration manually. **Do not manually open a simple
+version-bump pull request against `Homebrew/homebrew-core`.** Only prepare a
+manual upstream change if Homebrew maintainers explicitly request one because
+the automated path cannot represent a non-routine formula change. Homebrew's own
+CI and maintainers own official bottles. Always verify the public formula and a
+fresh installation after propagation rather than inferring availability from
+Nift's in-repository formula tests.
 
 Historical migration PRs remain useful provenance, but they are no longer the
 current installation state. `Homebrew/homebrew-core#299226` was closed with a
@@ -198,10 +201,11 @@ published 4.0.1 through the canonical formula.
 ## Flatpak and Flathub
 
 Nift is already published on Flathub with immutable app ID `cc.nift.nsm`. Do not
-submit it as a new app or change the ID as part of a normal update. As inspected
-on 17 August 2026, the canonical `flathub/cc.nift.nsm` manifest still publishes
-2.4.12 and builds the legacy `nifty-site-manager/nsm-flatpak` source, plus bundled
-Git and LuaRocks and a legacy patch.
+submit it as a new app or change the ID as part of a normal update. The canonical
+`flathub/cc.nift.nsm` manifest was migrated to the `nift-dev/nift` source and
+current `nift` command by PR #12 on 18 August 2026; ordinary updates now advance
+that manifest's immutable tag URL and checksum without restoring legacy Git,
+LuaRocks, patch, or `nsm` inputs.
 
 `packaging/flatpak/cc.nift.nsm.json.in` describes the core source migration for
 the current C++ rewrite. It is deliberately a template and deliberately does not
@@ -240,8 +244,9 @@ each service with its source metadata changed:
 - Flathub's `flathub/cc.nift.nsm` manifest must change its source URL to the
   immutable `nift-dev/nift` release. Update its AppStream bugtracker and
   VCS-browser URLs in the same external pull request.
-- Homebrew's `Homebrew/homebrew-core` `nift.rb` must be changed by pull request.
-  The in-repository template cannot redirect `brew install nift` by itself.
+- Homebrew's canonical `nift.rb` is updated through Homebrew's automatic bump
+  infrastructure for ordinary releases. Do not open a manual simple-bump pull
+  request; the in-repository template only validates the candidate formula.
 
 Archive the old repositories only after the public store entries use the new
 source and fresh installations have been verified. Add a short archived-repo
@@ -274,8 +279,11 @@ evidence for the release report.
    changes before touching release files.
 2. Choose `X.Y.Z` with Nick's approval. Update the public version reported by
    `src/CLI.cpp`, `snap/snapcraft.yaml`, release notes and affected public docs.
-3. Confirm the user-facing `about`, `version` and help output are release-ready
-   and contain no temporary checkpoint identity.
+3. Verify `nift version`, `nift about` and `nift commands`; confirm they are
+   release-ready and contain no temporary checkpoint identity. Also confirm
+   unknown and help-like invocations fail with the intended diagnostic and
+   direct users to `nift commands`. Do not infer that a separate `nift help`
+   command exists.
 4. Review `PENDING-WEBSITE.md`. Implement and verify every website change targeted
    at `X.Y.Z`, then remove the completed entries or explicitly retarget approved
    deferrals. The queue must contain no unresolved item for `X.Y.Z` before tagging.
@@ -354,11 +362,13 @@ evidence for the release report.
    and SHA-256 refer to the immutable `nift-dev/nift` tagged source archive.
 2. Confirm the workflow tested the formula on both supported macOS and Linux
    runners. Do not copy legacy LuaJIT, patch or `nsm` behavior into the formula.
-3. Check Homebrew's automatic bump service and existing pull requests before
-   opening anything manually. Do not submit a duplicate update.
-4. If needed, fork/update `Homebrew/homebrew-core`, change `Formula/n/nift.rb`,
-   run the required formula audit/tests, and submit the normal upstream pull
-   request. Homebrew CI and maintainers own official bottles.
+3. Wait for and monitor Homebrew's automatic bump service. Check existing pull
+   requests and formula history, but do not manually open a simple version-bump
+   pull request or duplicate the automated update.
+4. Prepare a manual `Homebrew/homebrew-core` change only if Homebrew maintainers
+   explicitly request it for a non-routine formula change; follow their requested
+   audit/test/submission process exactly. Homebrew CI and maintainers own official
+   bottles.
 5. After merge and bottle publication, run `brew update`, install/upgrade Nift
    from Homebrew, verify `nift version`, and record the merged PR and formula URL.
 
@@ -482,11 +492,63 @@ Downstream state recorded on 2026-08-17:
   the preserved 256px icon checksum; commit
   `16c53050308024405bd1361ce421acca598ae7d4` corrected it and triggered a new
   build. The rerun also failed on x86-64, with the aarch64 leg cancelled after
-  that failure; PR #12 remained open when rechecked on 2026-08-19. Diagnose and
-  repair that external build before claiming v4.0.1 Flathub publication, then
-  perform a fresh Flathub installation test.
+  that failure. The AppStream construction was then corrected in commit
+  `13b99da4b5ad4b7c9ca58424d459d8d25f6f04bc`; the replacement test build passed
+  on aarch64 and x86-64, and PR #12 was merged to Flathub `master` as
+  `9d8a657064a72c5f899d15db51afee500ef33120` on 2026-08-18. A fresh public
+  Flathub installation/version check remains required before recording 4.0.1 as
+  publicly installable evidence.
 
 Re-check and append final Chocolatey approval/install evidence, a fresh Homebrew
 install/version result from the canonical 4.0.1 formula, and the repaired Flathub
 build/publication/install evidence. Do not rewrite the v4.0.1 GitHub
 release to close a downstream task.
+
+## v4.0.2 release-candidate record (pre-publication)
+
+The 4.0.2 implementation state through `0368069` and its subsequent
+documentation-only readiness reconciliation were validated on 19 August 2026.
+No `v4.0.2` tag or GitHub release existed during this preparation, so downstream
+publication and final release-asset checks remain deliberately incomplete.
+
+Pre-release evidence:
+
+- `src/CLI.cpp`, generated framework metadata, `snap/snapcraft.yaml`, the
+  Homebrew pull-request validation version, release notes, and public website
+  documentation all identify or describe 4.0.2 consistently. The pending website
+  queue has no unresolved 4.0.2 item.
+- A clean GCC 15 C++17 build passed; `nift version` reported `Nift v4.0.2`, and
+  the supported `about` and `commands` surfaces were reviewed. Nift deliberately
+  has no generic `help` command or `init --help` option.
+- All implementation-local correctness targets passed, including the 4.0.2 init
+  targets and the generated Minify++ JavaScript/JSX/format corpora. Standalone
+  Jsonic++ and Minify++ synchronization checks passed for 20 and 24 files.
+- The independent regression suite passed all 18 contract modules against both
+  the repository candidate and a freshly extracted Linux release-layout archive.
+- The scaling guard passed with a 4.14x 2,000-to-10,000-page load ratio. The
+  10,000-page RSS guard passed with every measured peak below 16,384 KiB; full
+  build median was 19.927584 seconds and no-op updated median was 0.099882
+  seconds on this host. These timings are host evidence, not portable promises.
+- Checkpoint 7 passed 720 incremental/clean output comparisons, Checkpoint 8
+  passed 13 filesystem/transaction cases, and Checkpoint 9 passed 1,217
+  sanitizer-backed parser/resource cases. The 12-round, 40-page direct-Nift
+  Valgrind integration passed with four deliberate failure/recovery phases.
+- The ASan/UBSan executable and 4.0.2 init-target contract passed outside the
+  Codex ptrace sandbox with leak detection enabled. GCC emitted known
+  libstdc++ `<regex>` `-Wmaybe-uninitialized` diagnostics while compiling the
+  sanitizer build; no sanitizer finding occurred at runtime.
+- Nift Actions runs `32156523801` (init targets) and `32156523799`
+  (cross-platform behavioral corpus) passed on Linux, macOS and Windows at
+  `0368069`. The independent regression repository has no GitHub Actions
+  workflow; its evidence above is the exact local candidate run.
+- The Nift website built all 58 pages with the exact candidate and left both
+  website source `stage` and generated `public/main` clean. The corresponding
+  pushed heads were `255a5c6` and `65d3d2a` during preparation.
+
+The tag-triggered release workflow must still build and inspect the final Linux,
+macOS arm64, macOS x86-64 and statically linked Windows archives, publish the
+immutable GitHub release, and complete its downstream jobs. In particular, the
+Windows MinGW runtime-DLL check and both Homebrew formula runners are release
+workflow gates rather than locally reproduced host evidence. Homebrew ordinary
+version propagation must be left to Homebrew's automatic bump infrastructure;
+do not open a manual simple-bump pull request for 4.0.2.
