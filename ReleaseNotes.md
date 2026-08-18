@@ -1,5 +1,28 @@
 # Nift — Release Notes
 
+## v4.0.2 (development)
+
+Nift 4.0.2 simplifies project initialization and adds explicit hosting-platform presets without turning Nift into a deployment/account-management tool.
+
+### Project initialization
+
+- `nift init` now has one obvious default: create and build the standard HTML starter.
+- Added `--ext=.ext` for generic projects. HTML/HTM/PHP use the HTML-family starter (including Nift `$[title]` metadata); other extensions use a format-neutral direct-content starter. The selected extension remains the default content and output extension for the new project.
+- Removed the old positional extension form (`nift init .html`) and the `init-html` command. Both now fail with explicit migration diagnostics rather than remaining compatibility aliases.
+
+### Platform targets
+
+- Added `--target=<platform>` with initial targets for `vercel`, `netlify`, `amplify`, `azure`, `firebase`, `render`, `cloudflare`, and `github-pages`.
+- Target presets currently accept `.html` and `.htm` and reject runtime-oriented combinations such as `--target=vercel --ext=.php` rather than producing a misleading static artifact. Generic `nift init --ext=.php` remains supported for PHP-capable hosting.
+- Vercel emits the static Build Output API layout under `.vercel/output/static/` with `config.json`; Amplify emits its static deployment bundle under `.amplify-hosting/static/` with `deploy-manifest.json`. The other targets retain `public/` and add only the provider configuration needed/useful for the chosen static deployment model; GitHub Pages deliberately requires no provider file.
+- Target initialization does not authenticate, create provider projects, provision runtime services, configure DNS, or choose how remote CI installs Nift. Provider functions/APIs remain ordinary platform features beside Nift's build-time output.
+- Added focused local init-target coverage and a native Linux/macOS/Windows GitHub Actions matrix. The independent `nift-regression-suite` also carries the externally observable initializer contract.
+
+### Documentation
+
+- Added a maintained target matrix in `docs/PLATFORM-TARGETS.md` and provider-specific website guides covering generated files, deployment boundaries, functions/runtime options and official platform configuration.
+- Migrated maintained hardening/regression harnesses to the new zero-argument HTML initializer while retaining tests for the deliberate removal diagnostics.
+
 ## v4.0.1
 
 Nift 4.0.1 strengthens the v4 model of checked, dependency-aware website composition. The headline addition is project contracts: project-wide JSON-backed values that use the existing `$[...]` syntax while participating in Nift's dependency and incremental-build guarantees. The release also removes unnecessary template boilerplate for tracked files that do not need a separate template.

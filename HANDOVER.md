@@ -24,7 +24,7 @@ whether it is a regression.
 - Language/toolchain: C++17 and Make.
 - Output convention for modern projects: `public/`.
 - Current branch: `main` in this checkout.
-- Current project phase: **hardening plateau reached** after Checkpoints 0–10; focus now shifts to distribution, dogfooding, field evidence, and regression-backed responses to real findings.
+- Current project phase: **hardening plateau reached** after Checkpoints 0–10. The 4.0.2 candidate is adding explicit `init` extension/platform presets before release; distribution, dogfooding, field evidence, and regression-backed responses remain the next phase after that bounded feature lands.
 - Public documentation: the separate `nift-dev.github.io` repository.
 - External contract: the separate `nift-regression-suite` repository.
 - Embedded minifier: `minifypp/`, synchronized with standalone Minify++.
@@ -78,6 +78,7 @@ themselves. Nift owns the small build-time job it can perform precisely.
 - `jsonic/`: vendored Jsonic++ public header used by Nift core.
 - `ARCHITECTURE_RULES.md`: concise current architectural review checklist.
 - `PERFORMANCE.md`: retained performance rationale and checkpoint evidence.
+- `docs/PLATFORM-TARGETS.md`: current `nift init` extension/hosting-target contract and provider ownership boundaries.
 - `ReleaseNotes.md`: public implementation checkpoint history.
 - `docs/handover/PROJECT-CONTEXT.md`: historical and product mental model.
 - `docs/handover/ARCHITECTURE.md`: implementation architecture, subsystem

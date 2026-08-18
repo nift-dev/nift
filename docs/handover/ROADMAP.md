@@ -8,19 +8,19 @@ The completed campaign established and retained evidence around component memory
 
 Do **not** invent Checkpoint 11 merely to continue the sequence. New hardening campaigns need a concrete trigger: a field defect, an unsupported platform claim worth establishing, a newly introduced semantic contract, or another clearly justified guarantee.
 
-## Current phase: distribution and field evidence
+## Current phase: bounded 4.0.2 platform initialization, then distribution and field evidence
 
-The highest-value work now is to make the current code easy to install and expose it to environments and projects that were not designed by Nift's maintainers.
+Before distributing 4.0.2, the candidate is taking one bounded post-hardening usability feature: explicit project initialization through `nift init`, `--ext=.ext`, and `--target=<platform>`. This is not a reopened hardening campaign. It prepares small provider-correct static project shapes while leaving authentication, provisioning, runtime services, and provider-specific deployment tooling outside Nift.
 
 Priorities:
 
-1. Release/distribute the latest intended Nift version through the supported channels.
-2. Reconcile package recipes, checksums, install documentation and version-sensitive website material with that release.
-3. Use GitHub Actions or similarly reproducible clean environments to install from the **actual distribution channels** and run smoke/behavioral checks against the packaged binaries, rather than only testing locally built artifacts.
-4. Continue dogfooding Nift across its own sites and representative real projects.
-5. Encourage external use and treat unfamiliar user workflows as a new source of evidence.
-6. Convert every reproducible production/distribution defect into a focused regression when practical.
-7. Keep Battle Tested, Production readiness, handovers and package documentation synchronized with what current evidence actually proves.
+1. Finish and validate the 4.0.2 initialization contract, including the generic HTML/PHP/neutral starter families and the supported platform targets.
+2. Keep provider behavior factual and minimal; run local/native cross-platform target-generation checks before release and obtain end-to-end provider evidence where credentials/workflows make that practical.
+3. Reconcile the Nift repository, independent regression suite, website platform guides, command reference and release notes with the final 4.0.2 behavior. The homepage remains intentionally unchanged for this feature.
+4. Release/distribute 4.0.2 through the supported channels and reconcile recipes, checksums and version-sensitive install material.
+5. After the public packages propagate, use GitHub Actions or similarly reproducible clean environments to install from the **actual distribution channels** and run post-install smoke/behavioral checks. Testing an older package may rehearse the harness but is not 4.0.2 distribution evidence.
+6. Continue dogfooding Nift across its own sites and representative real projects; treat unfamiliar user workflows as a new source of evidence.
+7. Convert reproducible production/distribution defects into focused regressions when practical, and keep Battle Tested, Production readiness, handovers and package documentation synchronized with what current evidence actually proves.
 
 ## Distribution validation direction
 
