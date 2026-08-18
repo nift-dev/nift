@@ -214,9 +214,9 @@ If GitHub-generated raw artifacts are too runner-specific or bulky for Git, reta
 
 ## Documentation discipline
 
-Until the entire required matrix and final comparison job are green:
+Historical execution rule used while the checkpoint was running:
 
-- Checkpoint 10 = **IN PROGRESS**;
+- until the entire required matrix and final comparison job were green, Checkpoint 10 = **IN PROGRESS**;
 - cross-platform behavioural equivalence = **not yet proven**;
 - Battle Tested must continue to describe it as the final frontier.
 

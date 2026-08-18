@@ -1,74 +1,69 @@
-# Nift production-readiness roadmap
+# Nift maintained roadmap
+
+## Current status
+
+Nift has completed the planned Checkpoints 0–10 deliberate hardening campaign and reached the intended **hardening plateau**. The current development executable identifies as `Nift v4.0.2`. Production readiness is now a maintained state rather than a milestone still waiting to be earned through another synthetic checkpoint.
+
+The completed campaign established and retained evidence around component memory/resource safety, Nift lifecycle/endurance behavior, cross-component ownership, incremental-vs-clean equivalence, filesystem/transaction integrity, parser fuzz/resource boundaries, and scoped Linux/macOS/Windows behavioral equivalence. Checkpoint 10 also found and fixed a real Windows read-only artifact deletion defect before the final portable corpus converged with zero mismatches.
+
+Do **not** invent Checkpoint 11 merely to continue the sequence. New hardening campaigns need a concrete trigger: a field defect, an unsupported platform claim worth establishing, a newly introduced semantic contract, or another clearly justified guarantee.
+
+## Current phase: distribution and field evidence
+
+The highest-value work now is to make the current code easy to install and expose it to environments and projects that were not designed by Nift's maintainers.
+
+Priorities:
+
+1. Release/distribute the latest intended Nift version through the supported channels.
+2. Reconcile package recipes, checksums, install documentation and version-sensitive website material with that release.
+3. Use GitHub Actions or similarly reproducible clean environments to install from the **actual distribution channels** and run smoke/behavioral checks against the packaged binaries, rather than only testing locally built artifacts.
+4. Continue dogfooding Nift across its own sites and representative real projects.
+5. Encourage external use and treat unfamiliar user workflows as a new source of evidence.
+6. Convert every reproducible production/distribution defect into a focused regression when practical.
+7. Keep Battle Tested, Production readiness, handovers and package documentation synchronized with what current evidence actually proves.
+
+## Distribution validation direction
+
+Once the latest code is released through the intended channels, prefer a CI matrix that validates installation and a small post-install contract through each channel on the environment that actually consumes it. Examples may include Homebrew on macOS, Chocolatey/winget-style Windows channels where supported, Snap/Flatpak or other Linux channels, and direct GitHub release artifacts.
+
+The important distinction is:
+
+```text
+source CI green
+    ≠
+package is installable and correct
+
+actual package install
+    + version/provenance check
+    + representative Nift build
+    + upgrade/reinstall/uninstall checks where appropriate
+    = distribution evidence
+```
+
+Do not claim a channel is validated merely because its recipe exists or an upstream submission was accepted. Prefer testing the public artifact users actually receive after propagation. Keep channel-specific constraints explicit rather than forcing false uniformity across package managers.
+
+## Maintained engineering obligations
+
+The hardening plateau does not retire the existing gates. Significant changes should continue to protect the relevant established contracts, including:
+
+- focused source-tree tests and the independent black-box regression suite;
+- Checkpoint 7 incremental-vs-clean equivalence when incremental semantics are affected;
+- Checkpoint 8 filesystem/transaction integrity when state/output handling is affected;
+- Checkpoint 9 parser fuzz/resource boundaries when parser/template semantics are affected;
+- Checkpoint 10 cross-platform behavioral equivalence when portable behavior is affected;
+- component and Nift memory/resource gates when ownership/lifetime behavior is affected;
+- real-site self-builds and documentation reconciliation for public behavior changes.
+
+Run risk-specific gates deliberately; not every edit needs every expensive historical campaign.
+
+## Product and ecosystem work
+
+New functionality should still satisfy Nift's architectural rules: extend the small dependency-aware build layer only where Nift can provide a clear, testable guarantee without swallowing a specialist tool's domain. Lower comparison-table scores in integrated runtimes, framework islands or ecosystem size are not automatic feature requests.
+
+Useful post-plateau exploration may include AI/developer-experience experiments, additional real application patterns, documentation improvements and packaging ergonomics, but these should be judged by user value rather than used as excuses to reopen a completed hardening campaign.
 
 ## Living-roadmap rule
 
-This is a maintained risk assessment, not a fixed launch checklist. Review it at
-every substantial checkpoint. New failures, architecture findings, sanitizer
-results, real projects, performance evidence, documentation gaps, or release
-work may add, remove, reorder, or redefine priorities. Once production status is
-reached, continue maintaining the roadmap for preserving production quality.
+This remains a maintained risk assessment. Field findings, release incidents, new platform support, significant language features or architectural changes may add or reorder work. Production bugs should leave regressions where appropriate; new platforms expand evidence; performance and memory remain monitored; documentation and the website remain synchronized with current truth.
 
-## Current inherited assessment
-
-Nift is the most mature of the related projects and appears release-near, but that
-is a hypothesis to be re-earned against the live repository. Production readiness
-means cumulative behavioral correctness, safe filesystem/state handling, precise
-incrementality, real-world dogfooding, performance stability, accurate docs, and
-a reproducible release process—not merely a version number.
-
-## Immediate checkpoint sequence
-
-1. Reconcile current repository, local tests, external suite, website, and
-   retained benchmark evidence.
-2. Preserve the now-green `$[...]` parameter-level contract and its strict
-   value/operation boundary.
-3. Extend source-guided adversarial testing around parser/value/dependency edges.
-4. Continue proving lexical scope, escaping, type behavior, source-bound argument boundaries,
-   non-recursion, path-safety parity, and failure transactionality.
-5. Prove A→B lifecycle replacement for dynamic inputs, dependencies, JSON sources,
-   and requirements where supported, across relevant incremental modes/watch.
-6. Run the complete existing contract and targeted adversarial/source-guided
-   audit around parser/value/dependency interactions.
-7. Run appropriate native safety validation.
-8. Recheck literal-heavy and interpolated performance, 10k scaling, and memory.
-9. Build the real Nift website and representative templates with the candidate.
-10. Reconcile docs, AI guidance, decisions, testing lessons, and handovers.
-11. Resolve release-blocking findings and formalize the release candidate process.
-12. Decide with Nick whether evidence justifies production publication.
-
-Repository reconciliation and a clean 14-module pre-feature contract run were
-completed on 2026-08-16. The parameter feature was then implemented and the
-expanded suite passed all 15 modules, including its 73-check focused contract.
-Local integration tests, an ASan/UBSan candidate run, a disposable 40-page Nift
-website build, and the retained 10k performance fixture also passed. LeakSanitizer
-could not run under the desktop environment's ptrace supervision; retain that as
-a future native-environment check rather than claiming leak coverage here.
-
-If the feature exposes deeper dependency-state or parser architecture defects,
-expand the roadmap rather than promoting the candidate prematurely.
-
-## Current project-contract checkpoint
-
-Config-declared project contracts were implemented on 2026-08-17 using the existing JSON/value/dependency architecture. Focused tests cover lazy resolution, dependency and config-remapping invalidation, control-flow/parameter integration, non-shadowable namespaces, controlled failures, and path safety; the same module is part of the standalone contract suite. Treat the full suite, real website self-build, documentation reconciliation, and source/generated Git review as required evidence before promoting this checkpoint.
-
-## Broader evidence-building work
-
-- realistic JSON/Schema-driven catalogue using nested control flow and sorting;
-- large non-flat dependency topology with shared and page-specific inputs/data;
-- migration of an existing ordinary HTML/CSS/JS site;
-- larger multi-page islands project maintained after initial generation;
-- backend/API application frontend;
-- deliberate failure exercise for malformed data, missing requirements,
-  minification, collisions, and recovery;
-- fresh-install/package and broader Linux/macOS/Windows validation.
-
-These are evidence opportunities, not automatic release blockers. Promote them
-based on risk and intended production claims.
-
-## Post-production maintenance
-
-Every production bug should leave a regression where appropriate. New language
-features expand the contract. New platforms expand release evidence. Performance
-and memory remain monitored. Documentation and the website remain synchronized
-with current truth. “Production ready” is a maintained quality state, not a
-permanent medal.
+“Production ready” and “battle tested” are maintained scoped claims, not permanent medals.

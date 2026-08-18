@@ -24,7 +24,8 @@ whether it is a regression.
 - Language/toolchain: C++17 and Make.
 - Output convention for modern projects: `public/`.
 - Current branch: `main` in this checkout.
-- Public documentation: the separate `nifty-site-manager.github.io` repository.
+- Current project phase: **hardening plateau reached** after Checkpoints 0–10; focus now shifts to distribution, dogfooding, field evidence, and regression-backed responses to real findings.
+- Public documentation: the separate `nift-dev.github.io` repository.
 - External contract: the separate `nift-regression-suite` repository.
 - Embedded minifier: `minifypp/`, synchronized with standalone Minify++.
 - Embedded JSON parser: `jsonic/include/json.h`, synchronized with standalone Jsonic++; `src/Json.h` is a compatibility wrapper.
@@ -50,7 +51,7 @@ Nift provides the glue without trying to become the universe. HTML, CSS,
 JavaScript, React, Vite, backend services, npm, Make, and deployment tools remain
 themselves. Nift owns the small build-time job it can perform precisely.
 
-## Five things not to misunderstand
+## Six things not to misunderstand
 
 1. The modern simplification was deliberate. Do not restore LuaJIT, ExprTk,
    mutable template scripting, arbitrary shell execution, or build hooks merely
@@ -244,7 +245,7 @@ calling the Nift work complete.
 - The sanitizer build completed 12 rounds over 30 pages with four injected failure/recovery transitions and no ASan/LSan/UBSan finding.
 - Focused JSON/schema, Contracts, Minify++, cross-feature, incrementality and persistence/concurrency contracts remain green. Exact evidence is retained under `docs/evidence/memory-safety/checkpoint-6-*.json`.
 - Corrected Checkpoint 6B passed externally at commit `03e18b4`: 19 separate Nift invocations ran directly under Valgrind across a 40-page / 12-round mixed workload with four expected component failures; every invocation reported zero Valgrind errors and no non-zero definite/indirect/possible leak bytes. All 12 recovery phases and the final clean build passed. Exact evidence is retained at `docs/evidence/memory-safety/checkpoint-6-valgrind.json`.
-- The generic memory campaign is now complete. The roadmap moves to incremental-vs-clean equivalence, filesystem/transaction integrity, parser fuzz/resource boundaries and cross-platform behavioural equivalence before the hardening plateau.
+- The generic memory campaign completed here. At that point the roadmap moved to incremental-vs-clean equivalence, filesystem/transaction integrity, parser fuzz/resource boundaries and cross-platform behavioural equivalence; all of those later checkpoints are now complete and the hardening plateau has been reached.
 
 ## Checkpoint 6B instrumentation correction (2026-08-18)
 

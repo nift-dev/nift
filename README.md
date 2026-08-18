@@ -6,6 +6,10 @@ Nift can be used for simple websites, documentation, generated text assets, or a
 
 For documentation, examples and downloads, visit **[nift.dev](https://nift.dev)**.
 
+## Project status
+
+Nift has completed its planned Checkpoints 0–10 deliberate hardening campaign. The current development tree is `Nift v4.0.2`, and the project has moved from synthetic hardening into **distribution, dogfooding and field evidence**. Existing regression, sanitizer, filesystem, parser, incremental and cross-platform gates remain maintained; new hardening work should be driven by concrete findings or newly justified guarantees rather than arbitrary checkpoint numbers.
+
 ## Features
 
 - Fast, multithreaded builds and incremental rebuilds

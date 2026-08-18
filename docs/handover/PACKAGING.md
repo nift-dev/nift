@@ -172,10 +172,10 @@ packages only `nift.exe`. It has no Git dependency. Generated
 ## Homebrew
 
 `brew install nift` is owned by the external `Homebrew/homebrew-core` formula.
-As inspected on 17 August 2026, it still publishes legacy Nift 3.0.3 from
-`nifty-site-manager/nsm`, depends on LuaJIT, applies two legacy patches, and tests
-the `nsm` command. Its API marks the formula for automatic version bumping, but
-the old source URL cannot discover tags created in `nift-dev/nift`.
+As rechecked on 18 August 2026, the canonical formula publishes Nift 4.0.1 from
+`nift-dev/nift` and Homebrew provides bottles for supported Apple Silicon/Intel
+macOS and Linux architectures. The legacy 3.0.3 LuaJIT/patch/`nsm` formula has
+therefore been superseded.
 
 `packaging/homebrew/nift.rb.in` is the upstream formula for the rewrite.
 `homebrew.yml` resolves the immutable source archive and checksum and tests the
@@ -183,18 +183,17 @@ formula on Homebrew for macOS arm64 and Linux x86-64. It is called after a GitHu
 release and uploads the resolved formula as an artifact; it does not push to
 `homebrew-core` or manufacture bottle checksums.
 
-For the first rewritten release, use the generated formula in a normal
-`Homebrew/homebrew-core` pull request, changing the source to `nift-dev/nift` and
-removing LuaJIT, the legacy patches, and `nsm` expectations. Homebrew's own CI
-and maintainers build and attach official bottles. Once the canonical formula
-points to the new repository, its automatic bump service should be able to find
-later tags, but verify every update rather than assuming it occurred.
+The rewrite has now reached the canonical Homebrew formula, so future ordinary
+release work should use Homebrew's supported automatic version-bump path rather
+than recreating the original migration manually. Homebrew's own CI and
+maintainers own official bottles. Always verify the public formula and a fresh
+installation after propagation rather than inferring availability from Nift's
+in-repository formula tests.
 
-The first rewritten formula update was submitted as
-`Homebrew/homebrew-core#299162`. Check that pull request's current state before
-opening a replacement or duplicate. Until it is merged, the external canonical
-formula may still describe the legacy release even though the in-repository
-template and CI are current.
+Historical migration PRs remain useful provenance, but they are no longer the
+current installation state. `Homebrew/homebrew-core#299226` was closed with a
+request to use Homebrew's automated bump infrastructure; Homebrew subsequently
+published 4.0.1 through the canonical formula.
 
 ## Flatpak and Flathub
 
@@ -468,10 +467,13 @@ Downstream state recorded on 2026-08-17:
   `Submitted`/`Pending` state. It was not yet approved or fresh-install tested.
 - The generated Homebrew update was submitted as
   [`Homebrew/homebrew-core#299226`](https://github.com/Homebrew/homebrew-core/pull/299226).
-  The formula retains the official bottle block and changes the source to the
-  v4.0.1 archive and checksum. The pull request was open with upstream checks
-  pending when this record was written; Homebrew merge, bottles, and fresh
-  installation remain outstanding.
+  Homebrew closed that pull request on 2026-08-17 and asked that future simple
+  version bumps use Homebrew's automated update infrastructure rather than a
+  manually/AI-prepared PR. When rechecked on 2026-08-18, the canonical public
+  formula had subsequently advanced to stable Nift 4.0.1 with bottles for
+  supported macOS and Linux architectures. Homebrew v4.0.1 availability is
+  therefore established at the formula level; retain a fresh install/version
+  check in the planned distribution-validation campaign.
 - The consolidated Flathub migration was submitted as
   [`flathub/cc.nift.nsm#12`](https://github.com/flathub/cc.nift.nsm/pull/12).
   It changes the legacy `nsm` build to the current `nift` source and command,
@@ -479,9 +481,12 @@ Downstream state recorded on 2026-08-17:
   project links. Manifest validation passed. An initial build exposed a typo in
   the preserved 256px icon checksum; commit
   `16c53050308024405bd1361ce421acca598ae7d4` corrected it and triggered a new
-  build. Review, successful publication, and a fresh Flathub installation remain
-  outstanding.
+  build. The rerun also failed on x86-64, with the aarch64 leg cancelled after
+  that failure; PR #12 remained open when rechecked on 2026-08-18. Diagnose and
+  repair that external build before claiming v4.0.1 Flathub publication, then
+  perform a fresh Flathub installation test.
 
-Re-check and append the final Homebrew merge/bottle, Chocolatey approval, and
-Flathub build/publication/install evidence when those asynchronous services
-finish. Do not rewrite the v4.0.1 GitHub release to close a downstream task.
+Re-check and append final Chocolatey approval/install evidence, a fresh Homebrew
+install/version result from the canonical 4.0.1 formula, and the repaired Flathub
+build/publication/install evidence. Do not rewrite the v4.0.1 GitHub
+release to close a downstream task.
