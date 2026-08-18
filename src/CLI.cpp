@@ -12,6 +12,7 @@
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
+#include <optional>
 #include <set>
 #include <sstream>
 #include <thread>
@@ -280,7 +281,7 @@ void print_commands() {
     row("info-watching", "", "Show watched directories");
 
     std::cout << '\n' << console::dim("General") << '\n';
-    row("init", "[.ext]", "Create a Nift project");
+    row("init", "[--ext=.ext] [--target=platform]", "Create a Nift project");
     row("minify", "[-i|--in-place] <files...>", "Minify to *.min.ext by default; -i overwrites sources");
     row("about", "", "About Nift and where to learn more");
     row("version", "", "Show version information");
@@ -327,31 +328,231 @@ void remove_page_build_state(const ProjectInfo& project, const TrackedInfo& info
     filesystem::remove_owned_file(filesystem::hash_file_path(project.root, user_dependencies_path(project, info)));
 }
 
-bool initialise_project(const std::string& extension) {
+struct InitOptions {
+    std::string extension = ".html";
+    std::string target;
+};
+
+struct InitTarget {
+    std::string name;
+    std::string output_dir = "public/";
+};
+
+const std::vector<InitTarget>& init_targets() {
+    static const std::vector<InitTarget> targets = {
+        {"vercel", ".vercel/output/static/"},
+        {"netlify", "public/"},
+        {"amplify", ".amplify-hosting/static/"},
+        {"azure", "public/"},
+        {"firebase", "public/"},
+        {"render", "public/"},
+        {"cloudflare", "public/"},
+        {"github-pages", "public/"},
+    };
+    return targets;
+}
+
+const InitTarget* find_init_target(const std::string& name) {
+    for (const auto& target : init_targets())
+        if (target.name == name) return &target;
+    return nullptr;
+}
+
+bool target_extension_supported(const std::string& extension) {
+    return extension == ".html" || extension == ".htm";
+}
+
+bool html_family_extension(const std::string& extension) {
+    return extension == ".html" || extension == ".htm" || extension == ".php";
+}
+
+void print_init_targets() {
+    std::cerr << "  supported targets:";
+    for (const auto& target : init_targets()) std::cerr << " " << target.name;
+    std::cerr << '\n';
+}
+
+bool parse_init_options(int argc, char** argv, InitOptions& options) {
+    bool saw_ext = false;
+    bool saw_target = false;
+
+    for (int i = 2; i < argc; ++i) {
+        const std::string arg = argv[i];
+        if (arg.rfind("--ext=", 0) == 0) {
+            if (saw_ext) {
+                console::error("init extension specified more than once");
+                return false;
+            }
+            saw_ext = true;
+            options.extension = arg.substr(6);
+            if (options.extension.empty()) {
+                console::error("--ext requires a non-empty extension, for example '--ext=.html'");
+                return false;
+            }
+            continue;
+        }
+        if (arg == "--ext") {
+            console::error("--ext requires '=EXT', for example '--ext=.html'");
+            return false;
+        }
+        if (arg.rfind("--target=", 0) == 0) {
+            if (saw_target) {
+                console::error("init target specified more than once");
+                return false;
+            }
+            saw_target = true;
+            options.target = arg.substr(9);
+            if (options.target.empty()) {
+                console::error("--target requires a platform name");
+                print_init_targets();
+                return false;
+            }
+            continue;
+        }
+        if (arg == "--target") {
+            console::error("--target requires '=PLATFORM', for example '--target=vercel'");
+            return false;
+        }
+        if (!arg.empty() && arg[0] == '-') {
+            console::error("unknown init option '" + arg + "'");
+            return false;
+        }
+
+        console::error("positional init arguments are no longer supported");
+        if (filesystem::valid_extension(arg))
+            std::cerr << "  use '--ext=" << arg << "' instead\n";
+        else
+            std::cerr << "  use 'nift init', '--ext=.ext', and/or '--target=platform'\n";
+        return false;
+    }
+
+    if (!filesystem::valid_extension(options.extension)) {
+        console::error("init extension must begin with '.' and cannot contain path separators");
+        return false;
+    }
+
+    if (!options.target.empty()) {
+        const InitTarget* target = find_init_target(options.target);
+        if (!target) {
+            console::error("unknown init target '" + options.target + "'");
+            print_init_targets();
+            return false;
+        }
+        if (!target_extension_supported(options.extension)) {
+            console::error("extension '" + options.extension + "' is not supported by target '" + options.target + "'");
+            std::cerr << "  platform targets currently initialise static HTML sites; use '.html' or '.htm'\n";
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool write_target_files(const InitOptions& options) {
+    if (options.target.empty()) return true;
+
+    if (options.target == "vercel") {
+        json::Document config = json::Document::make_object();
+        config["version"] = 3;
+        return save_json_file(".vercel/output/config.json", config) &&
+               write_if_changed(".gitignore", ".vercel/output/static/\n");
+    }
+
+    if (options.target == "amplify") {
+        json::Document manifest = json::Document::make_object();
+        manifest["version"] = 1;
+        manifest["routes"] = json::Document::make_array();
+        json::Document route = json::Document::make_object();
+        route["path"] = "/*";
+        route["target"] = json::Document::make_object();
+        route["target"]["kind"] = "Static";
+        manifest["routes"].push_back(route);
+        manifest["framework"] = json::Document::make_object();
+        manifest["framework"]["name"] = "nift";
+        manifest["framework"]["version"] = "4.0.2";
+        return save_json_file(".amplify-hosting/deploy-manifest.json", manifest) &&
+               write_if_changed(".gitignore", ".amplify-hosting/static/\n");
+    }
+
+    if (options.target == "netlify") {
+        return write_if_changed("netlify.toml",
+            "[build]\n"
+            "  command = \"nift build\"\n"
+            "  publish = \"public\"\n");
+    }
+
+    if (options.target == "firebase") {
+        json::Document config = json::Document::make_object();
+        config["hosting"] = json::Document::make_object();
+        config["hosting"]["public"] = "public";
+        config["hosting"]["ignore"] = json::Document::make_array();
+        config["hosting"]["ignore"].push_back("firebase.json");
+        config["hosting"]["ignore"].push_back("**/.*");
+        config["hosting"]["ignore"].push_back("**/node_modules/**");
+        return save_json_file("firebase.json", config);
+    }
+
+    if (options.target == "render") {
+        return write_if_changed("render.yaml",
+            "services:\n"
+            "  - type: web\n"
+            "    name: nift-site\n"
+            "    runtime: static\n"
+            "    buildCommand: nift build\n"
+            "    staticPublishPath: ./public\n");
+    }
+
+    if (options.target == "cloudflare") {
+        return write_if_changed("wrangler.toml",
+            "name = \"nift-site\"\n"
+            "pages_build_output_dir = \"./public\"\n");
+    }
+
+    if (options.target == "azure") {
+        // Azure Static Web Apps consumes staticwebapp.config.json from the root
+        // of the deployed output. Track the source file through Nift so every
+        // clean build reproduces it under public/.
+        json::Document config = json::Document::make_object();
+        return save_json_file("content/staticwebapp.config.json", config);
+    }
+
+    if (options.target == "github-pages") {
+        // GitHub Pages accepts the ordinary public/ artifact. Deployment
+        // workflow setup is documented separately because CI must first make
+        // a Nift executable available on the runner.
+        return true;
+    }
+
+    return true;
+}
+
+bool initialise_project(const InitOptions& options) {
     if (fs::exists(".nift")) {
         console::error("cannot initialise project");
         std::cerr << "  this directory is already a Nift project\n";
         return false;
     }
 
-    if (!filesystem::valid_extension(extension)) {
-        console::error("init extension must begin with '.' and cannot contain path separators");
-        return false;
-    }
+    const InitTarget* target = options.target.empty() ? nullptr : find_init_target(options.target);
+    const std::string output_dir = target ? target->output_dir : "public/";
+    const bool html_family = html_family_extension(options.extension);
 
     fs::create_directories(".nift");
-    fs::create_directories("content/assets/css");
-    fs::create_directories("content/assets/js");
+    fs::create_directories("content");
     fs::create_directories("templates");
-    fs::create_directories("public");
+    fs::create_directories(output_dir);
+    if (html_family) {
+        fs::create_directories("content/assets/css");
+        fs::create_directories("content/assets/js");
+    }
 
     json::Document config = json::Document::make_object();
     config["config"] = json::Document::make_object();
     config["config"]["content-dir"] = "content/";
-    config["config"]["content-ext"] = extension;
-    config["config"]["output-dir"] = "public/";
-    config["config"]["output-ext"] = extension;
-    config["config"]["default-template"] = "templates/template.html";
+    config["config"]["content-ext"] = options.extension;
+    config["config"]["output-dir"] = output_dir;
+    config["config"]["output-ext"] = options.extension;
+    config["config"]["default-template"] = html_family ? "templates/template.html" : "";
     config["config"]["build-threads"] = -1;
     config["config"]["incremental-mode"] = "modified";
     config["config"]["minify-exts"] = json::Document::make_array();
@@ -367,16 +568,24 @@ bool initialise_project(const std::string& extension) {
         if (!oe.empty()) value["output-ext"] = oe;
         tracked["tracked"].push_back(value);
     };
-    add("/", "index", "templates/template.html");
-    add("assets/css/style", "style", "", ".css", ".css");
-    add("assets/js/script", "script", "", ".js", ".js");
+    add("/", "index", html_family ? "templates/template.html" : "");
+    if (html_family) {
+        add("assets/css/style", "style", "", ".css", ".css");
+        add("assets/js/script", "script", "", ".js", ".js");
+    }
+    if (options.target == "azure")
+        add("staticwebapp.config", "Azure Static Web Apps config", "", ".json", ".json");
     if (!save_json_file(".nift/tracked.json", tracked)) return false;
 
-    filesystem::write_file("content/index" + extension, "");
-    filesystem::write_file("content/assets/css/style.css", "");
-    filesystem::write_file("content/assets/js/script.js", "");
-    filesystem::write_file("templates/head.html", "<meta charset=\"utf-8\">\n");
-    filesystem::write_file("templates/template.html", "<!doctype html>\n<html lang=\"en\">\n\t<head>\n\t\t@input(\"templates/head.html\")\n\t</head>\n\t<body>\n\t\t@content\n\t</body>\n</html>\n");
+    if (!filesystem::write_file("content/index" + options.extension, "")) return false;
+    if (html_family) {
+        if (!filesystem::write_file("content/assets/css/style.css", "")) return false;
+        if (!filesystem::write_file("content/assets/js/script.js", "")) return false;
+        if (!filesystem::write_file("templates/head.html", "<meta charset=\"utf-8\">\n<title>$[title]</title>\n")) return false;
+        if (!filesystem::write_file("templates/template.html", "<!doctype html>\n<html lang=\"en\">\n\t<head>\n\t\t@input(\"templates/head.html\")\n\t</head>\n\t<body>\n\t\t@content\n\t</body>\n</html>\n")) return false;
+    }
+
+    if (!write_target_files(options)) return false;
 
     ProjectInfo project;
     return project.open() && project.build_all(true) == 0;
@@ -399,13 +608,15 @@ int run_cli(int argc, char** argv) {
         print_commands();
         return 0;
     }
-    if (command == "init" || command == "init-html") {
-        if ((command == "init" && argc > 3) || (command == "init-html" && argc > 2)) {
-            console::error(command + " received too many arguments");
-            return 1;
-        }
-        const std::string extension = command == "init-html" ? ".html" : (argc > 2 ? argv[2] : ".html");
-        return initialise_project(extension) ? 0 : 1;
+    if (command == "init") {
+        InitOptions options;
+        if (!parse_init_options(argc, argv, options)) return 1;
+        return initialise_project(options) ? 0 : 1;
+    }
+    if (command == "init-html") {
+        console::error("command 'init-html' has been removed");
+        std::cerr << "  use 'nift init' instead\n";
+        return 1;
     }
 
     if (command == "minify") {

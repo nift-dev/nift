@@ -93,6 +93,9 @@ test-template-optional: $(TARGET)
 test-contracts: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/contracts_smoke.sh
 
+test-init-targets: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/init_targets_smoke.sh
+
 install: $(TARGET)
 	mkdir -p "$(DESTDIR)$(BINDIR)"
 	$(INSTALL_PROGRAM) "$(TARGET)" "$(DESTDIR)$(BINDIR)/$(TARGET)"
@@ -108,7 +111,7 @@ clean:
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
-.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-minify test-json-schema-integration test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts install uninstall
+.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-minify test-json-schema-integration test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
 
 
 test-cross-feature: $(TARGET)
