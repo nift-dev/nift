@@ -40,6 +40,18 @@ def git_commit():
         return "unknown"
 
 
+def compiler_identity():
+    for command in (["g++", "--version"], ["c++", "--version"]):
+        try:
+            output = subprocess.check_output(
+                command, text=True, encoding="utf-8", errors="replace",
+                stderr=subprocess.STDOUT)
+            return output.splitlines()[0].strip()
+        except (OSError, subprocess.CalledProcessError):
+            pass
+    return "unknown"
+
+
 def run(root, *arguments, expect=0):
     result = subprocess.run(
         [NIFT, *arguments], cwd=root, text=True, encoding="utf-8", errors="strict",
@@ -338,6 +350,7 @@ def main():
             "release": platform.release(),
             "machine": platform.machine(),
             "python": platform.python_version(),
+            "compiler": compiler_identity(),
             "nift_commit": git_commit(),
         },
         "normalization": ["relative-path-separators-to-slash", "crlf-to-lf-before-output-hash"],
