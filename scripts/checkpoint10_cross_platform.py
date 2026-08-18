@@ -13,6 +13,7 @@ import os
 import pathlib
 import platform
 import shutil
+import stat
 import subprocess
 import tempfile
 
@@ -235,7 +236,17 @@ def main():
         run(root, "build-updated")
         add_case(cases, "contract-invalidation", root, stale_before=stale)
 
-        (root / "public/docs/index.html").unlink()
+        required_output = root / "public/docs/index.html"
+        readonly_delete_adjustment = False
+        try:
+            required_output.unlink()
+        except PermissionError:
+            # Nift outputs are deliberately read-only. POSIX permits unlinking
+            # one from a writable directory; Windows requires its read-only
+            # attribute to be cleared first. Retain that distinction below.
+            required_output.chmod(stat.S_IWRITE | stat.S_IREAD)
+            required_output.unlink()
+            readonly_delete_adjustment = True
         stale = status_class(root)
         run(root, "build-updated")
         add_case(cases, "requirement-recovery", root, stale_before=stale,
@@ -306,6 +317,15 @@ def main():
         "classification": "platform-specific",
         "pass": suffix_present == suffix_expected,
         "observation": {"expected_exe_suffix": suffix_expected, "has_exe_suffix": suffix_present},
+    })
+    cases.append({
+        "name": "readonly-output-deletion",
+        "classification": "platform-specific",
+        "pass": readonly_delete_adjustment == suffix_expected,
+        "observation": {
+            "expected_write_attribute_adjustment": suffix_expected,
+            "write_attribute_adjustment_required": readonly_delete_adjustment,
+        },
     })
 
     passed = all(case["pass"] for case in cases)
