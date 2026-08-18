@@ -1,0 +1,188 @@
+{
+  "schema_version": 1,
+  "checkpoint": "6-integration",
+  "commit": "03e18b495be66e9c7bf0e57714fa57084e581117",
+  "platform": "Linux-7.0.0-29-generic-x86_64-with-glibc2.43",
+  "rounds": 12,
+  "pages": 40,
+  "successful_recovery_phases": 12,
+  "injected_failures": 4,
+  "elapsed_seconds": 20.885,
+  "valgrind": true,
+  "valgrind_invocations": 19,
+  "valgrind_runs": [
+    {
+      "args": [
+        "init",
+        ".html"
+      ],
+      "exit": 0,
+      "error_summary": 0,
+      "reported_leak_bytes": [],
+      "leak_pattern": false
+    },
+    {
+      "args": [
+        "build-all"
+      ],
+      "exit": 0,
+      "error_summary": 0,
+      "reported_leak_bytes": [],
+      "leak_pattern": false
+    },
+    {
+      "args": [
+        "build-updated"
+      ],
+      "exit": 0,
+      "error_summary": 0,
+      "reported_leak_bytes": [],
+      "leak_pattern": false
+    },
+    {
+      "args": [
+        "build-updated"
+      ],
+      "exit": 0,
+      "error_summary": 0,
+      "reported_leak_bytes": [],
+      "leak_pattern": false
+    },
+    {
+      "args": [
+        "build-updated"
+      ],
+      "exit": 0,
+      "error_summary": 0,
+      "reported_leak_bytes": [],
+      "leak_pattern": false
+    },
+    {
+      "args": [
+        "build-updated"
+      ],
+      "exit": 0,
+      "error_summary": 0,
+      "reported_leak_bytes": [],
+      "leak_pattern": false
+    },
+    {
+      "args": [
+        "build-updated"
+      ],
+      "exit": 1,
+      "error_summary": 0,
+      "reported_leak_bytes": [],
+      "leak_pattern": false
+    },
+    {
+      "args": [
+        "build-updated"
+      ],
+      "exit": 0,
+      "error_summary": 0,
+      "reported_leak_bytes": [],
+      "leak_pattern": false
+    },
+    {
+      "args": [
+        "build-updated"
+      ],
+      "exit": 1,
+      "error_summary": 0,
+      "reported_leak_bytes": [],
+      "leak_pattern": false
+    },
+    {
+      "args": [
+        "build-updated"
+      ],
+      "exit": 0,
+      "error_summary": 0,
+      "reported_leak_bytes": [],
+      "leak_pattern": false
+    },
+    {
+      "args": [
+        "build-updated"
+      ],
+      "exit": 0,
+      "error_summary": 0,
+      "reported_leak_bytes": [],
+      "leak_pattern": false
+    },
+    {
+      "args": [
+        "build-updated"
+      ],
+      "exit": 0,
+      "error_summary": 0,
+      "reported_leak_bytes": [],
+      "leak_pattern": false
+    },
+    {
+      "args": [
+        "build-updated"
+      ],
+      "exit": 0,
+      "error_summary": 0,
+      "reported_leak_bytes": [],
+      "leak_pattern": false
+    },
+    {
+      "args": [
+        "build-updated"
+      ],
+      "exit": 0,
+      "error_summary": 0,
+      "reported_leak_bytes": [],
+      "leak_pattern": false
+    },
+    {
+      "args": [
+        "build-updated"
+      ],
+      "exit": 1,
+      "error_summary": 0,
+      "reported_leak_bytes": [],
+      "leak_pattern": false
+    },
+    {
+      "args": [
+        "build-updated"
+      ],
+      "exit": 0,
+      "error_summary": 0,
+      "reported_leak_bytes": [],
+      "leak_pattern": false
+    },
+    {
+      "args": [
+        "build-updated"
+      ],
+      "exit": 1,
+      "error_summary": 0,
+      "reported_leak_bytes": [],
+      "leak_pattern": false
+    },
+    {
+      "args": [
+        "build-updated"
+      ],
+      "exit": 0,
+      "error_summary": 0,
+      "reported_leak_bytes": [],
+      "leak_pattern": false
+    },
+    {
+      "args": [
+        "build-all"
+      ],
+      "exit": 0,
+      "error_summary": 0,
+      "reported_leak_bytes": [],
+      "leak_pattern": false
+    }
+  ],
+  "pass": true
+}

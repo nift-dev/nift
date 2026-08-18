@@ -237,13 +237,14 @@ calling the Nift work complete.
 - Wrapper/supervisor RSS was 3,824 KiB at cycle 20 and cycle 29. Treat this as operational telemetry, not the leak oracle.
 - Combined with Checkpoint 4A's native 180-cycle settling run, sanitizer watch run and 10k worker/minification matrix, Checkpoint 4 is complete. The memory-safety campaign advances to Checkpoint 5 (tscc).
 
-## Memory-safety Checkpoint 6A (2026-08-18)
+## Memory-safety Checkpoint 6 complete (2026-08-18)
 
 - At commit `9b64e94`, standalone/embedded synchronization passed for Jsonic++ (20 mirrored files) and Minify++ (24 mirrored files).
 - Native cross-component integration completed 60 rounds over 90 pages with schema-validated JSON, Project Contracts, HTML/CSS minification and ordinary content/template rebuilds in the same project. Twenty malformed-JSON/minifier-configuration failures were injected and each recovered successfully.
 - The sanitizer build completed 12 rounds over 30 pages with four injected failure/recovery transitions and no ASan/LSan/UBSan finding.
 - Focused JSON/schema, Contracts, Minify++, cross-feature, incrementality and persistence/concurrency contracts remain green. Exact evidence is retained under `docs/evidence/memory-safety/checkpoint-6-*.json`.
-- Checkpoint 6B remains independent Valgrind confirmation: run `make valgrind-memory-safety-checkpoint-6` on Linux with Valgrind and return the generated evidence. After that, the generic memory campaign is complete and the roadmap moves to incremental-vs-clean equivalence, filesystem/transaction integrity, parser fuzz/resource boundaries and cross-platform behavioural equivalence.
+- Corrected Checkpoint 6B passed externally at commit `03e18b4`: 19 separate Nift invocations ran directly under Valgrind across a 40-page / 12-round mixed workload with four expected component failures; every invocation reported zero Valgrind errors and no non-zero definite/indirect/possible leak bytes. All 12 recovery phases and the final clean build passed. Exact evidence is retained at `docs/evidence/memory-safety/checkpoint-6-valgrind.json`.
+- The generic memory campaign is now complete. The roadmap moves to incremental-vs-clean equivalence, filesystem/transaction integrity, parser fuzz/resource boundaries and cross-platform behavioural equivalence before the hardening plateau.
 
 ## Checkpoint 6B instrumentation correction (2026-08-18)
 
@@ -251,3 +252,11 @@ calling the Nift work complete.
 - `checkpoint6_integration.py --valgrind` now runs every Nift invocation directly under Memcheck. Exit 99, non-zero `ERROR SUMMARY`, and non-zero definite/indirect/possible leak byte counts fail the harness even during deliberately expected Nift build failures.
 - The final evidence records each monitored Nift invocation. A synthetic Valgrind shim completed the mixed workload and verified the corrected process boundary.
 - Rerun `make valgrind-memory-safety-checkpoint-6`; only that corrected result can close 6B.
+
+## Checkpoint 6B completion note (2026-08-18)
+
+- The corrected external run supersedes the rejected Python-wrapped attempt.
+- Commit under test: `03e18b4`; platform recorded by the evidence: Linux 7.0.0-29 x86-64.
+- Workload: 40 pages, 12 rounds, four injected Jsonic++/Minify++ failure paths, 12 successful repair phases, 19 directly Valgrind-monitored Nift invocations.
+- Every monitored invocation recorded `ERROR SUMMARY: 0 errors`; no non-zero definite/indirect/possible leak bytes were reported.
+- Checkpoint 6 is fully closed. Do not keep adding generic memory torture unless future changes invalidate this evidence; advance to Checkpoint 7.
