@@ -212,6 +212,6 @@ memory-safety-checkpoint-6-sanitize: memory-safety-checkpoint-6-sync $(SAN_TARGE
 
 valgrind-memory-safety-checkpoint-6: memory-safety-checkpoint-6-sync $(TARGET)
 	mkdir -p .build/memory-safety
-	python3 scripts/memory_safety.py --project nift-integration --mode valgrind --output .build/memory-safety/checkpoint-6-valgrind.json --iterations 1 --command 'python3 scripts/checkpoint6_integration.py --nift "$(CURDIR)/$(TARGET)" --rounds 12 --pages 40 --output .build/memory-safety/checkpoint-6-valgrind-workload.json'
+	python3 scripts/checkpoint6_integration.py --valgrind --nift "$(CURDIR)/$(TARGET)" --rounds 12 --pages 40 --output .build/memory-safety/checkpoint-6-valgrind.json
 
 .PHONY: memory-safety-checkpoint-6-sync memory-safety-checkpoint-6 memory-safety-checkpoint-6-sanitize valgrind-memory-safety-checkpoint-6

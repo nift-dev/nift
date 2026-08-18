@@ -244,3 +244,10 @@ calling the Nift work complete.
 - The sanitizer build completed 12 rounds over 30 pages with four injected failure/recovery transitions and no ASan/LSan/UBSan finding.
 - Focused JSON/schema, Contracts, Minify++, cross-feature, incrementality and persistence/concurrency contracts remain green. Exact evidence is retained under `docs/evidence/memory-safety/checkpoint-6-*.json`.
 - Checkpoint 6B remains independent Valgrind confirmation: run `make valgrind-memory-safety-checkpoint-6` on Linux with Valgrind and return the generated evidence. After that, the generic memory campaign is complete and the roadmap moves to incremental-vs-clean equivalence, filesystem/transaction integrity, parser fuzz/resource boundaries and cross-platform behavioural equivalence.
+
+## Checkpoint 6B instrumentation correction (2026-08-18)
+
+- The first external 6B `FAIL` is not Nift evidence: the target accidentally ran Valgrind around `python3 scripts/checkpoint6_integration.py`, so Memcheck observed the Python harness rather than the Nift subprocesses.
+- `checkpoint6_integration.py --valgrind` now runs every Nift invocation directly under Memcheck. Exit 99, non-zero `ERROR SUMMARY`, and non-zero definite/indirect/possible leak byte counts fail the harness even during deliberately expected Nift build failures.
+- The final evidence records each monitored Nift invocation. A synthetic Valgrind shim completed the mixed workload and verified the corrected process boundary.
+- Rerun `make valgrind-memory-safety-checkpoint-6`; only that corrected result can close 6B.

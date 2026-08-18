@@ -1,17 +1,45 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import argparse,json,os,pathlib,platform,subprocess,tempfile,time
+import argparse,json,os,pathlib,platform,re,subprocess,tempfile,time
 ap=argparse.ArgumentParser()
 ap.add_argument("--nift",required=True)
 ap.add_argument("--rounds",type=int,default=60)
 ap.add_argument("--pages",type=int,default=90)
 ap.add_argument("--output",required=True)
+ap.add_argument("--valgrind",action="store_true",
+                help="Run every Nift invocation under Valgrind and fail on any memory finding.")
 a=ap.parse_args(); nift=str(pathlib.Path(a.nift).resolve()); repo=pathlib.Path(__file__).resolve().parents[1]
+if a.valgrind:
+    import shutil
+    vg=shutil.which("valgrind")
+    if not vg:
+        raise SystemExit("error: valgrind not found")
+    command_prefix=[vg,"--leak-check=full","--show-leak-kinds=all",
+                    "--errors-for-leak-kinds=definite,indirect,possible",
+                    "--track-origins=yes","--error-exitcode=99",nift]
+else:
+    command_prefix=[nift]
+valgrind_runs=[]
 def commit():
     try:return subprocess.check_output(["git","rev-parse","HEAD"],cwd=repo,text=True,stderr=subprocess.DEVNULL).strip()
     except Exception:return "unknown"
 def run(root,*args,ok=True):
-    p=subprocess.run([nift,*args],cwd=root,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    p=subprocess.run([*command_prefix,*args],cwd=root,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    combined=p.stdout+"\n"+p.stderr
+    if a.valgrind:
+        if p.returncode==99:
+            raise RuntimeError(f"Valgrind memory finding during {args}:\n{combined}")
+        m=re.search(r"ERROR SUMMARY:\s*(\d+) errors",combined)
+        leak_bytes=[int(x.replace(",","")) for x in
+                    re.findall(r"(?:definitely|indirectly|possibly) lost:\s*([0-9,]+) bytes",combined)]
+        leaked=any(x != 0 for x in leak_bytes)
+        valgrind_runs.append({"args":list(args),"exit":p.returncode,
+                              "error_summary":int(m.group(1)) if m else None,
+                              "reported_leak_bytes":leak_bytes,"leak_pattern":leaked})
+        if m and int(m.group(1))!=0:
+            raise RuntimeError(f"Valgrind reported errors during {args}")
+        if leaked:
+            raise RuntimeError(f"Valgrind reported leak during {args}")
     if ok and p.returncode: raise RuntimeError(f"{args} failed: {p.stderr}\n{p.stdout}")
     if not ok and p.returncode==0: raise RuntimeError(f"{args} unexpectedly succeeded")
     return p
@@ -93,7 +121,7 @@ with tempfile.TemporaryDirectory(prefix="nift-cp6-integration-") as td:
 out=pathlib.Path(a.output); out.parent.mkdir(parents=True,exist_ok=True)
 data={"schema_version":1,"checkpoint":"6-integration","commit":commit(),"platform":platform.platform(),
       "rounds":a.rounds,"pages":a.pages,"successful_recovery_phases":phases,
-      "injected_failures":failures,"elapsed_seconds":round(time.monotonic()-started,3),"pass":True}
+      "injected_failures":failures,"elapsed_seconds":round(time.monotonic()-started,3),"valgrind":a.valgrind,"valgrind_invocations":len(valgrind_runs),"valgrind_runs":valgrind_runs if a.valgrind else [],"pass":True}
 out.write_text(json.dumps(data,indent=2)+"\n")
 print(f"checkpoint 6 integration: PASS ({a.rounds} rounds, {a.pages} pages, {failures} injected failures)")
 print("evidence="+str(out))
