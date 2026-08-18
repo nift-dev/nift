@@ -236,3 +236,11 @@ calling the Nift work complete.
 - Machine-readable evidence is retained at `docs/evidence/memory-safety/checkpoint-4-watch-valgrind.json`.
 - Wrapper/supervisor RSS was 3,824 KiB at cycle 20 and cycle 29. Treat this as operational telemetry, not the leak oracle.
 - Combined with Checkpoint 4A's native 180-cycle settling run, sanitizer watch run and 10k worker/minification matrix, Checkpoint 4 is complete. The memory-safety campaign advances to Checkpoint 5 (tscc).
+
+## Memory-safety Checkpoint 6A (2026-08-18)
+
+- At commit `9b64e94`, standalone/embedded synchronization passed for Jsonic++ (20 mirrored files) and Minify++ (24 mirrored files).
+- Native cross-component integration completed 60 rounds over 90 pages with schema-validated JSON, Project Contracts, HTML/CSS minification and ordinary content/template rebuilds in the same project. Twenty malformed-JSON/minifier-configuration failures were injected and each recovered successfully.
+- The sanitizer build completed 12 rounds over 30 pages with four injected failure/recovery transitions and no ASan/LSan/UBSan finding.
+- Focused JSON/schema, Contracts, Minify++, cross-feature, incrementality and persistence/concurrency contracts remain green. Exact evidence is retained under `docs/evidence/memory-safety/checkpoint-6-*.json`.
+- Checkpoint 6B remains independent Valgrind confirmation: run `make valgrind-memory-safety-checkpoint-6` on Linux with Valgrind and return the generated evidence. After that, the generic memory campaign is complete and the roadmap moves to incremental-vs-clean equivalence, filesystem/transaction integrity, parser fuzz/resource boundaries and cross-platform behavioural equivalence.

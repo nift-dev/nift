@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "checkpoint": "6-integration",
+  "commit": "9b64e94506817d0f71a3bb649131728adfb70f72",
+  "platform": "Linux-6.18.35-x86_64-with-glibc2.41",
+  "rounds": 12,
+  "pages": 30,
+  "successful_recovery_phases": 12,
+  "injected_failures": 4,
+  "elapsed_seconds": 1.061,
+  "pass": true
+}
