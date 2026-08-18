@@ -298,3 +298,12 @@ calling the Nift work complete.
 - The 64-level parser-depth boundary was verified directly: 16/32/63/64 succeeded for the nested fixture; 65/80/128 failed cleanly. The diagnostic was clarified from `maximum @input depth` to `maximum template parse depth` because the limit covers recursive parser entry generally.
 - No n++ crash/memory bug was found in this campaign. Existing parser/content, comments, control-flow, template-optional, Contracts, Checkpoint 7 and Checkpoint 8 gates remain green.
 - Checkpoint 10 still makes sense and is now the final deliberate-hardening campaign: cross-platform behavioural equivalence via normalized Linux/macOS/Windows CI evidence, not merely compilation.
+
+## Codex handover for Checkpoint 10 (2026-08-18)
+
+- The repository is intentionally paused after Checkpoint 9 at a clean handoff boundary.
+- The full Checkpoint 10 execution/design brief is now committed at `docs/handover/CODEX-CHECKPOINT-10.md`.
+- Preferred execution is a GitHub Actions matrix over `ubuntu-latest`, `macos-latest` and `windows-latest`, with normalized per-platform JSON artifacts and a final semantic comparison job.
+- Compare user-visible output semantics separately from selected internal behavioural state; normalize only documented platform noise and keep genuinely platform-specific filesystem expectations separate.
+- Checkpoints 7–9 are regression constraints during cross-platform fixes: `make checkpoint-7-incremental-equivalence`, `make checkpoint-8-filesystem-transaction`, and `make checkpoint-9-parser-fuzz`.
+- Do not promote Battle Tested claims until the required matrix and final comparer are green. After Checkpoint 10, deliberately stop adding arbitrary hardening checkpoints and move toward distribution, real-world dogfooding and the planned AI-DX example-site experiment.
