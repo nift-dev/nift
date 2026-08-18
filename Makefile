@@ -233,3 +233,9 @@ checkpoint-9-parser-fuzz: $(SAN_TARGET)
 	env -u LD_PRELOAD python3 scripts/checkpoint9_parser_fuzz.py --nift "$(CURDIR)/$(SAN_TARGET)" --cases 400 --seeds 9001,17713,424242 --output .build/checkpoint-9/parser-fuzz.json
 
 .PHONY: checkpoint-9-parser-fuzz
+
+checkpoint-10-cross-platform: $(TARGET)
+	mkdir -p .build/checkpoint-10
+	python3 scripts/checkpoint10_cross_platform.py --nift "$(CURDIR)/$(TARGET)" --output .build/checkpoint-10/$(if $(filter Windows_NT,$(OS)),windows,local).json --runner-os $(if $(filter Windows_NT,$(OS)),Windows,Local)
+
+.PHONY: checkpoint-10-cross-platform

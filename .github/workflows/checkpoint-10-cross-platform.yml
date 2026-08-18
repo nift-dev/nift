@@ -1,0 +1,94 @@
+name: Checkpoint 10 cross-platform equivalence
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/checkpoint-10-cross-platform.yml'
+      - 'Makefile'
+      - 'src/**'
+      - 'jsonic/**'
+      - 'minifypp/**'
+      - 'scripts/checkpoint10_cross_platform.py'
+      - 'scripts/compare_checkpoint10.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  corpus:
+    name: ${{ matrix.id }} behavioural corpus
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: linux
+            runner: ubuntu-latest
+            runner_os: Linux
+          - id: macos
+            runner: macos-latest
+            runner_os: macOS
+          - id: windows
+            runner: windows-latest
+            runner_os: Windows
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: msys2/setup-msys2@v2
+        if: runner.os == 'Windows'
+        with:
+          msystem: UCRT64
+          update: true
+          install: make mingw-w64-ucrt-x86_64-gcc
+      - name: Build Nift
+        if: runner.os != 'Windows'
+        run: make -j2
+      - name: Build Nift on Windows
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: make -j2
+      - name: Run normalized behavioural corpus
+        shell: bash
+        run: |
+          executable="$PWD/nift"
+          if [[ "${{ runner.os }}" == "Windows" ]]; then executable="$PWD/nift.exe"; fi
+          python scripts/checkpoint10_cross_platform.py \
+            --nift "$executable" \
+            --runner-os '${{ matrix.runner_os }}' \
+            --output '.build/checkpoint-10/${{ matrix.id }}.json'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: checkpoint-10-${{ matrix.id }}
+          path: .build/checkpoint-10/${{ matrix.id }}.json
+          if-no-files-found: error
+
+  compare:
+    name: Compare normalized semantics
+    needs: corpus
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: checkpoint-10-*
+          path: .build/checkpoint-10/downloaded
+          merge-multiple: true
+      - name: Compare all portable observations
+        run: |
+          python scripts/compare_checkpoint10.py \
+            .build/checkpoint-10/downloaded/linux.json \
+            .build/checkpoint-10/downloaded/macos.json \
+            .build/checkpoint-10/downloaded/windows.json \
+            --output .build/checkpoint-10/comparison.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: checkpoint-10-comparison
+          path: .build/checkpoint-10/comparison.json
+          if-no-files-found: error
