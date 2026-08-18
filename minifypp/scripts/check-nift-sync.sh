@@ -18,14 +18,18 @@ FILES=(
   README.md
   ReleaseNotes.md
   cli/main.cpp
+  docs/MEMORY-SAFETY.md
   include/minify/Minify.h
   scripts/check-nift-sync.sh
   scripts/distcheck.sh
+  scripts/memory_safety.py
   src/Json.h
   src/Minify.cpp
   tests/cli_smoke.sh
   tests/cross_format_adversarial.sh
   tests/fuzz_smoke.cpp
+  tests/memory_lifetime.cpp
+  tests/memory_cli_stress.sh
   tests/minify_format_idempotence.sh
   tests/minify_css_postcss_semantics.sh
   tests/minify_generated_semantics.sh

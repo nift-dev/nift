@@ -7,6 +7,7 @@ LIBSRC := src/Minify.cpp
 TESTDIR := .build
 SMOKE := $(TESTDIR)/minifypp-smoke
 FUZZ_SMOKE := $(TESTDIR)/minifypp-fuzz-smoke
+MEMORY_LIFETIME := $(TESTDIR)/minifypp-memory-lifetime
 SANITIZER_FLAGS ?= -O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer
 FUZZ_CASES ?= 10000
 BENCH_REPETITIONS ?= 10000
@@ -36,6 +37,28 @@ test-sanitize:
 	$(TESTDIR)/minifypp-fuzz-sanitize $(FUZZ_CASES)
 	$(CXX) $(CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic $(SANITIZER_FLAGS) cli/main.cpp $(LIBSRC) -o $(TESTDIR)/minify-sanitize
 	MINIFY_BIN="$(CURDIR)/$(TESTDIR)/minify-sanitize" bash tests/cli_smoke.sh
+
+memory-safety-smoke:
+	mkdir -p $(TESTDIR)/memory-safety
+	$(CXX) $(CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic $(SANITIZER_FLAGS) tests/minify_smoke.cpp $(LIBSRC) -o $(TESTDIR)/minifypp-memory-san
+	python3 scripts/memory_safety.py --project minify++ --mode sanitizer --output $(TESTDIR)/memory-safety/checkpoint-0.json --iterations 2 --command './$(TESTDIR)/minifypp-memory-san'
+
+$(MEMORY_LIFETIME): tests/memory_lifetime.cpp $(LIBSRC) include/minify/Minify.h src/Json.h
+	mkdir -p $(TESTDIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/memory_lifetime.cpp $(LIBSRC) -o $(MEMORY_LIFETIME)
+
+memory-safety-checkpoint-2: $(MEMORY_LIFETIME) $(TARGET)
+	mkdir -p $(TESTDIR)/memory-safety
+	$(CXX) $(CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic $(SANITIZER_FLAGS) tests/memory_lifetime.cpp $(LIBSRC) -o $(TESTDIR)/minifypp-memory-lifetime-san
+	python3 scripts/memory_safety.py --project minify++ --mode sanitizer --output $(TESTDIR)/memory-safety/checkpoint-2-sanitizer.json --iterations 1 --command './$(TESTDIR)/minifypp-memory-lifetime-san 80'
+	./$(MEMORY_LIFETIME) 300 | tee $(TESTDIR)/memory-safety/checkpoint-2-rss.txt
+	$(CXX) $(CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic $(SANITIZER_FLAGS) cli/main.cpp $(LIBSRC) -o $(TESTDIR)/minify-cli-memory-san
+	MINIFY_BIN="$(CURDIR)/$(TESTDIR)/minify-cli-memory-san" bash tests/memory_cli_stress.sh 8 42
+	MINIFY_BIN="$(CURDIR)/$(TARGET)" bash tests/memory_cli_stress.sh 30 70 | tee $(TESTDIR)/memory-safety/checkpoint-2-cli.txt
+
+valgrind-memory-safety-checkpoint-2: $(MEMORY_LIFETIME) $(TARGET)
+	mkdir -p $(TESTDIR)/memory-safety
+	python3 scripts/memory_safety.py --project minify++ --mode valgrind --output $(TESTDIR)/memory-safety/checkpoint-2-valgrind.json --iterations 1 --command './$(MEMORY_LIFETIME) 30'
 
 benchmark:
 	mkdir -p $(TESTDIR)
@@ -72,7 +95,7 @@ test-cli: $(TARGET)
 clean:
 	rm -rf $(TESTDIR) $(TARGET)
 
-.PHONY: all test check-nift-sync test-smoke test-node test-generated test-jsx test-css-semantics test-formats test-cross-format test-cli test-fuzz test-sanitize benchmark distcheck clean
+.PHONY: all test check-nift-sync test-smoke test-node test-generated test-jsx test-css-semantics test-formats test-cross-format test-cli test-fuzz test-sanitize memory-safety-smoke memory-safety-checkpoint-2 valgrind-memory-safety-checkpoint-2 benchmark distcheck clean
 
 test-formats:
 	bash tests/minify_format_idempotence.sh
