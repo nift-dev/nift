@@ -2,6 +2,7 @@
 
 Date: 2026-08-18
 Starting Nift state: post-Checkpoint-9 workspace, Nift `main` at `7338414` before this handover-only commit.
+Status: **COMPLETE** at final evidence commit `f1512bf`; retained summary is `docs/evidence/checkpoint-10/cross-platform-equivalence.json`.
 
 ## Purpose
 
@@ -247,3 +248,11 @@ Once the evidence and documentation are reconciled, declare the hardening platea
 5. publicity / broader field exposure.
 
 That field exposure is the next kind of evidence Nift cannot manufacture through another synthetic torture category.
+
+## Completion record
+
+The maintained GitHub Actions gate ran the same 18-case portable behavioural corpus on `ubuntu-latest`, `macos-latest` and `windows-latest`, uploaded normalized JSON from each runner and passed a final artifact-consuming comparison with zero portable mismatches. Two platform-specific contracts—Windows executable suffix and read-only generated-file deletion semantics—also satisfied their explicit expectations.
+
+The campaign found one genuine product defect: tracked `mv`/`rm` could leave stale read-only generated output and metadata on Windows because cleanup ignored failed removal. Commit `bd98e27` introduced portable owned-artifact removal and the cross-platform lifecycle cases verified the repair. CI runtime visibility and UTF-8 decoding defects were fixed in the harness rather than normalized as product semantics.
+
+Final passing workflow run: <https://github.com/nift-dev/nift/actions/runs/32118334090> at Nift commit `f1512bf`. Checkpoints 7–9 were rerun and remained green. Checkpoint 10 closes the planned deliberate-hardening campaign; do not create a Checkpoint 11 without a newly justified guarantee or field finding.

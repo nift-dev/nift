@@ -307,3 +307,14 @@ calling the Nift work complete.
 - Compare user-visible output semantics separately from selected internal behavioural state; normalize only documented platform noise and keep genuinely platform-specific filesystem expectations separate.
 - Checkpoints 7–9 are regression constraints during cross-platform fixes: `make checkpoint-7-incremental-equivalence`, `make checkpoint-8-filesystem-transaction`, and `make checkpoint-9-parser-fuzz`.
 - Do not promote Battle Tested claims until the required matrix and final comparer are green. After Checkpoint 10, deliberately stop adding arbitrary hardening checkpoints and move toward distribution, real-world dogfooding and the planned AI-DX example-site experiment.
+
+## Checkpoint 10 complete — cross-platform behavioural equivalence (2026-08-18)
+
+- Maintained gate: `make checkpoint-10-cross-platform`; decisive CI workflow: `.github/workflows/checkpoint-10-cross-platform.yml`.
+- Final passing run `32118334090` at commit `f1512bf` executed the same 18 portable contracts on `ubuntu-latest`, `macos-latest` and `windows-latest`; each runner uploaded normalized JSON and the final artifact-consuming comparer reported zero portable mismatches.
+- Evidence compares normalized complete output-tree hashes, selected tracked/build metadata, status classes, lifecycle/failure/recovery observations and diagnostic classes. Normalization is deliberately limited to path separators and non-contractual CRLF/LF spelling.
+- Two separately classified platform contracts passed: the Windows `.exe` suffix and Windows' need to restore write permission before deleting Nift's deliberately read-only generated files.
+- The campaign found and fixed a genuine Windows defect: tracked `mv`/`rm` could leave stale read-only generated output and metadata while tracking state moved on. `filesystem::remove_owned_file` now removes Nift-owned read-only artifacts portably; the cross-platform add/move/remove lifecycle is the maintained regression.
+- Checkpoints 7–9 were rerun after the change and remain green: 720 incremental-equivalence comparisons, 13 filesystem/transaction cases and 1,217 sanitizer-backed parser/resource cases.
+- Exact run/artifact identities, SHA-256 archive digests, scope, findings and limitations are retained in `docs/evidence/checkpoint-10/cross-platform-equivalence.json`.
+- The deliberate hardening sequence is now at its planned plateau. Future emphasis moves to distribution, real-world dogfooding, field exposure and evidence-driven work; do not invent Checkpoint 11 by default.
