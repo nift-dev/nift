@@ -11,7 +11,7 @@ class Nift < Formula
   end
 
   test do
-    system bin/"nift", "init", ".html"
+    system bin/"nift", "init", "--ext=.html"
     assert_path_exists testpath/"public/index.html"
   end
 end
