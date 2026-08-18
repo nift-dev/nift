@@ -45,6 +45,12 @@ for target in vercel netlify amplify azure firebase render cloudflare github-pag
   (cd "$TMP/$target" && "$NIFT_BIN" build >/dev/null)
 done
 
+mkdir "$TMP/vercel-existing-ignore"
+printf 'node_modules/\n' > "$TMP/vercel-existing-ignore/.gitignore"
+(cd "$TMP/vercel-existing-ignore" && "$NIFT_BIN" init --target=vercel >/dev/null)
+grep -qxF 'node_modules/' "$TMP/vercel-existing-ignore/.gitignore"
+grep -qxF '.vercel/output/static/' "$TMP/vercel-existing-ignore/.gitignore"
+
 python3 - "$TMP/vercel/.nift/config.json" "$TMP/vercel/.vercel/output/config.json" <<'PY'
 import json, sys
 with open(sys.argv[1], encoding='utf-8') as f: cfg=json.load(f)['config']

@@ -119,6 +119,18 @@ bool write_if_changed(const fs::path& path, const std::string& contents) {
     return filesystem::write_file(path, contents);
 }
 
+bool append_line_if_missing(const fs::path& path, const std::string& line) {
+    std::string contents;
+    if (filesystem::file_exists(path)) contents = filesystem::read_file(path);
+    std::istringstream input(contents);
+    std::string existing;
+    while (std::getline(input, existing))
+        if (existing == line) return true;
+    if (!contents.empty() && contents.back() != '\n') contents.push_back('\n');
+    contents += line + "\n";
+    return filesystem::write_file(path, contents);
+}
+
 class CommandTimer {
 public:
     explicit CommandTimer(bool enabled = true) : enabled_(enabled), started_(std::chrono::steady_clock::now()) {}
@@ -455,7 +467,7 @@ bool write_target_files(const InitOptions& options) {
         json::Document config = json::Document::make_object();
         config["version"] = 3;
         return save_json_file(".vercel/output/config.json", config) &&
-               write_if_changed(".gitignore", ".vercel/output/static/\n");
+               append_line_if_missing(".gitignore", ".vercel/output/static/");
     }
 
     if (options.target == "amplify") {
@@ -471,7 +483,7 @@ bool write_target_files(const InitOptions& options) {
         manifest["framework"]["name"] = "nift";
         manifest["framework"]["version"] = "4.0.2";
         return save_json_file(".amplify-hosting/deploy-manifest.json", manifest) &&
-               write_if_changed(".gitignore", ".amplify-hosting/static/\n");
+               append_line_if_missing(".gitignore", ".amplify-hosting/static/");
     }
 
     if (options.target == "netlify") {
