@@ -260,3 +260,8 @@ calling the Nift work complete.
 - Workload: 40 pages, 12 rounds, four injected Jsonic++/Minify++ failure paths, 12 successful repair phases, 19 directly Valgrind-monitored Nift invocations.
 - Every monitored invocation recorded `ERROR SUMMARY: 0 errors`; no non-zero definite/indirect/possible leak bytes were reported.
 - Checkpoint 6 is fully closed. Do not keep adding generic memory torture unless future changes invalidate this evidence; advance to Checkpoint 7.
+## Battle Tested pre-Checkpoint-7 editorial baseline (2026-08-18)
+
+- The website now defines Battle Tested as scoped executable evidence, not test-count marketing or a claim of perfection. It distinguishes test hardening from field hardening and explicitly acknowledges Nift's shorter production exposure.
+- Checkpoint 6 memory/resource evidence is public and complete. Checkpoint 7 incremental-vs-clean equivalence is deliberately described as the next planned/current frontier, not a proven property.
+- When Checkpoints 7–10 complete, reconcile implementation ↔ regression evidence ↔ HANDOVER/checkpoint ↔ public Battle Tested claims and promote only the properties actually established.
