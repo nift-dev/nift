@@ -23,6 +23,36 @@ def rss_kib(pid):
             if line.startswith("VmRSS:"): return int(line.split()[1])
     except FileNotFoundError: return None
     return None
+def child_pids(pid):
+    try:
+        text=pathlib.Path(f"/proc/{pid}/task/{pid}/children").read_text().strip()
+        return [int(x) for x in text.split()] if text else []
+    except (FileNotFoundError, ProcessLookupError, ValueError):
+        return []
+
+def descendants(pid):
+    result=[]; stack=child_pids(pid)
+    while stack:
+        child=stack.pop()
+        result.append(child)
+        stack.extend(child_pids(child))
+    return result
+
+def signal_monitored_leaf(supervisor_pid, sig):
+    """Signal deepest monitored descendants, leaving Valgrind/supervisor alive to report."""
+    desc=descendants(supervisor_pid)
+    if not desc:
+        return False
+    # Leaves first; normally this is the Nift build-auto child beneath Valgrind.
+    leaves=[pid for pid in desc if not child_pids(pid)]
+    targets=leaves or desc[-1:]
+    sent=False
+    for pid in targets:
+        try:
+            os.kill(pid,sig); sent=True
+        except ProcessLookupError:
+            pass
+    return sent
 def wait_for_rebuild(output_path, previous_mtime_ns, proc, timeout):
     deadline=time.monotonic()+timeout
     while time.monotonic() < deadline:
@@ -55,8 +85,8 @@ with tempfile.TemporaryDirectory(prefix="nift-cp4-watch-") as td:
     # supervisor such as valgrind_nift.sh: build-auto runs underneath Valgrind,
     # and signalling only the supervisor PID can leave the monitored process
     # alive while Valgrind waits forever for it to exit.
-    p=subprocess.Popen([nift,"build-auto"],cwd=root,stdout=subprocess.DEVNULL,
-                       stderr=subprocess.PIPE,text=True,start_new_session=True)
+    p=subprocess.Popen([nift,"build-auto"],cwd=root,stdin=subprocess.DEVNULL,
+                       stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True,start_new_session=True)
     samples=[]; started=time.monotonic()
     try:
         time.sleep(.8)
@@ -86,13 +116,13 @@ with tempfile.TemporaryDirectory(prefix="nift-cp4-watch-") as td:
         if p.poll() is None:
             shutdown="sigint"
             try:
-                os.killpg(p.pid, signal.SIGINT)
+                os.kill(p.pid, signal.SIGINT)
             except ProcessLookupError:
                 pass
             try:
                 p.wait(timeout=a.shutdown_grace_seconds)
             except subprocess.TimeoutExpired:
-                shutdown="sigterm"
+                shutdown="group-sigterm"
                 try:
                     os.killpg(p.pid, signal.SIGTERM)
                 except ProcessLookupError:
@@ -100,7 +130,7 @@ with tempfile.TemporaryDirectory(prefix="nift-cp4-watch-") as td:
                 try:
                     p.wait(timeout=10)
                 except subprocess.TimeoutExpired:
-                    shutdown="sigkill"
+                    shutdown="group-sigkill"
                     try:
                         os.killpg(p.pid, signal.SIGKILL)
                     except ProcessLookupError:

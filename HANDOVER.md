@@ -221,3 +221,10 @@ calling the Nift work complete.
 - Root cause was test pacing: the harness issued edits every 220 ms regardless of whether the much slower Valgrind-supervised rebuild had finished. That could mutate a dependency while the previous rebuild was still reading it.
 - The watch harness is now acknowledgement-driven. After each edit it waits for `public/index.html` to receive a new mtime before issuing the next edit, with a configurable rebuild timeout. The interval is now only an optional post-acknowledgement pause.
 - A synthetic slow-supervisor probe completed 30/30 cycles through the new path. The partial clean Valgrind result is useful diagnostic evidence but does not close Checkpoint 4B; rerun the maintained target and retain the full JSON evidence.
+
+## Checkpoint 4B terminal-safe supervisor correction (2026-08-18)
+
+- The third external attempt completed all 30 watch cycles and showed Valgrind-process RSS settling at 197,864 KiB from the midpoint through completion, but shutdown escalated to SIGKILL (`process_exit_status=-9`) before Valgrind could emit a final heap report.
+- The harness now launches watch mode with stdin connected to `/dev/null`, so a failed endurance run cannot alter the caller's interactive terminal settings.
+- `valgrind_nift.sh` now remains as an explicit supervisor, traps SIGINT/SIGTERM from the harness, forwards the signal to Valgrind and waits for Valgrind to finish. This preserves Valgrind's opportunity to observe Nift termination and write its final leak/error summary.
+- A synthetic forwarding-supervisor probe completed 30/30 acknowledgement-driven cycles and shut down through SIGINT with exit 130. Checkpoint 4B remains open until the corrected external Valgrind target completes and its final report is retained.
