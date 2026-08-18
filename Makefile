@@ -197,3 +197,21 @@ valgrind-memory-safety-checkpoint-4: $(TARGET)
 	python3 scripts/checkpoint4_watch_endurance.py --nift "$(CURDIR)/scripts/valgrind_nift.sh" --cycles 30 --interval 0.22 --output "$(TEST_DIR)/memory-safety/checkpoint-4-watch-valgrind.json"
 
 .PHONY: memory-safety-checkpoint-3 memory-safety-checkpoint-4-watch memory-safety-checkpoint-4-watch-sanitize memory-safety-checkpoint-4-large valgrind-memory-safety-checkpoint-4
+
+memory-safety-checkpoint-6-sync:
+	bash "$(CURDIR)/../jsonic/jsonic/scripts/check-nift-sync.sh" "$(CURDIR)"
+	bash "$(CURDIR)/../minify/minify/scripts/check-nift-sync.sh" "$(CURDIR)/minifypp"
+
+memory-safety-checkpoint-6: memory-safety-checkpoint-6-sync $(TARGET)
+	mkdir -p .build/memory-safety
+	python3 scripts/checkpoint6_integration.py --nift "$(CURDIR)/$(TARGET)" --rounds 60 --pages 90 --output .build/memory-safety/checkpoint-6-integration.json
+
+memory-safety-checkpoint-6-sanitize: memory-safety-checkpoint-6-sync $(SAN_TARGET)
+	mkdir -p .build/memory-safety
+	env -u LD_PRELOAD python3 scripts/checkpoint6_integration.py --nift "$(CURDIR)/$(SAN_TARGET)" --rounds 12 --pages 30 --output .build/memory-safety/checkpoint-6-integration-sanitizer.json
+
+valgrind-memory-safety-checkpoint-6: memory-safety-checkpoint-6-sync $(TARGET)
+	mkdir -p .build/memory-safety
+	python3 scripts/memory_safety.py --project nift-integration --mode valgrind --output .build/memory-safety/checkpoint-6-valgrind.json --iterations 1 --command 'python3 scripts/checkpoint6_integration.py --nift "$(CURDIR)/$(TARGET)" --rounds 12 --pages 40 --output .build/memory-safety/checkpoint-6-valgrind-workload.json'
+
+.PHONY: memory-safety-checkpoint-6-sync memory-safety-checkpoint-6 memory-safety-checkpoint-6-sanitize valgrind-memory-safety-checkpoint-6
