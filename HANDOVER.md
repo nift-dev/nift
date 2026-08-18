@@ -265,3 +265,14 @@ calling the Nift work complete.
 - The website now defines Battle Tested as scoped executable evidence, not test-count marketing or a claim of perfection. It distinguishes test hardening from field hardening and explicitly acknowledges Nift's shorter production exposure.
 - Checkpoint 6 memory/resource evidence is public and complete. Checkpoint 7 incremental-vs-clean equivalence is deliberately described as the next planned/current frontier, not a proven property.
 - When Checkpoints 7–10 complete, reconcile implementation ↔ regression evidence ↔ HANDOVER/checkpoint ↔ public Battle Tested claims and promote only the properties actually established.
+
+## Checkpoint 7 complete — incremental-vs-clean equivalence (2026-08-18)
+
+- Maintained gate: `make checkpoint-7-incremental-equivalence`.
+- Commit under test: `93b7c2c`.
+- All three incremental modes were exercised across 8 deterministic seeds × 30 mutations each: 720 complete public-output-tree comparisons.
+- Mutation coverage included content, templates, JSON, schemas, Project Contracts, build-thread config, shared input dependencies, metadata and tracked-page add/move/remove operations.
+- After every mutation, the incremental tree was compared byte-for-byte (SHA-256 per path) with a clean `build-all` from the same logical project state. All 720 comparisons passed.
+- Discovery corrected the oracle rather than Nift: untracked files in `public/` are user-owned and should not be erased to simulate a clean build. The maintained harness removes only generated tracked outputs and page build metadata.
+- Evidence is scoped deliberately: the generated/mutated states tested establish equivalence for that corpus; this is not an absolute proof over every possible Nift project.
+- Checkpoint 8 still makes sense unchanged: it attacks safe failure and persistent-state integrity under hostile filesystem/interruption conditions, a property not exercised by successful incremental equivalence.
