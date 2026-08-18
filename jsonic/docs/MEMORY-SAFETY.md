@@ -60,4 +60,10 @@ Evidence from the checkpoint:
 
 The RSS result is evidence of a settled operating band for this workload, not a general leak proof. The sanitizer run's much larger RSS reflects sanitizer allocator/quarantine behavior and is not used as the steady-state memory baseline.
 
-No parser defect or lifetime failure was found in Checkpoint 1A, so no production parser change was required. Checkpoint 1B remains open because Valgrind is unavailable in the current environment; independent Valgrind confirmation and public website publication should happen together on a suitable Linux environment.
+No parser defect or lifetime failure was found in Checkpoint 1A, so no production parser change was required.
+
+## Checkpoint 1B — independent Valgrind confirmation
+
+Checkpoint 1B is complete. On Linux 7.0.0-29-generic x86_64, Valgrind 3.26.0 ran `./.build/jsonic-memory-lifetime --iterations 40` against Jsonic++ commit `b9d0ff3` using the maintained wrapper. The run completed in 28.95 seconds with peak process RSS of 215,992 KiB. Valgrind reported 0 errors, 0 bytes in use at exit, 6,579,515 allocations and 6,579,515 frees, and “All heap blocks were freed -- no leaks are possible”.
+
+The machine-readable result is retained at `docs/evidence/memory-safety-checkpoint-1b-valgrind.json`. Together with Checkpoint 1A's clean ASan/LSan/UBSan run and stable 400-iteration RSS soak, this satisfies the Jsonic++ memory/lifetime exit gate for the maintained corpus.

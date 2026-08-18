@@ -185,3 +185,8 @@ production roadmap have been considered. When the checkpoint changes protected
 behavior, regression coverage, test families, or validation evidence, also review
 the website's Battle Tested page and related public reliability claims before
 calling the Nift work complete.
+## 2026-08-18 — vendored Jsonic++ memory-safety gate
+
+- Standalone Jsonic++ Checkpoints 1A and 1B are complete for the maintained lifetime corpus. Sanitizer/RSS evidence is supplemented by an independent Valgrind 3.26.0 Linux pass at canonical Jsonic++ commit `b9d0ff3`: 40 corpus iterations, 0 errors, 0 bytes in use at exit, all 6,579,515 allocations freed.
+- Nift's vendored Jsonic++ documentation is synchronized with that canonical record. This is component-level evidence only; Nift's own lifecycle, incremental-state, watch/endurance, large-project and cross-project integration memory gates remain open.
+- Keep standalone Jsonic++ as the source of truth for parser lifetime evidence and rerun Nift integration checks whenever the vendored parser implementation changes.

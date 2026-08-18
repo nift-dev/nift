@@ -3629,3 +3629,7 @@ I deliberately **haven’t folded the `$[...]` parameter-resolution implementati
 ## 2026-08-18 — Jsonic++ extraction
 
 The JSON implementation shared byte-for-byte by Nift core and Minify++ was given an independent canonical home as Jsonic++. Nift now vendors Jsonic++ `include/json.h` at `jsonic/include/json.h`; `src/Json.h` is a compatibility include. Parser semantics should originate in Jsonic++, synchronize into Nift, and then pass Nift JSON/schema/parser/project-contract integration before a checkpoint is complete.
+
+## 2026-08-18 — Jsonic++ standalone lifetime gate completed
+
+The canonical Jsonic++ lifetime corpus completed its independent memory-safety gate: after clean ASan/LSan/UBSan and stable non-sanitized RSS evidence, Valgrind 3.26.0 on Linux ran 40 corpus iterations at commit `b9d0ff3` with 0 errors, 0 bytes in use at exit and all 6,579,515 allocations freed. Nift mirrors the canonical Jsonic++ documentation, but this result remains component evidence rather than an end-to-end Nift leak verdict.
