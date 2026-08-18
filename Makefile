@@ -215,3 +215,9 @@ valgrind-memory-safety-checkpoint-6: memory-safety-checkpoint-6-sync $(TARGET)
 	python3 scripts/checkpoint6_integration.py --valgrind --nift "$(CURDIR)/$(TARGET)" --rounds 12 --pages 40 --output .build/memory-safety/checkpoint-6-valgrind.json
 
 .PHONY: memory-safety-checkpoint-6-sync memory-safety-checkpoint-6 memory-safety-checkpoint-6-sanitize valgrind-memory-safety-checkpoint-6
+
+checkpoint-7-incremental-equivalence: $(TARGET)
+	mkdir -p .build/checkpoint-7
+	python3 scripts/checkpoint7_incremental_equivalence.py --nift "$(CURDIR)/$(TARGET)" --seeds 8 --steps 30 --output .build/checkpoint-7/incremental-equivalence.json
+
+.PHONY: checkpoint-7-incremental-equivalence
