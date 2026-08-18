@@ -566,11 +566,14 @@ Publication evidence:
   The extracted Linux archive contained only `LICENSE`, `README.md`, and `nift`;
   its `version`, `about`, and `commands` surfaces passed.
 - Both GitHub Snap builds passed and their `Publish stable Snap` steps succeeded
-  for amd64 and arm64. Other connected-store architectures and a fresh public
-  stable installation remain external verification tasks.
-- The Chocolatey packaging/submission job passed. Community verification,
-  moderation, approval, and a fresh public install remain separate downstream
-  states.
+  for amd64 and arm64. A subsequent public `snap info nift` query reported 4.0.2
+  on both `latest/stable` (revision 489) and `latest/edge` (revision 485). Other
+  connected-store architectures and a fresh public stable installation remain
+  external verification tasks.
+- The Chocolatey packaging/submission job passed. The public 4.0.2 package page
+  showed the package published on 18 August 2026 but still marked “Pending
+  automated review”, with validation, verification, and scanning pending when
+  checked. Approval and a fresh public install remain separate downstream states.
 - The release run's two Homebrew formula jobs exposed a stale in-repository
   smoke invocation (`nift init .html`) after the release itself was published.
   Commit `889d5eb` changed the validation to the supported
@@ -578,6 +581,11 @@ Publication evidence:
   on macOS arm64 and Linux x86-64 against the immutable v4.0.2 source tag. No
   manual `Homebrew/homebrew-core` pull request was opened; ordinary propagation
   is left exclusively to Homebrew's automatic bump infrastructure.
-- Flathub manifest advancement, public channel propagation, and clean installed
-  package tests remain downstream work and must be recorded by their actual
-  external results.
+- The Flathub manifest's external-data checker follows the latest
+  `nift-dev/nift` GitHub release, but no 4.0.2 update pull request existed when
+  checked immediately after publication. Leave that checker to propose the
+  ordinary tag/checksum update, then review its build. Public channel propagation
+  and clean installed package tests remain downstream work.
+- No Homebrew 4.0.2 automatic bump pull request existed when checked immediately
+  after publication. Continue waiting for Homebrew's automation; do not replace
+  it with a manually opened simple-bump pull request.
