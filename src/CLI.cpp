@@ -293,7 +293,7 @@ void print_commands() {
     row("info-watching", "", "Show watched directories");
 
     std::cout << '\n' << console::dim("General") << '\n';
-    row("init", "[--ext=.ext] [--target=platform]", "Create a Nift project");
+    row("init", "[--target=platform] [--ext=.ext]", "Create a Nift project");
     row("minify", "[-i|--in-place] <files...>", "Minify to *.min.ext by default; -i overwrites sources");
     row("about", "", "About Nift and where to learn more");
     row("version", "", "Show version information");
@@ -360,6 +360,7 @@ const std::vector<InitTarget>& init_targets() {
         {"render", "public/"},
         {"cloudflare", "public/"},
         {"github-pages", "public/"},
+        {"supabase", "public/"},
     };
     return targets;
 }
@@ -526,6 +527,13 @@ bool write_target_files(const InitOptions& options) {
         // clean build reproduces it under public/.
         json::Document config = json::Document::make_object();
         return save_json_file("content/staticwebapp.config.json", config);
+    }
+
+    if (options.target == "supabase") {
+        // Supabase is backend infrastructure rather than a static frontend host.
+        // Keep Nift's ordinary public/ output; users can add Supabase CLI state
+        // separately when they actually need local backend development.
+        return true;
     }
 
     if (options.target == "github-pages") {

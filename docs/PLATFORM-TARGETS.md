@@ -31,6 +31,7 @@ file that the selected static host would only serve as an inert asset.
 | `render` | `public/` | `render.yaml` static-site Blueprint | Redirects/rewrites, headers and separate Render services/databases |
 | `cloudflare` | `public/` | `wrangler.toml` with `pages_build_output_dir = "./public"` | Pages Functions, Workers runtime features and bindings such as KV, D1, R2 and Durable Objects |
 | `github-pages` | `public/` | no extra provider file; the target is deliberately an ordinary Pages-ready static artifact | GitHub Actions deployment, custom domains; dynamic APIs must live elsewhere |
+| `supabase` | `public/` | no extra provider file; Nift keeps its ordinary static output | Supabase Postgres, Auth, Storage, Realtime and Edge Functions; deploy the frontend with a static host |
 
 The CLI deliberately hides whether a provider uses a native deployment bundle,
 a project config file, or simply Nift's normal `public/` tree. Users follow one
@@ -41,8 +42,8 @@ rule: if they know the destination, they can initialise with
 
 A target means:
 
-> Initialise the smallest Nift project that is prepared for this hosting
-> platform's static deployment model.
+> Initialise the smallest Nift project that is prepared for this platform's
+> static deployment or backend-integration model.
 
 It does **not** authenticate to the provider, create projects, configure DNS,
 provision databases, or install Nift into the provider's remote build image.
@@ -80,3 +81,5 @@ as `public/staticwebapp.config.json` on every build.
 - Render Blueprint specification: https://render.com/docs/blueprint-spec
 - Cloudflare Pages Wrangler configuration: https://developers.cloudflare.com/pages/functions/wrangler-configuration/
 - GitHub Pages custom workflows: https://docs.github.com/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages
+- Supabase deployment workflow: https://supabase.com/docs/guides/deployment
+- Supabase Edge Functions quickstart: https://supabase.com/docs/guides/functions/quickstart
