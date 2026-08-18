@@ -174,3 +174,26 @@ $(MEMORY_SMOKE): tests/json_smoke.cpp src/Json.h
 memory-safety-smoke: $(MEMORY_SMOKE)
 	mkdir -p "$(TEST_DIR)/memory-safety"
 	python3 scripts/memory_safety.py --project nift --mode sanitizer --output "$(TEST_DIR)/memory-safety/checkpoint-0.json" --iterations 2 --command './$(MEMORY_SMOKE)'
+
+# Maintained memory/resource-safety campaign gates.
+memory-safety-checkpoint-3: $(SAN_TARGET)
+	mkdir -p "$(TEST_DIR)/memory-safety"
+	env -u LD_PRELOAD python3 scripts/checkpoint3_core_memory.py --nift "$(CURDIR)/$(SAN_TARGET)" --rounds 4 --output "$(TEST_DIR)/memory-safety/checkpoint-3-core.json"
+
+memory-safety-checkpoint-4-watch: $(TARGET)
+	mkdir -p "$(TEST_DIR)/memory-safety"
+	python3 scripts/checkpoint4_watch_endurance.py --nift "$(CURDIR)/$(TARGET)" --cycles 180 --interval 0.22 --output "$(TEST_DIR)/memory-safety/checkpoint-4-watch-rss.json"
+
+memory-safety-checkpoint-4-watch-sanitize: $(SAN_TARGET)
+	mkdir -p "$(TEST_DIR)/memory-safety"
+	env -u LD_PRELOAD python3 scripts/checkpoint4_watch_endurance.py --nift "$(CURDIR)/$(SAN_TARGET)" --cycles 100 --interval 0.22 --output "$(TEST_DIR)/memory-safety/checkpoint-4-watch-sanitizer.json"
+
+memory-safety-checkpoint-4-large: $(TARGET)
+	mkdir -p "$(TEST_DIR)/memory-safety"
+	python3 scripts/checkpoint4_large_project.py --nift "$(CURDIR)/$(TARGET)" --pages 10000 --output "$(TEST_DIR)/memory-safety/checkpoint-4-large-project.json"
+
+valgrind-memory-safety-checkpoint-4: $(TARGET)
+	mkdir -p "$(TEST_DIR)/memory-safety"
+	python3 scripts/checkpoint4_watch_endurance.py --nift "$(CURDIR)/scripts/valgrind_nift.sh" --cycles 30 --interval 0.22 --output "$(TEST_DIR)/memory-safety/checkpoint-4-watch-valgrind.json"
+
+.PHONY: memory-safety-checkpoint-3 memory-safety-checkpoint-4-watch memory-safety-checkpoint-4-watch-sanitize memory-safety-checkpoint-4-large valgrind-memory-safety-checkpoint-4
