@@ -6,7 +6,7 @@ a=ap.parse_args(); nift=str(pathlib.Path(a.nift).resolve())
 def git_commit():
     try: return subprocess.check_output(["git","rev-parse","HEAD"],cwd=pathlib.Path(__file__).resolve().parents[1],text=True,stderr=subprocess.DEVNULL).strip()
     except Exception: return "unknown"
-; TIME="/usr/bin/time"
+TIME="/usr/bin/time"
 def peak(root,args):
     p=subprocess.run([TIME,"-v",nift,*args],cwd=root,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True)
     if p.returncode: raise RuntimeError(p.stderr)
