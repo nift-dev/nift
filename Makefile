@@ -165,7 +165,7 @@ $(SAN_TARGET): $(SAN_OBJECTS)
 	$(CXX) -std=c++17 -pthread $(SANITIZER_FLAGS) $(SAN_OBJECTS) -o "$@"
 
 test-sanitize: $(SAN_TARGET)
-	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(SAN_TARGET)" --version
+	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(SAN_TARGET)" --version
 
 $(MEMORY_SMOKE): tests/json_smoke.cpp src/Json.h
 	mkdir -p "$(TEST_DIR)"
@@ -173,7 +173,7 @@ $(MEMORY_SMOKE): tests/json_smoke.cpp src/Json.h
 
 memory-safety-smoke: $(MEMORY_SMOKE)
 	mkdir -p "$(TEST_DIR)/memory-safety"
-	python3 scripts/memory_safety.py --project nift --mode sanitizer --output "$(TEST_DIR)/memory-safety/checkpoint-0.json" --iterations 2 --command './$(MEMORY_SMOKE)'
+	env -u LD_PRELOAD python3 scripts/memory_safety.py --project nift --mode sanitizer --output "$(TEST_DIR)/memory-safety/checkpoint-0.json" --iterations 2 --command './$(MEMORY_SMOKE)'
 
 # Maintained memory/resource-safety campaign gates.
 memory-safety-checkpoint-3: $(SAN_TARGET)
