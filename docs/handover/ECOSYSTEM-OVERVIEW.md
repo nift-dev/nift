@@ -484,7 +484,7 @@ Historically/currently important examples include:
 The stripped-era onboarding moved toward:
 
 ```bash
-nift init .html
+nift init
 ```
 
 and the default output directory became:

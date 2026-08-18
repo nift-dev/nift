@@ -47,8 +47,19 @@ Create a project:
 ```bash
 mkdir my-site
 cd my-site
-nift init .html
+nift init
 ```
+
+The standard starter is HTML. Use `--ext=.php` (or another extension) for a
+different generic project, or prepare a supported static host directly:
+
+```bash
+nift init --target=vercel
+nift init --target=cloudflare
+```
+
+See [`docs/PLATFORM-TARGETS.md`](docs/PLATFORM-TARGETS.md) for the supported
+targets, generated files, extension contract, and platform boundaries.
 
 Build the project:
 

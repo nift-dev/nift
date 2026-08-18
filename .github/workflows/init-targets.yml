@@ -1,0 +1,57 @@
+name: Init targets
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/init-targets.yml'
+      - 'Makefile'
+      - 'src/**'
+      - 'jsonic/**'
+      - 'minifypp/**'
+      - 'scripts/init_targets_cross_platform.py'
+      - 'tests/init_targets_smoke.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  init-targets:
+    name: ${{ matrix.id }} init targets
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: linux
+            runner: ubuntu-latest
+          - id: macos
+            runner: macos-latest
+          - id: windows
+            runner: windows-latest
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - uses: msys2/setup-msys2@v2
+        if: runner.os == 'Windows'
+        with:
+          msystem: UCRT64
+          update: true
+          install: make mingw-w64-ucrt-x86_64-gcc
+      - name: Build Nift
+        if: runner.os != 'Windows'
+        run: make -j2
+      - name: Build Nift on Windows
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: make -j2
+      - name: Run init target contract
+        if: runner.os != 'Windows'
+        run: python scripts/init_targets_cross_platform.py --nift "$PWD/nift"
+      - name: Run init target contract on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: python scripts/init_targets_cross_platform.py --nift "$PWD\nift.exe"
