@@ -190,3 +190,8 @@ calling the Nift work complete.
 - Standalone Jsonic++ Checkpoints 1A and 1B are complete for the maintained lifetime corpus. Sanitizer/RSS evidence is supplemented by an independent Valgrind 3.26.0 Linux pass at canonical Jsonic++ commit `b9d0ff3`: 40 corpus iterations, 0 errors, 0 bytes in use at exit, all 6,579,515 allocations freed.
 - Nift's vendored Jsonic++ documentation is synchronized with that canonical record. This is component-level evidence only; Nift's own lifecycle, incremental-state, watch/endurance, large-project and cross-project integration memory gates remain open.
 - Keep standalone Jsonic++ as the source of truth for parser lifetime evidence and rerun Nift integration checks whenever the vendored parser implementation changes.
+## 2026-08-18 — standalone Minify++ memory-safety checkpoint
+
+- Nift's vendored Minify++ test infrastructure now mirrors the standalone Checkpoint 2A lifetime corpus and CLI stress harness. Standalone Minify++ at `db2a6ff` passed its sanitizer/RSS/CLI campaign without requiring a production source fix.
+- This is component-level evidence only. Do not claim Nift-owned Minify++ lifecycle/resource behavior until the later cross-project integration checkpoint exercises that ownership boundary directly.
+- Independent standalone Minify++ Valgrind confirmation remains open because the current environment has no Valgrind executable.
