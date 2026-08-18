@@ -57,7 +57,12 @@ Proportionately include:
     `nift commands`; a separate `nift help` command is not part of the contract.
 12. Inspect repository state for generated/debug residue.
 
-Repository tests passing does not prove a release archive is usable.
+Repository tests passing does not prove a release archive is usable. After the
+release is public, the separate distribution-verification workflow tests the
+actual packages and archives users receive. Package-manager propagation is a
+post-release state, not a reason to delay an otherwise completed release; keep
+its expected-version assertion strict and rerun lagging channels as they become
+publicly available. See `DISTRIBUTION-VERIFICATION.md`.
 
 ## Website publication
 

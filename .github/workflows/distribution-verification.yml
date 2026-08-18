@@ -1,0 +1,318 @@
+name: Distribution verification
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Public Nift version to require from every selected channel
+        required: true
+        default: '4.0.2'
+        type: string
+      github_release:
+        description: Verify public GitHub release archives
+        required: true
+        default: true
+        type: boolean
+      homebrew:
+        description: Verify canonical Homebrew formula
+        required: true
+        default: true
+        type: boolean
+      chocolatey:
+        description: Verify Chocolatey Community Repository package
+        required: true
+        default: true
+        type: boolean
+      snap:
+        description: Verify Snap Store latest/stable
+        required: true
+        default: true
+        type: boolean
+      flathub:
+        description: Verify Flathub package
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  github_release:
+    if: inputs.github_release
+    name: GitHub release / ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            platform: linux-x86_64
+            archive: tar.gz
+            executable: nift
+          - runner: macos-15
+            platform: macos-arm64
+            archive: tar.gz
+            executable: nift
+          - runner: macos-15-intel
+            platform: macos-x86_64
+            archive: tar.gz
+            executable: nift
+          - runner: windows-latest
+            platform: windows-x86_64
+            archive: zip
+            executable: nift.exe
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Download and extract public release archive
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          version='${{ inputs.version }}'
+          root="nift-$version-${{ matrix.platform }}"
+          url="https://github.com/nift-dev/nift/releases/download/v$version/$root.${{ matrix.archive }}"
+          mkdir -p .build/distribution/release
+          curl --fail --location --retry 5 --retry-delay 3 "$url" -o ".build/distribution/$root.${{ matrix.archive }}"
+          curl --fail --location --retry 5 --retry-delay 3 \
+            "https://github.com/nift-dev/nift/releases/download/v$version/SHA256SUMS" \
+            -o .build/distribution/SHA256SUMS
+          (cd .build/distribution && grep "  $root.${{ matrix.archive }}$" SHA256SUMS | sha256sum --check -)
+          tar -xzf ".build/distribution/$root.${{ matrix.archive }}" -C .build/distribution/release
+          echo "NIFT_EXE=$PWD/.build/distribution/release/$root/${{ matrix.executable }}" >> "$GITHUB_ENV"
+      - name: Download and extract public release archive on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $version = '${{ inputs.version }}'
+          $root = "nift-$version-${{ matrix.platform }}"
+          $url = "https://github.com/nift-dev/nift/releases/download/v$version/$root.${{ matrix.archive }}"
+          New-Item .build/distribution/release -ItemType Directory -Force | Out-Null
+          $archive = ".build/distribution/$root.${{ matrix.archive }}"
+          Invoke-WebRequest $url -OutFile $archive -MaximumRetryCount 5 -RetryIntervalSec 3
+          Invoke-WebRequest "https://github.com/nift-dev/nift/releases/download/v$version/SHA256SUMS" -OutFile .build/distribution/SHA256SUMS -MaximumRetryCount 5 -RetryIntervalSec 3
+          $filename = "$root.${{ matrix.archive }}"
+          $line = Get-Content .build/distribution/SHA256SUMS | Where-Object { $_.EndsWith("  $filename") } | Select-Object -First 1
+          if (-not $line) { throw "Checksum entry not found for $filename" }
+          $expected = ($line -split '\s+')[0].ToLowerInvariant()
+          $actual = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) { throw "Checksum mismatch for $filename" }
+          Expand-Archive $archive -DestinationPath .build/distribution/release
+          "NIFT_EXE=$PWD\.build\distribution\release\$root\${{ matrix.executable }}" >> $env:GITHUB_ENV
+      - name: Smoke installed release archive
+        shell: bash
+        run: |
+          python scripts/distribution_smoke.py \
+            --channel 'github-release-${{ matrix.platform }}' \
+            --expected-version '${{ inputs.version }}' \
+            --evidence '.build/distribution/evidence/github-release-${{ matrix.platform }}.json' \
+            --command "$NIFT_EXE"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: distribution-github-release-${{ matrix.platform }}
+          path: .build/distribution/evidence/*.json
+          if-no-files-found: error
+
+  homebrew:
+    if: inputs.homebrew
+    name: Homebrew / ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            platform: macos-arm64
+          - runner: ubuntu-latest
+            platform: linux-x86_64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Set up Homebrew
+        uses: Homebrew/actions/setup-homebrew@df4b09108a1de9d6f995fe68f302b3f68bd6d2ef # 2026.07.20.1
+        with:
+          core: true
+          cask: false
+      - name: Fresh install from Homebrew
+        shell: bash
+        run: |
+          brew update
+          brew uninstall --force nift >/dev/null 2>&1 || true
+          brew install nift
+      - name: Smoke public Homebrew package
+        shell: bash
+        run: |
+          python scripts/distribution_smoke.py \
+            --channel 'homebrew-${{ matrix.platform }}' \
+            --expected-version '${{ inputs.version }}' \
+            --evidence '.build/distribution/evidence/homebrew-${{ matrix.platform }}.json' \
+            --command nift
+      - name: Uninstall Homebrew package
+        if: always()
+        shell: bash
+        run: brew uninstall --force nift >/dev/null 2>&1 || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: distribution-homebrew-${{ matrix.platform }}
+          path: .build/distribution/evidence/*.json
+          if-no-files-found: warn
+
+  chocolatey:
+    if: inputs.chocolatey
+    name: Chocolatey / windows-x86_64
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Fresh install from Chocolatey Community Repository
+        shell: pwsh
+        run: |
+          choco uninstall nift -y --no-progress 2>$null | Out-Null
+          choco install nift --version '${{ inputs.version }}' -y --no-progress
+      - name: Smoke public Chocolatey package
+        shell: pwsh
+        run: |
+          python scripts/distribution_smoke.py `
+            --channel chocolatey-windows-x86_64 `
+            --expected-version '${{ inputs.version }}' `
+            --evidence '.build/distribution/evidence/chocolatey-windows-x86_64.json' `
+            --command nift
+      - name: Uninstall Chocolatey package
+        if: always()
+        shell: pwsh
+        run: choco uninstall nift -y --no-progress 2>$null | Out-Null
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: distribution-chocolatey-windows-x86_64
+          path: .build/distribution/evidence/*.json
+          if-no-files-found: warn
+
+  snap:
+    if: inputs.snap
+    name: Snap Store / linux-x86_64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Fresh install from Snap stable
+        shell: bash
+        run: |
+          sudo snap remove nift >/dev/null 2>&1 || true
+          sudo snap install nift --classic --channel=latest/stable
+      - name: Smoke public Snap package
+        shell: bash
+        run: |
+          python scripts/distribution_smoke.py \
+            --channel snap-latest-stable-linux-x86_64 \
+            --expected-version '${{ inputs.version }}' \
+            --evidence '.build/distribution/evidence/snap-linux-x86_64.json' \
+            --command nift
+      - name: Uninstall Snap package
+        if: always()
+        shell: bash
+        run: sudo snap remove nift >/dev/null 2>&1 || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: distribution-snap-linux-x86_64
+          path: .build/distribution/evidence/*.json
+          if-no-files-found: warn
+
+  flathub:
+    if: inputs.flathub
+    name: Flathub / linux-x86_64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Install Flatpak tooling
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+      - name: Fresh install from Flathub
+        shell: bash
+        run: |
+          flatpak uninstall --user -y cc.nift.nsm >/dev/null 2>&1 || true
+          flatpak install --user -y flathub cc.nift.nsm
+      - name: Smoke public Flathub package
+        shell: bash
+        run: |
+          python scripts/distribution_smoke.py \
+            --channel flathub-linux-x86_64 \
+            --expected-version '${{ inputs.version }}' \
+            --evidence '.build/distribution/evidence/flathub-linux-x86_64.json' \
+            --command flatpak \
+            --command run \
+            --command cc.nift.nsm
+      - name: Uninstall Flathub package
+        if: always()
+        shell: bash
+        run: flatpak uninstall --user -y cc.nift.nsm >/dev/null 2>&1 || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: distribution-flathub-linux-x86_64
+          path: .build/distribution/evidence/*.json
+          if-no-files-found: warn
+
+  summary:
+    if: always()
+    name: Distribution summary
+    needs: [github_release, homebrew, chocolatey, snap, flathub]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Record selected channel results
+        env:
+          EXPECTED_VERSION: ${{ inputs.version }}
+          GITHUB_RELEASE_SELECTED: ${{ inputs.github_release }}
+          HOMEBREW_SELECTED: ${{ inputs.homebrew }}
+          CHOCOLATEY_SELECTED: ${{ inputs.chocolatey }}
+          SNAP_SELECTED: ${{ inputs.snap }}
+          FLATHUB_SELECTED: ${{ inputs.flathub }}
+          GITHUB_RELEASE_RESULT: ${{ needs.github_release.result }}
+          HOMEBREW_RESULT: ${{ needs.homebrew.result }}
+          CHOCOLATEY_RESULT: ${{ needs.chocolatey.result }}
+          SNAP_RESULT: ${{ needs.snap.result }}
+          FLATHUB_RESULT: ${{ needs.flathub.result }}
+        shell: bash
+        run: |
+          mkdir -p .build/distribution
+          python - <<'PY'
+          import json, os
+          names = ["github_release", "homebrew", "chocolatey", "snap", "flathub"]
+          data = {
+              "schema": 1,
+              "expected_version": os.environ["EXPECTED_VERSION"],
+              "channels": {},
+          }
+          for name in names:
+              key = name.upper()
+              data["channels"][name] = {
+                  "selected": os.environ[f"{key}_SELECTED"].lower() == "true",
+                  "result": os.environ[f"{key}_RESULT"],
+              }
+          with open(".build/distribution/summary.json", "w", encoding="utf-8") as handle:
+              json.dump(data, handle, indent=2, sort_keys=True)
+              handle.write("\n")
+          print(json.dumps(data, indent=2, sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: distribution-summary
+          path: .build/distribution/summary.json
+          if-no-files-found: error

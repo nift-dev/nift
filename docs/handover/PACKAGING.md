@@ -252,6 +252,23 @@ Archive the old repositories only after the public store entries use the new
 source and fresh installations have been verified. Add a short archived-repo
 README pointing at `nift-dev/nift` where practical.
 
+## Post-release distribution verification
+
+After a public release and downstream propagation, run the maintained
+`.github/workflows/distribution-verification.yml` workflow against the exact
+public version. It installs Nift from the public GitHub release archives,
+Homebrew, Chocolatey, Snap stable, and Flathub rather than rebuilding those
+channels from this checkout. The shared `scripts/distribution_smoke.py` contract
+requires the exact version and exercises `version`, `about`, `commands`, a basic
+`init`/`build`, and a representative `--target=vercel` build.
+
+The workflow is intentionally strict while stores propagate. An older Homebrew,
+Chocolatey, or Flathub package should make that channel fail until the public
+store catches up; do not weaken the requested version to manufacture a green
+run. Each successful channel uploads normalized JSON evidence and the final job
+retains a channel-result summary. See `DISTRIBUTION-VERIFICATION.md` for the
+full contract, failure classification, and rerun policy.
+
 ## Minify++ packaging boundary
 
 Minify++ is a viable package candidate: its standalone CLI reports 1.1.0 and its
