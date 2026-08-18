@@ -16,7 +16,7 @@ Nift 4.0.2 simplifies project initialization and adds explicit hosting-platform 
 - Target presets currently accept `.html` and `.htm` and reject runtime-oriented combinations such as `--target=vercel --ext=.php` rather than producing a misleading static artifact. Generic `nift init --ext=.php` remains supported for PHP-capable hosting.
 - Vercel emits the static Build Output API layout under `.vercel/output/static/` with `config.json`; Amplify emits its static deployment bundle under `.amplify-hosting/static/` with `deploy-manifest.json`. The other targets retain `public/` and add only useful provider configuration. GitHub Pages deliberately requires no provider file, while Supabase is an integration-only target that keeps ordinary Nift output because Supabase supplies backend services rather than a static frontend artifact.
 - Target initialization does not authenticate, create provider projects, provision runtime services, configure DNS, or choose how remote CI installs Nift. Provider functions/APIs remain ordinary platform features beside Nift's build-time output.
-- Added focused local init-target coverage and a native Linux/macOS/Windows GitHub Actions matrix. The independent `nift-regression-suite` also carries the externally observable initializer contract.
+- Added focused local init-target coverage and a native Linux/macOS/Windows GitHub Actions matrix; the completed 4.0.2 initializer/target contract is green on all three runner families. The independent `nift-regression-suite` carries the matching externally observable initializer contract and is green as well. This proves the generated project/scaffold contract across those environments; it does not claim every provider has been end-to-end deployed before release.
 
 ### Documentation
 

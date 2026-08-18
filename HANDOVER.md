@@ -24,7 +24,7 @@ whether it is a regression.
 - Language/toolchain: C++17 and Make.
 - Output convention for modern projects: `public/`.
 - Current branch: `main` in this checkout.
-- Current project phase: **hardening plateau reached** after Checkpoints 0–10. The 4.0.2 candidate is adding explicit `init` extension/platform presets before release; distribution, dogfooding, field evidence, and regression-backed responses remain the next phase after that bounded feature lands.
+- Current project phase: **hardening plateau reached** after Checkpoints 0–10. The bounded 4.0.2 `init` extension/platform-target feature is implemented and its native Linux/macOS/Windows Actions contract is green. The remaining pre-release work is release/publication reconciliation; distribution-channel validation and provider dogfooding belong after the public 4.0.2 artifacts/packages exist.
 - Public documentation: the separate `nift-dev.github.io` repository.
 - External contract: the separate `nift-regression-suite` repository.
 - Embedded minifier: `minifypp/`, synchronized with standalone Minify++.

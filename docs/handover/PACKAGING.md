@@ -172,7 +172,7 @@ packages only `nift.exe`. It has no Git dependency. Generated
 ## Homebrew
 
 `brew install nift` is owned by the external `Homebrew/homebrew-core` formula.
-As rechecked on 18 August 2026, the canonical formula publishes Nift 4.0.1 from
+As rechecked on 19 August 2026, the canonical formula publishes Nift 4.0.1 from
 `nift-dev/nift` and Homebrew provides bottles for supported Apple Silicon/Intel
 macOS and Linux architectures. The legacy 3.0.3 LuaJIT/patch/`nsm` formula has
 therefore been superseded.
@@ -482,7 +482,7 @@ Downstream state recorded on 2026-08-17:
   the preserved 256px icon checksum; commit
   `16c53050308024405bd1361ce421acca598ae7d4` corrected it and triggered a new
   build. The rerun also failed on x86-64, with the aarch64 leg cancelled after
-  that failure; PR #12 remained open when rechecked on 2026-08-18. Diagnose and
+  that failure; PR #12 remained open when rechecked on 2026-08-19. Diagnose and
   repair that external build before claiming v4.0.1 Flathub publication, then
   perform a fresh Flathub installation test.
 

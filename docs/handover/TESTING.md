@@ -30,10 +30,11 @@ because timing and RSS are environment-sensitive.
 
 Nift 4.0.2 initialization is protected locally by `make test-init-targets` and by
 `.github/workflows/init-targets.yml`, which runs an implementation-level portable
-Python smoke contract on native Linux, macOS and Windows runners. The independent
+Python smoke contract on native Linux, macOS and Windows runners. The matrix is
+green for the completed 4.0.2 initializer/target contract. The independent
 `nift-regression-suite` carries the matching black-box `init_targets_smoke.sh`
-module. Keep these synchronized at the behavioral level rather than coupling the
-external suite to Nift internals.
+module and its GitHub Actions run is also green. Keep these synchronized at the
+behavioral level rather than coupling the external suite to Nift internals.
 
 Reconciliation run on 2026-08-16: the current Nift executable passed all 14
 standalone contract modules. This includes the external suite's 578-assertion

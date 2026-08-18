@@ -76,6 +76,12 @@ of the deployed output when a build step is used. Nift therefore creates
 `content/staticwebapp.config.json` as a tracked raw JSON file and reproduces it
 as `public/staticwebapp.config.json` on every build.
 
+## Validation status
+
+The 4.0.2 initializer/target contract is covered by focused implementation tests, the independent `nift-regression-suite`, and a native GitHub Actions matrix on Linux, macOS, and Windows. Those checks build the generated projects and verify the expected output/configuration shapes and failure diagnostics.
+
+This is intentionally different from claiming every provider has been deployed end-to-end. Provider acceptance is useful dogfooding/field evidence, not a 4.0.2 release gate; compatibility fixes discovered later should be handled as ordinary regressions.
+
 ## Primary platform references
 
 - Vercel Build Output API: https://vercel.com/docs/build-output-api
