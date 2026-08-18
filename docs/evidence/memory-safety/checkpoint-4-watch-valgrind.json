@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "checkpoint": "4-watch",
+  "commit": "92e6c05bcf4581ab86101bd0ef2a3f363927cf95",
+  "platform": "Linux-7.0.0-29-generic-x86_64-with-glibc2.43",
+  "cycles": 30,
+  "interval_seconds": 0.22,
+  "elapsed_seconds": 14.044,
+  "rss_samples": [
+    {
+      "cycle": 20,
+      "rss_kib": 3824
+    },
+    {
+      "cycle": 29,
+      "rss_kib": 3824
+    }
+  ],
+  "warm_sample_kib": 3824,
+  "mid_sample_kib": 3824,
+  "final_sample_kib": 3824,
+  "max_sample_kib": 3824,
+  "process_exit_status": 130,
+  "shutdown": "sigint",
+  "pass": true
+}

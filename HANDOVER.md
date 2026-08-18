@@ -228,3 +228,11 @@ calling the Nift work complete.
 - The harness now launches watch mode with stdin connected to `/dev/null`, so a failed endurance run cannot alter the caller's interactive terminal settings.
 - `valgrind_nift.sh` now remains as an explicit supervisor, traps SIGINT/SIGTERM from the harness, forwards the signal to Valgrind and waits for Valgrind to finish. This preserves Valgrind's opportunity to observe Nift termination and write its final leak/error summary.
 - A synthetic forwarding-supervisor probe completed 30/30 acknowledgement-driven cycles and shut down through SIGINT with exit 130. Checkpoint 4B remains open until the corrected external Valgrind target completes and its final report is retained.
+
+## Memory-safety Checkpoint 4 complete (2026-08-18)
+
+- Checkpoint 4B now passes on the external Linux/Valgrind host at Nift commit `92e6c05`.
+- The corrected acknowledgement-driven watch corpus completed all 30 cycles in 14.044 seconds and shut down through the intended SIGINT path (`process_exit_status=130`, `shutdown=sigint`).
+- Machine-readable evidence is retained at `docs/evidence/memory-safety/checkpoint-4-watch-valgrind.json`.
+- Wrapper/supervisor RSS was 3,824 KiB at cycle 20 and cycle 29. Treat this as operational telemetry, not the leak oracle.
+- Combined with Checkpoint 4A's native 180-cycle settling run, sanitizer watch run and 10k worker/minification matrix, Checkpoint 4 is complete. The memory-safety campaign advances to Checkpoint 5 (tscc).
