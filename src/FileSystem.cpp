@@ -150,6 +150,21 @@ bool write_readonly_file(const fs::path& path, const std::string& contents) {
     return replace_file(temp, path);
 }
 
+bool remove_owned_file(const fs::path& path) {
+    std::error_code error;
+    const bool exists = fs::exists(path, error);
+    if (error) return false;
+    if (!exists) return true;
+
+    // Generated output and metadata are deliberately read-only. POSIX permits
+    // unlinking them from a writable directory, but Windows requires clearing
+    // the read-only attribute before removal.
+    fs::permissions(path, fs::perms::owner_write, fs::perm_options::add, error);
+    if (error) return false;
+    error.clear();
+    return fs::remove(path, error) && !error;
+}
+
 bool path_exists(const fs::path& path) {
 #ifdef _WIN32
     std::error_code error;

@@ -162,16 +162,12 @@ bool WatchList::reconcile(ProjectInfo& project) {
                 if (!seen_names.count(value.string)) {
                     auto it = std::find_if(project.tracked.begin(), project.tracked.end(), [&](const TrackedInfo& info) { return info.name == value.string; });
                     if (it != project.tracked.end()) {
-                        std::error_code error;
-                        fs::remove(project.output_path(*it), error);
-                        error.clear();
-                        fs::remove(project.info_path(*it), error);
-                        error.clear();
-                        fs::remove(filesystem::hash_file_path(project.root, project.content_path(*it)), error);
+                        filesystem::remove_owned_file(project.output_path(*it));
+                        filesystem::remove_owned_file(project.info_path(*it));
+                        filesystem::remove_owned_file(filesystem::hash_file_path(project.root, project.content_path(*it)));
                         fs::path sidecar = project.content_path(*it);
                         sidecar.replace_extension(".deps.json");
-                        error.clear();
-                        fs::remove(filesystem::hash_file_path(project.root, sidecar), error);
+                        filesystem::remove_owned_file(filesystem::hash_file_path(project.root, sidecar));
                         project.tracked.erase(it);
                         project.invalidate_tracked_index();
                         tracking_changed = true;

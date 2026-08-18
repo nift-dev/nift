@@ -317,22 +317,14 @@ fs::path user_dependencies_path(const ProjectInfo& project, const TrackedInfo& i
 }
 
 void remove_page_build_state(const ProjectInfo& project, const TrackedInfo& info, bool remove_content_files) {
-    std::error_code error;
     if (remove_content_files) {
-        fs::permissions(project.content_path(info), fs::perms::owner_write, fs::perm_options::add, error);
-        error.clear();
-        fs::remove(project.content_path(info), error);
-        error.clear();
-        fs::remove(user_dependencies_path(project, info), error);
+        filesystem::remove_owned_file(project.content_path(info));
+        filesystem::remove_owned_file(user_dependencies_path(project, info));
     }
-    error.clear();
-    fs::remove(project.output_path(info), error);
-    error.clear();
-    fs::remove(project.info_path(info), error);
-    error.clear();
-    fs::remove(filesystem::hash_file_path(project.root, project.content_path(info)), error);
-    error.clear();
-    fs::remove(filesystem::hash_file_path(project.root, user_dependencies_path(project, info)), error);
+    filesystem::remove_owned_file(project.output_path(info));
+    filesystem::remove_owned_file(project.info_path(info));
+    filesystem::remove_owned_file(filesystem::hash_file_path(project.root, project.content_path(info)));
+    filesystem::remove_owned_file(filesystem::hash_file_path(project.root, user_dependencies_path(project, info)));
 }
 
 bool initialise_project(const std::string& extension) {
