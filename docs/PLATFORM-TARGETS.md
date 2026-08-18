@@ -45,6 +45,13 @@ A target means:
 > Initialise the smallest Nift project that is prepared for this platform's
 > static deployment or backend-integration model.
 
+Named targets are conveniences, not an allow-list of platforms Nift can use.
+Nift's normal output is ordinary files, so an unlisted host can still be used
+whenever it can serve the generated output (or accept it through its own
+deployment tooling). In that case initialise normally with `nift init` (or
+`nift init --ext=...`) and configure the host's build command, publish/output
+directory, workflow, redirects, headers, or other provider files manually.
+
 It does **not** authenticate to the provider, create projects, configure DNS,
 provision databases, or install Nift into the provider's remote build image.
 Where a provider runs `nift build` itself, Nift must be made available in that
