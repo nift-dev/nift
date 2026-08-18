@@ -82,7 +82,7 @@ $[title]
 ]
 
 def setup(root):
-    subprocess.run([NIFT,'init','.html'],cwd=root,check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,env=SAN_ENV)
+    subprocess.run([NIFT,'init'],cwd=root,check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,env=SAN_ENV)
     tr=json.loads((root/'.nift/tracked.json').read_text())
     tr['tracked']=[{'name':'/','title':'Fuzz','template':'templates/template.html'}]
     (root/'.nift/tracked.json').write_text(json.dumps(tr,separators=(',',':'))+'\n')

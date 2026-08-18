@@ -38,7 +38,7 @@ def run(cmd,cwd,expect=0,env=None):
 for r in range(a.rounds):
     with tempfile.TemporaryDirectory(prefix="nift-cp3-") as td:
         root=pathlib.Path(td)
-        run([nift,"init",".html"],root)
+        run([nift,"init"],root)
         run([nift,"track","a",f"A{r}"],root)
         run([nift,"cp","a","b"],root)
         run([nift,"mv","b","c"],root)

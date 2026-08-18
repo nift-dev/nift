@@ -31,7 +31,7 @@ def tree(root):
             out[rel]=hashlib.sha256(p.read_bytes()).hexdigest()
     return out
 def setup(root,mode):
-    run(root,"init",".html")
+    run(root,"init")
     cfg=json.loads((root/".nift/config.json").read_text())
     cfg["config"]["incremental-mode"]=mode
     cfg["config"]["build-threads"]=3

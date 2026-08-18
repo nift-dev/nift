@@ -48,7 +48,7 @@ def bump(path):
     os.utime(path,(now,now))
 started=time.monotonic()
 with tempfile.TemporaryDirectory(prefix="nift-cp6-integration-") as td:
-    root=pathlib.Path(td); run(root,"init",".html")
+    root=pathlib.Path(td); run(root,"init")
     cfg=json.loads((root/".nift/config.json").read_text())
     cfg["config"].update({"build-threads":4,"incremental-mode":"hybrid",
                           "minify-exts":[".html",".css"],

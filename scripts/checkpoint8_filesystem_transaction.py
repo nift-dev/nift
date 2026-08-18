@@ -22,7 +22,7 @@ def run(root,*args,ok=True,timeout=15):
         raise RuntimeError(f"{args} unexpectedly succeeded")
     return p
 def scaffold(root):
-    run(root,"init",".html")
+    run(root,"init")
     # Keep one deterministic page.
     tr=json.loads((root/".nift/tracked.json").read_text())
     tr["tracked"]=[{"name":"/","title":"Home","template":"templates/template.html"}]

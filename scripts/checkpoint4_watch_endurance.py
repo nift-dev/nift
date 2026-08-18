@@ -68,7 +68,7 @@ def wait_for_rebuild(output_path, previous_mtime_ns, proc, timeout):
     raise RuntimeError(f"timed out after {timeout}s waiting for {output_path} to rebuild")
 with tempfile.TemporaryDirectory(prefix="nift-cp4-watch-") as td:
     root=pathlib.Path(td)
-    subprocess.run([nift,"init",".html"],cwd=root,check=True,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True)
+    subprocess.run([nift,"init"],cwd=root,check=True,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True)
     # Add project contract + schema-validated JSON so watch repeatedly owns those paths.
     cfg=json.loads((root/".nift/config.json").read_text())
     cfg["config"]["contracts"]={"routes":".nift/routes.json"}
