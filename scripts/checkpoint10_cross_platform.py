@@ -41,7 +41,7 @@ def git_commit():
 
 def run(root, *arguments, expect=0):
     result = subprocess.run(
-        [NIFT, *arguments], cwd=root, text=True,
+        [NIFT, *arguments], cwd=root, text=True, encoding="utf-8", errors="strict",
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30)
     if result.returncode != expect:
         raise RuntimeError(
