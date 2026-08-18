@@ -276,3 +276,14 @@ calling the Nift work complete.
 - Discovery corrected the oracle rather than Nift: untracked files in `public/` are user-owned and should not be erased to simulate a clean build. The maintained harness removes only generated tracked outputs and page build metadata.
 - Evidence is scoped deliberately: the generated/mutated states tested establish equivalence for that corpus; this is not an absolute proof over every possible Nift project.
 - Checkpoint 8 still makes sense unchanged: it attacks safe failure and persistent-state integrity under hostile filesystem/interruption conditions, a property not exercised by successful incremental equivalence.
+
+## Checkpoint 8 complete — filesystem/transaction integrity (2026-08-18)
+
+- Maintained gate: `make checkpoint-8-filesystem-transaction`.
+- Commit under test: `e261074`; exact evidence is retained at `docs/evidence/checkpoint-8/filesystem-transaction.json`.
+- Thirteen Linux adversarial cases pass: unreadable content/template/JSON, dangling symlink, symlink loop, file↔directory obstruction classes, read-only output/state directories, metadata-write obstruction/recovery, long Unicode path, `RLIMIT_FSIZE` partial-write pressure, and forced `SIGKILL` during a 48 MiB generated-output write.
+- Three bug families were fixed: unreadable inputs being conflated with empty files; directory-as-file reads reaching a `std::length_error` abort; and truncate-in-place writes that could destroy the last-good artifact on interruption.
+- File/state writes now stage to same-directory Nift temporary files and replace only after a complete write. A killed write leaves the prior output+metadata intact; the next successful write removes stale Nift temporaries.
+- Failed output writes do not refresh page metadata. Failed metadata writes leave the page stale so `status`/`build-updated` can repair it.
+- Claim scope is intentionally limited to the tested Linux failure classes. Direct ENOSPC and platform-specific Windows/macOS permission/locking semantics remain outside this checkpoint and belong in later platform evidence.
+- Checkpoint 9 remains appropriate and distinct: fuzz/sanitizer the n++ parser and explicit resource/depth boundaries, without duplicating standalone Jsonic++ or Minify++ parser campaigns.

@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "checkpoint": "8-filesystem-transaction",
+  "commit": "e26107435ee7f91a8d7f80d83f324ac3b953dd77",
+  "platform": "Linux-6.18.35-x86_64-with-glibc2.41",
+  "cases": [
+    {
+      "case": "unreadable-content-preserves-last-good",
+      "pass": true,
+      "elapsed_seconds": 0.009835,
+      "diagnostic": "content file is not readable"
+    },
+    {
+      "case": "unreadable-template-preserves-last-good",
+      "pass": true,
+      "elapsed_seconds": 0.008488
+    },
+    {
+      "case": "unreadable-json-preserves-last-good",
+      "pass": true,
+      "elapsed_seconds": 0.012251
+    },
+    {
+      "case": "dangling-symlink-fails-safely",
+      "pass": true,
+      "elapsed_seconds": 0.010149
+    },
+    {
+      "case": "symlink-loop-does-not-hang",
+      "pass": true,
+      "elapsed_seconds": 0.008315,
+      "exit": 1
+    },
+    {
+      "case": "file-replaced-by-directory-fails-safely",
+      "pass": true,
+      "elapsed_seconds": 0.010542,
+      "exit": 1,
+      "diagnostic_tail": "  json: failed to parse data/site.json (JSON file is not readable)\n    @json(\"data/site.json\", site)\n    ^"
+    },
+    {
+      "case": "readonly-output-directory-does-not-claim-success",
+      "pass": true,
+      "elapsed_seconds": 0.008531
+    },
+    {
+      "case": "metadata-write-failure-remains-stale-and-repairs",
+      "pass": true,
+      "elapsed_seconds": 0.012114
+    },
+    {
+      "case": "unicode-and-long-relative-path",
+      "pass": true,
+      "elapsed_seconds": 0.00947,
+      "name_length": 349
+    },
+    {
+      "case": "output-directory-replaced-by-file-fails-safely",
+      "pass": true,
+      "elapsed_seconds": 0.01195
+    },
+    {
+      "case": "readonly-state-directory-preserves-tracking",
+      "pass": true,
+      "elapsed_seconds": 0.008321
+    },
+    {
+      "case": "partial-write-limit-preserves-last-good",
+      "pass": true,
+      "elapsed_seconds": 0.233364,
+      "exit": 1,
+      "limit_bytes": 1048576
+    },
+    {
+      "case": "sigkill-during-output-write-preserves-last-good",
+      "pass": true,
+      "elapsed_seconds": 2.861049,
+      "kill_exit": -9,
+      "stale_temp_observed": true,
+      "bytes": 50331648
+    }
+  ],
+  "case_count": 13,
+  "elapsed_seconds": 3.232,
+  "pass": true
+}
