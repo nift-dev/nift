@@ -195,3 +195,9 @@ calling the Nift work complete.
 - Nift's vendored Minify++ test infrastructure now mirrors the standalone Checkpoint 2A lifetime corpus and CLI stress harness. Standalone Minify++ at `db2a6ff` passed its sanitizer/RSS/CLI campaign without requiring a production source fix.
 - This is component-level evidence only. Do not claim Nift-owned Minify++ lifecycle/resource behavior until the later cross-project integration checkpoint exercises that ownership boundary directly.
 - Independent standalone Minify++ Valgrind confirmation remains open because the current environment has no Valgrind executable.
+
+## 2026-08-18 — standalone Minify++ memory-safety gate complete
+
+- Standalone Minify++ Checkpoints 2A and 2B are complete. The independent gate used Valgrind 3.26.0 on Linux x86_64 at canonical Minify++ commit `2a51a38`: 30 lifetime-corpus iterations, 0 errors, 0 bytes in use at exit, all 2,448 allocations freed and 184,908 KiB peak Valgrind process RSS.
+- The exact evidence is mirrored under `minifypp/docs/evidence/` so Nift's vendored component record remains synchronized with the canonical standalone checkpoint. This is still component evidence, not a Nift lifecycle/resource verdict.
+- The memory campaign now advances to Nift core command/state/failure-recovery lifetimes. Long-duration watch/10k endurance remains later, and sustained component-integration ownership stress remains reserved for the cross-project checkpoint.

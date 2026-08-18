@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "project": "minify++",
+  "commit": "2a51a38ea660b40c77786bb6e6231df0e77a1df7",
+  "timestamp_utc": "2026-08-18T00:27:54.061017+00:00",
+  "platform": {
+    "system": "Linux",
+    "release": "7.0.0-29-generic",
+    "machine": "x86_64",
+    "python": "3.14.4"
+  },
+  "toolchain": {
+    "compiler": "c++ (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
+    "valgrind": "valgrind-3.26.0",
+    "time": "/usr/bin/time"
+  },
+  "mode": "valgrind",
+  "command": [
+    "./.build/minifypp-memory-lifetime",
+    "30"
+  ],
+  "warmup_iterations": 0,
+  "requested_iterations": 1,
+  "requested_duration_seconds": 0.0,
+  "runs": [
+    {
+      "kind": "measured",
+      "index": 1,
+      "exit_status": 0,
+      "elapsed_seconds": 13.396404,
+      "peak_rss_kib": 184908,
+      "findings": [],
+      "stdout_tail": "iterations=30 warm_rss_kib=178924 midpoint_rss_kib=184928 final_rss_kib=184928",
+      "stderr_tail": "==3176324== Memcheck, a memory error detector\n==3176324== Copyright (C) 2002-2024, and GNU GPL'd, by Julian Seward et al.\n==3176324== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info\n==3176324== Command: ./.build/minifypp-memory-lifetime 30\n==3176324== \n==3176324== \n==3176324== HEAP SUMMARY:\n==3176324==     in use at exit: 0 bytes in 0 blocks\n==3176324==   total heap usage: 2,448 allocs, 2,448 frees, 126,152,486 bytes allocated\n==3176324== \n==3176324== All heap blocks were freed -- no leaks are possible\n==3176324== \n==3176324== For lists of detected and suppressed errors, rerun with: -s\n==3176324== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)\n\tCommand being timed: \"/usr/bin/valgrind --leak-check=full --show-leak-kinds=all --errors-for-leak-kinds=definite,indirect,possible --track-origins=yes --error-exitcode=99 ./.build/minifypp-memory-lifetime 30\"\n\tUser time (seconds): 13.32\n\tSystem time (seconds): 0.06\n\tPercent of CPU this job got: 99%\n\tElapsed (wall clock) time (h:mm:ss or m:ss): 0:13.39\n\tAverage shared text size (kbytes): 0\n\tAverage unshared data size (kbytes): 0\n\tAverage stack size (kbytes): 0\n\tAverage total size (kbytes): 0\n\tMaximum resident set size (kbytes): 184908\n\tAverage resident set size (kbytes): 0\n\tMajor (requiring I/O) page faults: 0\n\tMinor (reclaiming a frame) page faults: 54222\n\tVoluntary context switches: 1\n\tInvoluntary context switches: 152\n\tSwaps: 0\n\tFile system inputs: 0\n\tFile system outputs: 0\n\tSocket messages sent: 0\n\tSocket messages received: 0\n\tSignals delivered: 0\n\tPage size (bytes): 4096\n\tExit status: 0"
+    }
+  ],
+  "summary": {
+    "completed_iterations": 1,
+    "duration_seconds": 13.396404,
+    "peak_rss_kib": 184908,
+    "rss_samples_kib": [
+      184908
+    ],
+    "findings": [],
+    "pass": true,
+    "note": "RSS samples are process-level observations, not a leak oracle. Long-run settled-memory analysis is workload-specific."
+  }
+}
