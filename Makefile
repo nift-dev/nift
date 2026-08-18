@@ -221,3 +221,9 @@ checkpoint-7-incremental-equivalence: $(TARGET)
 	python3 scripts/checkpoint7_incremental_equivalence.py --nift "$(CURDIR)/$(TARGET)" --seeds 8 --steps 30 --output .build/checkpoint-7/incremental-equivalence.json
 
 .PHONY: checkpoint-7-incremental-equivalence
+
+checkpoint-8-filesystem-transaction: $(TARGET)
+	mkdir -p .build/checkpoint-8
+	python3 scripts/checkpoint8_filesystem_transaction.py --nift "$(CURDIR)/$(TARGET)" --output .build/checkpoint-8/filesystem-transaction.json
+
+.PHONY: checkpoint-8-filesystem-transaction

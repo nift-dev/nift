@@ -10,6 +10,7 @@ bool write_file(const std::filesystem::path& path, const std::string& contents);
 bool write_readonly_file(const std::filesystem::path& path, const std::string& contents);
 bool path_exists(const std::filesystem::path& path);
 bool file_exists(const std::filesystem::path& path);
+bool file_readable(const std::filesystem::path& path);
 bool has_parent_component(std::string path);
 bool valid_extension(const std::string& extension);
 bool path_within(const std::filesystem::path& base, const std::filesystem::path& candidate);

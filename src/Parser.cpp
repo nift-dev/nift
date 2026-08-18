@@ -1500,6 +1500,10 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     break;
                 }
 
+                if (!filesystem::file_readable(content_path)) {
+                    fail(source_path, source, i, "content file is not readable");
+                    break;
+                }
                 input_stack_.push_back(content_path);
                 result_.dependencies.insert(project_.relative(content_path));
                 const int insertion_code_block_depth = code_block_depth_;
@@ -1533,6 +1537,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     fail(source_path, source, i, "@input would result in an input loop through " + input_path.generic_string());
                     break;
                 }
+                if (!filesystem::file_readable(input_path)) { fail(source_path, source, i, "input file is not readable"); break; }
                 input_stack_.push_back(input_path);
                 result_.dependencies.insert(project_.relative(input_path));
                 const int insertion_code_block_depth = code_block_depth_;
@@ -1748,6 +1753,11 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
 RenderResult Parser::render() {
     const fs::path content_path = project_.content_path(tracked_info_);
     if (tracked_info_.template_path.empty()) {
+        if (!filesystem::file_readable(content_path)) {
+            result_.ok = false;
+            result_.error = {tracked_info_.name, content_path, 0, "content file is not readable"};
+            return result_;
+        }
         auto result = parse(filesystem::read_file(content_path), content_path, 0);
         result.content_used = true;
         result.dependencies.insert(project_.relative(content_path));
@@ -1761,6 +1771,11 @@ RenderResult Parser::render() {
         return result_;
     }
 
+    if (!filesystem::file_readable(template_path)) {
+        result_.ok = false;
+        result_.error = {tracked_info_.name, template_path, 0, "template file is not readable"};
+        return result_;
+    }
     input_stack_.push_back(fs::absolute(template_path).lexically_normal());
     result_.dependencies.insert(tracked_info_.template_path);
     const auto template_source = project_.read_shared_source(template_path);

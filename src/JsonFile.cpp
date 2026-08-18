@@ -6,6 +6,10 @@ bool load_json_file(const std::filesystem::path& path, json::Document& document,
         error = "file does not exist";
         return false;
     }
+    if (!filesystem::file_readable(path)) {
+        error = "file is not readable";
+        return false;
+    }
     return json::Document::parse(filesystem::read_file(path), document, error);
 }
 

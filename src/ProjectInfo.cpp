@@ -437,6 +437,10 @@ std::shared_ptr<const json::Document> ProjectInfo::read_shared_json(const fs::pa
         error = "JSON file does not exist";
         return {};
     }
+    if (!filesystem::file_readable(normalized)) {
+        error = "JSON file is not readable";
+        return {};
+    }
 
     const std::string source = filesystem::read_file(normalized);
     auto document = std::make_shared<json::Document>();

@@ -1,15 +1,24 @@
 #include "FileSystem.h"
 #include <algorithm>
+#include <atomic>
 #include <array>
 #include <fstream>
 #include <sstream>
+#include <thread>
 #include <sys/stat.h>
 #include <unordered_set>
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
 
 namespace fs = std::filesystem;
 namespace filesystem {
 
 std::string read_file(const fs::path& path) {
+    std::error_code type_error;
+    if (!fs::is_regular_file(path, type_error)) return {};
     std::ifstream file(path, std::ios::binary | std::ios::ate);
     if (!file) return {};
     const std::streamoff size = file.tellg();
@@ -44,26 +53,74 @@ static void ensure_parent_directory(const fs::path& path) {
     }
 }
 
-bool write_file(const fs::path& path, const std::string& contents) {
-    ensure_parent_directory(path);
-    std::ofstream file(path, std::ios::binary | std::ios::trunc);
+static void remove_stale_temporaries(const fs::path& path) {
+    const fs::path parent = path.parent_path().empty() ? fs::path(".") : path.parent_path();
+    const std::string prefix = path.filename().string() + ".nift-tmp-";
+    std::error_code error;
+    for (const auto& entry : fs::directory_iterator(parent, error)) {
+        if (error) break;
+        const std::string name = entry.path().filename().string();
+        if (name.rfind(prefix, 0) == 0) {
+            std::error_code ignored;
+            fs::remove(entry.path(), ignored);
+        }
+    }
+}
+
+static fs::path temporary_sibling(const fs::path& path) {
+    static std::atomic<unsigned long long> counter{0};
+#ifdef _WIN32
+    const auto pid = static_cast<unsigned long long>(::GetCurrentProcessId());
+#else
+    const auto pid = static_cast<unsigned long long>(::getpid());
+#endif
+    const auto id = counter.fetch_add(1, std::memory_order_relaxed);
+    fs::path temp = path;
+    temp += ".nift-tmp-" + std::to_string(pid) + "-" + std::to_string(id);
+    return temp;
+}
+
+static bool replace_file(const fs::path& temp, const fs::path& path) {
+#ifdef _WIN32
+    if (fs::exists(path)) {
+        std::error_code ignored;
+        fs::permissions(path, fs::perms::owner_read | fs::perms::owner_write |
+                              fs::perms::group_read | fs::perms::others_read,
+                        fs::perm_options::replace, ignored);
+    }
+    if (::MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) return true;
+    std::error_code cleanup;
+    fs::remove(temp, cleanup);
+    return false;
+#else
+    std::error_code error;
+    fs::rename(temp, path, error);
+    if (!error) return true;
+    fs::remove(temp, error);
+    return false;
+#endif
+}
+
+static bool write_temp_file(const fs::path& temp, const std::string& contents) {
+    std::ofstream file(temp, std::ios::binary | std::ios::trunc);
     if (!file) return false;
     file.write(contents.data(), static_cast<std::streamsize>(contents.size()));
+    file.close();
     return bool(file);
 }
 
-
-static bool make_writable(const fs::path& path) {
-#ifdef _WIN32
-    std::error_code error;
-    fs::permissions(path, fs::perms::owner_read | fs::perms::owner_write |
-                          fs::perms::group_read | fs::perms::others_read,
-                    fs::perm_options::replace, error);
-    return !error;
-#else
-    return ::chmod(path.c_str(), 0644) == 0;
-#endif
+bool write_file(const fs::path& path, const std::string& contents) {
+    ensure_parent_directory(path);
+    remove_stale_temporaries(path);
+    const fs::path temp = temporary_sibling(path);
+    if (!write_temp_file(temp, contents)) {
+        std::error_code cleanup;
+        fs::remove(temp, cleanup);
+        return false;
+    }
+    return replace_file(temp, path);
 }
+
 
 static bool make_readonly(const fs::path& path) {
 #ifdef _WIN32
@@ -78,18 +135,19 @@ static bool make_readonly(const fs::path& path) {
 
 bool write_readonly_file(const fs::path& path, const std::string& contents) {
     ensure_parent_directory(path);
-    auto try_write = [&]() {
-        std::ofstream file(path, std::ios::binary | std::ios::trunc);
-        if (!file) return false;
-        file.write(contents.data(), static_cast<std::streamsize>(contents.size()));
-        return bool(file);
-    };
-
-    if (!try_write()) {
-        if (!make_writable(path) || !try_write()) return false;
+    remove_stale_temporaries(path);
+    const fs::path temp = temporary_sibling(path);
+    if (!write_temp_file(temp, contents)) {
+        std::error_code cleanup;
+        fs::remove(temp, cleanup);
+        return false;
     }
-
-    return make_readonly(path);
+    if (!make_readonly(temp)) {
+        std::error_code cleanup;
+        fs::remove(temp, cleanup);
+        return false;
+    }
+    return replace_file(temp, path);
 }
 
 bool path_exists(const fs::path& path) {
@@ -100,6 +158,13 @@ bool path_exists(const fs::path& path) {
     struct stat info {};
     return ::stat(path.c_str(), &info) == 0;
 #endif
+}
+
+bool file_readable(const fs::path& path) {
+    std::error_code error;
+    if (!fs::is_regular_file(path, error)) return false;
+    std::ifstream file(path, std::ios::binary);
+    return bool(file);
 }
 
 bool file_exists(const fs::path& path) {
