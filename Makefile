@@ -227,3 +227,9 @@ checkpoint-8-filesystem-transaction: $(TARGET)
 	python3 scripts/checkpoint8_filesystem_transaction.py --nift "$(CURDIR)/$(TARGET)" --output .build/checkpoint-8/filesystem-transaction.json
 
 .PHONY: checkpoint-8-filesystem-transaction
+
+checkpoint-9-parser-fuzz: $(SAN_TARGET)
+	mkdir -p .build/checkpoint-9
+	env -u LD_PRELOAD python3 scripts/checkpoint9_parser_fuzz.py --nift "$(CURDIR)/$(SAN_TARGET)" --cases 400 --seeds 9001,17713,424242 --output .build/checkpoint-9/parser-fuzz.json
+
+.PHONY: checkpoint-9-parser-fuzz

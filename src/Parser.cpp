@@ -854,7 +854,7 @@ std::string Parser::path_to(const std::string& argument) {
 
 RenderResult Parser::parse(const std::string& source, const fs::path& source_path, int depth) {
     if (depth > 64) {
-        fail(source_path, source, 0, "maximum @input depth exceeded (possible input loop)");
+        fail(source_path, source, 0, "maximum template parse depth exceeded (possible recursion)");
         return result_;
     }
 
