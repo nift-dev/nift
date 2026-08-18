@@ -214,3 +214,10 @@ calling the Nift work complete.
 - The first Linux/Valgrind Checkpoint 4B attempt did not produce leak evidence because `checkpoint4_watch_endurance.py` signalled only the Valgrind supervisor PID and waited four seconds; the monitored `build-auto` process could remain alive underneath it.
 - The harness now launches the monitored command in a dedicated session/process group, sends SIGINT to the whole group, allows 30 seconds for Valgrind to finalize its leak report, then escalates to SIGTERM/SIGKILL only if shutdown genuinely wedges.
 - A direct Nift probe and a synthetic supervisor+child probe both complete through the new SIGINT path. Checkpoint 4B remains pending until `make valgrind-memory-safety-checkpoint-4` is rerun on Linux with Valgrind and its JSON evidence passes.
+
+## Checkpoint 4B acknowledgement-driven watch harness (2026-08-18)
+
+- The second external Valgrind attempt shut down cleanly and itself reported 0 bytes in use at exit, 39,102 allocations / 39,102 frees and 0 errors, but `build-auto` exited before the 30-cycle workload completed.
+- Root cause was test pacing: the harness issued edits every 220 ms regardless of whether the much slower Valgrind-supervised rebuild had finished. That could mutate a dependency while the previous rebuild was still reading it.
+- The watch harness is now acknowledgement-driven. After each edit it waits for `public/index.html` to receive a new mtime before issuing the next edit, with a configurable rebuild timeout. The interval is now only an optional post-acknowledgement pause.
+- A synthetic slow-supervisor probe completed 30/30 cycles through the new path. The partial clean Valgrind result is useful diagnostic evidence but does not close Checkpoint 4B; rerun the maintained target and retain the full JSON evidence.

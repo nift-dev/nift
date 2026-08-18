@@ -9,6 +9,8 @@ ap.add_argument("--interval",type=float,default=0.22)
 ap.add_argument("--output",required=True)
 ap.add_argument("--shutdown-grace-seconds",type=float,default=30.0,
                 help="Grace period after SIGINT so supervisors such as Valgrind can finalize reports.")
+ap.add_argument("--rebuild-timeout-seconds",type=float,default=20.0,
+                help="Maximum time to wait for each edited page to be rebuilt before issuing the next edit.")
 a=ap.parse_args()
 nift=str(pathlib.Path(a.nift).resolve())
 def git_commit():
@@ -21,6 +23,19 @@ def rss_kib(pid):
             if line.startswith("VmRSS:"): return int(line.split()[1])
     except FileNotFoundError: return None
     return None
+def wait_for_rebuild(output_path, previous_mtime_ns, proc, timeout):
+    deadline=time.monotonic()+timeout
+    while time.monotonic() < deadline:
+        if proc.poll() is not None:
+            raise RuntimeError(f"build-auto exited early with {proc.returncode}: {proc.stderr.read()}")
+        try:
+            current=output_path.stat().st_mtime_ns
+            if current != previous_mtime_ns:
+                return current
+        except FileNotFoundError:
+            pass
+        time.sleep(.05)
+    raise RuntimeError(f"timed out after {timeout}s waiting for {output_path} to rebuild")
 with tempfile.TemporaryDirectory(prefix="nift-cp4-watch-") as td:
     root=pathlib.Path(td)
     subprocess.run([nift,"init",".html"],cwd=root,check=True,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True)
@@ -45,6 +60,8 @@ with tempfile.TemporaryDirectory(prefix="nift-cp4-watch-") as td:
     samples=[]; started=time.monotonic()
     try:
         time.sleep(.8)
+        output_path=root/"public/index.html"
+        output_mtime_ns=output_path.stat().st_mtime_ns
         for i in range(a.cycles):
             phase=i%5
             if phase==0:
@@ -59,9 +76,9 @@ with tempfile.TemporaryDirectory(prefix="nift-cp4-watch-") as td:
                     f'<main data-cycle="{i}"><a href="$[routes.home]">$[state.name]-$[state.n]</a></main>\n@content\n')
             else:
                 (root/"data/state.json").write_text(json.dumps({"name":"rotated","n":i})+"\n")
-            time.sleep(a.interval)
-            if p.poll() is not None:
-                raise RuntimeError(f"build-auto exited early with {p.returncode}: {p.stderr.read()}")
+            output_mtime_ns=wait_for_rebuild(output_path, output_mtime_ns, p, a.rebuild_timeout_seconds)
+            if a.interval:
+                time.sleep(a.interval)
             if i>=20 and (i%20==0 or i==a.cycles-1):
                 samples.append({"cycle":i,"rss_kib":rss_kib(p.pid)})
     finally:
