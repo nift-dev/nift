@@ -2,22 +2,22 @@
 
 ## Current status
 
-Nift has completed the planned Checkpoints 0–10 deliberate hardening campaign and reached the intended **hardening plateau**. The current development executable identifies as `Nift v4.0.2`. Production readiness is now a maintained state rather than a milestone still waiting to be earned through another synthetic checkpoint.
+Nift has completed the planned Checkpoints 0–10 deliberate hardening campaign and reached the intended **hardening plateau**. The current development executable identifies as `Nift v4.0.3`, following the public v4.0.2 release. Production readiness is now a maintained state rather than a milestone still waiting to be earned through another synthetic checkpoint.
 
 The completed campaign established and retained evidence around component memory/resource safety, Nift lifecycle/endurance behavior, cross-component ownership, incremental-vs-clean equivalence, filesystem/transaction integrity, parser fuzz/resource boundaries, and scoped Linux/macOS/Windows behavioral equivalence. Checkpoint 10 also found and fixed a real Windows read-only artifact deletion defect before the final portable corpus converged with zero mismatches.
 
 Do **not** invent Checkpoint 11 merely to continue the sequence. New hardening campaigns need a concrete trigger: a field defect, an unsupported platform claim worth establishing, a newly introduced semantic contract, or another clearly justified guarantee.
 
-## Current phase: 4.0.2 release preparation, then distribution and field evidence
+## Current phase: v4.0.2 distribution verification and v4.0.3 maintenance
 
 The bounded post-hardening initialization feature is complete in the development tree: `nift init`, `--ext=.ext`, and nine `--target=<platform>` presets are implemented, covered by focused/local and independent black-box contracts, and the native `ubuntu-latest` / `macos-latest` / `windows-latest` init-target Actions matrix is green. This did not reopen the hardening campaign.
 
-The release sequence is now:
+The current sequence is now:
 
-1. Keep the 4.0.2 initializer/platform contract and documentation reconciled; do not broaden the feature during release preparation without a concrete defect.
+1. Keep the released 4.0.2 initializer/platform contract and documentation reconciled; broaden it only in response to a concrete requirement or defect.
 2. Treat the generated target files/layouts as implementations of the documented provider conventions, not as claims of end-to-end provider certification. Real provider deployments are optional dogfooding/field evidence and are **not** a 4.0.2 release gate.
-3. Complete ordinary release checks and publish 4.0.2 through the supported channels, reconciling recipes, checksums and version-sensitive install material.
-4. After public packages propagate, use GitHub Actions or similarly reproducible clean environments to install from the **actual 4.0.2 distribution channels** and run post-install smoke/behavioral checks. Testing an older package may rehearse the harness but is not 4.0.2 distribution evidence.
+3. Track v4.0.2 independently through each downstream channel until the public package is installable and verified; workflow submission alone is not availability evidence.
+4. Use GitHub Actions or similarly reproducible clean environments to install from the **actual 4.0.2 distribution channels** and run post-install smoke/behavioral checks. Testing an older package may rehearse the harness but is not 4.0.2 distribution evidence.
 5. Continue dogfooding platform targets and real projects. Turn concrete provider, packaging or field failures into focused regressions where practical rather than inventing a new synthetic hardening checkpoint.
 
 The homepage remains intentionally unchanged for the platform-target feature.

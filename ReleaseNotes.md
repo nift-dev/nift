@@ -1,5 +1,9 @@
 # Nift — Release Notes
 
+## v4.0.3 (development)
+
+- Development version following the v4.0.2 release.
+
 ## v4.0.2
 
 Nift 4.0.2 simplifies project initialization and adds explicit hosting-platform presets without turning Nift into a deployment/account-management tool.

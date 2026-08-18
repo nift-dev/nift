@@ -69,7 +69,7 @@ assert cfg['output-dir'] == '.amplify-hosting/static/'
 assert manifest['version'] == 1
 assert manifest['routes'] == [{'path':'/*','target':{'kind':'Static'}}]
 assert manifest['framework']['name'] == 'nift'
-assert manifest['framework']['version'] == '4.0.2'
+assert manifest['framework']['version'] == '4.0.3'
 PY
 test -f "$TMP/amplify/.amplify-hosting/static/index.html"
 grep -qxF '.amplify-hosting/static/' "$TMP/amplify/.gitignore"

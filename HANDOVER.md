@@ -20,11 +20,16 @@ whether it is a regression.
 ## Current identity
 
 - Product: **Nift**, a website generator and dependency-aware website build layer.
-- Current executable identity: `Nift v4.0.2`.
+- Current executable identity: `Nift v4.0.3` (development), following the public
+  v4.0.2 release.
 - Language/toolchain: C++17 and Make.
 - Output convention for modern projects: `public/`.
 - Current branch: `main` in this checkout.
-- Current project phase: **hardening plateau reached** after Checkpoints 0–10. The bounded 4.0.2 `init` extension/platform-target feature is implemented and its native Linux/macOS/Windows Actions contract is green. The remaining pre-release work is release/publication reconciliation; distribution-channel validation and provider dogfooding belong after the public 4.0.2 artifacts/packages exist.
+- Current project phase: **hardening plateau reached** after Checkpoints 0–10.
+  The bounded 4.0.2 `init` extension/platform-target feature is released and its
+  native Linux/macOS/Windows Actions contract is green. Current work is downstream
+  distribution verification, provider dogfooding, and evidence-driven v4.0.3
+  maintenance.
 - Public documentation: the separate `nift-dev.github.io` repository.
 - External contract: the separate `nift-regression-suite` repository.
 - Embedded minifier: `minifypp/`, synchronized with standalone Minify++.

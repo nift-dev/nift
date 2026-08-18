@@ -8,7 +8,7 @@ For documentation, examples and downloads, visit **[nift.dev](https://nift.dev)*
 
 ## Project status
 
-Nift has completed its planned Checkpoints 0–10 deliberate hardening campaign. The current development tree is `Nift v4.0.2`, and the project has moved from synthetic hardening into **distribution, dogfooding and field evidence**. Existing regression, sanitizer, filesystem, parser, incremental and cross-platform gates remain maintained; new hardening work should be driven by concrete findings or newly justified guarantees rather than arbitrary checkpoint numbers.
+Nift has completed its planned Checkpoints 0–10 deliberate hardening campaign. The current development tree is `Nift v4.0.3`, following the public v4.0.2 release, and the project has moved from synthetic hardening into **distribution, dogfooding and field evidence**. Existing regression, sanitizer, filesystem, parser, incremental and cross-platform gates remain maintained; new hardening work should be driven by concrete findings or newly justified guarantees rather than arbitrary checkpoint numbers.
 
 ## Features
 

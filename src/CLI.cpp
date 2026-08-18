@@ -29,7 +29,7 @@
 namespace fs = std::filesystem;
 
 namespace {
-constexpr const char* version_text = "Nift v4.0.2";
+constexpr const char* version_text = "Nift v4.0.3";
 constexpr auto build_auto_poll_interval = std::chrono::milliseconds(200);
 constexpr const char* build_auto_log_path = ".nift/build-auto.log";
 
@@ -482,7 +482,7 @@ bool write_target_files(const InitOptions& options) {
         manifest["routes"].push_back(route);
         manifest["framework"] = json::Document::make_object();
         manifest["framework"]["name"] = "nift";
-        manifest["framework"]["version"] = "4.0.2";
+        manifest["framework"]["version"] = "4.0.3";
         return save_json_file(".amplify-hosting/deploy-manifest.json", manifest) &&
                append_line_if_missing(".gitignore", ".amplify-hosting/static/");
     }

@@ -93,7 +93,7 @@ def check(nift: Path) -> None:
         assert manifest["version"] == 1
         assert manifest["routes"] == [{"path": "/*", "target": {"kind": "Static"}}]
         assert manifest["framework"]["name"] == "nift"
-        assert manifest["framework"]["version"] == "4.0.2"
+        assert manifest["framework"]["version"] == "4.0.3"
         assert (amplify / ".amplify-hosting/static/index.html").is_file()
 
         assert 'command = "nift build"' in (projects["netlify"] / "netlify.toml").read_text(encoding="utf-8")

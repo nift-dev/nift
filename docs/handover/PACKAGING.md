@@ -504,12 +504,14 @@ install/version result from the canonical 4.0.1 formula, and the repaired Flathu
 build/publication/install evidence. Do not rewrite the v4.0.1 GitHub
 release to close a downstream task.
 
-## v4.0.2 release-candidate record (pre-publication)
+## v4.0.2 publication record
 
 The 4.0.2 implementation state through `0368069` and its subsequent
 documentation-only readiness reconciliation were validated on 19 August 2026.
-No `v4.0.2` tag or GitHub release existed during this preparation, so downstream
-publication and final release-asset checks remain deliberately incomplete.
+The annotated `v4.0.2` tag was published at
+`596d12a102751ff5c696dd121364a7d1ef6c5be6`, and the immutable
+[GitHub release](https://github.com/nift-dev/nift/releases/tag/v4.0.2) was created
+by release run `32160738799`.
 
 Pre-release evidence:
 
@@ -545,10 +547,37 @@ Pre-release evidence:
   website source `stage` and generated `public/main` clean. The corresponding
   pushed heads were `255a5c6` and `65d3d2a` during preparation.
 
-The tag-triggered release workflow must still build and inspect the final Linux,
-macOS arm64, macOS x86-64 and statically linked Windows archives, publish the
-immutable GitHub release, and complete its downstream jobs. In particular, the
-Windows MinGW runtime-DLL check and both Homebrew formula runners are release
-workflow gates rather than locally reproduced host evidence. Homebrew ordinary
-version propagation must be left to Homebrew's automatic bump infrastructure;
-do not open a manual simple-bump pull request for 4.0.2.
+Publication evidence:
+
+- Linux x86-64, macOS arm64, macOS x86-64, and statically linked Windows x86-64
+  builds passed. The release contains exactly those four archives and
+  `SHA256SUMS`; all archives were downloaded from the public release and passed
+  independent checksum verification.
+- Final archive SHA-256 values are Linux x86-64
+  `edec01f9b28feb4fad96b09026d7d336feccd56615ee944b3cde5a8ecbe4f436`,
+  macOS arm64
+  `fa4aaa840f7b06dc299ab861d9080fcdccf2fd33a5f25442d1adca1f9aeab3d9`,
+  macOS x86-64
+  `97ce20737e29389efc37e191604f7ae030bd8094f905951f0154a28fa24e8feb`,
+  and Windows x86-64
+  `d49ab82068b70bdc1a6ea8c01a4866b54506298ed909f65cbffa261eeefff780`.
+- The immutable tagged source archive SHA-256 is
+  `fe462915db41574a58236c028c34561596751a8e91e868726a18e57210450b14`.
+  The extracted Linux archive contained only `LICENSE`, `README.md`, and `nift`;
+  its `version`, `about`, and `commands` surfaces passed.
+- Both GitHub Snap builds passed and their `Publish stable Snap` steps succeeded
+  for amd64 and arm64. Other connected-store architectures and a fresh public
+  stable installation remain external verification tasks.
+- The Chocolatey packaging/submission job passed. Community verification,
+  moderation, approval, and a fresh public install remain separate downstream
+  states.
+- The release run's two Homebrew formula jobs exposed a stale in-repository
+  smoke invocation (`nift init .html`) after the release itself was published.
+  Commit `889d5eb` changed the validation to the supported
+  `nift init --ext=.html` form. Dedicated Homebrew run `32161529965` then passed
+  on macOS arm64 and Linux x86-64 against the immutable v4.0.2 source tag. No
+  manual `Homebrew/homebrew-core` pull request was opened; ordinary propagation
+  is left exclusively to Homebrew's automatic bump infrastructure.
+- Flathub manifest advancement, public channel propagation, and clean installed
+  package tests remain downstream work and must be recorded by their actual
+  external results.
