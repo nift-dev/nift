@@ -208,3 +208,9 @@ calling the Nift work complete.
 - Checkpoint 4A retains native and sanitizer watch evidence plus the 10k worker/minification matrix under `docs/evidence/memory-safety/`.
 - `build-auto` exits after a failed watched rebuild; failure/repair cleanup therefore remains part of the repeated command-lifecycle corpus rather than the one-process watch soak.
 - Checkpoint 4B is still open pending `make valgrind-memory-safety-checkpoint-4` on Linux with Valgrind.
+
+## Checkpoint 4B Valgrind shutdown-harness correction (2026-08-18)
+
+- The first Linux/Valgrind Checkpoint 4B attempt did not produce leak evidence because `checkpoint4_watch_endurance.py` signalled only the Valgrind supervisor PID and waited four seconds; the monitored `build-auto` process could remain alive underneath it.
+- The harness now launches the monitored command in a dedicated session/process group, sends SIGINT to the whole group, allows 30 seconds for Valgrind to finalize its leak report, then escalates to SIGTERM/SIGKILL only if shutdown genuinely wedges.
+- A direct Nift probe and a synthetic supervisor+child probe both complete through the new SIGINT path. Checkpoint 4B remains pending until `make valgrind-memory-safety-checkpoint-4` is rerun on Linux with Valgrind and its JSON evidence passes.

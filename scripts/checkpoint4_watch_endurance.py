@@ -7,6 +7,8 @@ ap.add_argument("--nift",required=True)
 ap.add_argument("--cycles",type=int,default=500)
 ap.add_argument("--interval",type=float,default=0.22)
 ap.add_argument("--output",required=True)
+ap.add_argument("--shutdown-grace-seconds",type=float,default=30.0,
+                help="Grace period after SIGINT so supervisors such as Valgrind can finalize reports.")
 a=ap.parse_args()
 nift=str(pathlib.Path(a.nift).resolve())
 def git_commit():
@@ -34,7 +36,12 @@ with tempfile.TemporaryDirectory(prefix="nift-cp4-watch-") as td:
         '@json("data/state.json", state, "schemas/state.schema.json")\n'
         '<a href="$[routes.home]">$[state.name]-$[state.n]</a>\n@content\n')
     subprocess.run([nift,"build-all"],cwd=root,check=True,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True)
-    p=subprocess.Popen([nift,"build-auto"],cwd=root,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True)
+    # Use a dedicated process group/session. This matters when --nift is a
+    # supervisor such as valgrind_nift.sh: build-auto runs underneath Valgrind,
+    # and signalling only the supervisor PID can leave the monitored process
+    # alive while Valgrind waits forever for it to exit.
+    p=subprocess.Popen([nift,"build-auto"],cwd=root,stdout=subprocess.DEVNULL,
+                       stderr=subprocess.PIPE,text=True,start_new_session=True)
     samples=[]; started=time.monotonic()
     try:
         time.sleep(.8)
@@ -58,18 +65,37 @@ with tempfile.TemporaryDirectory(prefix="nift-cp4-watch-") as td:
             if i>=20 and (i%20==0 or i==a.cycles-1):
                 samples.append({"cycle":i,"rss_kib":rss_kib(p.pid)})
     finally:
+        shutdown="already-exited"
         if p.poll() is None:
-            p.send_signal(signal.SIGINT)
-            try: p.wait(timeout=4)
+            shutdown="sigint"
+            try:
+                os.killpg(p.pid, signal.SIGINT)
+            except ProcessLookupError:
+                pass
+            try:
+                p.wait(timeout=a.shutdown_grace_seconds)
             except subprocess.TimeoutExpired:
-                p.terminate(); p.wait(timeout=4)
+                shutdown="sigterm"
+                try:
+                    os.killpg(p.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
+                try:
+                    p.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    shutdown="sigkill"
+                    try:
+                        os.killpg(p.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    p.wait(timeout=5)
     vals=[x["rss_kib"] for x in samples if x["rss_kib"] is not None]
     first=vals[0] if vals else None; mid=vals[len(vals)//2] if vals else None; last=vals[-1] if vals else None
     data={"schema_version":1,"checkpoint":"4-watch","commit":git_commit(),"platform":platform.platform(),"cycles":a.cycles,"interval_seconds":a.interval,
           "elapsed_seconds":round(time.monotonic()-started,3),"rss_samples":samples,
           "warm_sample_kib":first,"mid_sample_kib":mid,"final_sample_kib":last,
           "max_sample_kib":max(vals) if vals else None,
-          "process_exit_status":p.returncode,"pass":p.returncode in (-2,130,0) and bool(vals)}
+          "process_exit_status":p.returncode,"shutdown":shutdown,"pass":p.returncode in (-2,130,0) and shutdown in ("already-exited","sigint") and bool(vals)}
     out=pathlib.Path(a.output)
     if not out.is_absolute(): out=pathlib.Path.cwd()/out
     out.parent.mkdir(parents=True,exist_ok=True); out.write_text(json.dumps(data,indent=2)+"\n")
