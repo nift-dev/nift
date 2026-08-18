@@ -201,3 +201,10 @@ calling the Nift work complete.
 - Standalone Minify++ Checkpoints 2A and 2B are complete. The independent gate used Valgrind 3.26.0 on Linux x86_64 at canonical Minify++ commit `2a51a38`: 30 lifetime-corpus iterations, 0 errors, 0 bytes in use at exit, all 2,448 allocations freed and 184,908 KiB peak Valgrind process RSS.
 - The exact evidence is mirrored under `minifypp/docs/evidence/` so Nift's vendored component record remains synchronized with the canonical standalone checkpoint. This is still component evidence, not a Nift lifecycle/resource verdict.
 - The memory campaign now advances to Nift core command/state/failure-recovery lifetimes. Long-duration watch/10k endurance remains later, and sustained component-integration ownership stress remains reserved for the cross-project checkpoint.
+
+## Memory-safety Checkpoints 3 and 4A (2026-08-18)
+
+- Checkpoint 3 core lifecycle evidence is retained under `docs/evidence/memory-safety/checkpoint-3-core.json`; 57 sanitizer-backed lifecycle/test phases passed without ASan/LSan/UBSan findings.
+- Checkpoint 4A retains native and sanitizer watch evidence plus the 10k worker/minification matrix under `docs/evidence/memory-safety/`.
+- `build-auto` exits after a failed watched rebuild; failure/repair cleanup therefore remains part of the repeated command-lifecycle corpus rather than the one-process watch soak.
+- Checkpoint 4B is still open pending `make valgrind-memory-safety-checkpoint-4` on Linux with Valgrind.

@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "checkpoint": "4-large-project",
+  "commit": "0d2b07ff11ceced214ae2e9a969286cac11a76ab",
+  "platform": "Linux-6.18.35-x86_64-with-glibc2.41",
+  "pages": 10000,
+  "cases": [
+    {
+      "workers": 1,
+      "minify": false,
+      "full_peak_rss_kib": 10852,
+      "noop_peak_rss_kib": 10788,
+      "single_peak_rss_kib": 10808,
+      "shared_peak_rss_kib": 10916
+    },
+    {
+      "workers": 4,
+      "minify": false,
+      "full_peak_rss_kib": 10940,
+      "noop_peak_rss_kib": 10808,
+      "single_peak_rss_kib": 10860,
+      "shared_peak_rss_kib": 11632
+    },
+    {
+      "workers": -1,
+      "minify": false,
+      "full_peak_rss_kib": 10964,
+      "noop_peak_rss_kib": 10852,
+      "single_peak_rss_kib": 10936,
+      "shared_peak_rss_kib": 11932
+    },
+    {
+      "workers": 4,
+      "minify": true,
+      "full_peak_rss_kib": 10896,
+      "noop_peak_rss_kib": 10868,
+      "single_peak_rss_kib": 10904,
+      "shared_peak_rss_kib": 11436
+    }
+  ],
+  "pass": true
+}

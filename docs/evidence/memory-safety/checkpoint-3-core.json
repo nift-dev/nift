@@ -1,0 +1,731 @@
+{
+  "schema_version": 1,
+  "checkpoint": "3",
+  "commit": "d5eaa7344871c7192d8be8ac6d16e92192ca55c7",
+  "platform": "Linux-6.18.35-x86_64-with-glibc2.41",
+  "rounds": 4,
+  "commands": 57,
+  "pass": true,
+  "runs": [
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "init",
+        ".html"
+      ],
+      "cwd": "/tmp/nift-cp3-8njsel62",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.021351,
+      "stdout_tail": "\ud83d\udce6 3 pages built successfully",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "track",
+        "a",
+        "A0"
+      ],
+      "cwd": "/tmp/nift-cp3-8njsel62",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.016734,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "cp",
+        "a",
+        "b"
+      ],
+      "cwd": "/tmp/nift-cp3-8njsel62",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.015557,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "mv",
+        "b",
+        "c"
+      ],
+      "cwd": "/tmp/nift-cp3-8njsel62",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.017107,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "build-all"
+      ],
+      "cwd": "/tmp/nift-cp3-8njsel62",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.019876,
+      "stdout_tail": "\ud83d\udce6 5 pages built successfully\ntime taken: 0.005896 seconds",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "build"
+      ],
+      "cwd": "/tmp/nift-cp3-8njsel62",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.016927,
+      "stdout_tail": "\u2713 5 tracked pages are up to date\ntime taken: 0.003727 seconds",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "status"
+      ],
+      "cwd": "/tmp/nift-cp3-8njsel62",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.018448,
+      "stdout_tail": "Nift status\n\u2713 all 5 tracked pages are up to date",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "build-all"
+      ],
+      "cwd": "/tmp/nift-cp3-8njsel62",
+      "exit_status": 1,
+      "expected": 1,
+      "elapsed_seconds": 0.019346,
+      "stdout_tail": "2 of 5 pages built successfully\ntime taken: 0.005564 seconds",
+      "stderr_tail": "    @input('missing-partial.html')\n    ^\nerror: while building a\n  templates/template.html:1:1\n  @input path does not exist: missing-partial.html\n    @input('missing-partial.html')\n    ^\nerror: while building /\n  templates/template.html:1:1\n  @input path does not exist: missing-partial.html\n    @input('missing-partial.html')\n    ^"
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "build-updated"
+      ],
+      "cwd": "/tmp/nift-cp3-8njsel62",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.022015,
+      "stdout_tail": "built /\n    \u21b3 dependency changed: templates/template.html\nbuilt a\n    \u21b3 dependency changed: templates/template.html\nbuilt c\n    \u21b3 dependency changed: templates/template.html\n\ud83d\udce6 3 pages rebuilt successfully\ntime taken: 0.008494 seconds",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "untrack",
+        "c"
+      ],
+      "cwd": "/tmp/nift-cp3-8njsel62",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.016225,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "rm",
+        "a"
+      ],
+      "cwd": "/tmp/nift-cp3-8njsel62",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.015263,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "info-all"
+      ],
+      "cwd": "/tmp/nift-cp3-8njsel62",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.019209,
+      "stdout_tail": "      \"content-path\": \"content/assets/js/script.js\",\n      \"output-path\": \"public/assets/js/script.js\",\n      \"content-ext\": \".js\",\n      \"output-ext\": \".js\",\n      \"minify\": false\n    }\n  ]\n}",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "init",
+        ".html"
+      ],
+      "cwd": "/tmp/nift-cp3-z5fjmtj6",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.020676,
+      "stdout_tail": "\ud83d\udce6 3 pages built successfully",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "track",
+        "a",
+        "A1"
+      ],
+      "cwd": "/tmp/nift-cp3-z5fjmtj6",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.016416,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "cp",
+        "a",
+        "b"
+      ],
+      "cwd": "/tmp/nift-cp3-z5fjmtj6",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.016269,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "mv",
+        "b",
+        "c"
+      ],
+      "cwd": "/tmp/nift-cp3-z5fjmtj6",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.017141,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "build-all"
+      ],
+      "cwd": "/tmp/nift-cp3-z5fjmtj6",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.019427,
+      "stdout_tail": "\ud83d\udce6 5 pages built successfully\ntime taken: 0.006213 seconds",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "build"
+      ],
+      "cwd": "/tmp/nift-cp3-z5fjmtj6",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.016717,
+      "stdout_tail": "\u2713 5 tracked pages are up to date\ntime taken: 0.003751 seconds",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "status"
+      ],
+      "cwd": "/tmp/nift-cp3-z5fjmtj6",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.019102,
+      "stdout_tail": "Nift status\n\u2713 all 5 tracked pages are up to date",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "build-all"
+      ],
+      "cwd": "/tmp/nift-cp3-z5fjmtj6",
+      "exit_status": 1,
+      "expected": 1,
+      "elapsed_seconds": 0.018626,
+      "stdout_tail": "2 of 5 pages built successfully\ntime taken: 0.00447 seconds",
+      "stderr_tail": "    @input('missing-partial.html')\n    ^\nerror: while building a\n  templates/template.html:1:1\n  @input path does not exist: missing-partial.html\n    @input('missing-partial.html')\n    ^\nerror: while building c\n  templates/template.html:1:1\n  @input path does not exist: missing-partial.html\n    @input('missing-partial.html')\n    ^"
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "build-updated"
+      ],
+      "cwd": "/tmp/nift-cp3-z5fjmtj6",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.023582,
+      "stdout_tail": "built /\n    \u21b3 dependency changed: templates/template.html\nbuilt a\n    \u21b3 dependency changed: templates/template.html\nbuilt c\n    \u21b3 dependency changed: templates/template.html\n\ud83d\udce6 3 pages rebuilt successfully\ntime taken: 0.008269 seconds",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "untrack",
+        "c"
+      ],
+      "cwd": "/tmp/nift-cp3-z5fjmtj6",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.015236,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "rm",
+        "a"
+      ],
+      "cwd": "/tmp/nift-cp3-z5fjmtj6",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.017786,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "info-all"
+      ],
+      "cwd": "/tmp/nift-cp3-z5fjmtj6",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.016113,
+      "stdout_tail": "      \"content-path\": \"content/assets/js/script.js\",\n      \"output-path\": \"public/assets/js/script.js\",\n      \"content-ext\": \".js\",\n      \"output-ext\": \".js\",\n      \"minify\": false\n    }\n  ]\n}",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "init",
+        ".html"
+      ],
+      "cwd": "/tmp/nift-cp3-rseivm22",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.020539,
+      "stdout_tail": "\ud83d\udce6 3 pages built successfully",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "track",
+        "a",
+        "A2"
+      ],
+      "cwd": "/tmp/nift-cp3-rseivm22",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.015389,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "cp",
+        "a",
+        "b"
+      ],
+      "cwd": "/tmp/nift-cp3-rseivm22",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.015964,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "mv",
+        "b",
+        "c"
+      ],
+      "cwd": "/tmp/nift-cp3-rseivm22",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.016398,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "build-all"
+      ],
+      "cwd": "/tmp/nift-cp3-rseivm22",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.095366,
+      "stdout_tail": "\ud83d\udce6 5 pages built successfully\ntime taken: 0.060935 seconds",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "build"
+      ],
+      "cwd": "/tmp/nift-cp3-rseivm22",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.067652,
+      "stdout_tail": "\u2713 5 tracked pages are up to date\ntime taken: 0.00657 seconds",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "status"
+      ],
+      "cwd": "/tmp/nift-cp3-rseivm22",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.020803,
+      "stdout_tail": "Nift status\n\u2713 all 5 tracked pages are up to date",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "build-all"
+      ],
+      "cwd": "/tmp/nift-cp3-rseivm22",
+      "exit_status": 1,
+      "expected": 1,
+      "elapsed_seconds": 0.021693,
+      "stdout_tail": "2 of 5 pages built successfully\ntime taken: 0.005565 seconds",
+      "stderr_tail": "    @input('missing-partial.html')\n    ^\nerror: while building c\n  templates/template.html:1:1\n  @input path does not exist: missing-partial.html\n    @input('missing-partial.html')\n    ^\nerror: while building a\n  templates/template.html:1:1\n  @input path does not exist: missing-partial.html\n    @input('missing-partial.html')\n    ^"
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "build-updated"
+      ],
+      "cwd": "/tmp/nift-cp3-rseivm22",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.023955,
+      "stdout_tail": "built /\n    \u21b3 dependency changed: templates/template.html\nbuilt a\n    \u21b3 dependency changed: templates/template.html\nbuilt c\n    \u21b3 dependency changed: templates/template.html\n\ud83d\udce6 3 pages rebuilt successfully\ntime taken: 0.007969 seconds",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "untrack",
+        "c"
+      ],
+      "cwd": "/tmp/nift-cp3-rseivm22",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.018382,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "rm",
+        "a"
+      ],
+      "cwd": "/tmp/nift-cp3-rseivm22",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.017121,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "info-all"
+      ],
+      "cwd": "/tmp/nift-cp3-rseivm22",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.016482,
+      "stdout_tail": "      \"content-path\": \"content/assets/js/script.js\",\n      \"output-path\": \"public/assets/js/script.js\",\n      \"content-ext\": \".js\",\n      \"output-ext\": \".js\",\n      \"minify\": false\n    }\n  ]\n}",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "init",
+        ".html"
+      ],
+      "cwd": "/tmp/nift-cp3-ckav2asu",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.021566,
+      "stdout_tail": "\ud83d\udce6 3 pages built successfully",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "track",
+        "a",
+        "A3"
+      ],
+      "cwd": "/tmp/nift-cp3-ckav2asu",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.016052,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "cp",
+        "a",
+        "b"
+      ],
+      "cwd": "/tmp/nift-cp3-ckav2asu",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.017391,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "mv",
+        "b",
+        "c"
+      ],
+      "cwd": "/tmp/nift-cp3-ckav2asu",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.017193,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "build-all"
+      ],
+      "cwd": "/tmp/nift-cp3-ckav2asu",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.02263,
+      "stdout_tail": "\ud83d\udce6 5 pages built successfully\ntime taken: 0.005954 seconds",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "build"
+      ],
+      "cwd": "/tmp/nift-cp3-ckav2asu",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.01886,
+      "stdout_tail": "\u2713 5 tracked pages are up to date\ntime taken: 0.004957 seconds",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "status"
+      ],
+      "cwd": "/tmp/nift-cp3-ckav2asu",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.018518,
+      "stdout_tail": "Nift status\n\u2713 all 5 tracked pages are up to date",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "build-all"
+      ],
+      "cwd": "/tmp/nift-cp3-ckav2asu",
+      "exit_status": 1,
+      "expected": 1,
+      "elapsed_seconds": 0.019252,
+      "stdout_tail": "2 of 5 pages built successfully\ntime taken: 0.005205 seconds",
+      "stderr_tail": "    @input('missing-partial.html')\n    ^\nerror: while building a\n  templates/template.html:1:1\n  @input path does not exist: missing-partial.html\n    @input('missing-partial.html')\n    ^\nerror: while building /\n  templates/template.html:1:1\n  @input path does not exist: missing-partial.html\n    @input('missing-partial.html')\n    ^"
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "build-updated"
+      ],
+      "cwd": "/tmp/nift-cp3-ckav2asu",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.025427,
+      "stdout_tail": "built /\n    \u21b3 dependency changed: templates/template.html\nbuilt a\n    \u21b3 dependency changed: templates/template.html\nbuilt c\n    \u21b3 dependency changed: templates/template.html\n\ud83d\udce6 3 pages rebuilt successfully\ntime taken: 0.010763 seconds",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "untrack",
+        "c"
+      ],
+      "cwd": "/tmp/nift-cp3-ckav2asu",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.017151,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "rm",
+        "a"
+      ],
+      "cwd": "/tmp/nift-cp3-ckav2asu",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.01607,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift/.build/nift-sanitize",
+        "info-all"
+      ],
+      "cwd": "/tmp/nift-cp3-ckav2asu",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.015376,
+      "stdout_tail": "      \"content-path\": \"content/assets/js/script.js\",\n      \"output-path\": \"public/assets/js/script.js\",\n      \"content-ext\": \".js\",\n      \"output-ext\": \".js\",\n      \"minify\": false\n    }\n  ]\n}",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "bash",
+        "tests/persistence_concurrency_failure_smoke.sh"
+      ],
+      "cwd": "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.837762,
+      "stdout_tail": "Persistence/concurrency/failed-build-state smoke test passed",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "bash",
+        "tests/incremental_new_features_smoke.sh"
+      ],
+      "cwd": "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 9.606202,
+      "stdout_tail": "New-feature incremental modes smoke test passed",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "bash",
+        "tests/contracts_smoke.sh"
+      ],
+      "cwd": "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 8.658565,
+      "stdout_tail": "Project contracts smoke test passed",
+      "stderr_tail": "  File \"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/rpc/client.py\", line 150, in call\nartifact_tool.rpc.client.RemoteError: hydrateCrdtFromProto requires an empty collaborative document.\nSpreadsheet runtime warmup failed during python startup\nTraceback (most recent call last):\n  File \"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/patches/warm_spreadsheet_runtime_on_startup.py\", line 26, in warm_spreadsheet_runtime_on_startup\n  File \"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/spreadsheet_warmup.py\", line 785, in warm_spreadsheet_runtime\n  File \"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/spreadsheet_warmup.py\", line 720, in _warm_feature_flows\n  File \"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/spreadsheet_warmup.py\", line 704, in _warm_collaboration_flows\n  File \"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/generated/interface/models.py\", line 32317, in hydrate_crdt_from_proto\n  File \"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/rpc/remote.py\", line 749, in __call__\n  File \"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/rpc/client.py\", line 150, in call\nartifact_tool.rpc.client.RemoteError: hydrateCrdtFromProto requires an empty collaborative document."
+    },
+    {
+      "command": [
+        "bash",
+        "tests/json_schema_integration_smoke.sh"
+      ],
+      "cwd": "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.191724,
+      "stdout_tail": "JSON Schema integration smoke test passed",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "bash",
+        "tests/minify_integration_smoke.sh"
+      ],
+      "cwd": "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.691276,
+      "stdout_tail": "Minifier integration smoke test passed",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "bash",
+        "tests/requirements_smoke.sh"
+      ],
+      "cwd": "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.344003,
+      "stdout_tail": "Requirements smoke test passed",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "bash",
+        "tests/path_safety_smoke.sh"
+      ],
+      "cwd": "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.234607,
+      "stdout_tail": "Path safety smoke test passed",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "bash",
+        "tests/template_optional_smoke.sh"
+      ],
+      "cwd": "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.203203,
+      "stdout_tail": "Optional tracked template smoke test passed",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "bash",
+        "tests/cross_feature_smoke.sh"
+      ],
+      "cwd": "/mnt/data/cp34/work/nift-dev-memory-safety-checkpoint-1b-complete/nift",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 8.853851,
+      "stdout_tail": "Cross-feature smoke test passed",
+      "stderr_tail": "  File \"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/rpc/client.py\", line 150, in call\nartifact_tool.rpc.client.RemoteError: hydrateCrdtFromProto requires an empty collaborative document.\nSpreadsheet runtime warmup failed during python startup\nTraceback (most recent call last):\n  File \"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/patches/warm_spreadsheet_runtime_on_startup.py\", line 26, in warm_spreadsheet_runtime_on_startup\n  File \"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/spreadsheet_warmup.py\", line 785, in warm_spreadsheet_runtime\n  File \"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/spreadsheet_warmup.py\", line 720, in _warm_feature_flows\n  File \"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/spreadsheet_warmup.py\", line 704, in _warm_collaboration_flows\n  File \"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/generated/interface/models.py\", line 32317, in hydrate_crdt_from_proto\n  File \"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/rpc/remote.py\", line 749, in __call__\n  File \"/tmp/tmp.L2TH2Y5coc/artifact_tool_v2-2.8.22/artifact_tool/rpc/client.py\", line 150, in call\nartifact_tool.rpc.client.RemoteError: hydrateCrdtFromProto requires an empty collaborative document."
+    }
+  ]
+}

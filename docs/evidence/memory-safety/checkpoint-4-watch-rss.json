@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "checkpoint": "4-watch",
+  "commit": "d5eaa7344871c7192d8be8ac6d16e92192ca55c7",
+  "platform": "Linux-6.18.35-x86_64-with-glibc2.41",
+  "cycles": 180,
+  "interval_seconds": 0.22,
+  "elapsed_seconds": 40.494,
+  "rss_samples": [
+    {
+      "cycle": 20,
+      "rss_kib": 6332
+    },
+    {
+      "cycle": 40,
+      "rss_kib": 6356
+    },
+    {
+      "cycle": 60,
+      "rss_kib": 6324
+    },
+    {
+      "cycle": 80,
+      "rss_kib": 6304
+    },
+    {
+      "cycle": 100,
+      "rss_kib": 6216
+    },
+    {
+      "cycle": 120,
+      "rss_kib": 6272
+    },
+    {
+      "cycle": 140,
+      "rss_kib": 6276
+    },
+    {
+      "cycle": 160,
+      "rss_kib": 6292
+    },
+    {
+      "cycle": 179,
+      "rss_kib": 5976
+    }
+  ],
+  "warm_sample_kib": 6332,
+  "mid_sample_kib": 6216,
+  "final_sample_kib": 5976,
+  "max_sample_kib": 6356,
+  "process_exit_status": -2,
+  "pass": true
+}
