@@ -329,3 +329,8 @@ calling the Nift work complete.
 - Checkpoints 7–9 were rerun after the change and remain green: 720 incremental-equivalence comparisons, 13 filesystem/transaction cases and 1,217 sanitizer-backed parser/resource cases.
 - Exact run/artifact identities, SHA-256 archive digests, scope, findings and limitations are retained in `docs/evidence/checkpoint-10/cross-platform-equivalence.json`.
 - The deliberate hardening sequence is now at its planned plateau. Future emphasis moves to distribution, real-world dogfooding, field exposure and evidence-driven work; do not invent Checkpoint 11 by default.
+
+## v4.0.3 shorthand ternary follow-up (2026-08-19)
+
+- Lazy ternary rendering now also accepts `$[condition ? true-branch]` as shorthand for an empty false branch. The condition is still evaluated by the same condition evaluator as `@if`, and the true branch is parsed only when selected; a false shorthand branch produces no output and no dependency/requirement side effects.
+- The source-tree and independent black-box control-flow contracts cover selected/unselected shorthand branches, nested shorthand ternaries and lazy dependency behavior.
