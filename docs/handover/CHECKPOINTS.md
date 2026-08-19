@@ -2497,3 +2497,19 @@ And I particularly like one criterion from the handover as the practical definit
 > **Would I tell another developer or agent, “Start from here”?**
 
 If yes, we've probably reached a real checkpoint. If the answer is “well, use this version, but don't touch watch mode yet, ignore these three unexplained failures, and the docs describe the previous behavior,” then we haven't.
+
+## v4.0.3 development checkpoints (2026-08-19)
+
+0. Baseline + contract freeze for the bounded v4.0.3 programme.
+1. Exactly-one executed `@content` contract.
+2. Condition language: short-circuit `&&` / `||` (retain `!`; parentheses if clean).
+3. Lazy ternary expressions using the shared condition evaluator.
+4. `@join`.
+5. UTF-8-safe `@substr(value, pos, length)`.
+6. Pagination contract + single-threaded semantics.
+7. Pagination lifecycle/persistence/transactionality.
+8. Multithreaded pagination.
+9. `nift.dev/install` installer.
+10. Strict Snap edge/candidate experiment.
+11. Full hardening/equivalence reconciliation.
+12. Website/release reconciliation, committing generated public/master before source stage.

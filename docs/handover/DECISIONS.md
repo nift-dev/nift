@@ -171,3 +171,22 @@ Configured contract namespaces are reserved project-wide and cannot be shadowed 
 The design rule is contract-first: state the guarantee, prove Nift can enforce it simply, check whether existing primitives already satisfy it, and only then add the smallest feature. Generalize contract philosophy before generic contract syntax.
 
 **Revisit if:** real projects demonstrate a need for richer contract source validation or a second contract class whose semantics cannot be expressed cleanly through this mechanism. Do not add arbitrary dynamic directives merely for extensibility.
+
+## v4.0.3 bounded language/distribution programme
+
+**Status:** ACTIVE CONTRACT-FIRST WORK (2026-08-19)
+
+The next development sequence is intentionally limited to templating/artifact-generation capability and distribution UX. Each checkpoint must establish tests before implementation and commit at its boundary.
+
+- Templated tracked items must execute exactly one `@content` across the executed template/`@input` graph. Comments and skipped branches do not count. Template-less tracked items remain direct content renders.
+- Conditions retain `!` and will add short-circuit `&&`/`||` with ordinary precedence; ternary uses the same evaluator.
+- Ternary is `$[condition ? true-branch : false-branch]`: only the selected branch is parsed as ordinary Nift source; the other branch is inert.
+- `@join(array, separator)` is a deliberately small presentation helper, not a query pipeline.
+- `@substr(value, pos, length)` is zero-based and length-based; UTF-8/code-point safety is required rather than byte-splitting text.
+- Pagination is opt-in metadata on a tracked entry. `items-per-page` is required; an explicit pagination template path may be supplied, otherwise `<content-stem>.paginate.html` is required. An explicit separator may be supplied; otherwise `<content-stem>.separator.html` is optional. Explicit paths win over conventional siblings.
+- Paginated content may execute `@item{...}` before or after the single required `@paginate`. Items render/capture immediately. Per-page pagination templates receive `$[paginate.items]`, `$[paginate.current]`, `$[paginate.total]`, `$[paginate.first]`, `$[paginate.last]`, `$[paginate.previous]`, `$[paginate.next]`; `@pathtopage(n)` resolves generated page links.
+- One tracked paginated item is one incremental unit: any relevant change rebuilds its complete page set. Page rendering should be parallelized, but output/state commit must remain deterministic and transactional. Naming is `blog.html`, `blog-2.html`, ... and index-style `blog/index.html`, `blog/2.html`, ... .
+- Zero pagination items is valid and still produces the primary page with an empty `$[paginate.items]`.
+- Distribution work includes an evidence-backed `curl -fsSL https://nift.dev/install | bash` path and an experimental strict-confined Snap in a non-stable channel before any stable promotion.
+
+Do not use this programme as authorization to restore old Nift's general scripting/runtime surface.
