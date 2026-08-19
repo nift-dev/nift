@@ -78,6 +78,9 @@ test-control-flow: $(TARGET)
 test-pagination: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/pagination_smoke.sh
 
+test-installer:
+	tests/install_script_smoke.sh
+
 test-requirements: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/requirements_smoke.sh
 
