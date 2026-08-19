@@ -209,7 +209,7 @@ jobs:
         shell: bash
         run: |
           sudo snap remove nift >/dev/null 2>&1 || true
-          sudo snap install nift --classic --channel=latest/stable
+          sudo snap install nift --channel=latest/stable
       - name: Smoke public Snap package
         shell: bash
         run: |

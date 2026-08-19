@@ -77,9 +77,15 @@ of the following deliberately:
 - `nift-X.Y.Z-windows-x86_64.zip`
 - `SHA256SUMS`
 
-The workflow creates the GitHub release only after all platform jobs succeed.
-This is build automation, not evidence that every release-candidate gate has
-been performed; record that evidence before tagging.
+The workflow creates the GitHub release only after all platform jobs succeed and
+the installer preflight passes (`sh -n packaging/install.sh` plus
+`make test-installer`). After publication, `installer-public-smoke` fetches the
+actual `https://nift.dev/install`, requires it to be byte-identical to the tagged
+`packaging/install.sh`, installs the exact tagged release through that public
+script on Linux x86-64, macOS ARM64 and macOS x86-64, and exercises `nift init`,
+`nift build` and `nift status` in a fresh project. This is build/distribution
+automation, not evidence that every release-candidate gate has been performed;
+record that evidence before tagging.
 
 Published release assets are immutable inputs to downstream package managers.
 Once a GitHub release exists, `release.yml` deliberately leaves its assets
@@ -93,9 +99,11 @@ files at the same URLs.
 
 The Snap is named `nift` and supports every architecture currently listed by
 Snapcraft's Launchpad remote-build service: amd64, arm64, armhf, ppc64el,
-riscv64, and s390x. It runs `usr/bin/nift`, uses classic confinement because
-Nift is a CLI build tool operating on arbitrary user projects, and builds the
-same portable C++ source through its Makefile. An architecture-specific build
+riscv64, and s390x. It runs `usr/bin/nift`. For v4.0.3 the recipe is staged
+with strict confinement and the `home` interface; this must be proven with the
+Store `edge` artifact against ordinary projects and their project-local `.nift/`
+state before promotion. It builds the same portable C++ source through its
+Makefile. An architecture-specific build
 failure is a packaging defect to fix, not a reason to narrow the intended support
 claim pre-emptively.
 `snap.yml` builds on relevant pull requests and is called by `release.yml` after
@@ -125,7 +133,7 @@ take much longer than the other builders.
 
 Before a stable release, install the produced `.snap` on a clean representative
 host and exercise version/help, project creation, a real build, dependency
-tracking, and filesystem behavior under classic confinement.
+tracking, and filesystem behavior under the configured confinement, including project-local `.nift/` state.
 
 ## Chocolatey
 
@@ -322,7 +330,11 @@ evidence for the release report.
 2. Create the approved signed or annotated `vX.Y.Z` tag at the validated commit
    and push that tag to `nift-dev/nift`.
 3. Watch `.github/workflows/release.yml`. All Linux, macOS and Windows artifact
-   jobs must succeed before the GitHub release is created.
+   jobs plus `installer-preflight` must succeed before the GitHub release is
+   created. After publication, require `installer-public-smoke` to pass on Linux
+   x86-64, macOS ARM64 and macOS x86-64; this proves the live nift.dev script
+   matches the tag, verifies the release checksum and can initialize/build a
+   fresh project using the installed binary.
 4. Confirm the release contains exactly the expected four platform archives and
    `SHA256SUMS`, and that each archive name and embedded executable version match
    `X.Y.Z`.
@@ -348,7 +360,7 @@ evidence for the release report.
    substantially longer. Legacy i386 is not a supported core24/Launchpad target.
 5. Install the exact `edge` or candidate revision on a clean representative host
    and test version/help, project creation, a real build, dependency tracking and
-   filesystem access under classic confinement.
+   filesystem access under strict confinement, especially project-local `.nift/` state.
 6. Promote to candidate/stable only with explicit approval. Confirm `snap info
    nift` reports `X.Y.Z` on the intended channel and perform a fresh store install.
 

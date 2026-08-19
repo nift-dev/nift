@@ -68,9 +68,18 @@ jobs:
           name: windows-x86_64
           path: nift-*.zip
 
+  installer-preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate installer
+        run: |
+          sh -n packaging/install.sh
+          make test-installer
+
   publish:
     if: github.event_name == 'push'
-    needs: [unix, windows]
+    needs: [unix, windows, installer-preflight]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -90,6 +99,40 @@ jobs:
           else
             gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --generate-notes
           fi
+
+  installer-public-smoke:
+    needs: publish
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            platform: linux-x86_64
+          - runner: macos-15
+            platform: macos-arm64
+          - runner: macos-15-intel
+            platform: macos-x86_64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch and verify public installer
+        shell: bash
+        run: |
+          curl --retry 5 --retry-all-errors --retry-delay 2 -fsSL https://nift.dev/install -o /tmp/nift-install.sh
+          cmp packaging/install.sh /tmp/nift-install.sh
+          sh -n /tmp/nift-install.sh
+      - name: Install tagged release through public installer
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          install_dir="$RUNNER_TEMP/nift-bin"
+          NIFT_VERSION="$version" NIFT_INSTALL_DIR="$install_dir" sh /tmp/nift-install.sh
+          test "$("$install_dir/nift" version | sed -E 's/^Nift v([^ ]+).*/\1/')" = "$version"
+          project="$RUNNER_TEMP/nift-installer-smoke"
+          mkdir -p "$project"
+          cd "$project"
+          "$install_dir/nift" init
+          "$install_dir/nift" build
+          "$install_dir/nift" status
 
   chocolatey:
     needs: publish
