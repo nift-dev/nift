@@ -21,6 +21,12 @@ struct Config {
     int build_threads = -1;
 };
 
+struct PaginationConfig {
+    std::size_t items_per_page = 0;
+    std::optional<std::string> template_path;
+    std::optional<std::string> separator_path;
+};
+
 struct TrackedInfo {
     std::string name;
     std::string title;
@@ -28,6 +34,7 @@ struct TrackedInfo {
     std::string content_ext;
     std::string output_ext;
     std::optional<bool> minify;
+    std::optional<PaginationConfig> paginate;
 };
 
 struct BuildError {
@@ -53,6 +60,9 @@ struct RenderResult {
     BuildError error;
     std::set<std::string> dependencies;
     std::set<std::string> reqs;
+    std::vector<std::string> pagination_items;
+    std::vector<std::string> pagination_outputs;
+    std::size_t paginate_count = 0;
 };
 
 struct WatchExtension {

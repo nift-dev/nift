@@ -791,7 +791,7 @@ int run_cli(int argc, char** argv) {
         const std::string title = argc > 3 ? argv[3] : fs::path(name).filename().string();
         const std::string templ = argc > 4 ? argv[4] : project.config.default_template;
         if (title.empty() || templ.empty()) { console::error("name, title and template path must be non-empty"); return 1; }
-        TrackedInfo candidate{name, title, templ, "", "", std::nullopt};
+        TrackedInfo candidate{name, title, templ, "", "", std::nullopt, std::nullopt};
         if (project.conflicts_with_tracked_path(candidate)) {
             console::error("tracked name resolves to a content/output path already managed by another tracked name");
             return 1;

@@ -624,7 +624,10 @@ bool Parser::interpolate_parameter(const std::string& parameter,
         }
 
         const std::string expression = parameter.substr(i + 2, end - i - 2);
-        if (built_in_metadata_name(expression)) {
+        std::shared_ptr<const json::Document> pagination_value;
+        if (resolve_pagination_value(expression, pagination_value)) {
+            resolved += pagination_value->is_string() ? pagination_value->string : pagination_value->dump(0);
+        } else if (built_in_metadata_name(expression)) {
             resolved += metadata(expression);
         } else {
             std::string value;
@@ -642,6 +645,48 @@ bool Parser::interpolate_parameter(const std::string& parameter,
         i = end + 1;
     }
     return true;
+}
+
+bool Parser::resolve_pagination_value(const std::string& expression,
+                                      std::shared_ptr<const json::Document>& value) const {
+    if (!pagination_context_active_) return false;
+    if (expression == "paginate.items") value = std::make_shared<const json::Document>(pagination_items_text_);
+    else if (expression == "paginate.current") value = std::make_shared<const json::Document>(static_cast<double>(pagination_current_));
+    else if (expression == "paginate.total") value = std::make_shared<const json::Document>(static_cast<double>(pagination_total_));
+    else if (expression == "paginate.first") value = std::make_shared<const json::Document>(pagination_current_ == 1);
+    else if (expression == "paginate.last") value = std::make_shared<const json::Document>(pagination_current_ == pagination_total_);
+    else if (expression == "paginate.previous") value = std::make_shared<const json::Document>(static_cast<double>(pagination_current_ > 1 ? pagination_current_ - 1 : 1));
+    else if (expression == "paginate.next") value = std::make_shared<const json::Document>(static_cast<double>(pagination_current_ < pagination_total_ ? pagination_current_ + 1 : pagination_total_));
+    else return false;
+    return true;
+}
+
+std::string Parser::path_to_page(std::size_t page) {
+    if (!pagination_context_active_ || !tracked_info_.paginate.has_value()) {
+        result_.ok = false;
+        result_.error = {tracked_info_.name, {}, 0, "pathtopage: only available while rendering pagination"};
+        return {};
+    }
+    if (page < 1 || page > pagination_total_) {
+        result_.ok = false;
+        result_.error = {tracked_info_.name, {}, 0, "pathtopage: page must be between 1 and " + std::to_string(pagination_total_)};
+        return {};
+    }
+    const fs::path destination = project_.pagination_output_path(tracked_info_, page);
+    const fs::path base = pagination_current_output_.empty()
+        ? project_.output_path(tracked_info_).parent_path()
+        : pagination_current_output_.parent_path();
+    if (page == 1 && (tracked_info_.name == "/" || (!tracked_info_.name.empty() && tracked_info_.name.back() == '/'))) {
+        fs::path relative_path = destination.parent_path().lexically_normal().lexically_relative(base.lexically_normal());
+        std::string relative = relative_path.empty() ? destination.parent_path().generic_string() : relative_path.generic_string();
+        if (relative.empty() || relative == ".") return "./";
+        if (relative.back() != '/') relative += '/';
+        return relative;
+    }
+    fs::path relative_path = destination.lexically_normal().lexically_relative(base.lexically_normal());
+    std::string relative = relative_path.empty() ? destination.generic_string() : relative_path.generic_string();
+    if (relative.find('/') == std::string::npos && relative.rfind("..", 0) != 0) relative = "./" + relative;
+    return relative;
 }
 
 bool Parser::scalar_literal(const std::string& text, json::Document& value, std::string& error) const {
@@ -693,6 +738,7 @@ bool Parser::evaluate_condition(const std::string& expression, bool& value, std:
     auto resolve_operand = [&](const std::string& operand,
                                std::shared_ptr<const json::Document>& document) -> bool {
         const std::string trimmed = trim_copy(operand);
+        if (resolve_pagination_value(trimmed, document)) return true;
         std::string local_error;
         if (resolve_json_value(trimmed, document, local_error)) {
             if (!local_error.empty()) error = local_error;
@@ -1022,6 +1068,13 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     continue;
                 }
 
+                std::shared_ptr<const json::Document> pagination_value;
+                if (resolve_pagination_value(trim_copy(key), pagination_value)) {
+                    output += pagination_value->is_string() ? pagination_value->string : pagination_value->dump(0);
+                    i = end + 1;
+                    continue;
+                }
+
                 const std::string metadata_value = metadata(key);
                 const bool known_metadata = built_in_metadata_name(key);
 
@@ -1043,6 +1096,33 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     continue;
                 }
             }
+        }
+
+        if (source.compare(i, 5, "@item") == 0 &&
+            (i + 5 == source.size() || source[i + 5] == '{' || std::isspace(static_cast<unsigned char>(source[i + 5])))) {
+            if (!pagination_collecting_) { fail(source_path, source, i, "@item requires pagination on the tracked item"); break; }
+            std::size_t block_open = i + 5;
+            while (block_open < source.size() && std::isspace(static_cast<unsigned char>(source[block_open]))) ++block_open;
+            if (block_open >= source.size() || source[block_open] != '{') { fail(source_path, source, i, "@item must be followed by a '{...}' block"); break; }
+            std::size_t block_close = 0;
+            if (!find_balanced(source, block_open, '{', '}', block_close)) { fail(source_path, source, block_open, "@item block has no matching '}'"); break; }
+            const auto body = normalize_control_block_body(source.substr(block_open + 1, block_close - block_open - 1));
+            push_json_scope();
+            const auto nested = parse(body.text, source_path, depth + 1);
+            pop_json_scope();
+            if (!nested.ok) break;
+            result_.pagination_items.push_back(nested.output);
+            i = block_close + 1;
+            continue;
+        }
+
+        if (source.compare(i, 9, "@paginate") == 0 &&
+            (i + 9 == source.size() || !(std::isalnum(static_cast<unsigned char>(source[i + 9])) || source[i + 9] == '_'))) {
+            if (!pagination_collecting_) { fail(source_path, source, i, "@paginate requires pagination on the tracked item"); break; }
+            if (++result_.paginate_count > 1) { fail(source_path, source, i, "paginated tracked items must execute exactly one @paginate"); break; }
+            output += "\x1dNIFT_PAGINATE\x1d";
+            i += 9;
+            continue;
         }
 
         if (source.compare(i, 4, "@if(") == 0) {
@@ -1608,6 +1688,20 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 continue;
             }
 
+            if (function == "pathtopage") {
+                if (!has_parameters || parameters.size() != 1) { fail(source_path, source, i, "pathtopage: expected 1 page number"); break; }
+                std::string resolved, interpolation_error;
+                if (!interpolate_parameter(parameters[0], resolved, interpolation_error)) { fail(source_path, source, i, "pathtopage: " + interpolation_error); break; }
+                const std::string trimmed = trim_copy(resolved);
+                char* endp = nullptr;
+                const unsigned long long page = std::strtoull(trimmed.c_str(), &endp, 10);
+                if (trimmed.empty() || !endp || *endp != '\0' || page == 0) { fail(source_path, source, i, "pathtopage: page must be a positive integer"); break; }
+                output += path_to_page(static_cast<std::size_t>(page));
+                if (!result_.ok) break;
+                i = end;
+                continue;
+            }
+
             if (function == "substr") {
                 if (!has_parameters || parameters.size() != 3) { fail(source_path, source, i, "substr: expected value, position and length"); break; }
                 std::string text, interpolation_error;
@@ -1952,10 +2046,84 @@ RenderResult Parser::render() {
     input_stack_.push_back(fs::absolute(template_path).lexically_normal());
     result_.dependencies.insert(tracked_info_.template_path);
     const auto template_source = project_.read_shared_source(template_path);
+    pagination_collecting_ = tracked_info_.paginate.has_value();
     auto result = parse(*template_source, template_path, 0);
     if (result.ok && result.content_count != 1) {
         result.ok = false;
         result.error = {tracked_info_.name, template_path, 0, "templated tracked items must execute exactly one @content; add @content through the template/input graph or omit the tracked template field"};
     }
-    return result;
+    if (!result.ok || !tracked_info_.paginate.has_value()) return result;
+    if (result.paginate_count != 1) {
+        result.ok = false;
+        result.error = {tracked_info_.name, content_path, 0, "paginated tracked items must execute exactly one @paginate"};
+        return result;
+    }
+
+    const auto& config = *tracked_info_.paginate;
+    auto conventional = [&](const char* suffix) {
+        return content_path.parent_path() / (content_path.stem().generic_string() + suffix + ".html");
+    };
+    fs::path pagination_template = config.template_path.has_value()
+        ? (project_.root / *config.template_path).lexically_normal()
+        : conventional(".paginate");
+    if (!filesystem::path_within(project_.root, pagination_template) || !filesystem::file_readable(pagination_template)) {
+        result.ok = false;
+        result.error = {tracked_info_.name, pagination_template, 0, "pagination template is missing, unreadable, or outside the project"};
+        return result;
+    }
+    fs::path separator;
+    if (config.separator_path.has_value()) separator = (project_.root / *config.separator_path).lexically_normal();
+    else {
+        const fs::path candidate = conventional(".separator");
+        if (filesystem::path_exists(candidate)) separator = candidate;
+    }
+    if (!separator.empty() && (!filesystem::path_within(project_.root, separator) || !filesystem::file_readable(separator))) {
+        result.ok = false;
+        result.error = {tracked_info_.name, separator, 0, "pagination separator is unreadable or outside the project"};
+        return result;
+    }
+
+    result_.dependencies.insert(project_.relative(pagination_template));
+    if (!separator.empty()) result_.dependencies.insert(project_.relative(separator));
+    const std::string base_output = result.output;
+    const std::string marker = "\x1dNIFT_PAGINATE\x1d";
+    const std::size_t marker_position = base_output.find(marker);
+    const std::size_t total = std::max<std::size_t>(1, (result_.pagination_items.size() + config.items_per_page - 1) / config.items_per_page);
+    result_.pagination_outputs.clear();
+    result_.pagination_outputs.reserve(total);
+    pagination_collecting_ = false;
+    pagination_context_active_ = true;
+    pagination_total_ = total;
+
+    for (std::size_t page = 1; page <= total && result_.ok; ++page) {
+        pagination_current_ = page;
+        pagination_current_output_ = project_.pagination_output_path(tracked_info_, page);
+        const std::size_t begin = (page - 1) * config.items_per_page;
+        const std::size_t finish = std::min(result_.pagination_items.size(), begin + config.items_per_page);
+        std::string separator_text;
+        if (!separator.empty() && finish > begin + 1) {
+            const auto sep_source = project_.read_shared_source(separator);
+            const auto rendered_separator = parse(*sep_source, separator, 0);
+            if (!rendered_separator.ok) break;
+            separator_text = rendered_separator.output;
+        }
+        std::string items;
+        for (std::size_t index = begin; index < finish; ++index) {
+            if (index != begin) items += separator_text;
+            items += result_.pagination_items[index];
+        }
+        pagination_items_text_ = std::move(items);
+        const auto page_source = project_.read_shared_source(pagination_template);
+        const auto rendered_page = parse(*page_source, pagination_template, 0);
+        if (!rendered_page.ok) break;
+        std::string page_output = base_output;
+        page_output.replace(marker_position, marker.size(), rendered_page.output);
+        result_.pagination_outputs.push_back(std::move(page_output));
+    }
+    pagination_context_active_ = false;
+    pagination_current_output_.clear();
+    pagination_items_text_.clear();
+    if (!result_.ok) return result_;
+    result_.output = result_.pagination_outputs.front();
+    return result_;
 }

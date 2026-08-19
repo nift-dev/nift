@@ -128,7 +128,7 @@ bool WatchList::reconcile(ProjectInfo& project) {
                         return false;
                     }
                 } else {
-                    TrackedInfo candidate{relative, fs::path(relative).filename().string(), extension.template_path, extension.content_ext, extension.output_ext, std::nullopt};
+                    TrackedInfo candidate{relative, fs::path(relative).filename().string(), extension.template_path, extension.content_ext, extension.output_ext, std::nullopt, std::nullopt};
                     if (project.conflicts_with_tracked_path(candidate)) {
                         console::error("watched file '" + relative + "' resolves to a content/output path already managed by another tracked name");
                         return false;

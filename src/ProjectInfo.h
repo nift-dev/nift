@@ -33,6 +33,7 @@ public:
 
     std::filesystem::path content_path(const TrackedInfo& info) const;
     std::filesystem::path output_path(const TrackedInfo& info) const;
+    std::filesystem::path pagination_output_path(const TrackedInfo& info, std::size_t page) const;
     std::filesystem::path info_path(const TrackedInfo& info) const;
     std::string relative(const std::filesystem::path& path) const;
     const std::string* read_shared_source(const std::filesystem::path& path) const;

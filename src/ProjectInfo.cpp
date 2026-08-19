@@ -207,7 +207,7 @@ bool ProjectInfo::load_tracking() {
                 std::move(entry["name"].string),
                 std::move(entry["title"].string),
                 entry.has("template") ? std::move(entry["template"].string) : std::string{},
-                "", "", std::nullopt
+                "", "", std::nullopt, std::nullopt
             };
             if (entry.has("content-ext")) {
                 if (!entry["content-ext"].is_string()) {
@@ -232,6 +232,29 @@ bool ProjectInfo::load_tracking() {
                     return false;
                 }
                 info.minify = entry["minify"].boolean;
+            }
+            if (entry.has("paginate")) {
+                const auto& paginate = entry["paginate"];
+                if (!paginate.is_object() || !paginate.has("items-per-page") ||
+                    !paginate["items-per-page"].is_number() ||
+                    !std::isfinite(paginate["items-per-page"].num) ||
+                    std::floor(paginate["items-per-page"].num) != paginate["items-per-page"].num ||
+                    paginate["items-per-page"].num < 1) {
+                    entries_valid = false;
+                    entry_error = "tracked paginate must be an object with positive integer items-per-page";
+                    return false;
+                }
+                PaginationConfig config;
+                config.items_per_page = static_cast<std::size_t>(paginate["items-per-page"].num);
+                if (paginate.has("template")) {
+                    if (!paginate["template"].is_string()) { entries_valid = false; entry_error = "paginate template must be a string"; return false; }
+                    config.template_path = paginate["template"].string;
+                }
+                if (paginate.has("separator")) {
+                    if (!paginate["separator"].is_string()) { entries_valid = false; entry_error = "paginate separator must be a string"; return false; }
+                    config.separator_path = paginate["separator"].string;
+                }
+                info.paginate = std::move(config);
             }
             if (!valid_tracked_name(info.name)) {
                 entries_valid = false;
@@ -334,6 +357,13 @@ bool ProjectInfo::save_tracking() const {
         if (!info.content_ext.empty()) entry["content-ext"] = info.content_ext;
         if (!info.output_ext.empty()) entry["output-ext"] = info.output_ext;
         if (info.minify.has_value()) entry["minify"] = *info.minify;
+        if (info.paginate.has_value()) {
+            json::Document paginate = json::Document::make_object();
+            paginate["items-per-page"] = static_cast<double>(info.paginate->items_per_page);
+            if (info.paginate->template_path.has_value()) paginate["template"] = *info.paginate->template_path;
+            if (info.paginate->separator_path.has_value()) paginate["separator"] = *info.paginate->separator_path;
+            entry["paginate"] = paginate;
+        }
         document["tracked"].push_back(entry);
     }
     return save_json_file(root / ".nift/tracked.json", document);
@@ -405,6 +435,17 @@ fs::path ProjectInfo::output_path(const TrackedInfo& info) const {
     if (name == "/") name = "index";
     else if (!name.empty() && name.back() == '/') name += "index";
     return root / config.output_dir / (name + (info.output_ext.empty() ? config.output_ext : info.output_ext));
+}
+
+fs::path ProjectInfo::pagination_output_path(const TrackedInfo& info, std::size_t page) const {
+    if (page <= 1) return output_path(info);
+    const std::string extension = info.output_ext.empty() ? config.output_ext : info.output_ext;
+    if (info.name == "/" || (!info.name.empty() && info.name.back() == '/')) {
+        const fs::path primary = output_path(info);
+        return primary.parent_path() / (std::to_string(page) + extension);
+    }
+    const fs::path primary = output_path(info);
+    return primary.parent_path() / (primary.stem().generic_string() + "-" + std::to_string(page) + extension);
 }
 
 fs::path ProjectInfo::info_path(const TrackedInfo& info) const {
@@ -816,16 +857,31 @@ bool ProjectInfo::build_one(TrackedInfo& info) {
             print_build_error({info.name, output, 0, "no minifier is available for output extension " + extension});
             return false;
         }
-        std::string minified, minify_error;
-        if (!minify::run(format, result.output, minified, minify_error)) {
-            print_build_error({info.name, output, 0, "minification failed" +
-                               (minify_error.empty() ? std::string() : ": " + minify_error)});
-            return false;
-        }
-        result.output = std::move(minified);
+        auto minify_output = [&](std::string& page_output) {
+            std::string minified, minify_error;
+            if (!minify::run(format, page_output, minified, minify_error)) {
+                print_build_error({info.name, output, 0, "minification failed" +
+                                   (minify_error.empty() ? std::string() : ": " + minify_error)});
+                return false;
+            }
+            page_output = std::move(minified);
+            return true;
+        };
+        if (!result.pagination_outputs.empty()) {
+            for (auto& page_output : result.pagination_outputs) if (!minify_output(page_output)) return false;
+            result.output = result.pagination_outputs.front();
+        } else if (!minify_output(result.output)) return false;
     }
 
-    if (!filesystem::write_readonly_file(output, result.output)) {
+    if (!result.pagination_outputs.empty()) {
+        for (std::size_t page = 1; page <= result.pagination_outputs.size(); ++page) {
+            const fs::path page_output = pagination_output_path(info, page);
+            if (!filesystem::write_readonly_file(page_output, result.pagination_outputs[page - 1])) {
+                print_build_error({info.name, page_output, 0, "failed to write generated pagination output"});
+                return false;
+            }
+        }
+    } else if (!filesystem::write_readonly_file(output, result.output)) {
         print_build_error({info.name, output, 0, "failed to write generated output"});
         return false;
     }

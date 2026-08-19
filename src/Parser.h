@@ -24,6 +24,12 @@ private:
     std::unordered_map<std::string, std::shared_ptr<const json::Document>> json_bindings_;
     std::unordered_map<std::string, std::shared_ptr<const json::Document>> contract_bindings_;
     std::vector<std::vector<std::string>> json_binding_scopes_;
+    bool pagination_collecting_ = false;
+    bool pagination_context_active_ = false;
+    std::size_t pagination_current_ = 1;
+    std::size_t pagination_total_ = 1;
+    std::string pagination_items_text_;
+    std::filesystem::path pagination_current_output_;
 
     RenderResult parse(const std::string& source, const std::filesystem::path& source_path, int depth);
     std::string metadata(const std::string& key) const;
@@ -35,6 +41,8 @@ private:
                             std::shared_ptr<const json::Document>& value,
                             std::string& error);
     bool evaluate_condition(const std::string& expression, bool& value, std::string& error);
+    bool resolve_pagination_value(const std::string& expression, std::shared_ptr<const json::Document>& value) const;
+    std::string path_to_page(std::size_t page);
     bool scalar_literal(const std::string& text, json::Document& value, std::string& error) const;
     std::string trim_copy(const std::string& text) const;
     void push_json_scope();
