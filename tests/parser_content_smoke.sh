@@ -242,3 +242,46 @@ grep -F "'public/assets/generated.css' is neither a tracked name nor a file that
 
 
 echo "Tracked content/input parser smoke test passed"
+
+# Templated tracked items must execute precisely one @content across the actual
+# template/@input graph, even when content is empty. Skipped/commented uses do
+# not count; nested @input uses do count.
+cd "$TMP"
+rm -rf .nift content templates public
+mkdir -p .nift content templates public
+cat > .nift/config.json <<'JSON'
+{"config":{"content-dir":"content/","content-ext":".html","output-dir":"public/","output-ext":".html","default-template":"templates/template.html","build-threads":-1,"incremental-mode":"modified"}}
+JSON
+cat > .nift/tracked.json <<'JSON'
+{"tracked":[{"name":"/","title":"content-count","template":"templates/template.html"}]}
+JSON
+: > content/index.html
+cat > templates/template.html <<'EOF2'
+@input('slot.html')
+EOF2
+cat > templates/slot.html <<'EOF2'
+@content
+EOF2
+"$NIFT_BIN" build-all >/dev/null
+
+cat > templates/template.html <<'EOF2'
+<p>no insertion</p>
+EOF2
+if "$NIFT_BIN" build-all >/dev/null 2>&1; then
+  echo "empty templated content unexpectedly succeeded without @content" >&2; exit 1
+fi
+
+cat > templates/template.html <<'EOF2'
+@content
+@input('slot.html')
+EOF2
+if "$NIFT_BIN" build-all >/dev/null 2>&1; then
+  echo "duplicate @content across template/input graph unexpectedly succeeded" >&2; exit 1
+fi
+
+cat > templates/template.html <<'EOF2'
+<#-- @content --#>
+@if(false){@content}
+@input('slot.html')
+EOF2
+"$NIFT_BIN" build-all >/dev/null

@@ -48,6 +48,7 @@ struct BuildError {
 struct RenderResult {
     bool ok = true;
     bool content_used = false;
+    std::size_t content_count = 0;
     std::string output;
     BuildError error;
     std::set<std::string> dependencies;

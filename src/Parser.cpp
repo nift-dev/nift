@@ -1493,6 +1493,10 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
 
             if (function == "content") {
                 if (has_parameters && !parameters.empty()) { fail(source_path, source, i, "content: expected 0 parameters"); break; }
+                if (++result_.content_count > 1) {
+                    fail(source_path, source, i, "@content may be executed exactly once for a templated tracked item");
+                    break;
+                }
 
                 const fs::path content_path = fs::absolute(project_.content_path(tracked_info_)).lexically_normal();
                 if (std::find(input_stack_.begin(), input_stack_.end(), content_path) != input_stack_.end()) {
@@ -1780,11 +1784,9 @@ RenderResult Parser::render() {
     result_.dependencies.insert(tracked_info_.template_path);
     const auto template_source = project_.read_shared_source(template_path);
     auto result = parse(*template_source, template_path, 0);
-    std::error_code content_size_error;
-    const auto content_size = fs::file_size(content_path, content_size_error);
-    if (result.ok && !result.content_used && !content_size_error && content_size > 0) {
+    if (result.ok && result.content_count != 1) {
         result.ok = false;
-        result.error = {tracked_info_.name, template_path, 0, "content has not been used as a dependency; add @content to the template or omit the tracked template field"};
+        result.error = {tracked_info_.name, template_path, 0, "templated tracked items must execute exactly one @content; add @content through the template/input graph or omit the tracked template field"};
     }
     return result;
 }
