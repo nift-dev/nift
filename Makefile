@@ -78,6 +78,9 @@ test-json-binding: $(TARGET)
 test-control-flow: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/control_flow_smoke.sh
 
+test-collections: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/collection_ops_smoke.sh
+
 test-pagination: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/pagination_smoke.sh
 
