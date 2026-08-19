@@ -1003,10 +1003,19 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
         if (source.compare(i, 2, "$[") == 0) {
             std::size_t end = i + 2;
             std::size_t nested_brackets = 0;
+            bool value_quoted = false;
+            char value_quote = 0;
             for (; end < source.size(); ++end) {
-                if (source[end] == '[') {
+                const char c = source[end];
+                if (value_quoted) {
+                    if (c == '\\' && end + 1 < source.size()) ++end;
+                    else if (c == value_quote) value_quoted = false;
+                    continue;
+                }
+                if (c == '\'' || c == '"') { value_quoted = true; value_quote = c; continue; }
+                if (c == '[') {
                     ++nested_brackets;
-                } else if (source[end] == ']') {
+                } else if (c == ']') {
                     if (nested_brackets == 0) break;
                     --nested_brackets;
                 }
@@ -1018,7 +1027,9 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 auto split_ternary = [&](const std::string& expression,
                                          std::string& condition,
                                          std::string& when_true,
-                                         std::string& when_false) -> bool {
+                                         std::string& when_false,
+                                         bool& malformed) -> bool {
+                    malformed = false;
                     bool quoted = false; char quote = 0;
                     int parens = 0, brackets = 0, braces = 0;
                     std::size_t question = std::string::npos;
@@ -1051,11 +1062,13 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                             return true;
                         }
                     }
+                    malformed = question != std::string::npos;
                     return false;
                 };
 
                 std::string ternary_condition, when_true, when_false;
-                if (split_ternary(key, ternary_condition, when_true, when_false)) {
+                bool malformed_ternary = false;
+                if (split_ternary(key, ternary_condition, when_true, when_false, malformed_ternary)) {
                     bool condition_value = false;
                     std::string condition_error;
                     if (!evaluate_condition(ternary_condition, condition_value, condition_error)) {
@@ -1068,6 +1081,10 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     output += nested.output;
                     i = end + 1;
                     continue;
+                }
+                if (malformed_ternary) {
+                    fail(source_path, source, i, "ternary expression has '?' without a matching ':'");
+                    break;
                 }
 
                 std::shared_ptr<const json::Document> pagination_value;

@@ -165,3 +165,34 @@ containment, or dependency checking merely to improve a benchmark.
 ## Project-contract checkpoint (2026-08-17)
 
 Project contracts are tested as an observable guarantee rather than only as a parser feature. The focused `tests/contracts_smoke.sh` module is mirrored into the standalone suite and covers successful resolution, lazy loading, dependency/config remapping, parameter/control-flow integration, missing/malformed sources, missing members, render-type errors, local JSON compatibility, namespace collisions, invalid declarations, traversal, and symlink escape. Preserve those failure families and add permanent reproducers for any new contract defect.
+
+## v4.0.3 language/pagination hardening (2026-08-19)
+
+The bounded v4.0.3 language work is protected by focused source-tree and
+independent black-box contracts. New coverage includes:
+
+- exactly-one executed `@content` across the template/`@input` graph;
+- short-circuit `&&` / `||`, existing `!`, ordinary precedence and parentheses;
+- lazy ternary rendering with inert unselected branches and quoted delimiter
+  adversarial cases;
+- scalar-array `@join` and UTF-8/code-point-safe `@substr(value,pos,length)`;
+- modern pagination configuration, `@item`, exactly-one `@paginate`, rendered
+  template/separator inputs, `$[paginate.*]`, `@pathtopage`, deterministic page
+  naming, zero-item behavior, stale-page cleanup and failed-render preservation;
+- deterministic multi-threaded rendering of a large single pagination set.
+
+`tests/pagination_incremental_equivalence.py` maintains 18 focused
+incremental-vs-clean comparisons: six pagination transitions under each of
+`modified`, `hash` and `hybrid`. The transitions cover content edits, page-count
+shrink/grow, optional separator appearance/disappearance and
+`items-per-page` changes.
+
+The compact pagination sanitizer workload passes under ASan/UBSan and under
+ThreadSanitizer in the current Linux development environment. The broader
+focused source-tree suite was rerun across JSON/schema, parser/content,
+comments, JSON binding, control flow, requirements, path safety/security,
+metadata safety, template-less output, contracts, init targets, cross-feature,
+incremental state, persistence/concurrency, Minify++ integration and tracking
+scaling. The matching standalone contract modules are green individually.
+The all-in-one external runner exceeded the available execution window while
+its historical layer was running; do not turn that timeout into green evidence.

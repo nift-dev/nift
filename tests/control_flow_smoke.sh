@@ -590,3 +590,27 @@ grep -F 'YES-ternary' public/index.html >/dev/null
 grep -F 'SAFE' public/index.html >/dev/null
 grep -F 'NESTED' public/index.html >/dev/null
 if grep -F 'missing-dep.txt' .nift/public/index.info.json >/dev/null; then echo 'unselected ternary branch registered dependency' >&2; exit 1; fi
+
+# Ternary delimiter scanning ignores quoted ?/:/] characters and malformed
+# expressions fail in a controlled way.
+cd "$TMP"
+rm -rf .nift content templates public
+mkdir -p .nift content templates public
+cat > .nift/config.json <<'JSON'
+{"config":{"content-dir":"content/","content-ext":".html","output-dir":"public/","output-ext":".html","default-template":"templates/template.html","build-threads":-1,"incremental-mode":"modified"}}
+JSON
+cat > .nift/tracked.json <<'JSON'
+{"tracked":[{"name":"/","title":"ternary delimiters","template":"templates/template.html"}]}
+JSON
+echo '@content' > templates/template.html
+cat > content/index.html <<'EOF2'
+$[true ? 'a?b:c]d' : no]
+$[false ? no : 'x:y?z]']
+EOF2
+"$NIFT_BIN" build-all >/dev/null
+grep -F ' a?b:c]d ' public/index.html >/dev/null || grep -F 'a?b:c]d' public/index.html >/dev/null
+grep -F 'x:y?z]' public/index.html >/dev/null
+cat > content/index.html <<'EOF2'
+$[true ? yes]
+EOF2
+if "$NIFT_BIN" build-all >/dev/null 2>&1; then echo 'malformed ternary unexpectedly succeeded' >&2; exit 1; fi

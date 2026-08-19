@@ -26,6 +26,9 @@ TEST_DIR := .build
 SANITIZER_FLAGS ?= -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined
 SAN_TARGET := $(TEST_DIR)/nift-sanitize$(EXEEXT)
 SAN_OBJECTS := $(patsubst %.cpp,$(TEST_DIR)/san/%.o,$(SOURCES))
+TSAN_FLAGS ?= -O1 -g -fno-omit-frame-pointer -fsanitize=thread
+TSAN_TARGET := $(TEST_DIR)/nift-tsan$(EXEEXT)
+TSAN_OBJECTS := $(patsubst %.cpp,$(TEST_DIR)/tsan/%.o,$(SOURCES))
 MEMORY_SMOKE := $(TEST_DIR)/nift-memory-san$(EXEEXT)
 JSON_TEST := $(TEST_DIR)/nift-json-smoke$(EXEEXT)
 JSON_SCHEMA_TEST := $(TEST_DIR)/nift-json-schema-smoke$(EXEEXT)
@@ -77,6 +80,9 @@ test-control-flow: $(TARGET)
 
 test-pagination: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/pagination_smoke.sh
+
+test-pagination-equivalence: $(TARGET)
+	python3 tests/pagination_incremental_equivalence.py --nift "$(CURDIR)/$(TARGET)"
 
 test-installer:
 	tests/install_script_smoke.sh
@@ -175,6 +181,20 @@ $(SAN_TARGET): $(SAN_OBJECTS)
 
 test-sanitize: $(SAN_TARGET)
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(SAN_TARGET)" --version
+
+test-pagination-sanitize: $(SAN_TARGET)
+	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT_BIN="$(CURDIR)/$(SAN_TARGET)" tests/pagination_sanitizer_smoke.sh
+
+$(TEST_DIR)/tsan/%.o: %.cpp
+	mkdir -p "$(dir $@)"
+	$(CXX) $(CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(TSAN_FLAGS) -c "$<" -o "$@"
+
+$(TSAN_TARGET): $(TSAN_OBJECTS)
+	mkdir -p "$(TEST_DIR)"
+	$(CXX) -std=c++17 -pthread $(TSAN_FLAGS) $(TSAN_OBJECTS) -o "$@"
+
+test-pagination-tsan: $(TSAN_TARGET)
+	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 NIFT_BIN="$(CURDIR)/$(TSAN_TARGET)" tests/pagination_sanitizer_smoke.sh
 
 $(MEMORY_SMOKE): tests/json_smoke.cpp src/Json.h
 	mkdir -p "$(TEST_DIR)"
