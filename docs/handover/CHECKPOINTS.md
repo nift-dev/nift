@@ -2513,3 +2513,9 @@ If yes, we've probably reached a real checkpoint. If the answer is “well, use 
 10. Strict Snap edge/candidate experiment.
 11. Full hardening/equivalence reconciliation.
 12. Website/release reconciliation, committing generated public/master before source stage.
+
+### Checkpoint 12 reconciliation result (2026-08-19)
+
+The public website/release reconciliation documents the v4.0.3 condition, ternary, join, substring and pagination contracts; adds the extensionless installer source/endpoint; refreshes Battle Tested and production-readiness evidence; and builds the complete Nift documentation site with the exact v4.0.3 candidate. The candidate built 59 tracked site outputs successfully, an immediate `nift status` reported all 59 up to date, the generated-site local link audit checked 7,338 `href`/`src` references with zero missing targets, the installer source/generated copy remained byte-identical and passed `sh -n`, and the core `test-installer` smoke gate passed again.
+
+Website publication preserved the required order: generated `public/main` commit `478c617` (`Publish v4.0.3 language and pagination docs`) first, then authoritative source `stage` commit `c5d0d94` (`Document v4.0.3 language and pagination`). Both website trees were clean immediately after those commits.

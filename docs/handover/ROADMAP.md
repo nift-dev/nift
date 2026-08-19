@@ -8,19 +8,18 @@ The completed campaign established and retained evidence around component memory
 
 Do **not** invent Checkpoint 11 merely to continue the sequence. New hardening campaigns need a concrete trigger: a field defect, an unsupported platform claim worth establishing, a newly introduced semantic contract, or another clearly justified guarantee.
 
-## Current phase: v4.0.2 distribution verification and v4.0.3 maintenance
+## Current phase: v4.0.3 release reconciliation and distribution verification
 
-The bounded post-hardening initialization feature is complete in the development tree: `nift init`, `--ext=.ext`, and nine `--target=<platform>` presets are implemented, covered by focused/local and independent black-box contracts, and the native `ubuntu-latest` / `macos-latest` / `windows-latest` init-target Actions matrix is green. This did not reopen the hardening campaign.
+The bounded v4.0.3 contract-first programme is now implemented: exactly-one rendered `@content`, logical condition composition, lazy ternary rendering, `@join`, UTF-8-safe `@substr`, modern multi-output pagination, a verified release installer, and a staged strict-Snap edge experiment. Pagination retains one tracked dependency/invalidation unit while rendering large page sets concurrently and preserving prior successful sets on failed replacement.
 
 The current sequence is now:
 
-1. Keep the released 4.0.2 initializer/platform contract and documentation reconciled; broaden it only in response to a concrete requirement or defect.
-2. Treat the generated target files/layouts as implementations of the documented provider conventions, not as claims of end-to-end provider certification. Real provider deployments are optional dogfooding/field evidence and are **not** a 4.0.2 release gate.
-3. Track v4.0.2 independently through each downstream channel until the public package is installable and verified; workflow submission alone is not availability evidence.
-4. Use GitHub Actions or similarly reproducible clean environments to install from the **actual 4.0.2 distribution channels** and run post-install smoke/behavioral checks. Testing an older package may rehearse the harness but is not 4.0.2 distribution evidence.
-5. Continue dogfooding platform targets and real projects. Turn concrete provider, packaging or field failures into focused regressions where practical rather than inventing a new synthetic hardening checkpoint.
-
-The homepage remains intentionally unchanged for the platform-target feature.
+1. Keep the v4.0.3 public language/configuration documentation synchronized with the candidate and retain the focused/independent regressions established for the new contracts.
+2. Treat the 18 pagination incremental-vs-clean comparisons plus compact sanitizer/TSan pagination gates as scoped evidence for the exercised states, not universal proof.
+3. Publish/test the strict Snap candidate only through a non-stable channel until an installed Store artifact proves ordinary project-local `.nift/` access. Revert to classic rather than redesign Nift around Snap if strict confinement cannot support the project model cleanly.
+4. Publish and validate the extensionless `nift.dev/install` endpoint against the actual public release artifacts/checksums before presenting it as live installation evidence.
+5. Continue v4.0.2 downstream distribution verification while preparing the v4.0.3 release candidate; store/channel propagation remains evidence separate from repository CI.
+6. Continue dogfooding real sites and platform targets; turn concrete field failures into focused regressions instead of opening synthetic checkpoint sequences without a trigger.
 
 ## Distribution validation direction
 

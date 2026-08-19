@@ -2,8 +2,28 @@
 
 ## v4.0.3 (development)
 
-- Development version following the v4.0.2 release.
+Nift 4.0.3 is a bounded post-4.0.2 language, pagination and distribution/DX refinement developed contract-first rather than as a return to the old general scripting surface.
+
+### Template and condition contracts
+
+- Templated tracked items must execute exactly one `@content` across the rendered template/`@input` graph. Zero or duplicate executed insertions fail; template-less tracked items remain the direct-source alternative.
+- Added short-circuit `&&` / `||` while retaining `!`, ordinary precedence and parentheses in the shared condition evaluator.
+- Added lazy `$[condition ? true-branch : false-branch]` rendering. Only the selected branch is parsed as ordinary Nift source, so the unselected branch cannot register dependencies/requirements or fail through unused directives.
+- Added `@join(array, separator)` for scalar-array presentation and UTF-8/code-point-safe `@substr(value, pos, length)` with zero-based, length-based semantics.
+
+### Modern pagination
+
+- Added opt-in tracked pagination through `paginate.items-per-page`, with optional explicit pagination-template/separator paths and conventional `<content-stem>.paginate.html` / `<content-stem>.separator.html` fallbacks.
+- Added `@item{...}`, exactly-one `@paginate`, `$[paginate.items]`, `$[paginate.current]`, `$[paginate.total]`, `$[paginate.first]`, `$[paginate.last]`, `$[paginate.previous]`, `$[paginate.next]`, and `@pathtopage(n)`.
+- Pagination output naming is deterministic (`blog.html`, `blog-2.html`, ...; index-style names use `blog/index.html`, `blog/2.html`, ...). Zero items still produce the primary page.
+- The complete pagination set is one tracked dependency/invalidation unit. Stale secondary outputs are reconciled from persisted successful state, failed replacements preserve the previous successful page set, and pages within a large set may render concurrently.
+- Added 18 focused incremental-vs-clean pagination comparisons across modified/hash/hybrid modes plus compact ASan/UBSan and TSan pagination gates.
+
+### Requirements and distribution UX
+
 - Refined `@pathto` requirement semantics for tracked targets: a referring page no longer becomes stale merely because another currently tracked page has not produced its output yet or its build fails. The tracked producer owns its own build result, while concrete project-path requirements retain the existing missing-path rebuild/error behavior. This removes misleading first-build `required path missing` noise without introducing transitive build failure.
+- Added a small verified POSIX installer intended for `curl -fsSL https://nift.dev/install | bash`: it detects supported Linux/macOS architectures, downloads the official release archive and SHA256SUMS, verifies the archive, defaults to `~/.local/bin`, and does not silently invoke sudo or edit shell profiles.
+- Staged strict Snap confinement with a non-stable edge publication path for empirical Store testing. Stable confinement must not change until a real installed candidate proves that normal project-local `.nift/` state works under strict confinement; otherwise classic remains the correct package boundary.
 
 ## v4.0.2
 

@@ -58,3 +58,5 @@ The template-less tracked-entry documentation was completed in the website
 source/generated checkpoints for Nift 4.0.1. It covers direct parsed content,
 ordinary `@content` templates, historical empty-string compatibility, dependency
 replacement, and removal of identity CSS/JavaScript template guidance.
+
+The v4.0.3 language/pagination/installer documentation was completed in the dedicated website/release reconciliation checkpoint. It covers exactly-one rendered `@content`, logical conditions, lazy ternary rendering, `@join`, UTF-8-safe `@substr`, pagination configuration/runtime metadata, `@pathtopage`, the installer endpoint, strict-Snap experiment status, and updated reliability evidence.

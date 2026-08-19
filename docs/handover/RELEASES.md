@@ -68,9 +68,13 @@ publicly available. See `DISTRIBUTION-VERIFICATION.md`.
 
 The Nift website source is a separate repository on its authoritative `stage`
 branch in the current checkout. Its nested `public/` is a separate generated Git
-checkout used for built-site state. Exact deployment commands must be documented
-in that website's `HANDOVER.md` after verification. Never hand-edit generated
-output as the source of truth.
+checkout used for built-site state. For Nift website publication checkpoints,
+commit the rebuilt/generated `public/` checkout on `main` first, then commit the
+corresponding authoritative source changes on `stage`, and verify both trees are
+clean. Never hand-edit generated HTML as the source of truth; the extensionless
+installer is the documented exception only in the sense that its canonical
+repository-root source is copied byte-for-byte to `public/install` because the
+current tracked-extension contract cannot emit an extensionless path directly.
 
 Building locally is authorized as validation. Pushing the generated branch or
 deploying publicly requires approval.
@@ -80,6 +84,8 @@ release belong in `PENDING-WEBSITE.md`. This queue does not freeze the website:
 unrelated website content and improvements can continue through their normal
 development and publication flow. The release gate applies only to queued items
 whose target version is the candidate being prepared.
+
+For the v4.0.3 reconciliation checkpoint, the generated website commit is `478c617` on `public/main` and the corresponding authoritative source commit is `c5d0d94` on `stage`, in that required order. These are local checkpoint identities until deliberately pushed/published.
 
 ## Version and notes
 

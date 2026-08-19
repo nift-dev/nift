@@ -27,9 +27,11 @@ whether it is a regression.
 - Current branch: `main` in this checkout.
 - Current project phase: **hardening plateau reached** after Checkpoints 0–10.
   The bounded 4.0.2 `init` extension/platform-target feature is released and its
-  native Linux/macOS/Windows Actions contract is green. Current work is downstream
-  distribution verification, provider dogfooding, and evidence-driven v4.0.3
-  maintenance.
+  native Linux/macOS/Windows Actions contract is green. The bounded v4.0.3
+  language/pagination/installer programme is implemented and hardened through its
+  dedicated checkpoints; current work is final release reconciliation, downstream
+  distribution verification, the strict-Snap edge experiment, provider dogfooding,
+  and field evidence.
 - Public documentation: the separate `nift-dev.github.io` repository.
 - External contract: the separate `nift-regression-suite` repository.
 - Embedded minifier: `minifypp/`, synchronized with standalone Minify++.

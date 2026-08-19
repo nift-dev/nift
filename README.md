@@ -13,7 +13,7 @@ Nift has completed its planned Checkpoints 0–10 deliberate hardening campaign.
 ## Features
 
 - Fast, multithreaded builds and incremental rebuilds
-- Simple templating with `@content`, `@input(...)`, `@pathto(...)`, `@dep(...)`, `@getenv(...)`, `@ent(...)` and structured JSON data via `@json(...)`, config-declared project contracts via `$[...]`, plus constrained `@for(...){...}` / `@if(...){...}` control flow
+- Simple templating with exactly-one rendered `@content`, `@input(...)`, `@pathto(...)`, `@dep(...)`, `@getenv(...)`, `@ent(...)`, structured JSON via `@json(...)`, project contracts via `$[...]`, bounded `@for` / `@if` control flow, short-circuit logical conditions, lazy ternary rendering, `@join`, UTF-8-safe `@substr`, and opt-in multi-output pagination
 - Modified-time, hash and hybrid incremental build modes
 - File and directory dependency tracking
 - Automatic and explicit dependency support
@@ -125,7 +125,9 @@ When structured data needs repetition or selection, Nift keeps the control-flow 
 }
 ```
 
-Objects can be iterated with `@for((key, val) : object){...}`. Loops expose reserved lexical metadata through `$[loop.index]`, `$[loop.index0]`, `$[loop.first]`, `$[loop.last]` and `$[loop.length]`, and can be stably ordered with `by ... asc|desc`. Conditions support truthiness, `!`, equality and strict numeric/string ordering comparisons over scalar JSON values/page metadata; there is intentionally no general scripting or expression runtime.
+Objects can be iterated with `@for((key, val) : object){...}`. Loops expose reserved lexical metadata through `$[loop.index]`, `$[loop.index0]`, `$[loop.first]`, `$[loop.last]` and `$[loop.length]`, and can be stably ordered with `by ... asc|desc`. Conditions support truthiness, `!`, short-circuit `&&` / `||`, parentheses, equality and strict numeric/string ordering comparisons over scalar JSON values/page metadata. Lazy `$[condition ? true : false]` rendering uses the same evaluator and parses only the selected branch. Small `@join` and UTF-8-safe `@substr(value, pos, length)` helpers cover presentation-oriented string work without introducing a general scripting runtime.
+
+A tracked entry can also opt into pagination with a positive `items-per-page` value. `@item{...}` captures rendered items, exactly one `@paginate` inserts the paginated result, pagination templates receive `$[paginate.items]`, `$[paginate.current]`, `$[paginate.total]`, `$[paginate.first]`, `$[paginate.last]`, `$[paginate.previous]` and `$[paginate.next]`, and `@pathtopage(n)` resolves generated page links. The complete generated page set remains one tracked dependency/invalidation unit even though its pages may render concurrently.
 
 ## Documentation
 
