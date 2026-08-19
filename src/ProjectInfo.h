@@ -79,7 +79,7 @@ private:
     bool hash_changed_cached(const std::filesystem::path& dependency) const;
     void reset_build_caches();
     void refresh_hash_once(const std::filesystem::path& dependency);
-    bool write_page_info(const TrackedInfo& info, const std::set<std::string>& dependencies, const std::set<std::string>& reqs) const;
+    bool write_page_info(const TrackedInfo& info, const std::set<std::string>& dependencies, const std::set<std::string>& reqs, std::size_t pagination_pages = 0) const;
     void print_build_error(const BuildError& error) const;
     int build_many(const std::vector<BuildJob>& jobs, bool targeted, bool full_detail, std::size_t requested_count);
 };

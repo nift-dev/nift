@@ -662,7 +662,12 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
         !document.has("content") || !document["content"].is_string() ||
         !document.has("output") || !document["output"].is_string() ||
         !document.has("minify") || !document["minify"].is_bool() ||
-        !document.has("minify-version") || !document["minify-version"].is_number()) {
+        !document.has("minify-version") || !document["minify-version"].is_number() ||
+        !document.has("pagination") || !document["pagination"].is_bool() ||
+        !document.has("pagination-items-per-page") || !document["pagination-items-per-page"].is_number() ||
+        !document.has("pagination-template") || !document["pagination-template"].is_string() ||
+        !document.has("pagination-separator") || !document["pagination-separator"].is_string() ||
+        !document.has("pagination-pages") || !document["pagination-pages"].is_number()) {
         reasons.push_back("page build metadata is invalid or from an older metadata format");
         return reasons;
     }
@@ -672,6 +677,39 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
     if (document["template"].string != info.template_path) reasons.push_back("tracked template changed");
     if (document["content"].string != relative(content_path(info))) reasons.push_back("tracked content path changed");
     if (document["output"].string != relative(output_path(info))) reasons.push_back("tracked output path changed");
+
+    const bool current_paginate = info.paginate.has_value();
+    if (document["pagination"].boolean != current_paginate) reasons.push_back("pagination setting changed");
+    const double stored_pages_value = document["pagination-pages"].num;
+    const bool stored_pages_valid = std::isfinite(stored_pages_value) && std::floor(stored_pages_value) == stored_pages_value && stored_pages_value >= 0;
+    const std::size_t stored_pages = stored_pages_valid ? static_cast<std::size_t>(stored_pages_value) : 0;
+    if (!stored_pages_valid) reasons.push_back("page build metadata has invalid pagination page count");
+    if (current_paginate) {
+        const fs::path current_content = content_path(info);
+        const fs::path effective_template = info.paginate->template_path.has_value()
+            ? (root / *info.paginate->template_path).lexically_normal()
+            : current_content.parent_path() / (current_content.stem().generic_string() + ".paginate.html");
+        std::string effective_separator;
+        if (info.paginate->separator_path.has_value()) effective_separator = relative((root / *info.paginate->separator_path).lexically_normal());
+        else {
+            const fs::path candidate = current_content.parent_path() / (current_content.stem().generic_string() + ".separator.html");
+            if (filesystem::path_exists(candidate)) effective_separator = relative(candidate);
+        }
+        if (!std::isfinite(document["pagination-items-per-page"].num) ||
+            std::floor(document["pagination-items-per-page"].num) != document["pagination-items-per-page"].num ||
+            document["pagination-items-per-page"].num != static_cast<double>(info.paginate->items_per_page))
+            reasons.push_back("pagination items-per-page changed");
+        if (document["pagination-template"].string != relative(effective_template)) reasons.push_back("pagination template changed");
+        if (document["pagination-separator"].string != effective_separator) reasons.push_back("pagination separator changed");
+        for (std::size_t page = 2; page <= stored_pages; ++page) {
+            if (!filesystem::path_exists(pagination_output_path(info, page)))
+                reasons.push_back("generated pagination output is missing: " + relative(pagination_output_path(info, page)));
+        }
+    } else if (document["pagination-items-per-page"].num != 0 ||
+               !document["pagination-template"].string.empty() ||
+               !document["pagination-separator"].string.empty() || stored_pages != 0) {
+        reasons.push_back("pagination setting changed");
+    }
 
     std::string current_output_extension = info.output_ext.empty() ? config.output_ext : info.output_ext;
     std::transform(current_output_extension.begin(), current_output_extension.end(), current_output_extension.begin(),
@@ -774,7 +812,7 @@ void ProjectInfo::print_build_error(const BuildError& error) const {
     }
 }
 
-bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::string>& dependencies, const std::set<std::string>& reqs) const {
+bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::string>& dependencies, const std::set<std::string>& reqs, std::size_t pagination_pages) const {
     const std::string content_name = relative(content_path(info));
     const std::string output_name = relative(output_path(info));
     std::string output_extension = info.output_ext.empty() ? config.output_ext : info.output_ext;
@@ -783,7 +821,24 @@ bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::s
     const bool effective_minify = info.minify.has_value()
         ? *info.minify
         : config.minify_exts.count(output_extension) != 0;
-    std::size_t estimated_size = 140 + info.name.size() + info.title.size() + info.template_path.size() + content_name.size() + output_name.size();
+    std::string pagination_template;
+    std::string pagination_separator;
+    std::size_t pagination_items_per_page = 0;
+    if (info.paginate.has_value()) {
+        pagination_items_per_page = info.paginate->items_per_page;
+        const fs::path content = content_path(info);
+        const fs::path template_path = info.paginate->template_path.has_value()
+            ? (root / *info.paginate->template_path).lexically_normal()
+            : content.parent_path() / (content.stem().generic_string() + ".paginate.html");
+        pagination_template = relative(template_path);
+        if (info.paginate->separator_path.has_value()) {
+            pagination_separator = relative((root / *info.paginate->separator_path).lexically_normal());
+        } else {
+            const fs::path candidate = content.parent_path() / (content.stem().generic_string() + ".separator.html");
+            if (filesystem::path_exists(candidate)) pagination_separator = relative(candidate);
+        }
+    }
+    std::size_t estimated_size = 240 + info.name.size() + info.title.size() + info.template_path.size() + content_name.size() + output_name.size() + pagination_template.size() + pagination_separator.size();
     for (const auto& dependency : dependencies) estimated_size += dependency.size() + 10;
     for (const auto& requirement : reqs) estimated_size += requirement.size() + 10;
 
@@ -803,6 +858,16 @@ bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::s
     output += effective_minify ? "true" : "false";
     output += ",\n  \"minify-version\": ";
     output += std::to_string(effective_minify ? minify::format_version : 0);
+    output += ",\n  \"pagination\": ";
+    output += info.paginate.has_value() ? "true" : "false";
+    output += ",\n  \"pagination-items-per-page\": ";
+    output += std::to_string(pagination_items_per_page);
+    output += ",\n  \"pagination-template\": \"";
+    json::Document::append_escaped_string(output, pagination_template);
+    output += "\",\n  \"pagination-separator\": \"";
+    json::Document::append_escaped_string(output, pagination_separator);
+    output += "\",\n  \"pagination-pages\": ";
+    output += std::to_string(pagination_pages);
     output += ",\n  \"dependencies\": [";
 
     if (!dependencies.empty()) output.push_back('\n');
@@ -832,6 +897,19 @@ bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::s
 }
 
 bool ProjectInfo::build_one(TrackedInfo& info) {
+    std::size_t previous_pagination_pages = 0;
+    {
+        const fs::path previous_info_path = info_path(info);
+        if (filesystem::path_exists(previous_info_path)) {
+            json::Document previous; std::string previous_error;
+            if (load_json_file(previous_info_path, previous, previous_error) && previous.is_object() &&
+                previous.has("pagination-pages") && previous["pagination-pages"].is_number() &&
+                std::isfinite(previous["pagination-pages"].num) && previous["pagination-pages"].num >= 0 &&
+                std::floor(previous["pagination-pages"].num) == previous["pagination-pages"].num) {
+                previous_pagination_pages = static_cast<std::size_t>(previous["pagination-pages"].num);
+            }
+        }
+    }
     const fs::path content = content_path(info);
     if (!filesystem::path_exists(content)) {
         print_build_error({info.name, content, 0, "content file does not exist"});
@@ -874,12 +952,13 @@ bool ProjectInfo::build_one(TrackedInfo& info) {
     }
 
     if (!result.pagination_outputs.empty()) {
-        for (std::size_t page = 1; page <= result.pagination_outputs.size(); ++page) {
-            const fs::path page_output = pagination_output_path(info, page);
-            if (!filesystem::write_readonly_file(page_output, result.pagination_outputs[page - 1])) {
-                print_build_error({info.name, page_output, 0, "failed to write generated pagination output"});
-                return false;
-            }
+        std::vector<std::pair<fs::path, std::string>> page_files;
+        page_files.reserve(result.pagination_outputs.size());
+        for (std::size_t page = 1; page <= result.pagination_outputs.size(); ++page)
+            page_files.emplace_back(pagination_output_path(info, page), result.pagination_outputs[page - 1]);
+        if (!filesystem::write_readonly_files(page_files)) {
+            print_build_error({info.name, output, 0, "failed to commit generated pagination outputs"});
+            return false;
         }
     } else if (!filesystem::write_readonly_file(output, result.output)) {
         print_build_error({info.name, output, 0, "failed to write generated output"});
@@ -893,7 +972,17 @@ bool ProjectInfo::build_one(TrackedInfo& info) {
         }
     }
 
-    if (!write_page_info(info, result.dependencies, result.reqs)) {
+    const std::size_t new_pagination_pages = result.pagination_outputs.size();
+    const std::size_t keep_pages = std::max<std::size_t>(1, new_pagination_pages);
+    for (std::size_t page = keep_pages + 1; page <= previous_pagination_pages; ++page) {
+        const fs::path stale = pagination_output_path(info, page);
+        if (!filesystem::remove_owned_file(stale)) {
+            print_build_error({info.name, stale, 0, "failed to remove stale pagination output"});
+            return false;
+        }
+    }
+
+    if (!write_page_info(info, result.dependencies, result.reqs, new_pagination_pages)) {
         print_build_error({info.name, info_path(info), 0, "failed to write page build metadata"});
         return false;
     }

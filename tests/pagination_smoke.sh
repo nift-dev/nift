@@ -84,3 +84,86 @@ EOF2
 if "$NIFT_BIN" build-all >/dev/null 2>&1; then echo '@paginate without config unexpectedly succeeded' >&2; exit 1; fi
 
 echo 'Pagination smoke test passed'
+
+# Lifecycle: page count changes remove stale owned outputs, missing secondary
+# pages invalidate the whole tracked item, separator appearance/disappearance is
+# part of effective pagination state, and disabling pagination removes old pages.
+cd "$TMP"
+rm -rf .nift content templates public data
+mkdir -p .nift content templates public data
+cat > .nift/config.json <<'JSON'
+{"config":{"content-dir":"content/","content-ext":".html","output-dir":"public/","output-ext":".html","default-template":"templates/template.html","build-threads":-1,"incremental-mode":"modified"}}
+JSON
+cat > .nift/tracked.json <<'JSON'
+{"tracked":[{"name":"blog","title":"Blog","template":"templates/template.html","paginate":{"items-per-page":1}}]}
+JSON
+echo '@content' > templates/template.html
+cat > content/blog.paginate.html <<'EOF2'
+$[paginate.items]-$[paginate.current]/$[paginate.total]
+EOF2
+cat > content/blog.html <<'EOF2'
+@item{a}@item{b}@item{c}@paginate
+EOF2
+"$NIFT_BIN" build-all >/dev/null
+test -f public/blog.html && test -f public/blog-2.html && test -f public/blog-3.html
+grep -F '"pagination-pages": 3' .nift/public/blog.info.json >/dev/null
+rm public/blog-2.html
+"$NIFT_BIN" status >status.log
+grep -F 'generated pagination output is missing: public/blog-2.html' status.log >/dev/null
+"$NIFT_BIN" build >/dev/null
+cat > content/blog.html <<'EOF2'
+@item{a}@paginate
+EOF2
+"$NIFT_BIN" build >/dev/null
+test ! -e public/blog-2.html && test ! -e public/blog-3.html
+grep -F '"pagination-pages": 1' .nift/public/blog.info.json >/dev/null
+cat > content/blog.separator.html <<'EOF2'
+--sep--
+EOF2
+"$NIFT_BIN" status >status.log
+grep -F 'pagination separator changed' status.log >/dev/null
+"$NIFT_BIN" build >/dev/null
+rm content/blog.separator.html
+"$NIFT_BIN" status >status.log
+grep -F 'pagination separator changed' status.log >/dev/null
+"$NIFT_BIN" build >/dev/null
+python3 - <<'PY'
+import json
+p='.nift/tracked.json'; d=json.load(open(p)); d['tracked'][0].pop('paginate'); json.dump(d,open(p,'w'))
+PY
+cat > content/blog.html <<'EOF2'
+plain
+EOF2
+"$NIFT_BIN" build >/dev/null
+test ! -e public/blog-2.html && test ! -e public/blog-3.html
+grep -F '"pagination": false' .nift/public/blog.info.json >/dev/null
+
+# Failed pagination rendering must preserve the entire previous page set.
+cd "$TMP"
+rm -rf .nift content templates public data
+mkdir -p .nift content templates public
+cat > .nift/config.json <<'JSON'
+{"config":{"content-dir":"content/","content-ext":".html","output-dir":"public/","output-ext":".html","default-template":"templates/template.html","build-threads":-1,"incremental-mode":"modified"}}
+JSON
+cat > .nift/tracked.json <<'JSON'
+{"tracked":[{"name":"blog","title":"Blog","template":"templates/template.html","paginate":{"items-per-page":1}}]}
+JSON
+echo '@content' > templates/template.html
+cat > content/blog.html <<'EOF2'
+@item{old-a}@item{old-b}@item{old-c}@paginate
+EOF2
+cat > content/blog.paginate.html <<'EOF2'
+$[paginate.items]-$[paginate.current]
+EOF2
+"$NIFT_BIN" build-all >/dev/null
+cp public/blog.html old1
+cp public/blog-2.html old2
+cp public/blog-3.html old3
+cat > content/blog.paginate.html <<'EOF2'
+@input('missing-pagination-fragment.html')
+$[paginate.items]
+EOF2
+if "$NIFT_BIN" build >/dev/null 2>&1; then echo 'broken pagination template unexpectedly succeeded' >&2; exit 1; fi
+cmp old1 public/blog.html
+cmp old2 public/blog-2.html
+cmp old3 public/blog-3.html

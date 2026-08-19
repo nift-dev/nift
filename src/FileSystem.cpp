@@ -150,6 +150,66 @@ bool write_readonly_file(const fs::path& path, const std::string& contents) {
     return replace_file(temp, path);
 }
 
+bool write_readonly_files(const std::vector<std::pair<fs::path, std::string>>& files) {
+    if (files.empty()) return true;
+    struct Staged { fs::path path; fs::path temp; fs::path backup; bool had_original = false; bool committed = false; };
+    std::vector<Staged> staged;
+    staged.reserve(files.size());
+
+    auto cleanup = [&] {
+        for (auto& item : staged) {
+            std::error_code ignored;
+            if (!item.temp.empty()) fs::remove(item.temp, ignored);
+            ignored.clear();
+            if (!item.backup.empty()) fs::remove(item.backup, ignored);
+        }
+    };
+
+    // Stage every new file before replacing any existing output. This makes
+    // write/permission failures all-or-none across a pagination set.
+    for (const auto& [path, contents] : files) {
+        ensure_parent_directory(path);
+        remove_stale_temporaries(path);
+        Staged item;
+        item.path = path;
+        item.temp = temporary_sibling(path);
+        if (!write_temp_file(item.temp, contents) || !make_readonly(item.temp)) {
+            staged.push_back(std::move(item));
+            cleanup();
+            return false;
+        }
+        std::error_code error;
+        item.had_original = fs::exists(path, error) && !error;
+        if (item.had_original) {
+            item.backup = temporary_sibling(path);
+            fs::copy_file(path, item.backup, fs::copy_options::overwrite_existing, error);
+            if (error) { staged.push_back(std::move(item)); cleanup(); return false; }
+        }
+        staged.push_back(std::move(item));
+    }
+
+    for (std::size_t i = 0; i < staged.size(); ++i) {
+        if (!replace_file(staged[i].temp, staged[i].path)) {
+            // Best-effort rollback of outputs already replaced in this group.
+            for (std::size_t j = 0; j < i; ++j) {
+                if (!staged[j].committed) continue;
+                if (staged[j].had_original) {
+                    replace_file(staged[j].backup, staged[j].path);
+                    staged[j].backup.clear();
+                } else {
+                    remove_owned_file(staged[j].path);
+                }
+            }
+            cleanup();
+            return false;
+        }
+        staged[i].temp.clear();
+        staged[i].committed = true;
+    }
+    cleanup();
+    return true;
+}
+
 bool remove_owned_file(const fs::path& path) {
     std::error_code error;
     const bool exists = fs::exists(path, error);
