@@ -620,3 +620,30 @@ cat > content/index.html <<'EOF2'
 $[? yes : no]
 EOF2
 if "$NIFT_BIN" build-all >/dev/null 2>&1; then echo 'malformed ternary unexpectedly succeeded' >&2; exit 1; fi
+
+# Pure value expressions support numeric arithmetic with conventional precedence,
+# parentheses, unary signs, conditions, and lazy logical evaluation.
+D_EXPR="$TMP/expression-project"
+make_project "$D_EXPR"
+echo '@content' > "$D_EXPR/templates/template.html"
+cat > "$D_EXPR/content/index.html" <<'EOF_EXPR'
+$[2 + 3 * 4]|$[(2 + 3) * 4]|$[-2 + 5]|$[10 / 4]|$[10 % 3]
+@if(2 + 3 * 4 == 14 && 10 % 3 == 1){COND}
+@if(false && missing.value > 0){BAD}
+@if(true || missing.value > 0){SHORT}
+$[2 + 3 > 4 ? 'YES' : 'NO']
+EOF_EXPR
+( cd "$D_EXPR" && "$NIFT_BIN" build-all >/dev/null )
+grep -F '14|20|3|2.5|1' "$D_EXPR/public/index.html" >/dev/null
+grep -F 'COND' "$D_EXPR/public/index.html" >/dev/null
+grep -F 'SHORT' "$D_EXPR/public/index.html" >/dev/null
+if grep -F 'BAD' "$D_EXPR/public/index.html" >/dev/null; then echo 'expression short circuit failed' >&2; exit 1; fi
+grep -F 'YES' "$D_EXPR/public/index.html" >/dev/null
+
+# Invalid arithmetic fails cleanly.
+for expr in '1 / 0' '1 % 0' '1.5 % 1' "'x' + 1"; do
+  printf '$[%s]\n' "$expr" > "$D_EXPR/content/index.html"
+  if (cd "$D_EXPR" && "$NIFT_BIN" build-all >/dev/null 2>&1); then
+    echo "invalid expression unexpectedly succeeded: $expr" >&2; exit 1
+  fi
+done

@@ -192,3 +192,29 @@ find public -maxdepth 1 -type f -name 'archive*.html' -print0 | sort -z | xargs 
 "$NIFT_BIN" build-all >/dev/null
 find public -maxdepth 1 -type f -name 'archive*.html' -print0 | sort -z | xargs -0 sha256sum > after.sha
 cmp before.sha after.sha
+
+# pathtopage accepts signed relative offsets, including interpolated offsets.
+cd "$TMP"
+rm -rf .nift content templates public data
+mkdir -p .nift content templates public data
+cat > .nift/config.json <<'JSON'
+{"config":{"content-dir":"content/","content-ext":".html","output-dir":"public/","output-ext":".html","default-template":"templates/template.html","build-threads":-1,"incremental-mode":"modified"}}
+JSON
+cat > .nift/tracked.json <<'JSON'
+{"tracked":[{"name":"blog","title":"Blog","template":"templates/template.html","paginate":{"items-per-page":1}}]}
+JSON
+echo '@content' > templates/template.html
+cat > data/nav.json <<'JSON'
+{"offset":1}
+JSON
+cat > content/blog.html <<'EOF2'
+@json('data/nav.json', nav)
+@item{one}@item{two}@item{three}@paginate
+EOF2
+cat > content/blog.paginate.html <<'EOF2'
+<section>$[paginate.items]</section><nav>@if(!paginate.first){<a class="prev" href="@pathtopage(-1)">prev</a>} @if(!paginate.last){<a class="next" href="@pathtopage(+1)">next</a>} @if(!paginate.last){<a class="skip" href="@pathtopage(+$[nav.offset])">skip</a>}</nav>
+EOF2
+"$NIFT_BIN" build-all >/dev/null
+grep -F 'class="next" href="./blog-2.html"' public/blog.html >/dev/null
+grep -F 'class="skip" href="./blog-2.html"' public/blog.html >/dev/null
+grep -F 'class="prev" href="./blog.html"' public/blog-2.html >/dev/null
