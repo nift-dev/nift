@@ -340,3 +340,13 @@ calling the Nift work complete.
 - `$[...]` now supports pure numeric expressions with `+`, `-`, `*`, `/`, integer-valued `%`, unary signs and parentheses. The same arithmetic is available inside `@if`/ternary conditions; division/modulo by zero, non-integer modulo and arithmetic on non-numeric values fail cleanly.
 - `@pathtopage(n)` retains absolute-page semantics, while an explicit leading sign selects a relative offset: `@pathtopage(+1)`, `@pathtopage(-1)`, `@pathtopage(+$[offset])`, etc. Existing `$[paginate.previous]` / `$[paginate.next]` remain supported.
 - The feature was defined by source-tree and independent regression tests before implementation.
+
+## v4.0.3 pure collection operations follow-up (2026-08-19)
+
+- Added immutable, composable typed collection operations: `@filter`, `@map`, `@sort`, `@slice`, `@find`, `@some`, `@every`, `@distinct`, and `@reverse`.
+- Simple `@sort(array)` stably sorts homogeneous numeric/string arrays ascending; binding form `@sort(item : array, expression asc|desc)` supports expression-derived keys.
+- Predicate/mapping/key forms reuse the same pure expression evaluator as `$[expression]` and `@if(expression)`.
+- Collection operations can consume nested collection operations and remain typed until rendered; `@for` and `@join` now consume these values directly. Direct rendering serializes arrays/objects as JSON, making the operations useful in generated JavaScript/JSON as well as HTML.
+- `@slice(array, pos, length)` is zero-based and requires non-negative integer position/length. `@find` returns the first match or `null`; `@some`/`@every` short-circuit, with `@every` true for an empty collection. `@distinct` preserves first-occurrence order and `@reverse` returns a reversed copy.
+- The deliberate boundary remains immutable pure transformation: no assignment, mutation, stateful reducers, user-defined functions, or general query DSL.
+- Contract tests were written before implementation in `tests/collection_ops_smoke.sh`; the independent regression suite mirrors this black-box contract.
