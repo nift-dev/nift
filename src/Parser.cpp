@@ -794,6 +794,75 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
         if (resolve_direct(text,out)) return true;
         if (!error.empty()) return false;
 
+        auto truthy_value = [](const json::Document& document) {
+            if (document.is_bool()) return document.boolean;
+            if (document.is_null()) return false;
+            if (document.is_number()) return document.num != 0.0;
+            if (document.is_string()) return !document.string.empty();
+            if (document.is_array()) return !document.array.empty();
+            if (document.is_object()) return !document.object.empty();
+            return false;
+        };
+        auto find_top_level_op = [&](const std::string& op) -> std::size_t {
+            bool quoted=false; char quote=0; int parens=0; int brackets=0;
+            for (std::size_t i=0; i+op.size()<=text.size(); ++i) {
+                char c=text[i];
+                if (quoted) { if (c=='\\' && i+1<text.size()) ++i; else if (c==quote) quoted=false; continue; }
+                if (c=='\'' || c=='"') { quoted=true; quote=c; continue; }
+                if (c=='[') { ++brackets; continue; }
+                if (c==']') { if (brackets) --brackets; continue; }
+                if (brackets) continue;
+                if (c=='(') { ++parens; continue; }
+                if (c==')') { if (parens) --parens; continue; }
+                if (!parens && text.compare(i,op.size(),op)==0) return i;
+            }
+            return std::string::npos;
+        };
+
+        if (const auto p=find_top_level_op("||"); p!=std::string::npos) {
+            json::Document left;
+            if (!eval(text.substr(0,p),left)) return false;
+            if (truthy_value(left)) { out=json::Document(true); return true; }
+            json::Document right; if (!eval(text.substr(p+2),right)) return false;
+            out=json::Document(truthy_value(right)); return true;
+        }
+        if (const auto p=find_top_level_op("&&"); p!=std::string::npos) {
+            json::Document left;
+            if (!eval(text.substr(0,p),left)) return false;
+            if (!truthy_value(left)) { out=json::Document(false); return true; }
+            json::Document right; if (!eval(text.substr(p+2),right)) return false;
+            out=json::Document(truthy_value(right)); return true;
+        }
+        for (const std::string op : {"==","!=","<=",">=","<",">"}) {
+            const auto p=find_top_level_op(op);
+            if (p==std::string::npos) continue;
+            json::Document left,right;
+            if (!eval(text.substr(0,p),left) || !eval(text.substr(p+op.size()),right)) return false;
+            bool result=false;
+            if (op=="==" || op=="!=") {
+                bool equal=false;
+                if (left.type==right.type) {
+                    if (left.is_null()) equal=true;
+                    else if (left.is_bool()) equal=left.boolean==right.boolean;
+                    else if (left.is_number()) equal=left.num==right.num;
+                    else if (left.is_string()) equal=left.string==right.string;
+                    else { error="comparisons are only supported for scalar values"; return false; }
+                }
+                result = op=="==" ? equal : !equal;
+            } else {
+                if (left.type!=right.type || (!left.is_number() && !left.is_string())) { error="ordering comparisons require two numbers or two strings of the same type"; return false; }
+                int ordering=0;
+                if (left.is_number()) ordering=left.num<right.num?-1:(left.num>right.num?1:0);
+                else ordering=left.string<right.string?-1:(left.string>right.string?1:0);
+                if (op=="<") result=ordering<0; else if (op=="<=") result=ordering<=0; else if (op==">") result=ordering>0; else result=ordering>=0;
+            }
+            out=json::Document(result); return true;
+        }
+        if (text.front()=='!' && (text.size()<2 || text[1]!='=')) {
+            json::Document operand; if (!eval(text.substr(1),operand)) return false;
+            out=json::Document(!truthy_value(operand)); return true;
+        }
+
         auto find_binary = [&](const std::string& ops) -> std::size_t {
             bool quoted=false; char quote=0; int parens=0; int brackets=0;
             for (std::size_t i=text.size(); i-- > 0;) {
