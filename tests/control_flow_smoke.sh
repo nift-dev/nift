@@ -557,3 +557,36 @@ grep -F 'SHORT_OR' public/index.html >/dev/null
 grep -F 'PARENS' public/index.html >/dev/null
 grep -F 'PRECEDENCE' public/index.html >/dev/null
 if grep -F 'BAD' public/index.html >/dev/null; then echo '&& short circuit failed' >&2; exit 1; fi
+
+# Lazy ternary expressions use the same condition grammar as @if and parse only
+# the selected branch as ordinary Nift source.
+cd "$TMP"
+rm -rf .nift content templates public data
+mkdir -p .nift content templates public data
+cat > .nift/config.json <<'JSON'
+{"config":{"content-dir":"content/","content-ext":".html","output-dir":"public/","output-ext":".html","default-template":"templates/template.html","build-threads":-1,"incremental-mode":"modified"}}
+JSON
+cat > .nift/tracked.json <<'JSON'
+{"tracked":[{"name":"/","title":"ternary","template":"templates/template.html"}]}
+JSON
+cat > templates/template.html <<'EOF2'
+@content
+EOF2
+cat > templates/yes.html <<'EOF2'
+YES-$[title]
+EOF2
+cat > data/t.json <<'JSON'
+{"yes":true,"no":false,"kind":"a"}
+JSON
+cat > content/index.html <<'EOF2'
+@json('data/t.json', d)
+<p class="$[d.yes ? active : inactive]">$[d.kind == 'a' && !d.no ? @input('templates/yes.html') : @input('missing.html')]</p>
+$[d.no ? @dep('missing-dep.txt') : SAFE]
+$[d.no ? BAD : d.yes ? NESTED : BAD2]
+EOF2
+"$NIFT_BIN" build-all >/dev/null
+grep -F 'class=" active "' public/index.html >/dev/null || grep -F 'class="active"' public/index.html >/dev/null
+grep -F 'YES-ternary' public/index.html >/dev/null
+grep -F 'SAFE' public/index.html >/dev/null
+grep -F 'NESTED' public/index.html >/dev/null
+if grep -F 'missing-dep.txt' .nift/public/index.info.json >/dev/null; then echo 'unselected ternary branch registered dependency' >&2; exit 1; fi

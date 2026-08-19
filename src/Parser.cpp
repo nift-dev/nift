@@ -961,6 +961,62 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
 
             if (end < source.size()) {
                 const std::string key = source.substr(i + 2, end - i - 2);
+
+                auto split_ternary = [&](const std::string& expression,
+                                         std::string& condition,
+                                         std::string& when_true,
+                                         std::string& when_false) -> bool {
+                    bool quoted = false; char quote = 0;
+                    int parens = 0, brackets = 0, braces = 0;
+                    std::size_t question = std::string::npos;
+                    int nested_ternary = 0;
+                    for (std::size_t pos = 0; pos < expression.size(); ++pos) {
+                        const char c = expression[pos];
+                        if (quoted) {
+                            if (c == '\\' && pos + 1 < expression.size()) ++pos;
+                            else if (c == quote) quoted = false;
+                            continue;
+                        }
+                        if (c == '\'' || c == '"') { quoted = true; quote = c; continue; }
+                        if (c == '(') { ++parens; continue; }
+                        if (c == ')') { if (parens) --parens; continue; }
+                        if (c == '[') { ++brackets; continue; }
+                        if (c == ']') { if (brackets) --brackets; continue; }
+                        if (c == '{') { ++braces; continue; }
+                        if (c == '}') { if (braces) --braces; continue; }
+                        if (parens || brackets || braces) continue;
+                        if (c == '?') {
+                            if (question == std::string::npos) question = pos;
+                            else ++nested_ternary;
+                            continue;
+                        }
+                        if (c == ':' && question != std::string::npos) {
+                            if (nested_ternary > 0) { --nested_ternary; continue; }
+                            condition = trim_copy(expression.substr(0, question));
+                            when_true = expression.substr(question + 1, pos - question - 1);
+                            when_false = expression.substr(pos + 1);
+                            return true;
+                        }
+                    }
+                    return false;
+                };
+
+                std::string ternary_condition, when_true, when_false;
+                if (split_ternary(key, ternary_condition, when_true, when_false)) {
+                    bool condition_value = false;
+                    std::string condition_error;
+                    if (!evaluate_condition(ternary_condition, condition_value, condition_error)) {
+                        fail(source_path, source, i, condition_error);
+                        break;
+                    }
+                    const std::string& selected = condition_value ? when_true : when_false;
+                    const auto nested = parse(selected, source_path, depth + 1);
+                    if (!nested.ok) break;
+                    output += nested.output;
+                    i = end + 1;
+                    continue;
+                }
+
                 const std::string metadata_value = metadata(key);
                 const bool known_metadata = built_in_metadata_name(key);
 
