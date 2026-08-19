@@ -10,7 +10,7 @@ Do **not** invent Checkpoint 11 merely to continue the sequence. New hardening c
 
 ## Current phase: v4.0.3 release reconciliation and distribution verification
 
-The bounded v4.0.3 contract-first programme is now implemented: exactly-one rendered `@content`, logical condition composition, lazy ternary rendering, `@join`, UTF-8-safe `@substr`, modern multi-output pagination, a verified release installer, and a staged strict-Snap edge experiment. Pagination retains one tracked dependency/invalidation unit while rendering large page sets concurrently and preserving prior successful sets on failed replacement.
+The bounded v4.0.3 contract-first programme is now implemented: exactly-one rendered `@content`, logical condition composition, lazy ternary rendering, `@join`, UTF-8-safe `@substr`, modern multi-output pagination, pure `$[expression]` arithmetic shared with conditions, relative `@pathtopage` offsets, and a composable immutable collection layer (`@filter`, `@map`, `@sort`, `@slice`, `@find`, `@some`, `@every`, `@distinct`, `@reverse`, `@sum`, `@prod`, `@min`, `@max`, `@reduce`). The collection surface deliberately has a small functional-programming flavour—pure transforms, projections, predicates, aggregation and folds—without general assignment or mutation. The release programme also includes a verified installer and staged strict-Snap edge experiment. Pagination retains one tracked dependency/invalidation unit while rendering large page sets concurrently and preserving prior successful sets on failed replacement.
 
 The current sequence is now:
 
