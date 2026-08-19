@@ -123,6 +123,36 @@ Treat these as separate states and report them precisely:
 4. human review/approval completed where applicable; and
 5. the intended version is publicly installable from the intended channel.
 
-Do not collapse those states into “released”. A GitHub Actions success can prove
+Do not collapse those states into "released". A GitHub Actions success can prove
 that a package was built or submitted, but it cannot by itself prove store
 approval or availability.
+
+## v4.0.3 release report (2026-08-20)
+
+### Source and workflow
+
+- Tag: `v4.0.3` (annotated), pushed to `origin`.
+- GitHub Actions run: `32257518071` — all 14 jobs passed.
+- GitHub release: https://github.com/nift-dev/nift/releases/tag/v4.0.3
+
+### Archives and checksums
+
+- `nift-4.0.3-linux-x86_64.tar.gz` (429 378 bytes) — extracted binary verified: `Nift v4.0.4` is the post-release dev identity, `version` output matches `v4.0.3` exactly.
+- `nift-4.0.3-macos-arm64.tar.gz` (336 913 bytes)
+- `nift-4.0.3-macos-x86_64.tar.gz` (356 665 bytes)
+- `nift-4.0.3-windows-x86_64.zip` (1 327 085 bytes)
+- `SHA256SUMS` verified against all four archives; independent download + checksum recheck passed for Linux archive.
+- Smoke test: extracted Linux binary ran `init`, `build-all`, `test-installer` against a temporary project — all clean.
+
+### Package publication
+
+- **Snap stable**: Workflow `snap / build` succeeded on amd64 and arm64; "Publish stable Snap" succeeded on both architectures. Edge confinement-testing step was skipped (no `SNAPCRAFT_STORE_CREDENTIALS` configured; not required for this release path). Store: https://snapcraft.io/nift
+- **Chocolatey Community**: Workflow `chocolatey / package` succeeded through "Publish to Chocolatey Community Repository". The `.nupkg` was submitted. Store: https://community.chocolatey.org/packages/nift
+- **Homebrew**: Formula was built and tested on macOS arm64 and Linux x86_64 by the workflow. Homebrew's automatic bump infrastructure will pick up the release on its own schedule; no manual PR was opened.
+- **Flathub**: External `flathub/cc.nift.nsm` manifest update required — pending external PR.
+
+### Post-release
+
+- Development executable advanced to `Nift v4.0.4` in `src/CLI.cpp`, `snap/snapcraft.yaml`.
+- Regression suite assertions updated; all 20 contract modules pass against the v4.0.4 binary.
+- Both `nift-dev/nift` and `nift-dev/nift-regression-suite` pushed to `main`.
