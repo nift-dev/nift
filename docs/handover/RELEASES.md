@@ -7,8 +7,7 @@ is packaged and published.
 
 ## Authority and current state
 
-The development executable currently reports `Nift v4.0.3`, following the public
-v4.0.2 release. The retained rewrite checkpoint
+The development executable currently reports `Nift v4.0.4`, following the public v4.0.3 release.
 identity remains documented in project history and release notes, but it is not
 part of the public product version. Exact tag, artifact, and public release
 conventions must follow `PACKAGING.md` and actual Git/release evidence.

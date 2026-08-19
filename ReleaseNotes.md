@@ -1,6 +1,10 @@
 # Nift — Release Notes
 
-## v4.0.3 (development)
+## v4.0.4 (development)
+
+Development version following the public v4.0.3 release.
+
+## v4.0.3
 
 Nift 4.0.3 is a bounded post-4.0.2 language, pagination and distribution/DX refinement developed contract-first rather than as a return to the old general scripting surface.
 

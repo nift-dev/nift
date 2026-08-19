@@ -2,24 +2,22 @@
 
 ## Current status
 
-Nift has completed the planned Checkpoints 0–10 deliberate hardening campaign and reached the intended **hardening plateau**. The current development executable identifies as `Nift v4.0.3`, following the public v4.0.2 release. Production readiness is now a maintained state rather than a milestone still waiting to be earned through another synthetic checkpoint.
+Nift has completed the planned Checkpoints 0–10 deliberate hardening campaign and reached the intended **hardening plateau**. The current development executable identifies as `Nift v4.0.4`, following the public v4.0.3 release. Production readiness is now a maintained state rather than a milestone still waiting to be earned through another synthetic checkpoint.
 
 The completed campaign established and retained evidence around component memory/resource safety, Nift lifecycle/endurance behavior, cross-component ownership, incremental-vs-clean equivalence, filesystem/transaction integrity, parser fuzz/resource boundaries, and scoped Linux/macOS/Windows behavioral equivalence. Checkpoint 10 also found and fixed a real Windows read-only artifact deletion defect before the final portable corpus converged with zero mismatches.
 
 Do **not** invent Checkpoint 11 merely to continue the sequence. New hardening campaigns need a concrete trigger: a field defect, an unsupported platform claim worth establishing, a newly introduced semantic contract, or another clearly justified guarantee.
 
-## Current phase: v4.0.3 release reconciliation and distribution verification
+## Current phase: v4.0.4 development
 
-The bounded v4.0.3 contract-first programme is now implemented: exactly-one rendered `@content`, logical condition composition, lazy ternary rendering, `@join`, UTF-8-safe `@substr`, modern multi-output pagination, pure `$[expression]` arithmetic shared with conditions, relative `@pathtopage` offsets, and a composable immutable collection layer (`@filter`, `@map`, `@sort`, `@slice`, `@find`, `@some`, `@every`, `@distinct`, `@reverse`, `@sum`, `@prod`, `@min`, `@max`, `@reduce`). The collection surface deliberately has a small functional-programming flavour—pure transforms, projections, predicates, aggregation and folds—without general assignment or mutation. The release programme also includes a verified installer and a validated strict-confined Snap package: a real Store-built edge revision successfully exercised an ordinary project including project-local `.nift/` state. Pagination retains one tracked dependency/invalidation unit while rendering large page sets concurrently and preserving prior successful sets on failed replacement.
+v4.0.3 has been released. The development executable now identifies as Nift v4.0.4.
 
 The current sequence is now:
 
-1. Keep the v4.0.3 public language/configuration documentation synchronized with the candidate and retain the focused/independent regressions established for the new contracts.
+1. Maintain the v4.0.3 public language/configuration documentation and retain the focused/independent regressions established for the new contracts.
 2. Treat the 18 pagination incremental-vs-clean comparisons plus compact sanitizer/TSan pagination gates as scoped evidence for the exercised states, not universal proof.
-3. Retain strict Snap confinement for 4.0.3. The required Store-built edge validation has succeeded on an ordinary project including project-local `.nift/` state; promote the corresponding release revision through the intended channels only after the normal release checks.
-4. Publish and validate the extensionless `nift.dev/install` endpoint against the actual public release artifacts/checksums before presenting it as live installation evidence.
-5. Continue v4.0.2 downstream distribution verification while preparing the v4.0.3 release candidate; store/channel propagation remains evidence separate from repository CI.
-6. Continue dogfooding real sites and platform targets; turn concrete field failures into focused regressions instead of opening synthetic checkpoint sequences without a trigger.
+3. Continue dogfooding real sites and platform targets; turn concrete field failures into focused regressions instead of opening synthetic checkpoint sequences without a trigger.
+4. Monitor downstream distribution propagation (Homebrew auto-bump, Flathub) for v4.0.3.
 
 ## Distribution validation direction
 
