@@ -11,6 +11,7 @@
 #include <sstream>
 #include <unordered_set>
 #include <vector>
+#include <functional>
 
 namespace fs = std::filesystem;
 
@@ -684,52 +685,6 @@ bool Parser::scalar_literal(const std::string& text, json::Document& value, std:
 }
 
 bool Parser::evaluate_condition(const std::string& expression, bool& value, std::string& error) {
-    std::string condition = trim_copy(expression);
-    if (condition.empty()) {
-        error = "@if condition cannot be empty";
-        return false;
-    }
-
-    bool negate = false;
-    if (!condition.empty() && condition.front() == '!') {
-        negate = true;
-        condition = trim_copy(condition.substr(1));
-        if (condition.empty()) {
-            error = "@if negation must be followed by a value";
-            return false;
-        }
-    }
-
-    auto find_operator = [&](const std::string& op) -> std::size_t {
-        bool quoted = false;
-        char quote = 0;
-        std::size_t brackets = 0;
-        for (std::size_t i = 0; i + op.size() <= condition.size(); ++i) {
-            const char c = condition[i];
-            if (quoted) {
-                if (c == '\\') ++i;
-                else if (c == quote) quoted = false;
-                continue;
-            }
-            if (c == '\'' || c == '"') { quoted = true; quote = c; continue; }
-            if (c == '[') { ++brackets; continue; }
-            if (c == ']') { if (brackets) --brackets; continue; }
-            if (brackets == 0 && condition.compare(i, op.size(), op) == 0) return i;
-        }
-        return std::string::npos;
-    };
-
-    std::string op;
-    std::size_t op_position = std::string::npos;
-    // Check two-character operators before their one-character prefixes.
-    for (const std::string candidate : {"==", "!=", "<=", ">=", "<", ">"}) {
-        op_position = find_operator(candidate);
-        if (op_position != std::string::npos) {
-            op = candidate;
-            break;
-        }
-    }
-
     auto resolve_operand = [&](const std::string& operand,
                                std::shared_ptr<const json::Document>& document) -> bool {
         const std::string trimmed = trim_copy(operand);
@@ -739,13 +694,7 @@ bool Parser::evaluate_condition(const std::string& expression, bool& value, std:
             return local_error.empty();
         }
 
-        const bool built_in_metadata =
-            trimmed == "title" || trimmed == "name" || trimmed == "content-path" ||
-            trimmed == "output-path" || trimmed == "template-path" ||
-            trimmed == "build-timezone" || trimmed == "build-time" ||
-            trimmed == "build-UTC-time" || trimmed == "build-date" ||
-            trimmed == "build-UTC-date" || trimmed == "build-YYYY" ||
-            trimmed == "build-YY" || trimmed == "build-OS";
+        const bool built_in_metadata = built_in_metadata_name(trimmed);
         if (built_in_metadata) {
             document = std::make_shared<const json::Document>(metadata(trimmed));
             return true;
@@ -757,62 +706,137 @@ bool Parser::evaluate_condition(const std::string& expression, bool& value, std:
         return true;
     };
 
-    bool result = false;
+    auto truthy = [](const json::Document& document) {
+        if (document.is_bool()) return document.boolean;
+        if (document.is_null()) return false;
+        if (document.is_number()) return document.num != 0.0;
+        if (document.is_string()) return !document.string.empty();
+        if (document.is_array()) return !document.array.empty();
+        if (document.is_object()) return !document.object.empty();
+        return false;
+    };
 
-    if (!op.empty()) {
-        std::shared_ptr<const json::Document> left;
-        std::shared_ptr<const json::Document> right;
-        if (!resolve_operand(condition.substr(0, op_position), left) ||
-            !resolve_operand(condition.substr(op_position + op.size()), right)) {
+    std::function<bool(const std::string&, bool&)> eval;
+    eval = [&](const std::string& raw, bool& result) -> bool {
+        std::string condition = trim_copy(raw);
+        if (condition.empty()) {
+            error = "@if condition cannot be empty";
             return false;
         }
 
-        if (op == "==" || op == "!=") {
-            bool equal = false;
-            if (left->type == right->type) {
-                if (left->is_null()) equal = true;
-                else if (left->is_bool()) equal = left->boolean == right->boolean;
-                else if (left->is_number()) equal = left->num == right->num;
-                else if (left->is_string()) equal = left->string == right->string;
-                else {
-                    error = "@if comparisons are only supported for scalar JSON values";
-                    return false;
+        auto encloses_entire_expression = [&](const std::string& text) {
+            if (text.size() < 2 || text.front() != '(' || text.back() != ')') return false;
+            bool quoted = false; char quote = 0; int parens = 0; int brackets = 0;
+            for (std::size_t i = 0; i < text.size(); ++i) {
+                const char c = text[i];
+                if (quoted) {
+                    if (c == '\\' && i + 1 < text.size()) ++i;
+                    else if (c == quote) quoted = false;
+                    continue;
                 }
+                if (c == '\'' || c == '"') { quoted = true; quote = c; continue; }
+                if (c == '[') { ++brackets; continue; }
+                if (c == ']') { if (brackets) --brackets; continue; }
+                if (brackets) continue;
+                if (c == '(') ++parens;
+                else if (c == ')' && --parens == 0 && i + 1 != text.size()) return false;
+                if (parens < 0) return false;
             }
-            result = op == "==" ? equal : !equal;
-        } else {
-            if (left->type != right->type ||
-                (!left->is_number() && !left->is_string())) {
+            return parens == 0 && !quoted;
+        };
+        while (encloses_entire_expression(condition)) {
+            condition = trim_copy(condition.substr(1, condition.size() - 2));
+            if (condition.empty()) { error = "@if condition cannot be empty"; return false; }
+        }
+
+        auto find_top_level = [&](const std::string& op) -> std::size_t {
+            bool quoted = false; char quote = 0; int parens = 0; int brackets = 0;
+            for (std::size_t i = 0; i + op.size() <= condition.size(); ++i) {
+                const char c = condition[i];
+                if (quoted) {
+                    if (c == '\\' && i + 1 < condition.size()) ++i;
+                    else if (c == quote) quoted = false;
+                    continue;
+                }
+                if (c == '\'' || c == '"') { quoted = true; quote = c; continue; }
+                if (c == '[') { ++brackets; continue; }
+                if (c == ']') { if (brackets) --brackets; continue; }
+                if (brackets) continue;
+                if (c == '(') { ++parens; continue; }
+                if (c == ')') { if (parens) --parens; continue; }
+                if (parens == 0 && condition.compare(i, op.size(), op) == 0) return i;
+            }
+            return std::string::npos;
+        };
+
+        // Lowest precedence first. Recursing on each side gives && tighter binding
+        // than || and preserves short-circuit behaviour.
+        if (const auto pos = find_top_level("||"); pos != std::string::npos) {
+            bool left = false;
+            if (!eval(condition.substr(0, pos), left)) return false;
+            if (left) { result = true; return true; }
+            return eval(condition.substr(pos + 2), result);
+        }
+        if (const auto pos = find_top_level("&&"); pos != std::string::npos) {
+            bool left = false;
+            if (!eval(condition.substr(0, pos), left)) return false;
+            if (!left) { result = false; return true; }
+            return eval(condition.substr(pos + 2), result);
+        }
+
+        if (condition.front() == '!' && (condition.size() < 2 || condition[1] != '=')) {
+            bool nested = false;
+            if (!eval(condition.substr(1), nested)) return false;
+            result = !nested;
+            return true;
+        }
+
+        std::string op;
+        std::size_t op_position = std::string::npos;
+        for (const std::string candidate : {"==", "!=", "<=", ">=", "<", ">"}) {
+            op_position = find_top_level(candidate);
+            if (op_position != std::string::npos) { op = candidate; break; }
+        }
+
+        if (!op.empty()) {
+            std::shared_ptr<const json::Document> left, right;
+            if (!resolve_operand(condition.substr(0, op_position), left) ||
+                !resolve_operand(condition.substr(op_position + op.size()), right)) return false;
+
+            if (op == "==" || op == "!=") {
+                bool equal = false;
+                if (left->type == right->type) {
+                    if (left->is_null()) equal = true;
+                    else if (left->is_bool()) equal = left->boolean == right->boolean;
+                    else if (left->is_number()) equal = left->num == right->num;
+                    else if (left->is_string()) equal = left->string == right->string;
+                    else { error = "@if comparisons are only supported for scalar JSON values"; return false; }
+                }
+                result = op == "==" ? equal : !equal;
+                return true;
+            }
+
+            if (left->type != right->type || (!left->is_number() && !left->is_string())) {
                 error = "@if ordering comparisons require two numbers or two strings of the same type";
                 return false;
             }
-
             int ordering = 0;
-            if (left->is_number()) {
-                ordering = left->num < right->num ? -1 : (left->num > right->num ? 1 : 0);
-            } else {
-                ordering = left->string < right->string ? -1 : (left->string > right->string ? 1 : 0);
-            }
-
+            if (left->is_number()) ordering = left->num < right->num ? -1 : (left->num > right->num ? 1 : 0);
+            else ordering = left->string < right->string ? -1 : (left->string > right->string ? 1 : 0);
             if (op == "<") result = ordering < 0;
             else if (op == "<=") result = ordering <= 0;
             else if (op == ">") result = ordering > 0;
             else result = ordering >= 0;
+            return true;
         }
-    } else {
+
         std::shared_ptr<const json::Document> document;
         if (!resolve_operand(condition, document)) return false;
+        result = truthy(*document);
+        return true;
+    };
 
-        if (document->is_bool()) result = document->boolean;
-        else if (document->is_null()) result = false;
-        else if (document->is_number()) result = document->num != 0.0;
-        else if (document->is_string()) result = !document->string.empty();
-        else if (document->is_array()) result = !document->array.empty();
-        else if (document->is_object()) result = !document->object.empty();
-    }
-
-    value = negate ? !result : result;
-    return true;
+    return eval(expression, value);
 }
 
 std::string Parser::path_to(const std::string& argument) {

@@ -523,3 +523,37 @@ expect_cf_failure object-third-binding "exactly two bindings" \
 
 echo "Control-flow adversarial boundary extensions passed"
 
+
+
+# Logical condition composition: !, &&, ||, parentheses, precedence, and short-circuiting.
+cd "$TMP"
+rm -rf .nift content templates public data
+mkdir -p .nift content templates public data
+cat > .nift/config.json <<'JSON'
+{"config":{"content-dir":"content/","content-ext":".html","output-dir":"public/","output-ext":".html","default-template":"templates/template.html","build-threads":-1,"incremental-mode":"modified"}}
+JSON
+cat > .nift/tracked.json <<'JSON'
+{"tracked":[{"name":"/","title":"logic","template":"templates/template.html"}]}
+JSON
+cat > templates/template.html <<'EOF'
+@content
+EOF
+cat > data/logic.json <<'JSON'
+{"a":true,"b":false,"n":5}
+JSON
+cat > content/index.html <<'EOF'
+@json('data/logic.json', d)
+@if(d.a && !d.b){AND}
+@if(d.b || d.a){OR}
+@if(d.a || missing.value){SHORT_OR}
+@if(d.b && missing.value){BAD}
+@if((d.b || d.a) && d.n >= 5){PARENS}
+@if(d.a || d.b && false){PRECEDENCE}
+EOF
+"$NIFT_BIN" build-all >/dev/null
+grep -F 'AND' public/index.html >/dev/null
+grep -F 'OR' public/index.html >/dev/null
+grep -F 'SHORT_OR' public/index.html >/dev/null
+grep -F 'PARENS' public/index.html >/dev/null
+grep -F 'PRECEDENCE' public/index.html >/dev/null
+if grep -F 'BAD' public/index.html >/dev/null; then echo '&& short circuit failed' >&2; exit 1; fi
