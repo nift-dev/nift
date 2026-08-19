@@ -606,3 +606,20 @@ Publication evidence:
 - No Homebrew 4.0.2 automatic bump pull request existed when checked immediately
   after publication. Continue waiting for Homebrew's automation; do not replace
   it with a manually opened simple-bump pull request.
+
+## Strict Snap experiment for v4.0.3 development
+
+The Snap recipe is now deliberately staged as `confinement: strict` with the
+`home` interface instead of classic confinement. `.github/workflows/snap.yml`
+can be manually dispatched with `publish_edge=true` to publish the exact built
+artifact to the `edge` channel for confinement testing before any stable
+release. Do not promote this confinement change merely because the snap builds.
+
+The decisive test is an installed Store snap operating on an ordinary project
+under a normal non-hidden directory in `$HOME`: `init`, `build`, `status`,
+tracking mutations and `build-auto` must all be able to read/write the
+project-local `.nift/` state. Current Snap documentation describes `home` as
+access to non-hidden home files; project-local hidden state is therefore the
+known risk and must be tested empirically on the edge artifact. If strict
+confinement cannot support arbitrary project-local `.nift/` state cleanly, do
+not redesign Nift around Snap; revert to classic and retain the evidence.

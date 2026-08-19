@@ -9,6 +9,12 @@ on:
       - 'src/**'
       - '.github/workflows/snap.yml'
   workflow_dispatch:
+    inputs:
+      publish_edge:
+        description: Publish the built snap to edge for strict-confinement testing
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -36,6 +42,12 @@ jobs:
         with:
           name: nift-snap-${{ matrix.platform }}
           path: ${{ steps.snapcraft.outputs.snap }}
+      - name: Publish edge Snap for confinement testing
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_edge && env.SNAPCRAFT_STORE_CREDENTIALS != ''
+        uses: snapcore/action-publish@v1
+        with:
+          snap: ${{ steps.snapcraft.outputs.snap }}
+          release: edge
       - name: Publish stable Snap
         if: startsWith(github.ref, 'refs/tags/v') && env.SNAPCRAFT_STORE_CREDENTIALS != ''
         uses: snapcore/action-publish@v1
