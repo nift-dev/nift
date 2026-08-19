@@ -21,13 +21,14 @@ std::vector<std::string> parse_parameters(const std::string& text, bool& ok) {
     std::string current;
     bool quoted = false;
     char quote = 0;
+    std::size_t significant_end = 0;
     ok = true;
 
-    auto append_trimmed = [&] {
-        const auto first = current.find_first_not_of(" \t\r\n");
-        const auto last = current.find_last_not_of(" \t\r\n");
-        result.push_back(first == std::string::npos ? "" : current.substr(first, last - first + 1));
+    auto append_parameter = [&] {
+        current.resize(significant_end);
+        result.push_back(current);
         current.clear();
+        significant_end = 0;
     };
 
     for (std::size_t i = 0; i < text.size(); ++i) {
@@ -35,26 +36,30 @@ std::vector<std::string> parse_parameters(const std::string& text, bool& ok) {
         if (quoted) {
             if (c == '\\' && i + 1 < text.size()) {
                 const char escaped = text[++i];
-                // Preserve escaped-dollar intent until the interpolation pass.
-                // Other quoted escapes retain the established logical-string
-                // behavior of dropping the source escape character.
                 if (escaped == '$') current += '\\';
                 current += escaped;
+                significant_end = current.size();
+            } else if (c == quote) {
+                quoted = false;
+            } else {
+                current += c;
+                significant_end = current.size();
             }
-            else if (c == quote) quoted = false;
-            else current += c;
         } else if (c == '\'' || c == '"') {
             quoted = true;
             quote = c;
         } else if (c == ',') {
-            append_trimmed();
+            append_parameter();
+        } else if (std::isspace(static_cast<unsigned char>(c))) {
+            if (!current.empty()) current += c; // retained only if later content makes it significant
         } else {
             current += c;
+            significant_end = current.size();
         }
     }
 
     if (quoted) { ok = false; return {}; }
-    if (!text.empty() || !current.empty()) append_trimmed();
+    if (!text.empty() || !current.empty()) append_parameter();
     return result;
 }
 
@@ -1599,6 +1604,37 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
 
                 append_indented(output, nested.output, indent, insertion_code_block_depth);
                 result_.content_used = true;
+                i = end;
+                continue;
+            }
+
+            if (function == "join") {
+                if (!has_parameters || parameters.size() != 2) { fail(source_path, source, i, "join: expected array and separator"); break; }
+                std::string expression = trim_copy(parameters[0]);
+                if (expression.size() >= 3 && expression.rfind("$[", 0) == 0 && expression.back() == ']') {
+                    expression = expression.substr(2, expression.size() - 3);
+                }
+                std::shared_ptr<const json::Document> array;
+                std::string join_error;
+                if (!resolve_json_value(expression, array, join_error) || !join_error.empty()) {
+                    fail(source_path, source, i, join_error.empty() ? "join: expected JSON array value" : "join: " + join_error);
+                    break;
+                }
+                if (!array->is_array()) { fail(source_path, source, i, "join: first parameter must resolve to a JSON array"); break; }
+                std::string separator, interpolation_error;
+                if (!interpolate_parameter(parameters[1], separator, interpolation_error)) {
+                    fail(source_path, source, i, "join: " + interpolation_error); break;
+                }
+                for (std::size_t item_index = 0; item_index < array->array.size(); ++item_index) {
+                    const auto& item = array->array[item_index];
+                    if (item.is_array() || item.is_object()) {
+                        fail(source_path, source, i, "join: array items must be scalar JSON values");
+                        break;
+                    }
+                    if (item_index) output += separator;
+                    output += item.is_string() ? item.string : item.dump(0);
+                }
+                if (!result_.ok) break;
                 i = end;
                 continue;
             }
