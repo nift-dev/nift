@@ -40,7 +40,9 @@ private:
     bool resolve_json_value(const std::string& expression,
                             std::shared_ptr<const json::Document>& value,
                             std::string& error);
+    bool evaluate_expression(const std::string& expression, json::Document& value, std::string& error);
     bool evaluate_condition(const std::string& expression, bool& value, std::string& error);
+    std::string render_expression_value(const json::Document& value) const;
     bool resolve_pagination_value(const std::string& expression, std::shared_ptr<const json::Document>& value) const;
     std::string path_to_page(std::size_t page);
     bool scalar_literal(const std::string& text, json::Document& value, std::string& error) const;

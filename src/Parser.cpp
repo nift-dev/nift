@@ -8,6 +8,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <ctime>
+#include <cmath>
 #include <sstream>
 #include <unordered_set>
 #include <vector>
@@ -626,9 +627,17 @@ bool Parser::interpolate_parameter(const std::string& parameter,
         }
 
         const std::string expression = parameter.substr(i + 2, end - i - 2);
-        std::shared_ptr<const json::Document> pagination_value;
-        if (resolve_pagination_value(expression, pagination_value)) {
-            resolved += pagination_value->is_string() ? pagination_value->string : pagination_value->dump(0);
+        json::Document expression_value;
+        std::string expression_error;
+        if (evaluate_expression(expression, expression_value, expression_error)) {
+            if (expression_value.is_array() || expression_value.is_object()) {
+                error = "parameter expression must resolve to a scalar value";
+                return false;
+            }
+            resolved += render_expression_value(expression_value);
+        } else if (!expression_error.empty() && expression_error.rfind("unknown value or malformed expression:", 0) != 0) {
+            error = expression_error;
+            return false;
         } else if (built_in_metadata_name(expression)) {
             resolved += metadata(expression);
         } else {
@@ -736,26 +745,113 @@ bool Parser::scalar_literal(const std::string& text, json::Document& value, std:
     return false;
 }
 
+std::string Parser::render_expression_value(const json::Document& value) const {
+    if (value.is_string()) return value.string;
+    return value.dump(0);
+}
+
+bool Parser::evaluate_expression(const std::string& expression, json::Document& value, std::string& error) {
+    auto resolve_direct = [&](const std::string& raw, json::Document& out) -> bool {
+        const std::string text = trim_copy(raw);
+        std::shared_ptr<const json::Document> document;
+        if (resolve_pagination_value(text, document)) { out = *document; return true; }
+        std::string local_error;
+        if (resolve_json_value(text, document, local_error)) {
+            if (!local_error.empty()) { error = local_error; return false; }
+            out = *document; return true;
+        }
+        if (built_in_metadata_name(text)) { out = json::Document(metadata(text)); return true; }
+        json::Document literal;
+        std::string literal_error;
+        if (scalar_literal(text, literal, literal_error)) { out = std::move(literal); return true; }
+        return false;
+    };
+
+    auto encloses = [](const std::string& text) {
+        if (text.size() < 2 || text.front() != '(' || text.back() != ')') return false;
+        bool quoted=false; char quote=0; int parens=0; int brackets=0;
+        for (std::size_t i=0;i<text.size();++i) {
+            char c=text[i];
+            if (quoted) { if (c=='\\' && i+1<text.size()) ++i; else if (c==quote) quoted=false; continue; }
+            if (c=='\'' || c=='"') { quoted=true; quote=c; continue; }
+            if (c=='[') { ++brackets; continue; }
+            if (c==']') { if (brackets) --brackets; continue; }
+            if (brackets) continue;
+            if (c=='(') ++parens;
+            else if (c==')') { --parens; if (parens==0 && i+1!=text.size()) return false; if (parens<0) return false; }
+        }
+        return parens==0 && !quoted;
+    };
+
+    std::function<bool(const std::string&, json::Document&)> eval;
+    eval = [&](const std::string& raw, json::Document& out) -> bool {
+        std::string text=trim_copy(raw);
+        if (text.empty()) { error="expression cannot be empty"; return false; }
+        while (encloses(text)) text=trim_copy(text.substr(1,text.size()-2));
+
+        // Preserve exact metadata/JSON names (notably built-ins such as output-path)
+        // before interpreting punctuation as arithmetic.
+        if (resolve_direct(text,out)) return true;
+        if (!error.empty()) return false;
+
+        auto find_binary = [&](const std::string& ops) -> std::size_t {
+            bool quoted=false; char quote=0; int parens=0; int brackets=0;
+            for (std::size_t i=text.size(); i-- > 0;) {
+                char c=text[i];
+                if (quoted) { if (c==quote && (i==0 || text[i-1]!='\\')) quoted=false; continue; }
+                if (c=='\'' || c=='"') { quoted=true; quote=c; continue; }
+                if (c==']') { ++brackets; continue; }
+                if (c=='[') { if (brackets) --brackets; continue; }
+                if (brackets) continue;
+                if (c==')') { ++parens; continue; }
+                if (c=='(') { if (parens) --parens; continue; }
+                if (parens || ops.find(c)==std::string::npos) continue;
+                if ((c=='+' || c=='-') && (i==0 || std::string("+-*/%(<>=!&|?:,").find(text[i-1])!=std::string::npos)) continue;
+                return i;
+            }
+            return std::string::npos;
+        };
+
+        std::size_t pos=find_binary("+-");
+        if (pos==std::string::npos) pos=find_binary("*/%");
+        if (pos!=std::string::npos) {
+            json::Document left,right;
+            if (!eval(text.substr(0,pos),left) || !eval(text.substr(pos+1),right)) return false;
+            if (!left.is_number() || !right.is_number()) { error="arithmetic operators require numeric operands"; return false; }
+            const char op=text[pos];
+            double result=0.0;
+            if (op=='+') result=left.num+right.num;
+            else if (op=='-') result=left.num-right.num;
+            else if (op=='*') result=left.num*right.num;
+            else if (op=='/') { if (right.num==0.0) { error="division by zero"; return false; } result=left.num/right.num; }
+            else {
+                if (right.num==0.0) { error="modulo by zero"; return false; }
+                if (std::trunc(left.num)!=left.num || std::trunc(right.num)!=right.num) { error="modulo requires integer-valued operands"; return false; }
+                result=std::fmod(left.num,right.num);
+            }
+            if (!std::isfinite(result)) { error="arithmetic result is not finite"; return false; }
+            out=json::Document(result); return true;
+        }
+
+        if ((text.front()=='+' || text.front()=='-') && text.size()>1) {
+            json::Document operand;
+            if (!eval(text.substr(1),operand)) return false;
+            if (!operand.is_number()) { error="unary arithmetic operators require a numeric operand"; return false; }
+            out=json::Document(text.front()=='-' ? -operand.num : operand.num); return true;
+        }
+
+        error="unknown value or malformed expression: " + text;
+        return false;
+    };
+    return eval(expression,value);
+}
+
 bool Parser::evaluate_condition(const std::string& expression, bool& value, std::string& error) {
     auto resolve_operand = [&](const std::string& operand,
                                std::shared_ptr<const json::Document>& document) -> bool {
-        const std::string trimmed = trim_copy(operand);
-        if (resolve_pagination_value(trimmed, document)) return true;
-        std::string local_error;
-        if (resolve_json_value(trimmed, document, local_error)) {
-            if (!local_error.empty()) error = local_error;
-            return local_error.empty();
-        }
-
-        const bool built_in_metadata = built_in_metadata_name(trimmed);
-        if (built_in_metadata) {
-            document = std::make_shared<const json::Document>(metadata(trimmed));
-            return true;
-        }
-
-        json::Document literal;
-        if (!scalar_literal(trimmed, literal, error)) return false;
-        document = std::make_shared<const json::Document>(std::move(literal));
+        json::Document evaluated;
+        if (!evaluate_expression(operand, evaluated, error)) return false;
+        document = std::make_shared<const json::Document>(std::move(evaluated));
         return true;
     };
 
@@ -1093,6 +1189,22 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     break;
                 }
 
+                json::Document expression_value;
+                std::string expression_error;
+                if (evaluate_expression(trim_copy(key), expression_value, expression_error)) {
+                    if (expression_value.is_array() || expression_value.is_object()) {
+                        fail(source_path, source, i, "cannot render array/object expression $[" + key + "]");
+                        break;
+                    }
+                    output += render_expression_value(expression_value);
+                    i = end + 1;
+                    continue;
+                }
+                if (!expression_error.empty() && expression_error.rfind("unknown value or malformed expression:", 0) != 0) {
+                    fail(source_path, source, i, expression_error);
+                    break;
+                }
+                // A direct legacy lookup below preserves its established diagnostics.
                 std::shared_ptr<const json::Document> pagination_value;
                 if (resolve_pagination_value(trim_copy(key), pagination_value)) {
                     output += pagination_value->is_string() ? pagination_value->string : pagination_value->dump(0);
@@ -1715,12 +1827,21 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
 
             if (function == "pathtopage") {
                 if (!has_parameters || parameters.size() != 1) { fail(source_path, source, i, "pathtopage: expected 1 page number"); break; }
+                const std::string raw_page = trim_copy(parameters[0]);
+                const bool relative = !raw_page.empty() && (raw_page.front() == '+' || raw_page.front() == '-');
+                const int relative_sign = !raw_page.empty() && raw_page.front() == '-' ? -1 : 1;
+                const std::string page_argument = relative ? raw_page.substr(1) : raw_page;
                 std::string resolved, interpolation_error;
-                if (!interpolate_parameter(parameters[0], resolved, interpolation_error)) { fail(source_path, source, i, "pathtopage: " + interpolation_error); break; }
+                if (!interpolate_parameter(page_argument, resolved, interpolation_error)) { fail(source_path, source, i, "pathtopage: " + interpolation_error); break; }
                 const std::string trimmed = trim_copy(resolved);
                 char* endp = nullptr;
-                const unsigned long long page = std::strtoull(trimmed.c_str(), &endp, 10);
-                if (trimmed.empty() || !endp || *endp != '\0' || page == 0) { fail(source_path, source, i, "pathtopage: page must be a positive integer"); break; }
+                const unsigned long long number = std::strtoull(trimmed.c_str(), &endp, 10);
+                if (trimmed.empty() || !endp || *endp != '\0' || number == 0) { fail(source_path, source, i, "pathtopage: page/offset must be a positive integer"); break; }
+                long long page = static_cast<long long>(number);
+                if (relative) page = static_cast<long long>(pagination_current_) + relative_sign * static_cast<long long>(number);
+                if (page < 1 || static_cast<unsigned long long>(page) > static_cast<unsigned long long>(pagination_total_)) {
+                    fail(source_path, source, i, "pathtopage: resolved page must be between 1 and " + std::to_string(pagination_total_)); break;
+                }
                 output += path_to_page(static_cast<std::size_t>(page));
                 if (!result_.ok) break;
                 i = end;
