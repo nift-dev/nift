@@ -1608,6 +1608,59 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 continue;
             }
 
+            if (function == "substr") {
+                if (!has_parameters || parameters.size() != 3) { fail(source_path, source, i, "substr: expected value, position and length"); break; }
+                std::string text, interpolation_error;
+                if (!interpolate_parameter(parameters[0], text, interpolation_error)) {
+                    fail(source_path, source, i, "substr: " + interpolation_error); break;
+                }
+                auto parse_index = [&](const std::string& raw, const char* label, std::size_t& parsed) {
+                    const std::string trimmed = trim_copy(raw);
+                    if (trimmed.empty() || trimmed.front() == '-') {
+                        fail(source_path, source, i, std::string("substr: ") + label + " must be a non-negative integer"); return false;
+                    }
+                    char* endp = nullptr;
+                    const unsigned long long value = std::strtoull(trimmed.c_str(), &endp, 10);
+                    if (!endp || *endp != '\0') {
+                        fail(source_path, source, i, std::string("substr: ") + label + " must be a non-negative integer"); return false;
+                    }
+                    parsed = static_cast<std::size_t>(value);
+                    return true;
+                };
+                std::size_t position = 0, length = 0;
+                if (!parse_index(parameters[1], "position", position) || !parse_index(parameters[2], "length", length)) break;
+
+                std::vector<std::size_t> offsets;
+                offsets.reserve(text.size() + 1);
+                for (std::size_t byte = 0; byte < text.size();) {
+                    offsets.push_back(byte);
+                    const unsigned char lead = static_cast<unsigned char>(text[byte]);
+                    std::size_t width = 0;
+                    if (lead < 0x80) width = 1;
+                    else if ((lead & 0xE0) == 0xC0) width = 2;
+                    else if ((lead & 0xF0) == 0xE0) width = 3;
+                    else if ((lead & 0xF8) == 0xF0) width = 4;
+                    else { fail(source_path, source, i, "substr: value contains invalid UTF-8"); break; }
+                    if (byte + width > text.size()) { fail(source_path, source, i, "substr: value contains truncated UTF-8"); break; }
+                    for (std::size_t c = 1; c < width; ++c) {
+                        if ((static_cast<unsigned char>(text[byte + c]) & 0xC0) != 0x80) {
+                            fail(source_path, source, i, "substr: value contains invalid UTF-8 continuation byte"); break;
+                        }
+                    }
+                    if (!result_.ok) break;
+                    byte += width;
+                }
+                if (!result_.ok) break;
+                offsets.push_back(text.size());
+                const std::size_t count = offsets.size() - 1;
+                if (position < count && length > 0) {
+                    const std::size_t finish = std::min(count, position + std::min(length, count - position));
+                    output.append(text, offsets[position], offsets[finish] - offsets[position]);
+                }
+                i = end;
+                continue;
+            }
+
             if (function == "join") {
                 if (!has_parameters || parameters.size() != 2) { fail(source_path, source, i, "join: expected array and separator"); break; }
                 std::string expression = trim_copy(parameters[0]);
