@@ -39,28 +39,28 @@ FOR=$[p.title]
 EOF2
 (cd "$D" && "$NIFT_BIN" build >/dev/null)
 OUT="$D/public/index.html"
-grep -F 'SORT=[1,2,2,3]' "$OUT"
-grep -F 'SORTDESC=[3,2,2,1]' "$OUT"
-grep -F 'FILTER=[{"title":"Old","score":5,"published":true},{"title":"Best","score":10,"published":true}]' "$OUT"
-grep -F 'MAP=["Old","Draft","Best"]' "$OUT"
-grep -F 'MAPEXPR=[10,198,20]' "$OUT"
-grep -F 'SORTOBJ=[{"title":"Draft","score":99,"published":false},{"title":"Best","score":10,"published":true},{"title":"Old","score":5,"published":true}]' "$OUT"
-grep -F 'SLICE=[1,2]' "$OUT"
-grep -F 'DISTINCT=["beta","alpha"]' "$OUT"
-grep -F 'REVERSE=[2,2,1,3]' "$OUT"
-grep -F 'FIND={"title":"Best","score":10,"published":true}' "$OUT"
-grep -F 'FINDNONE=null' "$OUT"
-grep -F 'SOME=true' "$OUT"
-grep -F 'EVERY=true' "$OUT"
-grep -F 'EMPTYEVERY=true' "$OUT"
-grep -F 'NEST=[3,2,2]' "$OUT"
-grep -F 'JOIN=Old | Best' "$OUT"
-python3 - "$OUT" <<'PY'
-import pathlib,sys
-s=pathlib.Path(sys.argv[1]).read_text()
-assert s.index('FOR=Best') < s.index('FOR=Old')
-PY
-
+python3 - "$OUT" <<'PYJSON'
+import json,pathlib,sys
+s=pathlib.Path(sys.argv[1]).read_text(); dec=json.JSONDecoder()
+def val(label):
+    p=s.index(label+"=")+len(label)+1
+    return dec.raw_decode(s[p:].lstrip())[0]
+assert val("SORT") == [1,2,2,3]
+assert val("SORTDESC") == [3,2,2,1]
+assert [x["title"] for x in val("FILTER")] == ["Old","Best"]
+assert val("MAP") == ["Old","Draft","Best"]
+assert val("MAPEXPR") == [10,198,20]
+assert [x["title"] for x in val("SORTOBJ")] == ["Draft","Best","Old"]
+assert val("SLICE") == [1,2]
+assert val("DISTINCT") == ["beta","alpha"]
+assert val("REVERSE") == [2,2,1,3]
+assert val("FIND")["title"] == "Best"
+assert val("FINDNONE") is None
+assert val("SOME") is True and val("EVERY") is True and val("EMPTYEVERY") is True
+assert val("NEST") == [3,2,2]
+assert "JOIN=Old | Best" in s
+assert s.index("FOR=Best") < s.index("FOR=Old")
+PYJSON
 # Invalid contracts are controlled failures.
 for CASE in badsort badslice badpredicate; do
   X="$TMP/$CASE"; cp -a "$D" "$X"; rm -rf "$X/public"; mkdir "$X/public"

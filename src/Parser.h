@@ -41,6 +41,7 @@ private:
                             std::shared_ptr<const json::Document>& value,
                             std::string& error);
     bool evaluate_expression(const std::string& expression, json::Document& value, std::string& error);
+    bool evaluate_collection_value(const std::string& expression, json::Document& value, std::string& error);
     bool evaluate_condition(const std::string& expression, bool& value, std::string& error);
     std::string render_expression_value(const json::Document& value) const;
     bool resolve_pagination_value(const std::string& expression, std::shared_ptr<const json::Document>& value) const;

@@ -20,52 +20,27 @@ namespace fs = std::filesystem;
 
 namespace {
 std::vector<std::string> parse_parameters(const std::string& text, bool& ok) {
-    std::vector<std::string> result;
-    std::string current;
-    bool quoted = false;
-    char quote = 0;
-    std::size_t significant_end = 0;
-    ok = true;
-
-    auto append_parameter = [&] {
-        current.resize(significant_end);
-        result.push_back(current);
-        current.clear();
-        significant_end = 0;
-    };
-
-    for (std::size_t i = 0; i < text.size(); ++i) {
-        const char c = text[i];
+    std::vector<std::string> result; std::string current; bool quoted=false; char quote=0;
+    int parens=0, brackets=0, braces=0; std::size_t significant_end=0; ok=true;
+    auto append_parameter=[&]{ current.resize(significant_end); result.push_back(current); current.clear(); significant_end=0; };
+    for (std::size_t i=0;i<text.size();++i) {
+        const char c=text[i];
         if (quoted) {
-            if (c == '\\' && i + 1 < text.size()) {
-                const char escaped = text[++i];
-                if (escaped == '$') current += '\\';
-                current += escaped;
-                significant_end = current.size();
-            } else if (c == quote) {
-                quoted = false;
-            } else {
-                current += c;
-                significant_end = current.size();
-            }
-        } else if (c == '\'' || c == '"') {
-            quoted = true;
-            quote = c;
-        } else if (c == ',') {
-            append_parameter();
-        } else if (std::isspace(static_cast<unsigned char>(c))) {
-            if (!current.empty()) current += c; // retained only if later content makes it significant
-        } else {
-            current += c;
-            significant_end = current.size();
+            if (c=='\\' && i+1<text.size()) { const char escaped=text[++i]; if (escaped=='$') current+='\\'; current+=escaped; significant_end=current.size(); }
+            else if (c==quote) quoted=false; else { current+=c; significant_end=current.size(); }
+            continue;
         }
+        if (c=='\'' || c=='"') { quoted=true; quote=c; continue; }
+        if (c=='(') ++parens; else if (c==')') --parens; else if (c=='[') ++brackets; else if (c==']') --brackets; else if (c=='{') ++braces; else if (c=='}') --braces;
+        if (parens<0 || brackets<0 || braces<0) { ok=false; return {}; }
+        if (c==',' && parens==0 && brackets==0 && braces==0) { append_parameter(); continue; }
+        if (std::isspace(static_cast<unsigned char>(c))) { if (!current.empty()) current+=c; }
+        else { current+=c; significant_end=current.size(); }
     }
-
-    if (quoted) { ok = false; return {}; }
+    if (quoted || parens || brackets || braces) { ok=false; return {}; }
     if (!text.empty() || !current.empty()) append_parameter();
     return result;
 }
-
 
 bool valid_binding_identifier(const std::string& name) {
     if (name.empty()) return false;
@@ -101,27 +76,13 @@ bool parse_for_collection_clause(const std::string& clause,
                                  std::string& sort_expression,
                                  bool& descending,
                                  std::string& error) {
-    std::istringstream stream(clause);
-    std::vector<std::string> words;
-    std::string word;
-    while (stream >> word) words.push_back(word);
-    if (words.size() == 1) {
-        collection_expression = words[0];
-        sort_expression.clear();
-        descending = false;
-        return true;
-    }
-    if (words.size() == 4 && words[1] == "by" &&
-        (words[3] == "asc" || words[3] == "desc")) {
-        collection_expression = words[0];
-        sort_expression = words[2];
-        descending = words[3] == "desc";
-        return true;
-    }
-    error = "@for sorting syntax is @for(item : collection by item.field asc|desc){...}";
-    return false;
+    bool quoted=false; char quote=0; int parens=0, brackets=0; std::size_t by=std::string::npos;
+    for(std::size_t i=0;i+4<=clause.size();++i){char c=clause[i]; if(quoted){if(c=='\\')++i;else if(c==quote)quoted=false;continue;} if(c=='\''||c=='"'){quoted=true;quote=c;continue;} if(c=='(')++parens;else if(c==')')--parens;else if(c=='[')++brackets;else if(c==']')--brackets; if(!parens&&!brackets&&clause.compare(i,4," by ")==0){by=i;break;}}
+    if(by==std::string::npos){collection_expression=clause;sort_expression.clear();descending=false;return true;}
+    collection_expression=clause.substr(0,by); std::string tail=clause.substr(by+4);
+    const auto space=tail.find_last_of(" \t"); if(space==std::string::npos){error="@for sorting syntax is @for(item : collection by item.field asc|desc){...}";return false;}
+    sort_expression=tail.substr(0,space); const std::string direction=tail.substr(space+1); if(direction!="asc"&&direction!="desc"){error="@for sorting syntax is @for(item : collection by item.field asc|desc){...}";return false;} descending=direction=="desc"; return true;
 }
-
 std::shared_ptr<const json::Document> make_loop_metadata(std::size_t index,
                                                          std::size_t length) {
     auto loop = std::make_shared<json::Document>(json::Document::make_object());
@@ -750,6 +711,94 @@ std::string Parser::render_expression_value(const json::Document& value) const {
     return value.dump(0);
 }
 
+bool Parser::evaluate_collection_value(const std::string& expression, json::Document& value, std::string& error) {
+    const std::string text = trim_copy(expression);
+    if (text.empty()) { error = "collection expression cannot be empty"; return false; }
+    if (text.front() != '@') return evaluate_expression(text, value, error);
+
+    std::size_t name_end = 1;
+    while (name_end < text.size() && std::islower(static_cast<unsigned char>(text[name_end]))) ++name_end;
+    if (name_end == 1 || name_end >= text.size() || text[name_end] != '(') { error = "malformed collection operation: " + text; return false; }
+    const std::string function = text.substr(1, name_end - 1);
+    if (function != "filter" && function != "map" && function != "sort" && function != "slice" &&
+        function != "find" && function != "some" && function != "every" && function != "distinct" && function != "reverse") {
+        error = "unsupported collection operation: @" + function; return false;
+    }
+    std::size_t close = 0;
+    if (!find_balanced(text, name_end, '(', ')', close) || close + 1 != text.size()) { error = "malformed @" + function + " call"; return false; }
+    bool params_ok = false;
+    auto params = parse_parameters(text.substr(name_end + 1, close - name_end - 1), params_ok);
+    if (!params_ok) { error = function + ": malformed parameters"; return false; }
+
+    auto truthy = [](const json::Document& d) { if (d.is_bool()) return d.boolean; if (d.is_null()) return false; if (d.is_number()) return d.num != 0.0; if (d.is_string()) return !d.string.empty(); if (d.is_array()) return !d.array.empty(); if (d.is_object()) return !d.object.empty(); return false; };
+    auto collection_arg = [&](const std::string& raw, json::Document& out) {
+        if (!evaluate_collection_value(raw, out, error)) return false;
+        if (!out.is_array()) { error = function + ": collection must resolve to an array"; return false; }
+        return true;
+    };
+    auto split_binding = [&](const std::string& raw, std::string& binding, std::string& collection_text) {
+        bool quoted=false; char quote=0; int parens=0, brackets=0;
+        for (std::size_t i=0;i<raw.size();++i) { char c=raw[i]; if (quoted) { if(c=='\\') ++i; else if(c==quote) quoted=false; continue; } if(c=='\''||c=='"'){quoted=true;quote=c;continue;} if(c=='(')++parens; else if(c==')')--parens; else if(c=='[')++brackets; else if(c==']')--brackets; else if(c==':'&&!parens&&!brackets){binding=trim_copy(raw.substr(0,i));collection_text=trim_copy(raw.substr(i+1));return true;} }
+        return false;
+    };
+    auto validate_binding = [&](const std::string& binding) {
+        if (!valid_binding_identifier(binding)) { error = function + ": binding must be an identifier"; return false; }
+        if (reserved_binding_name(binding) || project_.config.contracts.count(binding)) { error = function + ": binding conflicts with a reserved namespace: " + binding; return false; }
+        return true;
+    };
+    auto with_binding = [&](const std::string& binding, const std::shared_ptr<const json::Document>& root, const json::Document* element, const std::function<bool()>& action) {
+        const auto it=json_bindings_.find(binding); const bool had=it!=json_bindings_.end(); std::shared_ptr<const json::Document> previous; if(had) previous=it->second;
+        json_bindings_[binding]=std::shared_ptr<const json::Document>(root, element); const bool ok=action();
+        if(had) json_bindings_[binding]=previous; else json_bindings_.erase(binding); return ok;
+    };
+
+    if (function == "slice") {
+        if (params.size()!=3) { error="slice: expected collection, position and length"; return false; }
+        json::Document source; if(!collection_arg(params[0],source)) return false;
+        auto index=[&](const std::string& raw, std::size_t& out, const char* label){ json::Document v; if(!evaluate_expression(raw,v,error)) return false; if(!v.is_number()||v.num<0||std::trunc(v.num)!=v.num){error=std::string("slice: ")+label+" must be a non-negative integer";return false;} out=static_cast<std::size_t>(v.num); return true; };
+        std::size_t pos=0,len=0; if(!index(params[1],pos,"position")||!index(params[2],len,"length")) return false;
+        value=json::Document::make_array(); const std::size_t end=std::min(source.array.size(), pos>source.array.size()?source.array.size():pos+std::min(len,source.array.size()-pos));
+        if(pos<source.array.size()) value.array.insert(value.array.end(),source.array.begin()+pos,source.array.begin()+end);
+        return true;
+    }
+    if (function == "reverse" || function == "distinct") {
+        if(params.size()!=1){error=function+": expected one collection";return false;} json::Document source; if(!collection_arg(params[0],source))return false; value=json::Document::make_array();
+        if(function=="reverse"){value.array.assign(source.array.rbegin(),source.array.rend());return true;}
+        std::unordered_set<std::string> seen; for(const auto& item:source.array){const std::string key=item.dump(0);if(seen.insert(key).second)value.array.push_back(item);} return true;
+    }
+    if (function == "sort" && params.size()==1) {
+        json::Document source; if(!collection_arg(params[0],source)) return false; value=source;
+        if(value.array.empty()) return true;
+        const auto type=value.array.front().type; if(type!=json::Type::Number&&type!=json::Type::String){error="sort: simple form requires an array of numbers or strings";return false;}
+        for(const auto& item:value.array) if(item.type!=type){error="sort: values must all have the same sortable type";return false;}
+        std::stable_sort(value.array.begin(),value.array.end(),[](const auto&a,const auto&b){return a.is_number()?a.num<b.num:a.string<b.string;}); return true;
+    }
+
+    if ((function=="filter"||function=="map"||function=="find"||function=="some"||function=="every"||function=="sort") && params.size()==2) {
+        std::string binding, source_text; if(!split_binding(params[0],binding,source_text)){error=function+": expected binding : collection";return false;} if(!validate_binding(binding))return false;
+        json::Document source; if(!collection_arg(source_text,source))return false; auto root=std::make_shared<const json::Document>(source);
+        std::string expr=trim_copy(params[1]); bool descending=false;
+        if(function=="sort") { if(expr.size()>5&&expr.compare(expr.size()-5,5," desc")==0){descending=true;expr=trim_copy(expr.substr(0,expr.size()-5));} else if(expr.size()>4&&expr.compare(expr.size()-4,4," asc")==0) expr=trim_copy(expr.substr(0,expr.size()-4)); }
+        if(function=="filter"||function=="map") value=json::Document::make_array();
+        if(function=="some") value=json::Document(false);
+        if(function=="every") value=json::Document(true);
+        if(function=="find") value=json::Document(nullptr);
+        std::vector<json::Document> keys; if(function=="sort") keys.reserve(root->array.size());
+        for(std::size_t i=0;i<root->array.size();++i){json::Document evaluated; bool ok=with_binding(binding,root,&root->array[i],[&]{return evaluate_expression(expr,evaluated,error);}); if(!ok)return false;
+            if(function=="filter"){if(truthy(evaluated))value.array.push_back(root->array[i]);}
+            else if(function=="map") value.array.push_back(std::move(evaluated));
+            else if(function=="find"){if(truthy(evaluated)){value=root->array[i];return true;}}
+            else if(function=="some"){if(truthy(evaluated)){value=json::Document(true);return true;}}
+            else if(function=="every"){if(!truthy(evaluated)){value=json::Document(false);return true;}}
+            else keys.push_back(std::move(evaluated));
+        }
+        if(function!="sort") return true;
+        if(keys.empty()){value=source;return true;} const auto type=keys.front().type; if(type!=json::Type::Number&&type!=json::Type::String){error="sort: keys must be numbers or strings";return false;} for(const auto& k:keys)if(k.type!=type){error="sort: keys must all have the same type";return false;}
+        std::vector<std::size_t> order(keys.size()); for(std::size_t i=0;i<order.size();++i)order[i]=i; std::stable_sort(order.begin(),order.end(),[&](auto a,auto b){bool less=type==json::Type::Number?keys[a].num<keys[b].num:keys[a].string<keys[b].string;bool greater=type==json::Type::Number?keys[a].num>keys[b].num:keys[a].string>keys[b].string;return descending?greater:less;}); value=json::Document::make_array(); for(auto i:order)value.array.push_back(root->array[i]); return true;
+    }
+    error=function+": invalid parameters"; return false;
+}
+
 bool Parser::evaluate_expression(const std::string& expression, json::Document& value, std::string& error) {
     auto resolve_direct = [&](const std::string& raw, json::Document& out) -> bool {
         const std::string text = trim_copy(raw);
@@ -757,8 +806,15 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
         if (resolve_pagination_value(text, document)) { out = *document; return true; }
         std::string local_error;
         if (resolve_json_value(text, document, local_error)) {
-            if (!local_error.empty()) { error = local_error; return false; }
-            out = *document; return true;
+            if (!local_error.empty()) {
+                const bool compound = text.find("&&") != std::string::npos || text.find("||") != std::string::npos ||
+                    text.find("==") != std::string::npos || text.find("!=") != std::string::npos ||
+                    text.find("<=") != std::string::npos || text.find(">=") != std::string::npos ||
+                    text.find(" + ") != std::string::npos || text.find(" - ") != std::string::npos ||
+                    text.find(" * ") != std::string::npos || text.find(" / ") != std::string::npos ||
+                    text.find(" % ") != std::string::npos || text.find(" < ") != std::string::npos || text.find(" > ") != std::string::npos;
+                if (!compound) { error = local_error; return false; }
+            } else { out = *document; return true; }
         }
         if (built_in_metadata_name(text)) { out = json::Document(metadata(text)); return true; }
         json::Document literal;
@@ -1565,16 +1621,13 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 break;
             }
 
-            std::shared_ptr<const json::Document> collection;
+            json::Document collection_value;
             std::string collection_error;
-            if (!resolve_json_value(collection_expression, collection, collection_error)) {
-                fail(source_path, source, i, "@for collection must be a bound JSON value: " + collection_expression);
+            if (!evaluate_collection_value(collection_expression, collection_value, collection_error)) {
+                fail(source_path, source, i, "@for collection: " + collection_error);
                 break;
             }
-            if (!collection_error.empty()) {
-                fail(source_path, source, i, collection_error);
-                break;
-            }
+            auto collection = std::make_shared<const json::Document>(std::move(collection_value));
 
             const auto body = normalize_control_block_body(
                 source.substr(block_open + 1, block_close - block_open - 1));
@@ -1830,18 +1883,8 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
 
             if (call_start < source.size() && source[call_start] == '(') {
                 has_parameters = true;
-                bool quoted = false;
-                char quote = 0;
-                std::size_t close = call_start + 1;
-                for (; close < source.size(); ++close) {
-                    const char c = source[close];
-                    if (quoted) {
-                        if (c == '\\') ++close;
-                        else if (c == quote) quoted = false;
-                    } else if (c == '\'' || c == '"') { quoted = true; quote = c; }
-                    else if (c == ')') break;
-                }
-                if (close >= source.size()) { fail(source_path, source, i, function + ": malformed parameters"); break; }
+                std::size_t close = 0;
+                if (!find_balanced(source, call_start, '(', ')', close)) { fail(source_path, source, i, function + ": malformed parameters"); break; }
                 parameters = parse_parameters(source.substr(call_start + 1, close - call_start - 1), parameters_ok);
                 if (!parameters_ok) { fail(source_path, source, i, function + ": malformed parameters"); break; }
                 end = close + 1;
@@ -1921,6 +1964,16 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 continue;
             }
 
+            if (function == "filter" || function == "map" || function == "sort" || function == "slice" ||
+                function == "find" || function == "some" || function == "every" || function == "distinct" || function == "reverse") {
+                if (!has_parameters) { fail(source_path, source, i, function + ": expected parameters"); break; }
+                json::Document collection_result; std::string collection_error;
+                const std::size_t call_end = (end > call_start && source[end - 1] == ';') ? end - 1 : end;
+                const std::string call = "@" + function + source.substr(call_start, call_end - call_start);
+                if (!evaluate_collection_value(call, collection_result, collection_error)) { fail(source_path, source, i, collection_error); break; }
+                output += render_expression_value(collection_result); i = end; continue;
+            }
+
             if (function == "substr") {
                 if (!has_parameters || parameters.size() != 3) { fail(source_path, source, i, "substr: expected value, position and length"); break; }
                 std::string text, interpolation_error;
@@ -1980,12 +2033,12 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 if (expression.size() >= 3 && expression.rfind("$[", 0) == 0 && expression.back() == ']') {
                     expression = expression.substr(2, expression.size() - 3);
                 }
-                std::shared_ptr<const json::Document> array;
+                json::Document array_value;
                 std::string join_error;
-                if (!resolve_json_value(expression, array, join_error) || !join_error.empty()) {
-                    fail(source_path, source, i, join_error.empty() ? "join: expected JSON array value" : "join: " + join_error);
-                    break;
+                if (!evaluate_collection_value(expression, array_value, join_error)) {
+                    fail(source_path, source, i, "join: " + join_error); break;
                 }
+                auto array = std::make_shared<const json::Document>(std::move(array_value));
                 if (!array->is_array()) { fail(source_path, source, i, "join: first parameter must resolve to a JSON array"); break; }
                 std::string separator, interpolation_error;
                 if (!interpolate_parameter(parameters[1], separator, interpolation_error)) {
