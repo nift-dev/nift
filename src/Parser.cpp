@@ -1062,7 +1062,13 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                             return true;
                         }
                     }
-                    malformed = question != std::string::npos;
+                    if (question != std::string::npos) {
+                        condition = trim_copy(expression.substr(0, question));
+                        when_true = expression.substr(question + 1);
+                        when_false.clear();
+                        malformed = condition.empty();
+                        return !malformed;
+                    }
                     return false;
                 };
 

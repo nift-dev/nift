@@ -582,12 +582,18 @@ cat > content/index.html <<'EOF2'
 @json('data/t.json', d)
 <p class="$[d.yes ? active : inactive]">$[d.kind == 'a' && !d.no ? @input('templates/yes.html') : @input('missing.html')]</p>
 $[d.no ? @dep('missing-dep.txt') : SAFE]
+$[d.yes ? SHORTHAND]
+$[d.no ? @dep('short-missing.txt')]
+$[d.yes ? d.yes ? NESTED-SHORTHAND]
 $[d.no ? BAD : d.yes ? NESTED : BAD2]
 EOF2
 "$NIFT_BIN" build-all >/dev/null
 grep -F 'class=" active "' public/index.html >/dev/null || grep -F 'class="active"' public/index.html >/dev/null
 grep -F 'YES-ternary' public/index.html >/dev/null
 grep -F 'SAFE' public/index.html >/dev/null
+grep -F 'SHORTHAND' public/index.html >/dev/null
+grep -F 'NESTED-SHORTHAND' public/index.html >/dev/null
+if grep -F 'short-missing.txt' .nift/public/index.info.json >/dev/null; then echo 'unselected shorthand ternary branch registered dependency' >&2; exit 1; fi
 grep -F 'NESTED' public/index.html >/dev/null
 if grep -F 'missing-dep.txt' .nift/public/index.info.json >/dev/null; then echo 'unselected ternary branch registered dependency' >&2; exit 1; fi
 
@@ -611,6 +617,6 @@ EOF2
 grep -F ' a?b:c]d ' public/index.html >/dev/null || grep -F 'a?b:c]d' public/index.html >/dev/null
 grep -F 'x:y?z]' public/index.html >/dev/null
 cat > content/index.html <<'EOF2'
-$[true ? yes]
+$[? yes : no]
 EOF2
 if "$NIFT_BIN" build-all >/dev/null 2>&1; then echo 'malformed ternary unexpectedly succeeded' >&2; exit 1; fi
