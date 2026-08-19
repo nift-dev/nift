@@ -23,7 +23,7 @@ Nift 4.0.3 is a bounded post-4.0.2 language, pagination and distribution/DX refi
 
 - Refined `@pathto` requirement semantics for tracked targets: a referring page no longer becomes stale merely because another currently tracked page has not produced its output yet or its build fails. The tracked producer owns its own build result, while concrete project-path requirements retain the existing missing-path rebuild/error behavior. This removes misleading first-build `required path missing` noise without introducing transitive build failure.
 - Added a small verified POSIX installer intended for `curl -fsSL https://nift.dev/install | bash`: it detects supported Linux/macOS architectures, downloads the official release archive and SHA256SUMS, verifies the archive, defaults to `~/.local/bin`, and does not silently invoke sudo or edit shell profiles.
-- Staged strict Snap confinement with a non-stable edge publication path for empirical Store testing. Stable confinement must not change until a real installed candidate proves that normal project-local `.nift/` state works under strict confinement; otherwise classic remains the correct package boundary.
+- Migrated the Snap package to strict confinement with the `home` interface. A real Store-built edge revision was installed and validated successfully against an ordinary project, including project-local `.nift/` state, so the 4.0.3 Snap no longer requires classic confinement or the `--classic` install flag.
 
 ## v4.0.2
 

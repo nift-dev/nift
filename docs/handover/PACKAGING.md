@@ -99,10 +99,11 @@ files at the same URLs.
 
 The Snap is named `nift` and supports every architecture currently listed by
 Snapcraft's Launchpad remote-build service: amd64, arm64, armhf, ppc64el,
-riscv64, and s390x. It runs `usr/bin/nift`. For v4.0.3 the recipe is staged
-with strict confinement and the `home` interface; this must be proven with the
-Store `edge` artifact against ordinary projects and their project-local `.nift/`
-state before promotion. It builds the same portable C++ source through its
+riscv64, and s390x. It runs `usr/bin/nift`. For v4.0.3 the recipe uses
+strict confinement and the `home` interface. A real Store-built `edge` artifact
+has now been installed and validated successfully against an ordinary project,
+including its project-local `.nift/` state, so strict confinement is the settled
+package boundary for 4.0.3. It builds the same portable C++ source through its
 Makefile. An architecture-specific build
 failure is a packaging defect to fix, not a reason to narrow the intended support
 claim pre-emptively.
@@ -619,19 +620,16 @@ Publication evidence:
   after publication. Continue waiting for Homebrew's automation; do not replace
   it with a manually opened simple-bump pull request.
 
-## Strict Snap experiment for v4.0.3 development
+## Strict Snap validation for v4.0.3
 
-The Snap recipe is now deliberately staged as `confinement: strict` with the
-`home` interface instead of classic confinement. `.github/workflows/snap.yml`
-can be manually dispatched with `publish_edge=true` to publish the exact built
-artifact to the `edge` channel for confinement testing before any stable
-release. Do not promote this confinement change merely because the snap builds.
+The Snap recipe uses `confinement: strict` with the `home` interface.
+`.github/workflows/snap.yml` can be manually dispatched with `publish_edge=true`
+to publish the exact built artifact to the `edge` channel before stable release.
 
-The decisive test is an installed Store snap operating on an ordinary project
-under a normal non-hidden directory in `$HOME`: `init`, `build`, `status`,
-tracking mutations and `build-auto` must all be able to read/write the
-project-local `.nift/` state. Current Snap documentation describes `home` as
-access to non-hidden home files; project-local hidden state is therefore the
-known risk and must be tested empirically on the edge artifact. If strict
-confinement cannot support arbitrary project-local `.nift/` state cleanly, do
-not redesign Nift around Snap; revert to classic and retain the evidence.
+The decisive empirical gate has been completed: a real Store-built strict `edge`
+revision was installed on a representative host and successfully exercised an
+ordinary project, including project-local `.nift/` state. This resolves the
+filesystem-access risk that motivated the experiment. Keep strict confinement
+as the 4.0.3 package boundary and do not restore `--classic` to user-facing
+installation instructions unless a future concrete regression establishes that
+it is required.

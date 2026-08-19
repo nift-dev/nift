@@ -30,8 +30,10 @@ whether it is a regression.
   native Linux/macOS/Windows Actions contract is green. The bounded v4.0.3
   language/pagination/installer programme is implemented and hardened through its
   dedicated checkpoints; current work is final release reconciliation, downstream
-  distribution verification, the strict-Snap edge experiment, provider dogfooding,
-  and field evidence.
+  distribution verification, provider dogfooding, and field evidence. The Store-built
+  strict Snap candidate has been installed and validated successfully against an
+  ordinary project including project-local `.nift/` state; strict confinement is now
+  the settled 4.0.3 package boundary.
 - Public documentation: the separate `nift-dev.github.io` repository.
 - External contract: the separate `nift-regression-suite` repository.
 - Embedded minifier: `minifypp/`, synchronized with standalone Minify++.
