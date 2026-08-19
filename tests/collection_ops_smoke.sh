@@ -12,27 +12,38 @@ cat >"$D/.nift/tracked.json" <<'JSON'
 JSON
 printf 'BODY\n' >"$D/content/index.html"
 cat >"$D/data/data.json" <<'JSON'
-{"nums":[3,1,2,2],"words":["beta","alpha","beta"],"posts":[{"title":"Old","score":5,"published":true},{"title":"Draft","score":99,"published":false},{"title":"Best","score":10,"published":true}]}
+{"nums":[3,1,2,2],"words":["beta","alpha","beta"],"triples":[[1,2,3],[4,5,6]],"products":[{"price":10,"quantity":2},{"price":5,"quantity":3}],"posts":[{"title":"Old","score":5,"published":true},{"title":"Draft","score":99,"published":false},{"title":"Best","score":10,"published":true}]}
 JSON
 cat >"$D/templates/template.html" <<'EOF2'
 @json("data/data.json", d)
 SORT=@sort(d.nums)
-SORTDESC=@sort(n : d.nums, n desc)
-FILTER=@filter(p : d.posts, p.published && p.score >= 5)
-MAP=@map(p : d.posts, p.title)
-MAPEXPR=@map(p : d.posts, p.score * 2)
-SORTOBJ=@sort(p : d.posts, p.score desc)
+SORTDESC=@sort(n : d.nums => n desc)
+FILTER=@filter(p : d.posts => p.published && p.score >= 5)
+MAP=@map(p : d.posts => p.title)
+MAPEXPR=@map(p : d.posts => p.score * 2)
+SORTOBJ=@sort(p : d.posts => p.score desc)
 SLICE=@slice(d.nums, 1, 2)
 DISTINCT=@distinct(d.words)
 REVERSE=@reverse(d.nums)
-FIND=@find(p : d.posts, p.published && p.score > 6)
-FINDNONE=@find(p : d.posts, p.score > 100)
-SOME=@some(p : d.posts, p.published && p.score == 10)
-EVERY=@every(p : d.posts, p.score > 0)
-EMPTYEVERY=@every(n : @slice(d.nums, 0, 0), n > 0)
-NEST=@sort(n : @filter(n : d.nums, n >= 2), n desc)
-JOIN=@join(@map(p : @filter(p : d.posts, p.published), p.title), " | ")
-@for(p : @sort(p : @filter(p : d.posts, p.published), p.score desc)){
+SUM=@sum(d.nums)
+PROD=@prod(d.nums)
+MIN=@min(d.nums)
+MAX=@max(d.nums)
+SUMEXPR=@sum(p : d.products => p.price * p.quantity)
+MAXEXPR=@max(p : d.posts => p.score)
+TUPLESUM=@sum((a,b,c) : d.triples => a + b + c)
+TUPLEPROD=@prod((a,b,c) : d.triples => a + b + c)
+REDUCE=@reduce(n : d.nums & acc = 0 => acc + n)
+REDUCEEXPR=@reduce(p : d.products & total = 5 => total + p.price * p.quantity)
+REDUCEEMPTY=@reduce(n : @slice(d.nums, 0, 0) & acc = 42 => acc + n)
+FIND=@find(p : d.posts => p.published && p.score > 6)
+FINDNONE=@find(p : d.posts => p.score > 100)
+SOME=@some(p : d.posts => p.published && p.score == 10)
+EVERY=@every(p : d.posts => p.score > 0)
+EMPTYEVERY=@every(n : @slice(d.nums, 0, 0) => n > 0)
+NEST=@sort(n : @filter(n : d.nums => n >= 2) => n desc)
+JOIN=@join(@map(p : @filter(p : d.posts => p.published) => p.title), " | ")
+@for(p : @sort(p : @filter(p : d.posts => p.published) => p.score desc)){
 FOR=$[p.title]
 }
 @content
@@ -54,6 +65,16 @@ assert [x["title"] for x in val("SORTOBJ")] == ["Draft","Best","Old"]
 assert val("SLICE") == [1,2]
 assert val("DISTINCT") == ["beta","alpha"]
 assert val("REVERSE") == [2,2,1,3]
+assert val("SUM") == 8
+assert val("PROD") == 12
+assert val("MIN") == 1 and val("MAX") == 3
+assert val("SUMEXPR") == 35
+assert val("MAXEXPR") == 99
+assert val("TUPLESUM") == 21
+assert val("TUPLEPROD") == 90
+assert val("REDUCE") == 8
+assert val("REDUCEEXPR") == 40
+assert val("REDUCEEMPTY") == 42
 assert val("FIND")["title"] == "Best"
 assert val("FINDNONE") is None
 assert val("SOME") is True and val("EVERY") is True and val("EMPTYEVERY") is True
@@ -62,12 +83,14 @@ assert "JOIN=Old | Best" in s
 assert s.index("FOR=Best") < s.index("FOR=Old")
 PYJSON
 # Invalid contracts are controlled failures.
-for CASE in badsort badslice badpredicate; do
+for CASE in badsort badslice badpredicate legacycomma badreduce; do
   X="$TMP/$CASE"; cp -a "$D" "$X"; rm -rf "$X/public"; mkdir "$X/public"
   case "$CASE" in
-    badsort) printf '@json("data/data.json", d)\n@sort(p : d.posts, p)\n@content\n' >"$X/templates/template.html" ;;
+    badsort) printf '@json("data/data.json", d)\n@sort(p : d.posts => p)\n@content\n' >"$X/templates/template.html" ;;
     badslice) printf '@json("data/data.json", d)\n@slice(d.nums, -1, 2)\n@content\n' >"$X/templates/template.html" ;;
-    badpredicate) printf '@json("data/data.json", d)\n@filter(p : d.posts, p.missing)\n@content\n' >"$X/templates/template.html" ;;
+    badpredicate) printf '@json("data/data.json", d)\n@filter(p : d.posts => p.missing)\n@content\n' >"$X/templates/template.html" ;;
+    legacycomma) printf '@json("data/data.json", d)\n@map(p : d.posts, p.title)\n@content\n' >"$X/templates/template.html" ;;
+    badreduce) printf '@json("data/data.json", d)\n@reduce(n : d.nums & acc = 0 => acc + missing)\n@content\n' >"$X/templates/template.html" ;;
   esac
   if (cd "$X" && "$NIFT_BIN" build >out 2>err); then echo "$CASE unexpectedly succeeded" >&2; exit 1; fi
   test -s "$X/err"
