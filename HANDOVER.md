@@ -343,10 +343,12 @@ calling the Nift work complete.
 
 ## v4.0.3 pure collection operations follow-up (2026-08-19)
 
-- Added immutable, composable typed collection operations: `@filter`, `@map`, `@sort`, `@slice`, `@find`, `@some`, `@every`, `@distinct`, and `@reverse`.
-- Simple `@sort(array)` stably sorts homogeneous numeric/string arrays ascending; binding form `@sort(item : array, expression asc|desc)` supports expression-derived keys.
-- Predicate/mapping/key forms reuse the same pure expression evaluator as `$[expression]` and `@if(expression)`.
-- Collection operations can consume nested collection operations and remain typed until rendered; `@for` and `@join` now consume these values directly. Direct rendering serializes arrays/objects as JSON, making the operations useful in generated JavaScript/JSON as well as HTML.
-- `@slice(array, pos, length)` is zero-based and requires non-negative integer position/length. `@find` returns the first match or `null`; `@some`/`@every` short-circuit, with `@every` true for an empty collection. `@distinct` preserves first-occurrence order and `@reverse` returns a reversed copy.
-- The deliberate boundary remains immutable pure transformation: no assignment, mutation, stateful reducers, user-defined functions, or general query DSL.
+- Added immutable, composable typed collection operations: `@filter`, `@map`, `@sort`, `@slice`, `@find`, `@some`, `@every`, `@distinct`, `@reverse`, `@sum`, `@prod`, `@min`, `@max`, and `@reduce`.
+- Simple forms such as `@sort(array)`, `@sum(array)`, `@prod(array)`, `@min(array)` and `@max(array)` cover direct scalar collections. Advanced per-item forms use the canonical arrow grammar `binding : collection => expression`; the earlier comma-shaped prototype is intentionally rejected before release.
+- Tuple bindings such as `@sum((a,b,c) : triples => a + b + c)` positionally unpack array elements and require exact arity. Binding names are ordinary local names, not inferred object-member names.
+- `@reduce(item : items & acc = initial => expression)` is the general pure fold. The initial accumulator is evaluated once; each iteration exposes immutable item/accumulator bindings and carries the pure expression result forward. Empty reduction returns the initial value.
+- Predicate/mapping/key/aggregation forms reuse the same pure expression evaluator as `$[expression]` and `@if(expression)`.
+- Collection operations can consume nested collection operations and remain typed until rendered; `@for` and `@join` consume these values directly. Direct rendering serializes arrays/objects as JSON, making the operations useful in generated JavaScript/JSON as well as HTML.
+- `@slice(array, pos, length)` is zero-based and requires non-negative integer position/length. `@find` returns the first match or `null`; `@some`/`@every` short-circuit, with `@every` true for an empty collection. `@distinct` preserves first-occurrence order and `@reverse` returns a reversed copy. `@sum`/`@prod` are numeric; `@min`/`@max` accept homogeneous numbers or strings and reject empty collections.
+- The collection surface intentionally has a functional-programming flavour—immutable values, pure transforms, composition and folds—without adding assignment statements, collection mutation, side-effecting callbacks, user-defined functions or a general query/runtime language.
 - Contract tests were written before implementation in `tests/collection_ops_smoke.sh`; the independent regression suite mirrors this black-box contract.
