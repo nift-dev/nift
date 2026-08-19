@@ -1192,8 +1192,12 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 json::Document expression_value;
                 std::string expression_error;
                 if (evaluate_expression(trim_copy(key), expression_value, expression_error)) {
-                    if (expression_value.is_array() || expression_value.is_object()) {
-                        fail(source_path, source, i, "cannot render array/object expression $[" + key + "]");
+                    if (expression_value.is_array()) {
+                        fail(source_path, source, i, "cannot render JSON array $[" + key + "]; select an element first");
+                        break;
+                    }
+                    if (expression_value.is_object()) {
+                        fail(source_path, source, i, "cannot render JSON object $[" + key + "]; select a member first");
                         break;
                     }
                     output += render_expression_value(expression_value);
