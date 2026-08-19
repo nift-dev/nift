@@ -12,6 +12,8 @@
 #include <unordered_set>
 #include <vector>
 #include <functional>
+#include <thread>
+#include <atomic>
 
 namespace fs = std::filesystem;
 
@@ -2089,41 +2091,89 @@ RenderResult Parser::render() {
     const std::string marker = "\x1dNIFT_PAGINATE\x1d";
     const std::size_t marker_position = base_output.find(marker);
     const std::size_t total = std::max<std::size_t>(1, (result_.pagination_items.size() + config.items_per_page - 1) / config.items_per_page);
+    struct PageRender {
+        bool ok = false;
+        std::string output;
+        BuildError error;
+        std::set<std::string> dependencies;
+        std::set<std::string> reqs;
+    };
+    std::vector<PageRender> pages(total);
+    const auto page_source = project_.read_shared_source(pagination_template);
+    const std::string* separator_source = separator.empty() ? nullptr : project_.read_shared_source(separator);
+
+    const unsigned hardware = std::max(1u, std::thread::hardware_concurrency());
+    std::size_t thread_count = tracked_info_.paginate.has_value()
+        ? (project_.config.build_threads < 0
+            ? static_cast<std::size_t>(-static_cast<long long>(project_.config.build_threads)) * hardware
+            : (project_.config.build_threads == 0 ? hardware : static_cast<std::size_t>(project_.config.build_threads)))
+        : 1;
+    thread_count = std::max<std::size_t>(1, std::min(thread_count, total));
+    std::atomic<std::size_t> next_page{0};
+
+    auto render_page = [&] {
+        while (true) {
+            const std::size_t page_index = next_page.fetch_add(1);
+            if (page_index >= total) break;
+            const std::size_t page = page_index + 1;
+            Parser page_parser(project_, tracked_info_);
+            page_parser.json_bindings_ = json_bindings_;
+            page_parser.contract_bindings_ = contract_bindings_;
+            page_parser.pagination_collecting_ = false;
+            page_parser.pagination_context_active_ = true;
+            page_parser.pagination_current_ = page;
+            page_parser.pagination_total_ = total;
+            page_parser.pagination_current_output_ = project_.pagination_output_path(tracked_info_, page);
+            page_parser.result_.content_count = result_.content_count;
+
+            const std::size_t begin = page_index * config.items_per_page;
+            const std::size_t finish = std::min(result_.pagination_items.size(), begin + config.items_per_page);
+            std::string separator_text;
+            if (separator_source && finish > begin + 1) {
+                const auto rendered_separator = page_parser.parse(*separator_source, separator, 0);
+                if (!rendered_separator.ok) {
+                    pages[page_index].error = rendered_separator.error;
+                    continue;
+                }
+                separator_text = rendered_separator.output;
+            }
+            std::string items;
+            for (std::size_t index = begin; index < finish; ++index) {
+                if (index != begin) items += separator_text;
+                items += result_.pagination_items[index];
+            }
+            page_parser.pagination_items_text_ = std::move(items);
+            const auto rendered_page = page_parser.parse(*page_source, pagination_template, 0);
+            if (!rendered_page.ok) {
+                pages[page_index].error = rendered_page.error;
+                continue;
+            }
+            std::string page_output = base_output;
+            page_output.replace(marker_position, marker.size(), rendered_page.output);
+            pages[page_index].ok = true;
+            pages[page_index].output = std::move(page_output);
+            pages[page_index].dependencies = rendered_page.dependencies;
+            pages[page_index].reqs = rendered_page.reqs;
+        }
+    };
+
+    std::vector<std::thread> workers;
+    workers.reserve(thread_count);
+    for (std::size_t worker = 0; worker < thread_count; ++worker) workers.emplace_back(render_page);
+    for (auto& worker : workers) worker.join();
+
     result_.pagination_outputs.clear();
     result_.pagination_outputs.reserve(total);
-    pagination_collecting_ = false;
-    pagination_context_active_ = true;
-    pagination_total_ = total;
-
-    for (std::size_t page = 1; page <= total && result_.ok; ++page) {
-        pagination_current_ = page;
-        pagination_current_output_ = project_.pagination_output_path(tracked_info_, page);
-        const std::size_t begin = (page - 1) * config.items_per_page;
-        const std::size_t finish = std::min(result_.pagination_items.size(), begin + config.items_per_page);
-        std::string separator_text;
-        if (!separator.empty() && finish > begin + 1) {
-            const auto sep_source = project_.read_shared_source(separator);
-            const auto rendered_separator = parse(*sep_source, separator, 0);
-            if (!rendered_separator.ok) break;
-            separator_text = rendered_separator.output;
+    for (std::size_t page_index = 0; page_index < total; ++page_index) {
+        if (!pages[page_index].ok) {
+            result_.ok = false;
+            result_.error = pages[page_index].error;
+            return result_;
         }
-        std::string items;
-        for (std::size_t index = begin; index < finish; ++index) {
-            if (index != begin) items += separator_text;
-            items += result_.pagination_items[index];
-        }
-        pagination_items_text_ = std::move(items);
-        const auto page_source = project_.read_shared_source(pagination_template);
-        const auto rendered_page = parse(*page_source, pagination_template, 0);
-        if (!rendered_page.ok) break;
-        std::string page_output = base_output;
-        page_output.replace(marker_position, marker.size(), rendered_page.output);
-        result_.pagination_outputs.push_back(std::move(page_output));
+        result_.dependencies.insert(pages[page_index].dependencies.begin(), pages[page_index].dependencies.end());
+        result_.reqs.insert(pages[page_index].reqs.begin(), pages[page_index].reqs.end());
+        result_.pagination_outputs.push_back(std::move(pages[page_index].output));
     }
-    pagination_context_active_ = false;
-    pagination_current_output_.clear();
-    pagination_items_text_.clear();
-    if (!result_.ok) return result_;
     result_.output = result_.pagination_outputs.front();
     return result_;
 }

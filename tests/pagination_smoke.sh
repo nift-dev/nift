@@ -167,3 +167,28 @@ if "$NIFT_BIN" build >/dev/null 2>&1; then echo 'broken pagination template unex
 cmp old1 public/blog.html
 cmp old2 public/blog-2.html
 cmp old3 public/blog-3.html
+
+# Multi-threaded page rendering is deterministic for a large single tracked item.
+cd "$TMP"
+rm -rf .nift content templates public
+mkdir -p .nift content templates public
+cat > .nift/config.json <<'JSON'
+{"config":{"content-dir":"content/","content-ext":".html","output-dir":"public/","output-ext":".html","default-template":"templates/template.html","build-threads":8,"incremental-mode":"modified"}}
+JSON
+cat > .nift/tracked.json <<'JSON'
+{"tracked":[{"name":"archive","title":"Archive","template":"templates/template.html","paginate":{"items-per-page":2}}]}
+JSON
+echo '@content' > templates/template.html
+cat > content/archive.paginate.html <<'EOF2'
+[$[paginate.current]/$[paginate.total]]$[paginate.items]
+EOF2
+: > content/archive.html
+for i in $(seq 1 200); do printf '@item{item-%03d}\n' "$i" >> content/archive.html; done
+echo '@paginate' >> content/archive.html
+"$NIFT_BIN" build-all >/dev/null
+count=$(find public -maxdepth 1 -type f -name 'archive*.html' | wc -l)
+test "$count" -eq 100
+find public -maxdepth 1 -type f -name 'archive*.html' -print0 | sort -z | xargs -0 sha256sum > before.sha
+"$NIFT_BIN" build-all >/dev/null
+find public -maxdepth 1 -type f -name 'archive*.html' -print0 | sort -z | xargs -0 sha256sum > after.sha
+cmp before.sha after.sha
