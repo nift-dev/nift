@@ -334,3 +334,9 @@ calling the Nift work complete.
 
 - Lazy ternary rendering now also accepts `$[condition ? true-branch]` as shorthand for an empty false branch. The condition is still evaluated by the same condition evaluator as `@if`, and the true branch is parsed only when selected; a false shorthand branch produces no output and no dependency/requirement side effects.
 - The source-tree and independent black-box control-flow contracts cover selected/unselected shorthand branches, nested shorthand ternaries and lazy dependency behavior.
+
+## v4.0.3 pure-expression follow-up (2026-08-19)
+
+- `$[...]` now supports pure numeric expressions with `+`, `-`, `*`, `/`, integer-valued `%`, unary signs and parentheses. The same arithmetic is available inside `@if`/ternary conditions; division/modulo by zero, non-integer modulo and arithmetic on non-numeric values fail cleanly.
+- `@pathtopage(n)` retains absolute-page semantics, while an explicit leading sign selects a relative offset: `@pathtopage(+1)`, `@pathtopage(-1)`, `@pathtopage(+$[offset])`, etc. Existing `$[paginate.previous]` / `$[paginate.next]` remain supported.
+- The feature was defined by source-tree and independent regression tests before implementation.
