@@ -62,7 +62,9 @@ themselves. Nift owns the small build-time job it can perform precisely.
    mutable template scripting, arbitrary shell execution, or build hooks merely
    because older Nift had them.
 2. Dependencies and requirements are different. A dependency can change output
-   bytes; a requirement means generated output assumes a path continues to exist.
+   bytes; a requirement protects a checked project relationship. Missing concrete
+   paths make the referrer stale, while a currently tracked producer owns its own
+   output/build state and does not transitively stale or fail pages that link to it.
 3. The external regression suite is a black-box behavioral contract, not a copy
    of C++ internals.
 4. Standalone Minify++ owns the independent minifier identity. Nift consumes it

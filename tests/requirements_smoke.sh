@@ -61,8 +61,9 @@ PY
 grep -Fq 'page build metadata has an invalid requirement' "$P/status.log"
 (cd "$P" && "$NIFT_BIN" build-updated >/dev/null)
 
-# A tracked-name pathto records the target output, and deleting that output only
-# selects the referring page for rebuild. Rebuilding the target restores validity.
+# A tracked-name pathto records the target output, but the producer owns its own
+# build state. A missing tracked output must not make the referring page stale or
+# emit a misleading "required path missing" reason. The target itself is selected.
 P="$TMP/tracked"; mkproj "$P"
 python3 -S - "$P/.nift/tracked.json" <<'PY'
 import json,sys
@@ -70,13 +71,31 @@ p=sys.argv[1]; d=json.load(open(p)); d["tracked"].append({"name":"about","title"
 PY
 printf '<a href="@pathto('"'"'about'"'"')">About</a>\n' >"$P/content/index.html"
 printf '<p>about</p>\n' >"$P/content/about.html"
-(cd "$P" && "$NIFT_BIN" build-all >/dev/null)
+# Build only the referrer first so its recorded requirement points at an output
+# that has never existed. A normal incremental build should then build only about.
+(cd "$P" && "$NIFT_BIN" build-names / >/dev/null)
 grep -Fq '"public/about.html"' "$P/.nift/public/index.info.json"
-rm "$P/public/about.html"
+test ! -f "$P/public/about.html"
 (cd "$P" && "$NIFT_BIN" status >status.log)
-grep -Fq 'required path missing: public/about.html' "$P/status.log"
-(cd "$P" && "$NIFT_BIN" build-updated >/dev/null)
+grep -Fq 'about' "$P/status.log"
+! grep -Fq 'required path missing: public/about.html' "$P/status.log"
+! grep -Fxq '/' "$P/status.log"
+(cd "$P" && "$NIFT_BIN" build-updated >build.log)
 test -f "$P/public/about.html"
+! grep -Fq 'required path missing: public/about.html' "$P/build.log"
+
+# If the tracked producer later fails with no output present, the referrer is still
+# a successful/up-to-date artifact; the overall invocation fails because the
+# producer itself failed. This keeps build success non-transitive and easy to explain.
+rm "$P/public/about.html"
+printf '@input("missing-partial.html")\n' >"$P/content/about.html"
+if (cd "$P" && "$NIFT_BIN" build-updated >producer-fail.log 2>&1); then
+  echo "tracked producer failure unexpectedly succeeded" >&2
+  exit 1
+fi
+grep -Fq 'while building about' "$P/producer-fail.log"
+! grep -Fq 'while building /' "$P/producer-fail.log"
+! grep -Fq 'required path missing: public/about.html' "$P/producer-fail.log"
 
 
 # Corrupt internal metadata must not be allowed to point dependency/req checks

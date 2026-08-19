@@ -73,6 +73,10 @@ canonical contract run.
 ## Testing principles
 
 - Test failure families, not vanity counts.
+- For `@pathto` requirements, distinguish concrete-path disappearance from a
+  tracked producer whose output is temporarily absent: the former stales the
+  referrer; the latter is owned by the producer and must not create transitive
+  rebuild/failure noise in referring pages.
 - Preserve each important bug as a deterministic regression.
 - Test success status, failure status, filesystem/output/state transitions, and
   incremental decisions—not output bytes alone.

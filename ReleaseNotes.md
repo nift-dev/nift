@@ -3,6 +3,7 @@
 ## v4.0.3 (development)
 
 - Development version following the v4.0.2 release.
+- Refined `@pathto` requirement semantics for tracked targets: a referring page no longer becomes stale merely because another currently tracked page has not produced its output yet or its build fails. The tracked producer owns its own build result, while concrete project-path requirements retain the existing missing-path rebuild/error behavior. This removes misleading first-build `required path missing` noise without introducing transitive build failure.
 
 ## v4.0.2
 

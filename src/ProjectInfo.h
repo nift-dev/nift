@@ -50,6 +50,9 @@ public:
 private:
     WatchList* watch_ = nullptr;
     mutable std::unordered_map<std::string, std::size_t> tracked_index_;
+    mutable std::unordered_set<std::string> tracked_output_index_;
+    mutable bool tracked_output_index_valid_ = false;
+    mutable std::mutex tracked_output_index_mutex_;
     mutable std::size_t tracked_index_size_ = static_cast<std::size_t>(-1);
     mutable std::mutex hash_mutex_;
     mutable std::unordered_map<std::string, bool> hash_change_cache_;
@@ -68,6 +71,7 @@ private:
     };
 
     void rebuild_tracked_index() const;
+    bool is_tracked_output(const std::filesystem::path& path) const;
     bool load_user_dependencies(const TrackedInfo& info, std::set<std::string>& dependencies, BuildError* error = nullptr) const;
     bool dependency_changed(const std::filesystem::path& dependency, std::filesystem::file_time_type info_mtime) const;
     bool metadata_path_is_safe(const std::filesystem::path& path) const;

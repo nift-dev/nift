@@ -57,13 +57,16 @@ Project contracts add a third checked relationship at the value layer: configure
 
 Dependencies and requirements are separate contracts. Content, templates,
 `@input`, JSON/schema sources, `@dep`, and user `.deps.json` data contribute to
-dependency invalidation. `@pathto`/`@pathtofile` add requirements whose continued
-existence is checked without making implementation changes to an existing asset
-force page rebuilds. Successful page metadata records identity, paths,
-minification setting/version, dependencies, and requirements using escaped JSON.
+dependency invalidation. `@pathto`/`@pathtofile` add requirements. For concrete
+project paths, continued existence is checked without making ordinary content
+changes rebuild the referring page. For tracked-name targets, the tracked item
+owns its own build state: a temporarily missing or failed producer output does not
+make otherwise-valid referrers stale or transitively failed. Successful page
+metadata records identity, paths, minification setting/version, dependencies, and
+requirements using escaped JSON.
 
 Incremental validation checks missing output/metadata, tracked-field and path
-changes, minifier contract version, dependency removal/change, missing
+changes, minifier contract version, dependency removal/change, missing concrete
 requirements, invalid/untrusted page metadata, and user dependency sidecars.
 Modes are modified time, hash, and hybrid. Build selection and page building are
 parallelized; shared source/JSON/hash/path-safety caches are mutex-protected and

@@ -343,7 +343,25 @@ void ProjectInfo::rebuild_tracked_index() const {
     tracked_index_.clear();
     tracked_index_.reserve(tracked.size());
     for (std::size_t i = 0; i < tracked.size(); ++i) tracked_index_[tracked[i].name] = i;
+    {
+        std::lock_guard<std::mutex> lock(tracked_output_index_mutex_);
+        tracked_output_index_.clear();
+        tracked_output_index_valid_ = false;
+    }
     tracked_index_size_ = tracked.size();
+}
+
+bool ProjectInfo::is_tracked_output(const fs::path& path) const {
+    if (tracked_index_size_ != tracked.size()) rebuild_tracked_index();
+    std::lock_guard<std::mutex> lock(tracked_output_index_mutex_);
+    if (!tracked_output_index_valid_) {
+        tracked_output_index_.clear();
+        tracked_output_index_.reserve(tracked.size());
+        for (const auto& info : tracked)
+            tracked_output_index_.insert(output_path(info).lexically_normal().generic_string());
+        tracked_output_index_valid_ = true;
+    }
+    return tracked_output_index_.count(path.lexically_normal().generic_string()) != 0;
 }
 
 TrackedInfo* ProjectInfo::find(const std::string& name) {
@@ -655,7 +673,14 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
             reasons.push_back("page build metadata has an invalid requirement");
             continue;
         }
-        if (!filesystem::path_exists(requirement))
+        // A requirement produced by another currently tracked item is a checked
+        // project relationship, not an existence check on that producer's
+        // current artifact. The producer owns its own build state: if its output
+        // is missing it will be selected independently, and if its build fails
+        // the overall invocation fails without making otherwise-valid referrers
+        // stale. Concrete/untracked requirements still rebuild the referrer when
+        // their path disappears.
+        if (!filesystem::path_exists(requirement) && !is_tracked_output(requirement))
             reasons.push_back("required path missing: " + value.string);
     }
 
