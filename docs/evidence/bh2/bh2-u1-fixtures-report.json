@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "campaign": "bh2",
+  "scanned_files": 7,
+  "findings": [
+    {
+      "rule": "pipefail-missing",
+      "file": "/tmp/opencode/bh2-u1-fixtures/u1_arg.sh",
+      "detail": "pipeline runs without pipefail provably active; pipeline 'false | cat >/dev/null' can mask failure of upstream 'false'"
+    },
+    {
+      "rule": "pipefail-missing",
+      "file": "/tmp/opencode/bh2-u1-fixtures/u1_assign.sh",
+      "detail": "pipeline runs without pipefail provably active; pipeline 'false | cat >/dev/null' can mask failure of upstream 'false'"
+    },
+    {
+      "rule": "pipefail-missing",
+      "file": "/tmp/opencode/bh2-u1-fixtures/u1_bash_c.sh",
+      "detail": "pipeline runs without pipefail provably active; pipeline 'false | cat >/dev/null' can mask failure of upstream 'false'"
+    },
+    {
+      "rule": "pipefail-missing",
+      "file": "/tmp/opencode/bh2-u1-fixtures/u1_dq_echo.sh",
+      "detail": "pipeline runs without pipefail provably active; pipeline 'false | cat >/dev/null' can mask failure of upstream 'false'"
+    },
+    {
+      "rule": "pipefail-missing",
+      "file": "/tmp/opencode/bh2-u1-fixtures/u1_echo.sh",
+      "detail": "pipeline runs without pipefail provably active; pipeline 'false | cat >/dev/null' can mask failure of upstream 'false'"
+    },
+    {
+      "rule": "pipefail-missing",
+      "file": "/tmp/opencode/bh2-u1-fixtures/u1_export.sh",
+      "detail": "pipeline runs without pipefail provably active; pipeline 'false | cat >/dev/null' can mask failure of upstream 'false'"
+    },
+    {
+      "rule": "pipefail-missing",
+      "file": "/tmp/opencode/bh2-u1-fixtures/u1_printf.sh",
+      "detail": "pipeline runs without pipefail provably active; pipeline 'false | cat >/dev/null' can mask failure of upstream 'false'"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "campaign": "bh2",
+  "checkpoint": "test-integrity-path-coverage-u2",
+  "commit": "round-7 candidate (post-commit update)",
+  "timestamp_utc": "2026-08-21T11:05:00Z",
+  "platform": "Linux (round-7 red demonstration)",
+  "purpose": "BH2 U2 red-rule demonstration: a quoted YAML path-filter key ('paths':) that the parser previously did not recognize must not leave the trigger 'unfiltered'; it must be parsed or fail closed.",
+  "demonstrated": [
+    {
+      "mutation": "test-integrity.yml push/pull_request paths key quoted ('paths':) with narrowed - 'README.md' items",
+      "outcome": "FAIL",
+      "diagnostic": "workflow-path-coverage-gap: contracts.namespace-reservation: test-integrity.yml: uncovered by automatic trigger paths: ... src/**, tests/contracts_smoke.sh",
+      "red_as_expected": true
+    }
+  ],
+  "all_red_correct": true
+}

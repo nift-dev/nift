@@ -704,11 +704,29 @@ def _trigger_configs(path: Path) -> dict[str, tuple[str, list[str] | None, list[
             continue
         if current_trigger is None:
             continue
-        pmatch = re.match(r"^(\s+)paths(?:-ignore)?:\s*$", line)
-        if pmatch:
-            key = "ignore" if "paths-ignore" in pmatch.group(0) else "paths"
+        # A path-filter key may be written plain or quoted (`'paths':`); either
+        # way it must be parsed or the trigger fails closed. Anything that looks
+        # like a path-filter key but cannot be understood must never leave the
+        # trigger "unfiltered".
+        keymatch = re.match(
+            r"^(\s+)(['\"]?)(paths|paths-ignore)\2\s*:\s*(.*)$", line
+        )
+        if keymatch:
+            key = "ignore" if keymatch.group(3) == "paths-ignore" else "paths"
+            value = keymatch.group(4).strip()
+            if value and not value.startswith("#"):
+                flow = _parse_flow_list(value)
+                if flow is not None:
+                    state, paths, ignore = configs[current_trigger]
+                    if key == "ignore":
+                        configs[current_trigger] = ("filtered", paths, flow)
+                    else:
+                        configs[current_trigger] = ("filtered", flow, ignore)
+                    continue
+                configs[current_trigger] = ("unparsed", None, None)
+                continue
             items: list[str] = []
-            indent = len(pmatch.group(1))
+            indent = len(keymatch.group(1))
             for sub in lines[idx + 1:]:
                 if sub.strip() and not sub.startswith(" " * (indent + 2)):
                     break
@@ -720,19 +738,6 @@ def _trigger_configs(path: Path) -> dict[str, tuple[str, list[str] | None, list[
                 configs[current_trigger] = ("filtered", paths, items)
             else:
                 configs[current_trigger] = ("filtered", items, ignore)
-            continue
-        fpmatch = re.match(r"^(\s+)paths(?:-ignore)?:\s*(.+)$", line)
-        if fpmatch:
-            key = "ignore" if "paths-ignore" in fpmatch.group(0) else "paths"
-            flow = _parse_flow_list(fpmatch.group(2))
-            if flow is not None:
-                state, paths, ignore = configs[current_trigger]
-                if key == "ignore":
-                    configs[current_trigger] = ("filtered", paths, flow)
-                else:
-                    configs[current_trigger] = ("filtered", flow, ignore)
-            else:
-                configs[current_trigger] = ("unparsed", None, None)
             continue
     return configs
 

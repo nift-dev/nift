@@ -464,19 +464,92 @@ _PF_ON = re.compile(r"\bset\s+[^;\n]*?(?:-[A-Za-z]*o\s+pipefail)")
 _PF_OFF = re.compile(r"\bset\s+[^;\n]*?(?:\+[A-Za-z]*o\s+pipefail)")
 
 
-def _set_establishes_pipefail(s: str) -> bool:
-    """True when a ``set ... pipefail`` in this statement mutates the state that
-    governs subsequent top-level pipelines — i.e. it runs in the current shell.
+_SET_CONTROL_WORDS = {
+    "if", "then", "elif", "else", "while", "until", "for", "do", "in", "case",
+    "esac", "fi", "done", "{", "!", "time", "[",
+}
 
-    A ``set`` inside ``$( )`` command substitution, a ``( )`` subshell, a
-    pipeline segment (each segment runs in a subshell), or a backgrounded
-    command cannot establish parent-shell pipefail state; a ``set`` that cannot
-    is ignored for state purposes even though the text matches ``_PF_ON``.
+
+def _quote_state_at(s: str, idx: int) -> bool:
+    """True when character ``idx`` sits inside a single- or double-quoted string."""
+    q: str | None = None
+    i = 0
+    n = len(s)
+    while i < idx and i < n:
+        c = s[i]
+        if q:
+            if c == "\\":
+                i += 2
+                continue
+            if c == q:
+                q = None
+            i += 1
+            continue
+        if c in "\"'":
+            q = c
+            i += 1
+            continue
+        i += 1
+    return q is not None
+
+
+def _is_command_position(s: str, idx: int) -> bool:
+    """True when the token at ``idx`` is the command being executed by the
+    current shell — preceded only by control keywords, redirects, or prefix
+    assignments. If ``set`` appears as an argument to another command (or after
+    an unquoted command word) it is not in command position."""
+    prev_redirect = False
+    i = 0
+    n = len(s)
+    while i < idx and i < n:
+        c = s[i]
+        if c in "\"'":
+            i += 1
+            continue
+        if c in " \t":
+            i += 1
+            continue
+        if c in "();":
+            return False
+        start = i
+        while i < idx and i < n and s[i] not in " \t;":
+            i += 1
+        tok = s[start:i]
+        if not tok:
+            continue
+        if tok in _SET_CONTROL_WORDS:
+            continue
+        if tok.startswith((">", "<", "2>", "1>", "&>", "&>>")) or tok == "2>&1":
+            prev_redirect = True
+            continue
+        if prev_redirect:
+            prev_redirect = False
+            continue
+        if re.match(r"^[A-Za-z_][A-Za-z0-9_]*(\+)?=", tok):
+            continue
+        return False
+    return True
+
+
+def _set_establishes_pipefail(s: str) -> bool:
+    """True when a ``set ... pipefail`` in this statement is the command being
+    executed by the current shell and can therefore mutate the state that
+    governs subsequent top-level pipelines.
+
+    Quoted data (``echo 'set -o pipefail'``), command arguments
+    (``bash -c 'set -o pipefail'``), assignment values (``export X=...``), and
+    commands inside ``$( )`` command substitution, ``( )`` subshells, pipeline
+    segments or backgrounded commands all run elsewhere — the ``set`` text in
+    them does not establish parent-shell state.
     """
     m = _PF_ON.search(s) or _PF_OFF.search(s)
     if not m:
         return False
     if _paren_depth_at(s, m.start()) > 0:
+        return False
+    if _quote_state_at(s, m.start()):
+        return False
+    if not _is_command_position(s, m.start()):
         return False
     if _has_top_level_pipe(s):
         return False

@@ -298,6 +298,13 @@ make target.
 - `bh2-t2-path-coverage-red.json` — the round-6 red demo: an inline flow-style
   `paths: ['README.md']` filter sequence fails the registry check instead of
   collapsing into "covers everything".
+- `bh2-u1-fixtures-report.json` — the round-7 inert-text fixtures (`echo`,
+  `printf`, `bash -c`, `export`, assignment, command-argument `true set ...`)
+  are all rejected (exit 1); only a current-shell `set` command establishes
+  pipefail.
+- `bh2-u2-path-coverage-red.json` — the round-7 red demo: a quoted `'paths':`
+  filter key with narrowed items fails the registry check instead of leaving
+  the trigger "unfiltered".
 - `bh2-clean-report.json` — the scanner is clean on the real `tests/` + `scripts/`
   (42 files, 0 findings), and clean on the regression-suite contract scripts.
 
@@ -345,19 +352,23 @@ make target.
   adjacent to a SKIP message is a false green regardless of layout. `exit $?`,
   `exit` with an explicit non-zero code, or a SKIP message followed by later
   commands before the exit are deliberately outside the rule.
-- **Pipefail-state boundary (round 5/6):** state is tracked sequentially over
-  top-level statements with a conditional-block taint and an execution-
-  environment guard (`$( )`, `( )`, pipeline segments and backgrounded commands
-  cannot establish parent state). It is not a full shell interpreter:
+- **Pipefail-state boundary (round 5/6/7):** state is tracked sequentially over
+  top-level statements with a conditional-block taint, an execution-environment
+  guard (`$( )`, `( )`, pipeline segments and backgrounded commands cannot
+  establish parent state), and a command-position guard (only a current-shell
+  `set` builtin establishes state; quoted text, command arguments and
+  assignment values do not). It is not a full shell interpreter:
   within-statement ordering (e.g. `set -o pipefail && pipeline` on one `&&`
   chain), functions called at a different state than their definition point,
   and `trap`/`shopt`/`env`-based option changes are approximated; every
   approximation fails toward a false red, never a false green.
-- **Trigger-syntax boundary (round 6):** the trigger parser now distinguishes
+- **Trigger-syntax boundary (round 6/7):** the trigger parser now distinguishes
   genuinely-unfiltered triggers from unparsed filter syntax (which fails
-  closed). Flow-style `paths: [...]` sequences are parsed; the inline mapping
-  form `on: {push: {...}}` yields no triggers and is rejected. Other valid YAML
-  shapes remain carried-forward false-red boundaries, never false green.
+  closed), recognizes a path-filter key whether plain or quoted (`paths:` /
+  `'paths':`), and parses flow-style `paths: [...]` sequences. The inline
+  mapping form `on: {push: {...}}` yields no triggers and is rejected. Other
+  valid YAML shapes remain carried-forward false-red boundaries, never false
+  green.
 - **Path-coverage boundary (round 5):** coverage is proven structurally over the
   glob language, not by enumerating the current file tree: a tree requirement
   `root/**` is satisfied only by a recursive-tree pattern rooted at `root` (or an
@@ -618,13 +629,62 @@ flow-style full-coverage `paths:` still PASSes. All prior fixtures stay RED and
 the real trees stay GREEN (42 + 21 files, 0 findings); registry CI, the full
 3-repository audit, BH1 liveness, and the CI-equivalent chain all pass.
 
+### BH2 reviewer round 6 — returned to implementer
+
+ChatGPT attacked round-6 candidate `389a4ac` in a detached worktree. T1 and T2
+were accepted as closed. Two new false greens were reported (U1, U2), so BH2
+remains OPEN:
+
+- **U1 (inert text fakes parent-shell `set`):** `echo 'set -o pipefail'`,
+  `bash -c 'set -o pipefail'`, and `export X='set -o pipefail'` each made the
+  scanner believe pipefail was enabled — `_set_establishes_pipefail` returned
+  True for all three — while the real script runs green. The round-6 fix asked
+  about the execution environment (`$( )`, subshell, pipeline, background) but
+  not the more fundamental property: is `set` actually the command being
+  executed by the current shell, rather than text/arguments supplied to another
+  command?
+- **U2 (quoted YAML filter key collapses into unfiltered):** replacing the
+  `paths:` key with the perfectly ordinary quoted form `'paths':` still passed
+  the registry check; `_trigger_configs` reported the trigger as "unfiltered".
+  Round 6 separated unparsed filter *syntax* from genuinely-no-filter, but only
+  when the `paths` key itself was recognized. A syntactically valid key
+  representation it didn't recognize left the trigger "unfiltered", recreating
+  the T2 property: parser did not understand the filter → coverage unrestricted.
+
+### BH2 implementer round 7 — fixes
+
+- **U1:** `_set_establishes_pipefail` now requires the `set` to be in command
+  position — the command being executed by the current shell. It rejects a
+  `set` token inside quotes (`echo 'set -o pipefail'`, `printf ...`), a `set`
+  passed as an argument to another command (`bash -c '...'`, `true set ...`),
+  and a `set` that is a prefix-assignment value (`export X='...'`,
+  `X='...'`), in addition to the round-6 `$( )` / subshell / pipeline-segment /
+  background guards. Control keywords (`if`/`then`/`{`/`!`/`time`...), redirects
+  and prefix assignments may precede a current-shell `set`; anything else means
+  it is not in command position.
+- **U2:** `_trigger_configs` now recognizes a path-filter key whether it is
+  written plain or quoted (`paths:` or `'paths':` / `"paths-ignore":`), parses
+  its flow or block value, and marks the trigger "unparsed" (fail closed) if a
+  path-filter-like key has a value it cannot understand. A path-filter key can
+  no longer leave a trigger "unfiltered" merely because its representation was
+  not recognized.
+
+All seven U1 fixtures are RED (`echo`/double-quoted `echo`, `printf`,
+`bash -c`, `export`, plain assignment, and command-argument `true set ...`),
+retained at `docs/evidence/bh2/bh2-u1-fixtures-report.json`. The U2 quoted-`'paths':`
+narrowed mutation is demonstrated RED, retained at
+`docs/evidence/bh2/bh2-u2-path-coverage-red.json`, while quoted keys with full
+coverage still PASS. All prior fixtures stay RED and the real trees stay GREEN
+(42 + 21 files, 0 findings); registry CI, the full 3-repository audit, BH1
+liveness, and the CI-equivalent chain all pass.
+
 ### BH2 handoff to reviewer
 
-**Round-6 candidate: `389a4ac`** ("BH2 round 6: fix reviewer findings T1-T2
-on top of 689cd45"). Reviewer attacks the exact round-6 commit in a separate
+**Round-7 candidate: this commit** ("BH2 round 7: fix reviewer findings U1-U2
+on top of 389a4ac"). Reviewer attacks the exact round-7 commit in a separate
 clone/worktree and reports findings back; the implementer does not modify the
 tree during review. No changes are made to `7f8768b`, `c06fa33`, `7d2621b`,
-`88f1158`, `689cd45` or the round-6 candidate `389a4ac` itself.
+`88f1158`, `689cd45`, `389a4ac` or the round-7 candidate itself.
 
 Review focus areas (attack each):
 
