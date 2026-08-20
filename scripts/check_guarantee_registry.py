@@ -185,23 +185,134 @@ def _workflow_job_block(lines: list[str], job: str) -> list[str] | None:
     return block
 
 
-def _if_statically_false(value: str) -> bool:
-    """True when a job-level ``if:`` condition is a compile-time false.
+def _expr_truth(expr: str):
+    """Conservative three-valued truth of a GitHub Actions expression.
 
-    Covers the literal false forms and the always-empty event-name shape. This
-    is deliberately conservative: anything ambiguous is treated as live, so an
-    enabled job is never falsely rejected.
+    Returns True / False / None (unknown). Only expressions that are provably
+    always-false yield False; anything the small evaluator cannot decide yields
+    None, which callers treat as "live" (never a false rejection). This is a
+    definite-false subset of the Actions expression language, not a full
+    evaluator: function calls other than always() are unknown, github.*/secrets/
+    vars/inputs/matrix/needs/environment lookups are unknown, and comparisons
+    are only resolved for the always-empty event-name shape.
+    """
+    v = expr.strip()
+    if v.startswith("${{") and v.endswith("}}"):
+        v = v[3:-2].strip()
+    if v in {"true", "True"}:
+        return True
+    if v in {"false", "False", "'false'", '"false"'}:
+        return False
+    if v in {"0"}:
+        return False
+    if re.fullmatch(r"[+-]?[1-9][0-9]*", v):
+        return True
+    if v in {"''", '""'}:
+        return False
+    if re.fullmatch(r"'.+'|\".+\"", v):
+        return True
+    if v == "always()":
+        return True
+    # anything else is a lookup/comparison/call we cannot decide statically
+    return None
+
+
+def _if_statically_false(value: str) -> bool:
+    """True when a job-level ``if:`` condition is provably always-false.
+
+    The evaluator only returns False (definitely disabled) for a small,
+    documented subset of the Actions expression grammar — literals,
+    ``always()``, ``&&``/``||``/``!`` over those — and treats anything
+    ambiguous as live. The boundary is intentional: the checker does not
+    advertise full Actions-expression semantics.
     """
     v = value.strip()
     if v.startswith("${{") and v.endswith("}}"):
         v = v[3:-2].strip()
-    if v in {"false", "'false'", '"false"', "False"}:
-        return True
     if re.search(r"\.event_name\s*==\s*''", v):
         return True
-    if v.startswith("always()") and "false" in v:
-        return True
-    return False
+    # tokenize a boolean expression over (&&, ||, !/not, parentheses)
+    try:
+        result = _eval_bool(v)
+        return result is False
+    except Exception:
+        return False
+
+
+def _matching_paren(v: str) -> int | None:
+    """Index of the closing paren matching the first '(' at depth 0, or None."""
+    if not v.startswith("("):
+        return None
+    depth = 0
+    for i, ch in enumerate(v):
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                return i
+    return None
+
+
+def _eval_bool(v: str):
+    v = v.strip()
+    if not v:
+        return None
+    for op in ("||", "&&"):
+        parts = _split_top_level(v, op)
+        if parts is not None and len(parts) > 1:
+            values = [_eval_bool(p) for p in parts]
+            if op == "&&":
+                if any(x is False for x in values):
+                    return False
+                if all(x is True for x in values):
+                    return True
+                return None
+            else:
+                if any(x is True for x in values):
+                    return True
+                if all(x is False for x in values):
+                    return False
+                return None
+    if re.match(r"^!(?!=)", v):
+        return not _eval_bool(v[1:])
+    if re.match(r"^not\s+", v):
+        return not _eval_bool(re.sub(r"^not\s+", "", v, count=1).strip())
+    close = _matching_paren(v)
+    if close is not None and close == len(v) - 1:
+        return _eval_bool(v[1:close])
+    return _expr_truth(v)
+
+
+def _split_top_level(v: str, op: str) -> list[str] | None:
+    """Split on an operator at parenthesis depth 0."""
+    parts: list[str] = []
+    depth = 0
+    current: list[str] = []
+    i = 0
+    while i < len(v):
+        c = v[i]
+        if c == "(":
+            depth += 1
+            current.append(c)
+            i += 1
+            continue
+        if c == ")":
+            depth -= 1
+            current.append(c)
+            i += 1
+            continue
+        if depth == 0 and v.startswith(op, i):
+            parts.append("".join(current))
+            current = []
+            i += len(op)
+            continue
+        current.append(c)
+        i += 1
+    parts.append("".join(current))
+    if len(parts) == 1:
+        return None
+    return parts
 
 
 def validate_workflow_job_executable(path: Path, job: str, klass: str, gid: str) -> None:
@@ -324,6 +435,141 @@ def validate_workflow_trigger(path: Path, klass: str, gid: str) -> None:
         raise CheckFailure(f"workflow-trigger-not-scheduled: {gid}: {path}")
 
 
+def _glob_to_regex(pattern: str) -> re.Pattern:
+    """Translate the GitHub Actions minimatch subset used in workflow ``paths:``
+    filters to an anchored regular expression.
+
+    Supported: ``**`` (any characters including ``/``), ``*`` (any characters
+    within one path segment), ``?`` (one character within a segment). Anything
+    else is escaped literally. ``**/`` is treated as ``**`` for directories.
+    """
+    out: list[str] = []
+    i = 0
+    n = len(pattern)
+    while i < n:
+        c = pattern[i]
+        if c == "*":
+            if i + 1 < n and pattern[i + 1] == "*":
+                i += 2
+                out.append(".*")
+            else:
+                out.append("[^/]*")
+                i += 1
+        elif c == "?":
+            out.append("[^/]")
+            i += 1
+        else:
+            out.append(re.escape(c))
+            i += 1
+    return re.compile("^" + "".join(out) + "$")
+
+
+def _path_covered(pattern: str, path: str) -> bool:
+    return bool(_glob_to_regex(pattern).match(path))
+
+
+def _trigger_configs(path: Path) -> dict[str, tuple[list[str] | None, list[str] | None]]:
+    """Parse the ``on:`` block into per-trigger path filters.
+
+    Returns {trigger: (paths, paths_ignore)}. A trigger with no ``paths:``
+    filters is recorded as (None, None), meaning it covers every file. Both the
+    block style (``on:\\n  push:\\n    paths:\\n      - 'src/**'``) and the
+    single-line forms (``on: push``, ``on: [push, pull_request]``) are handled.
+    The inline mapping form (``on: {push: {paths: [...]}}``) fails closed by
+    recording the trigger with (None, None) only if no paths could be read.
+    """
+    text = path.read_text(encoding="utf-8", errors="replace")
+    lines = text.splitlines()
+    configs: dict[str, tuple[list[str] | None, list[str] | None]] = {}
+    in_on = False
+    current_trigger: str | None = None
+    for idx, line in enumerate(lines):
+        inline = re.match(r"^on:\s*\[([^\]]+)\]\s*$", line)
+        if inline:
+            for t in (x.strip() for x in inline.group(1).split(",")):
+                if t:
+                    configs[t] = (None, None)
+            continue
+        single = re.match(r"^on:\s*([A-Za-z_][A-Za-z0-9_-]*)\s*(?:#.*)?$", line)
+        if single:
+            configs[single.group(1)] = (None, None)
+            continue
+        if re.match(r"^on:\s*(?:#.*)?$", line):
+            in_on = True
+            continue
+        if not in_on:
+            continue
+        if line and not line[0].isspace():
+            break
+        tmatch = re.match(r"^  ([A-Za-z_][A-Za-z0-9_-]*):(?:\s|$)", line)
+        if tmatch:
+            current_trigger = tmatch.group(1)
+            configs.setdefault(current_trigger, (None, None))
+            continue
+        if current_trigger is None:
+            continue
+        pmatch = re.match(r"^(\s+)paths(?:-ignore)?:\s*$", line)
+        if pmatch:
+            key = "ignore" if "paths-ignore" in pmatch.group(0) else "paths"
+            items: list[str] = []
+            indent = len(pmatch.group(1))
+            for sub in lines[idx + 1:]:
+                if sub.strip() and not sub.startswith(" " * (indent + 2)):
+                    break
+                m = re.match(r"^\s+-\s+['\"]?([^'\"]+)['\"]?\s*(?:#.*)?$", sub)
+                if m:
+                    items.append(m.group(1))
+            paths, ignore = configs[current_trigger]
+            if key == "ignore":
+                configs[current_trigger] = (paths, items)
+            else:
+                configs[current_trigger] = (items, ignore)
+    return configs
+
+
+def validate_workflow_path_coverage(
+    wf_path: Path,
+    gid: str,
+    required: list[str],
+    workflow_file: str,
+) -> None:
+    """A CI_GATED / CROSS_PLATFORM_GATED workflow's automatic triggers must
+    cover the enforcement architecture: the guarantee's nift guard refs, the
+    implementation tree, the guarantee registry, the Makefile that invokes the
+    guards, and every enforcement workflow referenced by the registry.
+
+    Coverage is the union across automatic triggers (push / pull_request): for
+    each required path at least one such trigger must match it via ``paths:``
+    and not negate it via ``paths-ignore:``. A trigger without any ``paths:``
+    filters is treated as covering everything. Static filters only: runtime
+    event shape is out of scope for this structural contract.
+    """
+    triggers = _trigger_configs(wf_path)
+    auto = {t for t in triggers if t in {"push", "pull_request"}}
+    if not auto:
+        raise CheckFailure(f"workflow-path-coverage-not-automatic: {gid}: {workflow_file}")
+    uncovered = [
+        r
+        for r in required
+        if not any(
+            (
+                paths is None and ignore is None
+            )
+            or (
+                paths is not None
+                and any(_path_covered(p, r) for p in paths)
+                and not any(_path_covered(p, r) for p in (ignore or []))
+            )
+            for _t, (paths, ignore) in ((t, triggers[t]) for t in auto)
+        )
+    ]
+    if uncovered:
+        raise CheckFailure(
+            f"workflow-path-coverage-gap: {gid}: {workflow_file}: "
+            f"uncovered by automatic trigger paths: {', '.join(sorted(uncovered))}"
+        )
+
+
 def workflow_has_job(path: Path, job: str) -> bool:
     # Workflows in this repository use ordinary two-space job keys. Avoid a YAML
     # dependency for a deliberately tiny structural checker.
@@ -393,6 +639,8 @@ def check(registry_path: Path, args: argparse.Namespace) -> dict[str, Any]:
     external_skips: set[str] = set()
     ci_refs = 0
     local_refs = 0
+    gated_items: list[tuple[str, Path, list[str]]] = []
+    enforcement_workflows: set[str] = set()
 
     for g in guarantees:
         if not isinstance(g, dict):
@@ -480,7 +728,26 @@ def check(registry_path: Path, args: argparse.Namespace) -> dict[str, Any]:
             validate_workflow_trigger(wf_path, klass, gid)
             validate_workflow_job_executable(wf_path, job, klass, gid)
             validate_cross_platform_matrix(wf_path, klass, gid, g.get("platforms"), job)
+            enforcement_workflows.add(workflow)
+            if klass in {"CI_GATED", "CROSS_PLATFORM_GATED"}:
+                guard_paths = [
+                    ref.get("path")
+                    for ref in g.get("guard_refs", [])
+                    if ref.get("repo") == "nift" and ref.get("path")
+                ]
+                gated_items.append((gid, wf_path, guard_paths))
             ci_refs += 1
+
+    enforcement_file_set = sorted(enforcement_workflows)
+    common_required = ["src/**", "docs/guarantees/**", "Makefile"] + enforcement_file_set
+    seen_coverage: set[tuple[str, str]] = set()
+    for gid, wf_path, guard_paths in gated_items:
+        key = (gid, str(wf_path))
+        if key in seen_coverage:
+            continue
+        seen_coverage.add(key)
+        required = list(dict.fromkeys(common_required + guard_paths))
+        validate_workflow_path_coverage(wf_path, gid, required, str(wf_path.name))
 
     audited_surfaces = 0
     for surface in claim_surfaces:

@@ -5,10 +5,16 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/checkpoint-10-cross-platform.yml'
+      - '.github/workflows/init-targets.yml'
+      - '.github/workflows/nightly-deep.yml'
+      - '.github/workflows/performance-regression.yml'
+      - '.github/workflows/test-integrity.yml'
+      - '.github/workflows/distribution-verification.yml'
       - 'Makefile'
       - 'src/**'
       - 'jsonic/**'
       - 'minifypp/**'
+      - 'docs/guarantees/**'
       - 'scripts/checkpoint10_cross_platform.py'
       - 'scripts/compare_checkpoint10.py'
   workflow_dispatch:

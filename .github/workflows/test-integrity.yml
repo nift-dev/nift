@@ -12,6 +12,11 @@ on:
       - 'Makefile'
       - 'docs/guarantees/**'
       - '.github/workflows/test-integrity.yml'
+      - '.github/workflows/performance-regression.yml'
+      - '.github/workflows/checkpoint-10-cross-platform.yml'
+      - '.github/workflows/init-targets.yml'
+      - '.github/workflows/nightly-deep.yml'
+      - '.github/workflows/distribution-verification.yml'
   pull_request:
     paths:
       - 'src/**'
@@ -22,6 +27,11 @@ on:
       - 'Makefile'
       - 'docs/guarantees/**'
       - '.github/workflows/test-integrity.yml'
+      - '.github/workflows/performance-regression.yml'
+      - '.github/workflows/checkpoint-10-cross-platform.yml'
+      - '.github/workflows/init-targets.yml'
+      - '.github/workflows/nightly-deep.yml'
+      - '.github/workflows/distribution-verification.yml'
   workflow_dispatch:
 
 permissions:

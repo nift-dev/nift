@@ -278,6 +278,9 @@ make target.
 - `bh2-reviewer-fixtures-report.json` — the round-1 reviewer's four independent
   fixtures (`sys.exit(0)` skip, dead-code returncode, `false | cat`, plain
   swallowed returncode) are all rejected (exit 1).
+- `bh2-qfixtures-report.json` — the round-3 reviewer's three fixtures (dead-alias
+  `ignored = rc`, backslash-continued `false | cat`, unreachable
+  `if false; then set -o pipefail; fi`) are all rejected (exit 1).
 - `bh2-clean-report.json` — the scanner is clean on the real `tests/` + `scripts/`
   (42 files, 0 findings), and clean on the regression-suite contract scripts.
 
@@ -290,11 +293,29 @@ make target.
 - The scanner is static and pattern-based; it cannot reason about a guard's runtime
   semantics. A future guard that skips at runtime (after passing the static scan)
   is a BH3 mutation target.
-- **Workflow-trigger parsing boundary (carried forward):** the trigger parser
-  supports the repository's ordinary block-style `on:` and inline `on: push` /
-  `on: [push, pull_request]` forms. Other valid GitHub Actions YAML shapes fail
-  closed (false red), never false green. That boundary is intentionally carried
-  forward rather than claimed fully closed; hardening it is BH3/BH5 work.
+- **Workflow-trigger parsing boundary (carried forward):** the trigger and path
+  parsers support the repository's ordinary block-style `on:` and inline
+  `on: push` / `on: [push, pull_request]` forms. Other valid GitHub Actions YAML
+  shapes fail closed (false red), never false green. That boundary is
+  intentionally carried forward rather than claimed fully closed; hardening it
+  is BH3/BH5 work.
+- **Path-coverage contract boundary (round 3):** coverage is proven structurally
+  over static `paths:`/`paths-ignore:` filters for the automatic triggers
+  (push / pull_request union). It does not reason about runtime event shape
+  (`github.*`, `secrets`, `inputs`, branch/tag filters), nor about
+  `pull_request_target`/`merge_group`. The required coverage set — guard refs,
+  `src/**`, `docs/guarantees/**`, `Makefile`, and every enforcement workflow —
+  is intentionally uniform across CI_GATED / CROSS_PLATFORM_GATED gates.
+- **Static-false boundary (round 3):** `_if_statically_false` decides only a
+  documented subset of the Actions expression grammar (literals, `always()`,
+  `&&`/`||`/`!`, parentheses, always-empty `event_name`); every other shape is
+  treated as live. It proves a definite-false subset, not full expression
+  semantics.
+- **Swallowed-returncode boundary (round 3):** the rule is bounded liveness over
+  assignments, not full data-flow: it follows aliases, tuple unpacking, flags and
+  dict stores within a file, and stops at function boundaries, control-flow
+  joins, and interprocedural calls. A value that gates only *after* crossing a
+  function boundary is conservatively treated as inspected at the store site.
 
 ### BH2 reviewer round 1 — returned to implementer
 
@@ -342,13 +363,68 @@ findings retained at `docs/evidence/bh2/bh2-reviewer-fixtures-report.json`.
   still fail closed (false red). The remaining false-red boundary is carried
   forward explicitly in the residual list above.
 
+### BH2 reviewer round 2 — returned to implementer
+
+ChatGPT attacked round-2 candidate `c06fa33` in a separate worktree. No Nift
+semantic defect was found; three defects in the integrity machinery were
+reported (Q1–Q3), so BH2 remains OPEN:
+
+- **Q1 (path-filter coverage, most important):** the registry check never
+  looked at workflow `paths:` filters at all — narrowing `test-integrity.yml`
+  to `paths: ['README.md']` still PASSed, so a CI_GATED gate could be
+  unreachable for changes that break the guarded guarantee. Separately,
+  `test-integrity.yml` watched itself but not the other enforcement workflows
+  (`nightly-deep.yml`, `checkpoint-10-cross-platform.yml`, `init-targets.yml`,
+  `performance-regression.yml`, `distribution-verification.yml`).
+- **Q2 (scanner escapes):** `rc = p.returncode; ignored = rc;
+  print("PASS: done")` passed — a returncode that only flows into a dead alias
+  is not an outcome-controlling use. Shell `false \\\n | cat` escaped the
+  pipeline check (physical-line split), and an unreachable
+  `if false; then set -o pipefail; fi` counted as pipefail enabled.
+- **Q3 (static-false scope):** `if: ${{ false && always() }}` bypassed the
+  static-false job detection; the reviewer asked to either strengthen it with a
+  conservative boolean evaluator or narrow the claim.
+
+### BH2 implementer round 3 — fixes
+
+- **Q1:** `check_guarantee_registry.py` now machine-checks an enforcement
+  path-coverage contract for every CI_GATED / CROSS_PLATFORM_GATED workflow.
+  Each such workflow's automatic triggers (push / pull_request union) must cover
+  the guarantee's nift `guard_refs`, `src/**`, `docs/guarantees/**`, `Makefile`,
+  and every enforcement workflow referenced anywhere in the registry.
+  Minimatch semantics are implemented statically (`**` crosses `/`, `*` does
+  not) with `paths:`/`paths-ignore:` parsed per trigger, including the block and
+  inline `on:` forms. Narrowing to `paths: ['README.md']` is demonstrated RED
+  (retained). All four automatic-gated workflows gained the missing paths.
+- **Q2:** the swallowed-returncode rule now follows value flow through
+  assignments (aliases, tuple unpacking, comparison flags, dict stores) and
+  counts a reference as inspection only when it reaches a **live** use — a line
+  that is neither a pure print nor a dead store — so `ignored = rc` (never read
+  again) can no longer green a guard while `data = {..., "exit": p.returncode}`
+  feeding a later check still does. Shell analysis joins backslash-continued
+  logical lines before splitting pipelines, and strips statically-dead
+  `if false; then ...; fi` / `while false; do ...; done` blocks (preserving
+  `else`/`elif` branches) before pipefail detection.
+- **Q3:** `_if_statically_false` is now a conservative three-valued boolean
+  evaluator over literals, `always()`, `&&`/`||`/`!`, parentheses, and the
+  always-empty `event_name` shape. Only provably-false expressions reject a
+  job; anything ambiguous is treated as live (never a false rejection).
+  `${{ false && always() }}` is now caught; `always()`, `success()`,
+  `github.event_name == 'push'` remain live.
+
+All round-1 and round-2 fixtures stay RED, the three new round-3 reviewer
+fixtures are RED (retained at `docs/evidence/bh2/bh2-qfixtures-report.json`),
+and the real trees stay GREEN (42 tests/scripts files + 21 regression-suite
+contract files, 0 findings). The full 3-repository audit and the CI-equivalent
+single-repo sequence both PASS.
+
 ### BH2 handoff to reviewer
 
-**Round-1 candidate (already reviewed): `7f8768b`.** **Round-2 candidate:
-`c06fa33`** ("BH2 round 2: fix reviewer findings P1-P4 on top of 7f8768b").
-Reviewer attacks the exact round-2 commit in a separate clone/worktree and
-reports findings back; the implementer does not modify the tree during review.
-No changes are made to `7f8768b` or `c06fa33` themselves.
+**Round-3 candidate: this commit** ("BH2 round 3: fix reviewer findings Q1-Q3
+on top of c06fa33"). Reviewer attacks the exact round-3 commit in a separate
+clone/worktree and reports findings back; the implementer does not modify the
+tree during review. No changes are made to `7f8768b`, `c06fa33` or the round-3
+candidate itself.
 
 Review focus areas (attack each):
 

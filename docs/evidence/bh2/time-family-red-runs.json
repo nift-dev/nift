@@ -2,10 +2,10 @@
   "schema_version": 1,
   "campaign": "bh2",
   "checkpoint": "test-integrity-time-family",
-  "commit": "176bef441ae50814f4054f62bc2f75cd288b56f1",
-  "timestamp_utc": "2026-08-20T21:01:28Z",
-  "platform": "Linux (round-2 re-verification)",
-  "purpose": "BH2 red-rule re-verification after reviewer round 1: the /usr/bin/time silent-success family must be non-green (SKIP=2) when the tool is absent, and green only when the guard actually measures.",
+  "commit": "round-3 candidate (this commit)",
+  "timestamp_utc": "2026-08-21T08:10:00Z",
+  "platform": "Linux (round-3 re-verification)",
+  "purpose": "BH2 red-rule re-verification after reviewer round 2: the /usr/bin/time silent-success family must be non-green (SKIP=2) when the tool is absent, and green only when the guard actually measures.",
   "all_red_correct": true,
   "cases": [
     {
@@ -34,7 +34,7 @@
       "scenario": "control: /usr/bin/time present",
       "exit": 0,
       "outcome": "PASS",
-      "stdout_tail": "  no-op median:       9864  samples=[9876, 9864, 9828, 9900, 9704]\n  single-page:        9880\n  shared -> all:      9724\nPASS: all measured peaks <= 16384 KiB"
+      "stdout_tail": "PASS: all measured peaks <= 16384 KiB"
     }
   ]
 }

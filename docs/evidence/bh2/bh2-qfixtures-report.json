@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "campaign": "bh2",
+  "scanned_files": 3,
+  "findings": [
+    {
+      "rule": "pipefail-missing",
+      "file": "/tmp/opencode/bh2-qfixtures/q2_pipe_multiline.sh",
+      "detail": "uses pipelines but never enables pipefail; pipeline 'false \\\\   | cat >/dev/null' can mask failure of upstream 'false'"
+    },
+    {
+      "rule": "pipefail-missing",
+      "file": "/tmp/opencode/bh2-qfixtures/q3_dead_pipefail.sh",
+      "detail": "uses pipelines but never enables pipefail; pipeline 'false | cat' can mask failure of upstream 'false'"
+    },
+    {
+      "rule": "swallowed-returncode",
+      "file": "/tmp/opencode/bh2-qfixtures/q1_ignored_alias.py",
+      "detail": "subprocess result 'p' never controls a failure path (no check=True, no gating use of its returncode)"
+    }
+  ]
+}

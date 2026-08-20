@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "campaign": "bh2",
+  "checkpoint": "test-integrity-path-coverage",
+  "commit": "round-3 candidate (this commit)",
+  "timestamp_utc": "2026-08-21T00:00:00Z",
+  "platform": "Linux (round-3 red demonstration)",
+  "purpose": "BH2 Q1 red-rule demonstration: narrowing a CI_GATED workflow's automatic trigger paths to 'README.md' must make the registry check fail (the gate would be unreachable for changes that break the guarded guarantee).",
+  "demonstrated": [
+    {
+      "mutation": "test-integrity.yml push/pull_request paths -> ['README.md']",
+      "outcome": "FAIL",
+      "diagnostic": "workflow-path-coverage-gap: contracts.namespace-reservation: test-integrity.yml: uncovered by automatic trigger paths: .github/workflows/checkpoint-10-cross-platform.yml, .github/workflows/distribution-verification.yml, .github/workflows/init-targets.yml, .github/workflows/nightly-deep.yml, .github/workflows/performance-regression.yml, .github/workflows/test-integrity.yml, Makefile, docs/guarantees/**, src/**, tests/contracts_smoke.sh",
+      "red_as_expected": true
+    }
+  ],
+  "all_red_correct": true
+}

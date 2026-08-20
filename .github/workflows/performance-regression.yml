@@ -7,7 +7,13 @@ on:
       - 'tests/*scaling_benchmark.py'
       - 'tests/recovery_epoch_guard.cpp'
       - 'Makefile'
+      - 'docs/guarantees/**'
       - '.github/workflows/performance-regression.yml'
+      - '.github/workflows/test-integrity.yml'
+      - '.github/workflows/checkpoint-10-cross-platform.yml'
+      - '.github/workflows/init-targets.yml'
+      - '.github/workflows/nightly-deep.yml'
+      - '.github/workflows/distribution-verification.yml'
   push:
     branches: [master, main]
     paths:
@@ -15,7 +21,13 @@ on:
       - 'tests/*scaling_benchmark.py'
       - 'tests/recovery_epoch_guard.cpp'
       - 'Makefile'
+      - 'docs/guarantees/**'
       - '.github/workflows/performance-regression.yml'
+      - '.github/workflows/test-integrity.yml'
+      - '.github/workflows/checkpoint-10-cross-platform.yml'
+      - '.github/workflows/init-targets.yml'
+      - '.github/workflows/nightly-deep.yml'
+      - '.github/workflows/distribution-verification.yml'
 
 jobs:
   scaling:

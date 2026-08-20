@@ -23,10 +23,12 @@ Families (rule ids):
 
 The swallowed-returncode rule is deliberately conservative in its idea of
 "controls the outcome": it strips statically-dead blocks (if False:, if 0:,
-if None:, ...) before reasoning, follows simple aliases (rc = p.returncode),
-and only counts a reference as inspection when it appears on a line that gates
-the guard (if/elif/while/assert/return/raise/finish/exit). It is a pattern
-scanner, not a data-flow analysis; BH3 owns runtime guard mutation.
+if None:, ...) before reasoning, then follows value flow through assignments
+(rc = p.returncode, tuple unpacking, flag = rc == 0, data = {... p.returncode
+...}) and counts a reference as inspection only when it reaches a live use —
+a line that is neither a pure print nor a dead store, so `ignored = rc` (never
+read again) cannot green a guard. It is a pattern scanner with bounded
+liveness, not a full data-flow analysis; BH3 owns runtime guard mutation.
 
 Exit status: 0 when no findings, 1 when findings exist. A JSON report is
 written to --output for retained evidence.
@@ -54,12 +56,10 @@ PY_PREREQ_EXIT0 = re.compile(
 )
 PY_VACUOUS = re.compile(r"(?m)\bPASS\b")
 
-# A returncode reference only counts as inspection when its line gates the
-# outcome of the guard.
-GATING_LINE = re.compile(
-    r"^\s*(?:if|elif|while|assert|return|raise)\b|"
-    r"finish\(|SystemExit\(|sys\.exit|exit\(|check_returncode\("
-)
+# Any assignment `target = expr` (including `a, b = p.returncode, p.stdout`
+# tuple unpacking and `data = {...}` dict stores) forwards a result's value to
+# the target name when the right-hand side mentions a result or alias.
+ASSIGN_TARGETS = re.compile(r"^([A-Za-z_]\w*(?:\s*,\s*[A-Za-z_]\w*)*)\s*=\s*(.*)$")
 
 # Statically-false conditional headers whose bodies can never execute.
 STATIC_FALSE = re.compile(
@@ -69,8 +69,6 @@ STATIC_FALSE = re.compile(
 # subprocess result-producing calls; check_call/check_output raise on failure
 # and are therefore inherently safe.
 SUB_RESULT = re.compile(r"(\w+)\s*=\s*subprocess\.(run|call|check_call|check_output)\(")
-# aliases like rc = p.returncode
-SUB_ALIAS = re.compile(r"(\w+)\s*=\s*(\w+)\.(?:returncode|stdout|stderr)\b")
 # bare, discarded calls: subprocess.run(...) whose result is never bound
 BARE_SUB_CALL = re.compile(r"subprocess\.(run|call)\(")
 
@@ -144,6 +142,57 @@ def _pure_print(line: str) -> bool:
     return bool(re.match(r"^\s*print\(", line))
 
 
+def _store_targets(line: str) -> list[str]:
+    m = ASSIGN_TARGETS.match(line)
+    if not m:
+        return []
+    return [t.strip() for t in m.group(1).split(",") if t.strip()]
+
+
+def _var_inspected(refs: set[str], bind: set[int], lines: list[str]) -> bool:
+    """True when a result's value reaches a live use.
+
+    A reference counts as inspection only when it is neither a pure print nor a
+    dead store. A store is dead when none of its targets is subsequently read
+    on a live line, so ``ignored = rc`` (never read again) cannot green a
+    guard, while ``data = {..., "exit": p.returncode}`` feeding a later check
+    is a genuine inspection. Decided by a backward liveness fixpoint over
+    reference lines.
+    """
+    ref_pat = re.compile(r"\b(?:" + "|".join(re.escape(r) for r in refs) + r")\b")
+    candidates = [
+        i
+        for i, line in enumerate(lines)
+        if i not in bind and ref_pat.search(line) and not _pure_print(line)
+    ]
+    live: set[int] = set()
+    changed = True
+    while changed:
+        changed = False
+        for i in sorted(candidates, reverse=True):
+            if i in live:
+                continue
+            if not _store_targets(lines[i]):
+                live.add(i)
+                changed = True
+                continue
+            for j in range(i + 1, len(lines)):
+                if not ref_pat.search(lines[j]):
+                    continue
+                if _pure_print(lines[j]):
+                    continue
+                if _store_targets(lines[j]):
+                    if j in live:
+                        live.add(i)
+                        changed = True
+                        break
+                    continue
+                live.add(i)
+                changed = True
+                break
+    return any(i in live for i in candidates)
+
+
 def _find_swallowed_returncode(text: str) -> list[str]:
     body = _strip_dead_blocks(text)
     lines = body.splitlines()
@@ -159,29 +208,34 @@ def _find_swallowed_returncode(text: str) -> list[str]:
             safe.add(var)
         elif "check=True" in body[m.start(): m.start() + 200]:
             safe.add(var)
-    # Aliases (rc = p.returncode, rc,out = p.returncode,...) only expand from
-    # variables that are themselves subprocess results; `file=sys.stderr` or
-    # `proc=helper(...)` must never create a phantom result variable.
+    # Alias / derivation fixpoint: `rc = p.returncode`, tuple unpacking
+    # (`rc, out = p.returncode, p.stdout`), `flag = rc == 0`, and
+    # `data = {... p.returncode ...}` all forward a result's value to the
+    # target name; the forwarding line is then a binding, never a use.
     changed = True
     while changed:
         changed = False
-        for m in SUB_ALIAS.finditer(body):
-            target, source = m.group(1), m.group(2)
-            if source in result_vars and target not in result_vars[source]:
-                result_vars[source].add(target)
-                changed = True
+        for idx, line in enumerate(lines):
+            targets = _store_targets(line)
+            if not targets:
+                continue
+            for tgt in targets:
+                for var, refs in list(result_vars.items()):
+                    if tgt in refs:
+                        continue
+                    ref_pat = re.compile(
+                        r"\b(?:" + "|".join(re.escape(r) for r in refs) + r")\b"
+                    )
+                    if ref_pat.search(line):
+                        result_vars[var].add(tgt)
+                        binding_lines.setdefault(var, set()).add(idx)
+                        changed = True
     flagged: list[str] = []
     for var, refs in result_vars.items():
         if var in safe:
             continue
-        ref_pat = re.compile(r"\b(?:" + "|".join(re.escape(r) for r in refs) + r")\b")
         bind = binding_lines.get(var, set())
-        inspected = any(
-            ref_pat.search(line) and not _pure_print(line)
-            for idx, line in enumerate(lines)
-            if idx not in bind
-        )
-        if not inspected:
+        if not _var_inspected(refs, bind, lines):
             flagged.append(var)
     # Discarded bare calls: subprocess.run(...) not bound to a variable and not
     # returned/used. A `return subprocess.run(...)` hands the result upward and
@@ -243,6 +297,62 @@ SHELL_PIPE_FILTERS = {
 }
 
 
+def _logical_lines(text: str) -> str:
+    """Join shell physical lines continued with a trailing backslash so a
+    pipeline split across lines (``false \\\\`` then ``| cat``) is analyzed as
+    the single logical line the shell actually runs."""
+    out: list[str] = []
+    buf = ""
+    for raw in text.splitlines():
+        buf = (buf + " " + raw) if buf else raw
+        if re.search(r"\\\s*$", buf):
+            continue
+        out.append(buf)
+        buf = ""
+    if buf:
+        out.append(buf)
+    return "\n".join(out)
+
+
+def _strip_dead_shell_blocks(text: str) -> str:
+    """Remove bodies of statically-dead shell conditionals so a ``set -o
+    pipefail`` inside ``if false; then ...; fi`` (or a one-line
+    ``if false; then set -o pipefail; fi``) can never count as enabled.
+
+    The ``else``/``elif`` branches of a dead ``if`` are live and preserved.
+    """
+    lines = text.splitlines()
+    out: list[str] = []
+    i = 0
+    n = len(lines)
+    while i < n:
+        line = lines[i]
+        s = line.strip()
+        one_line = re.match(
+            r"^(?:if\s+false\s*;\s*then|while\s+false\s*;\s*do)\s+[^;]*;\s*(?:fi|done)\s*$",
+            s,
+        )
+        if one_line:
+            i += 1
+            continue
+        if re.match(r"^(?:if\s+false\s*;?\s*then|while\s+false\s*;\s*do)\s*$", s):
+            i += 1
+            depth = 1
+            while i < n and depth > 0:
+                sub = lines[i].strip()
+                if re.match(r"^(?:if|while|for)\b", sub):
+                    depth += 1
+                elif re.match(r"^(?:fi|done)\b", sub):
+                    depth -= 1
+                elif re.match(r"^(?:else|elif)\b", sub) and depth == 1:
+                    break
+                i += 1
+            continue
+        out.append(line)
+        i += 1
+    return "\n".join(out)
+
+
 def _split_pipeline(line: str) -> list[str]:
     # Remove simple quoted strings so Nift template text (" | ") does not count.
     stripped = re.sub(r"'[^']*'|\"[^\"]*\"", "", line)
@@ -279,12 +389,16 @@ def scan_shell(text: str, path: Path) -> list[dict]:
     if SH_EXIT0_AFTER_TOOL.search(text):
         findings.append({"rule": "prereq-exit0", "file": str(path),
                          "detail": "missing-tool guard exits 0 instead of a non-green code"})
-    has_pipe = bool(re.search(r"\| *\S+", text))
+    # Join continued physical lines, then drop statically-dead blocks, so a
+    # pipefail enabled only in an `if false; then ... fi` block or a pipeline
+    # hidden behind a trailing backslash can neither count nor escape.
+    analyzed = _strip_dead_shell_blocks(_logical_lines(text))
+    has_pipe = bool(re.search(r"\| *\S+", analyzed))
     # Only a real `set -o pipefail` / `set -euo pipefail` counts; a mention in a
     # comment or echo string does not.
-    has_pipefail = bool(re.search(r"^\s*set\s+(-\S+\s+)*.*pipefail", text, re.MULTILINE))
+    has_pipefail = bool(re.search(r"^\s*set\s+(-\S+\s+)*.*pipefail", analyzed, re.MULTILINE))
     if has_pipe and not has_pipefail:
-        reason = _shell_has_unsafe_pipeline(text)
+        reason = _shell_has_unsafe_pipeline(analyzed)
         if reason:
             findings.append({"rule": "pipefail-missing", "file": str(path),
                              "detail": f"uses pipelines but never enables pipefail; {reason}"})
