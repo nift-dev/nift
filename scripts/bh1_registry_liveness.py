@@ -103,6 +103,26 @@ def main() -> int:
         lambda d: d["guarantees"][0].update(guard_refs=[{"repo":"website","path":"content/docs/battle-tested.html"}]),
         "guard_refs-repo-not-executable",
     )
+    add_case(
+        "ci-gated-dispatch-only-workflow",
+        lambda d: next(g for g in d["guarantees"] if g["id"] == "performance.tracking-near-linear").update(enforcement=[{"class":"CI_GATED","workflow":".github/workflows/distribution-verification.yml","job":"summary"}]),
+        "workflow-trigger-not-automatic",
+    )
+    add_case(
+        "unsupported-manual-command",
+        lambda d: d["guarantees"][0].update(enforcement=[{"class":"MANUAL","command":"python3 scripts/no_such_script.py"}]),
+        "manual-command-unsupported",
+    )
+    add_case(
+        "public-claim-source-unpinned",
+        lambda d: d["public_claims"][0].update(source={"repo":"website","path":"content/docs/getting-started.html","needle":"Nift"}),
+        "public-claim-source-not-pinned",
+    )
+    add_case(
+        "retained-class-backed-by-guard",
+        lambda d: d["guarantees"][0].update(evidence_classes=["RETAINED"], evidence_refs=[{"repo":"nift","path":"tests/pagination_incremental_equivalence.py"}]),
+        "retained-evidence-artifact-missing",
+    )
 
     results = []
     all_ok = True

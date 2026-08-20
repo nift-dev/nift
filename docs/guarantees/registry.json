@@ -432,15 +432,8 @@
       "platforms": [
         "linux"
       ],
-      "evidence_classes": [
-        "RETAINED"
-      ],
-      "evidence_refs": [
-        {
-          "repo": "nift",
-          "path": "tests/contracts_smoke.sh"
-        }
-      ],
+      "evidence_classes": [],
+      "evidence_refs": [],
       "guard_refs": [
         {
           "repo": "nift",
@@ -458,7 +451,9 @@
         }
       ],
       "test_of_test": "UNPROVEN",
-      "known_limits": []
+      "known_limits": [
+        "Executable guard exists, but no retained completed-run evidence artifact is currently registered; BH3 may promote this evidence class after retaining a run artifact."
+      ]
     },
     {
       "id": "embedded.jsonic-sync",
@@ -470,16 +465,8 @@
         "macos",
         "windows"
       ],
-      "evidence_classes": [
-        "RETAINED"
-      ],
-      "evidence_refs": [
-        {
-          "repo": "nift",
-          "path": "Makefile",
-          "needle": "test-jsonic-sync:"
-        }
-      ],
+      "evidence_classes": [],
+      "evidence_refs": [],
       "guard_refs": [
         {
           "repo": "nift",
@@ -495,7 +482,8 @@
       ],
       "test_of_test": "UNPROVEN",
       "known_limits": [
-        "BH1 maps the sync contract; BH2/BH3 decide whether CI and drift-mutation enforcement are sufficient"
+        "BH1 maps the sync contract; BH2/BH3 decide whether CI and drift-mutation enforcement are sufficient",
+        "Executable guard exists, but no retained completed-run evidence artifact is currently registered; BH3 may promote this evidence class after retaining a run artifact."
       ]
     },
     {
@@ -668,15 +656,8 @@
       "platforms": [
         "linux"
       ],
-      "evidence_classes": [
-        "RETAINED"
-      ],
-      "evidence_refs": [
-        {
-          "repo": "nift",
-          "path": "tests/pagination_incremental_equivalence.py"
-        }
-      ],
+      "evidence_classes": [],
+      "evidence_refs": [],
       "guard_refs": [
         {
           "repo": "nift",
@@ -691,7 +672,8 @@
       ],
       "test_of_test": "UNPROVEN",
       "known_limits": [
-        "Focused pagination fixture; broader incremental state-space remains BH4 territory"
+        "Focused pagination fixture; broader incremental state-space remains BH4 territory",
+        "Executable guard exists, but no retained completed-run evidence artifact is currently registered; BH3 may promote this evidence class after retaining a run artifact."
       ]
     },
     {
@@ -702,15 +684,8 @@
       "platforms": [
         "linux"
       ],
-      "evidence_classes": [
-        "RETAINED"
-      ],
-      "evidence_refs": [
-        {
-          "repo": "regression",
-          "path": "contract/parameter_interpolation_smoke.sh"
-        }
-      ],
+      "evidence_classes": [],
+      "evidence_refs": [],
       "guard_refs": [
         {
           "repo": "regression",
@@ -725,7 +700,8 @@
       ],
       "test_of_test": "UNPROVEN",
       "known_limits": [
-        "Checkpoint count is historical evidence, not a current total-suite count"
+        "Checkpoint count is historical evidence, not a current total-suite count",
+        "Executable guard exists, but no retained completed-run evidence artifact is currently registered; BH3 may promote this evidence class after retaining a run artifact."
       ]
     },
     {

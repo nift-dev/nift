@@ -136,3 +136,44 @@ application of the campaign rule: **red before trusted green**.
 
 BH1 remains **OPEN / PENDING REVIEWER ROUND 2**. DeepSeek must re-attack the exact
 round-2 commit; the implementer does not self-close the checkpoint.
+
+### BH1 reviewer round 2 — returned to implementer
+
+DeepSeek re-attacked exact candidate `6ffc0b0`. It confirmed C1–C7 closed, then
+found four additional false-green/schema-integrity classes: enforcement tiers
+could cite workflows whose triggers did not match the claimed tier; arbitrary
+non-`make` MANUAL commands were accepted without structural validation; public
+claims could cite pages outside the hash-pinned audited surface set; and a guard
+script could masquerade as `RETAINED` evidence.
+
+Implementation round 3 closes P1–P4 without broadening BH1 into BH2:
+
+- `CI_GATED` and `CROSS_PLATFORM_GATED` workflow refs must expose an automatic
+  `push` or `pull_request` trigger; `RELEASE_GATED` must expose a release-capable
+  trigger; `SCHEDULED` must expose `schedule`. Deeper path/job-condition coverage
+  remains BH2 work.
+- BH1's `MANUAL` enforcement contract is intentionally restricted to the simple
+  `make` / `make -C` forms the registry actually uses, and the referenced target
+  must exist. BH1 does not pretend to validate arbitrary shell commands.
+- every public claim source must be one of the SHA-256-pinned
+  `public_claim_surfaces`, closing the future-claim anti-drift hole.
+- `RETAINED`/`CAMPAIGN` now requires a JSON artifact under a `docs/evidence/`
+  path; executable `guard_refs` cannot stand in for completed-run evidence.
+
+The four existing guarantees that had incorrectly labelled their guard as
+retained evidence (`contracts.namespace-reservation`, `embedded.jsonic-sync`,
+`pagination.incremental-clean-equivalence`, and
+`templating.parameter-interpolation-contract`) were corrected honestly: their
+`RETAINED` class and bogus evidence refs were removed rather than fabricating
+retrospective run artifacts. Their executable guards and enforcement remain
+mapped; BH3 may promote retained/test-of-test status after actual evidence is
+captured.
+
+The round-3 implementer liveness artifact is
+`docs/evidence/bh1/registry-liveness-implementer-round3.json`; all 15 corruption
+cases, including direct P1–P4 reproductions, go red. The full sibling-workspace
+structural check is green.
+
+BH1 remains **OPEN / PENDING REVIEWER ROUND 3**. DeepSeek must independently
+attack the exact round-3 commit and provide/retain its reviewer liveness evidence;
+the implementer does not self-close the checkpoint.

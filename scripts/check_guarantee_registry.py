@@ -137,6 +137,38 @@ def makefile_has_target(path: Path, target: str) -> bool:
     pattern = re.compile(rf"^{re.escape(target)}\s*:(?:\s|$)", re.MULTILINE)
     return bool(pattern.search(path.read_text(encoding="utf-8", errors="replace")))
 
+def workflow_triggers(path: Path) -> set[str]:
+    """Return top-level workflow triggers from the ordinary block-style YAML used here."""
+    text = path.read_text(encoding="utf-8", errors="replace")
+    lines = text.splitlines()
+    triggers: set[str] = set()
+    in_on = False
+    for line in lines:
+        if re.match(r"^on:\s*(?:#.*)?$", line):
+            in_on = True
+            continue
+        if not in_on:
+            continue
+        if line and not line[0].isspace():
+            break
+        match = re.match(r"^  ([A-Za-z_][A-Za-z0-9_-]*):(?:\s|$)", line)
+        if match:
+            triggers.add(match.group(1))
+    return triggers
+
+
+def validate_workflow_trigger(path: Path, klass: str, gid: str) -> None:
+    triggers = workflow_triggers(path)
+    if klass in {"CI_GATED", "CROSS_PLATFORM_GATED"}:
+        if not triggers.intersection({"push", "pull_request"}):
+            raise CheckFailure(f"workflow-trigger-not-automatic: {gid}: {klass}: {path}")
+    elif klass == "RELEASE_GATED":
+        if not triggers.intersection({"workflow_dispatch", "release", "push"}):
+            raise CheckFailure(f"workflow-trigger-not-release-capable: {gid}: {path}")
+    elif klass == "SCHEDULED" and "schedule" not in triggers:
+        raise CheckFailure(f"workflow-trigger-not-scheduled: {gid}: {path}")
+
+
 def workflow_has_job(path: Path, job: str) -> bool:
     # Workflows in this repository use ordinary two-space job keys. Avoid a YAML
     # dependency for a deliberately tiny structural checker.
@@ -197,6 +229,11 @@ def check(registry_path: Path, args: argparse.Namespace) -> dict[str, Any]:
     if not isinstance(meta_guards, list):
         raise CheckFailure("meta-guards-invalid: expected list")
 
+    pinned_surface_keys = {
+        (surface.get("repo"), surface.get("path"))
+        for surface in claim_surfaces if isinstance(surface, dict)
+    }
+
     guarantee_ids: set[str] = set()
     external_skips: set[str] = set()
     ci_refs = 0
@@ -225,6 +262,16 @@ def check(registry_path: Path, args: argparse.Namespace) -> dict[str, Any]:
             raise CheckFailure(f"guard_refs-invalid: {gid}")
         if any(x in {"RETAINED", "CAMPAIGN"} for x in evidence_classes) and not evidence_refs:
             raise CheckFailure(f"retained-evidence-ref-missing: {gid}")
+        if any(x in {"RETAINED", "CAMPAIGN"} for x in evidence_classes):
+            retained_refs = [
+                ref for ref in evidence_refs
+                if isinstance(ref, dict)
+                and isinstance(ref.get("path"), str)
+                and (ref["path"].startswith("docs/evidence/") or "/docs/evidence/" in ref["path"])
+                and ref["path"].endswith(".json")
+            ]
+            if not retained_refs:
+                raise CheckFailure(f"retained-evidence-artifact-missing: {gid}")
         for ref in evidence_refs:
             checked = validate_ref(ref, roots, f"{gid}:evidence_refs")
             local_refs += int(checked)
@@ -257,11 +304,12 @@ def check(registry_path: Path, args: argparse.Namespace) -> dict[str, Any]:
                 if not isinstance(item.get("command"), str) or not item["command"].strip():
                     raise CheckFailure(f"manual-command-missing: {gid}")
                 make_ref = make_target_from_command(item["command"])
-                if make_ref is not None:
-                    makefile_rel, target = make_ref
-                    makefile = nift_root / makefile_rel
-                    if not makefile_has_target(makefile, target):
-                        raise CheckFailure(f"manual-make-target-missing: {gid}: {makefile_rel}:{target}")
+                if make_ref is None:
+                    raise CheckFailure(f"manual-command-unsupported: {gid}: {item['command']!r}")
+                makefile_rel, target = make_ref
+                makefile = nift_root / makefile_rel
+                if not makefile_has_target(makefile, target):
+                    raise CheckFailure(f"manual-make-target-missing: {gid}: {makefile_rel}:{target}")
                 continue
             workflow = item.get("workflow")
             job = item.get("job")
@@ -274,6 +322,7 @@ def check(registry_path: Path, args: argparse.Namespace) -> dict[str, Any]:
                 raise CheckFailure(f"workflow-missing: {gid}: {workflow}")
             if not workflow_has_job(wf_path, job):
                 raise CheckFailure(f"workflow-job-missing: {gid}: {workflow}#{job}")
+            validate_workflow_trigger(wf_path, klass, gid)
             ci_refs += 1
 
     audited_surfaces = 0
@@ -307,7 +356,10 @@ def check(registry_path: Path, args: argparse.Namespace) -> dict[str, Any]:
         guarantee = next(g for g in guarantees if g.get("id") == gid)
         if guarantee.get("state") != "ESTABLISHED":
             raise CheckFailure(f"public-claim-guarantee-not-established: {cid}: {gid}")
-        checked = validate_ref(claim.get("source"), roots, f"{cid}:source", require_needle=True)
+        source = claim.get("source")
+        if not isinstance(source, dict) or (source.get("repo"), source.get("path")) not in pinned_surface_keys:
+            raise CheckFailure(f"public-claim-source-not-pinned: {cid}")
+        checked = validate_ref(source, roots, f"{cid}:source", require_needle=True)
         local_refs += int(checked)
         if not checked:
             external_skips.add(claim["source"]["repo"])
