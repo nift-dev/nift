@@ -2,6 +2,7 @@
 
 ## v4.0.4 (development)
 
+- Fixed init-target CI to validate generated framework metadata against the running Nift binary version instead of a hard-coded previous release version.
 Development version following the public v4.0.3 release.
 
 - Improved parser/build diagnostics: source excerpts now expand tabs deterministically before marker placement, underline the full offending Nift expression/call, syntax-highlight the complete current `@function` surface (including `@content`, `@input`, `@pathto`, control-flow, collection and data helpers), colour `$[...]` expressions and quoted Nift values, and accent the offending syntax/value when stderr is a TTY. The highlighter distinguishes Nift functions from unrelated at-sign syntax such as CSS `@media`; redirected/plain diagnostics remain ANSI-free.

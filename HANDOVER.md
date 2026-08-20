@@ -364,3 +364,10 @@ calling the Nift work complete.
 - The lexer uses an explicit current-function registry so ordinary at-sign syntax such as CSS `@media` and email-like text are not falsely coloured as Nift. HTML attribute quotes containing a Nift call no longer swallow the embedded directive: `href="@pathto('docs')"` highlights `@pathto` and its Nift argument independently.
 - Maintained source-tree gates: `make test-console` covers display-width/tab expansion, every current `@function`, `$[...]`, quoted values, false-positive rejection for CSS/ordinary at-sign text, and explicit colour rendering; `make test-diagnostics` creates a real initialized project with a two-tab-indented invalid `@pathto` and verifies caret/underline alignment. Existing path-security, parser-content, requirements and control-flow smoke tests remain green.
 - The independent `nift-regression-suite` now carries `contract/diagnostics_smoke.sh` for the black-box alignment/diagnostic contract; ANSI colouring stays implementation-level because redirected contract logs must not contain escape sequences.
+
+
+### Init-target CI version invariant
+
+The cross-platform init-target smoke test must not hard-code the last published Nift release version. Development `main` advances immediately after a release, so a release-number assertion becomes stale by design.
+
+`scripts/init_targets_cross_platform.py` now reads `nift --version` from the binary under test and requires generated platform metadata (currently the Amplify deploy manifest's `framework.version`) to match that binary version. Release/tag workflows may separately assert that the binary version matches the release tag.

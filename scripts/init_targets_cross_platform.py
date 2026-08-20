@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Portable smoke coverage for Nift's 4.0.2 init/target contract."""
+"""Portable smoke coverage for Nift init/target behavior."""
 
 from __future__ import annotations
 
@@ -38,6 +38,17 @@ def run(nift: Path, cwd: Path, *args: str, expect: int = 0) -> subprocess.Comple
             f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
         )
     return result
+
+
+
+
+def nift_version(nift: Path) -> str:
+    result = run(nift, nift.parent, "--version")
+    text = result.stdout.strip()
+    prefix = "Nift v"
+    if not text.startswith(prefix) or len(text) == len(prefix):
+        raise AssertionError(f"unexpected Nift version output: {text!r}")
+    return text[len(prefix):]
 
 
 def init(nift: Path, root: Path, name: str, *args: str) -> Path:
@@ -93,7 +104,7 @@ def check(nift: Path) -> None:
         assert manifest["version"] == 1
         assert manifest["routes"] == [{"path": "/*", "target": {"kind": "Static"}}]
         assert manifest["framework"]["name"] == "nift"
-        assert manifest["framework"]["version"] == "4.0.3"
+        assert manifest["framework"]["version"] == nift_version(nift)
         assert (amplify / ".amplify-hosting/static/index.html").is_file()
 
         assert 'command = "nift build"' in (projects["netlify"] / "netlify.toml").read_text(encoding="utf-8")
