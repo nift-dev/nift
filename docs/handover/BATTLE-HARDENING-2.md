@@ -420,11 +420,11 @@ single-repo sequence both PASS.
 
 ### BH2 handoff to reviewer
 
-**Round-3 candidate: this commit** ("BH2 round 3: fix reviewer findings Q1-Q3
+**Round-3 candidate: `7d2621b`** ("BH2 round 3: fix reviewer findings Q1-Q3
 on top of c06fa33"). Reviewer attacks the exact round-3 commit in a separate
 clone/worktree and reports findings back; the implementer does not modify the
 tree during review. No changes are made to `7f8768b`, `c06fa33` or the round-3
-candidate itself.
+candidate `7d2621b` itself.
 
 Review focus areas (attack each):
 
