@@ -620,11 +620,11 @@ the real trees stay GREEN (42 + 21 files, 0 findings); registry CI, the full
 
 ### BH2 handoff to reviewer
 
-**Round-6 candidate: this commit** ("BH2 round 6: fix reviewer findings T1-T2
+**Round-6 candidate: `389a4ac`** ("BH2 round 6: fix reviewer findings T1-T2
 on top of 689cd45"). Reviewer attacks the exact round-6 commit in a separate
 clone/worktree and reports findings back; the implementer does not modify the
 tree during review. No changes are made to `7f8768b`, `c06fa33`, `7d2621b`,
-`88f1158`, `689cd45` or the round-6 candidate itself.
+`88f1158`, `689cd45` or the round-6 candidate `389a4ac` itself.
 
 Review focus areas (attack each):
 
