@@ -680,11 +680,11 @@ liveness, and the CI-equivalent chain all pass.
 
 ### BH2 handoff to reviewer
 
-**Round-7 candidate: this commit** ("BH2 round 7: fix reviewer findings U1-U2
+**Round-7 candidate: `ad707c7`** ("BH2 round 7: fix reviewer findings U1-U2
 on top of 389a4ac"). Reviewer attacks the exact round-7 commit in a separate
 clone/worktree and reports findings back; the implementer does not modify the
 tree during review. No changes are made to `7f8768b`, `c06fa33`, `7d2621b`,
-`88f1158`, `689cd45`, `389a4ac` or the round-7 candidate itself.
+`88f1158`, `689cd45`, `389a4ac` or the round-7 candidate `ad707c7` itself.
 
 Review focus areas (attack each):
 
