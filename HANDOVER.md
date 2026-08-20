@@ -141,8 +141,8 @@ NIFT_BIN=/absolute/path/to/nift ./run-contract.sh
 
 Performance entry points currently include `make benchmark-10k`,
 `make benchmark-memory-10k`, `make test-tracking-scaling`, and
-`make test-full-build-scaling`. `make test-performance-scaling` runs both
-scaling guards. Keep both: Nift has independently suffered O(n²) regressions in
+`make test-full-build-scaling`, and `make test-recovery-epoch`. `make test-performance-scaling` runs both
+scaling guards plus the direct recovery-epoch complexity guard. Keep them: Nift has independently suffered O(n²) regressions in
 tracked-project validation and in per-output transactional filesystem recovery.
 
 The current Makefile does not define named ASan/UBSan targets. When sanitizer
@@ -296,9 +296,9 @@ calling the Nift work complete.
 
 - Maintained gate: `make checkpoint-8-filesystem-transaction`.
 - Commit under test: `e261074`; exact evidence is retained at `docs/evidence/checkpoint-8/filesystem-transaction.json`.
-- Fifteen Linux adversarial cases now pass: unreadable content/template/JSON, dangling symlink, symlink loop, file↔directory obstruction classes, read-only output/state directories, metadata-write obstruction/recovery, long Unicode path, `RLIMIT_FSIZE` partial-write pressure, forced `SIGKILL` during a 48 MiB generated-output write, stale-temporary recovery that preserves temporaries owned by a live concurrent process, and identical-output rebuilds that must still refresh modified-mode current-state metadata.
+- Sixteen Linux adversarial cases now pass: unreadable content/template/JSON, dangling symlink, symlink loop, file↔directory obstruction classes, read-only output/state directories, metadata-write obstruction/recovery, long Unicode path, `RLIMIT_FSIZE` partial-write pressure, forced `SIGKILL` during a 48 MiB generated-output write, stale-temporary recovery that preserves temporaries owned by a live concurrent process, long-running `build-auto` recovery of a dead-owner temp on the next relevant build pass, and identical-output rebuilds that must still refresh modified-mode current-state metadata.
 - Four bug families have been fixed around this checkpoint: unreadable inputs being conflated with empty files; directory-as-file reads reaching a `std::length_error` abort; truncate-in-place writes that could destroy the last-good artifact on interruption; and a later O(n²) full-build regression caused by scanning an output directory before every transactional write.
-- File/state writes stage to same-directory Nift temporary files and replace only after a complete write. A killed write leaves the prior output+metadata intact. Recovery now scans each output/state parent at most once per process and removes only temporaries whose recorded owner PID is no longer live, preserving both bounded full-build scaling and concurrent writers.
+- File/state writes stage to same-directory Nift temporary files and replace only after a complete write. A killed write leaves the prior output+metadata intact. Recovery is epoch-scoped and lazy: each output/state parent is scanned at most once per build pass when that parent next receives a write, and only temporaries whose recorded owner PID is no longer live are removed. Idle `build-auto` polls are not background garbage collection; a later relevant pass gets a fresh recovery opportunity. This preserves bounded full-build scaling, long-running recovery and concurrent writers.
 - Failed output writes do not refresh page metadata. Failed metadata writes leave the page stale so `status`/`build-updated` can repair it.
 - Claim scope is intentionally limited to the tested Linux failure classes. Direct ENOSPC and platform-specific Windows/macOS permission/locking semantics remain outside this checkpoint and belong in later platform evidence.
 - Checkpoint 9 remains appropriate and distinct: fuzz/sanitizer the n++ parser and explicit resource/depth boundaries, without duplicating standalone Jsonic++ or Minify++ parser campaigns.

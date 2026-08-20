@@ -9,7 +9,7 @@
 #include <sstream>
 #include <thread>
 #include <sys/stat.h>
-#include <unordered_set>
+#include <unordered_map>
 #ifdef _WIN32
 #include <windows.h>
 #else
@@ -95,20 +95,40 @@ static bool process_is_alive(unsigned long long pid) {
 #endif
 }
 
-static void remove_stale_temporaries(const fs::path& path) {
-    // Recovery used to scan the whole parent directory before *every* output
-    // write. A flat N-page build therefore performed O(N^2) directory work.
-    // Scan each parent at most once per process instead, before this process
-    // creates any temporaries there. Temp names carry their owner PID so an
-    // overlapping Nift process cannot have its live transactional files removed.
-    static std::mutex mutex;
-    static std::unordered_set<std::string> cleaned_parents;
-    thread_local std::array<fs::path, 4> recent_parents;
-    thread_local std::size_t recent_count = 0;
+namespace {
+std::atomic<std::uint64_t> recovery_epoch{0};
+std::mutex recovery_mutex;
+std::unordered_map<std::string, std::uint64_t> recovered_parent_epochs;
+#ifdef NIFT_TEST_RECOVERY_STATS
+std::atomic<std::uint64_t> recovery_scan_count{0};
+#endif
+}
 
+void begin_recovery_epoch() {
+    // Build passes are the recovery lifetime boundary. The expensive directory
+    // sweep remains lazy (first write to each parent), but a later build pass in
+    // the same long-running process gets another opportunity to recover a temp
+    // left after the previous pass had already scanned that parent.
+    recovery_epoch.fetch_add(1, std::memory_order_relaxed);
+}
+
+static void remove_stale_temporaries(const fs::path& path) {
+    // Recovery once ran before every generated-file write, making a flat N-page
+    // build O(N^2). Each parent is now scanned at most once per recovery epoch.
+    // An epoch begins before each build pass; short-lived non-build commands use
+    // their process-lifetime epoch. Temp names carry their owner PID so an
+    // overlapping live Nift process is preserved conservatively.
     const fs::path parent = path.parent_path().empty() ? fs::path(".") : path.parent_path();
+    const std::uint64_t epoch = recovery_epoch.load(std::memory_order_relaxed);
+
+    // This micro-cache avoids path normalization, hashing and locking on the hot
+    // repeated-write path. The epoch is part of the key so persistent threads
+    // cannot accidentally turn once-per-build recovery back into once-per-process.
+    struct RecentParent { fs::path path; std::uint64_t epoch = 0; };
+    thread_local std::array<RecentParent, 4> recent_parents;
+    thread_local std::size_t recent_count = 0;
     for (std::size_t i = 0; i < recent_count; ++i)
-        if (recent_parents[i] == parent) return;
+        if (recent_parents[i].epoch == epoch && recent_parents[i].path == parent) return;
 
     std::error_code key_error;
     fs::path key_path = fs::absolute(parent, key_error);
@@ -116,9 +136,13 @@ static void remove_stale_temporaries(const fs::path& path) {
     const std::string key = key_path.lexically_normal().string();
 
     {
-        std::lock_guard<std::mutex> lock(mutex);
-        if (cleaned_parents.find(key) == cleaned_parents.end()) {
+        std::lock_guard<std::mutex> lock(recovery_mutex);
+        const auto found = recovered_parent_epochs.find(key);
+        if (found == recovered_parent_epochs.end() || found->second != epoch) {
             std::error_code error;
+#ifdef NIFT_TEST_RECOVERY_STATS
+            recovery_scan_count.fetch_add(1, std::memory_order_relaxed);
+#endif
             for (const auto& entry : fs::directory_iterator(parent, error)) {
                 if (error) break;
                 const std::string name = entry.path().filename().string();
@@ -128,16 +152,27 @@ static void remove_stale_temporaries(const fs::path& path) {
                 fs::remove(entry.path(), ignored);
             }
             if (error) return;
-            cleaned_parents.insert(key);
+            recovered_parent_epochs[key] = epoch;
         }
     }
 
-    if (recent_count < recent_parents.size()) recent_parents[recent_count++] = parent;
+    RecentParent recent{parent, epoch};
+    if (recent_count < recent_parents.size()) recent_parents[recent_count++] = std::move(recent);
     else {
         for (std::size_t i = 1; i < recent_parents.size(); ++i) recent_parents[i - 1] = std::move(recent_parents[i]);
-        recent_parents.back() = parent;
+        recent_parents.back() = std::move(recent);
     }
 }
+
+#ifdef NIFT_TEST_RECOVERY_STATS
+std::uint64_t recovery_scan_count_for_tests() {
+    return recovery_scan_count.load(std::memory_order_relaxed);
+}
+
+void reset_recovery_scan_count_for_tests() {
+    recovery_scan_count.store(0, std::memory_order_relaxed);
+}
+#endif
 
 static fs::path temporary_sibling(const fs::path& path) {
     static std::atomic<unsigned long long> counter{0};

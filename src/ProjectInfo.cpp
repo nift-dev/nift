@@ -1098,6 +1098,7 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& jobs, bool targeted, bo
 }
 
 int ProjectInfo::build_all(bool force, bool explain) {
+    filesystem::begin_recovery_epoch();
     if (!reconcile_watch()) return 1;
     reset_build_caches();
 
@@ -1138,6 +1139,7 @@ int ProjectInfo::build_all(bool force, bool explain) {
 }
 
 int ProjectInfo::build_names(const std::vector<std::string>& names, bool, bool explain) {
+    filesystem::begin_recovery_epoch();
     if (!reconcile_watch()) return 1;
     reset_build_caches();
     std::unordered_set<std::string> seen_names;

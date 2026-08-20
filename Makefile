@@ -32,6 +32,7 @@ TSAN_OBJECTS := $(patsubst %.cpp,$(TEST_DIR)/tsan/%.o,$(SOURCES))
 MEMORY_SMOKE := $(TEST_DIR)/nift-memory-san$(EXEEXT)
 JSON_TEST := $(TEST_DIR)/nift-json-smoke$(EXEEXT)
 JSON_SCHEMA_TEST := $(TEST_DIR)/nift-json-schema-smoke$(EXEEXT)
+RECOVERY_EPOCH_GUARD := $(TEST_DIR)/nift-recovery-epoch-guard$(EXEEXT)
 
 all: $(TARGET)
 
@@ -136,7 +137,7 @@ clean:
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
-.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-diagnostics test-minify test-json-schema-integration test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
+.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-diagnostics test-minify test-json-schema-integration test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
 
 
 test-cross-feature: $(TARGET)
@@ -180,7 +181,16 @@ test-full-build-scaling: $(TARGET)
 	python3 tests/full_build_scaling_benchmark.py --nift "$(CURDIR)/$(TARGET)"
 
 
-test-performance-scaling: test-tracking-scaling test-full-build-scaling
+$(RECOVERY_EPOCH_GUARD): tests/recovery_epoch_guard.cpp src/FileSystem.cpp src/FileSystem.h
+	mkdir -p "$(TEST_DIR)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_TEST_RECOVERY_STATS tests/recovery_epoch_guard.cpp src/FileSystem.cpp -o "$@"
+
+
+test-recovery-epoch: $(RECOVERY_EPOCH_GUARD)
+	"$(RECOVERY_EPOCH_GUARD)" "$(CURDIR)/$(TEST_DIR)/recovery-epoch-fixture"
+
+
+test-performance-scaling: test-tracking-scaling test-full-build-scaling test-recovery-epoch
 
 
 benchmark-10k: $(TARGET)

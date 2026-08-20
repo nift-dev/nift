@@ -102,7 +102,7 @@ canonical contract run.
 | Demonstrated narrow hash collision | Construct hostile evidence; do not assume collisions away. |
 | Traversal/collisions | Paths and derived outputs are security/correctness boundaries. |
 | O(n²) tracked validation | Safety work needs scaling guards. |
-| O(n²) transactional output cleanup | Filesystem recovery must be tested for full-build scaling, not only correctness. |
+| O(n²) transactional output cleanup | Filesystem recovery must be tested for full-build scaling and direct per-parent/per-epoch scan bounds, not only correctness. |
 | Hash-table memory spike | Measure memory and object lifetime as well as CPU. |
 
 Where practical, link durable documentation to the actual regression protecting
@@ -161,8 +161,9 @@ should become deterministic regressions.
 
 Use `PERFORMANCE.md` and current scripts. Prefer scaling ratios and repeated
 checkpoint measurements to brittle absolute thresholds. Maintain both tracked-load
-and full-build-output scaling guards: those paths have independently suffered
-quadratic regressions. Never weaken validation, containment, or dependency
+and full-build-output scaling guards, plus the direct recovery-epoch scan-count guard:
+those paths have independently suffered quadratic regressions, and long-running
+`build-auto` must receive a fresh stale-temp recovery opportunity on the next relevant pass. Never weaken validation, containment, or dependency
 checking merely to improve a benchmark.
 
 ## Project-contract checkpoint (2026-08-17)

@@ -242,6 +242,55 @@ with tempfile.TemporaryDirectory(prefix="nift-cp8-") as td:
         return {"dead_owner_removed":True,"live_owner_preserved":True}
     case("stale-temp-recovery-is-bounded-and-concurrency-safe",stale_temp_recovery_is_bounded_and_concurrency_safe)
 
+    def build_auto_recovers_mid_session_stale_temp_on_relevant_activity():
+        root=td/"build-auto-stale-recovery"; root.mkdir(); scaffold(root)
+        public=root/"public"
+        # Make the first build-auto pass perform a real output write. This is
+        # essential to the regression shape: the long-running process must have
+        # already scanned public/ before the stale temp is planted.
+        content=root/"content/index.html"
+        content.write_text("<p>BUILD-AUTO-FIRST-PASS</p>\n")
+        process=subprocess.Popen([NIFT,"build-auto"],cwd=root,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        try:
+            deadline=time.monotonic()+8
+            output=root/"public/index.html"
+            while time.monotonic()<deadline and process.poll() is None:
+                if output.exists() and "BUILD-AUTO-FIRST-PASS" in output.read_text(): break
+                time.sleep(.05)
+            else:
+                if process.poll() is not None: raise RuntimeError("build-auto exited before initial write pass")
+                raise RuntimeError("build-auto did not complete initial write pass")
+
+            stale=public/"mid-session.html.nift-tmp-99999999-31"
+            stale.write_text("stale\n")
+
+            # No background garbage collection is promised: an idle poll with no
+            # relevant output write must not be required to remove this artifact.
+            time.sleep(.35)
+            if not stale.exists():
+                raise RuntimeError("idle build-auto unexpectedly performed background stale-temp collection")
+
+            # Relevant activity starts a new recovery epoch. The first write to
+            # public/ in that pass must recover the dead-owner temp without a
+            # process restart.
+            content.write_text("<p>MID-SESSION-RECOVERY</p>\n")
+            deadline=time.monotonic()+8
+            while time.monotonic()<deadline and process.poll() is None:
+                output=root/"public/index.html"
+                if output.exists() and "MID-SESSION-RECOVERY" in output.read_text() and not stale.exists():
+                    return {"idle_retained":True,"next_relevant_pass_removed":True}
+                time.sleep(.05)
+            if process.poll() is not None: raise RuntimeError("build-auto exited during recovery pass")
+            if stale.exists(): raise RuntimeError("mid-session stale temporary survived subsequent relevant build activity")
+            raise RuntimeError("build-auto did not publish changed output during recovery pass")
+        finally:
+            if process.poll() is None:
+                process.terminate()
+                try: process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill(); process.wait(timeout=5)
+    case("build-auto-recovers-mid-session-stale-temp-on-relevant-activity",build_auto_recovers_mid_session_stale_temp_on_relevant_activity)
+
     def identical_output_rebuild_refreshes_current_state():
         root=td/"identical-output-refresh"; root.mkdir(); scaffold(root)
         (root/"data").mkdir(); marker=root/"data/marker.txt"; marker.write_text("A\n")

@@ -6,6 +6,7 @@
 
 namespace filesystem {
 std::string read_file(const std::filesystem::path& path);
+void begin_recovery_epoch();
 bool write_file(const std::filesystem::path& path, const std::string& contents);
 bool write_readonly_file(const std::filesystem::path& path, const std::string& contents);
 bool write_readonly_files(const std::vector<std::pair<std::filesystem::path, std::string>>& files);
@@ -23,4 +24,8 @@ std::uint64_t hash_path(const std::filesystem::path& path);
 std::filesystem::path hash_file_path(const std::filesystem::path& root, const std::filesystem::path& path);
 bool stored_hash_changed(const std::filesystem::path& root, const std::filesystem::path& path);
 bool write_stored_hash(const std::filesystem::path& root, const std::filesystem::path& path);
+#ifdef NIFT_TEST_RECOVERY_STATS
+std::uint64_t recovery_scan_count_for_tests();
+void reset_recovery_scan_count_for_tests();
+#endif
 }

@@ -32,16 +32,20 @@ staged output to same-directory temporary files, but stale-temp recovery scanned
 the entire parent directory before every generated file write. For a flat N-page
 site this made output work approximately O(n²).
 
-The fix preserves atomic same-directory staging while moving stale-temp recovery
-to a bounded per-parent operation: each parent directory is scanned at most once
-per Nift process, and temporary files whose recorded owner PID is still live are
-preserved so overlapping writers are not destroyed.
+The fix preserves atomic same-directory staging while making stale-temp recovery
+epoch-scoped and lazy. A build pass starts a new recovery epoch; each parent is
+scanned at most once when it next receives a write in that epoch. That restores a
+recovery opportunity in long-running `build-auto` sessions without scanning on
+idle/no-write polls. Temporary files whose recorded owner PID is still live are
+preserved so overlapping writers are not destroyed. PID reuse may conservatively
+delay cleanup; Nift prefers leaking a stale temp over deleting a potentially live one.
 
 Two independent scaling guards are now maintained:
 
 - `make test-tracking-scaling` protects tracked-project loading;
 - `make test-full-build-scaling` protects full-build output work;
-- `make test-performance-scaling` runs both.
+- `make test-recovery-epoch` asserts one recovery directory scan per distinct touched parent per epoch;
+- `make test-performance-scaling` runs all three guards.
 
 The new full-build guard compares 1,000 and 4,000 flat pages and deliberately
 toggles the shared template between runs so every output changes and must pass
@@ -61,6 +65,10 @@ about 0.21–0.24 s median for repeated full builds, back in the retained ~0.21�
 v1.0.41 checkpoint range. The same container measured v4.0.1 at about 0.31 s.
 Absolute timings remain machine-specific; the durable regression evidence is both
 restored historical full-build performance and near-linear changed-output scaling.
+The maintained Checkpoint 8 and independent black-box recovery cases also prove
+that a dead-owner temp created after an earlier scan in a long-running
+`build-auto` process survives idle time but is removed on the next relevant build
+activity. That test is demonstrated to fail the previous once-per-process repair.
 
 ## v1.0.42 memory checkpoint
 
