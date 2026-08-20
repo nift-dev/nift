@@ -1,0 +1,14 @@
+{
+  "checkpoint": "BH1",
+  "kind": "implementer-round-2-standalone-skip",
+  "candidate_parent_commit": "a1bb6dd",
+  "scenario": "Run the registry checker from a standalone Nift checkout with website and regression siblings absent.",
+  "expected": "Explicit SKIP, non-zero exit, and no claim that public claims were validated.",
+  "checker_exit": 2,
+  "status": "SKIP",
+  "stdout": [
+    "SKIP: guarantee registry structural check incomplete; required sibling repositories unavailable: regression, website",
+    "checked 0 public claim surfaces; public-claim completeness is not asserted"
+  ],
+  "result": "PASS"
+}

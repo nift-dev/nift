@@ -91,6 +91,52 @@ def validate_ref(ref: Any, roots: dict[str, Path | None], label: str, require_ne
     return True
 
 
+
+def validate_guard_ref(ref: Any, roots: dict[str, Path | None], label: str) -> bool:
+    """Require guard refs to name executable/test artifacts, not passive prose."""
+    checked = validate_ref(ref, roots, label)
+    repo = ref.get("repo") if isinstance(ref, dict) else None
+    path = ref.get("path") if isinstance(ref, dict) else None
+    if repo not in {"nift", "regression"}:
+        raise CheckFailure(f"{label}-repo-not-executable: {repo!r}")
+    if not isinstance(path, str):
+        raise CheckFailure(f"{label}-path-invalid")
+    name = Path(path).name
+    suffix = Path(path).suffix
+    if name == "Makefile":
+        needle = ref.get("needle")
+        if not isinstance(needle, str) or not needle.strip():
+            raise CheckFailure(f"{label}-make-target-needle-missing")
+    elif suffix not in {".py", ".sh", ".cpp", ".cc", ".cxx", ".yml", ".yaml"}:
+        raise CheckFailure(f"{label}-not-executable-artifact: {repo}:{path}")
+    return checked
+
+
+def make_target_from_command(command: str) -> tuple[Path, str] | None:
+    """Extract the Makefile and target from the simple make commands used here."""
+    parts = command.split()
+    if not parts or parts[0] != "make":
+        return None
+    directory = Path(".")
+    i = 1
+    if i < len(parts) and parts[i] == "-C":
+        if i + 1 >= len(parts):
+            return None
+        directory = Path(parts[i + 1])
+        i += 2
+    while i < len(parts) and (parts[i].startswith("-") or "=" in parts[i]):
+        i += 1
+    if i >= len(parts):
+        return None
+    return directory / "Makefile", parts[i]
+
+
+def makefile_has_target(path: Path, target: str) -> bool:
+    if not path.is_file():
+        return False
+    pattern = re.compile(rf"^{re.escape(target)}\s*:(?:\s|$)", re.MULTILINE)
+    return bool(pattern.search(path.read_text(encoding="utf-8", errors="replace")))
+
 def workflow_has_job(path: Path, job: str) -> bool:
     # Workflows in this repository use ordinary two-space job keys. Avoid a YAML
     # dependency for a deliberately tiny structural checker.
@@ -171,12 +217,32 @@ def check(registry_path: Path, args: argparse.Namespace) -> dict[str, Any]:
             raise CheckFailure(f"evidence-class-invalid: {gid}: {evidence_classes!r}")
         if g.get("test_of_test") not in ALLOWED_TOT:
             raise CheckFailure(f"test-of-test-invalid: {gid}: {g.get('test_of_test')!r}")
-        for key in ("evidence_refs", "guard_refs"):
-            refs = g.get(key)
-            if not isinstance(refs, list):
-                raise CheckFailure(f"{key}-invalid: {gid}")
-            for ref in refs:
-                checked = validate_ref(ref, roots, f"{gid}:{key}")
+        evidence_refs = g.get("evidence_refs")
+        guard_refs = g.get("guard_refs")
+        if not isinstance(evidence_refs, list):
+            raise CheckFailure(f"evidence_refs-invalid: {gid}")
+        if not isinstance(guard_refs, list):
+            raise CheckFailure(f"guard_refs-invalid: {gid}")
+        if any(x in {"RETAINED", "CAMPAIGN"} for x in evidence_classes) and not evidence_refs:
+            raise CheckFailure(f"retained-evidence-ref-missing: {gid}")
+        for ref in evidence_refs:
+            checked = validate_ref(ref, roots, f"{gid}:evidence_refs")
+            local_refs += int(checked)
+            if not checked:
+                external_skips.add(ref["repo"])
+        for ref in guard_refs:
+            checked = validate_guard_ref(ref, roots, f"{gid}:guard_refs")
+            local_refs += int(checked)
+            if not checked:
+                external_skips.add(ref["repo"])
+        if g.get("test_of_test") == "VERIFIED_GUARD":
+            red_refs = g.get("test_of_test_evidence_refs")
+            if not isinstance(red_refs, list) or not red_refs:
+                raise CheckFailure(f"verified-guard-redrun-evidence-missing: {gid}")
+            for ref in red_refs:
+                if ref.get("repo") != "nift" or "docs/evidence" not in ref.get("path", "") or not ref.get("path", "").endswith(".json"):
+                    raise CheckFailure(f"verified-guard-redrun-evidence-invalid: {gid}")
+                checked = validate_ref(ref, roots, f"{gid}:test_of_test_evidence_refs")
                 local_refs += int(checked)
                 if not checked:
                     external_skips.add(ref["repo"])
@@ -190,6 +256,12 @@ def check(registry_path: Path, args: argparse.Namespace) -> dict[str, Any]:
             if klass == "MANUAL":
                 if not isinstance(item.get("command"), str) or not item["command"].strip():
                     raise CheckFailure(f"manual-command-missing: {gid}")
+                make_ref = make_target_from_command(item["command"])
+                if make_ref is not None:
+                    makefile_rel, target = make_ref
+                    makefile = nift_root / makefile_rel
+                    if not makefile_has_target(makefile, target):
+                        raise CheckFailure(f"manual-make-target-missing: {gid}: {makefile_rel}:{target}")
                 continue
             workflow = item.get("workflow")
             job = item.get("job")
@@ -227,11 +299,14 @@ def check(registry_path: Path, args: argparse.Namespace) -> dict[str, Any]:
         if not isinstance(claim, dict):
             raise CheckFailure("public-claim-invalid: expected object")
         cid = validate_id(claim.get("id"), "public-claim", claim_ids)
-        if claim.get("state") not in ALLOWED_STATES:
-            raise CheckFailure(f"public-claim-state-invalid: {cid}: {claim.get('state')!r}")
+        if claim.get("state") != "ESTABLISHED":
+            raise CheckFailure(f"public-claim-not-established: {cid}: {claim.get('state')!r}")
         gid = claim.get("guarantee_id")
         if gid not in guarantee_ids:
             raise CheckFailure(f"public-claim-guarantee-missing: {cid}: {gid!r}")
+        guarantee = next(g for g in guarantees if g.get("id") == gid)
+        if guarantee.get("state") != "ESTABLISHED":
+            raise CheckFailure(f"public-claim-guarantee-not-established: {cid}: {gid}")
         checked = validate_ref(claim.get("source"), roots, f"{cid}:source", require_needle=True)
         local_refs += int(checked)
         if not checked:
@@ -260,7 +335,7 @@ def check(registry_path: Path, args: argparse.Namespace) -> dict[str, Any]:
         mid = validate_id(item.get("id"), "meta-guard", meta_ids)
         if item.get("test_of_test") not in ALLOWED_TOT:
             raise CheckFailure(f"meta-guard-test-of-test-invalid: {mid}")
-        checked = validate_ref(item.get("guard_ref"), roots, f"{mid}:guard-ref")
+        checked = validate_guard_ref(item.get("guard_ref"), roots, f"{mid}:guard-ref")
         local_refs += int(checked)
         if not checked:
             external_skips.add(item["guard_ref"]["repo"])
@@ -290,17 +365,26 @@ def main() -> int:
     except CheckFailure as exc:
         print(f"FAIL: {exc}", file=sys.stderr)
         return 1
+    unavailable = summary["unavailable_sibling_repositories"]
+    status = "SKIP" if unavailable else "PASS"
     if args.json:
-        print(json.dumps({"status": "PASS", **summary}, indent=2, sort_keys=True))
+        print(json.dumps({"status": status, **summary}, indent=2, sort_keys=True))
+    elif unavailable:
+        print(
+            "SKIP: guarantee registry structural check incomplete; required sibling repositories unavailable: "
+            + ", ".join(unavailable)
+        )
+        print(
+            f"checked {summary['audited_public_claim_surfaces']} public claim surfaces; "
+            "public-claim completeness is not asserted"
+        )
     else:
         print(
             "PASS: guarantee registry structurally valid "
             f"({summary['guarantees']} guarantees, {summary['public_claims']} public claims, "
             f"{summary['known_discrepancies']} known discrepancies, {summary['ci_job_refs']} CI job refs)"
         )
-        if summary["unavailable_sibling_repositories"]:
-            print("note: sibling repositories unavailable: " + ", ".join(summary["unavailable_sibling_repositories"]))
-    return 0
+    return 2 if unavailable else 0
 
 
 if __name__ == "__main__":

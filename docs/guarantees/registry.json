@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "campaign": "battle-hardening-2026-08",
-  "purpose": "Map Nift guarantees and public reliability claims to retained evidence, enforcement, platform scope, limitations, and test-of-test status.",
+  "purpose": "Map Nift guarantees and the manually audited quantitative/reliability claims on the pinned public surfaces to retained evidence, enforcement, platform scope, limitations, and test-of-test status. Surface hashes force re-audit when those pages change.",
   "baseline": {
     "released_version": "4.0.4",
     "development_version": "4.0.5",
@@ -100,8 +100,8 @@
           "command": "make checkpoint-8-filesystem-transaction"
         }
       ],
-      "test_of_test": "VERIFIED_GUARD",
-      "test_of_test_note": "The long-running stale-temp case was demonstrated to fail the previous once-per-process recovery implementation.",
+      "test_of_test": "UNPROVEN",
+      "test_of_test_note": "The long-running stale-temp case was demonstrated to fail the previous once-per-process recovery implementation. Historical red behavior was observed, but no dedicated retained red-run artifact is currently referenced; BH3 must promote this guard.",
       "known_limits": [
         "PID reuse is an accepted conservative cleanup limitation"
       ]
@@ -293,7 +293,7 @@
       "id": "performance.full-build-near-linear",
       "state": "ESTABLISHED",
       "guarantee": "Changed-output full-build work remains near-linear on the retained large flat-output fixture.",
-      "scope": "1,000→4,000 page changed-output scaling guard; identical-output fast path cannot hide the writer cost.",
+      "scope": "1,000\u21924,000 page changed-output scaling guard; identical-output fast path cannot hide the writer cost.",
       "platforms": [
         "linux"
       ],
@@ -314,8 +314,8 @@
           "job": "scaling"
         }
       ],
-      "test_of_test": "VERIFIED_GUARD",
-      "test_of_test_note": "The guard was demonstrated to fail the historical per-write stale-temp scan implementation.",
+      "test_of_test": "UNPROVEN",
+      "test_of_test_note": "The guard was demonstrated to fail the historical per-write stale-temp scan implementation. Historical red behavior was observed, but no dedicated retained red-run artifact is currently referenced; BH3 must promote this guard.",
       "known_limits": [
         "Ratio guard, not a universal wall-clock guarantee"
       ]
@@ -435,7 +435,12 @@
       "evidence_classes": [
         "RETAINED"
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        {
+          "repo": "nift",
+          "path": "tests/contracts_smoke.sh"
+        }
+      ],
       "guard_refs": [
         {
           "repo": "nift",
@@ -468,11 +473,18 @@
       "evidence_classes": [
         "RETAINED"
       ],
-      "evidence_refs": [],
+      "evidence_refs": [
+        {
+          "repo": "nift",
+          "path": "Makefile",
+          "needle": "test-jsonic-sync:"
+        }
+      ],
       "guard_refs": [
         {
           "repo": "nift",
-          "path": "Makefile"
+          "path": "Makefile",
+          "needle": "test-jsonic-sync:"
         }
       ],
       "enforcement": [
@@ -499,12 +511,13 @@
       "evidence_classes": [
         "RELEASE_GATED"
       ],
-      "evidence_refs": [],
-      "guard_refs": [
+      "evidence_refs": [
         {
           "repo": "nift",
           "path": "docs/handover/PACKAGING.md"
-        },
+        }
+      ],
+      "guard_refs": [
         {
           "repo": "nift",
           "path": ".github/workflows/distribution-verification.yml"
@@ -553,7 +566,7 @@
       "enforcement": [
         {
           "class": "MANUAL",
-          "command": "make -C jsonic memory-safety"
+          "command": "make -C jsonic memory-safety-checkpoint-1a"
         }
       ],
       "test_of_test": "UNPROVEN",
@@ -592,7 +605,7 @@
       "enforcement": [
         {
           "class": "MANUAL",
-          "command": "make -C minifypp memory-safety"
+          "command": "make -C minifypp memory-safety-checkpoint-2"
         }
       ],
       "test_of_test": "UNPROVEN",
@@ -646,6 +659,107 @@
       "known_limits": [
         "Campaign-scoped; RSS is not used as a standalone leak oracle"
       ]
+    },
+    {
+      "id": "pagination.incremental-clean-equivalence",
+      "state": "ESTABLISHED",
+      "guarantee": "Pagination state transitions preserve incremental-vs-clean output equivalence across modified, hash, and hybrid modes.",
+      "scope": "18 focused comparisons: six pagination state transitions under each incremental mode.",
+      "platforms": [
+        "linux"
+      ],
+      "evidence_classes": [
+        "RETAINED"
+      ],
+      "evidence_refs": [
+        {
+          "repo": "nift",
+          "path": "tests/pagination_incremental_equivalence.py"
+        }
+      ],
+      "guard_refs": [
+        {
+          "repo": "nift",
+          "path": "tests/pagination_incremental_equivalence.py"
+        }
+      ],
+      "enforcement": [
+        {
+          "class": "MANUAL",
+          "command": "make test-pagination-equivalence"
+        }
+      ],
+      "test_of_test": "UNPROVEN",
+      "known_limits": [
+        "Focused pagination fixture; broader incremental state-space remains BH4 territory"
+      ]
+    },
+    {
+      "id": "templating.parameter-interpolation-contract",
+      "state": "ESTABLISHED",
+      "guarantee": "Parameter interpolation behavior is covered by a focused standalone contract module.",
+      "scope": "Checkpoint-specific 73-check parameter-interpolation module.",
+      "platforms": [
+        "linux"
+      ],
+      "evidence_classes": [
+        "RETAINED"
+      ],
+      "evidence_refs": [
+        {
+          "repo": "regression",
+          "path": "contract/parameter_interpolation_smoke.sh"
+        }
+      ],
+      "guard_refs": [
+        {
+          "repo": "regression",
+          "path": "contract/parameter_interpolation_smoke.sh"
+        }
+      ],
+      "enforcement": [
+        {
+          "class": "MANUAL",
+          "command": "make test-contracts"
+        }
+      ],
+      "test_of_test": "UNPROVEN",
+      "known_limits": [
+        "Checkpoint count is historical evidence, not a current total-suite count"
+      ]
+    },
+    {
+      "id": "concurrency.shared-data-isolation",
+      "state": "ESTABLISHED",
+      "guarantee": "The retained integration harness exercises shared JSON/schema/input state under parallel page builds and failure/repair transitions.",
+      "scope": "120-page shared-data fixture with 12 workers across repeated forced builds and schema invalidation/repair.",
+      "platforms": [
+        "linux"
+      ],
+      "evidence_classes": [
+        "RETAINED",
+        "CAMPAIGN"
+      ],
+      "evidence_refs": [
+        {
+          "repo": "nift",
+          "path": "docs/evidence/memory-safety/checkpoint-6-integration.json"
+        }
+      ],
+      "guard_refs": [
+        {
+          "repo": "nift",
+          "path": "scripts/checkpoint6_integration.py"
+        }
+      ],
+      "enforcement": [
+        {
+          "class": "MANUAL",
+          "command": "make memory-safety-checkpoint-6"
+        }
+      ],
+      "test_of_test": "UNPROVEN",
+      "known_limits": []
     }
   ],
   "public_claims": [
@@ -744,7 +858,7 @@
       "source": {
         "repo": "website",
         "path": "content/docs/production-readiness.html",
-        "needle": "protected by a dedicated 1,000→4,000-page full-build scaling guard"
+        "needle": "protected by a dedicated 1,000\u21924,000-page full-build scaling guard"
       },
       "kind": "reliability"
     },
@@ -846,6 +960,96 @@
         "needle": "directly monitored 19 Nift invocations under Valgrind across a 40-page, 12-round workload with four expected component failures"
       },
       "kind": "quantitative"
+    },
+    {
+      "id": "battle.pagination-18",
+      "state": "ESTABLISHED",
+      "guarantee_id": "pagination.incremental-clean-equivalence",
+      "source": {
+        "repo": "website",
+        "path": "content/docs/battle-tested.html",
+        "needle": "Pagination additionally carries 18 focused incremental-vs-clean comparisons"
+      }
+    },
+    {
+      "id": "battle.incremental-eight-by-30",
+      "state": "ESTABLISHED",
+      "guarantee_id": "incremental.clean-build-equivalence",
+      "source": {
+        "repo": "website",
+        "path": "content/docs/battle-tested.html",
+        "needle": "eight deterministic mutation sequences per mode performed 30 mutations each"
+      }
+    },
+    {
+      "id": "battle.concurrency-120-12",
+      "state": "ESTABLISHED",
+      "guarantee_id": "concurrency.shared-data-isolation",
+      "source": {
+        "repo": "website",
+        "path": "content/docs/battle-tested.html",
+        "needle": "builds 120 pages sharing JSON, JSON Schema and nested input sources with 12 workers"
+      }
+    },
+    {
+      "id": "battle.parameter-interpolation-73",
+      "state": "ESTABLISHED",
+      "guarantee_id": "templating.parameter-interpolation-contract",
+      "source": {
+        "repo": "website",
+        "path": "content/docs/battle-tested.html",
+        "needle": "73-check parameter-interpolation module"
+      }
+    },
+    {
+      "id": "battle.integration-fixture-46",
+      "state": "ESTABLISHED",
+      "guarantee_id": "memory.cross-component-valgrind",
+      "source": {
+        "repo": "website",
+        "path": "content/docs/battle-tested.html",
+        "needle": "46-page integration fixture"
+      }
+    },
+    {
+      "id": "memory.watch-rss-band",
+      "state": "ESTABLISHED",
+      "guarantee_id": "memory.nift-lifecycle",
+      "source": {
+        "repo": "website",
+        "path": "content/docs/memory-safety.html",
+        "needle": "RSS stayed within 5,976\u20136,356 KiB"
+      }
+    },
+    {
+      "id": "memory.watch-valgrind-30",
+      "state": "ESTABLISHED",
+      "guarantee_id": "memory.nift-lifecycle",
+      "source": {
+        "repo": "website",
+        "path": "content/docs/memory-safety.html",
+        "needle": "30 acknowledgement-driven watch cycles"
+      }
+    },
+    {
+      "id": "memory.jsonic-rss-400",
+      "state": "ESTABLISHED",
+      "guarantee_id": "memory.jsonic-component",
+      "source": {
+        "repo": "website",
+        "path": "content/docs/memory-safety.html",
+        "needle": "400-iteration RSS soak settled at 10,688 KiB"
+      }
+    },
+    {
+      "id": "memory.minify-rss-300",
+      "state": "ESTABLISHED",
+      "guarantee_id": "memory.minify-component",
+      "source": {
+        "repo": "website",
+        "path": "content/docs/memory-safety.html",
+        "needle": "300-iteration native soak stabilized at 7,160 KiB RSS"
+      }
     }
   ],
   "known_discrepancies": [

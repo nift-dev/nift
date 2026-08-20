@@ -1,0 +1,88 @@
+{
+  "checkpoint": "BH1",
+  "kind": "implementer-precheck",
+  "candidate_parent_commit": "a1bb6ddb245f48e1d085f2f02580b3fe3aeab1d1",
+  "registry_sha256": "6af0cee6dc32eb8e33055fb830d474c199506b84319f992fd5e38ef03cd4509d",
+  "checker_sha256": "88c11d4cf436ae4a79a7cf948a7ba21f5318a5e1bf9200a7be310d73b2179651",
+  "status": "PASS",
+  "note": "Independent reviewer liveness evidence is still required before BH1 closes.",
+  "cases": [
+    {
+      "case": "missing-retained-evidence",
+      "expected_diagnostic_fragment": "evidence_refs-missing",
+      "checker_exit": 1,
+      "observed": "FAIL: incremental.clean-build-equivalence:evidence_refs-missing: nift:docs/evidence/checkpoint-7/DOES-NOT-EXIST.json",
+      "red_as_expected": true
+    },
+    {
+      "case": "nonexistent-ci-job",
+      "expected_diagnostic_fragment": "workflow-job-missing",
+      "checker_exit": 1,
+      "observed": "FAIL: workflow-job-missing: platform.portable-equivalence: .github/workflows/checkpoint-10-cross-platform.yml#definitely-not-a-real-job",
+      "red_as_expected": true
+    },
+    {
+      "case": "duplicate-guarantee-id",
+      "expected_diagnostic_fragment": "duplicate-id",
+      "checker_exit": 1,
+      "observed": "FAIL: duplicate-id: incremental.clean-build-equivalence",
+      "red_as_expected": true
+    },
+    {
+      "case": "broken-public-claim-needle",
+      "expected_diagnostic_fragment": "needle-not-found",
+      "checker_exit": 1,
+      "observed": "FAIL: battle.incremental-720:source-needle-not-found: website:content/docs/battle-tested.html: 'THIS CLAIM TEXT DOES NOT EXIST'",
+      "red_as_expected": true
+    },
+    {
+      "case": "stale-public-claim-surface-hash",
+      "expected_diagnostic_fragment": "public-claim-surface-stale",
+      "checker_exit": 1,
+      "observed": "FAIL: public-claim-surface-stale: website:content/docs/battle-tested.html: expected 0000000000000000000000000000000000000000000000000000000000000000, observed de8d5856ec2b26ef38f2e213996beb82733c15d1d0312c3de857e73966007fe9",
+      "red_as_expected": true
+    },
+    {
+      "case": "retained-class-without-evidence-ref",
+      "expected_diagnostic_fragment": "retained-evidence-ref-missing",
+      "checker_exit": 1,
+      "observed": "FAIL: retained-evidence-ref-missing: incremental.clean-build-equivalence",
+      "red_as_expected": true
+    },
+    {
+      "case": "public-claim-downgraded",
+      "expected_diagnostic_fragment": "public-claim-not-established",
+      "checker_exit": 1,
+      "observed": "FAIL: public-claim-not-established: battle.incremental-720: 'NOT_ESTABLISHED'",
+      "red_as_expected": true
+    },
+    {
+      "case": "public-claim-guarantee-downgraded",
+      "expected_diagnostic_fragment": "public-claim-guarantee-not-established",
+      "checker_exit": 1,
+      "observed": "FAIL: public-claim-guarantee-not-established: battle.incremental-720: incremental.clean-build-equivalence",
+      "red_as_expected": true
+    },
+    {
+      "case": "verified-guard-without-redrun-evidence",
+      "expected_diagnostic_fragment": "verified-guard-redrun-evidence-missing",
+      "checker_exit": 1,
+      "observed": "FAIL: verified-guard-redrun-evidence-missing: incremental.clean-build-equivalence",
+      "red_as_expected": true
+    },
+    {
+      "case": "nonexistent-manual-make-target",
+      "expected_diagnostic_fragment": "manual-make-target-missing",
+      "checker_exit": 1,
+      "observed": "FAIL: manual-make-target-missing: incremental.clean-build-equivalence: Makefile:does-not-exist",
+      "red_as_expected": true
+    },
+    {
+      "case": "passive-page-as-guard-ref",
+      "expected_diagnostic_fragment": "guard_refs-repo-not-executable",
+      "checker_exit": 1,
+      "observed": "FAIL: incremental.clean-build-equivalence:guard_refs-repo-not-executable: 'website'",
+      "red_as_expected": true
+    }
+  ]
+}

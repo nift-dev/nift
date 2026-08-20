@@ -73,6 +73,36 @@ def main() -> int:
         lambda d: d["public_claim_surfaces"][0].update(sha256="0" * 64),
         "public-claim-surface-stale",
     )
+    add_case(
+        "retained-class-without-evidence-ref",
+        lambda d: d["guarantees"][0].update(evidence_classes=["RETAINED"], evidence_refs=[]),
+        "retained-evidence-ref-missing",
+    )
+    add_case(
+        "public-claim-downgraded",
+        lambda d: d["public_claims"][0].update(state="NOT_ESTABLISHED"),
+        "public-claim-not-established",
+    )
+    add_case(
+        "public-claim-guarantee-downgraded",
+        lambda d: next(g for g in d["guarantees"] if g["id"] == d["public_claims"][0]["guarantee_id"]).update(state="NOT_ESTABLISHED"),
+        "public-claim-guarantee-not-established",
+    )
+    add_case(
+        "verified-guard-without-redrun-evidence",
+        lambda d: d["guarantees"][0].update(test_of_test="VERIFIED_GUARD", test_of_test_note="fabricated"),
+        "verified-guard-redrun-evidence-missing",
+    )
+    add_case(
+        "nonexistent-manual-make-target",
+        lambda d: d["guarantees"][0].update(enforcement=[{"class":"MANUAL","command":"make does-not-exist"}]),
+        "manual-make-target-missing",
+    )
+    add_case(
+        "passive-page-as-guard-ref",
+        lambda d: d["guarantees"][0].update(guard_refs=[{"repo":"website","path":"content/docs/battle-tested.html"}]),
+        "guard_refs-repo-not-executable",
+    )
 
     results = []
     all_ok = True

@@ -101,3 +101,38 @@ committed by ChatGPT. Final BH1 status remains **PENDING REVIEWER** until DeepSe
 2. demonstrates the checker red against a reviewer-authored representative defect;
 3. retains that red-run evidence; and
 4. either signs off or returns a counterexample for another implementation round.
+
+### BH1 reviewer round 1 — returned to implementer
+
+DeepSeek independently attacked candidate `a1bb6dd` and correctly kept BH1 open.
+Its reviewer-authored liveness injections proved four checker paths red, but it
+also found six false-green structural classes and one significant claim omission.
+The retained review transcript summary is
+`docs/evidence/bh1/registry-reviewer-round1.json`.
+
+Implementation round 2 closes those reported classes structurally:
+
+- `RETAINED`/`CAMPAIGN` evidence classes may no longer have empty `evidence_refs`;
+- public claims and their referenced guarantees must both remain `ESTABLISHED`;
+- `VERIFIED_GUARD` now requires a retained JSON red-run evidence reference;
+- `make ...` manual enforcement commands must name a real target, including `-C`
+  component Makefiles;
+- `guard_refs` are restricted to executable/test artifacts in Nift or the external
+  regression suite; a passive website/document page cannot masquerade as a guard;
+- missing sibling repositories produce explicit `SKIP` with exit 2, never a green
+  PASS that counts unvalidated public claims; and
+- pagination incremental-vs-clean equivalence is now a first-class guarantee with
+  its public 18-comparison claim mapped. The round also maps the quantitative
+  subclaims identified during review (incremental sequence shape, shared-data
+  concurrency fixture, parameter-interpolation checkpoint, integration fixture,
+  watch/RSS figures, and component RSS soaks) rather than leaving them silently
+  outside the manually audited surface inventory.
+
+Two guards previously labelled `VERIFIED_GUARD` were deliberately downgraded to
+`UNPROVEN`: their historical failure demonstrations were real, but BH1 had no
+retained red-run artifact to which the registry could point. BH3 can promote them
+again only after retained liveness evidence exists. This is an intentional
+application of the campaign rule: **red before trusted green**.
+
+BH1 remains **OPEN / PENDING REVIEWER ROUND 2**. DeepSeek must re-attack the exact
+round-2 commit; the implementer does not self-close the checkpoint.
