@@ -344,11 +344,11 @@ findings retained at `docs/evidence/bh2/bh2-reviewer-fixtures-report.json`.
 
 ### BH2 handoff to reviewer
 
-**Round-1 candidate (already reviewed): `7f8768b`.** **Round-2 candidate: this
-commit** — the round-1 findings (P1–P4) are fixed on top of `7f8768b`. Reviewer
-attacks the exact round-2 commit in a separate clone/worktree and reports findings
-back; the implementer does not modify the tree during review. No changes are made
-to `7f8768b` itself.
+**Round-1 candidate (already reviewed): `7f8768b`.** **Round-2 candidate:
+`c06fa33`** ("BH2 round 2: fix reviewer findings P1-P4 on top of 7f8768b").
+Reviewer attacks the exact round-2 commit in a separate clone/worktree and
+reports findings back; the implementer does not modify the tree during review.
+No changes are made to `7f8768b` or `c06fa33` themselves.
 
 Review focus areas (attack each):
 
