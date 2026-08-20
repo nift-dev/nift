@@ -1,0 +1,37 @@
+{
+  "schema": 1,
+  "campaign": "bh2",
+  "scanned_files": 5,
+  "findings": [
+    {
+      "rule": "pipefail-missing",
+      "file": "/tmp/opencode/bh2-fixtures/falsegreen_pipe.sh",
+      "detail": "uses pipelines but never enables pipefail; a failing upstream command can be masked"
+    },
+    {
+      "rule": "prereq-exit0",
+      "file": "/tmp/opencode/bh2-fixtures/falsegreen_skip.py",
+      "detail": "missing-tool guard exits 0 instead of a non-green code"
+    },
+    {
+      "rule": "skip-as-pass",
+      "file": "/tmp/opencode/bh2-fixtures/falsegreen_prereq.sh",
+      "detail": "SKIP message immediately followed by exit 0 (silent green)"
+    },
+    {
+      "rule": "skip-as-pass",
+      "file": "/tmp/opencode/bh2-fixtures/falsegreen_skip.py",
+      "detail": "SKIP message immediately followed by SystemExit(0) (silent green)"
+    },
+    {
+      "rule": "swallowed-returncode",
+      "file": "/tmp/opencode/bh2-fixtures/falsegreen_swallow.py",
+      "detail": "subprocess invoked without check=True and no returncode inspection anywhere"
+    },
+    {
+      "rule": "vacuous-pass",
+      "file": "/tmp/opencode/bh2-fixtures/falsegreen_vacuous.py",
+      "detail": "prints PASS but invokes nothing and asserts nothing"
+    }
+  ]
+}

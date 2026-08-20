@@ -157,6 +157,57 @@ def workflow_triggers(path: Path) -> set[str]:
     return triggers
 
 
+def workflow_matrix_runners(path: Path) -> set[str]:
+    """Return the OS family names a workflow's strategy matrix actually targets.
+
+    Recognizes the `strategy.matrix.include` block style used in this
+    repository and maps each included runner to an OS family. A workflow that
+    claims cross-platform reach must list concrete OS runners in its matrix;
+    a matrix that only references an abstract ``${{ matrix.runner }}`` without
+    including concrete runners is not cross-platform evidence.
+    """
+    text = path.read_text(encoding="utf-8", errors="replace")
+    lines = text.splitlines()
+    include_depth = -1
+    runners: set[str] = set()
+    for i, line in enumerate(lines):
+        m = re.match(r"^(\s*)include:\s*$", line)
+        if m:
+            include_depth = len(m.group(1))
+            continue
+        if include_depth < 0:
+            continue
+        if line.strip() and not line.startswith(" " * (include_depth + 2)):
+            include_depth = -1
+            continue
+        rm = re.match(r"^\s*(?:-\s+)?runner:\s*([^\s#]+)", line)
+        if rm:
+            runner = rm.group(1).lower()
+            if "ubuntu" in runner:
+                runners.add("linux")
+            elif "macos" in runner:
+                runners.add("macos")
+            elif "windows" in runner:
+                runners.add("windows")
+    return runners
+
+
+def validate_cross_platform_matrix(path: Path, klass: str, gid: str, platforms) -> None:
+    """A CROSS_PLATFORM_GATED workflow must prove OS breadth structurally."""
+    if klass != "CROSS_PLATFORM_GATED":
+        return
+    declared = set(p.lower() for p in platforms) if platforms else set()
+    runner_families = workflow_matrix_runners(path)
+    if not runner_families:
+        raise CheckFailure(f"cross-platform-matrix-missing: {gid}: {path}: no concrete matrix include runners")
+    missing = declared - runner_families
+    if missing:
+        raise CheckFailure(
+            f"cross-platform-matrix-incomplete: {gid}: {path}: declared platforms "
+            f"missing from matrix runners: {sorted(missing)}"
+        )
+
+
 def validate_workflow_trigger(path: Path, klass: str, gid: str) -> None:
     triggers = workflow_triggers(path)
     if klass in {"CI_GATED", "CROSS_PLATFORM_GATED"}:
@@ -323,6 +374,7 @@ def check(registry_path: Path, args: argparse.Namespace) -> dict[str, Any]:
             if not workflow_has_job(wf_path, job):
                 raise CheckFailure(f"workflow-job-missing: {gid}: {workflow}#{job}")
             validate_workflow_trigger(wf_path, klass, gid)
+            validate_cross_platform_matrix(wf_path, klass, gid, g.get("platforms"))
             ci_refs += 1
 
     audited_surfaces = 0

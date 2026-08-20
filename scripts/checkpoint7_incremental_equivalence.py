@@ -12,10 +12,15 @@ a=ap.parse_args(); NIFT=str(pathlib.Path(a.nift).resolve()); repo=pathlib.Path(_
 def commit():
     try:return subprocess.check_output(["git","rev-parse","HEAD"],cwd=repo,text=True,stderr=subprocess.DEVNULL).strip()
     except Exception:return "unknown"
-def run(root,*args,expect=True):
-    p=subprocess.run([NIFT,*args],cwd=root,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-    if expect and p.returncode:
-        raise RuntimeError(f"{args} failed ({p.returncode}):\n{p.stdout}\n{p.stderr}")
+def run(root,*args,expect=True,timeout=30.0):
+    try:
+        p=subprocess.run([NIFT,*args],cwd=root,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=timeout)
+        rc=p.returncode; out=p.stdout; err=p.stderr
+    except subprocess.TimeoutExpired as exc:
+        rc=124; out=exc.stdout or ""; err=exc.stderr or ""
+    if expect and rc:
+        raise RuntimeError(f"{args} failed ({rc}):\n{out}\n{err}")
+    p.returncode=rc; p.stdout=out; p.stderr=err
     return p
 def touch(p,delta=2):
     t=time.time()+delta; os.utime(p,(t,t))

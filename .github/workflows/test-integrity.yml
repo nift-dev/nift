@@ -1,0 +1,59 @@
+name: Test integrity guards
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'jsonic/**'
+      - 'minifypp/**'
+      - 'Makefile'
+      - 'docs/guarantees/**'
+      - '.github/workflows/test-integrity.yml'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'jsonic/**'
+      - 'minifypp/**'
+      - 'Makefile'
+      - 'docs/guarantees/**'
+      - '.github/workflows/test-integrity.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static-integrity:
+    name: Static test-integrity scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Scan tests and scripts for false-green patterns
+        run: |
+          python scripts/test_integrity_check.py tests scripts \
+            --output .build/bh2/test-integrity-report.json
+      - name: Validate guarantee registry structurally
+        run: make test-guarantee-registry
+
+  fast-suites:
+    name: Fast deterministic contract suites
+    needs: static-integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build Nift
+        run: make -j2
+      - name: Contract suite
+        run: make test-contracts
+      - name: Init targets
+        run: make test-init-targets
+      - name: Pagination incremental equivalence
+        run: make test-pagination-equivalence

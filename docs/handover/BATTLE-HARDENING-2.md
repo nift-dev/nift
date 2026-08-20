@@ -196,3 +196,94 @@ Three residual boundaries are deliberately carried forward rather than hidden:
 The next active checkpoint is **BH2 — Test integrity + enforcement architecture**,
 implemented by DeepSeek and independently attacked by ChatGPT. Re-plan the remaining
 queue after BH2 rather than treating the list above as immutable.
+
+## BH2 — Test integrity + enforcement architecture
+
+**Implementer:** DeepSeek (this session). **Reviewer/attacker:** ChatGPT (exact
+candidate, separate worktree). BH2 closes the two CI-semantic residuals BH1
+carried forward and introduces a shared, auditable outcome contract plus a
+static false-green scanner.
+
+### Outcome contract
+
+`scripts/guard_outcome.py` defines the exit-code contract every Nift guard uses:
+
+| code | meaning |
+|------|---------|
+| 0 | PASS — assertions executed and held |
+| 1 | FAIL — assertions executed and broke |
+| 2 | SKIP — prerequisite/tool absent; **not** success |
+| 3 | UNSUPPORTED — platform/toolchain cannot run this guard |
+| 124 | TIMEOUT — guard exceeded its time budget |
+
+Consumers treat 0 as the only green code. SKIP is deliberately non-green.
+
+### `/usr/bin/time` silent-success family (fixed)
+
+The known BH1-era defect `tests/memory_10k_benchmark.py` printed `SKIP` and then
+exited 0 — a silent green that measured nothing. The family is now non-green:
+
+- `tests/memory_10k_benchmark.py` — missing `/usr/bin/time` → `SKIP` exit 2;
+  runtime timeouts → `TIMEOUT` exit 124; added `--time-bin`/`--timeout-seconds`.
+- `scripts/memory_safety.py` — RSS mode with no `/usr/bin/time` → `SKIP` exit 2
+  (it can no longer claim a PASS with zero RSS samples); per-run timeout → 124.
+- `scripts/checkpoint4_large_project.py` — missing `/usr/bin/time` → `SKIP`
+  exit 2 instead of an unclean traceback; per-run timeout → 124.
+- `scripts/checkpoint3_core_memory.py`, `scripts/checkpoint6_integration.py`,
+  `scripts/checkpoint7_incremental_equivalence.py` — every Nift subprocess now
+  has a timeout; a hang is `TIMEOUT` (124), never an unbounded CI hang.
+
+### Static false-green scanner
+
+`scripts/test_integrity_check.py` (make `test-test-integrity`) is a dependency-
+free static scanner that flags five false-green families across `tests/` and
+`scripts/`:
+
+- `skip-as-pass` — SKIP message immediately followed by `exit 0`/`SystemExit(0)`
+- `prereq-exit0` — a missing-tool guard exits 0
+- `pipefail-missing` — a shell test pipelines without enabling pipefail
+- `swallowed-returncode` — a subprocess result whose returncode is never checked
+- `vacuous-pass` — a guard that can only ever print PASS (tests nothing)
+
+It is wired into `.github/workflows/test-integrity.yml` and the `bh2-test-integrity`
+make target.
+
+### Enforcement tiers (registry updated)
+
+`docs/guarantees/registry.json` now carries 14 CI job refs (was 7):
+
+- `contracts.namespace-reservation`, `templating.parameter-interpolation-contract`,
+  `pagination.incremental-clean-equivalence` → `CI_GATED` on the new
+  `.github/workflows/test-integrity.yml#fast-suites` job (each suite is ~0.2 s).
+- `incremental.clean-build-equivalence`, `parser.controlled-mutation-failure`,
+  `memory.nift-lifecycle` → `SCHEDULED` on the new `.github/workflows/nightly-deep.yml`
+  (checkpoint 9 fuzz, checkpoint 3 core lifecycle, checkpoint 4 watch endurance,
+  checkpoint 7 equivalence).
+- `scripts/check_guarantee_registry.py` gains `CROSS_PLATFORM_GATED` OS-breadth
+  enforcement: a cross-platform workflow must list concrete `runner:` entries in a
+  `strategy.matrix.include` covering every declared platform, closing the BH1
+  residual that a trigger alone did not prove real Linux/macOS/Windows coverage.
+
+### BH2 red-rule evidence (retained)
+
+`docs/evidence/bh2/` retains:
+
+- `time-family-red-runs.json` — the fixed `/usr/bin/time` guards all go RED
+  (SKIP exit 2) when the tool is absent, and green only when they actually measure.
+- `bh2-fixtures-report.json` — the scanner rejects 6 injected false-green/vacuous
+  fixtures across all five families (exit 1).
+- `bh2-clean-report.json` — the scanner is clean on the real `tests/` + `scripts/`
+  (42 files, 0 findings), and clean on the regression-suite contract scripts.
+
+### Residual boundaries after BH2
+
+- **BH3:** guard mutation and semantic liveness — proving a guard's red evidence
+  is the *right* guard mutation for the guarantee, not just *a* red run.
+- **BH6:** onboarding artifacts are still not proven to match the registry.
+- **BH8:** performance invariants are not yet their own guard family.
+- The scanner is static and pattern-based; it cannot reason about a guard's runtime
+  semantics. A future guard that skips at runtime (after passing the static scan)
+  is a BH3 mutation target.
+
+The next active checkpoint is **BH3 — Guard mutation and liveness**, with the
+remaining queue re-planned after BH2 review.

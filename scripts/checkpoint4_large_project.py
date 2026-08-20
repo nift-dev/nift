@@ -1,16 +1,25 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import argparse, platform,json,pathlib,re,subprocess,tempfile,time
-ap=argparse.ArgumentParser(); ap.add_argument("--nift",required=True); ap.add_argument("--pages",type=int,default=10000); ap.add_argument("--output",required=True)
+import argparse, platform,json,pathlib,re,subprocess,sys,tempfile,time
+ap=argparse.ArgumentParser(); ap.add_argument("--nift",required=True); ap.add_argument("--pages",type=int,default=10000); ap.add_argument("--output",required=True); ap.add_argument("--time-bin",default="/usr/bin/time"); ap.add_argument("--timeout-seconds",type=float,default=180.0)
 a=ap.parse_args(); nift=str(pathlib.Path(a.nift).resolve())
 def git_commit():
     try: return subprocess.check_output(["git","rev-parse","HEAD"],cwd=pathlib.Path(__file__).resolve().parents[1],text=True,stderr=subprocess.DEVNULL).strip()
     except Exception: return "unknown"
-TIME="/usr/bin/time"
+sys.path.insert(0,str(pathlib.Path(__file__).resolve().parent))
+from guard_outcome import finish
+TIME=pathlib.Path(a.time_bin)
+if not TIME.exists():
+    finish(2,f"required tool {TIME} unavailable; checkpoint 4 large-project guard cannot measure peak RSS")
 def peak(root,args):
-    p=subprocess.run([TIME,"-v",nift,*args],cwd=root,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True)
+    try:
+        p=subprocess.run([str(TIME),"-v",nift,*args],cwd=root,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True,timeout=a.timeout_seconds)
+    except subprocess.TimeoutExpired as exc:
+        finish(124,f"TIMEOUT: {args} exceeded {a.timeout_seconds}s\n{exc.stderr or ''}")
     if p.returncode: raise RuntimeError(p.stderr)
-    m=re.search(r"Maximum resident set size \(kbytes\):\s*(\d+)",p.stderr); return int(m.group(1))
+    m=re.search(r"Maximum resident set size \(kbytes\):\s*(\d+)",p.stderr)
+    if not m: raise RuntimeError(f"could not read peak RSS from {TIME}")
+    return int(m.group(1))
 cases=[]
 for workers,minify in [(1,False),(4,False),(-1,False),(4,True)]:
   with tempfile.TemporaryDirectory(prefix="nift-cp4-10k-") as td:

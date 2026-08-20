@@ -3,20 +3,28 @@
 
 Linux uses /usr/bin/time -v. The guard is deliberately loose enough for normal
 allocator/kernel variance but catches multi-megabyte regressions.
+
+Outcome contract (BH2): this guard emits exactly one of PASS / FAIL / SKIP /
+UNSUPPORTED on its final line and exits with the matching code. SKIP (missing
+/usr/bin/time) is NOT success: a gating consumer must not treat it as green.
 """
-import argparse, json, pathlib, re, shutil, statistics, subprocess, tempfile
+import argparse, json, pathlib, re, statistics, subprocess, sys, tempfile
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "scripts"))
+from guard_outcome import GuardSkip, finish, require_tool
 
 ap=argparse.ArgumentParser()
 ap.add_argument("--nift", required=True)
 ap.add_argument("--pages", type=int, default=10000)
 ap.add_argument("--runs", type=int, default=5)
 ap.add_argument("--max-rss-kib", type=int, default=16384)
+ap.add_argument("--time-bin", default="/usr/bin/time")
+ap.add_argument("--timeout-seconds", type=float, default=120.0)
 args=ap.parse_args()
 
-time_bin=pathlib.Path("/usr/bin/time")
-if not time_bin.exists():
-    print("SKIP: /usr/bin/time is unavailable on this platform")
-    raise SystemExit(0)
+try:
+    time_bin = require_tool(args.time_bin, label="GNU time")
+except GuardSkip as exc:
+    finish(2, str(exc) + "; cannot measure peak RSS, so the guard does not run")
 
 def fixture(root):
     (root/".nift").mkdir(parents=True)
@@ -34,13 +42,17 @@ def fixture(root):
         (root/"content"/f"p{i}.html").write_text(f"<p>{i}</p>\n")
 
 def peak(root, command):
-    p=subprocess.run([str(time_bin),"-v",args.nift,*command],cwd=root,
-                     stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True)
+    try:
+        p=subprocess.run([str(time_bin),"-v",args.nift,*command],cwd=root,
+                         stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True,
+                         timeout=args.timeout_seconds)
+    except subprocess.TimeoutExpired as exc:
+        finish(124, f"nift {command} exceeded {args.timeout_seconds}s:\n{exc.stderr or ''}")
     if p.returncode:
-        raise SystemExit(p.stderr)
+        finish(1, f"nift {command} failed (exit {p.returncode}):\n{p.stderr}")
     m=re.search(r"Maximum resident set size \(kbytes\):\s*(\d+)",p.stderr)
     if not m:
-        raise SystemExit("could not read peak RSS from /usr/bin/time")
+        finish(1, f"could not read peak RSS from {time_bin} for {command}")
     return int(m.group(1))
 
 with tempfile.TemporaryDirectory(prefix="nift-memory-10k-") as td:
@@ -61,5 +73,5 @@ with tempfile.TemporaryDirectory(prefix="nift-memory-10k-") as td:
     print(f"  shared -> all:      {shared}")
     worst=max(med_full,med_noop,single,shared)
     if worst > args.max_rss_kib:
-        raise SystemExit(f"FAIL: peak RSS {worst} KiB exceeds {args.max_rss_kib} KiB guard")
-    print(f"PASS: all measured peaks <= {args.max_rss_kib} KiB")
+        finish(1, f"peak RSS {worst} KiB exceeds {args.max_rss_kib} KiB guard")
+    finish(0, f"all measured peaks <= {args.max_rss_kib} KiB")

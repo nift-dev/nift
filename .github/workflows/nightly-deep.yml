@@ -1,0 +1,81 @@
+name: Nightly deep guards
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  parser-fuzz:
+    name: Checkpoint 9 parser fuzz (sanitized)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Build sanitized Nift
+        run: make -j2 .build/nift-sanitize
+      - name: Fuzz the parser under sanitizers
+        run: |
+          env -u LD_PRELOAD python3 scripts/checkpoint9_parser_fuzz.py \
+            --nift "$PWD/.build/nift-sanitize" \
+            --cases 400 \
+            --seeds 9001,17713,424242 \
+            --output .build/checkpoint-9/parser-fuzz.json
+
+  core-memory:
+    name: Checkpoint 3 core lifecycle (sanitized)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Build sanitized Nift
+        run: make -j2 .build/nift-sanitize
+      - name: Core lifecycle memory safety
+        run: |
+          env -u LD_PRELOAD python3 scripts/checkpoint3_core_memory.py \
+            --nift "$PWD/.build/nift-sanitize" \
+            --rounds 4 \
+            --output .build/memory-safety/checkpoint-3-core.json
+
+  endurance:
+    name: Checkpoint 4 watch endurance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Build Nift
+        run: make -j2
+      - name: Watch-mode endurance soak
+        run: |
+          python3 scripts/checkpoint4_watch_endurance.py \
+            --nift "$PWD/nift" \
+            --cycles 180 \
+            --interval 0.22 \
+            --output .build/memory-safety/checkpoint-4-watch-rss.json
+
+  incremental-equivalence:
+    name: Checkpoint 7 incremental equivalence
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Build Nift
+        run: make -j2
+      - name: Incremental clean-build equivalence
+        run: |
+          python3 scripts/checkpoint7_incremental_equivalence.py \
+            --nift "$PWD/nift" \
+            --seeds 8 \
+            --steps 30 \
+            --output .build/checkpoint-7/incremental-equivalence.json

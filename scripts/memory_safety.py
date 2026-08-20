@@ -72,6 +72,10 @@ def main() -> int:
     ap.add_argument("--warmup-iterations", type=int, default=0)
     ap.add_argument("--command", required=True,
                     help="Shell-style command string; parsed with shlex, not executed through a shell.")
+    ap.add_argument("--time-bin", default=None,
+                    help="Path to GNU time; defaults to /usr/bin/time when present.")
+    ap.add_argument("--timeout-seconds", type=float, default=0.0,
+                    help="Per-invocation timeout; 0 disables.")
     args = ap.parse_args()
 
     cwd = Path(args.cwd).resolve()
@@ -85,7 +89,12 @@ def main() -> int:
         env.setdefault("LSAN_OPTIONS", "exitcode=99")
         env.setdefault("UBSAN_OPTIONS", "halt_on_error=1:print_stacktrace=1")
 
-    time_bin = "/usr/bin/time" if Path("/usr/bin/time").exists() else None
+    time_bin = args.time_bin if args.time_bin else (
+        "/usr/bin/time" if Path("/usr/bin/time").exists() else None)
+    if args.mode == "rss" and (time_bin is None or not Path(time_bin).exists()):
+        print("SKIP: rss mode requires /usr/bin/time but it is unavailable; "
+              "the guard cannot measure what it claims", file=sys.stderr)
+        return 2
     if args.mode == "valgrind":
         vg = shutil.which("valgrind")
         if not vg:
@@ -125,19 +134,26 @@ def main() -> int:
     def run_once(kind: str, index: int) -> dict:
         wrapped = ([time_bin, "-v"] + base) if time_bin else base
         started = time.monotonic()
-        p = subprocess.run(wrapped, cwd=cwd, env=env, text=True,
-                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        timeout = args.timeout_seconds if args.timeout_seconds > 0 else None
+        try:
+            p = subprocess.run(wrapped, cwd=cwd, env=env, text=True,
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                               timeout=timeout)
+            rc, out, err, timed_out = p.returncode, p.stdout, p.stderr, False
+        except subprocess.TimeoutExpired as exc:
+            rc, out, err, timed_out = 124, exc.stdout or "", exc.stderr or "", True
         elapsed = time.monotonic() - started
-        combined = p.stdout + "\n" + p.stderr
+        combined = out + "\n" + err
         return {
             "kind": kind,
             "index": index,
-            "exit_status": p.returncode,
+            "exit_status": rc,
+            "timed_out": timed_out,
             "elapsed_seconds": round(elapsed, 6),
-            "peak_rss_kib": parse_peak_rss(p.stderr),
+            "peak_rss_kib": parse_peak_rss(err),
             "findings": detect_findings(combined),
-            "stdout_tail": "\n".join(p.stdout.splitlines()[-20:]),
-            "stderr_tail": "\n".join(p.stderr.splitlines()[-40:]),
+            "stdout_tail": "\n".join(out.splitlines()[-20:]),
+            "stderr_tail": "\n".join(err.splitlines()[-40:]),
         }
 
     for i in range(args.warmup_iterations):

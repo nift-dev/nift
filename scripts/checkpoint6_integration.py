@@ -23,25 +23,30 @@ valgrind_runs=[]
 def commit():
     try:return subprocess.check_output(["git","rev-parse","HEAD"],cwd=repo,text=True,stderr=subprocess.DEVNULL).strip()
     except Exception:return "unknown"
-def run(root,*args,ok=True):
-    p=subprocess.run([*command_prefix,*args],cwd=root,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-    combined=p.stdout+"\n"+p.stderr
+def run(root,*args,ok=True,timeout=30.0):
+    try:
+        p=subprocess.run([*command_prefix,*args],cwd=root,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,timeout=timeout)
+        rc=p.returncode; out=p.stdout; err=p.stderr
+    except subprocess.TimeoutExpired as exc:
+        rc=124; out=exc.stdout or ""; err=exc.stderr or ""
+    combined=out+"\n"+err
     if a.valgrind:
-        if p.returncode==99:
+        if rc==99:
             raise RuntimeError(f"Valgrind memory finding during {args}:\n{combined}")
         m=re.search(r"ERROR SUMMARY:\s*(\d+) errors",combined)
         leak_bytes=[int(x.replace(",","")) for x in
                     re.findall(r"(?:definitely|indirectly|possibly) lost:\s*([0-9,]+) bytes",combined)]
         leaked=any(x != 0 for x in leak_bytes)
-        valgrind_runs.append({"args":list(args),"exit":p.returncode,
+        valgrind_runs.append({"args":list(args),"exit":rc,
                               "error_summary":int(m.group(1)) if m else None,
                               "reported_leak_bytes":leak_bytes,"leak_pattern":leaked})
         if m and int(m.group(1))!=0:
             raise RuntimeError(f"Valgrind reported errors during {args}")
         if leaked:
             raise RuntimeError(f"Valgrind reported leak during {args}")
-    if ok and p.returncode: raise RuntimeError(f"{args} failed: {p.stderr}\n{p.stdout}")
-    if not ok and p.returncode==0: raise RuntimeError(f"{args} unexpectedly succeeded")
+    if ok and rc: raise RuntimeError(f"{args} failed (exit {rc}): {err}\n{out}")
+    if not ok and rc==0: raise RuntimeError(f"{args} unexpectedly succeeded")
+    p.returncode=rc; p.stdout=out; p.stderr=err
     return p
 def bump(path):
     now=time.time()+2

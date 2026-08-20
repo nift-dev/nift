@@ -126,6 +126,9 @@ test-init-targets: $(TARGET)
 test-guarantee-registry:
 	python3 scripts/check_guarantee_registry.py
 
+test-test-integrity:
+	python3 scripts/test_integrity_check.py tests scripts --output "$(TEST_DIR)/bh2/test-integrity-report.json"
+
 BH1_WEBSITE_ROOT ?= ../nift-dev.github.io
 BH1_REGRESSION_ROOT ?= ../nift-regression-suite
 
@@ -133,7 +136,9 @@ bh1-guarantee-registry:
 	python3 scripts/check_guarantee_registry.py --website-root "$(BH1_WEBSITE_ROOT)" --regression-root "$(BH1_REGRESSION_ROOT)"
 	python3 scripts/bh1_registry_liveness.py --website-root "$(BH1_WEBSITE_ROOT)" --regression-root "$(BH1_REGRESSION_ROOT)"
 
-.PHONY: test-guarantee-registry bh1-guarantee-registry
+bh2-test-integrity: test-test-integrity test-guarantee-registry test-contracts test-pagination-equivalence test-init-targets
+
+.PHONY: test-guarantee-registry test-test-integrity bh1-guarantee-registry bh2-test-integrity
 
 install: $(TARGET)
 	mkdir -p "$(DESTDIR)$(BINDIR)"

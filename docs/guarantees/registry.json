@@ -62,6 +62,11 @@
         {
           "class": "MANUAL",
           "command": "make checkpoint-7-incremental-equivalence"
+        },
+        {
+          "class": "SCHEDULED",
+          "workflow": ".github/workflows/nightly-deep.yml",
+          "job": "incremental-equivalence"
         }
       ],
       "test_of_test": "UNPROVEN",
@@ -169,6 +174,11 @@
         {
           "class": "MANUAL",
           "command": "make checkpoint-9-parser-fuzz"
+        },
+        {
+          "class": "SCHEDULED",
+          "workflow": ".github/workflows/nightly-deep.yml",
+          "job": "parser-fuzz"
         }
       ],
       "test_of_test": "UNPROVEN",
@@ -448,6 +458,11 @@
         {
           "class": "MANUAL",
           "command": "make test-contracts"
+        },
+        {
+          "class": "CI_GATED",
+          "workflow": ".github/workflows/test-integrity.yml",
+          "job": "fast-suites"
         }
       ],
       "test_of_test": "UNPROVEN",
@@ -641,6 +656,16 @@
         {
           "class": "MANUAL",
           "command": "make memory-safety-checkpoint-3"
+        },
+        {
+          "class": "SCHEDULED",
+          "workflow": ".github/workflows/nightly-deep.yml",
+          "job": "core-memory"
+        },
+        {
+          "class": "SCHEDULED",
+          "workflow": ".github/workflows/nightly-deep.yml",
+          "job": "endurance"
         }
       ],
       "test_of_test": "UNPROVEN",
@@ -668,6 +693,11 @@
         {
           "class": "MANUAL",
           "command": "make test-pagination-equivalence"
+        },
+        {
+          "class": "CI_GATED",
+          "workflow": ".github/workflows/test-integrity.yml",
+          "job": "fast-suites"
         }
       ],
       "test_of_test": "UNPROVEN",
@@ -696,6 +726,11 @@
         {
           "class": "MANUAL",
           "command": "make test-contracts"
+        },
+        {
+          "class": "CI_GATED",
+          "workflow": ".github/workflows/test-integrity.yml",
+          "job": "fast-suites"
         }
       ],
       "test_of_test": "UNPROVEN",
@@ -1158,6 +1193,19 @@
       "red_run_evidence": {
         "repo": "nift",
         "path": "docs/evidence/bh1/registry-reviewer-round3.json"
+      }
+    },
+    {
+      "id": "test-integrity.static-scanner",
+      "guard_ref": {
+        "repo": "nift",
+        "path": "scripts/test_integrity_check.py"
+      },
+      "test_of_test": "VERIFIED_GUARD",
+      "note": "BH2: static scanner demonstrated RED against 6 injected false-green/vacuous fixtures across all five families (skip-as-pass, prereq-exit0, pipefail-missing, swallowed-returncode, vacuous-pass) and GREEN on the real tests/ + scripts/ trees. Static and pattern-based; runtime guard mutation is BH3.",
+      "red_run_evidence": {
+        "repo": "nift",
+        "path": "docs/evidence/bh2/bh2-fixtures-report.json"
       }
     }
   ],

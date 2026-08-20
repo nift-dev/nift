@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "campaign": "bh2",
+  "checkpoint": "test-integrity-time-family",
+  "commit": "502de12649b73ba9e7eab0800de3cf0325464d29",
+  "timestamp_utc": "2026-08-20T19:08:07.582124+00:00",
+  "platform": "Linux-7.0.0-29-generic-x86_64-with-glibc2.43",
+  "purpose": "BH2 red-rule: the /usr/bin/time silent-success family must be non-green (SKIP=2) when the tool is absent, and green only when the guard actually measures.",
+  "all_red_correct": true,
+  "cases": [
+    {
+      "guard": "memory.10k-peak-rss",
+      "scenario": "/usr/bin/time absent (explicit --time-bin missing)",
+      "exit": 2,
+      "outcome": "SKIP",
+      "stderr_tail": ""
+    },
+    {
+      "guard": "memory.nift-lifecycle (rss mode)",
+      "scenario": "rss mode with /usr/bin/time absent",
+      "exit": 2,
+      "outcome": "SKIP",
+      "stderr_tail": "SKIP: rss mode requires /usr/bin/time but it is unavailable; the guard cannot measure what it claims"
+    },
+    {
+      "guard": "memory.10k-peak-rss (large-project)",
+      "scenario": "/usr/bin/time absent (explicit --time-bin missing)",
+      "exit": 2,
+      "outcome": "SKIP",
+      "stderr_tail": ""
+    },
+    {
+      "guard": "memory.10k-peak-rss",
+      "scenario": "control: /usr/bin/time present",
+      "exit": 0,
+      "outcome": "PASS",
+      "stdout_tail": "0 pages peak RSS (KiB)\n  full median:        5184  samples=[5184]\n  no-op median:       5124  samples=[5124]\n  single-page:        5272\n  shared -> all:      5020\nPASS: all measured peaks <= 16384 KiB"
+    }
+  ]
+}

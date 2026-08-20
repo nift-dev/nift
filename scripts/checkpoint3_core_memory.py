@@ -25,15 +25,19 @@ tests=[
 ]
 repo=pathlib.Path(__file__).resolve().parents[1]
 runs=[]
-def run(cmd,cwd,expect=0,env=None):
+def run(cmd,cwd,expect=0,env=None,timeout=30.0):
     t=time.monotonic()
-    p=subprocess.run(cmd,cwd=cwd,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=env)
-    rec={"command":cmd,"cwd":str(cwd),"exit_status":p.returncode,"expected":expect,
+    try:
+        p=subprocess.run(cmd,cwd=cwd,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=env,timeout=timeout)
+        rc=p.returncode; out=p.stdout; err=p.stderr
+    except subprocess.TimeoutExpired as exc:
+        rc=124; out=exc.stdout or ""; err=exc.stderr or ""
+    rec={"command":cmd,"cwd":str(cwd),"exit_status":rc,"expected":expect,
          "elapsed_seconds":round(time.monotonic()-t,6),
-         "stdout_tail":"\n".join(p.stdout.splitlines()[-8:]),
-         "stderr_tail":"\n".join(p.stderr.splitlines()[-12:])}
+         "stdout_tail":"\n".join(out.splitlines()[-8:]),
+         "stderr_tail":"\n".join(err.splitlines()[-12:])}
     runs.append(rec)
-    if p.returncode!=expect:
+    if rc!=expect:
         raise RuntimeError(json.dumps(rec,indent=2))
 for r in range(a.rounds):
     with tempfile.TemporaryDirectory(prefix="nift-cp3-") as td:
