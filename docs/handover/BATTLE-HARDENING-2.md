@@ -557,11 +557,11 @@ full 3-repository audit, BH1 liveness, and the CI-equivalent chain all pass.
 
 ### BH2 handoff to reviewer
 
-**Round-5 candidate: this commit** ("BH2 round 5: fix reviewer findings S1-S2
+**Round-5 candidate: `689cd45`** ("BH2 round 5: fix reviewer findings S1-S2
 on top of 88f1158"). Reviewer attacks the exact round-5 commit in a separate
 clone/worktree and reports findings back; the implementer does not modify the
 tree during review. No changes are made to `7f8768b`, `c06fa33`, `7d2621b`,
-`88f1158` or the round-5 candidate itself.
+`88f1158` or the round-5 candidate `689cd45` itself.
 
 Review focus areas (attack each):
 
