@@ -1,13 +1,20 @@
 # Nift — Release Notes
 
-## v4.0.4 (development)
+## v4.0.5 (development)
 
-- Fixed init-target CI to validate generated framework metadata against the running Nift binary version instead of a hard-coded previous release version.
-Development version following the public v4.0.3 release.
+Development version following the public v4.0.4 release.
 
-- Improved parser/build diagnostics: source excerpts now expand tabs deterministically before marker placement, underline the full offending Nift expression/call, syntax-highlight the complete current `@function` surface (including `@content`, `@input`, `@pathto`, control-flow, collection and data helpers), colour `$[...]` expressions and quoted Nift values, and accent the offending syntax/value when stderr is a TTY. The highlighter distinguishes Nift functions from unrelated at-sign syntax such as CSS `@media`; redirected/plain diagnostics remain ANSI-free.
-- Fixed lazy ternary rendering of quoted string-literal branches. Expressions such as `class="card$[active ? ' active' : '']"` now render the selected string value without leaking its source quote delimiters, while non-literal selected branches still retain lazy Nift-source semantics and may contain directives such as `@input(...)`. Added mirrored source-tree and independent regression coverage for full/shorthand ternaries, true/false branches, empty strings, both quote styles, escaped quotes, nested ternaries, attribute embedding, literal directive text, selected directives and unselected dependency side effects.
+## v4.0.4
+
+Nift 4.0.4 is a bounded reliability release that fixes the Checkpoint 8
+transactional-writer performance regression and hardens transactional recovery
+semantics, alongside the diagnostic and ternary rendering refinements carried
+from the v4.0.3→v4.0.4 development cycle.
+
 - Fixed the Checkpoint 8 transactional-writer performance regression that made large flat full builds O(n²), restored repeated 10,000-page full-build performance to the retained historical range, and added changed-output scaling guards in both the source tree and independent regression suite. Stale-temporary recovery is now epoch-scoped: each touched parent is scanned at most once per build pass, live-owner temporaries are preserved, and long-running `build-auto` sessions recover dead-owner temporaries on the next relevant build activity without requiring a restart. Added a direct scan-count guard plus a black-box test demonstrated to fail the previous once-per-process recovery implementation.
+- Fixed lazy ternary rendering of quoted string-literal branches. Expressions such as `class="card$[active ? ' active' : '']"` now render the selected string value without leaking its source quote delimiters, while non-literal selected branches still retain lazy Nift-source semantics and may contain directives such as `@input(...)`. Added mirrored source-tree and independent regression coverage for full/shorthand ternaries, true/false branches, empty strings, both quote styles, escaped quotes, nested ternaries, attribute embedding, literal directive text, selected directives and unselected dependency side effects.
+- Improved parser/build diagnostics: source excerpts now expand tabs deterministically before marker placement, underline the full offending Nift expression/call, syntax-highlight the complete current `@function` surface (including `@content`, `@input`, `@pathto`, control-flow, collection and data helpers), colour `$[...]` expressions and quoted Nift values, and accent the offending syntax/value when stderr is a TTY. The highlighter distinguishes Nift functions from unrelated at-sign syntax such as CSS `@media`; redirected/plain diagnostics remain ANSI-free.
+- Fixed init-target CI to validate generated framework metadata against the running Nift binary version instead of a hard-coded previous release version.
 
 ## v4.0.3
 

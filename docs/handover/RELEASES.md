@@ -7,7 +7,7 @@ is packaged and published.
 
 ## Authority and current state
 
-The development executable currently reports `Nift v4.0.4`, following the public v4.0.3 release.
+The development executable currently reports `Nift v4.0.5`, following the public v4.0.4 release.
 identity remains documented in project history and release notes, but it is not
 part of the public product version. Exact tag, artifact, and public release
 conventions must follow `PACKAGING.md` and actual Git/release evidence.
@@ -170,9 +170,9 @@ v4.0.3→v4.0.4 development cycle.
 ### Source and workflow
 
 - Tag: `v4.0.4` (annotated), pushed to `origin`.
-- Release commit: `29eb4d0` (`Refresh checkpoint 8 recovery evidence`), matching `main`.
-- GitHub Actions run: TBD after push; all artifact jobs and `installer-preflight` must
-  succeed before the GitHub release is created.
+- Release commit: `29eb4d0` (`Refresh checkpoint 8 recovery evidence`).
+- GitHub Actions run: `32392530246` — all 13 jobs passed (unix linux/macos-arm64/macos-x86_64, windows, installer-preflight, publish, installer-public-smoke ×3, snap build ×2, chocolatey, homebrew ×2).
+- GitHub release: https://github.com/nift-dev/nift/releases/tag/v4.0.4
 
 ### Release-candidate validation (performed at `29eb4d0`, clean build)
 
@@ -197,22 +197,25 @@ v4.0.3→v4.0.4 development cycle.
 
 ### Archives and checksums
 
-- `nift-4.0.4-linux-x86_64.tar.gz`
-- `nift-4.0.4-macos-arm64.tar.gz`
-- `nift-4.0.4-macos-x86_64.tar.gz`
-- `nift-4.0.4-windows-x86_64.zip`
-- `SHA256SUMS` (verified independently after publication; record exact checksums below).
+- `nift-4.0.4-linux-x86_64.tar.gz` (436 896 bytes) — extracted binary verified: `Nift v4.0.4`; fresh-project `init`/`build`/`status` smoke passed.
+- `nift-4.0.4-macos-arm64.tar.gz` (343 783 bytes)
+- `nift-4.0.4-macos-x86_64.tar.gz` (363 737 bytes)
+- `nift-4.0.4-windows-x86_64.zip` (1 331 823 bytes)
+- `SHA256SUMS` (verified independently against all four public archives):
+  - `64b1a205cb4607702dc2bf1a2c886893c6377bfe1667862ecbbd390ea7e17acd` linux-x86_64
+  - `e94e29541fa9838d98c108035a75e210e9634e9e509700b9e9c680cc5ddbeefd` macos-arm64
+  - `81d7c95b80c528502e4b84093b74e72caf89d633e3def71fdac720a614fcfb5b` macos-x86_64
+  - `b4ddb5d8f57b05e9ebdd8ea65b82143baa7cc3798b96abad70f98f2b89c0d0b8` windows-x86_64
 
 ### Package publication
 
-- **Snap**: `snap.yml` called after the GitHub release; `SNAPCRAFT_STORE_CREDENTIALS`
-  is configured and direct publication to `stable` is intended for all supported
-  architectures.
-- **Chocolatey Community**: `chocolatey.yml` called after the GitHub release;
-  `CHOCOLATEY_API_KEY` is configured and the `.nupkg` is pushed. Store:
-  https://community.chocolatey.org/packages/nift
-- **Homebrew**: Formula built and tested on macOS arm64 and Linux x86_64 by the
-  workflow; Homebrew's automatic bump service picks up the release on its own
-  schedule; no manual PR.
-- **Flathub**: External `flathub/cc.nift.nsm` manifest update required — pending
-  external PR.
+- **Snap**: `snap / build` succeeded on amd64 and arm64; "Publish stable Snap" succeeded on both architectures. `snap info nift` reports `latest/stable: 4.0.4 (2026-08-20, rev 543)`. Other supported architectures (armhf, ppc64el, riscv64, s390x) remain on the connected Snap Store/Launchpad path; verify `snap info nift` on those before declaring full availability.
+- **Chocolatey Community**: `chocolatey / package` succeeded through "Publish to Chocolatey Community Repository". The public package page returns 200 and the `.nupkg` downloads for `nift/4.0.4`; its embedded `VERIFICATION.txt` and `chocolateyInstall.ps1` reference the v4.0.4 release URL with SHA-256 `b4ddb5d8…` matching the published Windows archive. Workflow success and downloadable package mean submitted, not yet approved by community moderation or publicly installable.
+- **Homebrew**: Formula was built and tested on macOS arm64 and Linux x86_64 by the workflow. The canonical `Homebrew/homebrew-core` formula still publishes v4.0.3; Homebrew's automatic bump service picks up releases on its own schedule. No manual PR was opened.
+- **Flathub**: External `flathub/cc.nift.nsm` manifest update required — pending external PR.
+
+### Post-release
+
+- Development executable advanced to `Nift v4.0.5` in `src/CLI.cpp`, `snap/snapcraft.yaml`, and release notes.
+- Regression suite assertions updated to the v4.0.5 development identity.
+- Remaining downstream states to track: Homebrew auto-bump merge + fresh install, Chocolatey moderation/approval, Flathub external PR, Snap non-x86 architectures.

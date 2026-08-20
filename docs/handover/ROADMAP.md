@@ -2,15 +2,15 @@
 
 ## Current status
 
-Nift has completed the planned Checkpoints 0–10 deliberate hardening campaign and reached the intended **hardening plateau**. The current development executable identifies as `Nift v4.0.4`, following the public v4.0.3 release. Production readiness is now a maintained state rather than a milestone still waiting to be earned through another synthetic checkpoint.
+Nift has completed the planned Checkpoints 0–10 deliberate hardening campaign and reached the intended **hardening plateau**. The current development executable identifies as `Nift v4.0.5`, following the public v4.0.4 release. Production readiness is now a maintained state rather than a milestone still waiting to be earned through another synthetic checkpoint.
 
 The completed campaign established and retained evidence around component memory/resource safety, Nift lifecycle/endurance behavior, cross-component ownership, incremental-vs-clean equivalence, filesystem/transaction integrity, parser fuzz/resource boundaries, and scoped Linux/macOS/Windows behavioral equivalence. Checkpoint 10 also found and fixed a real Windows read-only artifact deletion defect before the final portable corpus converged with zero mismatches.
 
 Do **not** invent Checkpoint 11 merely to continue the sequence. New hardening campaigns need a concrete trigger: a field defect, an unsupported platform claim worth establishing, a newly introduced semantic contract, or another clearly justified guarantee.
 
-## Current phase: v4.0.4 development
+## Current phase: v4.0.5 development
 
-v4.0.3 has been released. The development executable now identifies as Nift v4.0.4.
+v4.0.4 has been released. The development executable now identifies as Nift v4.0.5.
 
 The current sequence is now:
 

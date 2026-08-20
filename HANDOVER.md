@@ -20,7 +20,7 @@ whether it is a regression.
 ## Current identity
 
 - Product: **Nift**, a website generator and dependency-aware website build layer.
-- Current executable identity: `Nift v4.0.4` (development), following the public v4.0.3 release.
+- Current executable identity: `Nift v4.0.5` (development), following the public v4.0.4 release.
 - Language/toolchain: C++17 and Make.
 - Output convention for modern projects: `public/`.
 - Current branch: `main` in this checkout.
