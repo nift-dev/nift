@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "campaign": "bh2",
+  "checkpoint": "test-integrity-path-coverage-t2",
+  "commit": "round-6 candidate (post-commit update)",
+  "timestamp_utc": "2026-08-21T10:20:00Z",
+  "platform": "Linux (round-6 red demonstration)",
+  "purpose": "BH2 T2 red-rule demonstration: an inline flow-style paths: ['README.md'] sequence must not collapse into 'unfiltered, covers everything'; an unparsed filter fails closed.",
+  "demonstrated": [
+    {
+      "mutation": "test-integrity.yml push/pull_request block paths lists replaced with inline paths: ['README.md']",
+      "outcome": "FAIL",
+      "diagnostic": "workflow-path-coverage-gap: contracts.namespace-reservation: test-integrity.yml: uncovered by automatic trigger paths: ... src/**, tests/contracts_smoke.sh",
+      "red_as_expected": true
+    }
+  ],
+  "all_red_correct": true
+}

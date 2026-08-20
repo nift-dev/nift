@@ -464,6 +464,106 @@ _PF_ON = re.compile(r"\bset\s+[^;\n]*?(?:-[A-Za-z]*o\s+pipefail)")
 _PF_OFF = re.compile(r"\bset\s+[^;\n]*?(?:\+[A-Za-z]*o\s+pipefail)")
 
 
+def _set_establishes_pipefail(s: str) -> bool:
+    """True when a ``set ... pipefail`` in this statement mutates the state that
+    governs subsequent top-level pipelines — i.e. it runs in the current shell.
+
+    A ``set`` inside ``$( )`` command substitution, a ``( )`` subshell, a
+    pipeline segment (each segment runs in a subshell), or a backgrounded
+    command cannot establish parent-shell pipefail state; a ``set`` that cannot
+    is ignored for state purposes even though the text matches ``_PF_ON``.
+    """
+    m = _PF_ON.search(s) or _PF_OFF.search(s)
+    if not m:
+        return False
+    if _paren_depth_at(s, m.start()) > 0:
+        return False
+    if _has_top_level_pipe(s):
+        return False
+    if re.search(r"&\s*(?:#.*)?$", s):
+        return False
+    return True
+
+
+def _paren_depth_at(s: str, idx: int) -> int:
+    """Parenthesis nesting depth (``$(`` and ``(``) at character ``idx``."""
+    depth = 0
+    q: str | None = None
+    i = 0
+    n = len(s)
+    while i < idx and i < n:
+        c = s[i]
+        if q:
+            if c == "\\":
+                i += 2
+                continue
+            if c == q:
+                q = None
+            i += 1
+            continue
+        if c in "\"'":
+            q = c
+            i += 1
+            continue
+        if c == "$" and i + 1 < n and s[i + 1] == "(":
+            depth += 1
+            i += 2
+            continue
+        if c == "(":
+            depth += 1
+            i += 1
+            continue
+        if c == ")":
+            if depth:
+                depth -= 1
+            i += 1
+            continue
+        i += 1
+    return depth
+
+
+def _has_top_level_pipe(s: str) -> bool:
+    """True when the statement contains a pipeline operator ``|``/``|&`` at
+    parenthesis depth 0 (the ``||`` and-or operator is not a pipeline)."""
+    depth = 0
+    q: str | None = None
+    i = 0
+    n = len(s)
+    while i < n:
+        c = s[i]
+        if q:
+            if c == "\\":
+                i += 2
+                continue
+            if c == q:
+                q = None
+            i += 1
+            continue
+        if c in "\"'":
+            q = c
+            i += 1
+            continue
+        if c == "$" and i + 1 < n and s[i + 1] == "(":
+            depth += 1
+            i += 2
+            continue
+        if c == "(":
+            depth += 1
+            i += 1
+            continue
+        if c == ")" and depth:
+            depth -= 1
+            i += 1
+            continue
+        if depth == 0 and c == "|":
+            if i + 1 < n and s[i + 1] == "|":
+                i += 2
+                continue
+            return True
+        i += 1
+    return False
+
+
 def _shell_split_statements(text: str) -> list[tuple[str, bool]]:
     """Split normalized shell text into top-level statements on ``;``, ``&&``,
     ``||`` and newlines, quote- and ``$( )``-depth-aware. Each statement is
@@ -624,22 +724,22 @@ def _shell_unsafe_pipelines(analyzed: str) -> list[str]:
                     reasons.append(r)
                 # state changes inside a subshell do not propagate out
                 continue
-            if _PF_OFF.search(s):
-                if is_cond or stack:
-                    if stack:
-                        stack[-1]["tainted"] = True
-                    pf = None
+            if _PF_OFF.search(s) or _PF_ON.search(s):
+                if not _set_establishes_pipefail(s):
+                    # `set ... pipefail` in $( ), a ( ) subshell, a pipeline
+                    # segment or a backgrounded command cannot mutate the state
+                    # governing later pipelines; fall through to the pipeline
+                    # check with the state unchanged.
+                    pass
                 else:
-                    pf = False
-                continue
-            if _PF_ON.search(s):
-                if is_cond or stack:
-                    if stack:
-                        stack[-1]["tainted"] = True
-                    pf = None
-                else:
-                    pf = True
-                continue
+                    off = _PF_OFF.search(s) is not None
+                    if is_cond or stack:
+                        if stack:
+                            stack[-1]["tainted"] = True
+                        pf = None
+                    else:
+                        pf = False if off else True
+                    continue
             r = _shell_has_unsafe_pipeline(s)
             if r and pf is not True:
                 reasons.append(r)

@@ -292,6 +292,12 @@ make target.
 - `bh2-s2-path-coverage-red.json` — the round-5 path-coverage red demos: an
   ordered `'!src/**'` inside `paths:` and a `src/*` flat pattern for required
   `src/**` both fail the registry check.
+- `bh2-t1-fixtures-report.json` — the round-6 pipefail-execution-environment
+  fixtures (`set -o pipefail` in `$( )`, in a `( )` subshell, as a pipeline
+  segment, backgrounded) are rejected (exit 1); the redirect form stays GREEN.
+- `bh2-t2-path-coverage-red.json` — the round-6 red demo: an inline flow-style
+  `paths: ['README.md']` filter sequence fails the registry check instead of
+  collapsing into "covers everything".
 - `bh2-clean-report.json` — the scanner is clean on the real `tests/` + `scripts/`
   (42 files, 0 findings), and clean on the regression-suite contract scripts.
 
@@ -339,12 +345,19 @@ make target.
   adjacent to a SKIP message is a false green regardless of layout. `exit $?`,
   `exit` with an explicit non-zero code, or a SKIP message followed by later
   commands before the exit are deliberately outside the rule.
-- **Pipefail-state boundary (round 5):** state is tracked sequentially over
-  top-level statements with a conditional-block taint, not by a full shell
-  interpreter. Within-statement ordering (e.g. `set -o pipefail && pipeline` on
-  one `&&` chain), functions called at a different state than their definition
-  point, and `trap`/`shopt`/`env`-based option changes are approximated; every
+- **Pipefail-state boundary (round 5/6):** state is tracked sequentially over
+  top-level statements with a conditional-block taint and an execution-
+  environment guard (`$( )`, `( )`, pipeline segments and backgrounded commands
+  cannot establish parent state). It is not a full shell interpreter:
+  within-statement ordering (e.g. `set -o pipefail && pipeline` on one `&&`
+  chain), functions called at a different state than their definition point,
+  and `trap`/`shopt`/`env`-based option changes are approximated; every
   approximation fails toward a false red, never a false green.
+- **Trigger-syntax boundary (round 6):** the trigger parser now distinguishes
+  genuinely-unfiltered triggers from unparsed filter syntax (which fails
+  closed). Flow-style `paths: [...]` sequences are parsed; the inline mapping
+  form `on: {push: {...}}` yields no triggers and is rejected. Other valid YAML
+  shapes remain carried-forward false-red boundaries, never false green.
 - **Path-coverage boundary (round 5):** coverage is proven structurally over the
   glob language, not by enumerating the current file tree: a tree requirement
   `root/**` is satisfied only by a recursive-tree pattern rooted at `root` (or an
@@ -555,13 +568,63 @@ retained at `docs/evidence/bh2/bh2-s1-fixtures-report.json`. Both S2 mutations
 and the real trees stay GREEN (42 + 21 files, 0 findings); registry CI, the
 full 3-repository audit, BH1 liveness, and the CI-equivalent chain all pass.
 
+### BH2 reviewer round 5 — returned to implementer
+
+ChatGPT attacked round-5 candidate `689cd45` in a detached worktree. S1 and S2
+were accepted as materially closed. Two new false greens were reported (T1, T2),
+so BH2 remains OPEN:
+
+- **T1 (pipefail state leaks out of its execution environment):**
+  `x=$(set -o pipefail)` then `false | cat >/dev/null` scanned GREEN and ran
+  green. `set` inside `$( )` command substitution runs in a subshell and cannot
+  enable parent-shell pipefail, but `_PF_ON.search` promoted the state anyway.
+  The adjacent `set -o pipefail | cat >/dev/null` (the `set` as a pipeline
+  segment, also a subshell) had the same effect. This contradicted the round-5
+  handover's own claim that the analysis is `$( )`-aware and subshell state
+  does not leak.
+- **T2 (unparsed filter collapses into unrestricted):** replacing both
+  automatic trigger filters with the inline flow sequence
+  `paths: ['README.md']` still passed the registry check. `_trigger_configs`
+  only parsed the block form, so the trigger stayed `(None, None)`, and
+  `_trigger_covers` treated `(None, None)` as "covers everything" — the exact
+  opposite of fail-closed. "Unsupported/unparsed filter" and "no filter exists"
+  were represented identically.
+
+### BH2 implementer round 6 — fixes
+
+- **T1:** a `set ... pipefail` now establishes parent-shell state only when its
+  execution environment can actually mutate that state. `_set_establishes_pipefail`
+  rejects a `set` inside `$( )` command substitution, inside a `( )` subshell,
+  as a pipeline segment (each segment runs in a subshell), or backgrounded with
+  `&`. A `set` that cannot establish state is ignored for state purposes (the
+  state stays unchanged) and the statement still falls through to the normal
+  pipeline check. A redirect (`set -o pipefail >/dev/null`) still establishes,
+  because a redirect does not create a new shell.
+- **T2:** `_trigger_configs` now parses flow-style `paths: ['a', 'b']` /
+  `paths-ignore: [...]` sequences, and each trigger's config is a three-state
+  value: "unfiltered" (genuinely no filter — covers everything), "filtered"
+  (parsed filters), and "unparsed" (a filter construct the parser could not
+  understand — fails closed, covers nothing). `_trigger_covers` treats only
+  "unfiltered" as unrestricted; "unparsed" never covers a required path. The
+  inline map form `on: {push: {...}}` still yields no triggers and is rejected
+  by the not-automatic check.
+
+All five T1 fixtures are RED (command-substitution `set`, pipeline-segment
+`set`, subshell `set`, backgrounded `set`; the redirect form stays GREEN as it
+should), retained at `docs/evidence/bh2/bh2-t1-fixtures-report.json`. The T2
+inline `paths: ['README.md']` mutation is demonstrated RED, retained at
+`docs/evidence/bh2/bh2-t2-path-coverage-red.json`, while an equivalent
+flow-style full-coverage `paths:` still PASSes. All prior fixtures stay RED and
+the real trees stay GREEN (42 + 21 files, 0 findings); registry CI, the full
+3-repository audit, BH1 liveness, and the CI-equivalent chain all pass.
+
 ### BH2 handoff to reviewer
 
-**Round-5 candidate: `689cd45`** ("BH2 round 5: fix reviewer findings S1-S2
-on top of 88f1158"). Reviewer attacks the exact round-5 commit in a separate
+**Round-6 candidate: this commit** ("BH2 round 6: fix reviewer findings T1-T2
+on top of 689cd45"). Reviewer attacks the exact round-6 commit in a separate
 clone/worktree and reports findings back; the implementer does not modify the
 tree during review. No changes are made to `7f8768b`, `c06fa33`, `7d2621b`,
-`88f1158` or the round-5 candidate `689cd45` itself.
+`88f1158`, `689cd45` or the round-6 candidate itself.
 
 Review focus areas (attack each):
 

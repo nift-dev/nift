@@ -569,8 +569,15 @@ def _tree_overlaps_negative(root: str, neg: str) -> bool:
     return _regex_can_extend(_glob_atoms(neg), 0, root + "/", 0)
 
 
-def _trigger_covers(required: str, paths: list[str] | None, ignore: list[str] | None) -> bool:
+def _trigger_covers(
+    required: str, state: str, paths: list[str] | None, ignore: list[str] | None
+) -> bool:
     """True when a single trigger's path filters cover ``required``.
+
+    ``state`` distinguishes three cases that must never collapse into one:
+    "unfiltered" (genuinely no filter — covers everything), "filtered" (parsed
+    filters applied below), and "unparsed" (a filter construct the parser could
+    not understand — fails closed, covers nothing).
 
     GitHub ``paths:`` semantics: a file triggers only if it matches a positive
     pattern and matches no negative (``!``-prefixed) pattern; ``paths-ignore:``
@@ -578,12 +585,14 @@ def _trigger_covers(required: str, paths: list[str] | None, ignore: list[str] | 
     concrete match; for a required tree ``root/**`` a positive must cover the
     whole tree and no negative may overlap any file in it.
     """
-    if paths is None and ignore is None:
+    if state == "unparsed":
+        return False
+    if state == "unfiltered":
         return True
     pos = [p for p in (paths or []) if not p.startswith("!")]
     neg = [p[1:] for p in (paths or []) if p.startswith("!")] + list(ignore or [])
     if not pos:
-        return False
+        pos = ["**"]  # paths-ignore-only: covers everything except the negatives
     positive = any(_pattern_covers(required, p) for p in pos)
     if not positive:
         return False
@@ -598,19 +607,76 @@ def _trigger_covers(required: str, paths: list[str] | None, ignore: list[str] | 
     return True
 
 
-def _trigger_configs(path: Path) -> dict[str, tuple[list[str] | None, list[str] | None]]:
+def _split_flow_items(inner: str) -> list[str]:
+    """Split a YAML flow-sequence body on top-level commas, quote-aware."""
+    items: list[str] = []
+    buf: list[str] = []
+    q: str | None = None
+    i = 0
+    n = len(inner)
+    while i < n:
+        c = inner[i]
+        if q:
+            buf.append(c)
+            if c == "\\" and i + 1 < n:
+                buf.append(inner[i + 1])
+                i += 2
+                continue
+            if c == q:
+                q = None
+            i += 1
+            continue
+        if c in "\"'":
+            q = c
+            buf.append(c)
+            i += 1
+            continue
+        if c == ",":
+            items.append("".join(buf))
+            buf = []
+            i += 1
+            continue
+        buf.append(c)
+        i += 1
+    items.append("".join(buf))
+    return items
+
+
+def _parse_flow_list(value: str) -> list[str] | None:
+    """Parse a flow-style list ``['src/**', 'docs/**']``; None if not a list."""
+    value = value.strip()
+    if not (value.startswith("[") and value.endswith("]")):
+        return None
+    out: list[str] = []
+    for part in _split_flow_items(value[1:-1]):
+        part = part.strip()
+        if not part:
+            continue
+        if len(part) >= 2 and (
+            (part.startswith("'") and part.endswith("'"))
+            or (part.startswith('"') and part.endswith('"'))
+        ):
+            part = part[1:-1]
+        out.append(part)
+    return out
+
+
+def _trigger_configs(path: Path) -> dict[str, tuple[str, list[str] | None, list[str] | None]]:
     """Parse the ``on:`` block into per-trigger path filters.
 
-    Returns {trigger: (paths, paths_ignore)}. A trigger with no ``paths:``
-    filters is recorded as (None, None), meaning it covers every file. Both the
-    block style (``on:\\n  push:\\n    paths:\\n      - 'src/**'``) and the
-    single-line forms (``on: push``, ``on: [push, pull_request]``) are handled.
-    The inline mapping form (``on: {push: {paths: [...]}}``) fails closed by
-    recording the trigger with (None, None) only if no paths could be read.
+    Returns {trigger: (state, paths, paths_ignore)} where state is one of:
+      - "unfiltered" — genuinely no path filter; the trigger covers every file;
+      - "filtered" — parsed ``paths:`` / ``paths-ignore:`` filters;
+      - "unparsed" — a filter construct was seen but could not be understood;
+        it fails closed (never treated as covering everything).
+    Both the block style (``on:\\n  push:\\n    paths:\\n      - 'src/**'``)
+    and the flow-style sequence ``paths: ['src/**']`` are parsed. Inline
+    mapping forms (``on: {push: {...}}``) produce no triggers here and are
+    rejected by the not-automatic check.
     """
     text = path.read_text(encoding="utf-8", errors="replace")
     lines = text.splitlines()
-    configs: dict[str, tuple[list[str] | None, list[str] | None]] = {}
+    configs: dict[str, tuple[str, list[str] | None, list[str] | None]] = {}
     in_on = False
     current_trigger: str | None = None
     for idx, line in enumerate(lines):
@@ -618,11 +684,11 @@ def _trigger_configs(path: Path) -> dict[str, tuple[list[str] | None, list[str] 
         if inline:
             for t in (x.strip() for x in inline.group(1).split(",")):
                 if t:
-                    configs[t] = (None, None)
+                    configs[t] = ("unfiltered", None, None)
             continue
         single = re.match(r"^on:\s*([A-Za-z_][A-Za-z0-9_-]*)\s*(?:#.*)?$", line)
         if single:
-            configs[single.group(1)] = (None, None)
+            configs[single.group(1)] = ("unfiltered", None, None)
             continue
         if re.match(r"^on:\s*(?:#.*)?$", line):
             in_on = True
@@ -634,7 +700,7 @@ def _trigger_configs(path: Path) -> dict[str, tuple[list[str] | None, list[str] 
         tmatch = re.match(r"^  ([A-Za-z_][A-Za-z0-9_-]*):(?:\s|$)", line)
         if tmatch:
             current_trigger = tmatch.group(1)
-            configs.setdefault(current_trigger, (None, None))
+            configs.setdefault(current_trigger, ("unfiltered", None, None))
             continue
         if current_trigger is None:
             continue
@@ -649,11 +715,25 @@ def _trigger_configs(path: Path) -> dict[str, tuple[list[str] | None, list[str] 
                 m = re.match(r"^\s+-\s+['\"]?([^'\"]+)['\"]?\s*(?:#.*)?$", sub)
                 if m:
                     items.append(m.group(1))
-            paths, ignore = configs[current_trigger]
+            state, paths, ignore = configs[current_trigger]
             if key == "ignore":
-                configs[current_trigger] = (paths, items)
+                configs[current_trigger] = ("filtered", paths, items)
             else:
-                configs[current_trigger] = (items, ignore)
+                configs[current_trigger] = ("filtered", items, ignore)
+            continue
+        fpmatch = re.match(r"^(\s+)paths(?:-ignore)?:\s*(.+)$", line)
+        if fpmatch:
+            key = "ignore" if "paths-ignore" in fpmatch.group(0) else "paths"
+            flow = _parse_flow_list(fpmatch.group(2))
+            if flow is not None:
+                state, paths, ignore = configs[current_trigger]
+                if key == "ignore":
+                    configs[current_trigger] = ("filtered", paths, flow)
+                else:
+                    configs[current_trigger] = ("filtered", flow, ignore)
+            else:
+                configs[current_trigger] = ("unparsed", None, None)
+            continue
     return configs
 
 
@@ -672,9 +752,10 @@ def validate_workflow_path_coverage(
     each required path at least one such trigger must cover it — a positive
     ``paths:`` match with no negative (``!``-prefixed or ``paths-ignore:``)
     match, where a tree requirement ``root/**`` must be covered in full, not by
-    a flat or literal-string approximation. A trigger without any ``paths:``
-    filters is treated as covering everything. Static filters only: runtime
-    event shape is out of scope for this structural contract.
+    a flat or literal-string approximation. A trigger with genuinely no filter
+    covers everything; a filter the parser could not understand fails closed.
+    Static filters only: runtime event shape is out of scope for this
+    structural contract.
     """
     triggers = _trigger_configs(wf_path)
     auto = {t for t in triggers if t in {"push", "pull_request"}}
@@ -684,8 +765,8 @@ def validate_workflow_path_coverage(
         r
         for r in required
         if not any(
-            _trigger_covers(r, paths, ignore)
-            for _t, (paths, ignore) in ((t, triggers[t]) for t in auto)
+            _trigger_covers(r, *triggers[t])
+            for t in auto
         )
     ]
     if uncovered:
