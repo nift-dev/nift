@@ -23,6 +23,45 @@ On the development host after one untimed warm build, `benchmark-10k` measured:
 
 These numbers are checkpoint measurements, not portable performance guarantees. Use `make benchmark-10k` and `make test-tracking-scaling` on the target machine when evaluating changes.
 
+
+## v4.0.4 transactional-write scaling regression recovery
+
+Dogfooding after the v4.0.4 ternary fix exposed a much older full-build regression
+introduced by Checkpoint 8 filesystem hardening. Transactional writes correctly
+staged output to same-directory temporary files, but stale-temp recovery scanned
+the entire parent directory before every generated file write. For a flat N-page
+site this made output work approximately O(n²).
+
+The fix preserves atomic same-directory staging while moving stale-temp recovery
+to a bounded per-parent operation: each parent directory is scanned at most once
+per Nift process, and temporary files whose recorded owner PID is still live are
+preserved so overlapping writers are not destroyed.
+
+Two independent scaling guards are now maintained:
+
+- `make test-tracking-scaling` protects tracked-project loading;
+- `make test-full-build-scaling` protects full-build output work;
+- `make test-performance-scaling` runs both.
+
+The new full-build guard compares 1,000 and 4,000 flat pages and deliberately
+toggles the shared template between runs so every output changes and must pass
+through the transactional writer. Linear scaling is about 4× and the guard
+permits 7× for platform/filesystem noise. On the fix workspace it measured about
+3.1–4.3× across repeated runs. The historical buggy writer fails the same guard
+family even at 100→400 changed pages (about 8.9× in the reproduction), and larger
+fixtures become dramatically worse.
+
+Repeated `build-all` of byte-identical output is also optimized safely: Nift still
+renders and validates every page, but it avoids a temp-write/rename for unchanged
+bytes and refreshes the file mtime instead so modified-mode state remains current.
+Any changed bytes still use the transactional temp→replace path.
+
+On the current container, the repaired retained 10,000-page benchmark measured
+about 0.21–0.24 s median for repeated full builds, back in the retained ~0.21–0.26 s
+v1.0.41 checkpoint range. The same container measured v4.0.1 at about 0.31 s.
+Absolute timings remain machine-specific; the durable regression evidence is both
+restored historical full-build performance and near-linear changed-output scaling.
+
 ## v1.0.42 memory checkpoint
 
 The 10,000-page memory pass separates fixed process overhead from project-scale

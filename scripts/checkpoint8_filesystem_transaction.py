@@ -206,6 +206,9 @@ with tempfile.TemporaryDirectory(prefix="nift-cp8-") as td:
         content=root/"content/index.html"; content.write_text("B"*(4*1024*1024))
         (root/"templates/template.html").write_text("@content")
         run(root,"build-all",timeout=20); prior=preserve_pair(root)
+        # Force a different multi-megabyte result so identical-output elision
+        # cannot bypass the write-pressure path under test.
+        content.write_text("C"*(4*1024*1024))
         def limit_file_size():
             resource.setrlimit(resource.RLIMIT_FSIZE,(1024*1024,1024*1024))
             signal.signal(signal.SIGXFSZ,signal.SIG_IGN)
@@ -220,6 +223,44 @@ with tempfile.TemporaryDirectory(prefix="nift-cp8-") as td:
         return {"exit":p.returncode,"limit_bytes":1024*1024}
     case("partial-write-limit-preserves-last-good",partial_write_limit_preserves_last_good)
 
+    def stale_temp_recovery_is_bounded_and_concurrency_safe():
+        root=td/"stale-temp-recovery"; root.mkdir(); scaffold(root)
+        public=root/"public"
+        # A dead-owner temporary left by an interrupted process must be removed.
+        dead_pid=99999999
+        stale=public/f"unrelated.html.nift-tmp-{dead_pid}-17"
+        stale.write_text("stale\n")
+        # A temporary owned by this still-live Python process models another
+        # concurrent writer and must not be removed by Nift recovery.
+        live=public/f"concurrent.html.nift-tmp-{os.getpid()}-23"
+        live.write_text("live\n")
+        (root/"content/index.html").write_text("<p>RECOVER</p>\n")
+        run(root,"build-all")
+        if stale.exists(): raise RuntimeError("dead-owner stale temporary survived recovery")
+        if not live.exists(): raise RuntimeError("live-owner concurrent temporary was removed")
+        live.unlink()
+        return {"dead_owner_removed":True,"live_owner_preserved":True}
+    case("stale-temp-recovery-is-bounded-and-concurrency-safe",stale_temp_recovery_is_bounded_and_concurrency_safe)
+
+    def identical_output_rebuild_refreshes_current_state():
+        root=td/"identical-output-refresh"; root.mkdir(); scaffold(root)
+        (root/"data").mkdir(); marker=root/"data/marker.txt"; marker.write_text("A\n")
+        (root/"templates/template.html").write_text('@dep("data/marker.txt")<main>@content</main>\n')
+        run(root,"build-all")
+        before=(root/"public/index.html").read_bytes()
+        # Change a declared dependency without changing rendered output. The
+        # optimized writer may avoid replacing identical bytes, but page-info
+        # mtime must still advance so modified-mode status becomes clean.
+        time.sleep(.02); marker.write_text("B\n")
+        run(root,"build-all")
+        if (root/"public/index.html").read_bytes()!=before:
+            raise RuntimeError("non-rendered dependency change altered output")
+        status=run(root,"status")
+        if "up to date" not in status.stdout:
+            raise RuntimeError("identical-output rebuild did not refresh current-state metadata")
+        return {"rendered_bytes_unchanged":True,"status_clean":True}
+    case("identical-output-rebuild-refreshes-current-state",identical_output_rebuild_refreshes_current_state)
+
     def killed_output_write():
         root=td/"kill-write"; root.mkdir(); scaffold(root)
         # Replace tiny content with a large page and establish it as last-good.
@@ -228,8 +269,10 @@ with tempfile.TemporaryDirectory(prefix="nift-cp8-") as td:
         (root/"templates/template.html").write_text("@content")
         run(root,"build-all",timeout=30)
         prior=preserve_pair(root)
-        # Forced build-all rewrites the same logical output. Kill once the same-dir
-        # temporary output appears, before atomic rename.
+        # Force a different result so identical-output elision cannot bypass the
+        # transactional rewrite being interrupted.
+        content.write_text("B"*size)
+        # Kill once the same-dir temporary output appears, before atomic rename.
         p=subprocess.Popen([NIFT,"build-all"],cwd=root,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         deadline=time.monotonic()+10; seen=None
         while time.monotonic()<deadline and p.poll() is None:

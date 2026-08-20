@@ -136,7 +136,7 @@ clean:
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
-.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-diagnostics test-minify test-json-schema-integration test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
+.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-diagnostics test-minify test-json-schema-integration test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
 
 
 test-cross-feature: $(TARGET)
@@ -174,6 +174,13 @@ test-minify-cli:
 
 test-tracking-scaling: $(TARGET)
 	python3 tests/tracking_scaling_benchmark.py --nift "$(CURDIR)/$(TARGET)"
+
+
+test-full-build-scaling: $(TARGET)
+	python3 tests/full_build_scaling_benchmark.py --nift "$(CURDIR)/$(TARGET)"
+
+
+test-performance-scaling: test-tracking-scaling test-full-build-scaling
 
 
 benchmark-10k: $(TARGET)

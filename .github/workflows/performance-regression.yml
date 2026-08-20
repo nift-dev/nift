@@ -1,0 +1,26 @@
+name: Performance regression guards
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/*scaling_benchmark.py'
+      - 'Makefile'
+      - '.github/workflows/performance-regression.yml'
+  push:
+    branches: [master, main]
+    paths:
+      - 'src/**'
+      - 'tests/*scaling_benchmark.py'
+      - 'Makefile'
+      - '.github/workflows/performance-regression.yml'
+
+jobs:
+  scaling:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Nift
+        run: make -j2
+      - name: Guard tracking and full-build scaling
+        run: make test-performance-scaling

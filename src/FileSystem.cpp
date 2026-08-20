@@ -2,7 +2,10 @@
 #include <algorithm>
 #include <atomic>
 #include <array>
+#include <cerrno>
 #include <fstream>
+#include <limits>
+#include <mutex>
 #include <sstream>
 #include <thread>
 #include <sys/stat.h>
@@ -10,6 +13,7 @@
 #ifdef _WIN32
 #include <windows.h>
 #else
+#include <signal.h>
 #include <unistd.h>
 #endif
 
@@ -53,17 +57,85 @@ static void ensure_parent_directory(const fs::path& path) {
     }
 }
 
+static bool temporary_owner_pid(const std::string& name, unsigned long long& pid) {
+    constexpr const char* marker = ".nift-tmp-";
+    const std::size_t marker_pos = name.rfind(marker);
+    if (marker_pos == std::string::npos) return false;
+    const std::size_t pid_begin = marker_pos + 10;
+    const std::size_t pid_end = name.find('-', pid_begin);
+    if (pid_end == std::string::npos || pid_end == pid_begin) return false;
+
+    unsigned long long value = 0;
+    for (std::size_t i = pid_begin; i < pid_end; ++i) {
+        const unsigned char ch = static_cast<unsigned char>(name[i]);
+        if (ch < '0' || ch > '9') return false;
+        const unsigned digit = static_cast<unsigned>(ch - '0');
+        if (value > (std::numeric_limits<unsigned long long>::max() - digit) / 10) return false;
+        value = value * 10 + digit;
+    }
+    pid = value;
+    return true;
+}
+
+static bool process_is_alive(unsigned long long pid) {
+    if (pid == 0) return false;
+#ifdef _WIN32
+    if (pid > static_cast<unsigned long long>(std::numeric_limits<DWORD>::max())) return false;
+    HANDLE process = ::OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, static_cast<DWORD>(pid));
+    if (!process) return ::GetLastError() == ERROR_ACCESS_DENIED;
+    DWORD exit_code = 0;
+    const bool alive = ::GetExitCodeProcess(process, &exit_code) && exit_code == STILL_ACTIVE;
+    ::CloseHandle(process);
+    return alive;
+#else
+    if (pid > static_cast<unsigned long long>(std::numeric_limits<pid_t>::max())) return false;
+    errno = 0;
+    if (::kill(static_cast<pid_t>(pid), 0) == 0) return true;
+    return errno == EPERM;
+#endif
+}
+
 static void remove_stale_temporaries(const fs::path& path) {
+    // Recovery used to scan the whole parent directory before *every* output
+    // write. A flat N-page build therefore performed O(N^2) directory work.
+    // Scan each parent at most once per process instead, before this process
+    // creates any temporaries there. Temp names carry their owner PID so an
+    // overlapping Nift process cannot have its live transactional files removed.
+    static std::mutex mutex;
+    static std::unordered_set<std::string> cleaned_parents;
+    thread_local std::array<fs::path, 4> recent_parents;
+    thread_local std::size_t recent_count = 0;
+
     const fs::path parent = path.parent_path().empty() ? fs::path(".") : path.parent_path();
-    const std::string prefix = path.filename().string() + ".nift-tmp-";
-    std::error_code error;
-    for (const auto& entry : fs::directory_iterator(parent, error)) {
-        if (error) break;
-        const std::string name = entry.path().filename().string();
-        if (name.rfind(prefix, 0) == 0) {
-            std::error_code ignored;
-            fs::remove(entry.path(), ignored);
+    for (std::size_t i = 0; i < recent_count; ++i)
+        if (recent_parents[i] == parent) return;
+
+    std::error_code key_error;
+    fs::path key_path = fs::absolute(parent, key_error);
+    if (key_error) key_path = parent;
+    const std::string key = key_path.lexically_normal().string();
+
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+        if (cleaned_parents.find(key) == cleaned_parents.end()) {
+            std::error_code error;
+            for (const auto& entry : fs::directory_iterator(parent, error)) {
+                if (error) break;
+                const std::string name = entry.path().filename().string();
+                unsigned long long owner_pid = 0;
+                if (!temporary_owner_pid(name, owner_pid) || process_is_alive(owner_pid)) continue;
+                std::error_code ignored;
+                fs::remove(entry.path(), ignored);
+            }
+            if (error) return;
+            cleaned_parents.insert(key);
         }
+    }
+
+    if (recent_count < recent_parents.size()) recent_parents[recent_count++] = parent;
+    else {
+        for (std::size_t i = 1; i < recent_parents.size(); ++i) recent_parents[i - 1] = std::move(recent_parents[i]);
+        recent_parents.back() = parent;
     }
 }
 
@@ -109,6 +181,34 @@ static bool write_temp_file(const fs::path& temp, const std::string& contents) {
     return bool(file);
 }
 
+static bool file_contents_equal(const fs::path& path, const std::string& contents) {
+    std::error_code error;
+    if (!fs::is_regular_file(path, error) || error) return false;
+    const auto size = fs::file_size(path, error);
+    if (error || size != contents.size()) return false;
+    if (contents.empty()) return true;
+
+    std::ifstream file(path, std::ios::binary);
+    if (!file) return false;
+    constexpr std::size_t chunk_size = 8192;
+    std::array<char, chunk_size> buffer{};
+    std::size_t offset = 0;
+    while (offset < contents.size()) {
+        const std::size_t wanted = std::min(chunk_size, contents.size() - offset);
+        file.read(buffer.data(), static_cast<std::streamsize>(wanted));
+        if (file.gcount() != static_cast<std::streamsize>(wanted)) return false;
+        if (!std::equal(buffer.data(), buffer.data() + wanted, contents.data() + offset)) return false;
+        offset += wanted;
+    }
+    return true;
+}
+
+static bool refresh_modified_time(const fs::path& path) {
+    std::error_code error;
+    fs::last_write_time(path, fs::file_time_type::clock::now(), error);
+    return !error;
+}
+
 bool write_file(const fs::path& path, const std::string& contents) {
     ensure_parent_directory(path);
     remove_stale_temporaries(path);
@@ -133,9 +233,24 @@ static bool make_readonly(const fs::path& path) {
 #endif
 }
 
+static bool is_readonly(const fs::path& path) {
+    std::error_code error;
+    const fs::perms permissions = fs::status(path, error).permissions();
+    return !error && (permissions & fs::perms::owner_write) == fs::perms::none;
+}
+
 bool write_readonly_file(const fs::path& path, const std::string& contents) {
     ensure_parent_directory(path);
     remove_stale_temporaries(path);
+    // A forced full build still renders and validates every page, but replacing
+    // byte-identical files would pay an unnecessary temp-write + rename cost.
+    // Refreshing the mtime preserves the build-current marker used by modified
+    // mode while avoiding filesystem churn. Any content change still takes the
+    // transactional path below and therefore retains last-good interruption
+    // safety. If touching is unsupported, fall back to the transactional write.
+    if (file_contents_equal(path, contents)) {
+        if ((is_readonly(path) || make_readonly(path)) && refresh_modified_time(path)) return true;
+    }
     const fs::path temp = temporary_sibling(path);
     if (!write_temp_file(temp, contents)) {
         std::error_code cleanup;
