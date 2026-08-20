@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "campaign": "bh2",
+  "scanned_files": 7,
+  "findings": [
+    {
+      "rule": "pipefail-missing",
+      "file": "/tmp/opencode/bh2-r4-fixtures/r1_pipe_nobackslash.sh",
+      "detail": "uses pipelines but never enables pipefail; pipeline 'false |   cat >/dev/null' can mask failure of upstream 'false'"
+    },
+    {
+      "rule": "pipefail-missing",
+      "file": "/tmp/opencode/bh2-r4-fixtures/r3_leading_pipe.sh",
+      "detail": "uses pipelines but never enables pipefail; pipeline 'false | cat >/dev/null' can mask failure of upstream 'false'"
+    },
+    {
+      "rule": "pipefail-missing",
+      "file": "/tmp/opencode/bh2-r4-fixtures/r7_pipe_amp.sh",
+      "detail": "uses pipelines but never enables pipefail; pipeline 'false |& cat >/dev/null' can mask failure of upstream 'false'"
+    },
+    {
+      "rule": "prereq-exit0",
+      "file": "/tmp/opencode/bh2-r4-fixtures/r5_skip_brace.sh",
+      "detail": "missing-tool guard exits 0 instead of a non-green code"
+    },
+    {
+      "rule": "skip-as-pass",
+      "file": "/tmp/opencode/bh2-r4-fixtures/r2_same_line_skip.sh",
+      "detail": "SKIP message immediately followed by an exit-0 outcome (silent green)"
+    },
+    {
+      "rule": "skip-as-pass",
+      "file": "/tmp/opencode/bh2-r4-fixtures/r4_skip_bare_exit.sh",
+      "detail": "SKIP message immediately followed by an exit-0 outcome (silent green)"
+    },
+    {
+      "rule": "skip-as-pass",
+      "file": "/tmp/opencode/bh2-r4-fixtures/r5_skip_brace.sh",
+      "detail": "SKIP message immediately followed by an exit-0 outcome (silent green)"
+    },
+    {
+      "rule": "skip-as-pass",
+      "file": "/tmp/opencode/bh2-r4-fixtures/r6_skip_and.sh",
+      "detail": "SKIP message immediately followed by an exit-0 outcome (silent green)"
+    }
+  ]
+}

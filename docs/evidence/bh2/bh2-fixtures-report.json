@@ -16,7 +16,7 @@
     {
       "rule": "skip-as-pass",
       "file": "/tmp/opencode/bh2-fixtures/falsegreen_prereq.sh",
-      "detail": "SKIP message immediately followed by exit 0 (silent green)"
+      "detail": "SKIP message immediately followed by an exit-0 outcome (silent green)"
     },
     {
       "rule": "skip-as-pass",

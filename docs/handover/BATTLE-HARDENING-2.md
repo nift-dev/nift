@@ -281,6 +281,10 @@ make target.
 - `bh2-qfixtures-report.json` — the round-3 reviewer's three fixtures (dead-alias
   `ignored = rc`, backslash-continued `false | cat`, unreachable
   `if false; then set -o pipefail; fi`) are all rejected (exit 1).
+- `bh2-r4-fixtures-report.json` — the round-4 reviewer's two fixtures plus five
+  adjacent forms (native multiline pipeline without backslash; same-line
+  `printf 'SKIP...'; exit 0`; leading-pipe continuation; bare `exit` after SKIP;
+  brace-group SKIP; `&&`-separated SKIP; `|&` pipeline) are all rejected (exit 1).
 - `bh2-clean-report.json` — the scanner is clean on the real `tests/` + `scripts/`
   (42 files, 0 findings), and clean on the regression-suite contract scripts.
 
@@ -316,6 +320,18 @@ make target.
   dict stores within a file, and stops at function boundaries, control-flow
   joins, and interprocedural calls. A value that gates only *after* crossing a
   function boundary is conservatively treated as inspected at the store site.
+- **Shell layout boundary (round 4):** the normalizer understands the
+  continuation and compound constructs the scanner's families rely on —
+  backslash-newline, trailing/leading `|`/`|&`, `if`/`while`/`for`/`case`
+  blocks, and heredoc bodies. It does not fully tokenize shell: a leading `|`
+  immediately following an open `case` alternation, quoted strings spanning
+  physical lines, and nested `$( ... )` command substitution are approximated
+  rather than parsed. Every such approximation fails toward a false red, never a
+  false green.
+- **SKIP-outcome boundary (round 4):** `exit 0` (or a bare `exit`) declared
+  adjacent to a SKIP message is a false green regardless of layout. `exit $?`,
+  `exit` with an explicit non-zero code, or a SKIP message followed by later
+  commands before the exit are deliberately outside the rule.
 
 ### BH2 reviewer round 1 — returned to implementer
 
@@ -418,13 +434,59 @@ and the real trees stay GREEN (42 tests/scripts files + 21 regression-suite
 contract files, 0 findings). The full 3-repository audit and the CI-equivalent
 single-repo sequence both PASS.
 
+### BH2 reviewer round 3 — returned to implementer
+
+ChatGPT attacked round-3 candidate `7d2621b` in a separate worktree. Q1–Q3 were
+accepted as materially fixed and the untouched candidate's local registry check
+was confirmed. Two new false-green holes in the shell scanner were reported
+(R1, R2), so BH2 remains OPEN:
+
+- **R1 (source-layout equivalence):** the backslash-continuation fix closed the
+  specific example but not the invariant. Bash does not require a backslash
+  after a pipe: `false |` newline `cat >/dev/null` is one pipeline, yet the
+  scanner reported 0 findings because `_logical_lines()` joined only
+  backslash-continued physical lines.
+- **R2 (same-line SKIP + green):** `printf '%s\n' 'SKIP: missing'; exit 0` — a
+  SKIP declaration whose outcome is green on the same physical line — was
+  missed because `SH_SKIP_EXIT0` expected the `exit 0` on the following line.
+  The reviewer emphasised the SKIP→green property must not depend on line
+  layout, and pointed at ordinary compact prerequisite handlers such as
+  `command -v foo >/dev/null 2>&1 || { echo "SKIP..."; exit 0; }`.
+
+### BH2 implementer round 4 — fixes
+
+- **R1 (shell pipeline layout):** the shell normalizer now rebuilds the logical
+  commands the shell actually runs. Comments are stripped (quote-aware),
+  heredoc bodies are skipped as data, and physical lines are joined across
+  backslash-newline and across a trailing or leading `|`/`|&` pipeline operator
+  (with a `case`-block guard so a leading `|` in a case pattern is not joined).
+  `_split_pipeline` now splits `|` and `|&` while leaving `||` intact. Every
+  shell rule reasons over the same normalized text, so a pipeline is analyzed
+  as a whole regardless of where the newlines fall.
+- **R2 (SKIP outcome layout):** `SH_SKIP_EXIT0` is now layout-independent: the
+  SKIP statement and the green outcome may be separated by `;`, newlines,
+  `{`/`}` braces, or `&&`/`||` on one line or many, and the green outcome may be
+  `exit 0` or a bare `exit` (whose status is the preceding successful command's
+  0). `exit 1`/`exit 2` remain untouched. The SKIP and missing-tool checks now
+  run over the same dead-block-stripped, comment-stripped normalized text; the
+  Python SKIP/prereq/vacuous checks were aligned onto the dead-block-stripped
+  body for the same consistency.
+
+All seven round-4 fixtures (the reviewer's two plus five adjacent forms:
+leading-pipe continuation, bare `exit` after SKIP, brace-group SKIP,
+`&&`-separated SKIP, `|&` pipeline) are RED, retained at
+`docs/evidence/bh2/bh2-r4-fixtures-report.json`. All prior fixtures stay RED and
+the real trees stay GREEN (42 + 21 files, 0 findings); registry CI, the full
+3-repository audit, BH1 liveness, the CI-equivalent chain, and the time-family
+SKIP(2) red-runs all pass.
+
 ### BH2 handoff to reviewer
 
-**Round-3 candidate: `7d2621b`** ("BH2 round 3: fix reviewer findings Q1-Q3
-on top of c06fa33"). Reviewer attacks the exact round-3 commit in a separate
+**Round-4 candidate: this commit** ("BH2 round 4: fix reviewer findings R1-R2
+on top of 7d2621b"). Reviewer attacks the exact round-4 commit in a separate
 clone/worktree and reports findings back; the implementer does not modify the
-tree during review. No changes are made to `7f8768b`, `c06fa33` or the round-3
-candidate `7d2621b` itself.
+tree during review. No changes are made to `7f8768b`, `c06fa33`, `7d2621b` or
+the round-4 candidate itself.
 
 Review focus areas (attack each):
 

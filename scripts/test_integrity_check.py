@@ -259,10 +259,13 @@ def _find_swallowed_returncode(text: str) -> list[str]:
 def scan_python(text: str, path: Path) -> list[dict]:
     findings: list[dict] = []
     clean = _strip_py_comments(text)
-    if PY_SKIP_EXIT0.search(clean):
+    # Dead code can neither skip nor pass; reason over the liveness-stripped
+    # body so a `if False: print("SKIP"); sys.exit(0)` is not a false green.
+    live = _strip_dead_blocks(clean)
+    if PY_SKIP_EXIT0.search(live):
         findings.append({"rule": "skip-as-pass", "file": str(path),
                          "detail": "SKIP message immediately followed by an exit-0 call (silent green)"})
-    if PY_PREREQ_EXIT0.search(clean):
+    if PY_PREREQ_EXIT0.search(live):
         findings.append({"rule": "prereq-exit0", "file": str(path),
                          "detail": "missing-tool guard exits 0 instead of a non-green code"})
     if "subprocess." in clean:
@@ -270,7 +273,7 @@ def scan_python(text: str, path: Path) -> list[dict]:
             findings.append({"rule": "swallowed-returncode", "file": str(path),
                              "detail": f"subprocess result {var!r} never controls a failure path (no check=True, "
                                        "no gating use of its returncode)"})
-    if PY_VACUOUS.search(clean) and "PASS:" in clean and "subprocess." not in clean and not any(
+    if PY_VACUOUS.search(live) and "PASS:" in clean and "subprocess." not in clean and not any(
         token in clean for token in ("raise ", "assert ", "!=", "==", ">=", "<=", "> ", "< ")):
         findings.append({"rule": "vacuous-pass", "file": str(path),
                          "detail": "prints PASS but invokes nothing and asserts nothing"})
@@ -279,8 +282,14 @@ def scan_python(text: str, path: Path) -> list[dict]:
 
 # --- Shell false-green patterns ---------------------------------------------
 
+# SKIP declared and the controlling outcome is green (exit 0, or a bare `exit`
+# whose status is the preceding successful command's 0). Layout-independent: the
+# SKIP statement and the exit may be separated by `;`, newlines, `{`/`}` braces,
+# or `&&`/`||`, on one physical line or many.
 SH_SKIP_EXIT0 = re.compile(
-    r"(?:echo|printf)\s+[\"'][^\"']*SKIP[^\"']*[\"']\s*(?:[|>][^\n]*)?\n[ \t]*exit 0"
+    r"(?:echo|printf)\s+[^\n;]*?SKIP[^\n;]*?"
+    r"(?:[ \t]*(?:;|\n|\{|\}|&&|\|\|)[ \t]*)+"
+    r"exit\s*(?:0)?(?=\s*[;\n}]|$)"
 )
 SH_EXIT0_AFTER_TOOL = re.compile(
     r"command\s+-v\s+\S+\s*>?/dev/null\s*2>&1\s*\|\|\s*\{[^}]*exit\s+0|"
@@ -297,18 +306,82 @@ SHELL_PIPE_FILTERS = {
 }
 
 
+def _strip_shell_comments(text: str) -> str:
+    """Remove ``# ...`` comments outside quotes so a trailing comment cannot
+    hide a continuation operator or a pipefail mention."""
+    out: list[str] = []
+    state: str | None = None
+    i = 0
+    n = len(text)
+    while i < n:
+        c = text[i]
+        if state is not None:
+            out.append(c)
+            if c == "\\" and i + 1 < n:
+                out.append(text[i + 1])
+                i += 2
+                continue
+            if c == state:
+                state = None
+            i += 1
+            continue
+        if c in "\"'":
+            state = c
+            out.append(c)
+            i += 1
+            continue
+        if c == "#":
+            while i < n and text[i] != "\n":
+                i += 1
+            continue
+        out.append(c)
+        i += 1
+    return "".join(out)
+
+
+# A trailing backslash or a bare pipeline operator continues the same logical
+# command onto the next physical line (Bash needs no backslash after a pipe).
+_CONT_TAIL = re.compile(r"(?:\\\s*|\|&\s*|\|\s*)$")
+# A physical line may also start with a pipeline operator continuing the
+# previous command (`false` then `| cat`).
+_CONT_HEAD = re.compile(r"^\s*(?:\|&|\|)")
+_HEREDOC = re.compile(r"(?<!<)<<(?!<)\s*[-]?\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?")
+
+
+def _in_case(buf: str) -> bool:
+    # A leading `|` inside a `case` block is an alternation pattern, not a
+    # pipeline continuation; do not join there.
+    return bool(re.search(r"\bcase\b", buf)) and not re.search(r"\besac\b", buf)
+
+
 def _logical_lines(text: str) -> str:
-    """Join shell physical lines continued with a trailing backslash so a
-    pipeline split across lines (``false \\\\`` then ``| cat``) is analyzed as
-    the single logical line the shell actually runs."""
+    """Normalize a shell script to the logical commands the shell actually runs.
+
+    Physical lines are joined across backslash-newline and across a trailing or
+    leading ``|`` / ``|&`` pipeline operator, so a pipeline is analyzed as a
+    whole regardless of where the newlines fall. Comments are stripped first so
+    a trailing comment cannot hide a continuation. Heredoc bodies are data, not
+    executable code, and are skipped entirely.
+    """
     out: list[str] = []
     buf = ""
+    heredoc_term: str | None = None
     for raw in text.splitlines():
-        buf = (buf + " " + raw) if buf else raw
-        if re.search(r"\\\s*$", buf):
+        if heredoc_term is not None:
+            if raw.strip() == heredoc_term:
+                heredoc_term = None
             continue
-        out.append(buf)
-        buf = ""
+        line = _strip_shell_comments(raw).rstrip()
+        if buf and (_CONT_TAIL.search(buf) or (_CONT_HEAD.match(line) and not _in_case(buf))):
+            buf += " " + line
+        elif buf:
+            out.append(buf)
+            buf = line
+        else:
+            buf = line
+        m = _HEREDOC.search(line)
+        if m:
+            heredoc_term = m.group(1)
     if buf:
         out.append(buf)
     return "\n".join(out)
@@ -354,9 +427,12 @@ def _strip_dead_shell_blocks(text: str) -> str:
 
 
 def _split_pipeline(line: str) -> list[str]:
-    # Remove simple quoted strings so Nift template text (" | ") does not count.
+    # Remove simple quoted strings so Nift template text (" | ") does not count,
+    # normalize `|&` to `|`, and split on pipeline operators while leaving the
+    # `||` and-or operator intact (a single `|` with `|` on either side).
     stripped = re.sub(r"'[^']*'|\"[^\"]*\"", "", line)
-    return stripped.split("|")
+    stripped = re.sub(r"\|\&", "|", stripped)
+    return re.split(r"(?<!\|)\|(?!\|)", stripped)
 
 
 def _shell_has_unsafe_pipeline(text: str) -> str | None:
@@ -383,16 +459,17 @@ def _shell_has_unsafe_pipeline(text: str) -> str | None:
 
 def scan_shell(text: str, path: Path) -> list[dict]:
     findings: list[dict] = []
-    if SH_SKIP_EXIT0.search(text):
+    # Join continued physical lines, drop statically-dead blocks, strip comments
+    # and skip heredoc bodies once; every shell rule then reasons about the same
+    # normalized logical commands, so a SKIP, pipefail mention or pipeline is
+    # detected regardless of physical line layout.
+    analyzed = _strip_dead_shell_blocks(_logical_lines(text))
+    if SH_SKIP_EXIT0.search(analyzed):
         findings.append({"rule": "skip-as-pass", "file": str(path),
-                         "detail": "SKIP message immediately followed by exit 0 (silent green)"})
-    if SH_EXIT0_AFTER_TOOL.search(text):
+                         "detail": "SKIP message immediately followed by an exit-0 outcome (silent green)"})
+    if SH_EXIT0_AFTER_TOOL.search(analyzed):
         findings.append({"rule": "prereq-exit0", "file": str(path),
                          "detail": "missing-tool guard exits 0 instead of a non-green code"})
-    # Join continued physical lines, then drop statically-dead blocks, so a
-    # pipefail enabled only in an `if false; then ... fi` block or a pipeline
-    # hidden behind a trailing backslash can neither count nor escape.
-    analyzed = _strip_dead_shell_blocks(_logical_lines(text))
     has_pipe = bool(re.search(r"\| *\S+", analyzed))
     # Only a real `set -o pipefail` / `set -euo pipefail` counts; a mention in a
     # comment or echo string does not.
@@ -402,7 +479,7 @@ def scan_shell(text: str, path: Path) -> list[dict]:
         if reason:
             findings.append({"rule": "pipefail-missing", "file": str(path),
                              "detail": f"uses pipelines but never enables pipefail; {reason}"})
-        elif re.search(r"\b(grep|wc|head|tail|diff|cmp)\b", text):
+        elif re.search(r"\b(grep|wc|head|tail|diff|cmp)\b", analyzed):
             findings.append({"rule": "pipefail-missing", "file": str(path),
                              "detail": "uses pipelines but never enables pipefail; a failing upstream command can be masked"})
     return findings
