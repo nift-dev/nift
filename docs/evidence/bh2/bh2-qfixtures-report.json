@@ -6,12 +6,12 @@
     {
       "rule": "pipefail-missing",
       "file": "/tmp/opencode/bh2-qfixtures/q2_pipe_multiline.sh",
-      "detail": "uses pipelines but never enables pipefail; pipeline 'false \\\\   | cat >/dev/null' can mask failure of upstream 'false'"
+      "detail": "pipeline runs without pipefail provably active; pipeline 'false \\\\   | cat >/dev/null' can mask failure of upstream 'false'"
     },
     {
       "rule": "pipefail-missing",
       "file": "/tmp/opencode/bh2-qfixtures/q3_dead_pipefail.sh",
-      "detail": "uses pipelines but never enables pipefail; pipeline 'false | cat' can mask failure of upstream 'false'"
+      "detail": "pipeline runs without pipefail provably active; pipeline 'false | cat' can mask failure of upstream 'false'"
     },
     {
       "rule": "swallowed-returncode",

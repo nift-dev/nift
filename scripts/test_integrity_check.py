@@ -12,9 +12,10 @@ Families (rule ids):
                       (via SystemExit(0), sys.exit(0), exit(0) or shell exit 0,
                       on the same line or the next statement)
   prereq-exit0        a missing-tool guard exits 0 instead of a non-green code
-  pipefail-missing    a shell test pipelines a command whose failure can be
-                      masked, and never enables pipefail (a failing upstream
-                      segment must not be able to hide behind a green outcome)
+  pipefail-missing    a shell test runs a pipeline whose upstream failure can be
+                      masked because pipefail is not provably active at that
+                      pipeline's execution point (a failing upstream segment must
+                      not be able to hide behind a green outcome)
   swallowed-returncode a python test runs a subprocess (run/call) without
                       check=True and never lets the result's returncode control
                       a conditional, assertion, raise or exit path
@@ -457,6 +458,194 @@ def _shell_has_unsafe_pipeline(text: str) -> str | None:
     return None
 
 
+# pipefail state transitions in `set` statements. `set -euo pipefail` and
+# `set -o pipefail` enable; `set +o pipefail` / `set +euo pipefail` disable.
+_PF_ON = re.compile(r"\bset\s+[^;\n]*?(?:-[A-Za-z]*o\s+pipefail)")
+_PF_OFF = re.compile(r"\bset\s+[^;\n]*?(?:\+[A-Za-z]*o\s+pipefail)")
+
+
+def _shell_split_statements(text: str) -> list[tuple[str, bool]]:
+    """Split normalized shell text into top-level statements on ``;``, ``&&``,
+    ``||`` and newlines, quote- and ``$( )``-depth-aware. Each statement is
+    returned with a flag saying whether it is the conditional right-hand side
+    of an ``&&``/``||`` chain (its state changes may never execute)."""
+    out: list[tuple[str, bool]] = []
+    buf: list[str] = []
+    quote: str | None = None
+    depth = 0
+    cond = False
+    i = 0
+    n = len(text)
+    while i < n:
+        c = text[i]
+        if quote:
+            buf.append(c)
+            if c == "\\" and i + 1 < n:
+                buf.append(text[i + 1])
+                i += 2
+                continue
+            if c == quote:
+                quote = None
+            i += 1
+            continue
+        if c in "\"'":
+            quote = c
+            buf.append(c)
+            i += 1
+            continue
+        if c == "(":
+            depth += 1
+            buf.append(c)
+            i += 1
+            continue
+        if c == ")" and depth > 0:
+            depth -= 1
+            buf.append(c)
+            i += 1
+            continue
+        if depth == 0:
+            if c in ";\n":
+                s = "".join(buf).strip()
+                if s:
+                    out.append((s, cond))
+                buf = []
+                cond = False
+                i += 1
+                continue
+            if c == "&" and i + 1 < n and text[i + 1] == "&":
+                s = "".join(buf).strip()
+                if s:
+                    out.append((s, cond))
+                buf = []
+                cond = True
+                i += 2
+                continue
+            if c == "|" and i + 1 < n and text[i + 1] == "|":
+                s = "".join(buf).strip()
+                if s:
+                    out.append((s, cond))
+                buf = []
+                cond = True
+                i += 2
+                continue
+        buf.append(c)
+        i += 1
+    s = "".join(buf).strip()
+    if s:
+        out.append((s, cond))
+    return out
+
+
+_BLOCK_IF = re.compile(r"^if\b")
+_BLOCK_LOOP = re.compile(r"^(?:while|until|for)\b")
+_BLOCK_CASE = re.compile(r"^case\b")
+_BLOCK_CLOSE = re.compile(r"^(?:fi|done|esac)\b")
+_BLOCK_ELIF = re.compile(r"^elif\b")
+_BLOCK_FUNC = re.compile(r"^(?:[A-Za-z_][A-Za-z0-9_]*\(\)|function\s+[A-Za-z_][A-Za-z0-9_]*)\s*\{")
+
+
+def _block_kind(s: str) -> str:
+    if _BLOCK_IF.match(s):
+        return "if"
+    if _BLOCK_LOOP.match(s):
+        return "loop"
+    if _BLOCK_CASE.match(s):
+        return "case"
+    if _BLOCK_CLOSE.match(s):
+        return "close"
+    if s == "else":
+        return "else"
+    if _BLOCK_ELIF.match(s):
+        return "elif"
+    if s in {"then", "do", "in"}:
+        return "body_marker"
+    if s == "{":
+        return "brace_open"
+    if s == "}":
+        return "brace_close"
+    if s.startswith("("):
+        return "subshell"
+    if _BLOCK_FUNC.match(s):
+        return "func"
+    return "cmd"
+
+
+def _shell_unsafe_pipelines(analyzed: str) -> list[str]:
+    """Return reasons for every pipeline whose upstream failure can be masked
+    because pipefail is not provably active at its execution point.
+
+    pipefail is tracked as sequential top-level state: ``set ... pipefail``
+    enables it, ``set ... +o pipefail`` disables it, and only state changes on
+    an unconditional top-level ``;``/newline statement are trusted. A state
+    change inside a conditional block (``if``/``while``/``for``/``case``) or on
+    the right-hand side of ``&&``/``||`` may never execute, so it taints the
+    enclosing scope (pipefail becomes "not provably active", conservatively
+    treated as off). Subshells and function definitions do not leak state out.
+    """
+    reasons: list[str] = []
+    pf: bool | None = False
+    stack: list[dict] = []
+    for raw in analyzed.splitlines():
+        for s, is_cond in _shell_split_statements(raw):
+            kind = _block_kind(s)
+            if kind in {"if", "loop", "case"}:
+                r = _shell_has_unsafe_pipeline(s)
+                if r and pf is not True:
+                    reasons.append(r)
+                stack.append({"entry": pf, "tainted": False})
+                continue
+            if kind == "func":
+                # A function body runs at call time; its state changes cannot
+                # be trusted for the surrounding flow. Pipelines inside are
+                # checked against the definition-point state.
+                r = _shell_has_unsafe_pipeline(s)
+                if r and pf is not True:
+                    reasons.append(r)
+                stack.append({"entry": pf, "tainted": True})
+                continue
+            if kind in {"body_marker", "else", "elif"}:
+                continue
+            if kind == "close":
+                if stack:
+                    fr = stack.pop()
+                    pf = None if fr["tainted"] else fr["entry"]
+                continue
+            if kind == "brace_open":
+                stack.append({"entry": pf, "tainted": False})
+                continue
+            if kind == "brace_close":
+                if stack:
+                    fr = stack.pop()
+                    pf = None if fr["tainted"] else pf
+                continue
+            if kind == "subshell":
+                r = _shell_has_unsafe_pipeline(s)
+                if r and pf is not True:
+                    reasons.append(r)
+                # state changes inside a subshell do not propagate out
+                continue
+            if _PF_OFF.search(s):
+                if is_cond or stack:
+                    if stack:
+                        stack[-1]["tainted"] = True
+                    pf = None
+                else:
+                    pf = False
+                continue
+            if _PF_ON.search(s):
+                if is_cond or stack:
+                    if stack:
+                        stack[-1]["tainted"] = True
+                    pf = None
+                else:
+                    pf = True
+                continue
+            r = _shell_has_unsafe_pipeline(s)
+            if r and pf is not True:
+                reasons.append(r)
+    return reasons
+
+
 def scan_shell(text: str, path: Path) -> list[dict]:
     findings: list[dict] = []
     # Join continued physical lines, drop statically-dead blocks, strip comments
@@ -470,18 +659,12 @@ def scan_shell(text: str, path: Path) -> list[dict]:
     if SH_EXIT0_AFTER_TOOL.search(analyzed):
         findings.append({"rule": "prereq-exit0", "file": str(path),
                          "detail": "missing-tool guard exits 0 instead of a non-green code"})
-    has_pipe = bool(re.search(r"\| *\S+", analyzed))
-    # Only a real `set -o pipefail` / `set -euo pipefail` counts; a mention in a
-    # comment or echo string does not.
-    has_pipefail = bool(re.search(r"^\s*set\s+(-\S+\s+)*.*pipefail", analyzed, re.MULTILINE))
-    if has_pipe and not has_pipefail:
-        reason = _shell_has_unsafe_pipeline(analyzed)
-        if reason:
-            findings.append({"rule": "pipefail-missing", "file": str(path),
-                             "detail": f"uses pipelines but never enables pipefail; {reason}"})
-        elif re.search(r"\b(grep|wc|head|tail|diff|cmp)\b", analyzed):
-            findings.append({"rule": "pipefail-missing", "file": str(path),
-                             "detail": "uses pipelines but never enables pipefail; a failing upstream command can be masked"})
+    # pipefail must be provably active *at each pipeline*, not merely present
+    # somewhere in the file: a `set ... pipefail` after the pipeline, or a
+    # `set +o pipefail` before it, leaves the pipeline unprotected.
+    for reason in _shell_unsafe_pipelines(analyzed):
+        findings.append({"rule": "pipefail-missing", "file": str(path),
+                         "detail": f"pipeline runs without pipefail provably active; {reason}"})
     return findings
 
 

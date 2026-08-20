@@ -6,7 +6,7 @@
     {
       "rule": "pipefail-missing",
       "file": "/tmp/opencode/bh2-fixtures/falsegreen_pipe.sh",
-      "detail": "uses pipelines but never enables pipefail; pipeline 'out=$(./nift build-all 2>&1 | grep -c ERROR)' can mask failure of upstream 'out=$(./nift'"
+      "detail": "pipeline runs without pipefail provably active; pipeline 'out=$(./nift build-all 2>&1 | grep -c ERROR)' can mask failure of upstream 'out=$(./nift'"
     },
     {
       "rule": "prereq-exit0",

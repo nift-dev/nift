@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "campaign": "bh2",
+  "checkpoint": "test-integrity-path-coverage-s2",
+  "commit": "round-5 candidate (post-commit update)",
+  "timestamp_utc": "2026-08-21T09:30:00Z",
+  "platform": "Linux (round-5 red demonstrations)",
+  "purpose": "BH2 S2 red-rule demonstrations: an enforcement workflow must not be able to exclude a required path via an ordered negative '!' pattern inside paths:, nor satisfy a tree requirement src/** with the flat pattern src/*.",
+  "demonstrated": [
+    {
+      "mutation": "test-integrity.yml push/pull_request paths add '!src/**' after 'src/**'",
+      "outcome": "FAIL",
+      "diagnostic": "workflow-path-coverage-gap: contracts.namespace-reservation: test-integrity.yml: uncovered by automatic trigger paths: src/**",
+      "red_as_expected": true
+    },
+    {
+      "mutation": "test-integrity.yml push/pull_request paths 'src/**' replaced with 'src/*'",
+      "outcome": "FAIL",
+      "diagnostic": "workflow-path-coverage-gap: contracts.namespace-reservation: test-integrity.yml: uncovered by automatic trigger paths: src/**",
+      "red_as_expected": true
+    }
+  ],
+  "all_red_correct": true
+}

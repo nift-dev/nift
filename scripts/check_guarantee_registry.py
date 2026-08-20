@@ -468,6 +468,136 @@ def _path_covered(pattern: str, path: str) -> bool:
     return bool(_glob_to_regex(pattern).match(path))
 
 
+def _pattern_covers(required: str, provided: str) -> bool:
+    """True when every file the ``required`` pattern denotes is also matched by
+    ``provided`` — a language-subset test, not a literal string match.
+
+    A literal required path is matched concretely. A recursive tree requirement
+    ``root/**`` is covered only by ``**`` or by a ``proot/**`` whose root is the
+    same or an ancestor of ``root``; a flat pattern like ``src/*`` does not
+    cover ``src/**`` because it excludes nested files.
+    """
+    if not any(ch in required for ch in "*?["):
+        return _path_covered(provided, required)
+    m = re.match(r"^([^*?]+)/\*\*$", required)
+    if not m:
+        return False
+    root = m.group(1)
+    if provided == "**":
+        return True
+    pm = re.match(r"^([^*?]+)/\*\*$", provided)
+    if not pm:
+        return False
+    proot = pm.group(1)
+    return root == proot or root.startswith(proot + "/")
+
+
+def _regex_can_extend(atoms: list, i: int, s: str, j: int) -> bool:
+    """Whether the glob regex ``atoms`` (from index i) can match a string whose
+    prefix is ``s[j:]`` — i.e. ``s[j:]`` is a prefix of some accepted string.
+    Used to decide whether a negative path pattern overlaps a required tree."""
+    if i == len(atoms):
+        return j == len(s)
+    a = atoms[i]
+    if a[0] == "lit":
+        t = a[1]
+        if s[j:].startswith(t):
+            return _regex_can_extend(atoms, i + 1, s, j + len(t))
+        if t.startswith(s[j:]):
+            return True
+        return False
+    if a[0] == "dst":  # **  -> .*
+        if _regex_can_extend(atoms, i + 1, s, j):
+            return True
+        if j < len(s):
+            return _regex_can_extend(atoms, i, s, j + 1)
+        return False
+    if a[0] == "star":  # *  -> [^/]*
+        if j < len(s):
+            if s[j] == "/":
+                return _regex_can_extend(atoms, i + 1, s, j)
+            if _regex_can_extend(atoms, i, s, j + 1):
+                return True
+        return _regex_can_extend(atoms, i + 1, s, j)
+    if a[0] == "qst":  # ?  -> [^/]
+        if j < len(s) and s[j] != "/":
+            return _regex_can_extend(atoms, i + 1, s, j + 1)
+        return j == len(s)
+    return False
+
+
+def _glob_atoms(pattern: str) -> list:
+    """Decompose a glob pattern into (lit, star, dst, qst) atoms for the
+    prefix-matching decision above (mirrors ``_glob_to_regex``)."""
+    atoms: list = []
+    buf: list[str] = []
+    i = 0
+    n = len(pattern)
+    while i < n:
+        c = pattern[i]
+        if c == "*":
+            if buf:
+                atoms.append(("lit", "".join(buf)))
+                buf = []
+            if i + 1 < n and pattern[i + 1] == "*":
+                atoms.append(("dst", ""))
+                i += 2
+                continue
+            atoms.append(("star", ""))
+            i += 1
+            continue
+        if c == "?":
+            if buf:
+                atoms.append(("lit", "".join(buf)))
+                buf = []
+            atoms.append(("qst", ""))
+            i += 1
+            continue
+        buf.append(c)
+        i += 1
+    if buf:
+        atoms.append(("lit", "".join(buf)))
+    return atoms
+
+
+def _tree_overlaps_negative(root: str, neg: str) -> bool:
+    """True when the negative pattern ``neg`` matches at least one file under
+    ``root/**`` — any overlap breaks the guarantee that the whole required tree
+    triggers the workflow."""
+    if neg == "**":
+        return True
+    return _regex_can_extend(_glob_atoms(neg), 0, root + "/", 0)
+
+
+def _trigger_covers(required: str, paths: list[str] | None, ignore: list[str] | None) -> bool:
+    """True when a single trigger's path filters cover ``required``.
+
+    GitHub ``paths:`` semantics: a file triggers only if it matches a positive
+    pattern and matches no negative (``!``-prefixed) pattern; ``paths-ignore:``
+    entries are implicit negatives. For a literal required file this is a
+    concrete match; for a required tree ``root/**`` a positive must cover the
+    whole tree and no negative may overlap any file in it.
+    """
+    if paths is None and ignore is None:
+        return True
+    pos = [p for p in (paths or []) if not p.startswith("!")]
+    neg = [p[1:] for p in (paths or []) if p.startswith("!")] + list(ignore or [])
+    if not pos:
+        return False
+    positive = any(_pattern_covers(required, p) for p in pos)
+    if not positive:
+        return False
+    for n in neg:
+        if not any(ch in required for ch in "*?["):
+            if _path_covered(n, required):
+                return False
+        else:
+            m = re.match(r"^([^*?]+)/\*\*$", required)
+            if m and _tree_overlaps_negative(m.group(1), n):
+                return False
+    return True
+
+
 def _trigger_configs(path: Path) -> dict[str, tuple[list[str] | None, list[str] | None]]:
     """Parse the ``on:`` block into per-trigger path filters.
 
@@ -539,8 +669,10 @@ def validate_workflow_path_coverage(
     guards, and every enforcement workflow referenced by the registry.
 
     Coverage is the union across automatic triggers (push / pull_request): for
-    each required path at least one such trigger must match it via ``paths:``
-    and not negate it via ``paths-ignore:``. A trigger without any ``paths:``
+    each required path at least one such trigger must cover it — a positive
+    ``paths:`` match with no negative (``!``-prefixed or ``paths-ignore:``)
+    match, where a tree requirement ``root/**`` must be covered in full, not by
+    a flat or literal-string approximation. A trigger without any ``paths:``
     filters is treated as covering everything. Static filters only: runtime
     event shape is out of scope for this structural contract.
     """
@@ -552,14 +684,7 @@ def validate_workflow_path_coverage(
         r
         for r in required
         if not any(
-            (
-                paths is None and ignore is None
-            )
-            or (
-                paths is not None
-                and any(_path_covered(p, r) for p in paths)
-                and not any(_path_covered(p, r) for p in (ignore or []))
-            )
+            _trigger_covers(r, paths, ignore)
             for _t, (paths, ignore) in ((t, triggers[t]) for t in auto)
         )
     ]

@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "campaign": "bh2",
+  "scanned_files": 5,
+  "findings": [
+    {
+      "rule": "pipefail-missing",
+      "file": "/tmp/opencode/bh2-s1-fixtures/s1a_pipefail_after.sh",
+      "detail": "pipeline runs without pipefail provably active; pipeline 'false | cat >/dev/null' can mask failure of upstream 'false'"
+    },
+    {
+      "rule": "pipefail-missing",
+      "file": "/tmp/opencode/bh2-s1-fixtures/s1b_pipefail_disabled.sh",
+      "detail": "pipeline runs without pipefail provably active; pipeline 'false | cat >/dev/null' can mask failure of upstream 'false'"
+    },
+    {
+      "rule": "pipefail-missing",
+      "file": "/tmp/opencode/bh2-s1-fixtures/s1c_conditional_disable.sh",
+      "detail": "pipeline runs without pipefail provably active; pipeline 'false | cat >/dev/null' can mask failure of upstream 'false'"
+    },
+    {
+      "rule": "pipefail-missing",
+      "file": "/tmp/opencode/bh2-s1-fixtures/s1e_cond_enable_only.sh",
+      "detail": "pipeline runs without pipefail provably active; pipeline 'false | cat >/dev/null' can mask failure of upstream 'false'"
+    }
+  ]
+}

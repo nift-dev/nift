@@ -285,6 +285,13 @@ make target.
   adjacent forms (native multiline pipeline without backslash; same-line
   `printf 'SKIP...'; exit 0`; leading-pipe continuation; bare `exit` after SKIP;
   brace-group SKIP; `&&`-separated SKIP; `|&` pipeline) are all rejected (exit 1).
+- `bh2-s1-fixtures-report.json` — the round-5 pipefail-state fixtures (pipeline
+  before `set -o pipefail`; `set +o pipefail` before pipeline; conditional
+  disable inside `if`; conditional enable only) are rejected (exit 1), while a
+  dead-block disable stays GREEN.
+- `bh2-s2-path-coverage-red.json` — the round-5 path-coverage red demos: an
+  ordered `'!src/**'` inside `paths:` and a `src/*` flat pattern for required
+  `src/**` both fail the registry check.
 - `bh2-clean-report.json` — the scanner is clean on the real `tests/` + `scripts/`
   (42 files, 0 findings), and clean on the regression-suite contract scripts.
 
@@ -332,6 +339,24 @@ make target.
   adjacent to a SKIP message is a false green regardless of layout. `exit $?`,
   `exit` with an explicit non-zero code, or a SKIP message followed by later
   commands before the exit are deliberately outside the rule.
+- **Pipefail-state boundary (round 5):** state is tracked sequentially over
+  top-level statements with a conditional-block taint, not by a full shell
+  interpreter. Within-statement ordering (e.g. `set -o pipefail && pipeline` on
+  one `&&` chain), functions called at a different state than their definition
+  point, and `trap`/`shopt`/`env`-based option changes are approximated; every
+  approximation fails toward a false red, never a false green.
+- **Path-coverage boundary (round 5):** coverage is proven structurally over the
+  glob language, not by enumerating the current file tree: a tree requirement
+  `root/**` is satisfied only by a recursive-tree pattern rooted at `root` (or an
+  ancestor), and a negative pattern breaks coverage whenever its language
+  overlaps the required tree. GitHub's `branches:`/`tags:`/`types:` narrowing and
+  runtime `github.*`/`secrets` conditions remain out of scope for this static
+  contract.
+- **Outcome-flow boundary (round 5, reviewer observation):** a SKIP message
+  followed by an intervening successful statement and then `exit 0`
+  (`echo 'SKIP'; true; exit 0`) still escapes both shell and Python pattern
+  checks. That is explicitly carried into BH3 (runtime guard mutation /
+  outcome-flow), not silently implied closed by BH2's static scanner.
 
 ### BH2 reviewer round 1 — returned to implementer
 
@@ -480,13 +505,63 @@ the real trees stay GREEN (42 + 21 files, 0 findings); registry CI, the full
 3-repository audit, BH1 liveness, the CI-equivalent chain, and the time-family
 SKIP(2) red-runs all pass.
 
+### BH2 reviewer round 4 — returned to implementer
+
+ChatGPT attacked round-4 candidate `88f1158` in a detached worktree. R1 and R2
+were accepted as closed. Two new false-green families were reported (S1, S2),
+so BH2 remains OPEN:
+
+- **S1 (pipefail state, not presence):** `false | cat >/dev/null` followed later
+  by `set -o pipefail` scanned GREEN (the setting cannot protect an earlier
+  pipeline), and `set -o pipefail` followed by `set +o pipefail` then
+  `false | cat` scanned GREEN (pipefail explicitly disabled before the tested
+  pipeline). Both run green. The scanner reduced pipefail to "a live
+  `set ... pipefail` occurs somewhere", not "pipefail is active when this
+  pipeline executes".
+- **S2 (GitHub `paths:` negation + pattern superset):** adding `'!src/**'` after
+  `'src/**'` in both trigger `paths:` lists still passed the registry check,
+  even though GitHub excludes `src/**` from triggering. Separately, replacing
+  `src/**` with `src/*` also passed, because the checker matched the literal
+  string `"src/**"` (`*` matching the two `*` characters) rather than proving
+  the flat pattern covers the tree.
+
+### BH2 implementer round 5 — fixes
+
+- **S1:** `_shell_unsafe_pipelines` now tracks pipefail as sequential state over
+  the normalized statements, quote- and `$( )`-aware. `set -euo pipefail` /
+  `set -o pipefail` enable; `set +euo pipefail` / `set +o pipefail` disable;
+  only unconditional top-level `;`/newline statements are trusted. A pipefail
+  change inside a conditional block (`if`/`while`/`for`/`case`) or on the
+  right-hand side of `&&`/`||` may never execute, so it taints the enclosing
+  scope to "not provably active" (conservatively off). Subshells and function
+  definitions do not leak state out. Each pipeline is flagged unless pipefail is
+  provably active at its own execution point; statically-dead blocks are still
+  stripped first, so `if false; then set +o pipefail; fi` does not disable it.
+- **S2:** the path-coverage check now models GitHub's ordered negative `paths:`
+  semantics: a file triggers only if it matches a positive pattern and no
+  negative (`!`-prefixed or `paths-ignore:`) pattern. Required patterns are
+  compared as languages, not literal strings: a literal file is matched
+  concretely, and a tree requirement `root/**` is covered only by `**` or a
+  `proot/**` whose root is the same or an ancestor (so `src/*` no longer
+  satisfies `src/**`). A negative that overlaps any file of a required tree
+  (decided by a bounded prefix-matching automaton over the glob) breaks the
+  coverage contract.
+
+All five S1 fixtures are RED (pipefail-after, disabled-before, conditional
+disable, conditional enable; the dead-block disable stays GREEN as it should),
+retained at `docs/evidence/bh2/bh2-s1-fixtures-report.json`. Both S2 mutations
+(`!src/**` negation, `src/*` flat pattern) are demonstrated RED, retained at
+`docs/evidence/bh2/bh2-s2-path-coverage-red.json`. All prior fixtures stay RED
+and the real trees stay GREEN (42 + 21 files, 0 findings); registry CI, the
+full 3-repository audit, BH1 liveness, and the CI-equivalent chain all pass.
+
 ### BH2 handoff to reviewer
 
-**Round-4 candidate: `88f1158`** ("BH2 round 4: fix reviewer findings R1-R2
-on top of 7d2621b"). Reviewer attacks the exact round-4 commit in a separate
+**Round-5 candidate: this commit** ("BH2 round 5: fix reviewer findings S1-S2
+on top of 88f1158"). Reviewer attacks the exact round-5 commit in a separate
 clone/worktree and reports findings back; the implementer does not modify the
-tree during review. No changes are made to `7f8768b`, `c06fa33`, `7d2621b` or
-the round-4 candidate `88f1158` itself.
+tree during review. No changes are made to `7f8768b`, `c06fa33`, `7d2621b`,
+`88f1158` or the round-5 candidate itself.
 
 Review focus areas (attack each):
 

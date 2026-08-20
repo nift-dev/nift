@@ -6,7 +6,7 @@
     {
       "rule": "pipefail-missing",
       "file": "/tmp/opencode/bh2-reviewer-fixtures/rev3_pipe_cat.sh",
-      "detail": "uses pipelines but never enables pipefail; pipeline 'false | cat >/dev/null' can mask failure of upstream 'false'"
+      "detail": "pipeline runs without pipefail provably active; pipeline 'false | cat >/dev/null' can mask failure of upstream 'false'"
     },
     {
       "rule": "skip-as-pass",

@@ -6,17 +6,17 @@
     {
       "rule": "pipefail-missing",
       "file": "/tmp/opencode/bh2-r4-fixtures/r1_pipe_nobackslash.sh",
-      "detail": "uses pipelines but never enables pipefail; pipeline 'false |   cat >/dev/null' can mask failure of upstream 'false'"
+      "detail": "pipeline runs without pipefail provably active; pipeline 'false |   cat >/dev/null' can mask failure of upstream 'false'"
     },
     {
       "rule": "pipefail-missing",
       "file": "/tmp/opencode/bh2-r4-fixtures/r3_leading_pipe.sh",
-      "detail": "uses pipelines but never enables pipefail; pipeline 'false | cat >/dev/null' can mask failure of upstream 'false'"
+      "detail": "pipeline runs without pipefail provably active; pipeline 'false | cat >/dev/null' can mask failure of upstream 'false'"
     },
     {
       "rule": "pipefail-missing",
       "file": "/tmp/opencode/bh2-r4-fixtures/r7_pipe_amp.sh",
-      "detail": "uses pipelines but never enables pipefail; pipeline 'false |& cat >/dev/null' can mask failure of upstream 'false'"
+      "detail": "pipeline runs without pipefail provably active; pipeline 'false |& cat >/dev/null' can mask failure of upstream 'false'"
     },
     {
       "rule": "prereq-exit0",
