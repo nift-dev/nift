@@ -1,86 +1,107 @@
 {
   "schema_version": 1,
   "checkpoint": "8-filesystem-transaction",
-  "commit": "e26107435ee7f91a8d7f80d83f324ac3b953dd77",
+  "commit": "5deb974cd626596325fcf66bc594fd4e25eac222",
   "platform": "Linux-6.18.35-x86_64-with-glibc2.41",
   "cases": [
     {
       "case": "unreadable-content-preserves-last-good",
       "pass": true,
-      "elapsed_seconds": 0.009835,
+      "elapsed_seconds": 0.014644,
       "diagnostic": "content file is not readable"
     },
     {
       "case": "unreadable-template-preserves-last-good",
       "pass": true,
-      "elapsed_seconds": 0.008488
+      "elapsed_seconds": 0.008876
     },
     {
       "case": "unreadable-json-preserves-last-good",
       "pass": true,
-      "elapsed_seconds": 0.012251
+      "elapsed_seconds": 0.012407
     },
     {
       "case": "dangling-symlink-fails-safely",
       "pass": true,
-      "elapsed_seconds": 0.010149
+      "elapsed_seconds": 0.008246
     },
     {
       "case": "symlink-loop-does-not-hang",
       "pass": true,
-      "elapsed_seconds": 0.008315,
+      "elapsed_seconds": 0.008654,
       "exit": 1
     },
     {
       "case": "file-replaced-by-directory-fails-safely",
       "pass": true,
-      "elapsed_seconds": 0.010542,
+      "elapsed_seconds": 0.012573,
       "exit": 1,
-      "diagnostic_tail": "  json: failed to parse data/site.json (JSON file is not readable)\n    @json(\"data/site.json\", site)\n    ^"
+      "diagnostic_tail": "  json: failed to parse data/site.json (JSON file is not readable)\n    @json(\"data/site.json\", site)\n    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     },
     {
       "case": "readonly-output-directory-does-not-claim-success",
       "pass": true,
-      "elapsed_seconds": 0.008531
+      "elapsed_seconds": 0.006875
     },
     {
       "case": "metadata-write-failure-remains-stale-and-repairs",
       "pass": true,
-      "elapsed_seconds": 0.012114
+      "elapsed_seconds": 0.011335
     },
     {
       "case": "unicode-and-long-relative-path",
       "pass": true,
-      "elapsed_seconds": 0.00947,
+      "elapsed_seconds": 0.013992,
       "name_length": 349
     },
     {
       "case": "output-directory-replaced-by-file-fails-safely",
       "pass": true,
-      "elapsed_seconds": 0.01195
+      "elapsed_seconds": 0.011553
     },
     {
       "case": "readonly-state-directory-preserves-tracking",
       "pass": true,
-      "elapsed_seconds": 0.008321
+      "elapsed_seconds": 0.010619
     },
     {
       "case": "partial-write-limit-preserves-last-good",
       "pass": true,
-      "elapsed_seconds": 0.233364,
+      "elapsed_seconds": 0.278843,
       "exit": 1,
       "limit_bytes": 1048576
     },
     {
+      "case": "stale-temp-recovery-is-bounded-and-concurrency-safe",
+      "pass": true,
+      "elapsed_seconds": 0.008815,
+      "dead_owner_removed": true,
+      "live_owner_preserved": true
+    },
+    {
+      "case": "build-auto-recovers-mid-session-stale-temp-on-relevant-activity",
+      "pass": true,
+      "elapsed_seconds": 0.458304,
+      "idle_retained": true,
+      "next_relevant_pass_removed": true
+    },
+    {
+      "case": "identical-output-rebuild-refreshes-current-state",
+      "pass": true,
+      "elapsed_seconds": 0.033103,
+      "rendered_bytes_unchanged": true,
+      "status_clean": true
+    },
+    {
       "case": "sigkill-during-output-write-preserves-last-good",
       "pass": true,
-      "elapsed_seconds": 2.861049,
+      "elapsed_seconds": 3.286714,
       "kill_exit": -9,
       "stale_temp_observed": true,
       "bytes": 50331648
     }
   ],
-  "case_count": 13,
-  "elapsed_seconds": 3.232,
+  "case_count": 16,
+  "elapsed_seconds": 4.21,
   "pass": true
 }
