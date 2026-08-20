@@ -156,3 +156,63 @@ approval or availability.
 - Development executable advanced to `Nift v4.0.4` in `src/CLI.cpp`, `snap/snapcraft.yaml`.
 - Regression suite assertions updated; all 20 contract modules pass against the v4.0.4 binary.
 - Both `nift-dev/nift` and `nift-dev/nift-regression-suite` pushed to `main`.
+
+## v4.0.4 release report (2026-08-21)
+
+### Scope
+
+v4.0.4 is a bounded reliability release fixing the Checkpoint 8 transactional-writer
+performance regression and hardened transactional recovery semantics. It carries the
+recovery-epoch hardening (one directory scan per distinct touched parent per build pass),
+the quoted-ternary rendering fix, and the syntax-highlighted diagnostics from the
+v4.0.3→v4.0.4 development cycle.
+
+### Source and workflow
+
+- Tag: `v4.0.4` (annotated), pushed to `origin`.
+- Release commit: `29eb4d0` (`Refresh checkpoint 8 recovery evidence`), matching `main`.
+- GitHub Actions run: TBD after push; all artifact jobs and `installer-preflight` must
+  succeed before the GitHub release is created.
+
+### Release-candidate validation (performed at `29eb4d0`, clean build)
+
+- Full source build clean with the release compiler/options.
+- `nift version` reports `Nift v4.0.4`; `nift about` and `nift commands` correct;
+  unknown and help-like invocations fail with exit 1 and direct the user to
+  `nift commands`; no separate `nift help` command exists.
+- Contract suite: PASS (all modules).
+- Checkpoint 8 filesystem/transaction: 16/16 PASS (evidence refreshed at `29eb4d0`).
+- Checkpoint 7 incremental equivalence: 720/720 PASS.
+- Checkpoint 10 cross-platform corpus: 18/18 PASS.
+- Pagination incremental equivalence: 18/18 PASS.
+- Regression suite: 22/22 contract modules PASS against the candidate binary.
+- Performance guards: tracking 2k→10k ratio 4.63×, changed-output full build 1k→4k
+  ratio 3.48×, recovery-epoch scan-bound guard PASS; retained 10k benchmark
+  (full 0.116 s, no-op 0.074 s, single-page 0.083 s, shared-template 0.148 s medians);
+  memory peaks ≤ 9 920 KiB (guard ≤ 16 384 KiB). Ratios vary with machine load
+  (repeated runs measured tracking up to 6.09×); all guards pass and the retained
+  timings sit in the historical v1.0.41 checkpoint range.
+- Website built with the candidate binary: 61/61 pages, clean.
+- No generated/debug residue in the repository.
+
+### Archives and checksums
+
+- `nift-4.0.4-linux-x86_64.tar.gz`
+- `nift-4.0.4-macos-arm64.tar.gz`
+- `nift-4.0.4-macos-x86_64.tar.gz`
+- `nift-4.0.4-windows-x86_64.zip`
+- `SHA256SUMS` (verified independently after publication; record exact checksums below).
+
+### Package publication
+
+- **Snap**: `snap.yml` called after the GitHub release; `SNAPCRAFT_STORE_CREDENTIALS`
+  is configured and direct publication to `stable` is intended for all supported
+  architectures.
+- **Chocolatey Community**: `chocolatey.yml` called after the GitHub release;
+  `CHOCOLATEY_API_KEY` is configured and the `.nupkg` is pushed. Store:
+  https://community.chocolatey.org/packages/nift
+- **Homebrew**: Formula built and tested on macOS arm64 and Linux x86_64 by the
+  workflow; Homebrew's automatic bump service picks up the release on its own
+  schedule; no manual PR.
+- **Flathub**: External `flathub/cc.nift.nsm` manifest update required — pending
+  external PR.
