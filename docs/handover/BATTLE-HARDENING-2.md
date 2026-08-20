@@ -482,11 +482,11 @@ SKIP(2) red-runs all pass.
 
 ### BH2 handoff to reviewer
 
-**Round-4 candidate: this commit** ("BH2 round 4: fix reviewer findings R1-R2
+**Round-4 candidate: `88f1158`** ("BH2 round 4: fix reviewer findings R1-R2
 on top of 7d2621b"). Reviewer attacks the exact round-4 commit in a separate
 clone/worktree and reports findings back; the implementer does not modify the
 tree during review. No changes are made to `7f8768b`, `c06fa33`, `7d2621b` or
-the round-4 candidate itself.
+the round-4 candidate `88f1158` itself.
 
 Review focus areas (attack each):
 
