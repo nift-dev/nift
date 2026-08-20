@@ -43,13 +43,16 @@ struct BuildError {
     std::size_t line = 0;
     std::string message;
     std::size_t column = 0;
+    std::size_t source_length = 1;
     std::string source_line;
 
     BuildError() = default;
     BuildError(std::string tracked, std::filesystem::path source, std::size_t source_line_number,
-               std::string error_message, std::size_t source_column = 0, std::string source_text = {})
+               std::string error_message, std::size_t source_column = 0, std::string source_text = {},
+               std::size_t source_span_length = 1)
         : tracked_name(std::move(tracked)), source_file(std::move(source)), line(source_line_number),
-          message(std::move(error_message)), column(source_column), source_line(std::move(source_text)) {}
+          message(std::move(error_message)), column(source_column), source_length(source_span_length),
+          source_line(std::move(source_text)) {}
 };
 
 struct RenderResult {

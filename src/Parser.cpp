@@ -276,6 +276,20 @@ void Parser::fail(const fs::path& source_path, const std::string& source, std::s
     }
 
     result_.error.column = offset >= line_start ? offset - line_start + 1 : 1;
+    result_.error.source_length = 1;
+    if (offset < source.size() && source[offset] == '@') {
+        std::size_t name_end = offset + 1;
+        while (name_end < source.size() && source[name_end] >= 'a' && source[name_end] <= 'z') ++name_end;
+        std::size_t span_end = name_end;
+        if (name_end < source.size() && source[name_end] == '(') {
+            std::size_t close = 0;
+            if (find_balanced(source, name_end, '(', ')', close)) span_end = close + 1;
+        }
+        result_.error.source_length = std::max<std::size_t>(1, span_end - offset);
+    } else if (offset + 1 < source.size() && source[offset] == '$' && source[offset + 1] == '[') {
+        const auto close = source.find(']', offset + 2);
+        if (close != std::string::npos) result_.error.source_length = close + 1 - offset;
+    }
     const std::size_t line_end = source.find('\n', line_start);
     result_.error.source_line = source.substr(
         line_start,

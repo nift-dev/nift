@@ -60,6 +60,16 @@ test-json-schema:
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/json_schema_smoke.cpp src/JsonSchema.cpp -o "$(JSON_SCHEMA_TEST)"
 	"$(JSON_SCHEMA_TEST)"
 
+$(TEST_DIR)/nift-console-smoke$(EXEEXT): tests/console_smoke.cpp src/Console.h
+	mkdir -p "$(TEST_DIR)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/console_smoke.cpp -o "$@"
+
+test-console: $(TEST_DIR)/nift-console-smoke$(EXEEXT)
+	"$(TEST_DIR)/nift-console-smoke$(EXEEXT)"
+
+test-diagnostics: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/diagnostics_smoke.sh
+
 test-minify:
 	$(MAKE) -C minifypp test-smoke
 
@@ -126,7 +136,7 @@ clean:
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
-.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-minify test-json-schema-integration test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
+.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-diagnostics test-minify test-json-schema-integration test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
 
 
 test-cross-feature: $(TARGET)
