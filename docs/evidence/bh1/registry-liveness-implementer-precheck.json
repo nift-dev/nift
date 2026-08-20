@@ -1,0 +1,46 @@
+{
+  "checkpoint": "BH1",
+  "kind": "implementer-precheck",
+  "candidate_parent_commit": "d0ffe05bfd734903e22e9350b3122861841c47f1",
+  "registry_sha256": "d80b6b83afba50ce6e80dd0e3367910b42e6033b5487dc1a3e1303a7d8e8b1f1",
+  "checker_sha256": "7449056160653b53cbfc174f4926fd73a28c61ed471bd705051ecf4758a2d024",
+  "status": "PASS",
+  "note": "Independent reviewer liveness evidence is still required before BH1 closes.",
+  "cases": [
+    {
+      "case": "missing-retained-evidence",
+      "expected_diagnostic_fragment": "evidence_refs-missing",
+      "checker_exit": 1,
+      "observed": "FAIL: incremental.clean-build-equivalence:evidence_refs-missing: nift:docs/evidence/checkpoint-7/DOES-NOT-EXIST.json",
+      "red_as_expected": true
+    },
+    {
+      "case": "nonexistent-ci-job",
+      "expected_diagnostic_fragment": "workflow-job-missing",
+      "checker_exit": 1,
+      "observed": "FAIL: workflow-job-missing: platform.portable-equivalence: .github/workflows/checkpoint-10-cross-platform.yml#definitely-not-a-real-job",
+      "red_as_expected": true
+    },
+    {
+      "case": "duplicate-guarantee-id",
+      "expected_diagnostic_fragment": "duplicate-id",
+      "checker_exit": 1,
+      "observed": "FAIL: duplicate-id: incremental.clean-build-equivalence",
+      "red_as_expected": true
+    },
+    {
+      "case": "broken-public-claim-needle",
+      "expected_diagnostic_fragment": "needle-not-found",
+      "checker_exit": 1,
+      "observed": "FAIL: battle.incremental-720:source-needle-not-found: website:content/docs/battle-tested.html: 'THIS CLAIM TEXT DOES NOT EXIST'",
+      "red_as_expected": true
+    },
+    {
+      "case": "stale-public-claim-surface-hash",
+      "expected_diagnostic_fragment": "public-claim-surface-stale",
+      "checker_exit": 1,
+      "observed": "FAIL: public-claim-surface-stale: website:content/docs/battle-tested.html: expected 0000000000000000000000000000000000000000000000000000000000000000, observed de8d5856ec2b26ef38f2e213996beb82733c15d1d0312c3de857e73966007fe9",
+      "red_as_expected": true
+    }
+  ]
+}

@@ -122,6 +122,19 @@ test-contracts: $(TARGET)
 test-init-targets: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/init_targets_smoke.sh
 
+
+test-guarantee-registry:
+	python3 scripts/check_guarantee_registry.py
+
+BH1_WEBSITE_ROOT ?= ../nift-dev.github.io
+BH1_REGRESSION_ROOT ?= ../nift-regression-suite
+
+bh1-guarantee-registry:
+	python3 scripts/check_guarantee_registry.py --website-root "$(BH1_WEBSITE_ROOT)" --regression-root "$(BH1_REGRESSION_ROOT)"
+	python3 scripts/bh1_registry_liveness.py --website-root "$(BH1_WEBSITE_ROOT)" --regression-root "$(BH1_REGRESSION_ROOT)"
+
+.PHONY: test-guarantee-registry bh1-guarantee-registry
+
 install: $(TARGET)
 	mkdir -p "$(DESTDIR)$(BINDIR)"
 	$(INSTALL_PROGRAM) "$(TARGET)" "$(DESTDIR)$(BINDIR)/$(TARGET)"

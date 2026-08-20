@@ -379,3 +379,11 @@ The cross-platform init-target smoke test must not hard-code the last published 
 - Real OpenCode/DeepSeek website dogfooding exposed a lazy-ternary rendering defect: a selected quoted string branch such as `$[active ? ' active' : '']` was reparsed purely as Nift source and emitted its quote delimiters into HTML attributes.
 - Quoted scalar string branches now render their decoded scalar value (without source delimiters). Non-literal selected branches are still parsed lazily as Nift source, preserving selected `@input(...)`/other directive behavior and keeping unselected dependency/requirement side effects inert.
 - `tests/control_flow_smoke.sh` and the independent `nift-regression-suite/contract/control_flow_smoke.sh` protect full/shorthand true/false selection, single/double quotes, empty strings, escaped quotes, nested ternaries, inline attribute use, quoted text that resembles a directive, selected directives and unselected dependency side effects. Adjacent direct `$[...]`, `@if`, parameter-interpolation and collection-expression paths already use the scalar evaluator and were rerun as regression constraints.
+
+## Battle Hardening campaign II — BH1 guarantee registry (2026-08-21)
+
+The post-v4.0.4 hardening campaign now attacks **guarantee durability** rather than restarting generic hardening from zero. The provisional campaign contract and BH1–BH10 queue live in `docs/handover/BATTLE-HARDENING-2.md`.
+
+BH1 adds the small machine-checked `docs/guarantees/registry.json` plus `scripts/check_guarantee_registry.py`. The registry maps significant guarantees/public reliability claims to evidence class, enforcement, platform scope, limitations and test-of-test status; existing guards without a demonstrated campaign red-run are marked `UNPROVEN` rather than treated as invalid. Known Battle Tested count, `ai-context.txt`, memory-SKIP and CI-enforcement discrepancies are seeded explicitly instead of being hidden by the inventory.
+
+ChatGPT owns the BH1 implementation; DeepSeek owns independent review and reviewer-authored liveness proof. Until that review lands, the registry checker itself remains `PENDING_REVIEWER` and BH1 is not complete. Use `make test-guarantee-registry` for the repository-local structural check or `make bh1-guarantee-registry` when the sibling website/regression repositories are available.
