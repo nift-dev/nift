@@ -285,5 +285,38 @@ make target.
   semantics. A future guard that skips at runtime (after passing the static scan)
   is a BH3 mutation target.
 
+### BH2 handoff to reviewer
+
+**Exact candidate to attack: `7f8768b`** ("BH2: test integrity and enforcement
+architecture"). Implementer does **not** modify the working tree after this commit.
+Reviewer works from the exact commit in a separate clone/worktree, attacks with
+reviewer-authored fixtures, and reports findings back rather than silently fixing
+them. No changes are made to `7f8768b` during review.
+
+Review focus areas (attack each):
+
+- **Exit-code contract:** inject a guard that prints SKIP then `exit 0`, or
+  `SystemExit(0)` after `print("SKIP...")`, and confirm the scanner rejects it
+  (`skip-as-pass`), while legitimate `finish(2)`-style guards pass the scan.
+- **`/usr/bin/time` family:** with GNU time absent, each fixed guard must exit 2
+  (not 0, not a traceback). With a too-small `--time-bin`, `memory_10k_benchmark.py`
+  and `memory_safety.py` must go red rather than silently green.
+- **Timeout classification:** a hung Nift subprocess in checkpoint 3/4/6/7 must
+  surface as exit 124 with an outcome line, not an unbounded wait or raw traceback.
+- **Scanner false-positives:** confirm the scanner does not reject the project's
+  own guards — including the comment-embedded `set -o pipefail` pattern in
+  `tests/contracts_smoke.sh`-style scripts — and that it flags a pipelined test
+  missing pipefail (`pipefail-missing`).
+- **`CROSS_PLATFORM_GATED` breadth:** a workflow with a trigger but no concrete
+  `strategy.matrix.include` runner for every declared platform must fail the
+  registry check; the real `checkpoint-10-cross-platform.yml` and `init-targets.yml`
+  must pass for {linux, macos, windows}.
+- **Enforcement truth:** every CI_GATED/SCHEDULED registry ref must point at a
+  job that actually exists in the cited workflow and really runs the referenced
+  guard; the checker must reject a workflow/job ref that never exists.
+- **New workflow validity:** `test-integrity.yml` and `nightly-deep.yml` must be
+  valid YAML with sensible triggers; a `core-memory` job that does not actually run
+  checkpoint 3 against a sanitized build is a defect.
+
 The next active checkpoint is **BH3 — Guard mutation and liveness**, with the
 remaining queue re-planned after BH2 review.
