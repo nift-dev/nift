@@ -25,7 +25,7 @@ The operating rules are:
 
 The queue is provisional and must be reconsidered after every checkpoint:
 
-1. **BH1 — Guarantee registry + baseline map** — ChatGPT implements; DeepSeek reviews/attacks.
+1. **BH1 — Guarantee registry + baseline map — CLOSED / VERIFIED** — ChatGPT implemented; DeepSeek independently reviewed/attacked and signed off candidate `8419cec`.
 2. **BH2 — Test integrity + enforcement architecture** — DeepSeek implements; ChatGPT reviews/attacks.
 3. **BH3 — Curated guard mutation / test-of-test** — roles reverse per guard.
 4. **BH4 — Incremental/state-transition adversarial II** — DeepSeek implements; ChatGPT reviews/attacks.
@@ -94,13 +94,7 @@ BH2/BH6/BH10 own those families unless a finding is severe enough to jump the qu
 
 ### BH1 completion state
 
-The implementation-side structural checker and self-corruption precheck may be
-committed by ChatGPT. Final BH1 status remains **PENDING REVIEWER** until DeepSeek:
-
-1. attacks the exact committed candidate independently;
-2. demonstrates the checker red against a reviewer-authored representative defect;
-3. retains that red-run evidence; and
-4. either signs off or returns a counterexample for another implementation round.
+**CLOSED / VERIFIED.** DeepSeek independently attacked exact round-3 candidate `8419cec`, demonstrated the checker red against 12 reviewer-authored corruption cases, retained the reconciled reviewer evidence at `docs/evidence/bh1/registry-reviewer-round3.json`, verified the clean registry remained green, and signed off BH1. The structural checker meta-guard is therefore promoted to `VERIFIED_GUARD`.
 
 ### BH1 reviewer round 1 — returned to implementer
 
@@ -174,6 +168,31 @@ The round-3 implementer liveness artifact is
 cases, including direct P1–P4 reproductions, go red. The full sibling-workspace
 structural check is green.
 
-BH1 remains **OPEN / PENDING REVIEWER ROUND 3**. DeepSeek must independently
-attack the exact round-3 commit and provide/retain its reviewer liveness evidence;
-the implementer does not self-close the checkpoint.
+BH1 reviewer round 3 subsequently attacked exact candidate `8419cec` and signed off.
+The independent battery put all 12 reviewer-authored corruptions red while the clean
+registry stayed green. DeepSeek also independently reconciled the retained campaign
+figures used by the registry: 16 Checkpoint-8 filesystem cases, 720 Checkpoint-7
+incremental-vs-clean comparisons, 18 Checkpoint-10 portable contracts, 1,217
+Checkpoint-9 parser/resource cases, and 19 Checkpoint-6 Valgrind invocations.
+
+### BH1 final reconciliation — CLOSED / VERIFIED
+
+BH1 is complete. Reviewer evidence is retained in
+`docs/evidence/bh1/registry-reviewer-round3.json`, and the registry structural checker
+meta-guard is promoted to `VERIFIED_GUARD`. No checker implementation was changed
+during closure reconciliation.
+
+Three residual boundaries are deliberately carried forward rather than hidden:
+
+- **BH2:** workflow-trigger parsing is intentionally structural and currently accepts
+  the repository's ordinary block-style YAML subset. Unsupported valid YAML forms fail
+  closed (false red), not green; BH2 owns CI parser/enforcement robustness.
+- **BH2:** `CROSS_PLATFORM_GATED` proves a referenced workflow has an automatic trigger,
+  but BH1 does not prove that the referenced job really spans Linux/macOS/Windows. BH2
+  owns deeper workflow/job/path/condition enforcement semantics.
+- **BH3:** `VERIFIED_GUARD` requires retained red-run evidence structurally; proving the
+  artifact is semantically the matching guard mutation remains BH3 test-of-test work.
+
+The next active checkpoint is **BH2 — Test integrity + enforcement architecture**,
+implemented by DeepSeek and independently attacked by ChatGPT. Re-plan the remaining
+queue after BH2 rather than treating the list above as immutable.

@@ -1153,8 +1153,12 @@
         "repo": "nift",
         "path": "scripts/check_guarantee_registry.py"
       },
-      "test_of_test": "PENDING_REVIEWER",
-      "note": "BH1 implementer self-checks representative corruptions; DeepSeek must independently attack the committed checker and supply the reviewer-authored liveness red-run before BH1 is closed."
+      "test_of_test": "VERIFIED_GUARD",
+      "note": "BH1 closed after DeepSeek independently attacked exact candidate 8419cec: 12 reviewer-authored corruption cases went red and the clean registry stayed green. Residual CI-semantic depth is explicitly deferred to BH2; guard/evidence semantic binding is BH3.",
+      "red_run_evidence": {
+        "repo": "nift",
+        "path": "docs/evidence/bh1/registry-reviewer-round3.json"
+      }
     }
   ],
   "public_claim_surfaces": [

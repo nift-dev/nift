@@ -1,0 +1,99 @@
+{
+  "checkpoint": "BH1",
+  "kind": "independent-reviewer-round-3",
+  "reviewer": "DeepSeek V4 Flash Free",
+  "candidate_commit": "8419cec",
+  "candidate_parent": "6ffc0b0",
+  "verdict": "CLOSED_VERIFIED",
+  "status": "PASS",
+  "summary": "Independent round-3 review signed off BH1 after all prior findings were closed. Twelve reviewer-authored corruption cases went red and the clean registry remained green.",
+  "cases": [
+    {
+      "case": "missing-discrepancy-needle",
+      "expected": "RED",
+      "checker_exit": 1
+    },
+    {
+      "case": "missing-enforcement-workflow",
+      "expected": "RED",
+      "checker_exit": 1
+    },
+    {
+      "case": "duplicate-public-claim-id",
+      "expected": "RED",
+      "checker_exit": 1
+    },
+    {
+      "case": "stale-surface-hash",
+      "expected": "RED",
+      "checker_exit": 1
+    },
+    {
+      "case": "missing-retained-evidence",
+      "expected": "RED",
+      "checker_exit": 1
+    },
+    {
+      "case": "nonexistent-ci-job",
+      "expected": "RED",
+      "checker_exit": 1
+    },
+    {
+      "case": "ci-gated-dispatch-only",
+      "expected": "RED",
+      "checker_exit": 1
+    },
+    {
+      "case": "manual-unsupported-command",
+      "expected": "RED",
+      "checker_exit": 1
+    },
+    {
+      "case": "claim-source-unpinned",
+      "expected": "RED",
+      "checker_exit": 1
+    },
+    {
+      "case": "retained-but-guard-script",
+      "expected": "RED",
+      "checker_exit": 1
+    },
+    {
+      "case": "verified-guard-no-evidence",
+      "expected": "RED",
+      "checker_exit": 1
+    },
+    {
+      "case": "scheduled-no-trigger",
+      "expected": "RED",
+      "checker_exit": 1
+    },
+    {
+      "case": "clean-registry",
+      "expected": "GREEN",
+      "checker_exit": 0
+    }
+  ],
+  "independent_evidence_checks": {
+    "checkpoint_8_filesystem_cases": 16,
+    "checkpoint_7_incremental_clean_comparisons": 720,
+    "checkpoint_10_portable_contracts": 18,
+    "checkpoint_9_parser_resource_cases": 1217,
+    "checkpoint_6_valgrind_invocations": 19
+  },
+  "deferred_boundaries": [
+    {
+      "owner": "BH2",
+      "item": "workflow trigger parser supports the repository block-style YAML subset and fails closed on unsupported valid forms"
+    },
+    {
+      "owner": "BH2",
+      "item": "CROSS_PLATFORM_GATED does not yet prove that the referenced workflow/job actually spans multiple operating systems"
+    },
+    {
+      "owner": "BH3",
+      "item": "VERIFIED_GUARD retained evidence existence is structural; semantic proof that the artifact is the matching red-run remains test-of-test work"
+    }
+  ],
+  "provenance": "Transcribed from the independent reviewer round-3 session supplied by Nick during checkpoint reconciliation. The reviewer did not edit the authoritative workspace."
+}
