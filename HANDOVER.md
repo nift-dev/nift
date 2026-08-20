@@ -371,3 +371,8 @@ calling the Nift work complete.
 The cross-platform init-target smoke test must not hard-code the last published Nift release version. Development `main` advances immediately after a release, so a release-number assertion becomes stale by design.
 
 `scripts/init_targets_cross_platform.py` now reads `nift --version` from the binary under test and requires generated platform metadata (currently the Amplify deploy manifest's `framework.version`) to match that binary version. Release/tag workflows may separately assert that the binary version matches the release tag.
+## v4.0.4 ternary string-literal regression follow-up (2026-08-20)
+
+- Real OpenCode/DeepSeek website dogfooding exposed a lazy-ternary rendering defect: a selected quoted string branch such as `$[active ? ' active' : '']` was reparsed purely as Nift source and emitted its quote delimiters into HTML attributes.
+- Quoted scalar string branches now render their decoded scalar value (without source delimiters). Non-literal selected branches are still parsed lazily as Nift source, preserving selected `@input(...)`/other directive behavior and keeping unselected dependency/requirement side effects inert.
+- `tests/control_flow_smoke.sh` and the independent `nift-regression-suite/contract/control_flow_smoke.sh` protect full/shorthand true/false selection, single/double quotes, empty strings, escaped quotes, nested ternaries, inline attribute use, quoted text that resembles a directive, selected directives and unselected dependency side effects. Adjacent direct `$[...]`, `@if`, parameter-interpolation and collection-expression paths already use the scalar evaluator and were rerun as regression constraints.

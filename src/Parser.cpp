@@ -1493,9 +1493,25 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                         break;
                     }
                     const std::string& selected = condition_value ? when_true : when_false;
-                    const auto nested = parse(selected, source_path, depth + 1);
-                    if (!nested.ok) break;
-                    output += nested.output;
+
+                    // Ternary branches are normally parsed lazily as Nift source so a
+                    // selected branch can contain directives such as @input(...). A
+                    // branch that is itself a quoted scalar literal is different: the
+                    // quotes delimit the value and must not become rendered output.
+                    // This keeps constructs such as class="x$[active ? ' active' : '']"
+                    // consistent with the scalar-value semantics used elsewhere in
+                    // $[...] while preserving lazy source parsing for non-literal
+                    // branches.
+                    json::Document selected_literal;
+                    std::string selected_literal_error;
+                    if (scalar_literal(trim_copy(selected), selected_literal, selected_literal_error) &&
+                        selected_literal.is_string()) {
+                        output += selected_literal.string;
+                    } else {
+                        const auto nested = parse(selected, source_path, depth + 1);
+                        if (!nested.ok) break;
+                        output += nested.output;
+                    }
                     i = end + 1;
                     continue;
                 }

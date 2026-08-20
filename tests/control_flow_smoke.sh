@@ -597,6 +597,66 @@ if grep -F 'short-missing.txt' .nift/public/index.info.json >/dev/null; then ech
 grep -F 'NESTED' public/index.html >/dev/null
 if grep -F 'missing-dep.txt' .nift/public/index.info.json >/dev/null; then echo 'unselected ternary branch registered dependency' >&2; exit 1; fi
 
+# Ternary string-literal branches render their scalar value, not their source
+# delimiters. Keep this separate from the lazy-source tests above: quoted
+# literals must lose their quotes while non-literal selected branches still
+# retain normal Nift parsing semantics.
+D_TERNARY_STR="$TMP/ternary-string-literals"
+make_project "$D_TERNARY_STR"
+cat >"$D_TERNARY_STR/data/site.json" <<'JSON'
+{"yes":true,"no":false,"kind":"a"}
+JSON
+cat >"$D_TERNARY_STR/templates/selected.html" <<'EOF_TERNARY_STR'
+DIRECTIVE-$[title]
+EOF_TERNARY_STR
+cat >"$D_TERNARY_STR/templates/template.html" <<'EOF_TERNARY_STR'
+@json('data/site.json', d)
+SINGLE_TRUE=[$[d.yes ? 'yes' : 'no']]
+SINGLE_FALSE=[$[d.no ? 'yes' : 'no']]
+DOUBLE_TRUE=[$[d.yes ? "double" : "wrong"]]
+EMPTY_TRUE=[$[d.yes ? '' : 'wrong']]
+EMPTY_FALSE=[$[d.no ? 'wrong' : ""]]
+SHORTHAND_TRUE=[$[d.yes ? 'short']]
+SHORTHAND_FALSE=[$[d.no ? 'short']]
+ESCAPED=[$[d.yes ? "it's fine" : 'wrong']]
+ESCAPED_QUOTE=[$[d.yes ? "say \"hi\"" : 'wrong']]
+DIRECT=[$['direct string']]
+<p class="card$[d.yes ? ' active' : '']">active</p>
+<p class="card$[d.no ? ' active' : '']">inactive</p>
+NESTED=[$[d.yes ? $[d.kind == 'a' ? 'nested-value' : 'wrong-inner'] : 'wrong-outer']]
+LAZY=[$[d.yes ? @input('templates/selected.html') : @dep('missing-selected-dep.txt')]]
+LITERAL_DIRECTIVE=[$[d.yes ? '@input(\'missing-literal.html\')' : 'wrong']]
+SOURCE_BRANCH=[$[d.yes ? <em>'quoted source stays source'</em> : wrong]]
+@content
+EOF_TERNARY_STR
+( cd "$D_TERNARY_STR" && "$NIFT_BIN" build-all >/dev/null )
+TERNARY_STR_OUT="$D_TERNARY_STR/public/index.html"
+grep -Fq 'SINGLE_TRUE=[yes]' "$TERNARY_STR_OUT"
+grep -Fq 'SINGLE_FALSE=[no]' "$TERNARY_STR_OUT"
+grep -Fq 'DOUBLE_TRUE=[double]' "$TERNARY_STR_OUT"
+grep -Fq 'EMPTY_TRUE=[]' "$TERNARY_STR_OUT"
+grep -Fq 'EMPTY_FALSE=[]' "$TERNARY_STR_OUT"
+grep -Fq 'SHORTHAND_TRUE=[short]' "$TERNARY_STR_OUT"
+grep -Fq 'SHORTHAND_FALSE=[]' "$TERNARY_STR_OUT"
+grep -Fq "ESCAPED=[it's fine]" "$TERNARY_STR_OUT"
+grep -Fq 'ESCAPED_QUOTE=[say "hi"]' "$TERNARY_STR_OUT"
+grep -Fq 'DIRECT=[direct string]' "$TERNARY_STR_OUT"
+grep -Fq '<p class="card active">active</p>' "$TERNARY_STR_OUT"
+grep -Fq '<p class="card">inactive</p>' "$TERNARY_STR_OUT"
+grep -Fq 'NESTED=[ nested-value ]' "$TERNARY_STR_OUT"
+grep -Fq 'DIRECTIVE=[$[title]]' "$TERNARY_STR_OUT" && { echo 'selected directive did not execute' >&2; exit 1; } || true
+grep -Fq 'DIRECTIVE-Control Flow' "$TERNARY_STR_OUT"
+grep -Fq "LITERAL_DIRECTIVE=[@input('missing-literal.html')]" "$TERNARY_STR_OUT"
+grep -Fq "SOURCE_BRANCH=[ <em>'quoted source stays source'</em> ]" "$TERNARY_STR_OUT" || grep -Fq "<em>'quoted source stays source'</em>" "$TERNARY_STR_OUT"
+if grep -Fq 'missing-selected-dep.txt' "$D_TERNARY_STR/.nift/public/index.info.json"; then
+  echo 'unselected ternary source branch registered dependency' >&2; exit 1
+fi
+for leaked in "'yes'" "'no'" "'double'" "'short'" "'nested-value'"; do
+  if grep -Fq "$leaked" "$TERNARY_STR_OUT"; then
+    echo "ternary string literal leaked source quotes into rendered output: $leaked" >&2; exit 1
+  fi
+done
+
 # Ternary delimiter scanning ignores quoted ?/:/] characters and malformed
 # expressions fail in a controlled way.
 cd "$TMP"
@@ -639,8 +699,9 @@ grep -F '14|20|3|2.5|1' "$D_EXPR/public/index.html" >/dev/null
 grep -F 'COND' "$D_EXPR/public/index.html" >/dev/null
 grep -F 'SHORT' "$D_EXPR/public/index.html" >/dev/null
 if grep -F 'BAD' "$D_EXPR/public/index.html" >/dev/null; then echo 'expression short circuit failed' >&2; exit 1; fi
-grep -F 'true|true' "$D_EXPR/public/index.html" >/dev/null
-grep -F 'YES' "$D_EXPR/public/index.html" >/dev/null
+grep -Fq 'true|true' "$D_EXPR/public/index.html"
+grep -Fq 'YES' "$D_EXPR/public/index.html"
+if grep -Fq "'YES'" "$D_EXPR/public/index.html"; then echo 'expression ternary leaked string delimiters' >&2; exit 1; fi
 
 # Invalid arithmetic fails cleanly.
 for expr in '1 / 0' '1 % 0' '1.5 % 1' "'x' + 1"; do

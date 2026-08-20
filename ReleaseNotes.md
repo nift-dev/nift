@@ -6,6 +6,7 @@
 Development version following the public v4.0.3 release.
 
 - Improved parser/build diagnostics: source excerpts now expand tabs deterministically before marker placement, underline the full offending Nift expression/call, syntax-highlight the complete current `@function` surface (including `@content`, `@input`, `@pathto`, control-flow, collection and data helpers), colour `$[...]` expressions and quoted Nift values, and accent the offending syntax/value when stderr is a TTY. The highlighter distinguishes Nift functions from unrelated at-sign syntax such as CSS `@media`; redirected/plain diagnostics remain ANSI-free.
+- Fixed lazy ternary rendering of quoted string-literal branches. Expressions such as `class="card$[active ? ' active' : '']"` now render the selected string value without leaking its source quote delimiters, while non-literal selected branches still retain lazy Nift-source semantics and may contain directives such as `@input(...)`. Added mirrored source-tree and independent regression coverage for full/shorthand ternaries, true/false branches, empty strings, both quote styles, escaped quotes, nested ternaries, attribute embedding, literal directive text, selected directives and unselected dependency side effects.
 
 ## v4.0.3
 
