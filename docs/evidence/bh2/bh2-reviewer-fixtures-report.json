@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "campaign": "bh2",
+  "scanned_files": 4,
+  "findings": [
+    {
+      "rule": "pipefail-missing",
+      "file": "/tmp/opencode/bh2-reviewer-fixtures/rev3_pipe_cat.sh",
+      "detail": "uses pipelines but never enables pipefail; pipeline 'false | cat >/dev/null' can mask failure of upstream 'false'"
+    },
+    {
+      "rule": "skip-as-pass",
+      "file": "/tmp/opencode/bh2-reviewer-fixtures/rev1_skip_exit.py",
+      "detail": "SKIP message immediately followed by an exit-0 call (silent green)"
+    },
+    {
+      "rule": "swallowed-returncode",
+      "file": "/tmp/opencode/bh2-reviewer-fixtures/rev2_dead_rc.py",
+      "detail": "subprocess result 'p' never controls a failure path (no check=True, no gating use of its returncode)"
+    },
+    {
+      "rule": "swallowed-returncode",
+      "file": "/tmp/opencode/bh2-reviewer-fixtures/rev4_swallow_plain.py",
+      "detail": "subprocess result 'p' never controls a failure path (no check=True, no gating use of its returncode)"
+    }
+  ]
+}

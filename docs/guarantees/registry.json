@@ -1202,10 +1202,14 @@
         "path": "scripts/test_integrity_check.py"
       },
       "test_of_test": "VERIFIED_GUARD",
-      "note": "BH2: static scanner demonstrated RED against 6 injected false-green/vacuous fixtures across all five families (skip-as-pass, prereq-exit0, pipefail-missing, swallowed-returncode, vacuous-pass) and GREEN on the real tests/ + scripts/ trees. Static and pattern-based; runtime guard mutation is BH3.",
+      "note": "BH2: static scanner demonstrated RED against 6 injected false-green/vacuous fixtures across all five families and against 4 independent reviewer fixtures (sys.exit(0) skip, dead-code returncode, arbitrary-command pipeline, plain swallowed returncode); GREEN on the real tests/ + scripts/ trees (42 files). Static and pattern-based; runtime guard mutation is BH3.",
       "red_run_evidence": {
         "repo": "nift",
         "path": "docs/evidence/bh2/bh2-fixtures-report.json"
+      },
+      "reviewer_red_run_evidence": {
+        "repo": "nift",
+        "path": "docs/evidence/bh2/bh2-reviewer-fixtures-report.json"
       }
     }
   ],

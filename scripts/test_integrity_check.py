@@ -9,13 +9,24 @@ misbehaviour that a guard author could commit.
 
 Families (rule ids):
   skip-as-pass        a test prints/echoes a SKIP message and then exits 0
+                      (via SystemExit(0), sys.exit(0), exit(0) or shell exit 0,
+                      on the same line or the next statement)
   prereq-exit0        a missing-tool guard exits 0 instead of a non-green code
-  pipefail-missing    a shell test uses a pipeline whose status matters but
-                      never enables pipefail
-  swallowed-returncode a python test runs a subprocess without check=True and
-                      never inspects the result's returncode
+  pipefail-missing    a shell test pipelines a command whose failure can be
+                      masked, and never enables pipefail (a failing upstream
+                      segment must not be able to hide behind a green outcome)
+  swallowed-returncode a python test runs a subprocess (run/call) without
+                      check=True and never lets the result's returncode control
+                      a conditional, assertion, raise or exit path
   vacuous-pass        a guard can only ever print PASS (no subprocess, no
                       assertion construct), i.e. it tests nothing
+
+The swallowed-returncode rule is deliberately conservative in its idea of
+"controls the outcome": it strips statically-dead blocks (if False:, if 0:,
+if None:, ...) before reasoning, follows simple aliases (rc = p.returncode),
+and only counts a reference as inspection when it appears on a line that gates
+the guard (if/elif/while/assert/return/raise/finish/exit). It is a pattern
+scanner, not a data-flow analysis; BH3 owns runtime guard mutation.
 
 Exit status: 0 when no findings, 1 when findings exist. A JSON report is
 written to --output for retained evidence.
@@ -28,46 +39,236 @@ import re
 import sys
 from pathlib import Path
 
+# --- Python false-green patterns --------------------------------------------
+
+# SKIP-print followed by an exit-0 call, either later on the same line
+# (print(...); sys.exit(0)) or as the next statement after optional raise.
 PY_SKIP_EXIT0 = re.compile(
-    r"print\(\s*[\"'][^\"']*SKIP[^\"']*[\"']\s*\)[^\n]{0,120}\n[ \t]*"
-    r"(?:raise\s+)?SystemExit\(0\)"
-)
-SH_SKIP_EXIT0 = re.compile(
-    r"(?:echo|printf)\s+[\"'][^\"']*SKIP[^\"']*[\"']\s*(?:[|>][^\n]*)?\n[ \t]*exit 0"
+    r"print\(\s*[\"'][^\"']*SKIP[^\"']*[\"']\s*\)"
+    r"(?:[^\n]*\n[ \t]*|[ \t]*;[ \t]*|[ \t]*\n[ \t]*)?"
+    r"(?:raise\s+)?(?:SystemExit|sys\.exit|exit)\(\s*0\s*\)"
 )
 PY_PREREQ_EXIT0 = re.compile(
     r"(?:not\s+[A-Za-z_][A-Za-z0-9_]*\.exists\(\)|which\s*\([^)]*\)\s*is\s*None)\s*:?\s*\n"
-    r"[ \t]*(?:print\([^\n]*\)\n)?[ \t]*(?:raise\s+)?SystemExit\(0\)"
+    r"[ \t]*(?:print\([^\n]*\)\n)?[ \t]*(?:raise\s+)?(?:SystemExit|sys\.exit)\(0\)"
+)
+PY_VACUOUS = re.compile(r"(?m)\bPASS\b")
+
+# A returncode reference only counts as inspection when its line gates the
+# outcome of the guard.
+GATING_LINE = re.compile(
+    r"^\s*(?:if|elif|while|assert|return|raise)\b|"
+    r"finish\(|SystemExit\(|sys\.exit|exit\(|check_returncode\("
+)
+
+# Statically-false conditional headers whose bodies can never execute.
+STATIC_FALSE = re.compile(
+    r"^(?:if|elif|while|for)\s+(?:False|0|None|\(\)|\[\]|\{\}|''|\"\"|not\s+True|not\s+1)\s*:"
+)
+
+# subprocess result-producing calls; check_call/check_output raise on failure
+# and are therefore inherently safe.
+SUB_RESULT = re.compile(r"(\w+)\s*=\s*subprocess\.(run|call|check_call|check_output)\(")
+# aliases like rc = p.returncode
+SUB_ALIAS = re.compile(r"(\w+)\s*=\s*(\w+)\.(?:returncode|stdout|stderr)\b")
+# bare, discarded calls: subprocess.run(...) whose result is never bound
+BARE_SUB_CALL = re.compile(r"subprocess\.(run|call)\(")
+
+
+def _strip_py_comments(text: str) -> str:
+    """Remove ``# ...`` comments while leaving strings/docstrings intact."""
+    out: list[str] = []
+    state: str | None = None
+    i = 0
+    n = len(text)
+    while i < n:
+        if state is None:
+            if text.startswith('"""', i) or text.startswith("'''", i):
+                tok = text[i:i + 3]
+                state = tok
+                out.append(tok)
+                i += 3
+                continue
+            c = text[i]
+            if c in "\"'":
+                state = c
+                out.append(c)
+                i += 1
+                continue
+            if c == "#":
+                while i < n and text[i] != "\n":
+                    i += 1
+                continue
+            out.append(c)
+            i += 1
+        else:
+            c = text[i]
+            if c == "\\" and i + 1 < n:
+                out.append(c)
+                out.append(text[i + 1])
+                i += 2
+                continue
+            if text.startswith(state, i):
+                out.append(state)
+                i += len(state)
+                state = None
+                continue
+            out.append(c)
+            i += 1
+    return "".join(out)
+
+
+def _strip_dead_blocks(text: str) -> str:
+    """Remove bodies of statically-false if/while blocks so dead references
+    (e.g. ``if False: print(p.returncode)``) never satisfy an inspection rule."""
+    out: list[str] = []
+    dead_stack: list[int] = []
+    for line in text.splitlines():
+        stripped = line.lstrip()
+        indent = len(line) - len(stripped)
+        if not stripped:
+            out.append(line)
+            continue
+        while dead_stack and indent <= dead_stack[-1]:
+            dead_stack.pop()
+        if STATIC_FALSE.match(stripped):
+            dead_stack.append(indent)
+            continue
+        if dead_stack:
+            continue
+        out.append(line)
+    return "\n".join(out)
+
+
+def _pure_print(line: str) -> bool:
+    return bool(re.match(r"^\s*print\(", line))
+
+
+def _find_swallowed_returncode(text: str) -> list[str]:
+    body = _strip_dead_blocks(text)
+    lines = body.splitlines()
+    # var -> (set of refs that name it, set of binding-line indices)
+    result_vars: dict[str, set[str]] = {}
+    binding_lines: dict[str, set[int]] = {}
+    safe: set[str] = set()
+    for m in SUB_RESULT.finditer(body):
+        var, method = m.group(1), m.group(2)
+        result_vars.setdefault(var, set()).add(var)
+        binding_lines.setdefault(var, set()).add(body.count("\n", 0, m.start()))
+        if method in ("check_call", "check_output"):
+            safe.add(var)
+        elif "check=True" in body[m.start(): m.start() + 200]:
+            safe.add(var)
+    # Aliases (rc = p.returncode, rc,out = p.returncode,...) only expand from
+    # variables that are themselves subprocess results; `file=sys.stderr` or
+    # `proc=helper(...)` must never create a phantom result variable.
+    changed = True
+    while changed:
+        changed = False
+        for m in SUB_ALIAS.finditer(body):
+            target, source = m.group(1), m.group(2)
+            if source in result_vars and target not in result_vars[source]:
+                result_vars[source].add(target)
+                changed = True
+    flagged: list[str] = []
+    for var, refs in result_vars.items():
+        if var in safe:
+            continue
+        ref_pat = re.compile(r"\b(?:" + "|".join(re.escape(r) for r in refs) + r")\b")
+        bind = binding_lines.get(var, set())
+        inspected = any(
+            ref_pat.search(line) and not _pure_print(line)
+            for idx, line in enumerate(lines)
+            if idx not in bind
+        )
+        if not inspected:
+            flagged.append(var)
+    # Discarded bare calls: subprocess.run(...) not bound to a variable and not
+    # returned/used. A `return subprocess.run(...)` hands the result upward and
+    # a chained .attr/[...] uses it; neither is discarded.
+    for m in BARE_SUB_CALL.finditer(body):
+        line_start = body[: m.start()].rfind("\n") + 1
+        line = body[line_start:]
+        line = line[: line.find("\n")] if "\n" in line else line
+        if re.search(r"\w+\s*=\s*$", line[: m.start() - line_start]):
+            continue
+        if re.search(r"(?:^|[;\s])(?:return|yield)\s+[^;\n]*$", line[: m.start() - line_start]):
+            continue
+        call_end = body.find(")", m.end() - 1)
+        if call_end != -1 and line[call_end - line_start + 1:call_end - line_start + 2] in {".", "["}:
+            continue
+        if "check=True" not in body[m.start(): m.start() + 200]:
+            flagged.append("(discarded)")
+    return sorted(set(flagged))
+
+
+def scan_python(text: str, path: Path) -> list[dict]:
+    findings: list[dict] = []
+    clean = _strip_py_comments(text)
+    if PY_SKIP_EXIT0.search(clean):
+        findings.append({"rule": "skip-as-pass", "file": str(path),
+                         "detail": "SKIP message immediately followed by an exit-0 call (silent green)"})
+    if PY_PREREQ_EXIT0.search(clean):
+        findings.append({"rule": "prereq-exit0", "file": str(path),
+                         "detail": "missing-tool guard exits 0 instead of a non-green code"})
+    if "subprocess." in clean:
+        for var in _find_swallowed_returncode(clean):
+            findings.append({"rule": "swallowed-returncode", "file": str(path),
+                             "detail": f"subprocess result {var!r} never controls a failure path (no check=True, "
+                                       "no gating use of its returncode)"})
+    if PY_VACUOUS.search(clean) and "PASS:" in clean and "subprocess." not in clean and not any(
+        token in clean for token in ("raise ", "assert ", "!=", "==", ">=", "<=", "> ", "< ")):
+        findings.append({"rule": "vacuous-pass", "file": str(path),
+                         "detail": "prints PASS but invokes nothing and asserts nothing"})
+    return findings
+
+
+# --- Shell false-green patterns ---------------------------------------------
+
+SH_SKIP_EXIT0 = re.compile(
+    r"(?:echo|printf)\s+[\"'][^\"']*SKIP[^\"']*[\"']\s*(?:[|>][^\n]*)?\n[ \t]*exit 0"
 )
 SH_EXIT0_AFTER_TOOL = re.compile(
     r"command\s+-v\s+\S+\s*>?/dev/null\s*2>&1\s*\|\|\s*\{[^}]*exit\s+0|"
     r"if\s+!?\s*command\s+-v\s+\S+[^\n]*\n[^\n]*exit\s+0"
 )
-PY_SWALLOWED_RC = re.compile(
-    r"(\w+)\s*=\s*subprocess\.(?:run|call)\([^\)]*\)(?![\s\S]{0,400}\1\.returncode)"
-)
-PY_VACUOUS = re.compile(r"(?m)\bPASS\b")
+
+# Commands whose non-zero status inside a pipeline is conventionally
+# insignificant (pure text transforms / sinks). Anything else piped without
+# pipefail is a candidate for a masked failure.
+SHELL_PIPE_FILTERS = {
+    "sed", "awk", "tr", "sort", "cut", "head", "tail", "grep", "egrep", "fgrep",
+    "wc", "cat", "tee", "uniq", "printf", "echo", "xargs", "diff", "cmp", "comm",
+    "join", "paste", "rev", "fold", "nl", "column", "sha256sum", "md5sum",
+}
 
 
-def scan_python(text: str, path: Path) -> list[dict]:
-    findings: list[dict] = []
-    if PY_SKIP_EXIT0.search(text):
-        findings.append({"rule": "skip-as-pass", "file": str(path),
-                         "detail": "SKIP message immediately followed by SystemExit(0) (silent green)"})
-    if PY_PREREQ_EXIT0.search(text):
-        findings.append({"rule": "prereq-exit0", "file": str(path),
-                         "detail": "missing-tool guard exits 0 instead of a non-green code"})
-    has_subprocess = "subprocess." in text
-    if has_subprocess and not re.search(r"check=True|check_returncode|\.returncode|check_call|check_output", text):
-        findings.append({"rule": "swallowed-returncode", "file": str(path),
-                         "detail": "subprocess invoked without check=True and no returncode inspection anywhere"})
-    # vacuous-pass: guard-looking file (mentions PASS) with no subprocess and no
-    # assertion construct; it cannot fail, therefore it tests nothing.
-    if PY_VACUOUS.search(text) and "PASS:" in text and not has_subprocess and not any(
-        token in text for token in ("raise ", "assert ", "!=", "==", ">=", "<=", "> ", "< ")):
-        findings.append({"rule": "vacuous-pass", "file": str(path),
-                         "detail": "prints PASS but invokes nothing and asserts nothing"})
-    return findings
+def _split_pipeline(line: str) -> list[str]:
+    # Remove simple quoted strings so Nift template text (" | ") does not count.
+    stripped = re.sub(r"'[^']*'|\"[^\"]*\"", "", line)
+    return stripped.split("|")
+
+
+def _shell_has_unsafe_pipeline(text: str) -> str | None:
+    """Return a reason string when a pipeline can mask a failing upstream
+    segment (no pipefail, and an upstream command outside the pure-filter set)."""
+    for raw in text.splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if not line or "|" not in line:
+            continue
+        segs = _split_pipeline(line)
+        if len(segs) < 2:
+            continue
+        for seg in segs[:-1]:
+            seg = seg.strip().lstrip("$( ").lstrip("!").strip()
+            if not seg:
+                continue
+            first = seg.split()[0]
+            if first in {">", "<", "2>", "1>", ">>", "&&", "||"} or first.endswith("\\"):
+                continue
+            if first not in SHELL_PIPE_FILTERS:
+                return f"pipeline {line!r} can mask failure of upstream {first!r}"
+    return None
 
 
 def scan_shell(text: str, path: Path) -> list[dict]:
@@ -82,11 +283,18 @@ def scan_shell(text: str, path: Path) -> list[dict]:
     # Only a real `set -o pipefail` / `set -euo pipefail` counts; a mention in a
     # comment or echo string does not.
     has_pipefail = bool(re.search(r"^\s*set\s+(-\S+\s+)*.*pipefail", text, re.MULTILINE))
-    if has_pipe and not has_pipefail and re.search(r"\b(grep|wc|head|tail|diff|cmp)\b", text):
-        findings.append({"rule": "pipefail-missing", "file": str(path),
-                         "detail": "uses pipelines but never enables pipefail; a failing upstream command can be masked"})
+    if has_pipe and not has_pipefail:
+        reason = _shell_has_unsafe_pipeline(text)
+        if reason:
+            findings.append({"rule": "pipefail-missing", "file": str(path),
+                             "detail": f"uses pipelines but never enables pipefail; {reason}"})
+        elif re.search(r"\b(grep|wc|head|tail|diff|cmp)\b", text):
+            findings.append({"rule": "pipefail-missing", "file": str(path),
+                             "detail": "uses pipelines but never enables pipefail; a failing upstream command can be masked"})
     return findings
 
+
+# --- dispatch ---------------------------------------------------------------
 
 def scan_file(path: Path) -> list[dict]:
     suffix = path.suffix
@@ -120,9 +328,6 @@ def main() -> int:
             scanned.append(str(f))
             findings.extend(scan_file(f))
 
-    # A test file may be either an executable test or a support module; only
-    # *.py under tests/ and scripts/ that are guards are scanned for the
-    # vacuous-pass family, and only when they are not obviously utility modules.
     report = {
         "schema": 1,
         "campaign": "bh2",

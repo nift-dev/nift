@@ -6,7 +6,7 @@
     {
       "rule": "pipefail-missing",
       "file": "/tmp/opencode/bh2-fixtures/falsegreen_pipe.sh",
-      "detail": "uses pipelines but never enables pipefail; a failing upstream command can be masked"
+      "detail": "uses pipelines but never enables pipefail; pipeline 'out=$(./nift build-all 2>&1 | grep -c ERROR)' can mask failure of upstream 'out=$(./nift'"
     },
     {
       "rule": "prereq-exit0",
@@ -21,12 +21,12 @@
     {
       "rule": "skip-as-pass",
       "file": "/tmp/opencode/bh2-fixtures/falsegreen_skip.py",
-      "detail": "SKIP message immediately followed by SystemExit(0) (silent green)"
+      "detail": "SKIP message immediately followed by an exit-0 call (silent green)"
     },
     {
       "rule": "swallowed-returncode",
       "file": "/tmp/opencode/bh2-fixtures/falsegreen_swallow.py",
-      "detail": "subprocess invoked without check=True and no returncode inspection anywhere"
+      "detail": "subprocess result 'p' never controls a failure path (no check=True, no gating use of its returncode)"
     },
     {
       "rule": "vacuous-pass",

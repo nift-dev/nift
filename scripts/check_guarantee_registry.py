@@ -138,7 +138,10 @@ def makefile_has_target(path: Path, target: str) -> bool:
     return bool(pattern.search(path.read_text(encoding="utf-8", errors="replace")))
 
 def workflow_triggers(path: Path) -> set[str]:
-    """Return top-level workflow triggers from the ordinary block-style YAML used here."""
+    """Return top-level workflow triggers from the ordinary block-style or
+    inline ``on:`` YAML forms used here. Unsupported valid GitHub Actions forms
+    fail closed (reported as missing) rather than green.
+    """
     text = path.read_text(encoding="utf-8", errors="replace")
     lines = text.splitlines()
     triggers: set[str] = set()
@@ -146,6 +149,14 @@ def workflow_triggers(path: Path) -> set[str]:
     for line in lines:
         if re.match(r"^on:\s*(?:#.*)?$", line):
             in_on = True
+            continue
+        inline = re.match(r"^on:\s*\[([^\]]+)\]\s*$", line)
+        if inline:
+            triggers.update(t.strip() for t in inline.group(1).split(",") if t.strip())
+            continue
+        single = re.match(r"^on:\s*([A-Za-z_][A-Za-z0-9_-]*)\s*(?:#.*)?$", line)
+        if single:
+            triggers.add(single.group(1))
             continue
         if not in_on:
             continue
@@ -157,54 +168,147 @@ def workflow_triggers(path: Path) -> set[str]:
     return triggers
 
 
-def workflow_matrix_runners(path: Path) -> set[str]:
-    """Return the OS family names a workflow's strategy matrix actually targets.
-
-    Recognizes the `strategy.matrix.include` block style used in this
-    repository and maps each included runner to an OS family. A workflow that
-    claims cross-platform reach must list concrete OS runners in its matrix;
-    a matrix that only references an abstract ``${{ matrix.runner }}`` without
-    including concrete runners is not cross-platform evidence.
-    """
-    text = path.read_text(encoding="utf-8", errors="replace")
-    lines = text.splitlines()
-    include_depth = -1
-    runners: set[str] = set()
+def _workflow_job_block(lines: list[str], job: str) -> list[str] | None:
+    """Return the indented lines of a job block, or None if the job key is absent."""
+    start = None
     for i, line in enumerate(lines):
+        if re.match(rf"^  {re.escape(job)}:\s*(?:#.*)?$", line):
+            start = i
+            break
+    if start is None:
+        return None
+    block: list[str] = []
+    for line in lines[start + 1:]:
+        if line.strip() and not line[0].isspace():
+            break
+        block.append(line)
+    return block
+
+
+def _if_statically_false(value: str) -> bool:
+    """True when a job-level ``if:`` condition is a compile-time false.
+
+    Covers the literal false forms and the always-empty event-name shape. This
+    is deliberately conservative: anything ambiguous is treated as live, so an
+    enabled job is never falsely rejected.
+    """
+    v = value.strip()
+    if v.startswith("${{") and v.endswith("}}"):
+        v = v[3:-2].strip()
+    if v in {"false", "'false'", '"false"', "False"}:
+        return True
+    if re.search(r"\.event_name\s*==\s*''", v):
+        return True
+    if v.startswith("always()") and "false" in v:
+        return True
+    return False
+
+
+def validate_workflow_job_executable(path: Path, job: str, klass: str, gid: str) -> None:
+    """A registered CI enforcement job must not be statically disabled."""
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    block = _workflow_job_block(lines, job)
+    if block is None:
+        raise CheckFailure(f"workflow-job-missing: {gid}: {path}#{job}")
+    for line in block:
+        m = re.match(r"^\s+if:\s*(.*)$", line)
+        if m and _if_statically_false(m.group(1).strip()):
+            raise CheckFailure(
+                f"workflow-job-statically-disabled: {gid}: {path}#{job}: if: {m.group(1).strip()}"
+            )
+
+
+def _runners_from_block(block: list[str]) -> set[str]:
+    runners: set[str] = set()
+    in_include = False
+    include_indent = -1
+    for line in block:
         m = re.match(r"^(\s*)include:\s*$", line)
         if m:
-            include_depth = len(m.group(1))
+            in_include = True
+            include_indent = len(m.group(1))
             continue
-        if include_depth < 0:
-            continue
-        if line.strip() and not line.startswith(" " * (include_depth + 2)):
-            include_depth = -1
-            continue
-        rm = re.match(r"^\s*(?:-\s+)?runner:\s*([^\s#]+)", line)
-        if rm:
-            runner = rm.group(1).lower()
-            if "ubuntu" in runner:
-                runners.add("linux")
-            elif "macos" in runner:
-                runners.add("macos")
-            elif "windows" in runner:
-                runners.add("windows")
+        if in_include:
+            if line.strip() and len(line) - len(line.lstrip()) <= include_indent:
+                in_include = False
+                continue
+            rm = re.match(r"^\s*(?:-\s+)?runner:\s*([^\s#]+)", line)
+            if rm:
+                runner = rm.group(1).lower()
+                if "ubuntu" in runner:
+                    runners.add("linux")
+                elif "macos" in runner:
+                    runners.add("macos")
+                elif "windows" in runner:
+                    runners.add("windows")
     return runners
 
 
-def validate_cross_platform_matrix(path: Path, klass: str, gid: str, platforms) -> None:
-    """A CROSS_PLATFORM_GATED workflow must prove OS breadth structurally."""
+def _needs_from_block(block: list[str]) -> set[str]:
+    needs: set[str] = set()
+    for i, line in enumerate(block):
+        m = re.match(r"^(\s*)needs:\s*(\[.*\]|.*)$", line)
+        if not m:
+            continue
+        inline = m.group(2).strip()
+        if inline:
+            if inline.startswith("[") and inline.endswith("]"):
+                needs.update(x.strip() for x in inline[1:-1].split(",") if x.strip())
+            else:
+                needs.update(x.strip() for x in inline.split(",") if x.strip())
+        else:
+            indent = len(m.group(1))
+            for sub in block[i + 1:]:
+                if sub.strip() and len(sub) - len(sub.lstrip()) <= indent:
+                    break
+                sm = re.match(r"^\s*-\s*([A-Za-z0-9_.-]+)\s*$", sub)
+                if sm:
+                    needs.add(sm.group(1))
+    return needs
+
+
+def workflow_job_runners(path: Path, job: str, _memo: dict[str, set[str]] | None = None) -> set[str]:
+    """OS families the enforcement job itself spans: its own matrix runners
+    unioned (transitively) with the runners of jobs it ``needs:``. A matrix
+    sitting in an unrelated workflow job does not count for this job."""
+    if _memo is None:
+        _memo = {}
+    if job in _memo:
+        return _memo[job]
+    _memo[job] = set()
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    block = _workflow_job_block(lines, job)
+    if block is None:
+        return set()
+    runners = _runners_from_block(block)
+    for need in _needs_from_block(block):
+        runners |= workflow_job_runners(path, need, _memo)
+    _memo[job] = runners
+    return runners
+
+
+def validate_cross_platform_matrix(path: Path, klass: str, gid: str, platforms, job: str) -> None:
+    """A CROSS_PLATFORM_GATED enforcement job must prove OS breadth structurally.
+
+    The breadth must belong to the enforcement path itself: the registered job's
+    own ``strategy.matrix.include`` runners, or (transitively) the runners of
+    jobs it ``needs:``. A matrix that merely appears elsewhere in the workflow
+    does not satisfy the job.
+    """
     if klass != "CROSS_PLATFORM_GATED":
         return
     declared = set(p.lower() for p in platforms) if platforms else set()
-    runner_families = workflow_matrix_runners(path)
+    runner_families = workflow_job_runners(path, job)
     if not runner_families:
-        raise CheckFailure(f"cross-platform-matrix-missing: {gid}: {path}: no concrete matrix include runners")
+        raise CheckFailure(
+            f"cross-platform-matrix-missing: {gid}: {path}#{job}: no matrix include "
+            "runners on the job or its transitive needs"
+        )
     missing = declared - runner_families
     if missing:
         raise CheckFailure(
-            f"cross-platform-matrix-incomplete: {gid}: {path}: declared platforms "
-            f"missing from matrix runners: {sorted(missing)}"
+            f"cross-platform-matrix-incomplete: {gid}: {path}#{job}: declared platforms "
+            f"missing from the job's matrix runners: {sorted(missing)}"
         )
 
 
@@ -374,7 +478,8 @@ def check(registry_path: Path, args: argparse.Namespace) -> dict[str, Any]:
             if not workflow_has_job(wf_path, job):
                 raise CheckFailure(f"workflow-job-missing: {gid}: {workflow}#{job}")
             validate_workflow_trigger(wf_path, klass, gid)
-            validate_cross_platform_matrix(wf_path, klass, gid, g.get("platforms"))
+            validate_workflow_job_executable(wf_path, job, klass, gid)
+            validate_cross_platform_matrix(wf_path, klass, gid, g.get("platforms"), job)
             ci_refs += 1
 
     audited_surfaces = 0
@@ -462,6 +567,11 @@ def main() -> int:
     parser.add_argument("--nift-root")
     parser.add_argument("--website-root")
     parser.add_argument("--regression-root")
+    parser.add_argument("--local", action="store_true",
+                        help="single-repository CI mode: assert only what the Nift "
+                             "checkout itself can prove and PASS, never SKIP for "
+                             "absent sibling repositories; the public-claim surface "
+                             "audit is reported as deferred")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
     try:
@@ -470,8 +580,26 @@ def main() -> int:
         print(f"FAIL: {exc}", file=sys.stderr)
         return 1
     unavailable = summary["unavailable_sibling_repositories"]
-    status = "SKIP" if unavailable else "PASS"
+    base = (
+        f"guarantee registry structurally valid "
+        f"({summary['guarantees']} guarantees, {summary['public_claims']} public claims, "
+        f"{summary['known_discrepancies']} known discrepancies, {summary['ci_job_refs']} CI job refs)"
+    )
+    if args.local:
+        # Local CI mode: a single-repo checkout cannot audit sibling public-claim
+        # surfaces. That audit is deferred and reported truthfully, not skipped
+        # into a silent green of the local integrity claims.
+        if args.json:
+            print(json.dumps({"status": "PASS", "deferred_public_claim_surface_audit": unavailable, **summary},
+                             indent=2, sort_keys=True))
+        elif unavailable:
+            print(f"PASS: {base} (local); public-claim surface audit deferred "
+                  f"(sibling repositories absent: {', '.join(unavailable)})")
+        else:
+            print(f"PASS: {base}")
+        return 0
     if args.json:
+        status = "SKIP" if unavailable else "PASS"
         print(json.dumps({"status": status, **summary}, indent=2, sort_keys=True))
     elif unavailable:
         print(
@@ -483,11 +611,7 @@ def main() -> int:
             "public-claim completeness is not asserted"
         )
     else:
-        print(
-            "PASS: guarantee registry structurally valid "
-            f"({summary['guarantees']} guarantees, {summary['public_claims']} public claims, "
-            f"{summary['known_discrepancies']} known discrepancies, {summary['ci_job_refs']} CI job refs)"
-        )
+        print(f"PASS: {base}")
     return 2 if unavailable else 0
 
 

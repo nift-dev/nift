@@ -40,8 +40,8 @@ jobs:
         run: |
           python scripts/test_integrity_check.py tests scripts \
             --output .build/bh2/test-integrity-report.json
-      - name: Validate guarantee registry structurally
-        run: make test-guarantee-registry
+      - name: Validate guarantee registry structurally (repository-local)
+        run: make test-guarantee-registry-ci
 
   fast-suites:
     name: Fast deterministic contract suites

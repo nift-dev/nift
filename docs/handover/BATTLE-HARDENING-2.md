@@ -200,8 +200,8 @@ queue after BH2 rather than treating the list above as immutable.
 ## BH2 — Test integrity + enforcement architecture
 
 **Implementer:** DeepSeek (this session). **Reviewer/attacker:** ChatGPT (exact
-candidate, separate worktree). BH2 closes the two CI-semantic residuals BH1
-carried forward and introduces a shared, auditable outcome contract plus a
+candidate `7f8768b`, separate worktree). BH2 closes the two CI-semantic residuals
+BH1 carried forward and introduces a shared, auditable outcome contract plus a
 static false-green scanner.
 
 ### Outcome contract
@@ -263,6 +263,9 @@ make target.
   enforcement: a cross-platform workflow must list concrete `runner:` entries in a
   `strategy.matrix.include` covering every declared platform, closing the BH1
   residual that a trigger alone did not prove real Linux/macOS/Windows coverage.
+  Since round 2 the breadth is proven per enforcement job (the job's own matrix,
+  unioned with its transitive `needs:` runners), and statically-disabled jobs are
+  rejected.
 
 ### BH2 red-rule evidence (retained)
 
@@ -272,6 +275,9 @@ make target.
   (SKIP exit 2) when the tool is absent, and green only when they actually measure.
 - `bh2-fixtures-report.json` — the scanner rejects 6 injected false-green/vacuous
   fixtures across all five families (exit 1).
+- `bh2-reviewer-fixtures-report.json` — the round-1 reviewer's four independent
+  fixtures (`sys.exit(0)` skip, dead-code returncode, `false | cat`, plain
+  swallowed returncode) are all rejected (exit 1).
 - `bh2-clean-report.json` — the scanner is clean on the real `tests/` + `scripts/`
   (42 files, 0 findings), and clean on the regression-suite contract scripts.
 
@@ -284,36 +290,97 @@ make target.
 - The scanner is static and pattern-based; it cannot reason about a guard's runtime
   semantics. A future guard that skips at runtime (after passing the static scan)
   is a BH3 mutation target.
+- **Workflow-trigger parsing boundary (carried forward):** the trigger parser
+  supports the repository's ordinary block-style `on:` and inline `on: push` /
+  `on: [push, pull_request]` forms. Other valid GitHub Actions YAML shapes fail
+  closed (false red), never false green. That boundary is intentionally carried
+  forward rather than claimed fully closed; hardening it is BH3/BH5 work.
+
+### BH2 reviewer round 1 — returned to implementer
+
+DeepSeek committed round-1 candidate `7f8768b` and ChatGPT independently attacked
+it in a detached worktree. No Nift semantic defect was found; four defects in the
+integrity machinery itself were reported. The most serious was compositional: the
+newly added `static-integrity` CI job ran `make test-guarantee-registry`, which
+SKIPs (exit 2) when the website/regression sibling repositories are absent, and
+GH Actions only checks out Nift — so the gate failed on a normal checkout and its
+`needs: static-integrity` blocked `fast-suites` from ever running. Three scanner
+bypasses were also demonstrated with fresh fixtures (`sys.exit(0)` after a SKIP
+print; `.returncode` referenced only in dead code; an arbitrary command piped
+into `cat`). The enforcement checker accepted a job with `if: ${{ false }}` and
+credited OS breadth from a matrix that belonged to a different job. Round-1
+findings retained at `docs/evidence/bh2/bh2-reviewer-fixtures-report.json`.
+
+### BH2 implementer round 2 — fixes
+
+- **P1 (CI gate composition):** `check_guarantee_registry.py` gains a `--local`
+  single-repository mode (make `test-guarantee-registry-ci`) that asserts
+  everything a Nift-only checkout can prove and PASSes, reporting the public-claim
+  surface audit as explicitly deferred when sibling repositories are absent. SKIP
+  semantics for the full audit are unchanged (still exit 2 without siblings).
+  `test-integrity.yml#static-integrity` now runs the local variant, so the gate is
+  usable in GH Actions and `fast-suites` can actually run.
+- **P2 (scanner hardening):** `test_integrity_check.py` now catches
+  `sys.exit(0)` / `exit(0)` after a SKIP print (same-line or next-statement);
+  strips statically-dead blocks (`if False:`, `if 0:`, `if None:`, ...) before
+  reasoning; requires a subprocess `returncode` to control a failure path via
+  word-boundary refs with alias following, and flags bare discarded calls while
+  honouring `return`/`yield`/chained use. Shell pipefail detection now flags any
+  pipeline whose upstream command is outside the pure-filter set (`false | cat`,
+  `nift ... | tee`, `make ... | grep`), not just `grep|wc|head|tail|diff|cmp`.
+  All four reviewer fixtures are RED (retained evidence), the original six remain
+  RED, and the real trees stay GREEN.
+- **P3 (job executability + OS breadth):** the checker rejects a registered
+  CI job whose `if:` is statically false (`${{ false }}`, literal false,
+  `event_name == ''`, `always() && false`). Cross-platform breadth is now proven
+  per enforcement job: the job's own `strategy.matrix.include` runners, unioned
+  transitively with the runners of jobs it `needs:`. A matrix that merely exists
+  elsewhere in the workflow no longer satisfies the job (demonstrated RED), while
+  `compare` still passes because it consumes `corpus` via `needs:`.
+- **P4 (trigger parsing):** `workflow_triggers` now also parses inline
+  `on: push` and `on: [push, pull_request]` forms; unsupported valid YAML forms
+  still fail closed (false red). The remaining false-red boundary is carried
+  forward explicitly in the residual list above.
 
 ### BH2 handoff to reviewer
 
-**Exact candidate to attack: `7f8768b`** ("BH2: test integrity and enforcement
-architecture"). Implementer does **not** modify the working tree after this commit.
-Reviewer works from the exact commit in a separate clone/worktree, attacks with
-reviewer-authored fixtures, and reports findings back rather than silently fixing
-them. No changes are made to `7f8768b` during review.
+**Round-1 candidate (already reviewed): `7f8768b`.** **Round-2 candidate: this
+commit** — the round-1 findings (P1–P4) are fixed on top of `7f8768b`. Reviewer
+attacks the exact round-2 commit in a separate clone/worktree and reports findings
+back; the implementer does not modify the tree during review. No changes are made
+to `7f8768b` itself.
 
 Review focus areas (attack each):
 
 - **Exit-code contract:** inject a guard that prints SKIP then `exit 0`, or
-  `SystemExit(0)` after `print("SKIP...")`, and confirm the scanner rejects it
-  (`skip-as-pass`), while legitimate `finish(2)`-style guards pass the scan.
+  `SystemExit(0)`/`sys.exit(0)` after `print("SKIP...")`, and confirm the scanner
+  rejects it (`skip-as-pass`), while legitimate `finish(2)`-style guards pass.
+- **Swallowed-returncode (round-2 hardening):** a subprocess result whose
+  `returncode` appears only in dead code (`if False:`), only in a `print()`, or is
+  never referenced at all must be flagged; a result that gates an `if`/`assert`/
+  `finish`/`raise`, or is handed up via `return`, must not be. Watch for regressions
+  on the real checkpoint scripts.
+- **Pipefail breadth (round-2 hardening):** any pipeline without pipefail whose
+  upstream command is outside the pure-filter set (`false | cat`,
+  `nift ... | tee`, `make ... | grep`) must be flagged; pure-transform pipelines
+  (`printf | sed`) under pipefail must stay green.
 - **`/usr/bin/time` family:** with GNU time absent, each fixed guard must exit 2
   (not 0, not a traceback). With a too-small `--time-bin`, `memory_10k_benchmark.py`
   and `memory_safety.py` must go red rather than silently green.
 - **Timeout classification:** a hung Nift subprocess in checkpoint 3/4/6/7 must
   surface as exit 124 with an outcome line, not an unbounded wait or raw traceback.
-- **Scanner false-positives:** confirm the scanner does not reject the project's
-  own guards — including the comment-embedded `set -o pipefail` pattern in
-  `tests/contracts_smoke.sh`-style scripts — and that it flags a pipelined test
-  missing pipefail (`pipefail-missing`).
-- **`CROSS_PLATFORM_GATED` breadth:** a workflow with a trigger but no concrete
-  `strategy.matrix.include` runner for every declared platform must fail the
-  registry check; the real `checkpoint-10-cross-platform.yml` and `init-targets.yml`
-  must pass for {linux, macos, windows}.
-- **Enforcement truth:** every CI_GATED/SCHEDULED registry ref must point at a
-  job that actually exists in the cited workflow and really runs the referenced
-  guard; the checker must reject a workflow/job ref that never exists.
+- **CI composition (P1):** from a Nift-only checkout (no website/regression
+  siblings) the full CI sequence must pass — scanner, then
+  `make test-guarantee-registry-ci` — while `make test-guarantee-registry` still
+  SKIPs (exit 2). The full 3-repository audit must still PASS.
+- **Job executability (P3):** a registered CI_GATED/SCHEDULED job with
+  `if: ${{ false }}` (or literal false / `event_name == ''`) must fail the registry
+  check; every registry ref must point at a job that exists and is live.
+- **OS breadth ownership (P3):** a job that only inherits a matrix from an
+  unrelated job (no own matrix, no `needs:`) must fail; `compare` must still pass
+  via `needs: corpus`; single-OS matrices must fail.
+- **Trigger parsing (P4):** inline `on: push` / `on: [push, pull_request]` must be
+  recognized; unsupported valid YAML forms must fail closed (never false green).
 - **New workflow validity:** `test-integrity.yml` and `nightly-deep.yml` must be
   valid YAML with sensible triggers; a `core-memory` job that does not actually run
   checkpoint 3 against a sanitized build is a defect.
