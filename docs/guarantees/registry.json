@@ -187,6 +187,46 @@
       ]
     },
     {
+      "id": "parser.value-composition-adversarial",
+      "state": "ESTABLISHED",
+      "guarantee": "Adversarial parser/value/composition inputs (truncated or invalid JSON bound through @json, deep nesting, type mismatches, missing/null/coerced values, unicode, missing or cyclic @input fragments, @pathto edges) resolve with a controlled outcome: a successful build with correct output, or a controlled non-zero error. A hang, a signal termination, a sanitizer finding, or missing output is a defect.",
+      "scope": "15 deterministic adversarial parser/value/composition cases.",
+      "platforms": [
+        "linux"
+      ],
+      "evidence_classes": [
+        "RETAINED"
+      ],
+      "evidence_refs": [
+        {
+          "repo": "nift",
+          "path": "docs/evidence/bh5/bh5-parser-value-composition-red.json"
+        }
+      ],
+      "guard_refs": [
+        {
+          "repo": "nift",
+          "path": "tests/parser_value_composition_adversarial.py"
+        }
+      ],
+      "enforcement": [
+        {
+          "class": "MANUAL",
+          "command": "make test-parser-value-composition"
+        },
+        {
+          "class": "CI_GATED",
+          "workflow": ".github/workflows/test-integrity.yml",
+          "job": "fast-suites"
+        }
+      ],
+      "test_of_test": "UNPROVEN",
+      "known_limits": [
+        "Focused deterministic case set; checkpoint-9 fuzzes the template plane, this guard covers the value/composition plane",
+        "Deep-nesting depth is bounded to 200; pathological resource exhaustion is not asserted"
+      ]
+    },
+    {
       "id": "parser.controlled-mutation-failure",
       "state": "ESTABLISHED",
       "guarantee": "The retained Checkpoint 9 mutation/resource corpus either builds or fails in a controlled way without hangs, crashes, signals, sanitizer findings, or uncontrolled resource failure.",

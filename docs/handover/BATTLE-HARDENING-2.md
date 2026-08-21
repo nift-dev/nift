@@ -134,6 +134,35 @@ discrepancy).
 
 BH3 tranche 1 is an immutable candidate for ChatGPT to attack cold.
 
+## BH5 — Parser / value / composition adversarial — ACTIVE
+
+### BH5 guarantee
+
+Adversarial parser/value/composition inputs — truncated or invalid JSON bound
+through `@json`, deep nesting, type mismatches, missing/null/coerced values,
+unicode, missing or cyclic `@input` fragments, `@pathto` edges — must resolve
+with a controlled outcome: a successful build with correct output, or a
+controlled non-zero error. A hang, a signal termination, a sanitizer finding,
+or missing output is a defect.
+
+### BH5 attack
+
+checkpoint-9 fuzzes randomized template text; BH5 attacks the value and
+composition plane deterministically. The real Nift binary resolves all 15
+cases with controlled outcomes (probed first).
+
+### BH5 guard + red-run evidence
+
+`tests/parser_value_composition_adversarial.py` (make
+`test-parser-value-composition`, CI_GATED via `fast-suites`). Red-runs retained
+at `docs/evidence/bh5/bh5-parser-value-composition-red.json`:
+
+- real nift (15 cases) → GREEN
+- crasher wrapper (SIGSEGV on build) → RED (terminated by signal 11)
+- hanger wrapper (sleep on build) → RED (timeout)
+
+Registered as `parser.value-composition-adversarial` (ESTABLISHED, RETAINED).
+
 ## BH4 — Incremental / state-transition adversarial II — ACTIVE
 
 ### BH4 guarantee

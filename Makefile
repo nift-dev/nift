@@ -104,6 +104,12 @@ test-pagination-equivalence: $(TARGET)
 test-incremental-state-transitions: $(TARGET)
 	python3 tests/incremental_state_transitions_adversarial.py --nift "$(CURDIR)/$(TARGET)"
 
+# BH5: parser / value / composition adversarial; each case must resolve to a
+# controlled outcome (success with correct output, or a controlled error) -
+# never a hang, signal, sanitizer finding, or missing output.
+test-parser-value-composition: $(TARGET)
+	python3 tests/parser_value_composition_adversarial.py --nift "$(CURDIR)/$(TARGET)"
+
 test-installer:
 	tests/install_script_smoke.sh
 
@@ -148,7 +154,7 @@ bh1-guarantee-registry:
 	python3 scripts/check_guarantee_registry.py --website-root "$(BH1_WEBSITE_ROOT)" --regression-root "$(BH1_REGRESSION_ROOT)"
 	python3 scripts/bh1_registry_liveness.py --website-root "$(BH1_WEBSITE_ROOT)" --regression-root "$(BH1_REGRESSION_ROOT)"
 
-bh2-test-integrity: test-test-integrity test-guarantee-registry-ci test-contracts test-pagination-equivalence test-init-targets test-incremental-state-transitions
+bh2-test-integrity: test-test-integrity test-guarantee-registry-ci test-contracts test-pagination-equivalence test-init-targets test-incremental-state-transitions test-parser-value-composition
 
 # BH3 curated guard mutation / test-of-test tranche 1: applies mutation
 # families to exact guard copies, runs them against a real Nift binary (and

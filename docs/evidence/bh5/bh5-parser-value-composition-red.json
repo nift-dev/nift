@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "campaign": "bh5",
+  "checkpoint": "parser-value-composition-adversarial",
+  "timestamp_utc": "2026-08-21T17:05:00Z",
+  "platform": "Linux (BH5)",
+  "nift": "/home/nick/Repositories/nift/nift/nift",
+  "purpose": "BH5 guard red-rule evidence: tests/parser_value_composition_adversarial.py is GREEN on the real Nift binary across 15 adversarial parser/value/composition cases (truncated/invalid/deep JSON, type mismatches, missing/null/coerced values, unicode, missing/cyclic @input, @pathto edge) and RED on representative defects (a parser that crashes with a signal, or hangs).",
+  "attack": "checkpoint-9 fuzzes randomized template text; BH5 attacks the value and composition plane deterministically: @json binding of malformed/typed data, deep nesting, @input composition, @pathto edges. Each case must resolve to a controlled outcome (success with correct output, or a controlled non-zero error) - never a hang, signal, sanitizer finding, or missing output.",
+  "red_runs": [
+    {
+      "case": "real nift (15 cases)",
+      "exit": 0,
+      "outcome": "GREEN",
+      "red_as_expected": false
+    },
+    {
+      "case": "crasher wrapper (SIGSEGV on build-all)",
+      "exit": 1,
+      "outcome": "RED (terminated by signal 11)",
+      "red_as_expected": true
+    },
+    {
+      "case": "hanger wrapper (sleep 60 on build-all)",
+      "exit": 1,
+      "outcome": "RED (hung, timeout)",
+      "red_as_expected": true
+    }
+  ],
+  "all_red_correct": true
+}

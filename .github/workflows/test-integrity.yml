@@ -69,3 +69,5 @@ jobs:
         run: make test-pagination-equivalence
       - name: Incremental state-transition adversarial (BH4)
         run: make test-incremental-state-transitions
+      - name: Parser/value/composition adversarial (BH5)
+        run: make test-parser-value-composition
