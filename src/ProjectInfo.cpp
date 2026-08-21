@@ -13,6 +13,7 @@
 #include <iostream>
 #include <map>
 #include <thread>
+#include <unordered_set>
 
 namespace fs = std::filesystem;
 
@@ -172,6 +173,22 @@ bool ProjectInfo::load_config() {
     if (config.incremental_mode != "modified" && config.incremental_mode != "hash" && config.incremental_mode != "hybrid") {
         console::error(console::path(relative(path), true) + ": incremental-mode must be modified, hash or hybrid");
         return false;
+    }
+
+    // Reject unknown config keys rather than silently ignoring them. A key from
+    // an older Nift (or a typo) must fail loudly: the project should never
+    // believe a setting is honoured when it is not.
+    static const std::unordered_set<std::string> known_config_keys = {
+        "content-dir", "content-ext", "output-dir", "output-ext",
+        "default-template", "incremental-mode", "build-threads",
+        "contracts", "minify-exts",
+    };
+    for (const auto& entry : value.object) {
+        if (!known_config_keys.count(entry.first)) {
+            console::error(console::path(relative(path), true) +
+                           ": unknown config key '" + entry.first + "'");
+            return false;
+        }
     }
     return true;
 }

@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "campaign": "post-release-hardening",
+  "checkpoint": "config-validation",
+  "timestamp_utc": "2026-08-22T00:30:00Z",
+  "platform": "Linux",
+  "nift": "v4.0.6 development",
+  "purpose": "Fail-closed config validation red-run evidence: .nift/config.json must reject unknown keys loudly (legacy keys from old Nift, or typos) instead of silently ignoring them.",
+  "trigger": "Template review found legacy keys (script-ext, backup-scripts, paginate-threads) in shipped template configs that the v4 loader silently ignored; the templates themselves were the evidence of the drift.",
+  "fix": "ProjectInfo::load_config now rejects any config key outside the known set with a clear 'unknown config key '<name>' error. Known keys: content-dir, content-ext, output-dir, output-ext, default-template, incremental-mode, build-threads, contracts, minify-exts.",
+  "guard": "tests/config_validation.sh (make test-config-validation, wired into the bh2-test-integrity CI-equivalent chain).",
+  "red_runs": [
+    {
+      "case": "clean known-key config",
+      "exit": 0,
+      "outcome": "GREEN (builds)",
+      "red_as_expected": false
+    },
+    {
+      "case": "legacy keys script-ext/backup-scripts/paginate-threads",
+      "exit": 1,
+      "outcome": "RED (unknown config key 'script-ext')",
+      "red_as_expected": true
+    },
+    {
+      "case": "typo key content-dri",
+      "exit": 1,
+      "outcome": "RED (unknown config key 'content-dri')",
+      "red_as_expected": true
+    }
+  ],
+  "templates_fixed": [
+    "nift-barebones",
+    "nift-codex",
+    "nift-frame",
+    "nift-nocturne",
+    "nift-orbit",
+    "nift-pulse",
+    "nift-signal",
+    "nift-vault"
+  ],
+  "all_red_correct": true
+}

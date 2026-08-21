@@ -131,6 +131,11 @@ test-complexity-invariants: $(TARGET)
 test-filesystem-boundary: $(TARGET)
 	python3 tests/filesystem_boundary_adversarial.py --nift "$(CURDIR)/$(TARGET)"
 
+# Config validation guard: unknown .nift/config.json keys (legacy or typo)
+# must be rejected loudly rather than silently ignored.
+test-config-validation: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/config_validation.sh
+
 test-installer:
 	tests/install_script_smoke.sh
 
@@ -175,7 +180,7 @@ bh1-guarantee-registry:
 	python3 scripts/check_guarantee_registry.py --website-root "$(BH1_WEBSITE_ROOT)" --regression-root "$(BH1_REGRESSION_ROOT)"
 	python3 scripts/bh1_registry_liveness.py --website-root "$(BH1_WEBSITE_ROOT)" --regression-root "$(BH1_REGRESSION_ROOT)"
 
-bh2-test-integrity: test-test-integrity test-guarantee-registry-ci test-contracts test-pagination-equivalence test-init-targets test-incremental-state-transitions test-parser-value-composition test-init-functional-truth test-crash-recovery test-complexity-invariants test-filesystem-boundary
+bh2-test-integrity: test-test-integrity test-guarantee-registry-ci test-contracts test-pagination-equivalence test-init-targets test-incremental-state-transitions test-parser-value-composition test-init-functional-truth test-crash-recovery test-complexity-invariants test-filesystem-boundary test-config-validation
 
 # BH3 curated guard mutation / test-of-test tranche 1: applies mutation
 # families to exact guard copies, runs them against a real Nift binary (and
