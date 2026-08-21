@@ -682,8 +682,15 @@
       "platforms": [
         "linux"
       ],
-      "evidence_classes": [],
-      "evidence_refs": [],
+      "evidence_classes": [
+        "RETAINED"
+      ],
+      "evidence_refs": [
+        {
+          "repo": "nift",
+          "path": "docs/evidence/bh10/bh10-reconciliation-evidence.json"
+        }
+      ],
       "guard_refs": [
         {
           "repo": "nift",
@@ -707,7 +714,7 @@
       ],
       "test_of_test": "UNPROVEN",
       "known_limits": [
-        "Executable guard exists, but no retained completed-run evidence artifact is currently registered; BH3 may promote this evidence class after retaining a run artifact."
+        "Completed-run evidence retained at docs/evidence/bh10/ in BH10 reconciliation"
       ]
     },
     {
@@ -737,8 +744,8 @@
       ],
       "test_of_test": "UNPROVEN",
       "known_limits": [
-        "BH1 maps the sync contract; BH2/BH3 decide whether CI and drift-mutation enforcement are sufficient",
-        "Executable guard exists, but no retained completed-run evidence artifact is currently registered; BH3 may promote this evidence class after retaining a run artifact."
+        "Requires an external canonical Jsonic++ checkout (JSONIC_DIR); no local completed-run evidence is registered in BH10, so its evidence class is not RETAINED",
+        "Automatic CI enforcement not established"
       ]
     },
     {
@@ -981,8 +988,15 @@
       "platforms": [
         "linux"
       ],
-      "evidence_classes": [],
-      "evidence_refs": [],
+      "evidence_classes": [
+        "RETAINED"
+      ],
+      "evidence_refs": [
+        {
+          "repo": "nift",
+          "path": "docs/evidence/bh10/bh10-reconciliation-evidence.json"
+        }
+      ],
       "guard_refs": [
         {
           "repo": "regression",
@@ -1003,7 +1017,7 @@
       "test_of_test": "UNPROVEN",
       "known_limits": [
         "Checkpoint count is historical evidence, not a current total-suite count",
-        "Executable guard exists, but no retained completed-run evidence artifact is currently registered; BH3 may promote this evidence class after retaining a run artifact."
+        "The standalone 73-check module lives in the regression suite and runs in full 3-repo executions; the nift CI_GATED path runs make test-contracts, whose contracts_smoke.sh also exercises interpolation bindings. Completed-run evidence retained at docs/evidence/bh10/."
       ]
     },
     {

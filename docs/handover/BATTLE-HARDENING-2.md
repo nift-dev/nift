@@ -134,6 +134,31 @@ discrepancy).
 
 BH3 tranche 1 is an immutable candidate for ChatGPT to attack cold.
 
+## BH10 — Claims / evidence / public-truth reconciliation — ACTIVE
+
+### BH10 reconciliation
+
+BH10 audits the registry's claims/evidence/public-truth consistency:
+
+- **Unbacked guarantees promoted:** `contracts.namespace-reservation` and
+  `templating.parameter-interpolation-contract` had empty `evidence_classes`;
+  BH10 ran both guards against the real binary and retained completed-run
+  evidence at `docs/evidence/bh10/bh10-reconciliation-evidence.json`
+  (contracts PASS; parameter interpolation 73/73 PASS), registering RETAINED
+  evidence in the registry.
+- **Honest limitation recorded:** `embedded.jsonic-sync` requires an external
+  canonical Jsonic++ checkout (`JSONIC_DIR`); no local completed-run evidence
+  is registered, so its evidence class is deliberately not RETAINED and its
+  known_limits state this.
+- **Enforcement truth:** the standalone 73-check parameter-interpolation module
+  lives in the regression suite (runs in full 3-repo executions); the nift
+  CI_GATED path runs `make test-contracts`, whose `contracts_smoke.sh` also
+  exercises interpolation bindings — recorded in known_limits rather than
+  overclaimed.
+- The 7 known discrepancies remain recorded as NOT_ESTABLISHED (honest
+  non-claims); every public claim still maps to an ESTABLISHED guarantee with
+  evidence.
+
 ## BH9 — Platform / filesystem boundaries — ACTIVE
 
 ### BH9 guarantee

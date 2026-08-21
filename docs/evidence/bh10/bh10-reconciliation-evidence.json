@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "campaign": "bh10",
+  "checkpoint": "claims-evidence-public-truth-reconciliation",
+  "timestamp_utc": "2026-08-21T22:00:00Z",
+  "platform": "Linux (BH10)",
+  "purpose": "BH10 reconciliation: register completed-run retained evidence for guarantees that previously had no evidence class, and record the external-dependency limitation honestly.",
+  "completed_runs": [
+    {
+      "guarantee": "contracts.namespace-reservation",
+      "guard": "tests/contracts_smoke.sh",
+      "exit": 0,
+      "outcome": "Project contracts smoke test passed"
+    },
+    {
+      "guarantee": "templating.parameter-interpolation-contract",
+      "guard": "contract/parameter_interpolation_smoke.sh",
+      "exit": 0,
+      "outcome": "Parameter interpolation contract passed: 73 checks"
+    }
+  ],
+  "limitations": [
+    "embedded.jsonic-sync requires an external canonical Jsonic++ checkout (JSONIC_DIR); no local completed-run evidence is registered, so its evidence class is not RETAINED"
+  ],
+  "all_green": true
+}
