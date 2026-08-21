@@ -34,14 +34,12 @@ The queue is provisional and must be reconsidered after every checkpoint:
 7. **BH7 — Persistence/crash/recovery II — CLOSED / VERIFIED** — `1b3b7ad`.
 8. **BH8 — Performance/complexity invariants — CLOSED / VERIFIED** — `ed2e251`.
 9. **BH9 — Platform/filesystem boundaries — CLOSED / VERIFIED** — `43aeadf`.
-10. **BH10 — Claims/evidence/public-truth reconciliation — CLOSED / VERIFIED** — `d833536`. — DeepSeek drives the mutant/attack tranches and commits immutable candidates; ChatGPT attacks each exact candidate cold; DeepSeek fixes; ChatGPT re-attacks; reconcile. Semantic decisions, guarantee downgrades and roadmap changes stay with Nick. Families pre-registered below.
-4. **BH4 — Incremental/state-transition adversarial II** — DeepSeek implements; ChatGPT reviews/attacks.
-5. **BH5 — Parser/value/composition adversarial** — ChatGPT implements; DeepSeek reviews/attacks.
-6. **BH6 — Init/starter/AI-context functional truth** — DeepSeek implements; ChatGPT reviews/attacks.
-7. **BH7 — Persistence/crash/recovery II** — ChatGPT implements; DeepSeek reviews/attacks.
-8. **BH8 — Performance/complexity invariants** — DeepSeek implements; ChatGPT reviews/attacks.
-9. **BH9 — Platform/filesystem boundaries** — ownership chosen after BH8.
-10. **BH10 — Claims/evidence/public-truth reconciliation** — DeepSeek leads the audit; ChatGPT implements reconciliations; DeepSeek signs off.
+10. **BH10 — Claims/evidence/public-truth reconciliation — CLOSED / VERIFIED** — `d833536`.
+
+Operating model for remaining reviewer passes: DeepSeek drove each checkpoint
+tranche and committed immutable candidates; ChatGPT attacks each exact
+candidate cold; DeepSeek fixes; ChatGPT re-attacks; reconcile. Semantic
+decisions, guarantee downgrades and roadmap changes stay with Nick.
 
 ## BH3 — Curated guard mutation / test-of-test
 
