@@ -136,6 +136,11 @@ test-filesystem-boundary: $(TARGET)
 test-config-validation: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/config_validation.sh
 
+# @pathto on the tracked page `404` must emit root-absolute web paths because a
+# 404 document is served at arbitrary request depth; checking is unchanged.
+test-pathto-404: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/pathto_404_smoke.sh
+
 test-installer:
 	tests/install_script_smoke.sh
 
@@ -180,7 +185,7 @@ bh1-guarantee-registry:
 	python3 scripts/check_guarantee_registry.py --website-root "$(BH1_WEBSITE_ROOT)" --regression-root "$(BH1_REGRESSION_ROOT)"
 	python3 scripts/bh1_registry_liveness.py --website-root "$(BH1_WEBSITE_ROOT)" --regression-root "$(BH1_REGRESSION_ROOT)"
 
-bh2-test-integrity: test-test-integrity test-guarantee-registry-ci test-contracts test-pagination-equivalence test-init-targets test-incremental-state-transitions test-parser-value-composition test-init-functional-truth test-crash-recovery test-complexity-invariants test-filesystem-boundary test-config-validation
+bh2-test-integrity: test-test-integrity test-guarantee-registry-ci test-contracts test-pagination-equivalence test-init-targets test-incremental-state-transitions test-parser-value-composition test-init-functional-truth test-crash-recovery test-complexity-invariants test-filesystem-boundary test-config-validation test-pathto-404
 
 # BH3 curated guard mutation / test-of-test tranche 1: applies mutation
 # families to exact guard copies, runs them against a real Nift binary (and

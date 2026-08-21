@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "campaign": "post-release-hardening",
+  "checkpoint": "pathto-404",
+  "timestamp_utc": "2026-08-22T02:40:00Z",
+  "platform": "Linux",
+  "nift": "v4.0.6 development",
+  "purpose": "@pathto on the tracked page named '404' must emit root-absolute web paths, because a deployed 404 document is served at any request depth and has no meaningful relative location. All existence/dependency checking is unchanged; only the path representation differs.",
+  "trigger": "Warden 404-page authoring exposed that relative @pathto paths from a 404 document are wrong when the browser request path depth is arbitrary.",
+  "fix": "Parser::path_to emits root-absolute web paths when tracked_info_.name == '404' (index pages become '/dir/'; ordinary targets become '/dir/file.ext'), for targets under the output directory; targets outside it keep relative behaviour.",
+  "guard": "tests/pathto_404_smoke.sh (make test-pathto-404), wired into the bh2-test-integrity CI-equivalent chain.",
+  "green_runs": [
+    {
+      "case": "404 page: root, page, deep page, directory index, asset",
+      "outcome": "GREEN: '/', '/about.html', '/docs.html', '/docs/getting-started.html', '/guides/', '/assets/css/style.css'"
+    },
+    {
+      "case": "ordinary page: same links",
+      "outcome": "GREEN: relative paths unchanged ('./', 'docs/getting-started.html', 'assets/css/style.css')"
+    }
+  ],
+  "red_runs": [
+    {
+      "case": "404 @pathto('missing')",
+      "exit": 1,
+      "outcome": "RED: 'neither a tracked name nor a file that exists' (existence checking intact)",
+      "red_as_expected": true
+    }
+  ],
+  "all_red_correct": true
+}

@@ -1351,3 +1351,17 @@ failing on Nift's read-only outputs, regenerating truthful evidence
 (26 guarantees / 27 claims / 3 discrepancies / 20 CI refs), BH1 liveness, the
 full CI-equivalent chain, and the 50-file integrity scan all pass. The next
 release's hardening queue is re-planned from the ledger.
+
+## Nift `@pathto` on the 404 page (2026-08-22)
+
+Warden 404-page authoring surfaced a real path-semantics gap. A deployed 404
+document is served at arbitrary request depth, so a relative `@pathto` path from
+its on-disk location is meaningless. `Parser::path_to` now emits root-absolute
+web paths when the tracked page being rendered is named `404` (index pages
+become `/dir/`, ordinary targets `/dir/file.ext`), for targets under the output
+directory; targets outside it keep the ordinary relative behaviour. Only the
+path representation changes — existence/dependency checking is untouched. Guard
+`tests/pathto_404_smoke.sh` (`make test-pathto-404`, in the CI chain) proves the
+404 page emits root-absolute links, ordinary pages keep relative links, and a
+missing target still fails. Evidence at
+`docs/evidence/pathto-404/pathto-404.json`.

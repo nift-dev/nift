@@ -1305,6 +1305,7 @@ bool Parser::evaluate_condition(const std::string& expression, bool& value, std:
 
 std::string Parser::path_to(const std::string& argument) {
     const fs::path output = project_.output_path(tracked_info_);
+    const bool absolute_404 = (tracked_info_.name == "404");
     const fs::path base = output.parent_path();
     fs::path destination;
     bool index_page = false;
@@ -1323,6 +1324,29 @@ std::string Parser::path_to(const std::string& argument) {
             result_.ok = false;
             result_.error = {tracked_info_.name, {}, 0, "'" + argument + "' is neither a tracked name nor a file that exists"};
             return {};
+        }
+    }
+
+    // A deployed 404 document is served at any request depth, so a relative
+    // path from its on-disk location is meaningless: the browser might think it
+    // is at /docs/foo/bar while the file physically lives at /404.html. Emit a
+    // root-absolute web path instead. All existence/dependency checking above
+    // is unchanged; only the path representation differs. Targets outside the
+    // output directory keep the ordinary relative behaviour.
+    if (absolute_404) {
+        const fs::path web_root = (project_.root / project_.config.output_dir).lexically_normal();
+        fs::path web_rel = destination.lexically_normal().lexically_relative(web_root.lexically_normal());
+        const std::string web_rel_str = web_rel.generic_string();
+        const bool escapes_web_root = web_rel_str == ".." || web_rel_str.rfind("../", 0) == 0;
+        if (!escapes_web_root) {
+            if (index_page) {
+                const std::string dir = web_rel.parent_path().generic_string();
+                if (dir.empty() || dir == ".") return "/";
+                std::string p = "/" + dir;
+                if (p.back() != '/') p += '/';
+                return p;
+            }
+            return "/" + web_rel_str;
         }
     }
 
