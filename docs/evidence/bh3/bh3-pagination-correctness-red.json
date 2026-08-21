@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "campaign": "bh3",
+  "checkpoint": "guard-mutation-tranche-2",
+  "timestamp_utc": "2026-08-21T15:30:00Z",
+  "platform": "Linux (BH3 tranche 2)",
+  "purpose": "BH3 self-attack on the pagination guard revealed that it proved incremental/clean EQUIVALENCE but not output CORRECTNESS: a nift that under-produces pages in BOTH builds passes. The guard was strengthened with assert_output_correct (exact page set + nav total). Representative-defect red-runs below.",
+  "attack": "pagination.incremental-clean-equivalence: original guard GREEN against a truncating nift (drops blog-*.html in both builds); a consistently-broken nift was invisible to equivalence-only checking.",
+  "fix": "tests/pagination_incremental_equivalence.py now asserts the expected page set (ceil(items/items-per-page)) exists non-empty and the first page nav total matches.",
+  "red_runs": [
+    {
+      "case": "original guard + truncating nift",
+      "exit": 0,
+      "outcome": "GREEN (blind spot: under-production invisible to equivalence-only check)"
+    },
+    {
+      "case": "strengthened guard + truncating nift",
+      "exit": 1,
+      "outcome": "RED (page-set assertion catches under-production)",
+      "red_as_expected": true
+    },
+    {
+      "case": "strengthened guard + stub nift",
+      "exit": 1,
+      "outcome": "RED (no pages produced)",
+      "red_as_expected": true
+    },
+    {
+      "case": "strengthened guard + real nift",
+      "exit": 0,
+      "outcome": "GREEN (baseline preserved)",
+      "red_as_expected": false
+    }
+  ],
+  "all_red_correct": true
+}

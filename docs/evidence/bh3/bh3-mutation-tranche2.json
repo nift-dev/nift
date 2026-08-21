@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "campaign": "bh3",
+  "checkpoint": "guard-mutation-tranche-2",
+  "timestamp_utc": "2026-08-21T01:23:56.039635+00:00",
+  "platform": "Linux (BH3 tranche 1)",
+  "nift": "/home/nick/Repositories/nift/nift/nift",
+  "purpose": "BH3 tranche 2 re-run of the mutation battery against the STRENGTHENED pagination guard (assert_output_correct added). The tranche-1 LIVE_FALSE_GREEN for m2-stub-nift is now HYPOTHESIS_REJECTED (the stub is caught); m4-remove-equivalence-check remains LIVE_FALSE_GREEN (deleting the equivalence comparison specifically is the accepted logic-removal boundary, not statically catchable).",
+  "guards": [
+    {
+      "guard_id": "pagination.incremental-clean-equivalence",
+      "guard": "tests/pagination_incremental_equivalence.py",
+      "baseline": {
+        "exit": 0,
+        "green": true,
+        "outcome_tail": "Pagination incremental equivalence passed: 18 comparisons"
+      },
+      "mutants": [
+        {
+          "name": "m2-stub-nift",
+          "family": "M2 input-redirection",
+          "binary": "stub",
+          "expectation": "a stub nift (validates nothing) must not be accepted as a green run; if it is, the guard is LIVE_FALSE_GREEN",
+          "expected": "GREEN",
+          "classification": "HYPOTHESIS_REJECTED",
+          "exit": 1,
+          "outcome": "FAIL",
+          "outcome_tail": "RuntimeError: modified:initial: expected page 'blog.html' missing or empty (items=5, items-per-page=2)",
+          "bh2_scanner_findings": 0
+        },
+        {
+          "name": "m3-invert-equivalence-check",
+          "family": "M3 condition-inversion",
+          "binary": "real",
+          "expectation": "inverting the load-bearing check must flip a healthy run to FAIL (proves the check is load-bearing)",
+          "expected": "NON_GREEN",
+          "classification": "ROBUST",
+          "exit": 1,
+          "outcome": "FAIL",
+          "outcome_tail": "clean={'blog-2.html': '3260415ba858f9b830f0b23d2efe96b73d133de1c8682bfc72c09445ec236a74', 'blog-3.html': '22f4e126f4c5e3769adcd03176d699e3fe3a2ae9d3c0649802686172e6681406', 'blog.html': '05273d087196b5668e378f335e1b9e28f875088c32681d7685abc2b3d335e52c'}",
+          "bh2_scanner_findings": 0
+        },
+        {
+          "name": "m4-remove-equivalence-check-sabotaged",
+          "family": "M4 check-removal / test-of-test",
+          "binary": "sabotaged",
+          "expectation": "removing the equivalence check must turn a would-be RED (sabotaged nift) into GREEN: the removal is LIVE",
+          "expected": "GREEN",
+          "classification": "LIVE_FALSE_GREEN",
+          "exit": 0,
+          "outcome": "PASS",
+          "outcome_tail": "Pagination incremental equivalence passed: 18 comparisons",
+          "bh2_scanner_findings": 0
+        }
+      ]
+    },
+    {
+      "guard_id": "contracts.namespace-reservation",
+      "guard": "tests/contracts_smoke.sh",
+      "baseline": {
+        "exit": 0,
+        "green": true,
+        "outcome_tail": "Project contracts smoke test passed"
+      },
+      "mutants": [
+        {
+          "name": "m2-stub-nift",
+          "family": "M2 input-redirection",
+          "binary": "stub",
+          "expectation": "a stub nift must be detected (guard stays RED), not silently accepted; if so, ROBUST",
+          "expected": "NON_GREEN",
+          "classification": "ROBUST",
+          "exit": 2,
+          "outcome": "EXIT_2",
+          "outcome_tail": "grep: /tmp/nift-contracts.U6GQoD/happy/public/index.html: No such file or directory",
+          "bh2_scanner_findings": 0
+        },
+        {
+          "name": "m4-remove-expect-failure-probes-stub",
+          "family": "M4 check-removal / test-of-test",
+          "binary": "stub",
+          "expectation": "even with the expected-failure probes removed the stub must not be accepted as green; the probes are not the sole load-bearing check",
+          "expected": "NON_GREEN",
+          "classification": "ROBUST",
+          "exit": 2,
+          "outcome": "EXIT_2",
+          "outcome_tail": "/tmp/bh3-mutation.2hkvj3lw/contracts_smoke.sh.m4-remove-expect-failure-probes-stub: line 26: syntax error near unexpected token `}'",
+          "bh2_scanner_findings": 0
+        }
+      ]
+    }
+  ]
+}

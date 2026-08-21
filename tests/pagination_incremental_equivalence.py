@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import argparse, hashlib, json, os, shutil, subprocess, tempfile
+import argparse, hashlib, json, math, os, re, shutil, subprocess, tempfile
 from pathlib import Path
 
 
@@ -8,6 +8,40 @@ def run(nift, cwd, *args, expect=0):
     if proc.returncode != expect:
         raise RuntimeError(f"{' '.join(args)} returned {proc.returncode}:\n{proc.stdout}")
     return proc.stdout
+
+
+def pagination_items(project: Path) -> int:
+    return (project / 'content' / 'blog.html').read_text().count('@item{')
+
+
+def pagination_items_per_page(project: Path) -> int:
+    tracked = json.loads((project / '.nift' / 'tracked.json').read_text())
+    return int(tracked['tracked'][0]['paginate']['items-per-page'])
+
+
+def assert_output_correct(project: Path, label: str) -> None:
+    """The rendered pagination must be *correct*, not merely self-consistent:
+    the exact expected page set must exist non-empty, and the first page's nav
+    total must match ceil(items / items-per-page). A stub or a build that
+    under-produces pages in both incremental and clean runs is caught here."""
+    items = pagination_items(project)
+    per_page = pagination_items_per_page(project)
+    total = max(1, math.ceil(items / per_page))
+    public = project / 'public'
+    expected = ['blog.html'] + [f'blog-{i}.html' for i in range(2, total + 1)]
+    for name in expected:
+        page = public / name
+        if not page.is_file() or page.stat().st_size == 0:
+            raise RuntimeError(
+                f"{label}: expected page {name!r} missing or empty "
+                f"(items={items}, items-per-page={per_page})")
+    if total >= 2:
+        content = (public / 'blog.html').read_text()
+        m = re.search(r"<nav>\d+/(\d+) ", content)
+        if not m or int(m.group(1)) != total:
+            raise RuntimeError(
+                f"{label}: pagination nav total wrong "
+                f"(expected {total}, got {m.group(1) if m else 'none'})")
 
 
 def tree_hash(root: Path):
@@ -54,9 +88,11 @@ def write_project(project: Path, mode: str):
 def compare_incremental_to_clean(nift: str, project: Path, label: str):
     run(nift, project, 'build')
     inc = tree_hash(project / 'public')
+    assert_output_correct(project, f'{label}:incremental')
     reset_generated(project)
     run(nift, project, 'build-all')
     clean = tree_hash(project / 'public')
+    assert_output_correct(project, f'{label}:clean')
     if inc != clean:
         raise RuntimeError(f"{label}: incremental/clean mismatch\nincremental={inc}\nclean={clean}")
 
@@ -74,6 +110,7 @@ def main():
             project.mkdir()
             write_project(project, mode)
             run(nift, project, 'build-all')
+            assert_output_correct(project, f'{mode}:initial')
 
             # Content changes without changing page count.
             (project / 'content' / 'blog.html').write_text('@item{a}@item{B}@item{c}@item{d}@item{e}@paginate\n')

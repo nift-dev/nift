@@ -134,6 +134,35 @@ discrepancy).
 
 BH3 tranche 1 is an immutable candidate for ChatGPT to attack cold.
 
+### BH3 tranche 2 — self-attack + strengthen
+
+DeepSeek self-attacked tranche-1 candidate `50f7d7f`. The attack found that
+`pagination.incremental-clean-equivalence` proved incremental/clean
+*equivalence* but not output *correctness*: a nift that under-produces pages in
+both builds (truncating `blog-*.html`) passes, because both hashes are equal
+and the guard never checks that the right pages exist. The tranche-1
+`m2-stub-nift` LIVE_FALSE_GREEN is the same class (nothing produced → equal
+hashes).
+
+The guard was strengthened with `assert_output_correct`: after every build it
+asserts the exact expected page set (`blog.html` + `blog-{i}.html` for
+`i = 2..ceil(items/items-per-page)`) exists non-empty and the first page's nav
+total matches. Red-runs retained at
+`docs/evidence/bh3/bh3-pagination-correctness-red.json`:
+
+- original guard + truncating nift → GREEN (the blind spot)
+- strengthened guard + truncating nift → RED
+- strengthened guard + stub nift → RED
+- strengthened guard + real nift → GREEN (baseline preserved)
+
+The mutation battery re-run (`docs/evidence/bh3/bh3-mutation-tranche2.json`)
+shows `m2-stub-nift` is now HYPOTHESIS_REJECTED (the stub is caught);
+`m4-remove-equivalence-check` remains LIVE_FALSE_GREEN — deleting the
+equivalence comparison specifically is the accepted logic-removal boundary, not
+statically catchable. The pagination guard's `test_of_test` is promoted to
+`VERIFIED_GUARD` (load-bearing proof: m3 inversion flips a healthy run to FAIL)
+with RETAINED evidence registered.
+
 ## BH1 — Guarantee registry + baseline map
 
 BH1 introduces `docs/guarantees/registry.json` as a deliberately small, versioned

@@ -681,8 +681,23 @@
       "platforms": [
         "linux"
       ],
-      "evidence_classes": [],
-      "evidence_refs": [],
+      "evidence_classes": [
+        "RETAINED"
+      ],
+      "evidence_refs": [
+        {
+          "repo": "nift",
+          "path": "docs/evidence/bh3/bh3-mutation-tranche1.json"
+        },
+        {
+          "repo": "nift",
+          "path": "docs/evidence/bh3/bh3-mutation-tranche2.json"
+        },
+        {
+          "repo": "nift",
+          "path": "docs/evidence/bh3/bh3-pagination-correctness-red.json"
+        }
+      ],
       "guard_refs": [
         {
           "repo": "nift",
@@ -700,10 +715,22 @@
           "job": "fast-suites"
         }
       ],
-      "test_of_test": "UNPROVEN",
+      "test_of_test": "VERIFIED_GUARD",
+      "test_of_test_evidence_refs": [
+        {
+          "repo": "nift",
+          "path": "docs/evidence/bh3/bh3-pagination-correctness-red.json"
+        },
+        {
+          "repo": "nift",
+          "path": "docs/evidence/bh3/bh3-mutation-tranche2.json"
+        }
+      ],
       "known_limits": [
         "Focused pagination fixture; broader incremental state-space remains BH4 territory",
-        "Executable guard exists, but no retained completed-run evidence artifact is currently registered; BH3 may promote this evidence class after retaining a run artifact."
+        "Output correctness (exact page set + nav total) is now asserted, so a stub or a build that under-produces pages in both incremental and clean runs is RED",
+        "Deleting the equivalence comparison specifically (m4 logic removal) remains a live mutation that is not statically catchable; accepted enforcement boundary",
+        "Mutation battery (stub / truncating / sabotaged nift) retained under docs/evidence/bh3/; test_of_test VERIFIED_GUARD via load-bearing proof (m3 inversion flips healthy to FAIL)"
       ]
     },
     {
