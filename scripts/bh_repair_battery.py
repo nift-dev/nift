@@ -86,7 +86,7 @@ exit $rc
 "$real" "$@"
 rc=$?
 if [ "$rc" = 0 ] && {{ [ "$1" = build ] || [ "$1" = build-all ]; }} && grep -q B2 content/b.html 2>/dev/null && ! grep -q 'T2:' templates/template.html 2>/dev/null && [ -f public/b.html ]; then
-  echo '<p>WRONG</p>' > public/b.html
+  chmod u+w public/b.html; echo '<p>WRONG</p>' > public/b.html
 fi
 exit $rc
 """), 1)]),
@@ -96,7 +96,7 @@ exit $rc
 "$real" "$@"
 rc=$?
 if [ "$rc" = 0 ] && [ "$1" = build-all ] && [ -d public ]; then
-  find public -type f -name '*.html' -exec sh -c 'echo WRONG > "$1"' _ {{}} \\;
+  find public -type f -name '*.html' -exec sh -c 'chmod u+w "$1"; echo WRONG > "$1"' _ {{}} \\;
 fi
 exit $rc
 """), 1),

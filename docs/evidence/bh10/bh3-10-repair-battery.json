@@ -2,9 +2,9 @@
   "schema_version": 1,
   "campaign": "bh3-10-repair",
   "checkpoint": "guard-oracle-repair-tranche",
-  "timestamp_utc": "2026-08-21T07:02:40.279853+00:00",
+  "timestamp_utc": "2026-08-21T07:21:51.511336+00:00",
   "platform": "Linux (repair tranche)",
-  "nift": "/mnt/data/coldreview/nift/nift",
+  "nift": "/home/nick/Repositories/nift/nift/nift",
   "purpose": "Replays the independent reviewer's oracle attacks against the repaired BH3-BH10 guards: real Nift must stay GREEN and each representative attack must go RED.",
   "all_red_correct": true,
   "guards": [
