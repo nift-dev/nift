@@ -1336,3 +1336,18 @@ A final independent cold review after repair tranche 2 found no Nift product def
 The retained `scripts/bh_repair_battery.py` battery now includes these attacks. Its final run kept real Nift green and every injected fault red (`all_red_correct: true`), with evidence refreshed at `docs/evidence/bh10/bh3-10-repair-battery.json`. No semantic/product change was required.
 
 The public Battle Tested page was also clarified so “battle hardening” is not presented as one undifferentiated badge. It now separates semantic/regression, adversarial/boundary, memory/resource, filesystem/recovery, performance/complexity, concurrency, platform and field hardening, and states the non-claims at each boundary (for example adversarial testing is not a security audit, and a portable cross-platform corpus is not proof of identical filesystem semantics).
+
+### Campaign disposition — closed for this release
+
+The final cold review closed the deliberate battle-hardening campaign for this
+release. The reviewer independently found and repaired the last guard-only
+false-greens (pagination navigation, incremental semantic assertions,
+filesystem exact-bytes valid outcomes, process-group crash injection, and the
+BH1 liveness mutation targeting the real CI_GATED entry), attacked the repairs
+again, and found no Nift semantic/product defect. DeepSeek then verified the
+workspace and fixed two attack-battery wrappers whose injections were silently
+failing on Nift's read-only outputs, regenerating truthful evidence
+(`all_red_correct: True`). All three repositories are clean; registry CI/full
+(26 guarantees / 27 claims / 3 discrepancies / 20 CI refs), BH1 liveness, the
+full CI-equivalent chain, and the 50-file integrity scan all pass. The next
+release's hardening queue is re-planned from the ledger.
