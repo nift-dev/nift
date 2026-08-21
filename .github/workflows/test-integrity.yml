@@ -73,3 +73,5 @@ jobs:
         run: make test-parser-value-composition
       - name: Init scaffold functional truth (BH6)
         run: make test-init-functional-truth
+      - name: Crash/recovery adversarial (BH7)
+        run: make test-crash-recovery

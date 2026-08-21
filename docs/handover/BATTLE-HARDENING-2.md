@@ -134,6 +134,32 @@ discrepancy).
 
 BH3 tranche 1 is an immutable candidate for ChatGPT to attack cold.
 
+## BH7 — Persistence / crash / recovery II — ACTIVE
+
+### BH7 guarantee
+
+Interrupting Nift mid-build (SIGKILL at multiple points during `build-all`)
+leaves the project crash-safe: tracked and config metadata remain valid JSON,
+the next build succeeds, and a further build converges to the clean output.
+
+### BH7 attack
+
+checkpoint-8 covers failure-injection/transaction integrity; BH7 attacks the
+crash/recovery plane directly. The real binary survives SIGKILL at all probed
+points with valid metadata and a succeeding next build.
+
+### BH7 guard + red-run evidence
+
+`tests/crash_recovery_adversarial.py` (make `test-crash-recovery`, CI_GATED via
+`fast-suites`). Red-runs retained at
+`docs/evidence/bh7/bh7-crash-recovery-red.json`:
+
+- real nift (SIGKILL at 3 points x 3 modes) → GREEN
+- non-atomic-metadata wrapper → RED (tracked.json invalid after crash)
+- non-converging wrapper → RED (output does not converge)
+
+Registered as `persistence.crash-recovery` (ESTABLISHED, RETAINED).
+
 ## BH6 — Init / starter functional truth — ACTIVE
 
 ### BH6 guarantee

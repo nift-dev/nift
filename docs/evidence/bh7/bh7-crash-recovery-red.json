@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "campaign": "bh7",
+  "checkpoint": "persistence-crash-recovery-adversarial",
+  "timestamp_utc": "2026-08-21T19:00:00Z",
+  "platform": "Linux (BH7)",
+  "nift": "/home/nick/Repositories/nift/nift/nift",
+  "purpose": "BH7 guard red-rule evidence: tests/crash_recovery_adversarial.py is GREEN on the real Nift binary (SIGKILL at 3 points across 3 incremental modes; metadata stays valid JSON, next build succeeds, output converges to clean) and RED on representative defects (non-atomic metadata writes; output that never converges).",
+  "attack": "checkpoint-8 covers failure-injection/transaction integrity; BH7 attacks the crash/recovery plane directly: SIGKILL mid-build at multiple points, then asserts crash-safe metadata, recovery, and convergence.",
+  "red_runs": [
+    {
+      "case": "real nift (SIGKILL at 0/0.02/0.08s x 3 modes)",
+      "exit": 0,
+      "outcome": "GREEN",
+      "red_as_expected": false
+    },
+    {
+      "case": "non-atomic-metadata wrapper (truncates tracked.json after each build)",
+      "exit": 1,
+      "outcome": "RED (tracked.json not valid JSON after crash)",
+      "red_as_expected": true
+    },
+    {
+      "case": "non-converging wrapper (emits a new orphan file each build)",
+      "exit": 1,
+      "outcome": "RED (output does not converge after crash recovery)",
+      "red_as_expected": true
+    }
+  ],
+  "all_red_correct": true
+}

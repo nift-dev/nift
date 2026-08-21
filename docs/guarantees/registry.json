@@ -76,6 +76,46 @@
       ]
     },
     {
+      "id": "persistence.crash-recovery",
+      "state": "ESTABLISHED",
+      "guarantee": "Interrupting Nift mid-build (SIGKILL at multiple points during build-all) leaves the project crash-safe: tracked and config metadata remain valid JSON, the next build succeeds, and a further build converges to the clean output.",
+      "scope": "3 incremental modes x 3 kill points each, plus clean-rebuild convergence.",
+      "platforms": [
+        "linux"
+      ],
+      "evidence_classes": [
+        "RETAINED"
+      ],
+      "evidence_refs": [
+        {
+          "repo": "nift",
+          "path": "docs/evidence/bh7/bh7-crash-recovery-red.json"
+        }
+      ],
+      "guard_refs": [
+        {
+          "repo": "nift",
+          "path": "tests/crash_recovery_adversarial.py"
+        }
+      ],
+      "enforcement": [
+        {
+          "class": "MANUAL",
+          "command": "make test-crash-recovery"
+        },
+        {
+          "class": "CI_GATED",
+          "workflow": ".github/workflows/test-integrity.yml",
+          "job": "fast-suites"
+        }
+      ],
+      "test_of_test": "UNPROVEN",
+      "known_limits": [
+        "Kill points are coarse (0/20/80ms); scheduler-dependent timing is not exhaustively covered",
+        "Process-level kill only; power-loss/cache-flush simulation is out of scope"
+      ]
+    },
+    {
       "id": "filesystem.transaction-integrity",
       "state": "ESTABLISHED",
       "guarantee": "The retained Checkpoint 8 corpus exercises controlled filesystem/transaction failure, last-good output behavior, concurrent live-temp preservation, and stale-temp recovery.",
