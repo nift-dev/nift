@@ -257,14 +257,19 @@ bool write_file(const fs::path& path, const std::string& contents) {
 }
 
 
-static bool make_readonly(const fs::path& path) {
+std::filesystem::perms file_permissions(const fs::path& path) {
+    std::error_code error;
+    return fs::status(path, error).permissions();
+}
+
+static bool apply_mode(const fs::path& path, fs::perms mode) {
 #ifdef _WIN32
     std::error_code error;
-    fs::permissions(path, fs::perms::owner_read | fs::perms::group_read | fs::perms::others_read,
-                    fs::perm_options::replace, error);
+    fs::permissions(path, mode, fs::perm_options::replace, error);
     return !error;
 #else
-    return ::chmod(path.c_str(), 0444) == 0;
+    const auto bits = static_cast<unsigned>(mode & fs::perms::all);
+    return ::chmod(path.c_str(), bits) == 0;
 #endif
 }
 
@@ -274,7 +279,7 @@ static bool is_readonly(const fs::path& path) {
     return !error && (permissions & fs::perms::owner_write) == fs::perms::none;
 }
 
-bool write_readonly_file(const fs::path& path, const std::string& contents) {
+bool write_readonly_file(const fs::path& path, const std::string& contents, fs::perms mode) {
     ensure_parent_directory(path);
     remove_stale_temporaries(path);
     // A forced full build still renders and validates every page, but replacing
@@ -284,7 +289,7 @@ bool write_readonly_file(const fs::path& path, const std::string& contents) {
     // transactional path below and therefore retains last-good interruption
     // safety. If touching is unsupported, fall back to the transactional write.
     if (file_contents_equal(path, contents)) {
-        if ((is_readonly(path) || make_readonly(path)) && refresh_modified_time(path)) return true;
+        if ((is_readonly(path) || apply_mode(path, mode)) && refresh_modified_time(path)) return true;
     }
     const fs::path temp = temporary_sibling(path);
     if (!write_temp_file(temp, contents)) {
@@ -292,7 +297,7 @@ bool write_readonly_file(const fs::path& path, const std::string& contents) {
         fs::remove(temp, cleanup);
         return false;
     }
-    if (!make_readonly(temp)) {
+    if (!apply_mode(temp, mode)) {
         std::error_code cleanup;
         fs::remove(temp, cleanup);
         return false;
@@ -300,7 +305,7 @@ bool write_readonly_file(const fs::path& path, const std::string& contents) {
     return replace_file(temp, path);
 }
 
-bool write_readonly_files(const std::vector<std::pair<fs::path, std::string>>& files) {
+bool write_readonly_files(const std::vector<std::pair<fs::path, std::string>>& files, fs::perms mode) {
     if (files.empty()) return true;
     struct Staged { fs::path path; fs::path temp; fs::path backup; bool had_original = false; bool committed = false; };
     std::vector<Staged> staged;
@@ -323,7 +328,7 @@ bool write_readonly_files(const std::vector<std::pair<fs::path, std::string>>& f
         Staged item;
         item.path = path;
         item.temp = temporary_sibling(path);
-        if (!write_temp_file(item.temp, contents) || !make_readonly(item.temp)) {
+        if (!write_temp_file(item.temp, contents) || !apply_mode(item.temp, mode)) {
             staged.push_back(std::move(item));
             cleanup();
             return false;

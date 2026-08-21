@@ -8,8 +8,15 @@ namespace filesystem {
 std::string read_file(const std::filesystem::path& path);
 void begin_recovery_epoch();
 bool write_file(const std::filesystem::path& path, const std::string& contents);
-bool write_readonly_file(const std::filesystem::path& path, const std::string& contents);
-bool write_readonly_files(const std::vector<std::pair<std::filesystem::path, std::string>>& files);
+bool write_readonly_file(const std::filesystem::path& path, const std::string& contents,
+                         std::filesystem::perms mode = std::filesystem::perms::owner_read |
+                                                         std::filesystem::perms::group_read |
+                                                         std::filesystem::perms::others_read);
+bool write_readonly_files(const std::vector<std::pair<std::filesystem::path, std::string>>& files,
+                          std::filesystem::perms mode = std::filesystem::perms::owner_read |
+                                                          std::filesystem::perms::group_read |
+                                                          std::filesystem::perms::others_read);
+std::filesystem::perms file_permissions(const std::filesystem::path& path);
 bool remove_owned_file(const std::filesystem::path& path);
 bool path_exists(const std::filesystem::path& path);
 bool file_exists(const std::filesystem::path& path);

@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "campaign": "post-release-hardening",
+  "checkpoint": "output-permissions",
+  "timestamp_utc": "2026-08-21T21:42:14Z",
+  "platform": "Linux",
+  "nift": "v4.0.6 development",
+  "purpose": "Tracked page outputs deterministically preserve the source content file's permission bits: an executable script output (e.g. a tracked .sh, or an HTML file made executable) must stay executable, and an ordinary content output must keep its source mode. Previously every generated output was written read-only (0444), so a tracked executable lost its execute bit on every build.",
+  "trigger": "Warden's website root 'install' executable resets to non-executable surfaced the fact that nift rebuilds rewrite outputs 0444, stripping the execute bit from tracked executable outputs.",
+  "fix": "filesystem::file_permissions(path) reads the source content file's mode (fs::status().permissions()); write_readonly_file/write_readonly_files take an explicit fs::perms mode (default read-only 0444, so .nift/public/*.info.json build metadata stays read-only); ProjectInfo's page-write path passes content_path(info)'s permissions, falling back to 0444 when the source mode cannot be read.",
+  "guard": "tests/output_permissions_smoke.sh (make test-output-permissions), wired into the bh2-test-integrity CI-equivalent chain.",
+  "green_runs": [
+    {
+      "case": "content/script.sh chmod 755 -> public/script.sh",
+      "outcome": "GREEN: output mode 755; './public/script.sh' executes and prints 'run'"
+    },
+    {
+      "case": "content/helper.sh chmod 700 -> public/helper.sh",
+      "outcome": "GREEN: output mode 700"
+    },
+    {
+      "case": "content/index.html chmod 644 -> public/index.html",
+      "outcome": "GREEN: output mode 644 (source-preserving, no longer forced 0444)"
+    },
+    {
+      "case": "determinism: output pre-chmod 600, rebuild",
+      "outcome": "GREEN: rebuild restores source permissions (script.sh back to 755), independent of the output's prior mode"
+    }
+  ],
+  "red_runs": [],
+  "all_red_correct": true
+}

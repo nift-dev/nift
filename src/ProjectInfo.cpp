@@ -982,16 +982,24 @@ bool ProjectInfo::build_one(TrackedInfo& info) {
         } else if (!minify_output(result.output)) return false;
     }
 
+    // Outputs deterministically preserve the source content file's permissions
+    // (an executable script stays executable; a normal content file keeps its
+    // ordinary mode), falling back to read-only when the source mode cannot be
+    // read. `info`-metadata writes keep the default read-only mode.
+    fs::perms output_mode = filesystem::file_permissions(content_path(info));
+    if (output_mode == fs::perms::unknown || output_mode == fs::perms::none)
+        output_mode = fs::perms::owner_read | fs::perms::group_read | fs::perms::others_read;
+
     if (!result.pagination_outputs.empty()) {
         std::vector<std::pair<fs::path, std::string>> page_files;
         page_files.reserve(result.pagination_outputs.size());
         for (std::size_t page = 1; page <= result.pagination_outputs.size(); ++page)
             page_files.emplace_back(pagination_output_path(info, page), result.pagination_outputs[page - 1]);
-        if (!filesystem::write_readonly_files(page_files)) {
+        if (!filesystem::write_readonly_files(page_files, output_mode)) {
             print_build_error({info.name, output, 0, "failed to commit generated pagination outputs"});
             return false;
         }
-    } else if (!filesystem::write_readonly_file(output, result.output)) {
+    } else if (!filesystem::write_readonly_file(output, result.output, output_mode)) {
         print_build_error({info.name, output, 0, "failed to write generated output"});
         return false;
     }
