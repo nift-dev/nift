@@ -1,8 +1,43 @@
 # Nift — Release Notes
 
-## v4.0.5 (development)
+## v4.0.5
 
-Development version following the public v4.0.4 release.
+Nift 4.0.5 focuses on reliability and release hardening. There are no
+intentional user-facing semantic changes in this release. It incorporates the
+results of Nift's completed battle-hardening campaign, strengthening regression
+enforcement, recovery and filesystem validation, cross-platform evidence, and
+the checks that keep Nift's public reliability claims tied to retained
+evidence.
+
+- **Test-integrity and enforcement architecture.** The integrity scanner rejects
+  false-green guard patterns (silent SKIP-as-pass, swallowed subprocess
+  failures, masked shell pipelines) and the enforcement checker structurally
+  validates every registered CI/release gate — trigger existence, job
+  executability, cross-platform breadth, and GitHub `paths:` coverage that
+  cannot silently collapse into unrestricted triggers. The guarantee registry
+  now maps every public reliability claim to retained evidence, with the
+  boundaries of what static checking can and cannot establish recorded rather
+  than implied.
+- **Curated guard mutation and test-of-test.** Representative mutations were
+  applied to the executable guards (stub, crashing, hanging, stale-output and
+  corrupted-render implementations) to prove each guard goes red on a broken
+  tool and stays green on real Nift. Guards for incremental state transitions,
+  parser/value composition, init scaffolding, crash recovery, change-proportional
+  builds and filesystem containment now run in CI.
+- **Recovery and filesystem validation.** SIGKILL-during-build crash recovery,
+  transactional-write recovery bounded to one directory scan per parent per
+  build pass, and output containment under adversarial path names are all
+  continuously guarded.
+- **Cross-platform evidence.** The portable behavioural corpus remains
+  validated across Linux, macOS and Windows, with platform-specific filesystem
+  behavior classified separately rather than conflated with portability.
+- **Public-truth reconciliation.** Stale website claims were corrected against
+  measured evidence (for example the maintained minifier semantic corpus count
+  and the Checkpoint 8 filesystem corpus size), and the generated site was
+  rebuilt and republished in the documented order.
+- **No product changes.** No Nift source behavior changed in this release; the
+  changes are entirely in test/enforcement machinery, retained evidence, and
+  the public documentation that describes what is established.
 
 ## v4.0.4
 
