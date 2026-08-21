@@ -1491,7 +1491,7 @@
     {
       "repo": "website",
       "path": "content/docs/battle-tested.html",
-      "sha256": "823c228f03d20240a6a2ab995bba9271cb37d56fc747ab335d003c3f0ece7356",
+      "sha256": "af8b7ea35e42737d404e2d9c4d224165aa68e59116f71327724053bff8fe009a",
       "mapping_scope": "BH1 manual audit of significant quantitative/reliability claims; source hash invalidates the audit if this page changes."
     },
     {
