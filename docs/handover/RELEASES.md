@@ -219,3 +219,76 @@ v4.0.3→v4.0.4 development cycle.
 - Development executable advanced to `Nift v4.0.5` in `src/CLI.cpp`, `snap/snapcraft.yaml`, and release notes.
 - Regression suite assertions updated to the v4.0.5 development identity.
 - Remaining downstream states to track: Homebrew auto-bump merge + fresh install, Chocolatey moderation/approval, Flathub external PR, Snap non-x86 architectures.
+
+## v4.0.5 release report
+
+### Scope
+
+v4.0.5 is a public reliability/release-hardening release. There are no
+intentional user-facing semantic changes; it incorporates the completed
+battle-hardening campaign (test-integrity/enforcement architecture, curated
+guard mutation and test-of-test, recovery/filesystem validation,
+cross-platform evidence, and public-truth reconciliation). The only `src/`
+change since v4.0.4 is the development-version bump.
+
+### Source and workflow
+
+- Candidate commit: `fb30c1b` (release-notes framing commit; HEAD of `main`).
+- Tag: `v4.0.5` (annotated) — push requires explicit approval (pending).
+- GitHub Actions run: pending on tag push.
+
+### Release-candidate validation (performed at `fb30c1b`, clean build)
+
+- Clean source build clean with release compiler/options (g++ C++17 -O2).
+- `nift version` reports `Nift v4.0.5`; `about`/`commands` correct; unknown and
+  help-like invocations fail with exit 1 and direct users to `nift commands`.
+- Implementation-local correctness: 19/19 targets PASS (jsonic-sync not run
+  locally — requires external `JSONIC_DIR` checkout).
+- BH2 CI-equivalent chain PASS: integrity scanner 50 files / 0 findings;
+  registry CI (26 guarantees / 27 claims / 3 discrepancies / 20 CI refs);
+  contracts; pagination 18/18; init targets; BH4 incremental transitions;
+  BH5 parser/value 15/15; BH6 init functional truth; BH7 crash recovery;
+  BH8 complexity invariants; BH9 filesystem boundary.
+- BH3 repair battery: `all_red_correct: True` (real Nift GREEN, all injected
+  faulty implementations RED).
+- Full 3-repository registry audit PASS; BH1 liveness PASS.
+- Minify++ standalone gates PASS (15,459-program generated JS corpus, 180 JSX,
+  CSS, formats, CLI, 70,000-case fuzz).
+- Performance guards: tracking 4.01x, full-build 3.52x ratios; recovery-epoch
+  scan-bound PASS. External regression harness: tracking 4.00x, full-build
+  3.42x; 10k full build 0.108 s, no-op 0.073 s medians.
+- Memory guard: all 10k peaks ≤ 9,948 KiB (guard ≤ 16,384 KiB).
+- ASan/UBSan build clean; sanitized binary passed the BH5 parser battery and
+  BH6 init scaffold with no findings.
+- Website built with the exact candidate binary: 61/61 pages; both website
+  source `stage` and generated `public/main` trees clean; corrected wording
+  (15,459-program corpus, Checkpoint 8 16 cases, `ai-context.txt` wording)
+  present in the generated site.
+- No generated/debug residue in any of the three repositories.
+
+### Local Linux archive layout validation
+
+- `nift-4.0.5-linux-x86_64/` (nift, README.md, LICENSE) built and tarred;
+  SHA-256 `9925c4a556d33147c769e8627e95afe26117b9148900802bb026f6035fd3d7eb`.
+- Fresh extract: binary reports `Nift v4.0.5`; unknown/help diagnostics exit 1;
+  fresh-project `init`/`build`/`status` smoke PASS.
+- Other platform archives, the full `SHA256SUMS`, and the GitHub release are
+  produced by `release.yml` on tag push (pending approval).
+
+### Package publication (pending on tag push and store credentials)
+
+- **Snap**: `snap.yml` builds and, with `SNAPCRAFT_STORE_CREDENTIALS`, publishes
+  to stable. Connected-store other architectures remain external.
+- **Chocolatey**: `chocolatey.yml` derives the checksum from the release ZIP and
+  pushes with `CHOCOLATEY_API_KEY`. Submitted ≠ approved.
+- **Homebrew**: `homebrew.yml` tests the formula; ordinary propagation is left
+  to Homebrew's automatic bump service.
+- **Flathub**: external `flathub/cc.nift.nsm` manifest tag/checksum update.
+
+### Post-release (pending)
+
+- Advance development identity to `Nift v4.0.6` in `src/CLI.cpp`,
+  `snap/snapcraft.yaml`, release notes, and regression-suite assertions.
+- Track downstream states: Homebrew auto-bump merge + fresh install,
+  Chocolatey moderation/approval, Flathub external PR, Snap non-x86.
+- Run `distribution-verification.yml` against the exact public version.
