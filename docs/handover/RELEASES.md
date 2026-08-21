@@ -306,6 +306,15 @@ change since v4.0.4 is the development-version bump.
   Community Repository` succeeded. The public page
   `community.chocolatey.org/packages/nift/4.0.5` returns 200. Submitted, not yet
   approved or publicly fresh-install tested.
+- Chocolatey automated verification initially FAILED for a spurious reason: the
+  verifier's `choco install nift --version 4.0.5` query to
+  `community.chocolatey.org/api/v2/Packages(Id='nift',Version='4.0.5')` returned
+  503 (service unavailable). Validation passed and the package content was
+  independently confirmed correct (release ZIP URL + SHA-256
+  `f7898f0e…ee5439` match). Per PACKAGING.md a verifier-only resubmit of the
+  exact same version is the documented remedy; resubmit run `32467758750`
+  completed success on 2026-08-21, replacing the version under moderation and
+  triggering a fresh automated verification.
 - **Homebrew**: `homebrew.yml` tested the formula on macOS arm64 and Linux
   x86-64. Ordinary propagation is left to Homebrew's automatic bump service.
 - **Flathub**: external `flathub/cc.nift.nsm` manifest tag/checksum update
