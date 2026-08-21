@@ -740,11 +740,12 @@ full 3-repository audit, BH1 liveness, and the CI-equivalent chain all pass.
 
 ### BH2 handoff to reviewer
 
-**Round-8 candidate: this commit** ("BH2 round 8: fix reviewer findings V1-V2
+**Round-8 candidate: `75fb00e`** ("BH2 round 8: fix reviewer findings V1-V2
 on top of ad707c7"). Reviewer attacks the exact round-8 commit in a separate
 clone/worktree and reports findings back; the implementer does not modify the
 tree during review. No changes are made to `7f8768b`, `c06fa33`, `7d2621b`,
-`88f1158`, `689cd45`, `389a4ac`, `ad707c7` or the round-8 candidate itself.
+`88f1158`, `689cd45`, `389a4ac`, `ad707c7` or the round-8 candidate `75fb00e`
+itself.
 
 Review focus areas (attack each):
 
