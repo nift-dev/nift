@@ -77,3 +77,5 @@ jobs:
         run: make test-crash-recovery
       - name: Complexity invariants (BH8)
         run: make test-complexity-invariants
+      - name: Filesystem boundary (BH9)
+        run: make test-filesystem-boundary

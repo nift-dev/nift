@@ -134,6 +134,33 @@ discrepancy).
 
 BH3 tranche 1 is an immutable candidate for ChatGPT to attack cold.
 
+## BH9 — Platform / filesystem boundaries — ACTIVE
+
+### BH9 guarantee
+
+Build output is contained within the output directory: adversarial content
+names (encoded traversal, parent references, spaces, unicode, deep nesting)
+never write outside `public/`; the project tree outside the output directory is
+unchanged by a build; and a read-only output directory yields a controlled
+failure (never a signal or hang).
+
+### BH9 attack
+
+The real binary rejects the parent-reference path (`sub/../x`) controlled and
+contains all other adversarial names; a read-only `public/` fails controlled.
+
+### BH9 guard + red-run evidence
+
+`tests/filesystem_boundary_adversarial.py` (make `test-filesystem-boundary`,
+CI_GATED via `fast-suites`). Red-runs retained at
+`docs/evidence/bh9/bh9-filesystem-boundary-red.json`:
+
+- real nift → GREEN
+- escape-writer wrapper → RED (wrote outside the output directory)
+- crash-on-readonly wrapper → RED (signal 11 on read-only output)
+
+Registered as `platform.filesystem-boundary` (ESTABLISHED, RETAINED).
+
 ## BH8 — Performance / complexity invariants — ACTIVE
 
 ### BH8 guarantee

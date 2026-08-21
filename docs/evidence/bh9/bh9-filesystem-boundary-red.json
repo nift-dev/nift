@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "campaign": "bh9",
+  "checkpoint": "platform-filesystem-boundary-adversarial",
+  "timestamp_utc": "2026-08-21T21:00:00Z",
+  "platform": "Linux (BH9)",
+  "nift": "/home/nick/Repositories/nift/nift/nift",
+  "purpose": "BH9 guard red-rule evidence: tests/filesystem_boundary_adversarial.py is GREEN on the real Nift binary (adversarial content names are contained; the parent-reference path is rejected controlled; a read-only output dir fails controlled) and RED on representative defects (a tool that writes outside the output directory; a tool that crashes on read-only output).",
+  "attack": "Existing path_safety/metadata_safety smoke suites cover common paths; BH9 attacks the boundary with adversarial names (encoded traversal, parent references, spaces, unicode, deep nesting) plus a read-only output directory, asserting output containment and controlled failure.",
+  "red_runs": [
+    {
+      "case": "real nift (adversarial names + read-only output)",
+      "exit": 0,
+      "outcome": "GREEN (contained; parent-reference path rejected; read-only fails controlled)",
+      "red_as_expected": false
+    },
+    {
+      "case": "escape-writer wrapper (writes escaped-outside.html to project root)",
+      "exit": 1,
+      "outcome": "RED (build wrote outside the output directory)",
+      "red_as_expected": true
+    },
+    {
+      "case": "crash-on-readonly wrapper (SIGSEGV when public is read-only)",
+      "exit": 1,
+      "outcome": "RED (build into read-only output crashed with signal 11)",
+      "red_as_expected": true
+    }
+  ],
+  "all_red_correct": true
+}

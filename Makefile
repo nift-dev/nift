@@ -126,6 +126,11 @@ test-crash-recovery: $(TARGET)
 test-complexity-invariants: $(TARGET)
 	python3 tests/complexity_invariants.py --nift "$(CURDIR)/$(TARGET)"
 
+# BH9: platform/filesystem boundary; build output is contained within the
+# output directory and a read-only output dir fails controlled.
+test-filesystem-boundary: $(TARGET)
+	python3 tests/filesystem_boundary_adversarial.py --nift "$(CURDIR)/$(TARGET)"
+
 test-installer:
 	tests/install_script_smoke.sh
 
@@ -170,7 +175,7 @@ bh1-guarantee-registry:
 	python3 scripts/check_guarantee_registry.py --website-root "$(BH1_WEBSITE_ROOT)" --regression-root "$(BH1_REGRESSION_ROOT)"
 	python3 scripts/bh1_registry_liveness.py --website-root "$(BH1_WEBSITE_ROOT)" --regression-root "$(BH1_REGRESSION_ROOT)"
 
-bh2-test-integrity: test-test-integrity test-guarantee-registry-ci test-contracts test-pagination-equivalence test-init-targets test-incremental-state-transitions test-parser-value-composition test-init-functional-truth test-crash-recovery test-complexity-invariants
+bh2-test-integrity: test-test-integrity test-guarantee-registry-ci test-contracts test-pagination-equivalence test-init-targets test-incremental-state-transitions test-parser-value-composition test-init-functional-truth test-crash-recovery test-complexity-invariants test-filesystem-boundary
 
 # BH3 curated guard mutation / test-of-test tranche 1: applies mutation
 # families to exact guard copies, runs them against a real Nift binary (and

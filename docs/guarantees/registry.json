@@ -308,6 +308,46 @@
       ]
     },
     {
+      "id": "platform.filesystem-boundary",
+      "state": "ESTABLISHED",
+      "guarantee": "Build output is contained within the output directory: adversarial content names (encoded traversal, parent references, spaces, unicode, deep nesting) never write outside public/, the project tree outside the output directory is unchanged by a build, and a read-only output directory yields a controlled failure (never a signal or hang).",
+      "scope": "6 adversarial name families plus read-only output failure, on Linux.",
+      "platforms": [
+        "linux"
+      ],
+      "evidence_classes": [
+        "RETAINED"
+      ],
+      "evidence_refs": [
+        {
+          "repo": "nift",
+          "path": "docs/evidence/bh9/bh9-filesystem-boundary-red.json"
+        }
+      ],
+      "guard_refs": [
+        {
+          "repo": "nift",
+          "path": "tests/filesystem_boundary_adversarial.py"
+        }
+      ],
+      "enforcement": [
+        {
+          "class": "MANUAL",
+          "command": "make test-filesystem-boundary"
+        },
+        {
+          "class": "CI_GATED",
+          "workflow": ".github/workflows/test-integrity.yml",
+          "job": "fast-suites"
+        }
+      ],
+      "test_of_test": "UNPROVEN",
+      "known_limits": [
+        "Linux only; platform-specific path semantics remain with the portable-equivalence corpus",
+        "Symlink following within content is Nift behavior, not a boundary violation"
+      ]
+    },
+    {
       "id": "platform.portable-equivalence",
       "state": "ESTABLISHED",
       "guarantee": "The same retained portable behavioral corpus produces normalized equivalent semantics on Linux, macOS, and Windows.",
