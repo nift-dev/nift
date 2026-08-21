@@ -105,6 +105,35 @@ RED evidence is only trusted for a defect whose removal flips the guard GREEN
 (M4 live), and enforcement (BH2 scanner / CI gate) must RED the source-level
 mutants it can see.
 
+### BH3 tranche 1 — results
+
+Driver: `scripts/bh3_guard_mutation.py` (make `bh3-mutation-tranche1`),
+retained at `docs/evidence/bh3/bh3-mutation-tranche1.json`. Every mutation is
+applied to an exact guard copy and run against the real Nift binary (or a
+stub that does nothing, or a sabotaged wrapper that drops a marker on
+`build-all` and removes it on `build`, simulating an incremental-vs-clean
+discrepancy).
+
+- **pagination.incremental-clean-equivalence:**
+  - `m2-stub-nift` — **LIVE_FALSE_GREEN**: the guard falsely PASSes against a
+    stub nift that validates nothing (both hashes empty → equal).
+  - `m3-invert-equivalence-check` — load-bearing proof: inverting `inc !=
+    clean` flips a healthy run to FAIL.
+  - `m4-remove-equivalence-check` — **LIVE_FALSE_GREEN**: with the check
+    removed, a would-be RED (sabotaged nift makes the original RED) turns
+    GREEN. The equivalence check is load-bearing; the removal is a live
+    false-green.
+  - The BH2 static scanner reports 0 findings on all three mutants: these are
+    runtime/logic mutations outside its static world (BH3's boundary).
+- **contracts.namespace-reservation:**
+  - `m2-stub-nift` — **ROBUST**: a stub nift is detected (exit 2), not
+    silently accepted.
+  - `m4-remove-expect-failure-probes` — **ROBUST**: even with the expected-
+    failure probes removed the stub is not accepted as green; the probes are
+    not the sole load-bearing check.
+
+BH3 tranche 1 is an immutable candidate for ChatGPT to attack cold.
+
 ## BH1 — Guarantee registry + baseline map
 
 BH1 introduces `docs/guarantees/registry.json` as a deliberately small, versioned

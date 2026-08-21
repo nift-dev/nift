@@ -144,7 +144,16 @@ bh1-guarantee-registry:
 
 bh2-test-integrity: test-test-integrity test-guarantee-registry-ci test-contracts test-pagination-equivalence test-init-targets
 
-.PHONY: test-guarantee-registry test-guarantee-registry-ci test-test-integrity bh1-guarantee-registry bh2-test-integrity
+# BH3 curated guard mutation / test-of-test tranche 1: applies mutation
+# families to exact guard copies, runs them against a real Nift binary (and
+# stub/sabotaged substitutes), runs the BH2 static scanner over each mutant,
+# and retains the classification report under docs/evidence/bh3/.
+bh3-mutation-tranche1:
+	mkdir -p docs/evidence/bh3
+	python3 scripts/bh3_guard_mutation.py --nift "$(CURDIR)/$(TARGET)" \
+		--output docs/evidence/bh3/bh3-mutation-tranche1.json
+
+.PHONY: test-guarantee-registry test-guarantee-registry-ci test-test-integrity bh1-guarantee-registry bh2-test-integrity bh3-mutation-tranche1
 
 install: $(TARGET)
 	mkdir -p "$(DESTDIR)$(BINDIR)"
