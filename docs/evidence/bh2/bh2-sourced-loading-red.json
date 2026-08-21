@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "campaign": "bh2",
+  "checkpoint": "test-integrity-sourced-loading",
+  "commit": "BH2 close commit",
+  "timestamp_utc": "2026-08-21T14:00:00Z",
+  "platform": "Linux (BH2 close)",
+  "purpose": "BH2 closing boundary: a sourced file (source ./shadow.inc defining set() { :; }) can change runtime command resolution after static analysis. The scanner does not model sourcing/import graphs; it fails conservatively instead - any `source` / `.` statement taints the pipefail and command-resolution state, so a later `set -o pipefail` cannot establish parent-shell pipefail and a masked pipeline goes RED.",
+  "accepted_limitation": "Dynamic shell code loaded via source/., environment-imported functions, arbitrary runtime-generated shell, and recursive sourcing are NOT established by this static checker. The failure direction is conservative (false red, never false green). Deeper sourcing-graph analysis is out of scope for BH2 and is a BH3 mutation seed.",
+  "cases": [
+    {
+      "guard": "main.sh (source ./shadow.inc; set -o pipefail; false | cat >/dev/null)",
+      "scenario": "sourced file redefines `set` as a function before a plain set -o pipefail call",
+      "scanner_exit": 1,
+      "outcome": "pipefail-missing (conservative RED)",
+      "red_as_expected": true
+    }
+  ],
+  "all_red_correct": true
+}

@@ -26,7 +26,7 @@ The operating rules are:
 The queue is provisional and must be reconsidered after every checkpoint:
 
 1. **BH1 — Guarantee registry + baseline map — CLOSED / VERIFIED** — ChatGPT implemented; DeepSeek independently reviewed/attacked and signed off candidate `8419cec`.
-2. **BH2 — Test integrity + enforcement architecture** — DeepSeek implements; ChatGPT reviews/attacks.
+2. **BH2 — Test integrity + enforcement architecture — CLOSED / VERIFIED** — DeepSeek implemented; ChatGPT independently reviewed/attacked rounds 1–9 and signed off with an explicit boundary. Final candidate `84816dc`; close record and sourced-loading boundary below.
 3. **BH3 — Curated guard mutation / test-of-test** — roles reverse per guard.
 4. **BH4 — Incremental/state-transition adversarial II** — DeepSeek implements; ChatGPT reviews/attacks.
 5. **BH5 — Parser/value/composition adversarial** — ChatGPT implements; DeepSeek reviews/attacks.
@@ -321,6 +321,10 @@ make target.
   (`? paths : [...]`) and tagged-key (`!!str paths: [...]`) representations of
   a paths filter narrowed to README.md fail the registry check; an unrecognized
   trigger key fails closed rather than staying "unfiltered".
+- `bh2-sourced-loading-red.json` — the BH2 close boundary: a `source`d file
+  redefining `set` before a plain `set -o pipefail` goes RED (conservative),
+  because dynamic loading is not modeled and instead taints the state. Retained
+  as an accepted limitation / BH3 mutation seed.
 - `bh2-clean-report.json` — the scanner is clean on the real `tests/` + `scripts/`
   (42 files, 0 findings), and clean on the regression-suite contract scripts.
 
@@ -368,20 +372,21 @@ make target.
   adjacent to a SKIP message is a false green regardless of layout. `exit $?`,
   `exit` with an explicit non-zero code, or a SKIP message followed by later
   commands before the exit are deliberately outside the rule.
-- **Pipefail-state boundary (round 5/6/7/8/9):** state is tracked sequentially
-  over top-level statements with a conditional-block taint, an
+- **Pipefail-state boundary (round 5/6/7/8/9 + close):** state is tracked
+  sequentially over top-level statements with a conditional-block taint, an
   execution-environment guard (`$( )`, `( )`, pipeline segments and
   backgrounded commands cannot establish parent state), a command-position
   guard (only a current-shell `set` builtin establishes state; quoted text,
-  command arguments and assignment values do not), and a command-resolution
-  guard (a `set` function/alias shadow with aliases expanded, an `eval`
-  shadow, or a builtin disabled with `enable -n set` all stop a plain `set`
-  from being the builtin). It is not a full shell interpreter:
+  command arguments and assignment values do not), a command-resolution guard
+  (a `set` function/alias shadow with aliases expanded, an `eval` shadow, or a
+  builtin disabled with `enable -n set` all stop a plain `set` from being the
+  builtin), and a dynamic-load guard (`source`/`.` taints the state, because
+  sourced code is not modeled). It is not a full shell interpreter:
   within-statement ordering (e.g. `set -o pipefail && pipeline` on one `&&`
   chain), `unset -f`/`enable`/`alias` resolution changes inside subshells and
-  function bodies, and `trap`/`shopt`/`env`-based option changes are
-  approximated; every approximation fails toward a false red, never a false
-  green.
+  function bodies, environment-imported functions, recursive sourcing, and
+  `trap`/`shopt`/`env`-based option changes are approximated; every
+  approximation fails toward a false red, never a false green.
 - **Trigger-syntax boundary (round 6/7/8/9):** the trigger parser distinguishes
   genuinely-unfiltered triggers from unparsed filter syntax (which fails
   closed), recognizes a path-filter key whether plain, quoted, YAML-tagged, or
@@ -819,6 +824,74 @@ clone/worktree and reports findings back; the implementer does not modify the
 tree during review. No changes are made to `7f8768b`, `c06fa33`, `7d2621b`,
 `88f1158`, `689cd45`, `389a4ac`, `ad707c7`, `75fb00e` or the round-9 candidate
 `84816dc` itself.
+
+### BH2 reviewer round 9 — CLOSE with explicit boundary
+
+ChatGPT attacked round-9 candidate `84816dc` and found one further real
+counterexample: a sourced file can redefine `set` at runtime.
+
+```bash
+# shadow.inc
+set() { :; }
+```
+
+```bash
+#!/bin/bash
+source ./shadow.inc
+set -o pipefail
+false | cat >/dev/null
+echo 'PASS: done'
+exit 0
+```
+
+This executes green and scanned GREEN on `84816dc`. The round-9 state tracker
+models function definitions, aliases, `enable`, and certain `eval` effects that
+appear inside the scanned file, but it does not follow sourced shell code.
+
+The reviewer's verdict was **not** a round-10 return: modelling sourcing/import
+graphs, environment-imported functions, recursive sourcing, and arbitrary
+runtime-generated shell is a Bash interpreter, not a static integrity scanner.
+BH2 is closed with an explicit boundary instead.
+
+### BH2 close — sourced-loading boundary
+
+The BH2 static scanner establishes its guarantees for command-resolution and
+pipefail-state transitions **visible in the scanned source itself**. Dynamic
+changes introduced through `source`/`.` files, environment-imported functions,
+and arbitrary runtime-generated shell are not established by this static
+checker. To keep the failure direction conservative (never a false green), the
+walker now treats any `source` / `.` statement as a dynamic code load: it
+taints the pipefail and command-resolution state, so a later `set -o pipefail`
+cannot establish parent-shell pipefail and a masked pipeline goes RED. The
+reviewer's sourced-function counterexample is retained as RED evidence at
+`docs/evidence/bh2/bh2-sourced-loading-red.json` and is a BH3 mutation seed:
+BH3 asks whether the *actual guards* stay live under environment mutation,
+rather than expanding this static analyser into a shell import-graph engine.
+
+### BH2 closure summary
+
+Not "perfect", and not "all Bash/YAML semantics proven" — the following are
+established:
+
+- SKIP is never PASS (exit 2, never green).
+- Timeouts surface as exit 124 with an outcome line.
+- subprocess failures cannot trivially disappear (swallowed-returncode /
+  bare-discarded-call detection with bounded liveness).
+- CI enforcement references are structurally checked (job existence, static
+  executability, cross-platform breadth via own/transitive `needs:` matrices).
+- GitHub `paths:` filters cannot silently collapse into unrestricted coverage
+  across the supported representations (block, flow, quoted, tagged, escaped,
+  explicit-key), with unparsed filter syntax failing closed.
+- pipefail must be provably active at each pipeline's execution point, in
+  command position, from the `set` builtin, with no function/alias/enable/eval
+  shadow and no dynamic load.
+- the scanner has gone RED against nine independent reviewer rounds of injected
+  false-greens, with all retained evidence in `docs/evidence/bh2/`.
+- the remaining counterexample class requires dynamic shell-code loading
+  outside the scanner's stated static world, which fails conservatively.
+
+The next active checkpoint is **BH3 — Guard mutation and liveness**, with the
+remaining queue re-planned above.
 
 Review focus areas (attack each):
 

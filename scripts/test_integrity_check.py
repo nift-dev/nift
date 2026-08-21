@@ -876,6 +876,20 @@ def _shell_unsafe_pipelines(analyzed: str) -> list[str]:
                 set_alias_defined = True
                 set_builtin_disabled = True
                 continue
+            src = re.search(r"\bsource\b", s)
+            dot = re.search(r"(?<!\w)\.\s", s)
+            if _is_current_shell_cmd(s, src) or _is_current_shell_cmd(s, dot):
+                # `source` / `.` loads arbitrary runtime shell code: it can
+                # redefine `set`, re-enable/disable the builtin, or toggle
+                # pipefail itself. The static checker does not model sourcing
+                # graphs, so it fails conservatively: after a dynamic load we
+                # can no longer prove pipefail is active or that a later `set`
+                # is the builtin.
+                pf = None
+                set_shadowed = True
+                set_builtin_disabled = True
+                set_alias_defined = True
+                continue
             if _PF_OFF.search(s) or _PF_ON.search(s):
                 if not _set_establishes_pipefail(
                     s, set_shadowed, set_builtin_disabled,
