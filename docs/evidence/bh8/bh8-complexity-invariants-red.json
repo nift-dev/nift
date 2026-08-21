@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "campaign": "bh8",
+  "checkpoint": "performance-complexity-invariants",
+  "timestamp_utc": "2026-08-21T20:00:00Z",
+  "platform": "Linux (BH8)",
+  "nift": "/home/nick/Repositories/nift/nift/nift",
+  "purpose": "BH8 guard red-rule evidence: tests/complexity_invariants.py is GREEN on the real Nift binary (no-op build rewrites nothing; one-page change rebuilds exactly that page) and RED on representative over-rewriting defects.",
+  "attack": "The existing scaling benchmarks measure wall-clock near-linearity; BH8 asserts change-proportionality structurally (mtime + content): a no-op build must not rewrite any output, and a one-page change must rebuild exactly that page, across modified/hash/hybrid modes.",
+  "red_runs": [
+    {
+      "case": "real nift (3 modes)",
+      "exit": 0,
+      "outcome": "GREEN (no-op rewrites nothing; one-page change rebuilds exactly one page)",
+      "red_as_expected": false
+    },
+    {
+      "case": "rewrite-on-noop wrapper (touches all outputs after every build)",
+      "exit": 1,
+      "outcome": "RED (no-op build rewrote outputs)",
+      "red_as_expected": true
+    },
+    {
+      "case": "rebuild-all-on-change wrapper (touches all outputs when p7 changed)",
+      "exit": 1,
+      "outcome": "RED (one-page change rebuilt many pages)",
+      "red_as_expected": true
+    }
+  ],
+  "all_red_correct": true
+}

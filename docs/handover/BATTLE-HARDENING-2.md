@@ -134,6 +134,33 @@ discrepancy).
 
 BH3 tranche 1 is an immutable candidate for ChatGPT to attack cold.
 
+## BH8 — Performance / complexity invariants — ACTIVE
+
+### BH8 guarantee
+
+Incremental builds are change-proportional: a no-op build rewrites no output,
+and changing one source rebuilds exactly that page (no full re-render),
+measured structurally (mtime + content) across modified/hash/hybrid modes.
+
+### BH8 attack
+
+The existing scaling benchmarks measure wall-clock near-linearity; BH8 asserts
+change-proportionality structurally. The real binary rewrites nothing on a
+no-op build and rebuilds exactly one page on a one-page change.
+
+### BH8 guard + red-run evidence
+
+`tests/complexity_invariants.py` (make `test-complexity-invariants`, CI_GATED
+via `fast-suites`). Red-runs retained at
+`docs/evidence/bh8/bh8-complexity-invariants-red.json`:
+
+- real nift (3 modes) → GREEN
+- rewrite-on-noop wrapper → RED (no-op build rewrote outputs)
+- rebuild-all-on-change wrapper → RED (one-page change rebuilt many pages)
+
+Registered as `performance.change-proportional-incremental` (ESTABLISHED,
+RETAINED).
+
 ## BH7 — Persistence / crash / recovery II — ACTIVE
 
 ### BH7 guarantee

@@ -75,3 +75,5 @@ jobs:
         run: make test-init-functional-truth
       - name: Crash/recovery adversarial (BH7)
         run: make test-crash-recovery
+      - name: Complexity invariants (BH8)
+        run: make test-complexity-invariants

@@ -121,6 +121,11 @@ test-init-functional-truth: $(TARGET)
 test-crash-recovery: $(TARGET)
 	python3 tests/crash_recovery_adversarial.py --nift "$(CURDIR)/$(TARGET)"
 
+# BH8: performance/complexity invariants; a no-op build rewrites nothing and a
+# one-page change rebuilds exactly that page (change-proportional).
+test-complexity-invariants: $(TARGET)
+	python3 tests/complexity_invariants.py --nift "$(CURDIR)/$(TARGET)"
+
 test-installer:
 	tests/install_script_smoke.sh
 
@@ -165,7 +170,7 @@ bh1-guarantee-registry:
 	python3 scripts/check_guarantee_registry.py --website-root "$(BH1_WEBSITE_ROOT)" --regression-root "$(BH1_REGRESSION_ROOT)"
 	python3 scripts/bh1_registry_liveness.py --website-root "$(BH1_WEBSITE_ROOT)" --regression-root "$(BH1_REGRESSION_ROOT)"
 
-bh2-test-integrity: test-test-integrity test-guarantee-registry-ci test-contracts test-pagination-equivalence test-init-targets test-incremental-state-transitions test-parser-value-composition test-init-functional-truth test-crash-recovery
+bh2-test-integrity: test-test-integrity test-guarantee-registry-ci test-contracts test-pagination-equivalence test-init-targets test-incremental-state-transitions test-parser-value-composition test-init-functional-truth test-crash-recovery test-complexity-invariants
 
 # BH3 curated guard mutation / test-of-test tranche 1: applies mutation
 # families to exact guard copies, runs them against a real Nift binary (and

@@ -430,6 +430,46 @@
       ]
     },
     {
+      "id": "performance.change-proportional-incremental",
+      "state": "ESTABLISHED",
+      "guarantee": "Incremental builds are change-proportional: a no-op build rewrites no output, and changing one source rebuilds exactly that page (no full re-render), measured structurally by mtime and content across modified/hash/hybrid modes.",
+      "scope": "3 incremental modes x no-op + one-page-change probes.",
+      "platforms": [
+        "linux"
+      ],
+      "evidence_classes": [
+        "RETAINED"
+      ],
+      "evidence_refs": [
+        {
+          "repo": "nift",
+          "path": "docs/evidence/bh8/bh8-complexity-invariants-red.json"
+        }
+      ],
+      "guard_refs": [
+        {
+          "repo": "nift",
+          "path": "tests/complexity_invariants.py"
+        }
+      ],
+      "enforcement": [
+        {
+          "class": "MANUAL",
+          "command": "make test-complexity-invariants"
+        },
+        {
+          "class": "CI_GATED",
+          "workflow": ".github/workflows/test-integrity.yml",
+          "job": "fast-suites"
+        }
+      ],
+      "test_of_test": "UNPROVEN",
+      "known_limits": [
+        "Structural change-proportionality only; wall-clock scaling remains covered by the near-linear benchmarks",
+        "Filesystem timestamp granularity makes sub-millisecond rewrites undetectable"
+      ]
+    },
+    {
       "id": "performance.tracking-near-linear",
       "state": "ESTABLISHED",
       "guarantee": "Tracked-project loading remains near-linear over the retained scaling fixture and preserves duplicate/collision rejection.",
