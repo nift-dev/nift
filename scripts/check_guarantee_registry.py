@@ -589,10 +589,15 @@ def _trigger_covers(
         return False
     if state == "unfiltered":
         return True
-    pos = [p for p in (paths or []) if not p.startswith("!")]
     neg = [p[1:] for p in (paths or []) if p.startswith("!")] + list(ignore or [])
-    if not pos:
+    if paths is None:
+        if ignore is None:
+            return False
         pos = ["**"]  # paths-ignore-only: covers everything except the negatives
+    else:
+        pos = [p for p in paths if not p.startswith("!")]
+        if not pos:
+            return False  # empty (or all-negative) paths covers nothing
     positive = any(_pattern_covers(required, p) for p in pos)
     if not positive:
         return False
@@ -661,6 +666,111 @@ def _parse_flow_list(value: str) -> list[str] | None:
     return out
 
 
+def _yaml_unescape(s: str) -> str:
+    """Decode YAML double-quoted-string escapes (``\\uXXXX``, ``\\xXX``, and the
+    common single-char escapes) so an escaped key such as ``"pa\\u0074hs"`` is
+    recognized as ``paths``."""
+
+    def repl(m):
+        esc = m.group(1)
+        if esc[0] in "uU":
+            return chr(int(esc[1:], 16))
+        if esc[0] in "xX":
+            return chr(int(esc[1:], 16))
+        return {"n": "\n", "t": "\t", "r": "\r", "\\": "\\", '"': '"', "'": "'",
+                "0": "\0", "a": "\a", "b": "\b", "f": "\f", "v": "\v"}.get(esc, esc)
+
+    return re.sub(r"\\(u[0-9a-fA-F]{4}|x[0-9a-fA-F]{2}|.)", repl, s)
+
+
+def _normalize_key(raw: str) -> str:
+    """Strip quoting and decode YAML escapes from a mapping key."""
+    k = raw.strip()
+    if len(k) >= 2 and (
+        (k.startswith("'") and k.endswith("'"))
+        or (k.startswith('"') and k.endswith('"'))
+    ):
+        k = k[1:-1]
+    return _yaml_unescape(k)
+
+
+def _parse_flow_mapping(value: str) -> dict[str, str] | None:
+    """Parse a YAML flow mapping ``{ key: value, key: value }`` into
+    {normalized_key: raw_value}. Returns None if it is not a flow mapping."""
+    value = value.strip()
+    if not (value.startswith("{") and value.endswith("}")):
+        return None
+    pairs: dict[str, str] = {}
+    buf: list[str] = []
+    q: str | None = None
+    depth = 0
+    cur: list[str] | None = None
+    cur_key: str | None = None
+    for c in value[1:-1]:
+        if q:
+            buf.append(c)
+            if c == "\\":
+                continue
+            if c == q:
+                q = None
+            continue
+        if c in "\"'":
+            q = c
+            buf.append(c)
+            continue
+        if c in "{[":
+            depth += 1
+            buf.append(c)
+            continue
+        if c in "}]":
+            depth -= 1
+            buf.append(c)
+            continue
+        if c == ":" and depth == 0:
+            cur_key = _normalize_key("".join(buf))
+            buf = []
+            continue
+        if c == "," and depth == 0 and cur_key is not None:
+            pairs[cur_key] = "".join(buf).strip()
+            cur_key = None
+            buf = []
+            continue
+        buf.append(c)
+    if cur_key is not None:
+        pairs[cur_key] = "".join(buf).strip()
+    return pairs
+
+
+def _apply_inline_value(trigger: str, value: str, configs: dict) -> None:
+    """Apply an inline trigger value such as ``{ paths: ['README.md'] }``.
+    A path-filter key inside it is parsed, or the trigger fails closed."""
+    value = value.strip()
+    if value.startswith("#") or not value:
+        return
+    mapping = _parse_flow_mapping(value)
+    if mapping is None:
+        # an inline value that is not a flow mapping cannot be understood
+        configs[trigger] = ("unparsed", None, None)
+        return
+    paths = mapping.get("paths")
+    ignore = mapping.get("paths-ignore")
+    if paths is None and ignore is None:
+        return  # no path filter inside; branches/tags etc. are out of scope
+    if paths is not None:
+        flow = _parse_flow_list(paths)
+        if flow is None:
+            configs[trigger] = ("unparsed", None, None)
+            return
+        configs[trigger] = ("filtered", flow, None)
+    if ignore is not None:
+        flow = _parse_flow_list(ignore)
+        if flow is None:
+            configs[trigger] = ("unparsed", None, None)
+            return
+        _, paths, _ = configs[trigger]
+        configs[trigger] = ("filtered", paths, flow)
+
+
 def _trigger_configs(path: Path) -> dict[str, tuple[str, list[str] | None, list[str] | None]]:
     """Parse the ``on:`` block into per-trigger path filters.
 
@@ -701,44 +811,47 @@ def _trigger_configs(path: Path) -> dict[str, tuple[str, list[str] | None, list[
         if tmatch:
             current_trigger = tmatch.group(1)
             configs.setdefault(current_trigger, ("unfiltered", None, None))
+            rest = line[tmatch.end():].strip()
+            if rest:
+                _apply_inline_value(current_trigger, rest, configs)
             continue
         if current_trigger is None:
             continue
-        # A path-filter key may be written plain or quoted (`'paths':`); either
-        # way it must be parsed or the trigger fails closed. Anything that looks
-        # like a path-filter key but cannot be understood must never leave the
-        # trigger "unfiltered".
-        keymatch = re.match(
-            r"^(\s+)(['\"]?)(paths|paths-ignore)\2\s*:\s*(.*)$", line
-        )
-        if keymatch:
-            key = "ignore" if keymatch.group(3) == "paths-ignore" else "paths"
-            value = keymatch.group(4).strip()
-            if value and not value.startswith("#"):
-                flow = _parse_flow_list(value)
-                if flow is not None:
-                    state, paths, ignore = configs[current_trigger]
-                    if key == "ignore":
-                        configs[current_trigger] = ("filtered", paths, flow)
-                    else:
-                        configs[current_trigger] = ("filtered", flow, ignore)
+        # A path-filter key may be written plain, quoted (`'paths':`) or with
+        # YAML escapes (`"pa\u0074hs":`); normalize it before comparing, and
+        # never let an unrecognized representation of a path-filter key leave
+        # the trigger "unfiltered".
+        keyline = re.match(r"^(\s+)([^:]+?)\s*:\s*(.*)$", line)
+        if keyline:
+            key = _normalize_key(keyline.group(2))
+            if key in {"paths", "paths-ignore"}:
+                key_is_ignore = key == "paths-ignore"
+                value = keyline.group(3).strip()
+                if value and not value.startswith("#"):
+                    flow = _parse_flow_list(value)
+                    if flow is not None:
+                        state, paths, ignore = configs[current_trigger]
+                        if key_is_ignore:
+                            configs[current_trigger] = ("filtered", paths, flow)
+                        else:
+                            configs[current_trigger] = ("filtered", flow, ignore)
+                        continue
+                    configs[current_trigger] = ("unparsed", None, None)
                     continue
-                configs[current_trigger] = ("unparsed", None, None)
+                items: list[str] = []
+                indent = len(keyline.group(1))
+                for sub in lines[idx + 1:]:
+                    if sub.strip() and not sub.startswith(" " * (indent + 2)):
+                        break
+                    m = re.match(r"^\s+-\s+['\"]?([^'\"]+)['\"]?\s*(?:#.*)?$", sub)
+                    if m:
+                        items.append(m.group(1))
+                state, paths, ignore = configs[current_trigger]
+                if key_is_ignore:
+                    configs[current_trigger] = ("filtered", paths, items)
+                else:
+                    configs[current_trigger] = ("filtered", items, ignore)
                 continue
-            items: list[str] = []
-            indent = len(keymatch.group(1))
-            for sub in lines[idx + 1:]:
-                if sub.strip() and not sub.startswith(" " * (indent + 2)):
-                    break
-                m = re.match(r"^\s+-\s+['\"]?([^'\"]+)['\"]?\s*(?:#.*)?$", sub)
-                if m:
-                    items.append(m.group(1))
-            state, paths, ignore = configs[current_trigger]
-            if key == "ignore":
-                configs[current_trigger] = ("filtered", paths, items)
-            else:
-                configs[current_trigger] = ("filtered", items, ignore)
-            continue
     return configs
 
 

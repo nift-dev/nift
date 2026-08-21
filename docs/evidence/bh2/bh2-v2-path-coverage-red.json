@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "campaign": "bh2",
+  "checkpoint": "test-integrity-path-coverage-v2",
+  "commit": "round-8 candidate (post-commit update)",
+  "timestamp_utc": "2026-08-21T12:10:00Z",
+  "platform": "Linux (round-8 red demonstrations)",
+  "purpose": "BH2 V2 red-rule demonstrations: an inline flow-mapping trigger value (push: { paths: [...] }) and an escaped quoted YAML key (\"pa\\u0074hs\":) must not leave a trigger 'unfiltered'; unrecognized filter representations fail closed.",
+  "demonstrated": [
+    {
+      "mutation": "push: { paths: ['README.md'] } / pull_request: { paths: ['README.md'] } inline flow mappings",
+      "outcome": "FAIL",
+      "red_as_expected": true
+    },
+    {
+      "mutation": "escaped quoted key \"pa\\u0074hs\": with - 'README.md' items on both triggers",
+      "outcome": "FAIL",
+      "red_as_expected": true
+    }
+  ],
+  "all_red_correct": true
+}

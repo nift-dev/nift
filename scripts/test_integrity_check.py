@@ -466,7 +466,7 @@ _PF_OFF = re.compile(r"\bset\s+[^;\n]*?(?:\+[A-Za-z]*o\s+pipefail)")
 
 _SET_CONTROL_WORDS = {
     "if", "then", "elif", "else", "while", "until", "for", "do", "in", "case",
-    "esac", "fi", "done", "{", "!", "time", "[",
+    "esac", "fi", "done", "{", "!", "time", "[", "command", "builtin",
 }
 
 
@@ -531,19 +531,24 @@ def _is_command_position(s: str, idx: int) -> bool:
     return True
 
 
-def _set_establishes_pipefail(s: str) -> bool:
-    """True when a ``set ... pipefail`` in this statement is the command being
-    executed by the current shell and can therefore mutate the state that
+def _set_establishes_pipefail(s: str, set_shadowed: bool = False) -> bool:
+    """True when a ``set ... pipefail`` in this statement is the Bash ``set``
+    builtin running in the current shell and can therefore mutate the state that
     governs subsequent top-level pipelines.
 
     Quoted data (``echo 'set -o pipefail'``), command arguments
-    (``bash -c 'set -o pipefail'``), assignment values (``export X=...``), and
+    (``bash -c 'set -o pipefail'``), assignment values (``export X=...``),
     commands inside ``$( )`` command substitution, ``( )`` subshells, pipeline
     segments or backgrounded commands all run elsewhere — the ``set`` text in
-    them does not establish parent-shell state.
+    them does not establish parent-shell state. A user function named ``set``
+    (defined earlier in program order) shadows the builtin, so a plain ``set``
+    call then resolves to the function, not the builtin; only an explicit
+    ``command set`` / ``builtin set`` forces the builtin.
     """
     m = _PF_ON.search(s) or _PF_OFF.search(s)
     if not m:
+        return False
+    if set_shadowed and not re.match(r"^(?:command|builtin)\s+set\b", s.strip()):
         return False
     if _paren_depth_at(s, m.start()) > 0:
         return False
@@ -717,6 +722,13 @@ _BLOCK_ELIF = re.compile(r"^elif\b")
 _BLOCK_FUNC = re.compile(r"^(?:[A-Za-z_][A-Za-z0-9_]*\(\)|function\s+[A-Za-z_][A-Za-z0-9_]*)\s*\{")
 
 
+def _func_name(s: str) -> str | None:
+    m = re.match(r"^(?:([A-Za-z_][A-Za-z0-9_]*)\s*\(\)|function\s+([A-Za-z_][A-Za-z0-9_]*))", s)
+    if not m:
+        return None
+    return m.group(1) or m.group(2)
+
+
 def _block_kind(s: str) -> str:
     if _BLOCK_IF.match(s):
         return "if"
@@ -757,6 +769,7 @@ def _shell_unsafe_pipelines(analyzed: str) -> list[str]:
     """
     reasons: list[str] = []
     pf: bool | None = False
+    set_shadowed = False
     stack: list[dict] = []
     for raw in analyzed.splitlines():
         for s, is_cond in _shell_split_statements(raw):
@@ -765,16 +778,19 @@ def _shell_unsafe_pipelines(analyzed: str) -> list[str]:
                 r = _shell_has_unsafe_pipeline(s)
                 if r and pf is not True:
                     reasons.append(r)
-                stack.append({"entry": pf, "tainted": False})
+                stack.append({"kind": "cond", "entry": pf, "tainted": False})
                 continue
             if kind == "func":
                 # A function body runs at call time; its state changes cannot
                 # be trusted for the surrounding flow. Pipelines inside are
-                # checked against the definition-point state.
+                # checked against the definition-point state. A function named
+                # `set` shadows the builtin for later plain `set` calls.
+                if _func_name(s) == "set":
+                    set_shadowed = True
                 r = _shell_has_unsafe_pipeline(s)
                 if r and pf is not True:
                     reasons.append(r)
-                stack.append({"entry": pf, "tainted": True})
+                stack.append({"kind": "func", "entry": pf, "tainted": True})
                 continue
             if kind in {"body_marker", "else", "elif"}:
                 continue
@@ -784,12 +800,17 @@ def _shell_unsafe_pipelines(analyzed: str) -> list[str]:
                     pf = None if fr["tainted"] else fr["entry"]
                 continue
             if kind == "brace_open":
-                stack.append({"entry": pf, "tainted": False})
+                stack.append({"kind": "brace", "entry": pf, "tainted": False})
                 continue
             if kind == "brace_close":
                 if stack:
                     fr = stack.pop()
-                    pf = None if fr["tainted"] else pf
+                    if fr["kind"] == "func":
+                        # a function definition does not execute its body, so it
+                        # leaves the enclosing pipefail state untouched
+                        pf = fr["entry"]
+                    else:
+                        pf = None if fr["tainted"] else pf
                 continue
             if kind == "subshell":
                 r = _shell_has_unsafe_pipeline(s)
@@ -798,11 +819,12 @@ def _shell_unsafe_pipelines(analyzed: str) -> list[str]:
                 # state changes inside a subshell do not propagate out
                 continue
             if _PF_OFF.search(s) or _PF_ON.search(s):
-                if not _set_establishes_pipefail(s):
+                if not _set_establishes_pipefail(s, set_shadowed):
                     # `set ... pipefail` in $( ), a ( ) subshell, a pipeline
-                    # segment or a backgrounded command cannot mutate the state
-                    # governing later pipelines; fall through to the pipeline
-                    # check with the state unchanged.
+                    # segment, a backgrounded command, quoted text, an argument,
+                    # or a call resolved to a user `set` function cannot mutate
+                    # the state governing later pipelines; fall through to the
+                    # pipeline check with the state unchanged.
                     pass
                 else:
                     off = _PF_OFF.search(s) is not None

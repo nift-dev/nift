@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "campaign": "bh2",
+  "scanned_files": 5,
+  "findings": [
+    {
+      "rule": "pipefail-missing",
+      "file": "/tmp/opencode/bh2-v1-fixtures/v1_func_shadow.sh",
+      "detail": "pipeline runs without pipefail provably active; pipeline 'false | cat >/dev/null' can mask failure of upstream 'false'"
+    },
+    {
+      "rule": "pipefail-missing",
+      "file": "/tmp/opencode/bh2-v1-fixtures/v1_function_kw.sh",
+      "detail": "pipeline runs without pipefail provably active; pipeline 'false | cat >/dev/null' can mask failure of upstream 'false'"
+    }
+  ]
+}

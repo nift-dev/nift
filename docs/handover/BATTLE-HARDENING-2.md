@@ -305,6 +305,14 @@ make target.
 - `bh2-u2-path-coverage-red.json` — the round-7 red demo: a quoted `'paths':`
   filter key with narrowed items fails the registry check instead of leaving
   the trigger "unfiltered".
+- `bh2-v1-fixtures-report.json` — the round-8 `set`-function-shadow fixtures
+  (`set() { :; }`, `function set { :; }` before a plain `set -o pipefail`) are
+  rejected (exit 1); late-definition, `command set`, and `builtin set` forms
+  stay GREEN.
+- `bh2-v2-path-coverage-red.json` — the round-8 red demos: inline flow-mapping
+  `push: { paths: [...] }` and the escaped quoted key `"pa\u0074hs":`, each
+  narrowed to README.md, fail the registry check instead of leaving the trigger
+  "unfiltered".
 - `bh2-clean-report.json` — the scanner is clean on the real `tests/` + `scripts/`
   (42 files, 0 findings), and clean on the regression-suite contract scripts.
 
@@ -352,16 +360,25 @@ make target.
   adjacent to a SKIP message is a false green regardless of layout. `exit $?`,
   `exit` with an explicit non-zero code, or a SKIP message followed by later
   commands before the exit are deliberately outside the rule.
-- **Pipefail-state boundary (round 5/6/7):** state is tracked sequentially over
+- **Pipefail-state boundary (round 5/6/7/8):** state is tracked sequentially over
   top-level statements with a conditional-block taint, an execution-environment
   guard (`$( )`, `( )`, pipeline segments and backgrounded commands cannot
-  establish parent state), and a command-position guard (only a current-shell
+  establish parent state), a command-position guard (only a current-shell
   `set` builtin establishes state; quoted text, command arguments and
-  assignment values do not). It is not a full shell interpreter:
-  within-statement ordering (e.g. `set -o pipefail && pipeline` on one `&&`
-  chain), functions called at a different state than their definition point,
-  and `trap`/`shopt`/`env`-based option changes are approximated; every
+  assignment values do not), and a function-shadow guard (a `set` function
+  defined earlier in program order shadows the builtin). It is not a full shell
+  interpreter: within-statement ordering (e.g. `set -o pipefail && pipeline` on
+  one `&&` chain), `unset -f`/`enable`-based resolution changes, aliases, and
+  `trap`/`shopt`/`env`-based option changes are approximated; every
   approximation fails toward a false red, never a false green.
+- **Trigger-syntax boundary (round 6/7/8):** the trigger parser distinguishes
+  genuinely-unfiltered triggers from unparsed filter syntax (which fails
+  closed), recognizes a path-filter key whether plain, quoted, or
+  YAML-escaped, parses flow-style `paths: [...]` sequences and inline
+  flow-mapping trigger values, and treats a genuinely empty `paths:` list as
+  covering nothing. The inline mapping form `on: {push: {...}}` yields no
+  triggers and is rejected. Other valid YAML shapes remain carried-forward
+  false-red boundaries, never false green.
 - **Trigger-syntax boundary (round 6/7):** the trigger parser now distinguishes
   genuinely-unfiltered triggers from unparsed filter syntax (which fails
   closed), recognizes a path-filter key whether plain or quoted (`paths:` /
@@ -678,13 +695,56 @@ coverage still PASS. All prior fixtures stay RED and the real trees stay GREEN
 (42 + 21 files, 0 findings); registry CI, the full 3-repository audit, BH1
 liveness, and the CI-equivalent chain all pass.
 
+### BH2 reviewer round 7 — returned to implementer
+
+ChatGPT attacked round-7 candidate `ad707c7` in a detached worktree. U1 and U2
+were accepted as closed. Two new false greens were reported (V1, V2), so BH2
+remains OPEN:
+
+- **V1 (a shell function named `set` still fakes pipefail):**
+  `set() { :; }` then `set -o pipefail` scanned GREEN and ran green — Bash
+  resolves `set` to the user function, not the `set` builtin, so pipefail never
+  turns on. Command position (round 7) does not establish command identity: a
+  function can shadow the builtin while satisfying every command-position check.
+- **V2 (another valid YAML mapping shape becomes "unfiltered"):**
+  `push: { paths: ['README.md'] }` — the trigger key is recognized but its
+  inline flow-mapping value is ignored, leaving the trigger "unfiltered". The
+  adjacent escaped-key form `"pa\u0074hs":` (YAML escape for `paths`) is also
+  unrecognized. Both silently recreated the T2/U2 fail-open class.
+
+### BH2 implementer round 8 — fixes
+
+- **V1:** the walker now tracks whether a function named `set` has been defined
+  earlier in program order; a plain `set` call after that shadows the builtin
+  and no longer establishes pipefail, while an explicit `command set` or
+  `builtin set` still forces the builtin. A `set` function defined *after* the
+  `set -o pipefail` call does not retroactively disable it, and a function
+  definition itself restores the enclosing state on close (it does not execute
+  its body).
+- **V2:** `_trigger_configs` now parses inline flow-mapping trigger values
+  (`push: { paths: [...] }`), and normalizes mapping keys by unquoting and
+  decoding YAML escapes (`"pa\u0074hs":` → `paths`). Any path-filter-like key —
+  plain, quoted, or escaped — is parsed or fails the trigger closed; an inline
+  value that is not a flow mapping is unparsed. A genuinely empty `paths:` list
+  now covers nothing (previously it fell back to "covers everything").
+
+All V1 fixtures are RED where the `set` function shadows before the call
+(`set() { :; }` and `function set { :; }`), while late-definition, `command set`,
+and `builtin set` forms stay GREEN as they should, retained at
+`docs/evidence/bh2/bh2-v1-fixtures-report.json`. Both V2 mutations (inline
+flow-mapping `paths:` and escaped `"pa\u0074hs":` key, each narrowed to
+README.md) are demonstrated RED, retained at
+`docs/evidence/bh2/bh2-v2-path-coverage-red.json`. All prior fixtures stay RED
+and the real trees stay GREEN (42 + 21 files, 0 findings); registry CI, the
+full 3-repository audit, BH1 liveness, and the CI-equivalent chain all pass.
+
 ### BH2 handoff to reviewer
 
-**Round-7 candidate: `ad707c7`** ("BH2 round 7: fix reviewer findings U1-U2
-on top of 389a4ac"). Reviewer attacks the exact round-7 commit in a separate
+**Round-8 candidate: this commit** ("BH2 round 8: fix reviewer findings V1-V2
+on top of ad707c7"). Reviewer attacks the exact round-8 commit in a separate
 clone/worktree and reports findings back; the implementer does not modify the
 tree during review. No changes are made to `7f8768b`, `c06fa33`, `7d2621b`,
-`88f1158`, `689cd45`, `389a4ac` or the round-7 candidate `ad707c7` itself.
+`88f1158`, `689cd45`, `389a4ac`, `ad707c7` or the round-8 candidate itself.
 
 Review focus areas (attack each):
 
