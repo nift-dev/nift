@@ -463,6 +463,19 @@ def _shell_has_unsafe_pipeline(text: str) -> str | None:
 _PF_ON = re.compile(r"\bset\s+[^;\n]*?(?:-[A-Za-z]*o\s+pipefail)")
 _PF_OFF = re.compile(r"\bset\s+[^;\n]*?(?:\+[A-Za-z]*o\s+pipefail)")
 
+# command-resolution changes that can stop a later `set` call from being the
+# builtin: `enable -n set` (disable), `alias set=...` (with expand_aliases),
+# `shopt -s expand_aliases`, and an `eval` that establishes a shadow.
+_ENABLE_DISABLE_SET = re.compile(r"\benable\s+-n\b[^;\n]*\bset\b")
+_ENABLE_SET = re.compile(r"\benable\b(?!\s+-n)[^;\n]*\bset\b")
+_SHOPT_EXPAND_ALIASES_ON = re.compile(r"\bshopt\s+-s\b[^;\n]*\bexpand_aliases\b")
+_SHOPT_EXPAND_ALIASES_OFF = re.compile(r"\bshopt\s+-u\b[^;\n]*\bexpand_aliases\b")
+_ALIAS_SET = re.compile(r"\balias\s+(?:set\s*=|set\s+)")
+_UNALIAS_SET = re.compile(r"\bunalias\s+(?:-a\b|set\b)")
+_EVAL_SET_RES = re.compile(
+    r"\beval\b[^;\n]*?(?:set\s*\(\)|function\s+set\b|alias\s+set\b|enable\s+-n\s+set\b)"
+)
+
 
 _SET_CONTROL_WORDS = {
     "if", "then", "elif", "else", "while", "until", "for", "do", "in", "case",
@@ -531,24 +544,43 @@ def _is_command_position(s: str, idx: int) -> bool:
     return True
 
 
-def _set_establishes_pipefail(s: str, set_shadowed: bool = False) -> bool:
+def _is_current_shell_cmd(s: str, m: re.Match | None) -> bool:
+    """True when a matched keyword is the command being executed by the current
+    shell (command position, not quoted, not inside ``$( )``/``( )``)."""
+    return bool(
+        m
+        and _paren_depth_at(s, m.start()) == 0
+        and not _quote_state_at(s, m.start())
+        and _is_command_position(s, m.start())
+    )
+
+
+def _set_establishes_pipefail(
+    s: str,
+    set_shadowed: bool = False,
+    set_builtin_disabled: bool = False,
+    set_alias: bool = False,
+) -> bool:
     """True when a ``set ... pipefail`` in this statement is the Bash ``set``
     builtin running in the current shell and can therefore mutate the state that
     governs subsequent top-level pipelines.
 
-    Quoted data (``echo 'set -o pipefail'``), command arguments
-    (``bash -c 'set -o pipefail'``), assignment values (``export X=...``),
-    commands inside ``$( )`` command substitution, ``( )`` subshells, pipeline
-    segments or backgrounded commands all run elsewhere — the ``set`` text in
-    them does not establish parent-shell state. A user function named ``set``
-    (defined earlier in program order) shadows the builtin, so a plain ``set``
-    call then resolves to the function, not the builtin; only an explicit
-    ``command set`` / ``builtin set`` forces the builtin.
+    Bash resolves a plain ``set`` as alias (if aliases are expanded) then
+    function then builtin: a ``set`` alias or function shadow, or a builtin
+    disabled with ``enable -n set``, means the call does not run the builtin
+    and cannot establish pipefail. ``command set`` / ``builtin set`` bypass
+    aliases and functions but not a disabled builtin. Quoted data, command
+    arguments, assignment values, ``$( )`` command substitution, ``( )``
+    subshells, pipeline segments and backgrounded commands also run elsewhere.
     """
     m = _PF_ON.search(s) or _PF_OFF.search(s)
     if not m:
         return False
-    if set_shadowed and not re.match(r"^(?:command|builtin)\s+set\b", s.strip()):
+    forced = bool(re.match(r"^(?:command|builtin)\s+set\b", s.strip()))
+    if forced:
+        if set_builtin_disabled:
+            return False
+    elif set_alias or set_shadowed or set_builtin_disabled:
         return False
     if _paren_depth_at(s, m.start()) > 0:
         return False
@@ -770,6 +802,9 @@ def _shell_unsafe_pipelines(analyzed: str) -> list[str]:
     reasons: list[str] = []
     pf: bool | None = False
     set_shadowed = False
+    set_builtin_disabled = False
+    set_alias_defined = False
+    expand_aliases = False
     stack: list[dict] = []
     for raw in analyzed.splitlines():
         for s, is_cond in _shell_split_statements(raw):
@@ -818,8 +853,34 @@ def _shell_unsafe_pipelines(analyzed: str) -> list[str]:
                     reasons.append(r)
                 # state changes inside a subshell do not propagate out
                 continue
+            if _is_current_shell_cmd(s, _ENABLE_DISABLE_SET.search(s)):
+                set_builtin_disabled = True
+                continue
+            if _is_current_shell_cmd(s, _ENABLE_SET.search(s)):
+                set_builtin_disabled = False
+                continue
+            if _is_current_shell_cmd(s, _SHOPT_EXPAND_ALIASES_ON.search(s)):
+                expand_aliases = True
+                continue
+            if _is_current_shell_cmd(s, _SHOPT_EXPAND_ALIASES_OFF.search(s)):
+                expand_aliases = False
+                continue
+            if _is_current_shell_cmd(s, _ALIAS_SET.search(s)):
+                set_alias_defined = True
+                continue
+            if _is_current_shell_cmd(s, _UNALIAS_SET.search(s)):
+                set_alias_defined = False
+                continue
+            if _is_current_shell_cmd(s, _EVAL_SET_RES.search(s)):
+                set_shadowed = True
+                set_alias_defined = True
+                set_builtin_disabled = True
+                continue
             if _PF_OFF.search(s) or _PF_ON.search(s):
-                if not _set_establishes_pipefail(s, set_shadowed):
+                if not _set_establishes_pipefail(
+                    s, set_shadowed, set_builtin_disabled,
+                    set_alias_defined and expand_aliases,
+                ):
                     # `set ... pipefail` in $( ), a ( ) subshell, a pipeline
                     # segment, a backgrounded command, quoted text, an argument,
                     # or a call resolved to a user `set` function cannot mutate

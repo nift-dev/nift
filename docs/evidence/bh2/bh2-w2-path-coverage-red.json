@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "campaign": "bh2",
+  "checkpoint": "test-integrity-path-coverage-w2",
+  "commit": "round-9 candidate (post-commit update)",
+  "timestamp_utc": "2026-08-21T13:05:00Z",
+  "platform": "Linux (round-9 red demonstrations)",
+  "purpose": "BH2 W2 red-rule demonstrations: YAML explicit-key (? paths : [...]) and tagged-key (!!str paths: [...]) representations of a paths filter narrowed to README.md must fail the registry check; an unrecognized key inside a trigger mapping can never leave it 'unfiltered'.",
+  "demonstrated": [
+    {
+      "mutation": "explicit-key form '? paths' / ': [\\'README.md\\']' on push and pull_request",
+      "outcome": "FAIL",
+      "red_as_expected": true
+    },
+    {
+      "mutation": "tagged-key form '!!str paths: [\\'README.md\\']' on push and pull_request",
+      "outcome": "FAIL",
+      "red_as_expected": true
+    }
+  ],
+  "all_red_correct": true
+}
