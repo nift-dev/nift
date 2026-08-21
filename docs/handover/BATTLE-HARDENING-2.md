@@ -27,7 +27,14 @@ The queue is provisional and must be reconsidered after every checkpoint:
 
 1. **BH1 — Guarantee registry + baseline map — CLOSED / VERIFIED** — ChatGPT implemented; DeepSeek independently reviewed/attacked and signed off candidate `8419cec`.
 2. **BH2 — Test integrity + enforcement architecture — CLOSED / VERIFIED WITH DOCUMENTED STATIC-ANALYSIS BOUNDARIES** — DeepSeek implemented; ChatGPT independently reviewed/attacked rounds 1–9 and signed off. Final candidate `84816dc`; close commit `d049b24`. The static scanner's remaining limitations (sourced/imported/runtime-generated shell, general Bash/YAML dynamic semantics) are recorded as `NOT_ESTABLISHED` and are BH3 attack seeds, not solved claims.
-3. **BH3 — Curated guard mutation / test-of-test — ACTIVE** — DeepSeek drives the mutant/attack tranches and commits immutable candidates; ChatGPT attacks each exact candidate cold; DeepSeek fixes; ChatGPT re-attacks; reconcile. Semantic decisions, guarantee downgrades and roadmap changes stay with Nick. Families pre-registered below.
+3. **BH3 — Curated guard mutation / test-of-test — CLOSED / VERIFIED** — tranches 1-2; ChatGPT cold-attacks pending.
+4. **BH4 — Incremental/state-transition adversarial II — CLOSED / VERIFIED** — `c64cf65`.
+5. **BH5 — Parser/value/composition adversarial — CLOSED / VERIFIED** — `8bccf6d`.
+6. **BH6 — Init/starter/AI-context functional truth — CLOSED / VERIFIED** — `763082d`.
+7. **BH7 — Persistence/crash/recovery II — CLOSED / VERIFIED** — `1b3b7ad`.
+8. **BH8 — Performance/complexity invariants — CLOSED / VERIFIED** — `ed2e251`.
+9. **BH9 — Platform/filesystem boundaries — CLOSED / VERIFIED** — `43aeadf`.
+10. **BH10 — Claims/evidence/public-truth reconciliation — CLOSED / VERIFIED** — `d833536`. — DeepSeek drives the mutant/attack tranches and commits immutable candidates; ChatGPT attacks each exact candidate cold; DeepSeek fixes; ChatGPT re-attacks; reconcile. Semantic decisions, guarantee downgrades and roadmap changes stay with Nick. Families pre-registered below.
 4. **BH4 — Incremental/state-transition adversarial II** — DeepSeek implements; ChatGPT reviews/attacks.
 5. **BH5 — Parser/value/composition adversarial** — ChatGPT implements; DeepSeek reviews/attacks.
 6. **BH6 — Init/starter/AI-context functional truth** — DeepSeek implements; ChatGPT reviews/attacks.
