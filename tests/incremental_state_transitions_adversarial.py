@@ -106,6 +106,8 @@ def main() -> int:
             # content change
             (proj / 'content' / 'b.html').write_text('<p>B2</p>\n')
             transition(nift, proj, mode, expected, 'content-change')
+            if '<p>B2</p>' not in (proj / 'public' / 'b.html').read_text():
+                raise RuntimeError(f"{mode}:content-change: b.html does not reflect changed content")
 
             # remove b via the tracked command; stale output must disappear
             run(nift, proj, 'rm', 'b')
@@ -123,6 +125,8 @@ def main() -> int:
             run(nift, proj, 'track', 'e', 'E', 'templates/template.html')
             expected.add('e.html')
             transition(nift, proj, mode, expected, 'track-e')
+            if '<p>e</p>' not in (proj / 'public' / 'e.html').read_text():
+                raise RuntimeError(f"{mode}:track-e: e.html does not reflect tracked content")
 
             # template change must propagate to every output
             (proj / 'templates' / 'template.html').write_text('T2:@content\n')

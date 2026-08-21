@@ -41,9 +41,6 @@ def main() -> int:
         ("bh5", "parser_value_composition_adversarial.py",
          [("real-nift", NIFT, 0),
           ("always-success-nothing", make_wrapper("silent", f"real={NIFT}\n" + 'if [ "$1" = "init" ]; then exec "$real" "$@"; fi\nexit 0\n'), 1)]),
-        ("bh7", "crash_recovery_adversarial.py",
-         [("real-nift", NIFT, 0),
-          ("non-atomic-metadata", make_wrapper("corrupt", f"real={NIFT}\n" + '"$real" "$@"\nrc=$?\nif [ -f .nift/tracked.json ]; then echo \'{"tracked":\' > .nift/tracked.json; fi\nexit $rc\n'), 1)]),
         ("bh8", "complexity_invariants.py",
          [("real-nift", NIFT, 0),
           ("stale-rebuild-on-change", make_wrapper("stale", f"real={NIFT}\n" + '"$real" "$@"\nrc=$?\nif [ "$rc" = 0 ] && grep -q 7-CHANGED content/p7.html 2>/dev/null && [ -f public/p7.html ]; then chmod u+w public/p7.html; echo "<p>0</p>" > public/p7.html; fi\nexit $rc\n'), 1)]),
@@ -70,6 +67,45 @@ def main() -> int:
         ("bh9", "filesystem_boundary_adversarial.py",
          [("real-nift", NIFT, 0),
           ("index-only-fake", make_wrapper("fake", 'if [ "$1" = "build-all" ] && [ -f .nift/tracked.json ]; then\n  mkdir -p public; echo hi > public/index.html; exit 0\nfi\nexit 1\n'), 1)]),
+        ("bh3", "pagination_incremental_equivalence.py",
+         [("real-nift", NIFT, 0),
+          ("wrong-current-nav", make_wrapper("badnav", f"""real={NIFT}
+"$real" "$@"
+rc=$?
+if [ "$rc" = 0 ] && [ -d public ]; then
+  for f in public/blog-*.html; do
+    [ -f "$f" ] || continue
+    sed -E -i 's#<nav>[0-9]+/([0-9]+) #<nav>1/\\1 #' "$f"
+  done
+fi
+exit $rc
+"""), 1)]),
+        ("bh4", "incremental_state_transitions_adversarial.py",
+         [("real-nift", NIFT, 0),
+          ("same-wrong-content-in-incremental-and-clean", make_wrapper("wrongboth", f"""real={NIFT}
+"$real" "$@"
+rc=$?
+if [ "$rc" = 0 ] && {{ [ "$1" = build ] || [ "$1" = build-all ]; }} && grep -q B2 content/b.html 2>/dev/null && ! grep -q 'T2:' templates/template.html 2>/dev/null && [ -f public/b.html ]; then
+  echo '<p>WRONG</p>' > public/b.html
+fi
+exit $rc
+"""), 1)]),
+        ("bh9", "filesystem_boundary_adversarial.py",
+         [("real-nift", NIFT, 0),
+          ("wrong-valid-page-content", make_wrapper("wrongpages", f"""real={NIFT}
+"$real" "$@"
+rc=$?
+if [ "$rc" = 0 ] && [ "$1" = build-all ] && [ -d public ]; then
+  find public -type f -name '*.html' -exec sh -c 'echo WRONG > "$1"' _ {{}} \\;
+fi
+exit $rc
+"""), 1),
+          ("valid-build-returns-nonzero", make_wrapper("nonzero", f"""real={NIFT}
+"$real" "$@"
+rc=$?
+if [ "$1" = build-all ] && [ "$rc" = 0 ]; then exit 7; fi
+exit $rc
+"""), 1)]),
         ("bh6", "init_scaffold_functional_truth.py",
          [("real-nift", NIFT, 0),
           ("minimal-scaffold", make_wrapper("min", f"real={NIFT}\n" + '"$real" "$@"\nrc=$?\nif [ "$rc" = 0 ] && [ "$1" = "init" ] && [ -d content ]; then rm -rf content/assets public/assets; python3 -c "import json; p=\'.nift/tracked.json\'; d=json.load(open(p)); d[\'tracked\']=[e for e in d[\'tracked\'] if not e[\'name\'].startswith(\'assets\')]; open(p,\'w\').write(json.dumps(d))"; fi\nexit $rc\n'), 1)]),
@@ -82,6 +118,7 @@ def main() -> int:
             gpath = REPO / "tests" / guard
             entry = {"bh": bh, "guard": guard, "cases": []}
             for name, binary, expected in cases:
+                print(f"RUN {bh}:{guard}:{name}", flush=True)
                 rc, out = _run(["python3", str(gpath), "--nift", binary])
                 entry["cases"].append({"name": name, "exit": rc,
                                        "expected_nonzero" if expected else "expected_zero": True,

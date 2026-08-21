@@ -55,7 +55,7 @@ def main() -> int:
     )
     add_case(
         "nonexistent-ci-job",
-        lambda d: d["guarantees"][4]["enforcement"][0].update(job="definitely-not-a-real-job"),
+        lambda d: d["guarantees"][4]["enforcement"][1].update(job="definitely-not-a-real-job"),
         "workflow-job-missing",
     )
     add_case(

@@ -7,7 +7,7 @@ remain valid JSON, the next build succeeds, and a further build converges to
 the clean output. A tool whose metadata writes are non-atomic (corrupt after a
 crash) or whose output never converges is caught here.
 """
-import argparse, hashlib, json, shutil, subprocess, tempfile, time
+import argparse, hashlib, json, os, shutil, signal, subprocess, tempfile, time
 from pathlib import Path
 
 
@@ -54,7 +54,10 @@ def kill_during_build(nift: str, root: Path, label: str, timeout: float = 10.0) 
     shutil.rmtree(public, ignore_errors=True)
     public.mkdir(exist_ok=True)
     shutil.rmtree(root / '.nift' / 'public', ignore_errors=True)
-    proc = subprocess.Popen([nift, 'build-all'], cwd=root,
+    # Put the command in its own process group. This matters for test-of-test
+    # wrappers: killing only a shell wrapper can leave the real Nift child
+    # running, which would make a red-team crash attack meaningless.
+    proc = subprocess.Popen([nift, 'build-all'], cwd=root, start_new_session=True,
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     deadline = time.time() + timeout
     progress = False
@@ -69,15 +72,15 @@ def kill_during_build(nift: str, root: Path, label: str, timeout: float = 10.0) 
             break
         time.sleep(0.002)
     if not progress:
-        proc.kill()
+        os.killpg(proc.pid, signal.SIGKILL)
         proc.wait()
         raise RuntimeError(f"{label}: no observable build progress within {timeout}s")
     if proc.poll() is not None:
         proc.wait()
         raise RuntimeError(f"{label}: build finished between progress and SIGKILL")
-    proc.kill()
+    os.killpg(proc.pid, signal.SIGKILL)
     proc.wait()
-    if proc.returncode != -9:
+    if proc.returncode != -signal.SIGKILL:
         raise RuntimeError(
             f"{label}: SIGKILL did not terminate a live mid-build process "
             f"(rc={proc.returncode})")

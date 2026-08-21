@@ -1322,3 +1322,17 @@ Review focus areas (attack each):
 
 The next active checkpoint is **BH3 — Guard mutation and liveness**, with the
 remaining queue re-planned after BH2 review.
+
+## Final cold review — guard-oracle closure
+
+A final independent cold review after repair tranche 2 found no Nift product defect, but it did find three remaining false-green classes in the maintained guards and one weakness in the crash test-of-test harness:
+
+- BH3 accepted incorrect per-page pagination current numbers when item splits and total counts were otherwise correct. The oracle now checks exact current/total and expected previous/next links on every page.
+- BH4 could accept a content transition when both incremental and clean builds were corrupted to the same wrong bytes. The transition corpus now carries direct semantic checks for changed/tracked content in addition to clean equivalence.
+- BH9 required every valid adversarial output to exist, but did not require the valid build to return zero or the output bytes to match the source. It now requires successful exit plus exact expected content for every valid tracked name.
+- BH7's wrapped red-team binaries could leave a real Nift child alive if only the wrapper PID was killed. Crash injection now creates a dedicated process group and SIGKILLs that whole group, keeping wrapper-based crash attacks meaningful.
+- BH1's `nonexistent-ci-job` liveness mutation was pointed at a `MANUAL` enforcement entry, so adding a bogus `job` field was semantically inert and the mutation remained green. The liveness precheck now mutates the actual `CI_GATED` enforcement entry; the registry checker rejects the nonexistent job as intended.
+
+The retained `scripts/bh_repair_battery.py` battery now includes these attacks. Its final run kept real Nift green and every injected fault red (`all_red_correct: true`), with evidence refreshed at `docs/evidence/bh10/bh3-10-repair-battery.json`. No semantic/product change was required.
+
+The public Battle Tested page was also clarified so “battle hardening” is not presented as one undifferentiated badge. It now separates semantic/regression, adversarial/boundary, memory/resource, filesystem/recovery, performance/complexity, concurrency, platform and field hardening, and states the non-claims at each boundary (for example adversarial testing is not a security audit, and a portable cross-platform corpus is not proof of identical filesystem semantics).

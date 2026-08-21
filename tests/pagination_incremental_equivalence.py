@@ -35,13 +35,29 @@ def assert_output_correct(project: Path, label: str) -> None:
             raise RuntimeError(
                 f"{label}: expected page {name!r} missing or empty "
                 f"(items={items}, items-per-page={per_page})")
-    if total >= 2:
-        content = (public / 'blog.html').read_text()
-        m = re.search(r"<nav>\d+/(\d+) ", content)
-        if not m or int(m.group(1)) != total:
+    # Navigation is semantic output too: every page must identify its exact
+    # current/total position and expose only the correct previous/next links.
+    # Comparing incremental with a clean build cannot detect an implementation
+    # that renders the same wrong navigation in both paths.
+    for i, name in enumerate(expected, start=1):
+        content = (public / name).read_text()
+        m = re.search(r'<nav>(\d+)/(\d+) (.*?)</nav>', content, re.S)
+        if not m:
+            raise RuntimeError(f"{label}: page {name!r} has no pagination nav")
+        current, nav_total = int(m.group(1)), int(m.group(2))
+        if current != i or nav_total != total:
             raise RuntimeError(
-                f"{label}: pagination nav total wrong "
-                f"(expected {total}, got {m.group(1) if m else 'none'})")
+                f"{label}: page {name!r} nav says {current}/{nav_total}, "
+                f"expected {i}/{total}")
+        hrefs = re.findall(r'href="([^"]+)"', m.group(3))
+        wanted = []
+        if i > 1:
+            wanted.append('./blog.html' if i == 2 else f'./blog-{i - 1}.html')
+        if i < total:
+            wanted.append('./blog-2.html' if i == 1 else f'./blog-{i + 1}.html')
+        if hrefs != wanted:
+            raise RuntimeError(
+                f"{label}: page {name!r} nav links {hrefs!r}, expected {wanted!r}")
 
     # the rendered item CONTENT must match the source items AND the per-page
     # split must honour items-per-page: page i carries exactly items

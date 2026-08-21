@@ -81,15 +81,24 @@ def main() -> int:
                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60)
         if p.returncode < 0:
             raise RuntimeError(f"build terminated by signal {-p.returncode}")
+        if p.returncode != 0:
+            raise RuntimeError(
+                f"valid adversarial names must build successfully, got exit {p.returncode}:\n{p.stdout}")
 
-        # every valid tracked name must actually have been built, each inside
-        # the output directory: a tool that "builds" nothing (or only one page,
-        # or exits 1 without writing) is not a green run
-        expected_outputs = ['index.html'] + [n + '.html' for n in ADVERSARIAL_NAMES]
-        for rel in expected_outputs:
+        # Every valid tracked name must actually have been built with the exact
+        # source content, each inside the output directory. Presence/non-empty
+        # alone is not a semantic oracle: an index-only or placeholder-output
+        # implementation must go RED. The template is @content, so equality is
+        # exact for this fixture.
+        source_for_output = {'index.html': root / 'content' / 'index.html'}
+        source_for_output.update({n + '.html': root / 'content' / (n + '.html')
+                                  for n in ADVERSARIAL_NAMES})
+        for rel, src in source_for_output.items():
             out = root / 'public' / rel
             if not out.is_file() or out.stat().st_size == 0:
                 raise RuntimeError(f"build produced no output for valid page {rel!r}")
+            if out.read_bytes() != src.read_bytes():
+                raise RuntimeError(f"build produced wrong content for valid page {rel!r}")
 
         # every output lives under public/, and nothing appeared outside it;
         # outside-tree comparison is by content hash, so corrupting an existing
