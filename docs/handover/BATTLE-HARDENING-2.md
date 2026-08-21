@@ -26,8 +26,8 @@ The operating rules are:
 The queue is provisional and must be reconsidered after every checkpoint:
 
 1. **BH1 — Guarantee registry + baseline map — CLOSED / VERIFIED** — ChatGPT implemented; DeepSeek independently reviewed/attacked and signed off candidate `8419cec`.
-2. **BH2 — Test integrity + enforcement architecture — CLOSED / VERIFIED** — DeepSeek implemented; ChatGPT independently reviewed/attacked rounds 1–9 and signed off with an explicit boundary. Final candidate `84816dc`; close record and sourced-loading boundary below.
-3. **BH3 — Curated guard mutation / test-of-test** — roles reverse per guard.
+2. **BH2 — Test integrity + enforcement architecture — CLOSED / VERIFIED WITH DOCUMENTED STATIC-ANALYSIS BOUNDARIES** — DeepSeek implemented; ChatGPT independently reviewed/attacked rounds 1–9 and signed off. Final candidate `84816dc`; close commit `d049b24`. The static scanner's remaining limitations (sourced/imported/runtime-generated shell, general Bash/YAML dynamic semantics) are recorded as `NOT_ESTABLISHED` and are BH3 attack seeds, not solved claims.
+3. **BH3 — Curated guard mutation / test-of-test — ACTIVE** — DeepSeek drives the mutant/attack tranches and commits immutable candidates; ChatGPT attacks each exact candidate cold; DeepSeek fixes; ChatGPT re-attacks; reconcile. Semantic decisions, guarantee downgrades and roadmap changes stay with Nick. Families pre-registered below.
 4. **BH4 — Incremental/state-transition adversarial II** — DeepSeek implements; ChatGPT reviews/attacks.
 5. **BH5 — Parser/value/composition adversarial** — ChatGPT implements; DeepSeek reviews/attacks.
 6. **BH6 — Init/starter/AI-context functional truth** — DeepSeek implements; ChatGPT reviews/attacks.
@@ -35,6 +35,75 @@ The queue is provisional and must be reconsidered after every checkpoint:
 8. **BH8 — Performance/complexity invariants** — DeepSeek implements; ChatGPT reviews/attacks.
 9. **BH9 — Platform/filesystem boundaries** — ownership chosen after BH8.
 10. **BH10 — Claims/evidence/public-truth reconciliation** — DeepSeek leads the audit; ChatGPT implements reconciliations; DeepSeek signs off.
+
+## BH3 — Curated guard mutation / test-of-test
+
+### What BH2 taught us
+
+BH2 hardened the integrity *machinery* and exposed where static analysis stops
+being economical: the remaining false-green cases increasingly require
+runtime/import/command-resolution semantics (sourced shell, environment-
+imported functions, dynamic code generation) that belong in mutation and
+runtime testing, not an ever-growing static scanner. BH3 therefore moves from
+"can the scanner model all of Bash/YAML?" to the questions that actually matter
+for the guarantees:
+
+- can the important guards still be made to false-green under representative
+  runtime mutations, and do the enforcement layers catch those failures?
+- is each guard's retained RED evidence for a mutation that is *live* — i.e.
+  the specific defect the guard claims to detect actually flips it RED, and
+  removing the guard's check actually flips it GREEN (a dead check is not a
+  guard)?
+
+### Operating model
+
+DeepSeek drives each tranche: curate guards, apply mutation families to exact
+copies, run them against a real Nift binary, classify live/dead, run the BH2
+static scanner over the mutants, retain evidence, commit an immutable candidate.
+ChatGPT attacks the exact candidate cold and reports findings; DeepSeek fixes;
+ChatGPT re-attacks; reconcile. Nick reserves semantic decisions, guarantee
+downgrades and roadmap changes.
+
+### Pre-registered guard set
+
+Curated from `docs/guarantees/registry.json` guard refs, one or more per
+enforcement family:
+
+- `tests/contracts_smoke.sh` (contracts.namespace-reservation; CI_GATED)
+- `tests/pagination_incremental_equivalence.py` (pagination; CI_GATED)
+- `scripts/checkpoint7_incremental_equivalence.py` (incremental; SCHEDULED)
+- `scripts/checkpoint10_cross_platform.py` (platform; CROSS_PLATFORM_GATED)
+- `scripts/init_targets_cross_platform.py` (init; CROSS_PLATFORM_GATED)
+- `scripts/memory_safety.py` + `tests/memory_10k_benchmark.py` (memory; SCHEDULED)
+- `scripts/checkpoint3_core_memory.py` (memory lifecycle; SCHEDULED)
+- `scripts/checkpoint9_parser_fuzz.py` (parser; SCHEDULED)
+- `scripts/checkpoint6_integration.py` (memory/valgrind; SCHEDULED)
+
+### Pre-registered mutation families
+
+For each curated guard, apply representative mutations and classify each as
+LIVE (guard falsely greens) or DEAD (guard still correctly non-green), then
+run the BH2 static scanner over the mutant and record whether enforcement
+catches it:
+
+- **M1 outcome-swallow** — a subprocess/check failure is caught and converted
+  to PASS (e.g. try/except that prints PASS; returncode ignored).
+- **M2 input-redirection** — the guard is pointed at trivial/empty/identical
+  inputs so it validates nothing while PASSing (stub binary, 1-page corpus).
+- **M3 condition-inversion** — a critical comparison (`!= 0` → `== 0`,
+  `> threshold` → `< threshold`) accepts failures.
+- **M4 check-removal** — the guard's load-bearing assertion is deleted; this is
+  the test-of-test probe for whether the retained RED evidence is live.
+- **M5 environment/tool mutation** — the guard runs under a mutated
+  environment (missing input dir, absent tool, wrong env var) and must go
+  non-green, never falsely PASS.
+- **M6 assertion-threshold softening** — thresholds/limits are widened so the
+  guard passes on inputs it should reject.
+
+Evidence for every tranche is retained under `docs/evidence/bh3/`; a guard's
+RED evidence is only trusted for a defect whose removal flips the guard GREEN
+(M4 live), and enforcement (BH2 scanner / CI gate) must RED the source-level
+mutants it can see.
 
 ## BH1 — Guarantee registry + baseline map
 
