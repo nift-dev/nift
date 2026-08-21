@@ -813,12 +813,12 @@ CI-equivalent chain all pass.
 
 ### BH2 handoff to reviewer
 
-**Round-9 candidate: this commit** ("BH2 round 9: fix reviewer findings W1-W2
+**Round-9 candidate: `84816dc`** ("BH2 round 9: fix reviewer findings W1-W2
 on top of 75fb00e"). Reviewer attacks the exact round-9 commit in a separate
 clone/worktree and reports findings back; the implementer does not modify the
 tree during review. No changes are made to `7f8768b`, `c06fa33`, `7d2621b`,
 `88f1158`, `689cd45`, `389a4ac`, `ad707c7`, `75fb00e` or the round-9 candidate
-itself.
+`84816dc` itself.
 
 Review focus areas (attack each):
 
