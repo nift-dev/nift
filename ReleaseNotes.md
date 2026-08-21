@@ -1,5 +1,9 @@
 # Nift — Release Notes
 
+## v4.0.6 (development)
+
+Development version following the public v4.0.5 release.
+
 ## v4.0.5
 
 Nift 4.0.5 focuses on reliability and release hardening. There are no
