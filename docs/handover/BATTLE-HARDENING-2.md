@@ -72,8 +72,38 @@ Registry `test_of_test` reconciled: the six BH4–BH9 guards are promoted to
 `VERIFIED_GUARD` with `test_of_test_evidence_refs` (7 VERIFIED_GUARD total,
 including the BH3 pagination guard). BH10 was performed against the website
 source: the stale minify matrix count (379→15,459), Checkpoint 8 case count
-(13→16), and `ai-context.txt` wording were corrected, the site rebuilt, and the
-registry's pinned claim-surface hashes and claim needles updated.
+(13→16), and `ai-context.txt` wording were corrected, the site rebuilt, the
+generated `public/` submodule committed and bumped, and the registry's pinned
+claim-surface hashes and claim needles updated.
+
+### BH3–BH10 repair tranche 2 (post second-order review)
+
+The second cold review found further second-order oracle holes; a second
+focused tranche closed them, retained as
+`docs/evidence/bh10/bh3-10-repair-battery.json` (extended):
+
+- **BH3** adds a per-page split oracle: page *i* must carry exactly items
+  `[(i-1)*pp : i*pp]`, so redistributing `abcde` into `a | bcde | ""` is RED.
+- **BH5** gives every success case a semantic oracle: the rendered `@content`
+  block plus any case-specific value must be present, so a page replaced with
+  `WRONG` is RED.
+- **BH7** synchronizes the SIGKILL to observable build-write progress (the
+  first output appearing in `public/`): the guard raises if the build finishes
+  before any output, or if SIGKILL does not terminate a live mid-build process.
+  A wrapper that sleeps before building is therefore a *genuine* mid-build
+  crash test, not a dead-process kill.
+- **BH8** proves unrelated pages were not rewritten at all (mtime AND bytes
+  unchanged), not merely byte-identical: rewriting every other page is RED.
+- **BH9** asserts the exact expected output for every valid adversarial
+  tracked name (not just `index.html`): an index-only fake is RED.
+- **BH10** finished publication: the generated `public/` submodule was
+  committed and bumped in the website repo, and the four now-resolved
+  discrepancies (`minify-generated-count`, `checkpoint8-count`,
+  `ai-context-provided`, `memory-10k-skip-is-green`) were removed from the
+  registry (7 → 3 remaining, all still genuine).
+
+BH4 and BH6 needed no second-order change; the reviewer found no new blocker
+in those scopes.
 
 ## BH3 — Curated guard mutation / test-of-test
 

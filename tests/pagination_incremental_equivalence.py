@@ -43,19 +43,28 @@ def assert_output_correct(project: Path, label: str) -> None:
                 f"{label}: pagination nav total wrong "
                 f"(expected {total}, got {m.group(1) if m else 'none'})")
 
-    # the rendered item CONTENT must match the source items: every page's
-    # section text (minus any |N| pagination separators) concatenated equals
-    # the source @item values. A build that renders the wrong item content is
-    # caught even when incremental and clean agree with each other.
+    # the rendered item CONTENT must match the source items AND the per-page
+    # split must honour items-per-page: page i carries exactly items
+    # [(i-1)*pp : i*pp], so an implementation that redistributes items across
+    # pages (e.g. `a | bcde | ""`) is caught even when the global
+    # concatenation and incremental/clean agree.
     source = (project / 'content' / 'blog.html').read_text()
-    expected_items = ''.join(re.findall(r'@item\{([^}]*)\}', source))
+    items_list = re.findall(r'@item\{([^}]*)\}', source)
+    expected_items = ''.join(items_list)
     rendered = []
-    for name in expected:
+    for i, name in enumerate(expected, start=1):
         page = (public / name).read_text()
         m = re.search(r'<section>(.*?)</section>', page, re.S)
         if not m:
             raise RuntimeError(f"{label}: page {name!r} has no section content")
-        rendered.append(re.sub(r'\|[0-9]+\|', '', m.group(1)))
+        chunk = re.sub(r'\|[0-9]+\|', '', m.group(1))
+        rendered.append(chunk)
+        expected_chunk = ''.join(items_list[(i - 1) * per_page:i * per_page])
+        if chunk != expected_chunk:
+            raise RuntimeError(
+                f"{label}: page {name!r} carries items {chunk!r} but "
+                f"items-per-page={per_page} requires {expected_chunk!r} "
+                f"(page {i} of {total})")
     if ''.join(rendered) != expected_items:
         raise RuntimeError(
             f"{label}: rendered pagination items {''.join(rendered)!r} "

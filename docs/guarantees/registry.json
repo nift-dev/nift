@@ -1406,52 +1406,6 @@
   ],
   "known_discrepancies": [
     {
-      "id": "docs.battle-tested.minify-generated-count",
-      "state": "NOT_ESTABLISHED",
-      "summary": "Battle Tested contains two incompatible Minify++ JavaScript generated-matrix counts (379 and 15,459). BH1 records the contradiction; BH10 owns public-claim reconciliation unless earlier work proves one side materially affects a release guarantee.",
-      "refs": [
-        {
-          "repo": "website",
-          "path": "content/docs/battle-tested.html",
-          "needle": "15,459 executable programs"
-        },
-        {
-          "repo": "website",
-          "path": "content/docs/battle-tested.html",
-          "needle": "15,459-program JavaScript semantic matrix"
-        }
-      ]
-    },
-    {
-      "id": "docs.getting-started.ai-context-provided",
-      "state": "NOT_ESTABLISHED",
-      "summary": "Getting Started says to add the provided ai-context.txt while the starter/init flow does not currently provide that file. BH1 records the functional/documentation mismatch; BH6 owns the executable onboarding contract unless it is promoted earlier by a larger finding.",
-      "refs": [
-        {
-          "repo": "website",
-          "path": "content/docs/getting-started.html",
-          "needle": "add your own <code>ai-context.txt</code>"
-        },
-        {
-          "repo": "website",
-          "path": "content/docs/ai-assistants.html",
-          "needle": "Put a short description of Nift's project model in <code>ai-context.txt</code>"
-        }
-      ]
-    },
-    {
-      "id": "tests.memory-10k-skip-is-green",
-      "state": "NOT_ESTABLISHED",
-      "summary": "memory_10k_benchmark.py exits successfully when /usr/bin/time is unavailable, so the harness can report process success without measuring the claimed guard. BH2 owns PASS/FAIL/SKIP/UNSUPPORTED integrity.",
-      "refs": [
-        {
-          "repo": "nift",
-          "path": "tests/memory_10k_benchmark.py",
-          "needle": "/usr/bin/time"
-        }
-      ]
-    },
-    {
       "id": "evidence.ci-coverage-gap",
       "state": "NOT_ESTABLISHED",
       "summary": "Several retained correctness/checkpoint families are not enforced on every relevant change. BH2 owns the enforcement-tier design rather than silently upgrading RETAINED evidence to CI_GATED.",
@@ -1480,27 +1434,6 @@
           "repo": "nift",
           "path": "Makefile",
           "needle": "test-guarantee-registry:"
-        }
-      ]
-    },
-    {
-      "id": "docs.memory-safety.checkpoint8-count",
-      "state": "NOT_ESTABLISHED",
-      "summary": "Memory & Resource Safety summarizes Checkpoint 8 as 13 filesystem/transaction cases, while the maintained Checkpoint 8 evidence and Battle Tested page now describe 16. This is stale public evidence wording.",
-      "refs": [
-        {
-          "repo": "website",
-          "path": "content/docs/memory-safety.html",
-          "needle": "16 adversarial filesystem/transaction cases"
-        },
-        {
-          "repo": "website",
-          "path": "content/docs/battle-tested.html",
-          "needle": "maintained Linux corpus now has sixteen cases"
-        },
-        {
-          "repo": "nift",
-          "path": "docs/evidence/checkpoint-8/filesystem-transaction.json"
         }
       ]
     },

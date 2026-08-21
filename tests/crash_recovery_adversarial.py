@@ -44,13 +44,52 @@ def build_ok(nift: str, root: Path) -> bool:
         return False
 
 
+def kill_during_build(nift: str, root: Path, label: str, timeout: float = 10.0) -> None:
+    """Start a build-all, wait for OBSERVABLE build-write progress (the first
+    output file appearing in public/), then SIGKILL the still-live process so
+    the crash genuinely interrupts transactional/build activity. Fails (rather
+    than passing) if the process exits before any output is written, or if
+    SIGKILL does not terminate a live process."""
+    public = root / 'public'
+    shutil.rmtree(public, ignore_errors=True)
+    public.mkdir(exist_ok=True)
+    shutil.rmtree(root / '.nift' / 'public', ignore_errors=True)
+    proc = subprocess.Popen([nift, 'build-all'], cwd=root,
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    deadline = time.time() + timeout
+    progress = False
+    while time.time() < deadline:
+        if proc.poll() is not None:
+            proc.wait()
+            raise RuntimeError(
+                f"{label}: build finished before any output was written "
+                f"(rc={proc.returncode}); NOT a crash test")
+        if public.exists() and any(public.iterdir()):
+            progress = True
+            break
+        time.sleep(0.002)
+    if not progress:
+        proc.kill()
+        proc.wait()
+        raise RuntimeError(f"{label}: no observable build progress within {timeout}s")
+    if proc.poll() is not None:
+        proc.wait()
+        raise RuntimeError(f"{label}: build finished between progress and SIGKILL")
+    proc.kill()
+    proc.wait()
+    if proc.returncode != -9:
+        raise RuntimeError(
+            f"{label}: SIGKILL did not terminate a live mid-build process "
+            f"(rc={proc.returncode})")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument('--nift', required=True)
-    ap.add_argument('--kills', default='0.0,0.01,0.03')
+    ap.add_argument('--kills', type=int, default=2)
     args = ap.parse_args()
     nift = str(Path(args.nift).resolve())
-    kill_points = [float(x) for x in args.kills.split(',')]
+    kill_count = args.kills
 
     def assert_valid_json(root: Path, label: str) -> None:
         for rel in ('.nift/tracked.json', '.nift/config.json'):
@@ -71,24 +110,12 @@ def main() -> int:
             assert_valid_json(root, f'{mode}:baseline')
             baseline = tree_hash(root / 'public')
 
-            for kp in kill_points:
-                proc = subprocess.Popen([nift, 'build-all'], cwd=root,
-                                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                time.sleep(kp)
-                if proc.poll() is not None:
-                    proc.wait()
-                    raise RuntimeError(
-                        f"{mode}:kill-{kp}: build finished before SIGKILL was sent "
-                        f"(rc={proc.returncode}); this is NOT a crash test")
-                proc.kill()
-                proc.wait()
-                if proc.returncode != -9:
-                    raise RuntimeError(
-                        f"{mode}:kill-{kp}: SIGKILL did not terminate a live process "
-                        f"(rc={proc.returncode})")
-                assert_valid_json(root, f'{mode}:kill-{kp}')
+            for i in range(kill_count):
+                label = f'{mode}:crash-{i}'
+                kill_during_build(nift, root, label)
+                assert_valid_json(root, label)
                 if not build_ok(nift, root):
-                    raise RuntimeError(f"{mode}:kill-{kp}: next build failed after crash")
+                    raise RuntimeError(f"{label}: next build failed after crash")
 
             # a further build must converge to the baseline clean output
             if not build_ok(nift, root):

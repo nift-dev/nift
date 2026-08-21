@@ -2,7 +2,7 @@
   "schema_version": 1,
   "campaign": "bh3-10-repair",
   "checkpoint": "guard-oracle-repair-tranche",
-  "timestamp_utc": "2026-08-21T03:45:41.552681+00:00",
+  "timestamp_utc": "2026-08-21T04:34:26.013597+00:00",
   "platform": "Linux (repair tranche)",
   "nift": "/home/nick/Repositories/nift/nift/nift",
   "purpose": "Replays the independent reviewer's oracle attacks against the repaired BH3-BH10 guards: real Nift must stay GREEN and each representative attack must go RED.",
@@ -116,6 +116,102 @@
         },
         {
           "name": "corrupt-rendered-content",
+          "exit": 1,
+          "expected_nonzero": true,
+          "red_as_expected": true
+        }
+      ]
+    },
+    {
+      "bh": "bh3",
+      "guard": "pagination_incremental_equivalence.py",
+      "cases": [
+        {
+          "name": "real-nift",
+          "exit": 0,
+          "expected_zero": true,
+          "red_as_expected": true
+        },
+        {
+          "name": "redistributed-per-page-split",
+          "exit": 1,
+          "expected_nonzero": true,
+          "red_as_expected": true
+        }
+      ]
+    },
+    {
+      "bh": "bh5",
+      "guard": "parser_value_composition_adversarial.py",
+      "cases": [
+        {
+          "name": "real-nift",
+          "exit": 0,
+          "expected_zero": true,
+          "red_as_expected": true
+        },
+        {
+          "name": "wrong-success-output",
+          "exit": 1,
+          "expected_nonzero": true,
+          "red_as_expected": true
+        }
+      ]
+    },
+    {
+      "bh": "bh7",
+      "guard": "crash_recovery_adversarial.py",
+      "cases": [
+        {
+          "name": "real-nift",
+          "exit": 0,
+          "expected_zero": true,
+          "red_as_expected": true
+        },
+        {
+          "name": "non-atomic-metadata",
+          "exit": 1,
+          "expected_nonzero": true,
+          "red_as_expected": true
+        },
+        {
+          "name": "sleepy-wrapper-neutralized",
+          "exit": 0,
+          "expected_zero": true,
+          "red_as_expected": true
+        }
+      ]
+    },
+    {
+      "bh": "bh8",
+      "guard": "complexity_invariants.py",
+      "cases": [
+        {
+          "name": "real-nift",
+          "exit": 0,
+          "expected_zero": true,
+          "red_as_expected": true
+        },
+        {
+          "name": "rewrite-unrelated-pages",
+          "exit": 1,
+          "expected_nonzero": true,
+          "red_as_expected": true
+        }
+      ]
+    },
+    {
+      "bh": "bh9",
+      "guard": "filesystem_boundary_adversarial.py",
+      "cases": [
+        {
+          "name": "real-nift",
+          "exit": 0,
+          "expected_zero": true,
+          "red_as_expected": true
+        },
+        {
+          "name": "index-only-fake",
           "exit": 1,
           "expected_nonzero": true,
           "red_as_expected": true

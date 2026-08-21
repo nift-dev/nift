@@ -82,11 +82,14 @@ def main() -> int:
         if p.returncode < 0:
             raise RuntimeError(f"build terminated by signal {-p.returncode}")
 
-        # the valid page must actually have been built: a tool that "builds"
-        # nothing (or exits 1 without writing) is not a green run
-        index_out = root / 'public' / 'index.html'
-        if not index_out.is_file() or index_out.stat().st_size == 0:
-            raise RuntimeError("build produced no output for the valid page")
+        # every valid tracked name must actually have been built, each inside
+        # the output directory: a tool that "builds" nothing (or only one page,
+        # or exits 1 without writing) is not a green run
+        expected_outputs = ['index.html'] + [n + '.html' for n in ADVERSARIAL_NAMES]
+        for rel in expected_outputs:
+            out = root / 'public' / rel
+            if not out.is_file() or out.stat().st_size == 0:
+                raise RuntimeError(f"build produced no output for valid page {rel!r}")
 
         # every output lives under public/, and nothing appeared outside it;
         # outside-tree comparison is by content hash, so corrupting an existing

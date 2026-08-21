@@ -98,11 +98,14 @@ def main() -> int:
                 out_path = root / 'public' / 'index.html'
                 if not out_path.is_file():
                     raise RuntimeError(f"{case_id}: expected output but none produced")
-                if must_contain:
-                    out = out_path.read_text()
-                    for needle in must_contain:
-                        if needle not in out:
-                            raise RuntimeError(f"{case_id}: output missing {needle!r}")
+                # every success case carries a semantic oracle: the @content
+                # block plus any case-specific rendered value must be present
+                out = out_path.read_text()
+                if '<p>CONTENT</p>' not in out:
+                    raise RuntimeError(f"{case_id}: output missing the rendered @content block")
+                for needle in (must_contain or []):
+                    if needle not in out:
+                        raise RuntimeError(f"{case_id}: output missing {needle!r}")
             else:
                 # adversarial input must be REJECTED with a controlled non-zero
                 # exit - a silent success that builds nothing (or an empty

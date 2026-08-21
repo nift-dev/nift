@@ -62,19 +62,25 @@ def main() -> int:
             if rewritten:
                 raise RuntimeError(f"{mode}:noop: no-op build rewrote outputs {rewritten}")
 
-            # a one-page change must rebuild exactly that page: its output
-            # BYTES must change and reflect the new source content, while every
-            # other output's bytes stay identical (an mtime-only touch is not a
-            # rebuild)
+            # a one-page change must rebuild exactly that page: p7's output
+            # BYTES and mtime must change and reflect the new source content,
+            # and every OTHER output must be completely untouched (mtime AND
+            # bytes) - a full re-render that rewrites unrelated pages is RED
+            # even when their bytes are identical
             time.sleep(0.02)
             (root / 'content' / 'p7.html').write_text('<p>7-CHANGED</p>\n')
             run(nift, root, 'build')
             after2 = stamps(root)
-            changed_bytes = [k for k in before if before[k][2] != after2.get(k, (0, 0, b''))[2]]
-            if changed_bytes != ['p7.html']:
-                raise RuntimeError(f"{mode}:proportional: one-page change rebuilt {changed_bytes}")
             if b'7-CHANGED' not in after2['p7.html'][2]:
                 raise RuntimeError(f"{mode}:proportional: p7.html output does not reflect the source change")
+            if before['p7.html'][2] == after2['p7.html'][2]:
+                raise RuntimeError(f"{mode}:proportional: p7.html bytes did not change on rebuild")
+            if before['p7.html'][0] == after2['p7.html'][0]:
+                raise RuntimeError(f"{mode}:proportional: p7.html mtime did not change on rebuild")
+            touched_others = [k for k in before if k != 'p7.html' and before[k] != after2.get(k)]
+            if touched_others:
+                raise RuntimeError(
+                    f"{mode}:proportional: unrelated pages were rewritten {touched_others}")
 
             print(f'{mode}: PASS')
 
