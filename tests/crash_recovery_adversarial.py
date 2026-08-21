@@ -18,7 +18,7 @@ def tree_hash(root: Path) -> dict[str, str]:
             for p in sorted(x for x in root.rglob('*') if x.is_file())}
 
 
-def setup(root: Path, mode: str, n: int = 40) -> None:
+def setup(root: Path, mode: str, n: int = 6000) -> None:
     (root / '.nift').mkdir()
     (root / 'content').mkdir()
     (root / 'templates').mkdir()
@@ -47,7 +47,7 @@ def build_ok(nift: str, root: Path) -> bool:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument('--nift', required=True)
-    ap.add_argument('--kills', default='0.0,0.02,0.08')
+    ap.add_argument('--kills', default='0.0,0.01,0.03')
     args = ap.parse_args()
     nift = str(Path(args.nift).resolve())
     kill_points = [float(x) for x in args.kills.split(',')]
@@ -75,8 +75,17 @@ def main() -> int:
                 proc = subprocess.Popen([nift, 'build-all'], cwd=root,
                                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 time.sleep(kp)
+                if proc.poll() is not None:
+                    proc.wait()
+                    raise RuntimeError(
+                        f"{mode}:kill-{kp}: build finished before SIGKILL was sent "
+                        f"(rc={proc.returncode}); this is NOT a crash test")
                 proc.kill()
                 proc.wait()
+                if proc.returncode != -9:
+                    raise RuntimeError(
+                        f"{mode}:kill-{kp}: SIGKILL did not terminate a live process "
+                        f"(rc={proc.returncode})")
                 assert_valid_json(root, f'{mode}:kill-{kp}')
                 if not build_ok(nift, root):
                     raise RuntimeError(f"{mode}:kill-{kp}: next build failed after crash")

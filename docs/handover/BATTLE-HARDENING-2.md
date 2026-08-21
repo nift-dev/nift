@@ -41,6 +41,40 @@ tranche and committed immutable candidates; ChatGPT attacks each exact
 candidate cold; DeepSeek fixes; ChatGPT re-attacks; reconcile. Semantic
 decisions, guarantee downgrades and roadmap changes stay with Nick.
 
+### BH3–BH10 repair tranche (post-review)
+
+The independent cold review of BH3–BH10 found oracle holes in the new guards.
+A single focused repair tranche closed every one; the reviewer's attacks are
+replayed as retained red evidence in
+`docs/evidence/bh10/bh3-10-repair-battery.json`
+(`scripts/bh_repair_battery.py`), where real Nift stays GREEN and every
+representative attack goes RED:
+
+- **BH4** now byte-compares incremental vs clean output at *every* transition
+  (a do-nothing incremental build is RED), not only at the end.
+- **BH5** now requires a controlled non-zero exit for every malformed-input
+  case (a silent success that builds nothing is RED); success cases must
+  produce correct output.
+- **BH7** verifies SIGKILL actually terminated a *live* process at every kill
+  point (raises if the build finished before the kill), with a build large
+  enough for genuine mid-build crashes.
+- **BH8** rebuild proof is content-based: the changed page's output bytes must
+  reflect the source change (an mtime-only touch or stale-bytes rebuild is RED).
+- **BH9** requires the valid page to actually build, compares the outside-tree
+  by content hash (corrupting an existing source is RED), and rejects the
+  parent-reference name controlled.
+- **BH3** pagination oracle now verifies rendered item content matches the
+  source items (corrupting rendered content in both builds is RED).
+- **BH6** asserts the full init scaffold including the starter CSS/JS assets
+  and their tracked entries/outputs (a scaffold missing them is RED).
+
+Registry `test_of_test` reconciled: the six BH4–BH9 guards are promoted to
+`VERIFIED_GUARD` with `test_of_test_evidence_refs` (7 VERIFIED_GUARD total,
+including the BH3 pagination guard). BH10 was performed against the website
+source: the stale minify matrix count (379→15,459), Checkpoint 8 case count
+(13→16), and `ai-context.txt` wording were corrected, the site rebuilt, and the
+registry's pinned claim-surface hashes and claim needles updated.
+
 ## BH3 — Curated guard mutation / test-of-test
 
 ### What BH2 taught us

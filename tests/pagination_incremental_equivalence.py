@@ -43,6 +43,24 @@ def assert_output_correct(project: Path, label: str) -> None:
                 f"{label}: pagination nav total wrong "
                 f"(expected {total}, got {m.group(1) if m else 'none'})")
 
+    # the rendered item CONTENT must match the source items: every page's
+    # section text (minus any |N| pagination separators) concatenated equals
+    # the source @item values. A build that renders the wrong item content is
+    # caught even when incremental and clean agree with each other.
+    source = (project / 'content' / 'blog.html').read_text()
+    expected_items = ''.join(re.findall(r'@item\{([^}]*)\}', source))
+    rendered = []
+    for name in expected:
+        page = (public / name).read_text()
+        m = re.search(r'<section>(.*?)</section>', page, re.S)
+        if not m:
+            raise RuntimeError(f"{label}: page {name!r} has no section content")
+        rendered.append(re.sub(r'\|[0-9]+\|', '', m.group(1)))
+    if ''.join(rendered) != expected_items:
+        raise RuntimeError(
+            f"{label}: rendered pagination items {''.join(rendered)!r} "
+            f"do not match source items {expected_items!r}")
+
 
 def tree_hash(root: Path):
     result = {}

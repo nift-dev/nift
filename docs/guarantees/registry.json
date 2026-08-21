@@ -109,10 +109,20 @@
           "job": "fast-suites"
         }
       ],
-      "test_of_test": "UNPROVEN",
+      "test_of_test": "VERIFIED_GUARD",
       "known_limits": [
         "Kill points are coarse (0/20/80ms); scheduler-dependent timing is not exhaustively covered",
         "Process-level kill only; power-loss/cache-flush simulation is out of scope"
+      ],
+      "test_of_test_evidence_refs": [
+        {
+          "repo": "nift",
+          "path": "docs/evidence/bh7/bh7-crash-recovery-red.json"
+        },
+        {
+          "repo": "nift",
+          "path": "docs/evidence/bh10/bh3-10-repair-battery.json"
+        }
       ]
     },
     {
@@ -220,10 +230,20 @@
           "job": "fast-suites"
         }
       ],
-      "test_of_test": "UNPROVEN",
+      "test_of_test": "VERIFIED_GUARD",
       "known_limits": [
         "Focused deterministic transition sequence; randomized fuzzing over longer horizons remains possible",
         "Red-run evidence covers drop-page, stale-orphan, and stub defects; a crash mid-transition is BH7 territory"
+      ],
+      "test_of_test_evidence_refs": [
+        {
+          "repo": "nift",
+          "path": "docs/evidence/bh4/bh4-incremental-state-transitions-red.json"
+        },
+        {
+          "repo": "nift",
+          "path": "docs/evidence/bh10/bh3-10-repair-battery.json"
+        }
       ]
     },
     {
@@ -260,10 +280,20 @@
           "job": "fast-suites"
         }
       ],
-      "test_of_test": "UNPROVEN",
+      "test_of_test": "VERIFIED_GUARD",
       "known_limits": [
         "Focused deterministic case set; checkpoint-9 fuzzes the template plane, this guard covers the value/composition plane",
         "Deep-nesting depth is bounded to 200; pathological resource exhaustion is not asserted"
+      ],
+      "test_of_test_evidence_refs": [
+        {
+          "repo": "nift",
+          "path": "docs/evidence/bh5/bh5-parser-value-composition-red.json"
+        },
+        {
+          "repo": "nift",
+          "path": "docs/evidence/bh10/bh3-10-repair-battery.json"
+        }
       ]
     },
     {
@@ -341,10 +371,20 @@
           "job": "fast-suites"
         }
       ],
-      "test_of_test": "UNPROVEN",
+      "test_of_test": "VERIFIED_GUARD",
       "known_limits": [
         "Linux only; platform-specific path semantics remain with the portable-equivalence corpus",
         "Symlink following within content is Nift behavior, not a boundary violation"
+      ],
+      "test_of_test_evidence_refs": [
+        {
+          "repo": "nift",
+          "path": "docs/evidence/bh9/bh9-filesystem-boundary-red.json"
+        },
+        {
+          "repo": "nift",
+          "path": "docs/evidence/bh10/bh3-10-repair-battery.json"
+        }
       ]
     },
     {
@@ -426,10 +466,20 @@
           "job": "fast-suites"
         }
       ],
-      "test_of_test": "UNPROVEN",
+      "test_of_test": "VERIFIED_GUARD",
       "known_limits": [
         "Base scaffold only; target-specific scaffolds remain covered by init.target-shape-cross-platform",
         "This Nift version emits no AI-context files from init, so AI-context truth is not asserted"
+      ],
+      "test_of_test_evidence_refs": [
+        {
+          "repo": "nift",
+          "path": "docs/evidence/bh6/bh6-init-functional-truth-red.json"
+        },
+        {
+          "repo": "nift",
+          "path": "docs/evidence/bh10/bh3-10-repair-battery.json"
+        }
       ]
     },
     {
@@ -503,10 +553,20 @@
           "job": "fast-suites"
         }
       ],
-      "test_of_test": "UNPROVEN",
+      "test_of_test": "VERIFIED_GUARD",
       "known_limits": [
         "Structural change-proportionality only; wall-clock scaling remains covered by the near-linear benchmarks",
         "Filesystem timestamp granularity makes sub-millisecond rewrites undetectable"
+      ],
+      "test_of_test_evidence_refs": [
+        {
+          "repo": "nift",
+          "path": "docs/evidence/bh8/bh8-complexity-invariants-red.json"
+        },
+        {
+          "repo": "nift",
+          "path": "docs/evidence/bh10/bh3-10-repair-battery.json"
+        }
       ]
     },
     {
@@ -543,7 +603,7 @@
       "id": "performance.full-build-near-linear",
       "state": "ESTABLISHED",
       "guarantee": "Changed-output full-build work remains near-linear on the retained large flat-output fixture.",
-      "scope": "1,000\u21924,000 page changed-output scaling guard; identical-output fast path cannot hide the writer cost.",
+      "scope": "1,000→4,000 page changed-output scaling guard; identical-output fast path cannot hide the writer cost.",
       "platforms": [
         "linux"
       ],
@@ -1150,7 +1210,7 @@
       "source": {
         "repo": "website",
         "path": "content/docs/production-readiness.html",
-        "needle": "protected by a dedicated 1,000\u21924,000-page full-build scaling guard"
+        "needle": "protected by a dedicated 1,000→4,000-page full-build scaling guard"
       },
       "kind": "reliability"
     },
@@ -1310,7 +1370,7 @@
       "source": {
         "repo": "website",
         "path": "content/docs/memory-safety.html",
-        "needle": "RSS stayed within 5,976\u20136,356 KiB"
+        "needle": "RSS stayed within 5,976–6,356 KiB"
       }
     },
     {
@@ -1353,7 +1413,7 @@
         {
           "repo": "website",
           "path": "content/docs/battle-tested.html",
-          "needle": "379 executable programs"
+          "needle": "15,459 executable programs"
         },
         {
           "repo": "website",
@@ -1370,12 +1430,12 @@
         {
           "repo": "website",
           "path": "content/docs/getting-started.html",
-          "needle": "add the provided <code>ai-context.txt</code>"
+          "needle": "add your own <code>ai-context.txt</code>"
         },
         {
           "repo": "website",
           "path": "content/docs/ai-assistants.html",
-          "needle": "touch ai-context.txt"
+          "needle": "Put a short description of Nift's project model in <code>ai-context.txt</code>"
         }
       ]
     },
@@ -1431,7 +1491,7 @@
         {
           "repo": "website",
           "path": "content/docs/memory-safety.html",
-          "needle": "13 adversarial filesystem/transaction cases"
+          "needle": "16 adversarial filesystem/transaction cases"
         },
         {
           "repo": "website",
@@ -1498,13 +1558,13 @@
     {
       "repo": "website",
       "path": "content/docs/battle-tested.html",
-      "sha256": "de8d5856ec2b26ef38f2e213996beb82733c15d1d0312c3de857e73966007fe9",
+      "sha256": "1aa5bf12cfbcd21b10a4dc28fdd42f7fc1617c454e0127dabb3565faba5e673a",
       "mapping_scope": "BH1 manual audit of significant quantitative/reliability claims; source hash invalidates the audit if this page changes."
     },
     {
       "repo": "website",
       "path": "content/docs/memory-safety.html",
-      "sha256": "a16d1037b9a8ec5af16babd6d50ae402cb60c61bc9516a5497def4819e59a9ff",
+      "sha256": "5380d9a66c5acb1e6fb42db47912c138e1bb124e966b3f7653f5483a469dfba1",
       "mapping_scope": "BH1 manual audit of significant quantitative/reliability claims; source hash invalidates the audit if this page changes."
     },
     {

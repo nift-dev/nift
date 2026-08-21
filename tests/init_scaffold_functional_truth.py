@@ -39,12 +39,20 @@ def main() -> int:
         root = Path(td)
         run(nift, root, 'init')
 
-        # scaffold present
+        # scaffold present (including the starter CSS/JS assets and their
+        # tracked entries and outputs; deleting them is a broken scaffold)
         for rel in ('.nift/config.json', '.nift/tracked.json',
                     'templates/template.html', 'templates/head.html',
-                    'content/index.html', 'public/index.html'):
+                    'content/index.html', 'public/index.html',
+                    'content/assets/css/style.css', 'content/assets/js/script.js',
+                    'public/assets/css/style.css', 'public/assets/js/script.js'):
             if not (root / rel).is_file():
                 raise RuntimeError(f"init scaffold missing {rel!r}")
+        tracked = json.loads((root / '.nift' / 'tracked.json').read_text())['tracked']
+        tracked_names = {e['name'] for e in tracked}
+        for expect_name in ('assets/css/style', 'assets/js/script'):
+            if expect_name not in tracked_names:
+                raise RuntimeError(f"init scaffold missing tracked entry {expect_name!r}")
 
         # template references resolve
         tpl = (root / 'templates' / 'template.html').read_text()

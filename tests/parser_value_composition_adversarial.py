@@ -104,9 +104,20 @@ def main() -> int:
                         if needle not in out:
                             raise RuntimeError(f"{case_id}: output missing {needle!r}")
             else:
-                # controlled failure (or a successful tolerant parse) is fine;
-                # the run() checks already excluded hang/signal/sanitizer
-                pass
+                # adversarial input must be REJECTED with a controlled non-zero
+                # exit - a silent success that builds nothing (or an empty
+                # tolerant parse) is a false green
+                if p.returncode == 0:
+                    out_path = root / 'public' / 'index.html'
+                    if not out_path.is_file() or out_path.stat().st_size == 0:
+                        raise RuntimeError(
+                            f"{case_id}: malformed input accepted with no output "
+                            "(silent success)")
+                    raise RuntimeError(
+                        f"{case_id}: malformed input accepted with output "
+                        "(uncontrolled tolerant success)")
+                if p.returncode < 0:
+                    raise RuntimeError(f"{case_id}: terminated by signal {-p.returncode}")
             passed += 1
     print(f'BH5 parser/value/composition adversarial: PASS ({passed} cases)')
     return 0

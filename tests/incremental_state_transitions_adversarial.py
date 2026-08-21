@@ -71,9 +71,21 @@ def setup(project: Path, mode: str, names: list[str]) -> None:
         p.write_text(f'<p>{n}</p>\n')
 
 
-def transition(nift: str, proj: Path, mode: str, expected: set[str]) -> None:
+def transition(nift: str, proj: Path, mode: str, expected: set[str], label: str) -> None:
     run(nift, proj, 'build')
-    assert_outputs(proj, expected, f'{mode}:build')
+    assert_outputs(proj, expected, f'{mode}:{label}')
+    # incremental output must byte-match a clean rebuild of this exact state,
+    # not merely share the same output set; stale content from an earlier
+    # transition cannot hide behind a later one.
+    fresh = proj.parent / f'{proj.name}-oracle'
+    if fresh.exists():
+        shutil.rmtree(fresh)
+    shutil.copytree(proj, fresh)
+    shutil.rmtree(fresh / 'public')
+    (fresh / 'public').mkdir()
+    run(nift, fresh, 'build-all')
+    if public_hash(fresh) != public_hash(proj):
+        raise RuntimeError(f"{mode}:{label}: incremental/clean bytes differ after transition")
 
 
 def main() -> int:
@@ -93,28 +105,28 @@ def main() -> int:
 
             # content change
             (proj / 'content' / 'b.html').write_text('<p>B2</p>\n')
-            transition(nift, proj, mode, expected)
+            transition(nift, proj, mode, expected, 'content-change')
 
             # remove b via the tracked command; stale output must disappear
             run(nift, proj, 'rm', 'b')
             expected.discard('b.html')
-            transition(nift, proj, mode, expected)
+            transition(nift, proj, mode, expected, 'rm-b')
 
             # rename c -> d via the tracked command; old output must go
             run(nift, proj, 'mv', 'c', 'd')
             expected.discard('c.html')
             expected.add('d.html')
-            transition(nift, proj, mode, expected)
+            transition(nift, proj, mode, expected, 'mv-c-d')
 
             # add e via the tracked command
             (proj / 'content' / 'e.html').write_text('<p>e</p>\n')
             run(nift, proj, 'track', 'e', 'E', 'templates/template.html')
             expected.add('e.html')
-            transition(nift, proj, mode, expected)
+            transition(nift, proj, mode, expected, 'track-e')
 
             # template change must propagate to every output
             (proj / 'templates' / 'template.html').write_text('T2:@content\n')
-            transition(nift, proj, mode, expected)
+            transition(nift, proj, mode, expected, 'template-change')
             for rel in sorted(expected):
                 if 'T2:' not in (proj / 'public' / rel).read_text():
                     raise RuntimeError(f"{mode}:template: {rel!r} not rebuilt")
@@ -123,7 +135,7 @@ def main() -> int:
             tr = json.loads((proj / '.nift' / 'tracked.json').read_text())
             tr['tracked'][0]['title'] = 'Renamed'
             (proj / '.nift' / 'tracked.json').write_text(json.dumps(tr))
-            transition(nift, proj, mode, expected)
+            transition(nift, proj, mode, expected, 'metadata-change')
 
             # incremental output must equal a clean rebuild of the same project
             fresh = base / f'{mode}-fresh'
