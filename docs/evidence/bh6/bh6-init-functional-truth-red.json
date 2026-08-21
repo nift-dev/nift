@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "campaign": "bh6",
+  "checkpoint": "init-starter-functional-truth",
+  "timestamp_utc": "2026-08-21T18:00:00Z",
+  "platform": "Linux (BH6)",
+  "nift": "/home/nick/Repositories/nift/nift/nift",
+  "purpose": "BH6 guard red-rule evidence: tests/init_scaffold_functional_truth.py is GREEN on the real Nift binary and RED on representative defects (init that builds stale output; a build whose output extension disagrees with config).",
+  "attack": "nift init emits no AI-context files in this version; BH6 asserts the functional truth of the scaffold itself: scaffold completeness, @input reference resolution, config/tracked/content-ext->output-ext consistency, clean-rebuild reproducibility of init'd public+metadata, and build idempotency.",
+  "red_runs": [
+    {
+      "case": "real nift",
+      "exit": 0,
+      "outcome": "GREEN",
+      "red_as_expected": false
+    },
+    {
+      "case": "stale-init wrapper (init adds public/stale-orphan.html)",
+      "exit": 1,
+      "outcome": "RED (clean rebuild does not reproduce init'd public output)",
+      "red_as_expected": true
+    },
+    {
+      "case": "wrong-ext wrapper (build-all renames index.html to index.htm)",
+      "exit": 1,
+      "outcome": "RED (clean rebuild does not reproduce init'd public output)",
+      "red_as_expected": true
+    }
+  ],
+  "all_red_correct": true
+}

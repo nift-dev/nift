@@ -71,3 +71,5 @@ jobs:
         run: make test-incremental-state-transitions
       - name: Parser/value/composition adversarial (BH5)
         run: make test-parser-value-composition
+      - name: Init scaffold functional truth (BH6)
+        run: make test-init-functional-truth

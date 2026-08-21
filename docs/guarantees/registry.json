@@ -313,6 +313,46 @@
       ]
     },
     {
+      "id": "init.scaffold-functional-truth",
+      "state": "ESTABLISHED",
+      "guarantee": "The base init scaffold is functionally true: the generated project builds out of the box, config/tracked/template/content state is internally consistent (every @input reference resolves, content-ext->output-ext mapping holds), a clean rebuild reproduces the init'd public output and page metadata exactly, and builds are idempotent.",
+      "scope": "Base init scaffold reproducibility, consistency, and idempotency.",
+      "platforms": [
+        "linux"
+      ],
+      "evidence_classes": [
+        "RETAINED"
+      ],
+      "evidence_refs": [
+        {
+          "repo": "nift",
+          "path": "docs/evidence/bh6/bh6-init-functional-truth-red.json"
+        }
+      ],
+      "guard_refs": [
+        {
+          "repo": "nift",
+          "path": "tests/init_scaffold_functional_truth.py"
+        }
+      ],
+      "enforcement": [
+        {
+          "class": "MANUAL",
+          "command": "make test-init-functional-truth"
+        },
+        {
+          "class": "CI_GATED",
+          "workflow": ".github/workflows/test-integrity.yml",
+          "job": "fast-suites"
+        }
+      ],
+      "test_of_test": "UNPROVEN",
+      "known_limits": [
+        "Base scaffold only; target-specific scaffolds remain covered by init.target-shape-cross-platform",
+        "This Nift version emits no AI-context files from init, so AI-context truth is not asserted"
+      ]
+    },
+    {
       "id": "init.target-shape-cross-platform",
       "state": "ESTABLISHED",
       "guarantee": "Initializer target/scaffold output shapes, builds, and diagnostics agree with the target contract on native Linux, macOS, and Windows CI.",

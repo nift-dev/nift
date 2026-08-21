@@ -134,6 +134,34 @@ discrepancy).
 
 BH3 tranche 1 is an immutable candidate for ChatGPT to attack cold.
 
+## BH6 — Init / starter functional truth — ACTIVE
+
+### BH6 guarantee
+
+The base `nift init` scaffold is functionally true: the generated project
+builds out of the box; config/tracked/template/content state is internally
+consistent (every `@input` reference resolves, content-ext→output-ext mapping
+holds); a clean rebuild reproduces the init'd public output and page metadata
+exactly; and builds are idempotent.
+
+### BH6 attack
+
+`nift init` emits no AI-context files in this version, so BH6 asserts the
+functional truth of the scaffold itself. A probe confirmed init output is
+reproducible and idempotent on the real binary.
+
+### BH6 guard + red-run evidence
+
+`tests/init_scaffold_functional_truth.py` (make `test-init-functional-truth`,
+CI_GATED via `fast-suites`). Red-runs retained at
+`docs/evidence/bh6/bh6-init-functional-truth-red.json`:
+
+- real nift → GREEN
+- stale-init wrapper (init leaves an orphan output) → RED
+- wrong-ext wrapper (build-all emits `.htm` instead of `.html`) → RED
+
+Registered as `init.scaffold-functional-truth` (ESTABLISHED, RETAINED).
+
 ## BH5 — Parser / value / composition adversarial — ACTIVE
 
 ### BH5 guarantee
