@@ -233,9 +233,11 @@ change since v4.0.4 is the development-version bump.
 
 ### Source and workflow
 
-- Candidate commit: `fb30c1b` (release-notes framing commit; HEAD of `main`).
-- Tag: `v4.0.5` (annotated) — push requires explicit approval (pending).
-- GitHub Actions run: pending on tag push.
+- Release-candidate validation performed at `fb30c1b` (release-notes framing
+  commit). The tagged commit `8bb10f2` adds this release report (documentation
+  only) on top of the validated product state.
+- Tag: `v4.0.5` (annotated) at `8bb10f2`.
+- GitHub Actions run: created on tag push.
 
 ### Release-candidate validation (performed at `fb30c1b`, clean build)
 
