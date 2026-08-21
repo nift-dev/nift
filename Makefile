@@ -98,6 +98,12 @@ test-pagination: $(TARGET)
 test-pagination-equivalence: $(TARGET)
 	python3 tests/pagination_incremental_equivalence.py --nift "$(CURDIR)/$(TARGET)"
 
+# BH4: deterministic adversarial incremental state-transition sequence across
+# modified/hash/hybrid modes; asserts exact output set (no stale, no missing)
+# and incremental==clean equivalence.
+test-incremental-state-transitions: $(TARGET)
+	python3 tests/incremental_state_transitions_adversarial.py --nift "$(CURDIR)/$(TARGET)"
+
 test-installer:
 	tests/install_script_smoke.sh
 
@@ -142,7 +148,7 @@ bh1-guarantee-registry:
 	python3 scripts/check_guarantee_registry.py --website-root "$(BH1_WEBSITE_ROOT)" --regression-root "$(BH1_REGRESSION_ROOT)"
 	python3 scripts/bh1_registry_liveness.py --website-root "$(BH1_WEBSITE_ROOT)" --regression-root "$(BH1_REGRESSION_ROOT)"
 
-bh2-test-integrity: test-test-integrity test-guarantee-registry-ci test-contracts test-pagination-equivalence test-init-targets
+bh2-test-integrity: test-test-integrity test-guarantee-registry-ci test-contracts test-pagination-equivalence test-init-targets test-incremental-state-transitions
 
 # BH3 curated guard mutation / test-of-test tranche 1: applies mutation
 # families to exact guard copies, runs them against a real Nift binary (and

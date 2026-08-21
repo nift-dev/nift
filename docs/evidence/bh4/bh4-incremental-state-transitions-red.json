@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "campaign": "bh4",
+  "checkpoint": "incremental-state-transitions-adversarial",
+  "timestamp_utc": "2026-08-21T16:10:00Z",
+  "platform": "Linux (BH4)",
+  "nift": "/home/nick/Repositories/nift/nift/nift",
+  "purpose": "BH4 guard red-rule evidence: tests/incremental_state_transitions_adversarial.py is GREEN on the real Nift binary and RED on representative defects (a tool that drops a page, leaves a stale/orphan output, or produces nothing).",
+  "attack": "Prior incremental guards (checkpoint-7, pagination) exercised content/add/template/metadata changes; removals/renames were only covered randomly. BH4 makes the state-transition sequence deterministic and asserts the exact output set (no stale, no missing) plus incremental==clean equivalence across modified/hash/hybrid modes, using nift rm/mv/track commands.",
+  "red_runs": [
+    {
+      "case": "real nift",
+      "exit": 0,
+      "outcome": "GREEN",
+      "red_as_expected": false
+    },
+    {
+      "case": "drop-page wrapper (build drops public/a.html)",
+      "exit": 1,
+      "outcome": "RED (missing expected page)",
+      "red_as_expected": true
+    },
+    {
+      "case": "orphan wrapper (build leaves public/stale-orphan.html)",
+      "exit": 1,
+      "outcome": "RED (stale output)",
+      "red_as_expected": true
+    },
+    {
+      "case": "stub nift (produces nothing)",
+      "exit": 1,
+      "outcome": "RED (no outputs)",
+      "red_as_expected": true
+    }
+  ],
+  "all_red_correct": true
+}

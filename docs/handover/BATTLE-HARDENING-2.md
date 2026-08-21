@@ -134,6 +134,41 @@ discrepancy).
 
 BH3 tranche 1 is an immutable candidate for ChatGPT to attack cold.
 
+## BH4 — Incremental / state-transition adversarial II — ACTIVE
+
+### BH4 guarantee
+
+A deterministic adversarial sequence of incremental state transitions (content
+change, `nift rm`, `nift mv`, `nift track`, template change, tracked metadata
+change) must leave the output set exact across modified, hash and hybrid modes:
+every expected page present and non-empty, no stale/orphan outputs, and
+incremental output equal to a clean rebuild.
+
+### BH4 attack
+
+The prior incremental guards (checkpoint-7, pagination) exercised
+content/add/template/metadata changes, but removals and renames were only
+covered randomly. BH4 makes the transition sequence deterministic and asserts
+the exact output set plus incremental==clean equivalence. A preliminary probe
+found that manually deleting a source file and editing `tracked.json` leaves
+stale outputs — but that is an invalid Nift state transition; using the tracked
+commands (`nift rm`, `nift mv`, `nift track`) prunes outputs correctly, so the
+guard drives the state machine through the supported commands.
+
+### BH4 guard + red-run evidence
+
+`tests/incremental_state_transitions_adversarial.py` (make
+`test-incremental-state-transitions`, CI_GATED via `fast-suites`). Red-runs
+retained at `docs/evidence/bh4/bh4-incremental-state-transitions-red.json`:
+
+- real nift → GREEN
+- drop-page wrapper (build drops `public/a.html`) → RED
+- orphan wrapper (build leaves `public/stale-orphan.html`) → RED
+- stub nift (produces nothing) → RED
+
+Registered in the registry as `incremental.adversarial-state-transitions`
+(ESTABLISHED, RETAINED evidence).
+
 ### BH3 tranche 2 — self-attack + strengthen
 
 DeepSeek self-attacked tranche-1 candidate `50f7d7f`. The attack found that

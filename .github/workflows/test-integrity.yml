@@ -67,3 +67,5 @@ jobs:
         run: make test-init-targets
       - name: Pagination incremental equivalence
         run: make test-pagination-equivalence
+      - name: Incremental state-transition adversarial (BH4)
+        run: make test-incremental-state-transitions

@@ -147,6 +147,46 @@
       ]
     },
     {
+      "id": "incremental.adversarial-state-transitions",
+      "state": "ESTABLISHED",
+      "guarantee": "A deterministic adversarial sequence of incremental state transitions (content change, rm, mv, track, template change, tracked metadata change) leaves the output set exact across modified, hash, and hybrid modes: every expected page present and non-empty, no stale/orphan outputs, and incremental output equals a clean rebuild.",
+      "scope": "3 incremental modes x 6 deterministic transitions each, plus clean-rebuild equivalence and template-propagation checks.",
+      "platforms": [
+        "linux"
+      ],
+      "evidence_classes": [
+        "RETAINED"
+      ],
+      "evidence_refs": [
+        {
+          "repo": "nift",
+          "path": "docs/evidence/bh4/bh4-incremental-state-transitions-red.json"
+        }
+      ],
+      "guard_refs": [
+        {
+          "repo": "nift",
+          "path": "tests/incremental_state_transitions_adversarial.py"
+        }
+      ],
+      "enforcement": [
+        {
+          "class": "MANUAL",
+          "command": "make test-incremental-state-transitions"
+        },
+        {
+          "class": "CI_GATED",
+          "workflow": ".github/workflows/test-integrity.yml",
+          "job": "fast-suites"
+        }
+      ],
+      "test_of_test": "UNPROVEN",
+      "known_limits": [
+        "Focused deterministic transition sequence; randomized fuzzing over longer horizons remains possible",
+        "Red-run evidence covers drop-page, stale-orphan, and stub defects; a crash mid-transition is BH7 territory"
+      ]
+    },
+    {
       "id": "parser.controlled-mutation-failure",
       "state": "ESTABLISHED",
       "guarantee": "The retained Checkpoint 9 mutation/resource corpus either builds or fails in a controlled way without hangs, crashes, signals, sanitizer findings, or uncontrolled resource failure.",
