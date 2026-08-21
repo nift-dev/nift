@@ -236,8 +236,27 @@ change since v4.0.4 is the development-version bump.
 - Release-candidate validation performed at `fb30c1b` (release-notes framing
   commit). The tagged commit `8bb10f2` adds this release report (documentation
   only) on top of the validated product state.
-- Tag: `v4.0.5` (annotated) at `8bb10f2`.
-- GitHub Actions run: created on tag push.
+- Tag: `v4.0.5` (annotated) at `8bb10f2`; pushed to `origin`.
+- GitHub Actions run: `32462270055` — all 15 jobs passed (linux, macos-arm64,
+  macos-x86_64, windows, installer-preflight, publish, installer-public-smoke ×3,
+  homebrew ×2, chocolatey, snap ×2).
+- GitHub release: https://github.com/nift-dev/nift/releases/tag/v4.0.5
+
+### Archives and checksums
+
+- `nift-4.0.5-linux-x86_64.tar.gz` (436 896 bytes) — extracted binary verified:
+  `Nift v4.0.5`; fresh-project `init`/`build`/`status` smoke passed.
+- `nift-4.0.5-macos-arm64.tar.gz` (343 785 bytes)
+- `nift-4.0.5-macos-x86_64.tar.gz` (363 735 bytes)
+- `nift-4.0.5-windows-x86_64.zip` (1 331 823 bytes)
+- `SHA256SUMS` (386 bytes), independently downloaded and verified against all
+  four public archives:
+  - `9d18ace1f939cc3bf62f57a1e75f89b0d5f7909ba6199f04e1b24c5615d745c8` linux-x86_64
+  - `14dff81a8269a43ee8672a1074804c97e79106d85367ee52f07f36dcd2dd4f80` macos-arm64
+  - `adabeaf9b2722ca947812339988267031db4c18a7425a47fa9d4949e14978233` macos-x86_64
+  - `f7898f0ee7f6c4887bcf84c4ed6a6bad6318dddcd590355830eaf1cdb3ee5439` windows-x86_64
+- The GitHub release body mirrors the user-facing v4.0.5 framing (reliability
+  and release hardening; no intentional user-facing semantic changes).
 
 ### Release-candidate validation (performed at `fb30c1b`, clean build)
 
@@ -277,20 +296,36 @@ change since v4.0.4 is the development-version bump.
 - Other platform archives, the full `SHA256SUMS`, and the GitHub release are
   produced by `release.yml` on tag push (pending approval).
 
-### Package publication (pending on tag push and store credentials)
+### Package publication
 
-- **Snap**: `snap.yml` builds and, with `SNAPCRAFT_STORE_CREDENTIALS`, publishes
-  to stable. Connected-store other architectures remain external.
-- **Chocolatey**: `chocolatey.yml` derives the checksum from the release ZIP and
-  pushes with `CHOCOLATEY_API_KEY`. Submitted ≠ approved.
-- **Homebrew**: `homebrew.yml` tests the formula; ordinary propagation is left
-  to Homebrew's automatic bump service.
-- **Flathub**: external `flathub/cc.nift.nsm` manifest tag/checksum update.
+- **Snap**: `snap.yml` built and `Publish stable Snap` succeeded on amd64 and
+  arm64. Public `snap info nift` reports `latest/stable: 4.0.5 (2026-08-21,
+  rev 553)`. Other connected-store architectures and a fresh public stable
+  install remain external verification tasks.
+- **Chocolatey**: `chocolatey.yml` packaged and `Publish to Chocolatey
+  Community Repository` succeeded. The public page
+  `community.chocolatey.org/packages/nift/4.0.5` returns 200. Submitted, not yet
+  approved or publicly fresh-install tested.
+- **Homebrew**: `homebrew.yml` tested the formula on macOS arm64 and Linux
+  x86-64. Ordinary propagation is left to Homebrew's automatic bump service.
+- **Flathub**: external `flathub/cc.nift.nsm` manifest tag/checksum update
+  required — pending external PR.
 
-### Post-release (pending)
+### Post-release (completed)
 
-- Advance development identity to `Nift v4.0.6` in `src/CLI.cpp`,
-  `snap/snapcraft.yaml`, release notes, and regression-suite assertions.
-- Track downstream states: Homebrew auto-bump merge + fresh install,
-  Chocolatey moderation/approval, Flathub external PR, Snap non-x86.
-- Run `distribution-verification.yml` against the exact public version.
+- Development identity advanced to `Nift v4.0.6` in `src/CLI.cpp`,
+  `snap/snapcraft.yaml`, release notes, and the guarantee registry baseline
+  (released_version 4.0.5, release_commit a318732, development_version 4.0.6).
+- The init-target Amplify framework version is now derived from `version_text`
+  so it can never drift from the executable version again (it previously held a
+  hard-coded 4.0.5).
+- Regression-suite version assertions advanced to v4.0.6; 22/22 contract modules
+  pass against the v4.0.6 development binary.
+- Both `nift-dev/nift` and `nift-dev/nift-regression-suite` pushed to `main`.
+
+### Remaining downstream tracking
+
+- Homebrew auto-bump merge + fresh install; Chocolatey moderation/approval and
+  fresh install; Flathub external PR; Snap non-x86 architectures.
+- Run `distribution-verification.yml` against the exact public version once
+  stores propagate.
