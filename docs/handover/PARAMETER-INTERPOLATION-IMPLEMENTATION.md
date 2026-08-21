@@ -2527,7 +2527,7 @@ This is useful for documentation and AI-context testing.
 
 ---
 
-# 124. AI DX test
+# 124. AI-DX test
 
 Give Codex/current agent a small task using the new feature **from documentation only**, without explaining internal behavior in the prompt.
 

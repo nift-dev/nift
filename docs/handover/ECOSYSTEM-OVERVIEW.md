@@ -115,7 +115,7 @@ performance
 correctness
 determinism
 good human DX
-good AI DX
+good AI-DX
 strong regression protection
 evidence rather than feature-count marketing
 ```
@@ -2947,7 +2947,7 @@ This is guidance, not a rigid CI matrix.
 
 ---
 
-# A NOTE ABOUT AI DX
+# A NOTE ABOUT AI-DX
 
 One of the broader conclusions from Nift development was that these tools can be unusually pleasant for coding agents because they favor:
 
@@ -2960,11 +2960,11 @@ good errors
 few hidden abstractions
 ```
 
-We referred to this as **AI DX** / AI developer experience.
+We referred to this as **AI-DX** / AI developer experience.
 
 We did not invent the general term, but it became useful vocabulary.
 
-The handover infrastructure itself is now part of that AI DX.
+The handover infrastructure itself is now part of that AI-DX.
 
 The objective is not to write documents specifically so an AI can blindly obey them.
 

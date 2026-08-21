@@ -957,11 +957,11 @@ and encouraged project-local AI context.
 
 ---
 
-# 33. AI DX
+# 33. AI-DX
 
 We later used the term:
 
-> AI DX / AI developer experience
+> AI-DX / AI developer experience
 
 for the broader question:
 
@@ -981,7 +981,7 @@ small template language
 fast feedback
 ```
 
-The new repository-local handovers are themselves part of improving AI DX.
+The new repository-local handovers are themselves part of improving AI-DX.
 
 ---
 

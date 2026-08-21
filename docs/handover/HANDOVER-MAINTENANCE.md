@@ -261,7 +261,7 @@ JSON/Schema/loops/conditions
 Composition philosophy
 External-tool philosophy
 Performance evolution
-AI DX
+AI-DX
 Human DX
 Tool-choice boundaries
 Evidence versus hypotheses

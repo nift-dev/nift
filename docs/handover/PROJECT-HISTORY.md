@@ -2253,11 +2253,11 @@ Minimalism should be challenged by real use.
 
 # Part XVI — AI developer experience
 
-## 95. AI DX emerged as an important concept
+## 95. AI-DX emerged as an important concept
 
 **Status: STRONG OPINION / PARTLY EMPIRICALLY SUPPORTED**
 
-We began informally discussing **AI DX**: the equivalent of developer experience for coding agents.
+We began informally discussing **AI-DX**: the equivalent of developer experience for coding agents.
 
 Nift appears unusually promising here because of:
 
@@ -2277,13 +2277,13 @@ strong black-box tests
 
 ---
 
-# 96. AI DX does not mean adding “AI features”
+# 96. AI-DX does not mean adding “AI features”
 
 **Status: SETTLED PREFERENCE**
 
 Do not add gimmicky AI functionality merely to make Nift “AI friendly.”
 
-Excellent ordinary DX often produces excellent AI DX automatically.
+Excellent ordinary DX often produces excellent AI-DX automatically.
 
 ---
 
@@ -2308,7 +2308,7 @@ This is stronger evidence than merely claiming the syntax looks easy for AI.
 
 ---
 
-# 98. Strictness may improve AI DX
+# 98. Strictness may improve AI-DX
 
 **Status: EMERGING HYPOTHESIS**
 
@@ -2324,7 +2324,7 @@ Nift rejects it
 agent corrects assumption
 ```
 
-Fast, precise rejection can be better AI DX than permissiveness.
+Fast, precise rejection can be better AI-DX than permissiveness.
 
 An agent does not necessarily need its first guess accepted.
 
@@ -2359,7 +2359,7 @@ actual Nift change
 reasonable learning cost
 ```
 
-This is much better evidence for AI DX than giving Nift an arbitrary 10/10.
+This is much better evidence for AI-DX than giving Nift an arbitrary 10/10.
 
 ---
 
@@ -3054,7 +3054,7 @@ Examples:
 best documentation generator
 best choice for every large site
 best choice for every full-stack frontend
-10/10 AI DX universally
+10/10 AI-DX universally
 best React architecture
 ```
 
@@ -3237,7 +3237,7 @@ This is the compact part Codex should refer back to when historical discussion i
 | Nift for rich publication system automatically   | **NO**                                | Hugo/Astro/docs tools may be better                       |
 | Nift for existing-site migrations                | **STRONG HYPOTHESIS**                 | Test more realistically                                   |
 | Nift for AI-generated bespoke sites              | **STRONG HYPOTHESIS + SOME EVIDENCE** | Continue real Codex experiments                           |
-| AI DX = permissive syntax                        | **NO**                                | Fast precise failure may be better                        |
+| AI-DX = permissive syntax                        | **NO**                                | Fast precise failure may be better                        |
 | Perfect comparison scores                        | **NOT A GOAL**                        | Credibility over advocacy                                 |
 | Test count as quality metric                     | **REJECTED**                          | Bug-family coverage matters more                          |
 | Add features to win comparisons                  | **REJECTED**                          | Protect conceptual integrity                              |
@@ -3523,7 +3523,7 @@ composability
 +
 good human DX
 +
-promising AI DX
+promising AI-DX
 ```
 
 Any one of those properties exists elsewhere.
