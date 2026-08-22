@@ -603,7 +603,7 @@
       "id": "performance.full-build-near-linear",
       "state": "ESTABLISHED",
       "guarantee": "Changed-output full-build work remains near-linear on the retained large flat-output fixture.",
-      "scope": "1,000→4,000 page changed-output scaling guard; identical-output fast path cannot hide the writer cost.",
+      "scope": "1,000\u21924,000 page changed-output scaling guard; identical-output fast path cannot hide the writer cost.",
       "platforms": [
         "linux"
       ],
@@ -1210,7 +1210,7 @@
       "source": {
         "repo": "website",
         "path": "content/docs/production-readiness.html",
-        "needle": "protected by a dedicated 1,000→4,000-page full-build scaling guard"
+        "needle": "protected by a dedicated 1,000\u21924,000-page full-build scaling guard"
       },
       "kind": "reliability"
     },
@@ -1370,7 +1370,7 @@
       "source": {
         "repo": "website",
         "path": "content/docs/memory-safety.html",
-        "needle": "RSS stayed within 5,976–6,356 KiB"
+        "needle": "RSS stayed within 5,976\u20136,356 KiB"
       }
     },
     {
@@ -1491,7 +1491,7 @@
     {
       "repo": "website",
       "path": "content/docs/battle-tested.html",
-      "sha256": "af8b7ea35e42737d404e2d9c4d224165aa68e59116f71327724053bff8fe009a",
+      "sha256": "55b53016d70e84c1267b976bce53d1b80d3dc9ca6ca36e843878d9710abd4a9f",
       "mapping_scope": "BH1 manual audit of significant quantitative/reliability claims; source hash invalidates the audit if this page changes."
     },
     {
@@ -1503,7 +1503,7 @@
     {
       "repo": "website",
       "path": "content/docs/production-readiness.html",
-      "sha256": "527ddfa4298e13cf3202327fff8c801438900f08a234b9753cb3e52e53128e35",
+      "sha256": "3db1ce95abfeffa1229c37a1401dae1dc201924ea5351d0172deb0dc6f57b64a",
       "mapping_scope": "BH1 manual audit of significant quantitative/reliability claims; source hash invalidates the audit if this page changes."
     },
     {
