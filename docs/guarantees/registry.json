@@ -1491,25 +1491,25 @@
     {
       "repo": "website",
       "path": "content/docs/battle-tested.html",
-      "sha256": "55b53016d70e84c1267b976bce53d1b80d3dc9ca6ca36e843878d9710abd4a9f",
+      "sha256": "d20e7aa3e2d0b1205eab6468f370f3e5daa377726c41f57ab6e78b9b1b69f7d6",
       "mapping_scope": "BH1 manual audit of significant quantitative/reliability claims; source hash invalidates the audit if this page changes."
     },
     {
       "repo": "website",
       "path": "content/docs/memory-safety.html",
-      "sha256": "5380d9a66c5acb1e6fb42db47912c138e1bb124e966b3f7653f5483a469dfba1",
+      "sha256": "30c848c65b221d235756d0b176e93122a199b6bd0b3fdcf4ab404cdb313741de",
       "mapping_scope": "BH1 manual audit of significant quantitative/reliability claims; source hash invalidates the audit if this page changes."
     },
     {
       "repo": "website",
       "path": "content/docs/production-readiness.html",
-      "sha256": "3db1ce95abfeffa1229c37a1401dae1dc201924ea5351d0172deb0dc6f57b64a",
+      "sha256": "d078d5b7d6a209d40b898ded818f56e725c42876d6c3c20ebc68321a43586c98",
       "mapping_scope": "BH1 manual audit of significant quantitative/reliability claims; source hash invalidates the audit if this page changes."
     },
     {
       "repo": "website",
       "path": "content/docs/platforms.html",
-      "sha256": "59863487ea68ffe4f7d519fbaa2b585b6637ce6ab84b316132a3b23da45e9911",
+      "sha256": "057590e80f6afdf8ef5096a643fedf6da8467ba6db27d9aff796d944a7f87d07",
       "mapping_scope": "BH1 manual audit of significant quantitative/reliability claims; source hash invalidates the audit if this page changes."
     }
   ]

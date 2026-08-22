@@ -79,3 +79,17 @@ jobs:
         run: make test-complexity-invariants
       - name: Filesystem boundary (BH9)
         run: make test-filesystem-boundary
+  aggregate-evidence:
+    name: Aggregate evidence (${{ matrix.os }})
+    needs: static-integrity
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build Nift
+        run: make -j2
+      - name: Run documented aggregate evidence gate
+        run: make bh2-test-integrity

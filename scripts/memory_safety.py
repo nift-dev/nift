@@ -85,8 +85,12 @@ def main() -> int:
 
     env = os.environ.copy()
     if args.mode == "sanitizer":
-        env.setdefault("ASAN_OPTIONS", "detect_leaks=1:halt_on_error=1:abort_on_error=1")
-        env.setdefault("LSAN_OPTIONS", "exitcode=99")
+        leak_detection = platform.system() != "Darwin"
+        env.setdefault("ASAN_OPTIONS", f"detect_leaks={1 if leak_detection else 0}:halt_on_error=1:abort_on_error=1")
+        if leak_detection:
+            env.setdefault("LSAN_OPTIONS", "exitcode=99")
+        else:
+            env.pop("LSAN_OPTIONS", None)
         env.setdefault("UBSAN_OPTIONS", "halt_on_error=1:print_stacktrace=1")
 
     time_bin = args.time_bin if args.time_bin else (

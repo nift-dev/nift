@@ -141,7 +141,7 @@ The website covers installation, project structure, tracking, templates, depende
 
 ## Building from source
 
-Nift requires a C++17 compiler and `make`.
+Nift requires a C++17-capable compiler and GNU Make. The supported build uses the standard C++ library and pthreads; there is no project-local runtime/package dependency tree.
 
 ```bash
 make

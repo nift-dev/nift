@@ -25,7 +25,13 @@ printf '#!/bin/sh\necho run\n' >"$P/content/script.sh" && chmod 755 "$P/content/
 printf '#!/bin/sh\necho helper\n' >"$P/content/helper.sh" && chmod 700 "$P/content/helper.sh"
 
 fail() { echo "output-permissions FAIL: $*" >&2; exit 1; }
-mode() { stat -c '%a' "$1"; }
+mode() {
+  case "$(uname -s)" in
+    Darwin) stat -f '%Lp' "$1" ;;
+    FreeBSD) stat -f '%Lp' "$1" ;;
+    *) stat -c '%a' "$1" ;;
+  esac
+}
 
 (cd "$P" && "$NIFT_BIN" build-all >/dev/null 2>&1) || fail "project did not build"
 [ "$(mode "$P/public/script.sh")" = "755" ] || fail "executable script output lost exec bit (got $(mode "$P/public/script.sh"))"
