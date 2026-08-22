@@ -147,6 +147,17 @@ test-pathto-404: $(TARGET)
 test-output-permissions: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/output_permissions_smoke.sh
 
+# `nift init --handover` writes a project-root HANDOVER.md byte-for-byte
+# identical to the canonical copy (tests/fixtures/HANDOVER.md). Plain init
+# must not create it, and it must never land under the output directory.
+test-init-handover: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/init_handover_smoke.sh
+
+# Network-gated: the vendored canonical handover must match the live download
+# from https://nift.dev/HANDOVER.md. Skipped unless NIFT_LIVE_TESTS=1.
+test-handover-live:
+	tests/handover_live_check.sh
+
 test-installer:
 	tests/install_script_smoke.sh
 
@@ -191,7 +202,7 @@ bh1-guarantee-registry:
 	python3 scripts/check_guarantee_registry.py --website-root "$(BH1_WEBSITE_ROOT)" --regression-root "$(BH1_REGRESSION_ROOT)"
 	python3 scripts/bh1_registry_liveness.py --website-root "$(BH1_WEBSITE_ROOT)" --regression-root "$(BH1_REGRESSION_ROOT)"
 
-bh2-test-integrity: test-test-integrity test-guarantee-registry-ci test-contracts test-pagination-equivalence test-init-targets test-incremental-state-transitions test-parser-value-composition test-init-functional-truth test-crash-recovery test-complexity-invariants test-filesystem-boundary test-config-validation test-pathto-404 test-output-permissions
+bh2-test-integrity: test-test-integrity test-guarantee-registry-ci test-contracts test-pagination-equivalence test-init-targets test-incremental-state-transitions test-parser-value-composition test-init-functional-truth test-crash-recovery test-complexity-invariants test-filesystem-boundary test-config-validation test-pathto-404 test-output-permissions test-init-handover
 
 # BH3 curated guard mutation / test-of-test tranche 1: applies mutation
 # families to exact guard copies, runs them against a real Nift binary (and

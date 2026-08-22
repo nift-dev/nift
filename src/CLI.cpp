@@ -6,6 +6,7 @@
 #include <map>
 #include "ProjectInfo.h"
 #include "WatchList.h"
+#include "handover_content.h"
 
 #include <algorithm>
 #include <chrono>
@@ -293,7 +294,7 @@ void print_commands() {
     row("info-watching", "", "Show watched directories");
 
     std::cout << '\n' << console::dim("General") << '\n';
-    row("init", "[--target=platform] [--ext=.ext]", "Create a Nift project");
+    row("init", "[--target=platform] [--ext=.ext] [--handover]", "Create a Nift project");
     row("minify", "[-i|--in-place] <files...>", "Minify to *.min.ext by default; -i overwrites sources");
     row("about", "", "About Nift and where to learn more");
     row("version", "", "Show version information");
@@ -343,6 +344,7 @@ void remove_page_build_state(const ProjectInfo& project, const TrackedInfo& info
 struct InitOptions {
     std::string extension = ".html";
     std::string target;
+    bool handover = false;
 };
 
 struct InitTarget {
@@ -425,6 +427,10 @@ bool parse_init_options(int argc, char** argv, InitOptions& options) {
         if (arg == "--target") {
             console::error("--target requires '=PLATFORM', for example '--target=vercel'");
             return false;
+        }
+        if (arg == "--handover") {
+            options.handover = true;
+            continue;
         }
         if (!arg.empty() && arg[0] == '-') {
             console::error("unknown init option '" + arg + "'");
@@ -608,7 +614,18 @@ bool initialise_project(const InitOptions& options) {
     if (!write_target_files(options)) return false;
 
     ProjectInfo project;
-    return project.open() && project.build_all(true) == 0;
+    if (!(project.open() && project.build_all(true) == 0)) return false;
+
+    if (options.handover) {
+        // The canonical handover goes in the project root (never under the
+        // output directory). It is a living document users keep alongside the
+        // source, so it is written writable like any other project file.
+        if (!filesystem::write_file("HANDOVER.md", std::string(handover_content))) {
+            console::error("failed to write HANDOVER.md");
+            return false;
+        }
+    }
+    return true;
 }
 }
 

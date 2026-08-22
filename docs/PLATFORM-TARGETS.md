@@ -7,11 +7,18 @@ nift init
 nift init --ext=.php
 nift init --target=vercel
 nift init --target=cloudflare
+nift init --handover
 ```
 
 `nift init` defaults to `.html`. `--ext=.ext` sets both the default content and
 output extension for the new project. The old positional spelling (`nift init
 .html`) and `init-html` command are removed.
+
+`--handover` composes with every other init option and, in addition to the
+normal scaffold, writes a `HANDOVER.md` in the project root (never under the
+output directory). The file is a copy of the canonical Nift handover
+(https://nift.dev/HANDOVER.md) intended as a living, project-specific context
+document for humans and AI agents working in the project.
 
 Platform targets intentionally initialise **static HTML sites**. When
 `--target` is present, the accepted page extensions are `.html` and `.htm`.
