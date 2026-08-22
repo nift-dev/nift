@@ -338,3 +338,118 @@ change since v4.0.4 is the development-version bump.
   fresh install; Flathub external PR; Snap non-x86 architectures.
 - Run `distribution-verification.yml` against the exact public version once
   stores propagate.
+
+## v4.0.6 release report
+
+### Scope
+
+v4.0.6 is the first release with intentional user-facing changes since v4.0.4.
+It ships four product changes: `nift init --handover` (a canonical project-root
+`HANDOVER.md`, byte-identical to the live canonical version), generated outputs
+that preserve the source content file's permissions (executable script outputs
+stay executable), `@pathto` root-absolute web paths when rendering the tracked
+page named `404`, and loud rejection of unknown `.nift/config.json` keys.
+
+### Source and workflow
+
+- Release-candidate validation performed at `d0d10c9` (release-notes framing
+  commit); the working tree and the release commit are exactly that state.
+- Tag: `v4.0.6` (annotated) at `d0d10c9`; pushed to `origin`.
+- GitHub Actions run: `32564541873` — all 14 jobs passed (unix linux-x86_64,
+  macos-arm64, macos-x86_64, windows, installer-preflight, publish,
+  installer-public-smoke ×3, chocolatey, snap ×2, homebrew ×2).
+- GitHub release: https://github.com/nift-dev/nift/releases/tag/v4.0.6
+
+### Archives and checksums
+
+- `nift-4.0.6-linux-x86_64.tar.gz` — extracted binary verified: `Nift v4.0.6`;
+  fresh-project `init`/`build`/`status` and `init --handover` (byte-identical
+  HANDOVER.md) smoke passed.
+- `nift-4.0.6-macos-arm64.tar.gz`
+- `nift-4.0.6-macos-x86_64.tar.gz`
+- `nift-4.0.6-windows-x86_64.zip`
+- `SHA256SUMS` (386 bytes), independently downloaded and verified against all
+  four public archives:
+  - `c342695001f987c515bcdb7314784bc1ff0e2d5290e7d846fc9e6752de170782` linux-x86_64
+  - `496f1e746219af1009e55fccfeed994050fdb35fb2477a4fc99a88ecd72f8398` macos-arm64
+  - `96abb1f7d12577b3a25b416b3478e85b698e1943e272a96d0914b04e4fb28ae0` macos-x86_64
+  - `6d6852060ba919c962c20c9b45502670446720846310902df8e5d23345f04b99` windows-x86_64
+- The immutable tagged source archive used by source-based package managers has
+  SHA-256 `8e43c1579001d8f97695bb50f2486a3ce48442797fb56d80519335312af34fbd`.
+
+### Release-candidate validation (performed at `d0d10c9`, clean build)
+
+- Clean source build clean with release compiler/options (g++ C++17 -O2);
+  `nift version` reports `Nift v4.0.6`; `about`/`commands` correct (init row
+  lists `[--handover]`); unknown and `help`-like invocations behave exactly as
+  in the released v4.0.5 (a separate `nift help` command does not exist).
+- Implementation-local suite: all standard correctness targets pass; bh2
+  CI-equivalent chain PASS (test-integrity 55 files / 0 findings; registry
+  26 guarantees / 27 claims / 3 known discrepancies / 20 CI refs; contracts;
+  pagination 18/18; init targets; BH4 transitions; BH5 15/15; BH6 init truth;
+  BH7 crash recovery; BH8 complexity; BH9 filesystem boundary; config
+  validation; pathto-404; output permissions; init-handover).
+- Full 3-repository registry audit PASS; BH1 liveness PASS.
+- External regression suite: 22/22 contract modules PASS against the candidate
+  (after the legacy mode-444 assertion was updated to the source-permission
+  contract); historical+ruthless 578 assertions PASS. Performance harness: 10k
+  full 0.113 s / no-op 0.074 s / single-page 0.091 s / shared-template 0.143 s
+  medians; memory guard PASS (all peaks ≤ 9 972 KiB).
+- ASan/UBSan build clean; sanitized binary + pagination sanitizer smoke PASS.
+- Minify++ embedded gates PASS: 15,459-program generated JS semantic corpus,
+  115-document non-JS idempotence corpus, standalone CLI, and Node semantic
+  differential.
+- Scaling guards PASS: full-build near-linear, recovery scans bounded to one
+  per distinct parent per epoch, tracked loading near-linear.
+- Website built with the exact candidate binary: 70/70 pages; the generated
+  `public/main` and source `stage` trees clean; `scripts/check_handover_display.py`
+  reports the rendered HANDOVER.md byte-identical to `public/HANDOVER.md`.
+- No generated/debug residue in any of the three repositories.
+
+### Local Linux archive layout validation
+
+- `nift-4.0.6-linux-x86_64/` (nift, README.md, LICENSE) built and tarred
+  locally; fresh extract reported `Nift v4.0.6` and passed a fresh-project
+  `init`/`build`/`status` smoke plus `init --handover` producing the canonical
+  HANDOVER.md (SHA-256 `fe8c0459…`, matching the vendored fixture).
+- Other platform archives, the full `SHA256SUMS`, and the GitHub release are
+  produced by `release.yml` on tag push.
+
+### Package publication
+
+- **Snap**: `snap.yml` built and `Publish stable Snap` succeeded on amd64 and
+  arm64. Public `snap info nift` reports `latest/stable: 4.0.6 (2026-08-22,
+  rev 579)`. Other connected-store architectures and a fresh public stable
+  install remain external verification tasks.
+- **Chocolatey**: `chocolatey.yml` packaged and `Publish to Chocolatey
+  Community Repository` succeeded. The public page
+  `community.chocolatey.org/packages/nift/4.0.6` returns 200. Submitted, not yet
+  approved or publicly fresh-install tested.
+- **Homebrew**: `homebrew.yml` tested the formula on macOS arm64 and Linux
+  x86-64. Ordinary propagation is left to Homebrew's automatic bump service.
+- **Flathub**: external `flathub/cc.nift.nsm` manifest tag/checksum update
+  required — pending external PR.
+
+### Cross-platform CI
+
+- The `checkpoint-10-cross-platform.yml` corpus passed on Linux, macOS and
+  Windows at `247ca84`, including the corrected `readonly-output-deletion`
+  platform-specific contract (source-preserving outputs keep the portable
+  read-only deletion distinction via a read-only fixture source) and the
+  deterministic cross-platform `init --handover` pre-build-ordering proof.
+
+### Post-release
+
+- Development identity advanced to `Nift v4.0.7` in `src/CLI.cpp`,
+  `snap/snapcraft.yaml`, release notes, and the guarantee registry baseline
+  (released_version 4.0.6, release_commit d0d10c9, development_version 4.0.7).
+- Regression-suite version assertions advanced to v4.0.7; contract modules
+  re-verified against the v4.0.7 development binary.
+- Both `nift-dev/nift` and `nift-dev/nift-regression-suite` pushed to `main`.
+
+### Remaining downstream tracking
+
+- Homebrew auto-bump merge + fresh install; Chocolatey moderation/approval and
+  fresh install; Flathub external PR; Snap non-x86 architectures.
+- Run `distribution-verification.yml` against the exact public version once
+  stores propagate.

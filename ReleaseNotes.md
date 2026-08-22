@@ -1,5 +1,9 @@
 # Nift — Release Notes
 
+## v4.0.7 (development)
+
+Development version following the public v4.0.6 release.
+
 ## v4.0.6
 
 Nift 4.0.6 is the first release with intentional user-facing changes since
