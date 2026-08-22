@@ -33,4 +33,34 @@ if NIFT_VERSION="$version" NIFT_RELEASE_BASE="file://$release" NIFT_INSTALL_DIR=
   echo 'installer accepted bad checksum' >&2; exit 1
 fi
 [ "$("$TMP/bin/nift")" = preserved ]
+
+# macOS default installs must make ~/.local/bin usable without sudo or a manual move.
+mac_home="$TMP/mac-home"
+mac_release="$TMP/mac-release/v$version"
+mac_root="nift-$version-macos-arm64"
+mkdir -p "$mac_home" "$mac_release/$mac_root" "$TMP/mockbin"
+cat > "$mac_release/$mac_root/nift" <<EOF2
+#!/bin/sh
+echo 'Nift v$version'
+EOF2
+chmod +x "$mac_release/$mac_root/nift"
+( cd "$mac_release" && tar -czf "$mac_root.tar.gz" "$mac_root"
+  if command -v sha256sum >/dev/null 2>&1; then sha256sum "$mac_root.tar.gz" > SHA256SUMS
+  else shasum -a 256 "$mac_root.tar.gz" > SHA256SUMS; fi )
+cat > "$TMP/mockbin/uname" <<'EOF2'
+#!/bin/sh
+case "${1:-}" in
+  -s|'') echo Darwin ;;
+  -m) echo arm64 ;;
+  *) /usr/bin/uname "$@" ;;
+esac
+EOF2
+chmod +x "$TMP/mockbin/uname"
+mac_path="$TMP/mockbin:/usr/bin:/bin"
+HOME="$mac_home" SHELL="/bin/zsh" PATH="$mac_path" NIFT_VERSION="$version" NIFT_RELEASE_BASE="file://$mac_release" "$ROOT/packaging/install.sh" >/dev/null
+[ "$("$mac_home/.local/bin/nift")" = "Nift v$version" ]
+grep -Fqx 'export PATH="$HOME/.local/bin:$PATH"' "$mac_home/.zprofile"
+HOME="$mac_home" SHELL="/bin/zsh" PATH="$mac_path" NIFT_VERSION="$version" NIFT_RELEASE_BASE="file://$mac_release" "$ROOT/packaging/install.sh" >/dev/null
+[ "$(grep -Fc 'export PATH="$HOME/.local/bin:$PATH"' "$mac_home/.zprofile")" -eq 1 ]
+
 echo 'Installer smoke test passed'
