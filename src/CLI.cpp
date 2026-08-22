@@ -613,19 +613,21 @@ bool initialise_project(const InitOptions& options) {
 
     if (!write_target_files(options)) return false;
 
-    ProjectInfo project;
-    if (!(project.open() && project.build_all(true) == 0)) return false;
-
+    // The handover is part of project creation: it is written alongside the
+    // other scaffold files and before the initial build, so a project created
+    // with --handover contains HANDOVER.md even if the first build later fails
+    // for an unrelated reason. It goes in the project root (never under the
+    // output directory) and stays writable as a living document the user keeps
+    // alongside the source.
     if (options.handover) {
-        // The canonical handover goes in the project root (never under the
-        // output directory). It is a living document users keep alongside the
-        // source, so it is written writable like any other project file.
         if (!filesystem::write_file("HANDOVER.md", std::string(handover_content))) {
             console::error("failed to write HANDOVER.md");
             return false;
         }
     }
-    return true;
+
+    ProjectInfo project;
+    return project.open() && project.build_all(true) == 0;
 }
 }
 
