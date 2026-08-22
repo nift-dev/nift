@@ -56,7 +56,11 @@ different generic project, or prepare a supported static host directly:
 ```bash
 nift init --target=vercel
 nift init --target=cloudflare
+nift init --handover
 ```
+
+`--handover` also writes a canonical `HANDOVER.md` in the project root so the
+project is ready for AI-assisted and human-directed work.
 
 See [`docs/PLATFORM-TARGETS.md`](docs/PLATFORM-TARGETS.md) for the supported
 targets, generated files, extension contract, and platform boundaries.

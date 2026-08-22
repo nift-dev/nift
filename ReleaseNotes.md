@@ -1,8 +1,41 @@
 # Nift — Release Notes
 
-## v4.0.6 (development)
+## v4.0.6
 
-Development version following the public v4.0.5 release.
+Nift 4.0.6 is the first release with intentional user-facing changes since
+v4.0.4. It adds a generated project handover for AI-assisted and
+human-directed development, preserves executable permissions on generated
+outputs, hardens `@pathto` semantics for 404 documents, and rejects unknown
+project configuration instead of silently ignoring it.
+
+- **`nift init --handover`.** `nift init` accepts `--handover` to write a
+  project-root `HANDOVER.md` alongside the normal scaffold — never under the
+  output directory. The file is a byte-for-byte copy of the canonical Nift
+  handover (https://nift.dev/HANDOVER.md) embedded in the binary, so it is
+  generated offline and identical to the live canonical version. It is written
+  during project creation, before the initial build, so a project created with
+  `--handover` contains the handover even if the first build fails. All
+  compatible named init options remain order-independent, and the embedded /
+  vendored / generated / live copies are pinned to each other by regression
+  tests.
+- **Generated outputs preserve source permissions.** A tracked page output now
+  inherits its source content file's permission bits instead of being forced
+  read-only. Executable script outputs (for example tracked `.sh` files) stay
+  executable across rebuilds, while ordinary content keeps its normal mode.
+  Build metadata (`.nift/public/*.info.json`) remains read-only, and deletion of
+  owned read-only artifacts remains portable across platforms.
+- **`@pathto` on a tracked page named `404`.** When rendering the tracked page
+  named `404`, `@pathto(...)` emits root-absolute web paths, because a deployed
+  404 document is served at arbitrary request depth and has no meaningful
+  relative location. Existence and dependency checking is unchanged; only the
+  path representation differs.
+- **Unknown configuration keys are rejected.** `.nift/config.json` keys outside
+  the documented set now fail loudly instead of being silently ignored,
+  preventing typos and invented fields from drifting into projects.
+
+Cross-platform hardening accompanies the new behavior: the `init --handover`
+pre-build-ordering proof and the portable read-only-output deletion contract
+no longer depend on Unix-only permission semantics.
 
 ## v4.0.5
 
