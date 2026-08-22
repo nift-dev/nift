@@ -186,6 +186,12 @@ def setup_project(root):
     write(root / "templates/parts/shared.html", "<strong>shared-one</strong>\n")
     write(root / "content/index.html", "<main>home-one</main>\n")
     write(root / "content/docs/index.html", "<main>docs-one</main>\n")
+    # Outputs preserve the source content file's permissions, so this source is
+    # made read-only to keep its generated output read-only. That preserves the
+    # portable read-only-output deletion distinction exercised below (POSIX
+    # unlinks a read-only output from a writable directory; Windows requires
+    # its write attribute to be cleared first).
+    (root / "content/docs/index.html").chmod(stat.S_IREAD | stat.S_IRGRP | stat.S_IROTH)
     write(root / "content/nested/深い/ページ.html", "<p>Grüße 世界 🚀</p>\n")
     write(root / "content/assets/style.css", ".x { color : red ; margin : 0  1rem ; }\n")
 
@@ -253,9 +259,11 @@ def main():
         try:
             required_output.unlink()
         except PermissionError:
-            # Nift outputs are deliberately read-only. POSIX permits unlinking
-            # one from a writable directory; Windows requires its read-only
-            # attribute to be cleared first. Retain that distinction below.
+            # The generated output is read-only because its source content file
+            # is read-only (outputs preserve source permissions). POSIX permits
+            # unlinking one from a writable directory; Windows requires its
+            # read-only attribute to be cleared first. Retain that distinction
+            # below.
             required_output.chmod(stat.S_IWRITE | stat.S_IREAD)
             required_output.unlink()
             readonly_delete_adjustment = True

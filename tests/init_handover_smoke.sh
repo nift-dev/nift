@@ -72,15 +72,20 @@ P="$TMP/handover"; mkdir -p "$P"
 check_handover "$P"
 
 # Order independence: every compatible named init option works in any order,
-# and the handover is identical regardless of spelling.
-for combo in \
-    "--handover --target=vercel" "--target=vercel --handover" \
-    "--handover --target=netlify" "--target=netlify --handover" \
-    "--handover --target=azure" "--target=azure --handover" \
-    "--handover --ext=.php" "--ext=.php --handover" \
-    "--ext=.html --target=vercel" "--target=vercel --ext=.html"; do
-    P="$TMP/$(echo "$combo" | tr ' =.' '---')"; mkdir -p "$P"
-    (cd "$P" && $NIFT_BIN init $combo >/dev/null 2>&1) || fail "init $combo failed"
+# and the handover is identical regardless of spelling. Combinations are
+# carried as argument arrays so paths containing spaces cannot break the
+# harness.
+combos=(
+  "--handover --target=vercel" "--target=vercel --handover"
+  "--handover --target=netlify" "--target=netlify --handover"
+  "--handover --target=azure" "--target=azure --handover"
+  "--handover --ext=.php" "--ext=.php --handover"
+  "--ext=.html --target=vercel" "--target=vercel --ext=.html"
+)
+for combo in "${combos[@]}"; do
+    read -r -a combo_args <<< "$combo"
+    P="$TMP/$(printf '%s' "$combo" | tr ' =.' '---')"; mkdir -p "$P"
+    (cd "$P" && "$NIFT_BIN" init "${combo_args[@]}" >/dev/null 2>&1) || fail "init $combo failed"
     if [[ "$combo" == *--handover* ]]; then
         check_handover "$P"
     else
@@ -90,10 +95,13 @@ done
 
 # The handover is created as part of project creation, before the initial
 # build: even when that first build fails, HANDOVER.md must already exist.
-P="$TMP/failbuild"; mkdir -p "$P/public"
-chmod 555 "$P/public"
+# The initial build is forced to fail deterministically on every platform by
+# placing a non-empty directory where the first output file belongs — renaming
+# a file onto a directory fails on POSIX and Windows alike, so this does not
+# rely on Unix permission semantics.
+P="$TMP/failbuild"; mkdir -p "$P/public/index.html"
+touch "$P/public/index.html/.occupied"
 (cd "$P" && "$NIFT_BIN" init --handover >/dev/null 2>&1)
-chmod 755 "$P/public"
 [ -f "$P/HANDOVER.md" ] || fail "HANDOVER.md missing when the initial build fails (must be written before the build)"
 
 echo "init-handover smoke test passed: embedded == fixture == generated; plain init untouched; options order-independent"
