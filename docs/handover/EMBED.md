@@ -67,11 +67,10 @@ and is better than an arbitrary `set_path_resolver` callback for the normal
 case, because the project already knows what its names mean; the application
 should not have to explain Nift back to Nift.
 
-The host seam that makes this possible is `RenderHost::tracked_output_path()`:
-a project-backed Engine host would implement it by loading `.nift/tracked.json`
-(tracked name -> generated output + index flag), exactly as `ProjectInfoHost`
-does today. Not implemented in CP6; recorded here so the abstraction is not
-accidentally closed off.
+The host seam that makes this possible is `RenderHost::tracked_output_path()`.
+This is now implemented: `ProjectHost` (PA2) supplies tracked-name -> output +
+index-flag lookup from the read-only `ProjectState` snapshot, exactly as
+`ProjectInfoHost` does for the CLI.
 
 ### Render by tracked page name (explicit requirement)
 
@@ -105,13 +104,13 @@ app.get("/user/:id", async (req, res) =>
     res.send(nift.render("user", { user: await db.user(req.params.id) })));
 ```
 
-Not implemented yet; recorded as an explicit requirement. A project-backed
-Engine host plugs into the existing `RenderHost` seam (loads `.nift/tracked.json`
-and `.nift/config.json`, supplies `content_path`/`output_path`/
-`tracked_output_path`/loaders/contracts), and `render("about")` is then
-orchestration over the same `render_composed` used by `render(page, template)`.
+Implemented (PA3): `Engine(project_root)` loads the validated immutable
+snapshot; `render("about"[, context])` drives the same `Parser(host, info).render()`
+path the CLI uses, so content/template composition, `@pathto`, `@input`,
+`@json`, contracts, pagination, dependencies and requirements match the CLI
+exactly (see the PA1–PA6 programme below and the conformance corpus).
 
-## Project-aware Engine programme (approved with amendments, PA1 done)
+## Project-aware Engine programme (approved with amendments; PA1–PA5 complete, PA6 archaeology in progress)
 
 The architecture was approved in principle with six amendments folded in below.
 Do **not** let the project-aware Engine depend on mutable `ProjectInfo`; it
@@ -182,10 +181,11 @@ consumes a read-only snapshot and never becomes the build system.
   (confirmed against the actual `nift` CLI build, incl. `blog=blog/` and the
   404 root-absolute rule), contracts, host bindings, `@input`, `@json` and 3
   pagination pages; plus zero-write tree snapshots and 8-thread concurrent
-  renders. Retained archaeology items (repeated `tracked_output_path` lookup,
-  loader probe-then-read, provisional host-vs-contract precedence) were
-  exercised but deliberately not "fixed" — they remain recorded and
-  unresolved. No public project-aware Engine API yet (that is PA3).
+   renders. Retained archaeology items (repeated `tracked_output_path` lookup,
+   loader probe-then-read) were exercised but deliberately not "fixed" — they
+   remain recorded and unresolved; host-vs-contract precedence, also exercised
+   here, was later specified and locked (see PA6 archaeology findings). No
+   public project-aware Engine API yet at PA2 (that is PA3).
 - **PA3 public project-aware API** — DONE. `Engine(std::filesystem::path)`
   loads and validates the immutable snapshot eagerly, non-throwing, with
   `is_open()`/`open_error()` for construction status; default `Engine()` stays
@@ -283,10 +283,14 @@ consumes a read-only snapshot and never becomes the build system.
   `render(page, number)`.
   Verified: `make test-conformance` 7/7 (3 parity with goldens + 4 reject with
   semantic classes).
-- **PA6 archaeology/docs/sign-off** — document the contract, record the
-  staleness/reload decision, resolve/forward the now-concrete archaeology items
-  (empty-root containment, repeated `tracked_output_path` lookup,
-  host-vs-contract precedence).
+- **PA6 archaeology/docs/sign-off** — DONE (findings classified above under
+  "PA6 archaeology findings"). Stale "not implemented"/"provisional" handover
+  text reconciled with the implemented PA1–PA5 behaviour; host-vs-contract
+  precedence specified and locked by a regression; the empty-root containment,
+  repeated `tracked_output_path` lookup, loader probe-then-read and
+  ASAN-FLAKE-001 items remain recorded and unresolved. Complete final evidence
+  battery green: conformance 9/9, all project-aware/Engine tests, both TSan
+  targets, and the CLI smoke/incremental/equivalence suites.
 
 ### Decided semantics (proposed, to be confirmed at PA3/PA4 review)
 
@@ -323,7 +327,9 @@ consumes a read-only snapshot and never becomes the build system.
   binding vs `@json` (controlled collision error); host "title" > title
   metadata; structural built-ins (`name`, `content-path`, `output-path`,
   `template-path`, `loop`) non-overridable by `set`. Host-vs-contract
-  precedence is provisional until an Embedded contract source exists.
+  precedence is now specified (not provisional): project mode has real
+  contract sources, and host-supplied bindings resolve before them, locked by
+  a regression in `tests/engine_project.cpp`.
 
 ## Checkpoint status
 
@@ -341,10 +347,10 @@ consumes a read-only snapshot and never becomes the build system.
   Established and directly exercised: Context overlay > Engine default; host
   binding colliding with `@json` => controlled "already bound" error; host
   "title" binding > built-in title metadata; structural/reserved names rejected.
-  **Host-vs-contract precedence is provisional** (Embedded Nift has no contract
-  source yet; `EngineHost::contract_source()` returns nullptr). Do not claim it
-  frozen until an Embedded contract capability exists and a real conformance
-  test exercises it. The public headers are self-contained (PIMPL `nift::Value`,
+  Host-vs-contract precedence, provisional during CP3, is now **specified**:
+  project mode provides real contract sources and a real conformance corpus,
+  and the parser's host-bindings-first order is locked by a regression
+  (`tests/engine_project.cpp`). The public headers are self-contained (PIMPL `nift::Value`,
   no `json::Document`/`src` visibility); `test-public-header` compiles a
   consumer with only `-Iinclude`. Exception contract is truthful: moves are
   pure `shared_ptr` moves (nothrow, no allocation); `impl_ == nullptr` is the
@@ -427,7 +433,9 @@ consumes a read-only snapshot and never becomes the build system.
   binding -> contract binding -> built-in metadata; structural built-ins
   (`name`, `content-path`, `output-path`, `template-path`, `loop`) rejected;
   `set_title` and `set("title")` share one per-render slot. Host-vs-contract
-  precedence is provisional until an Embedded contract source exists.
+  precedence is specified: host-supplied bindings resolve before `@json` and
+  contract bindings (project mode has real contract sources; locked by a
+  regression in `tests/engine_project.cpp`).
 - **Loaders**: repeatable lookup functions (probe then read), may be called
   concurrently, must be thread-safe.
 - **`@pathto`**: requires `Context::set_current_output` (and page name for the
@@ -446,11 +454,11 @@ consumes a read-only snapshot and never becomes the build system.
 
 ## Deliberately unsupported / future
 
-- **Engine mutation during active renders** is unsupported (documented, not
-  serialized).
-- **Project-aware rendering** (`render("page-name"[, context])` backed by real
-  `.nift/tracked.json`/`config.json` knowledge) is a recorded future
-  requirement, not implemented.
+- **Engine mutation during active renders** is unsupported for the other
+  mutators (documented, not serialized); `reload()` is the deliberate exception
+  (atomic snapshot replacement, PA4).
+- **Arbitrary pagination-page selection** is outside the project-aware v1 API;
+  `render("blog/")` returns the primary pagination output only (decided at PA5).
 - **Custom `set_path_resolver`** is deferred (a runtime route's interaction
   with existence/requirements is not yet designed).
 - **Value serialization** (e.g. `dump()` to JSON text) is not in the public
@@ -461,6 +469,34 @@ consumes a read-only snapshot and never becomes the build system.
   deliberate independent experiment, used to validate portability and
   conformance against this reference.
 
+## PA6 archaeology findings (classification)
+
+Findings from the final semantic archaeology pass against the implementation
+and accumulated evidence, classified rather than silently changed.
+
+- **Specified / intentional**: host-vs-contract precedence. Previously
+  "provisional until an Embedded contract source exists", it is now concrete
+  and locked: `Parser::resolve_json_value` resolves host-supplied bindings
+  (Context overlay > Engine default) before `@json` bindings, then contract
+  bindings, then built-in metadata. Locked by a regression in
+  `tests/engine_project.cpp` (an Engine default named like a configured
+  contract shadows the contract; without it the contract is visible). This is
+  the CLI's established seam (the CLI has no host bindings, so contracts are
+  never shadowed there) and is a deliberate embedding override capability, not
+  a defect.
+- **Implementation detail / edge**: `Engine::set_root` on a project-aware
+  Engine affects only where a subsequent `reload()` looks; project rendering
+  uses the snapshot root, which is authoritative. Not exposed in the conformance
+  corpus; recorded so it is not mistaken for a serving path.
+- **Permitted platform variation**: conformance goldens are generated on the
+  reference platform and are path-separator-agnostic by construction
+  (`generic_string`, relative project paths). A non-`/` separator or a host
+  locale difference that appears only on another OS is a permitted platform
+  variation, not a corpus defect; regenerate goldens only after a reviewed,
+  intentional semantic change.
+- **Unresolved (retained, not silently fixed)**: the items below and
+  ASAN-FLAKE-001.
+
 ## Unresolved known issues
 
 - **ASAN-FLAKE-001**: single historical GCC/ASan stack-instrumentation finding;
@@ -468,14 +504,18 @@ consumes a read-only snapshot and never becomes the build system.
   corroborating corruption. Retained; reopen-and-preserve-report on reappearance.
 - **Empty-root containment**: `@json`/`@dep`/`@pathto` containment with an
   empty Engine root derives meaning from the process working directory via
-  `path_within`; preserved, to be settled deliberately in spec work.
+  `path_within`; preserved, to be settled deliberately in spec work. Standalone
+  only: a project-aware Engine always has a real snapshot root, so this does
+  not affect project rendering.
 - **`tracked_output_path` repeated lookup**: queried more than once per
   directive; hosts are deterministic so this is correct, but the seam assumes
   stable lookup during a render (resolve-once is a possible later cleanup).
 - **Loader probe-then-read**: a custom loader may be called twice per source;
-  classified as an API-hardening item (repeatable lookup contract).
+  classified as an API-hardening item (repeatable lookup contract). Standalone
+  Engine only; project mode reads through the snapshot/filesystem.
 
-Cadence: one or two checkpoints between reviews; CP5 is a hard review gate.
+Cadence: one checkpoint between reviews; PA6 is the final project-aware review
+gate before the conformance corpus becomes the `nift-rs` oracle.
 
 ## ASAN-FLAKE-001 (retained, unresolved)
 

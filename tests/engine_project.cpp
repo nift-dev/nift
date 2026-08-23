@@ -151,6 +151,24 @@ void test_context_overlay_and_environment(const fs::path& root) {
     if (home.ok()) CHECK(contains(home.output(), "<title>Custom Title</title>"));
 }
 
+void test_host_binding_vs_contract(const fs::path& root) {
+    // The fixture's config declares a contract "site" -> content/site.json
+    // {"name":"Nift"}. A host-supplied binding (Engine default) with the same
+    // name must precede the contract binding: the parser's established seam
+    // (host bindings -> @json -> contracts) is now concrete in project mode.
+    nift::Engine engine(root);
+    engine.set_json("site", R"({"name":"HostWins"})");
+    nift::RenderResult result = engine.render("about");
+    CHECK(result.ok());
+    if (result.ok()) CHECK(contains(result.output(), "site=HostWins"));
+
+    // Without the host binding the contract binding is visible.
+    nift::Engine plain(root);
+    nift::RenderResult contract_result = plain.render("about");
+    CHECK(contract_result.ok());
+    if (contract_result.ok()) CHECK(contains(contract_result.output(), "site=Nift"));
+}
+
 void test_unknown_page_and_control_flow(const fs::path& root) {
     nift::Engine engine(root);
     nift::RenderResult unknown = engine.render("nope");
@@ -270,6 +288,7 @@ int main() {
 
     test_open_and_defaults(project);
     test_context_overlay_and_environment(project);
+    test_host_binding_vs_contract(project);
     test_unknown_page_and_control_flow(project);
     test_failed_open_controlled(base);
     test_pagination_through_public_api(project);
