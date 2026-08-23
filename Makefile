@@ -4,7 +4,7 @@ CPPFLAGS ?= -Isrc -Iinclude -Iminifypp/include -Iminifypp/src
 LDFLAGS ?=
 LDLIBS ?=
 
-SOURCES := src/nift.cpp src/CLI.cpp src/Engine.cpp src/FileSystem.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp src/Parser.cpp src/ProjectInfo.cpp src/WatchList.cpp src/BuildProgress.cpp
+SOURCES := src/nift.cpp src/CLI.cpp src/Engine.cpp src/Context.cpp src/Value.cpp src/FileSystem.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp src/Parser.cpp src/ProjectInfo.cpp src/WatchList.cpp src/BuildProgress.cpp
 OBJECTS := $(SOURCES:.cpp=.o)
 DEPFILES := $(OBJECTS:.o=.d)
 
@@ -84,6 +84,7 @@ ENGINE_TEST := $(TEST_DIR)/engine-smoke$(EXEEXT)
 ENGINE_CORE_OBJECTS := $(filter-out src/nift.o src/CLI.o,$(OBJECTS))
 
 $(ENGINE_TEST): tests/engine_smoke.cpp $(ENGINE_CORE_OBJECTS)
+	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/engine_smoke.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
 test-engine: $(ENGINE_TEST)
@@ -91,10 +92,21 @@ test-engine: $(ENGINE_TEST)
 
 ENGINE_BINDINGS_TEST := $(TEST_DIR)/engine-bindings$(EXEEXT)
 $(ENGINE_BINDINGS_TEST): tests/engine_bindings.cpp $(ENGINE_CORE_OBJECTS)
+	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/engine_bindings.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
 test-engine-bindings: $(ENGINE_BINDINGS_TEST)
 	$(ENGINE_BINDINGS_TEST)
+
+# Public-header consumer probe: compiled with ONLY the public include path, so
+# it proves <nift/nift.h> is self-contained (no -Isrc, no Jsonic++ visibility).
+PUBLIC_HEADER_PROBE := $(TEST_DIR)/public-header-probe$(EXEEXT)
+$(PUBLIC_HEADER_PROBE): tests/public_header_probe.cpp $(ENGINE_CORE_OBJECTS)
+	mkdir -p $(TEST_DIR)
+	$(CXX) -std=c++17 -Iinclude tests/public_header_probe.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
+
+test-public-header: $(PUBLIC_HEADER_PROBE)
+	$(PUBLIC_HEADER_PROBE)
 
 
 test-comments: $(TARGET)
@@ -247,7 +259,7 @@ clean:
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
-.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-diagnostics test-minify test-json-schema-integration test-engine test-engine-bindings test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
+.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-diagnostics test-minify test-json-schema-integration test-engine test-engine-bindings test-public-header test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
 
 
 test-cross-feature: $(TARGET)

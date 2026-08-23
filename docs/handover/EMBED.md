@@ -39,11 +39,17 @@ details.
 - `render_composed(template_source, page_source, require_exactly_one_content)`
   is the shared page+template composition; standalone partial rendering is the
   same operation with no page source, so `@content` in a partial is an error.
-- Value model: public `nift::Value`, backed internally by Jsonic++
-  `json::Document` (not an alias). The parser resolves values in the order
-  host-supplied bindings -> `@json` bindings -> contract bindings -> built-in
-  metadata, with structural built-ins (`name`, `content-path`, `output-path`,
-  `template-path`, `loop`) non-overridable by `set`.
+- Value model: public `nift::Value` is Nift's contract and is self-contained at
+  the compilation boundary (PIMPL; the internal Jsonic++ `json::Document`
+  backing lives only in `src/`). A consumer of `<nift/nift.h>` must not need
+  `-Isrc`, see `json::Document`, or know Jsonic++ exists.
+  The parser resolves values in the order host-supplied bindings -> `@json`
+  bindings -> contract bindings -> built-in metadata. The parts directly
+  exercised by conformance tests are: Context overlay > Engine default; host
+  binding vs `@json` (controlled collision error); host "title" > title
+  metadata; structural built-ins (`name`, `content-path`, `output-path`,
+  `template-path`, `loop`) non-overridable by `set`. Host-vs-contract
+  precedence is provisional until an Embedded contract source exists.
 
 ## Checkpoint status
 
@@ -54,11 +60,21 @@ details.
   `@content` via per-parser page source; `render_composed`; `@input` no-cwd
   guard; `RenderHost::root()` returns const ref; `tests/engine_smoke.cpp`.
   Full CLI suite + sanitizers green. See ASAN-FLAKE-001 below.
-- **CP3** (in progress): value bindings (`engine.set`/`set_json`,
-  `context.set`/`set_json`), precedence + structural built-in rule, direct
-  collision tests. Then CP4 loaders, CP5 `@pathto` (own review gate), CP6 CLI
-  fully on the core, CP7a concurrency / CP7b pagination-through-host /
-  CP7c API freeze + docs.
+- **CP3** (`0795c0a` + review fixes): value bindings (`engine.set`/`set_json`,
+  `context.set`/`set_json`), structural built-in rule, collision tests, and the
+  title-precedence fix (`Context::set_title` writes the same per-render "title"
+  slot as `Context::set("title", ...)` and outranks an Engine default).
+  Established and directly exercised: Context overlay > Engine default; host
+  binding colliding with `@json` => controlled "already bound" error; host
+  "title" binding > built-in title metadata; structural/reserved names rejected.
+  **Host-vs-contract precedence is provisional** (Embedded Nift has no contract
+  source yet; `EngineHost::contract_source()` returns nullptr). Do not claim it
+  frozen until an Embedded contract capability exists and a real conformance
+  test exercises it. The public headers are self-contained (PIMPL `nift::Value`,
+  no `json::Document`/`src` visibility); `test-public-header` compiles a
+  consumer with only `-Iinclude`.
+  Then CP4 loaders, CP5 `@pathto` (own review gate), CP6 CLI fully on the core,
+  CP7a concurrency / CP7b pagination-through-host / CP7c API freeze + docs.
 
 Cadence: one or two checkpoints between reviews; CP5 is a hard review gate.
 

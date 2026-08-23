@@ -4,6 +4,7 @@
 #include "Json.h"
 #include "Parser.h"
 #include "RenderHost.h"
+#include "ValueInternal.h"
 
 #include <memory>
 #include <mutex>
@@ -181,7 +182,7 @@ void Engine::set_loader(std::function<std::optional<std::string>(std::string_vie
 bool Engine::set(std::string name, Value value) {
     if (!nift::detail::valid_binding_identifier(name) || nift::detail::structural_builtin_name(name))
         return false;
-    impl_->defaults[std::move(name)] = std::make_shared<json::Document>(value.document());
+    impl_->defaults[std::move(name)] = std::make_shared<json::Document>(ValueAccess::doc(value));
     return true;
 }
 bool Engine::set(std::string name, std::string value) {
@@ -211,7 +212,7 @@ RenderResult Engine::render(const Source& page, const Source& page_template, con
     info.title = context.title_;
     std::unordered_map<std::string, std::shared_ptr<const json::Document>> render_bindings;
     for (const auto& [name, value] : context.bindings_)
-        render_bindings[name] = std::make_shared<json::Document>(value.document());
+        render_bindings[name] = std::make_shared<json::Document>(ValueAccess::doc(value));
     EngineHost host(*impl_, &render_bindings);
     Parser parser(host, info);
     return RenderResultBuilder::build(parser.render_composed(template_render_source, page_render_source,
@@ -229,7 +230,7 @@ RenderResult Engine::render(const Source& partial, const Context& context) {
     info.title = context.title_;
     std::unordered_map<std::string, std::shared_ptr<const json::Document>> render_bindings;
     for (const auto& [name, value] : context.bindings_)
-        render_bindings[name] = std::make_shared<json::Document>(value.document());
+        render_bindings[name] = std::make_shared<json::Document>(ValueAccess::doc(value));
     EngineHost host(*impl_, &render_bindings);
     Parser parser(host, info);
     return RenderResultBuilder::build(parser.render_composed(partial_render_source, std::nullopt,

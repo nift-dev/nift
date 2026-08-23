@@ -133,6 +133,67 @@ int main() {
         CHECK(r.output() == "42/true");
     }
 
+    // 10. Title precedence matrix. Context::set_title and Context::set("title")
+    //     write the same per-render slot and must both outrank an Engine
+    //     default; the most recent Context write wins.
+    {
+        // Engine default + Context::set_title -> Context title wins.
+        nift::Engine engine;
+        engine.set("title", std::string("ENGINE"));
+        nift::Context context;
+        context.set_title(std::string("CONTEXT_TITLE"));
+        auto r = engine.render(nift::Source::text("x"), nift::Source::text("$[title]@content"), context);
+        CHECK(r.ok());
+        CHECK(r.output() == "CONTEXT_TITLEx");
+    }
+    {
+        // Engine default + Context::set("title") -> Context binding wins.
+        nift::Engine engine;
+        engine.set("title", std::string("ENGINE"));
+        nift::Context context;
+        context.set("title", std::string("CONTEXT_SET"));
+        auto r = engine.render(nift::Source::text("x"), nift::Source::text("$[title]@content"), context);
+        CHECK(r.ok());
+        CHECK(r.output() == "CONTEXT_SETx");
+    }
+    {
+        // Context::set_title then Context::set("title") -> later write wins.
+        nift::Engine engine;
+        nift::Context context;
+        context.set_title(std::string("FIRST"));
+        context.set("title", std::string("SECOND"));
+        auto r = engine.render(nift::Source::text("x"), nift::Source::text("$[title]@content"), context);
+        CHECK(r.ok());
+        CHECK(r.output() == "SECONDx");
+    }
+    {
+        // Context::set("title") then Context::set_title -> later write wins.
+        nift::Engine engine;
+        nift::Context context;
+        context.set("title", std::string("FIRST"));
+        context.set_title(std::string("SECOND"));
+        auto r = engine.render(nift::Source::text("x"), nift::Source::text("$[title]@content"), context);
+        CHECK(r.ok());
+        CHECK(r.output() == "SECONDx");
+    }
+    {
+        // No host title + Context::set_title -> Context title renders.
+        nift::Engine engine;
+        nift::Context context;
+        context.set_title(std::string("ONLY_TITLE"));
+        auto r = engine.render(nift::Source::text("x"), nift::Source::text("$[title]@content"), context);
+        CHECK(r.ok());
+        CHECK(r.output() == "ONLY_TITLEx");
+    }
+    {
+        // No Context title + Engine default -> Engine default renders.
+        nift::Engine engine;
+        engine.set("title", std::string("ENGINE_ONLY"));
+        auto r = engine.render(nift::Source::text("x"), nift::Source::text("$[title]@content"));
+        CHECK(r.ok());
+        CHECK(r.output() == "ENGINE_ONLYx");
+    }
+
     if (failures == 0) {
         std::printf("engine bindings test passed\n");
         return 0;

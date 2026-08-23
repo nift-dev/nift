@@ -4,6 +4,7 @@
 #include <cctype>
 #include <set>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 
 #include "nift/value.h"
@@ -42,7 +43,10 @@ inline bool structural_builtin_name(const std::string& name) {
 class Context {
 public:
     void set_page_name(std::string name) { page_name_ = std::move(name); }
-    void set_title(std::string title) { title_ = std::move(title); }
+
+    // set_title and set("title", ...) write the same per-render title slot:
+    // both override an Engine "title" default; the most recent write wins.
+    void set_title(std::string title);
 
     // Request-scoped value bindings, resolved before Engine defaults, @json
     // bindings, contracts and built-in metadata. Returns false if the name is
@@ -60,28 +64,5 @@ private:
     std::string title_;
     std::unordered_map<std::string, Value> bindings_;
 };
-
-inline bool Context::set(std::string name, Value value) {
-    if (!detail::valid_binding_identifier(name) || detail::structural_builtin_name(name)) return false;
-    bindings_[std::move(name)] = std::move(value);
-    return true;
-}
-inline bool Context::set(std::string name, std::string value) {
-    return set(std::move(name), Value(std::move(value)));
-}
-inline bool Context::set(std::string name, int value) {
-    return set(std::move(name), Value(value));
-}
-inline bool Context::set(std::string name, bool value) {
-    return set(std::move(name), Value(value));
-}
-inline bool Context::set_json(std::string name, std::string_view json_text) {
-    if (!detail::valid_binding_identifier(name) || detail::structural_builtin_name(name)) return false;
-    Value value;
-    std::string error;
-    if (!json::Document::parse(std::string(json_text), value.document(), error)) return false;
-    bindings_[std::move(name)] = std::move(value);
-    return true;
-}
 
 } // namespace nift
