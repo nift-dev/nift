@@ -198,7 +198,7 @@ orchestration over the same `render_composed` used by `render(page, template)`.
   existence and reads named sources, so the existing host capabilities express
   it fully (no new capability required). CLI pagination semantics preserved
   (smoke, 18/18 incremental equivalence, ASan/UBSan and TSan pagination).
-- **CP7c** (`...`): API freeze + documentation + programme sign-off. The public
+- **CP7c** (`40fbb73`): API freeze + documentation + programme sign-off. The public
   `include/nift/` surface was audited and the behavioural contracts below were
   documented in the headers; the public-header probe now exercises every
   public type/member with only `-Iinclude`. Final evidence: all six engine
