@@ -46,6 +46,18 @@ void write_file(const fs::path& path, const std::string& contents) {
     out << contents;
 }
 
+// Atomic replace so a concurrent reload() never reads a torn candidate file.
+void write_file_atomic(const fs::path& path, const std::string& contents) {
+    std::error_code error;
+    fs::create_directories(path.parent_path(), error);
+    const fs::path tmp = path.string() + ".tmp";
+    {
+        std::ofstream out(tmp, std::ios::binary);
+        out << contents;
+    }
+    fs::rename(tmp, path, error);
+}
+
 fs::path fixture_base() { return fs::current_path() / ".build" / "engine-reload-fixtures"; }
 
 const char* kConfig = R"({"config":{"content-dir":"content/","content-ext":".html","output-dir":"public/","output-ext":".html","default-template":"templates/template.html","incremental-mode":"modified"}})";
@@ -154,11 +166,15 @@ void test_concurrent_render_and_reload(const fs::path& root) {
     constexpr int kIterations = 30;
     constexpr int kReloads = 40;
 
+    // ONE shared Engine created before any thread starts: every render and
+    // reload below is on the same Engine and the same snapshot lifecycle.
+    nift::Engine engine(root);
+    CHECK(engine.is_open());
+
     std::atomic<bool> renders_ok{true};
     std::vector<std::thread> workers;
     for (int t = 0; t < kRenderThreads; ++t) {
         workers.emplace_back([&] {
-            nift::Engine engine(root);
             for (int i = 0; i < kIterations; ++i) {
                 nift::RenderResult result = engine.render("about");
                 if (!result.ok()) { renders_ok = false; continue; }
@@ -171,14 +187,21 @@ void test_concurrent_render_and_reload(const fs::path& root) {
         });
     }
 
-    // Reload thread flips between two known-good generations while renders run.
+    // Reload thread, on the SAME shared Engine: flips between two known-good
+    // generations and injects failed reloads while renders run. A failed reload
+    // must retain the last-good snapshot (renders keep succeeding) and a later
+    // valid reload must recover.
     std::atomic<bool> reloads_ok{true};
     std::thread reloader([&] {
-        nift::Engine engine(root);
         for (int i = 0; i < kReloads; ++i) {
-            write_file(root / ".nift/tracked.json",
-                       tracked_with_title((i % 2 == 0) ? "Title-BETA" : "Title-ALPHA"));
-            if (!engine.reload()) reloads_ok = false;
+            if (i % 5 == 4) {
+                write_file_atomic(root / ".nift/tracked.json", "{ not json");
+                if (engine.reload()) reloads_ok = false;  // must fail, keep last-good
+            } else {
+                write_file_atomic(root / ".nift/tracked.json",
+                                  tracked_with_title((i % 2 == 0) ? "Title-BETA" : "Title-ALPHA"));
+                if (!engine.reload()) reloads_ok = false; // must succeed
+            }
         }
     });
 
@@ -186,6 +209,34 @@ void test_concurrent_render_and_reload(const fs::path& root) {
     for (auto& worker : workers) worker.join();
     CHECK(renders_ok.load());
     CHECK(reloads_ok.load());
+
+    // Recovery: after all the malformed injections and the final valid reload,
+    // the shared Engine still renders a committed generation.
+    CHECK(engine.render("about").ok());
+    // The Engine never wrote anything: no .info.json anywhere in the project.
+    for (const auto& [path, contents] : tree_snapshot(root))
+        CHECK(path.find(".info.json") == std::string::npos);
+}
+
+void test_deterministic_lifecycle(const fs::path& root) {
+    write_project(root);  // tracked title = Title-ALPHA
+    nift::Engine engine(root);
+
+    // Opens snapshot A; renders observe A.
+    CHECK(contains(engine.render("about").output(), "Title-ALPHA"));
+
+    // Disk becomes B, but the Engine keeps serving its captured snapshot A:
+    // this is snapshot semantics, not re-opening the project per render.
+    write_file(root / ".nift/tracked.json", tracked_with_title("Title-BETA"));
+    nift::RenderResult before_reload = engine.render("about");
+    CHECK(before_reload.ok());
+    CHECK(contains(before_reload.output(), "Title-ALPHA"));
+
+    // reload() atomically replaces the generation; later renders observe B.
+    CHECK(engine.reload());
+    nift::RenderResult after_reload = engine.render("about");
+    CHECK(after_reload.ok());
+    CHECK(contains(after_reload.output(), "Title-BETA"));
 }
 
 void test_zero_writes_across_reload(const fs::path& root) {
@@ -240,6 +291,7 @@ int main() {
     test_failed_reload_retains_last_good(project);
     test_reload_as_open_retry(project);
     test_generation_switch(project);
+    test_deterministic_lifecycle(project);
     test_concurrent_render_and_reload(project);
     test_zero_writes_across_reload(project);
     test_defaults_survive_reload(project);

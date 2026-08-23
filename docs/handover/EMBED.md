@@ -220,13 +220,26 @@ consumes a read-only snapshot and never becomes the build system.
   unaffected by reload; cache ownership is per generation (a fresh snapshot has
   fresh caches). Staleness detection is deliberately the host's job - an
   explicit reload() API, no filesystem watching in the embedded core, per the
-  "glue, not universe" direction. Evidence: `tests/engine_reload.cpp`
-  (new-page-after-reload, failed-reload-retains-last-good incl. recovery,
-  reload-as-open-retry, generation switch, 8-thread concurrent render + reload
-  flipper observing exactly one committed generation per render, zero-write
-  across success/failure reloads, defaults/environment survival) - all also
-  green under ThreadSanitizer (`test-engine-reload-tsan`, plus
-  `test-engine-concurrency-tsan` re-validated against the current core).
+  "glue, not universe" direction.
+  **Precise atomicity guarantee:** the snapshot covers project config/tracking
+  state and geometry only; content/template/JSON sources are read from the
+  filesystem at render time. So the guarantee is "config/tracking/project-
+  geometry generation replacement is atomic" - not "an entire render observes
+  an immutable filesystem generation" - and tests change only state captured by
+  ProjectState (tracked metadata/geometry) while keeping rendered sources
+  stable. Evidence: `tests/engine_reload.cpp` (new-page-after-reload,
+  failed-reload-retains-last-good incl. recovery, reload-as-open-retry,
+  generation switch, deterministic lifecycle: opens A → renders A → disk
+  becomes B → still renders A → reload → renders B, and the shared-Engine
+  concurrency test: ONE Engine created before any thread, 8 simultaneous
+  render() threads + a reload thread on that same Engine flipping known-good
+  generations and injecting failed reloads, every render observing exactly one
+  committed generation, last-good retained across failures, recovery, no
+  .info.json) - all also green under ThreadSanitizer (`test-engine-reload-tsan`
+  compiles tests/engine_reload.cpp directly so it genuinely exercises the
+  shared-Engine test, plus `test-engine-concurrency-tsan` re-validated against
+  the current core). Candidate writes in the test use atomic rename so reload
+  never reads a torn file.
 - **PA5 CLI ↔ Engine parity → portable conformance corpus** — not a handful of
   examples. The seed of the cross-implementation corpus `nift-rs` will inherit
   (CLI ↕ C++ project Engine ↕ nift-rs): tracked-name lookup, index/trailing-

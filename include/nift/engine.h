@@ -59,13 +59,18 @@ public:
 
     // Replaces the immutable project snapshot atomically (PA4). In-flight
     // renders finish on the snapshot they started with; later renders observe
-    // the new one. Returns true when the new snapshot loaded and validated;
-    // otherwise false (with `error` filled when provided) and the last known-
-    // good snapshot remains in service - reload never fails closed and never
-    // writes to the project. This is also how an Engine constructed before its
-    // project existed can later open it. The host application decides when a
-    // reload matters; the embedded Engine never watches the filesystem. The
-    // Engine defaults and environment provider are unaffected by a reload.
+    // the new one. The snapshot covers project config/tracking state and
+    // geometry (content/output/pagination paths, contracts, tracked-name
+    // registry); content/template/JSON sources are still read from the
+    // filesystem at render time, so only state captured in the snapshot is
+    // generation-scoped. Returns true when the new snapshot loaded and
+    // validated; otherwise false (with `error` filled when provided) and the
+    // last known-good snapshot remains in service - reload never fails closed
+    // and never writes to the project. This is also how an Engine constructed
+    // before its project existed can later open it. The host application
+    // decides when a reload matters; the embedded Engine never watches the
+    // filesystem. The Engine defaults and environment provider are unaffected
+    // by a reload. reload() is safe to call concurrently with render().
     bool reload(std::string* error = nullptr);
 
     // Project-aware rendering by tracked page name, e.g. render("about").
