@@ -240,7 +240,7 @@ consumes a read-only snapshot and never becomes the build system.
   shared-Engine test, plus `test-engine-concurrency-tsan` re-validated against
   the current core). Candidate writes in the test use atomic rename so reload
   never reads a torn file.
-- **PA5 CLI ↔ Engine parity → portable conformance corpus** — DONE.
+- **PA5 CLI ↔ Engine parity → portable conformance corpus** — DONE (strengthened).
   `tests/conformance/` is the seed of the cross-implementation corpus
   `nift-rs` will inherit (CLI ↕ C++ project Engine ↕ nift-rs). Each case under
   `cases/<name>/` is a fixture project + `expected.json`; `run_conformance.py`
@@ -248,17 +248,26 @@ consumes a read-only snapshot and never becomes the build system.
   (via `cpp_runner`, which drives the public `Engine.render(page)` and dumps
   output + sorted dependencies + sorted requirements). Categories are
   classified explicitly in `manifest.json`:
-  - **parity**: byte-identical CLI output == Engine output per tracked page,
-    plus dependency/requirement set parity against the CLI `.info.json`.
-    Cases: `comprehensive` (tracked-name lookup, index/trailing-slash geometry,
-    content/template composition, metadata title/name/content-path/output-path,
-    `@input`, `@json`, contracts, tracked + concrete `@pathto`, 404 root-absolute
-    geometry, pagination primary page, dependencies, requirements), `schema`
-    (JSON schema validation + schema/data dependency recording), `getenv`
-    (default process-environment semantics, driver sets the variable for both).
-  - **reject**: both implementations reject the same invalid state (CLI build
-    fails; Engine render fails): `missing-source`, `bad-config`, `bad-tracking`,
-    `path-escape` (containment/security).
+  - **parity — canonical goldens**: every parity case carries committed golden
+    expectations under `expected/<page>.out/.deps/.reqs`, generated from the
+    reference CLI by `gen_golden.py`. The driver requires
+    `CLI == golden`, `Engine == golden`, and (kept for differential value)
+    `CLI == Engine`, for output AND for dependency/requirement sets. The oracle
+    is therefore implementation-independent: a case can no longer pass just
+    because two C++ paths agree. Cases: `comprehensive` (tracked-name lookup,
+    index/trailing-slash geometry, content/template composition, metadata
+    title/name/content-path/output-path, `@input`, `@json`, contracts, tracked
+    + concrete `@pathto`, 404 root-absolute geometry, pagination primary page,
+    dependencies, requirements), `schema` (JSON schema validation + schema/data
+    dependency recording), `getenv` (default process-environment semantics,
+    driver sets the variable for both).
+  - **reject — semantic classes**: each reject case declares an expected
+    semantic class (`missing-source`, `unknown-config-key`,
+    `duplicate-tracked-name`, `invalid-tracking-json`, `project-root-escape`),
+    validated by a stable diagnostic substring per `REJECT_CLASSES` in the
+    driver; prose is not part of the public contract. Both implementations must
+    reject for the intended reason, not merely fail somewhere. Cases:
+    `missing-source`, `bad-config`, `bad-tracking`, `path-escape`.
   - **engine-only**: Context overlays, injected environment provider, unknown
     page, `is_open()`/`open_error()` — no artificial CLI equivalent; executable
     evidence is `tests/engine_project.cpp`.
@@ -266,12 +275,14 @@ consumes a read-only snapshot and never becomes the build system.
     C++ Engine serving contracts, explicitly NOT template-language semantics
     `nift-rs` must duplicate unless project-aware Rust adopts the same serving
     API; executable evidence is `tests/engine_reload.cpp`.
-  Verified parity includes dependency sets (e.g. about →
-  `.nift/config.json`, `content/about.html`, `content/site.json`,
-  `data/items.json`, `templates/page.html`) and requirement sets (`@pathto`
-  destinations) matching the CLI exactly. Pagination API design remains open
-  (no magic context keys); `render("blog/")` returns the primary page, which is
-  exactly what the parity case compares against the CLI's primary output.
+  **Pagination contract — DECIDED (not open):** the project-aware Engine v1
+  renders a tracked page's primary pagination output; `render("blog/")` equals
+  the CLI's primary output `public/blog/index.html` (a parity case). Explicit
+  arbitrary pagination-page selection is NOT part of the current contract and
+  is deferred to future API design; no magic Context keys, no hastily invented
+  `render(page, number)`.
+  Verified: `make test-conformance` 7/7 (3 parity with goldens + 4 reject with
+  semantic classes).
 - **PA6 archaeology/docs/sign-off** — document the contract, record the
   staleness/reload decision, resolve/forward the now-concrete archaeology items
   (empty-root containment, repeated `tracked_output_path` lookup,

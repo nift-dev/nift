@@ -1,0 +1,5 @@
+<!doctype html>
+<title>Home</title>
+<head><meta name="site" content="Nift"></head>
+<link href="./app.js">
+<body><h1>Home</h1></body>

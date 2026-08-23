@@ -82,6 +82,12 @@ public:
     // value overlays and title override Engine defaults and the tracked title.
     // A failed project open or an unknown page name is a controlled error in
     // the returned RenderResult, never a throw or process termination.
+    //
+    // Pagination contract (decided at PA5): for a paginated tracked page this
+    // renders the page's PRIMARY output, matching the CLI's primary file
+    // (render("blog/") == public/blog/index.html). Explicit arbitrary
+    // pagination-page selection is not part of this contract; a future API may
+    // add it. No Context key controls pagination.
     RenderResult render(std::string_view page_name);
     RenderResult render(std::string_view page_name, const Context& context);
 

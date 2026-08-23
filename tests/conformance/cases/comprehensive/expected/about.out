@@ -1,0 +1,10 @@
+<main><h1>About</h1>
+      <p>page=about</p>
+      <p>content-path=content/about.html</p>
+      <p>output-path=public/about.html</p>
+      <p>site=Nift</p>
+      
+      <span>one</span><span>two</span><span>three</span><span>four</span><span>five</span>
+      <p>home=./</p>
+      <p>blog=blog/</p>
+      <p>appjs=./app.js</p></main>

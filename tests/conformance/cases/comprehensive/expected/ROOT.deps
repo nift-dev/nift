@@ -1,0 +1,5 @@
+.nift/config.json
+content/index.html
+content/site.json
+templates/head.html
+templates/template.html
