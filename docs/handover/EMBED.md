@@ -140,28 +140,35 @@ consumes a read-only snapshot and never becomes the build system.
   `tests/project_state_parity.cpp` (valid parity vs ProjectInfo, ~28 invalid
   accept/reject parity cases, zero-write guarantee on success and failure,
   concurrent shared reads).
-- **PA1b semantic convergence** — REQUIRED before ProjectHost. PA1 currently
-  mirrors ProjectInfo's read semantics in a second implementation, kept in
-  agreement by the parity harness. That parity harness is excellent migration
-  evidence and stays permanently as regression evidence, but it must NOT be the
-  permanent architecture: there must ultimately be **one implementation of Nift
-  project-read semantics**, not two synchronized by tests. Convergence options
-  (exact approach open, decided at review): extract shared pure
-  parsing/validation/geometry primitives that both `ProjectInfo` and the SSR
-  layer consume, or have `ProjectInfo` delegate its read side to ProjectState
-  (ProjectInfo's mutable tracked/build behaviour stays above the shared read
-  layer either way). The destination:
+- **PA1b semantic convergence** — DONE. The duplicated project-read authority
+  is removed: `src/ProjectRead.{h,cpp}` is now the **single implementation** of
+  Nift project-read semantics — config parsing/validation, tracking
+  parsing/validation, tracked-name rules, and path geometry — consumed by both
+  `ProjectInfo` and `ProjectState`. `ProjectInfo::load_config`/`load_tracking`
+  delegate to it (adding only the CLI console-error prefix), and
+  `ProjectInfo`'s geometry methods delegate to `project_read::*`. Nothing moved
+  downward: build/write/watch/hash ownership remains entirely in `ProjectInfo`;
+  `ProjectState` still owns no write/build machinery and remains zero-write.
+  The parity harness stays permanently as regression evidence.
   ```text
-               shared project-read layer
+               shared project-read layer  (ProjectRead)
                 /                  \
                /                    \
-      ProjectInfo                 ProjectHost
+      ProjectInfo                 ProjectState
     CLI build/write                SSR read-only
   ```
-- **PA2 ProjectHost** — a read-only `RenderHost` over the *converged* shared
-  project-read layer so the existing Parser renders project pages unchanged
-  (`@pathto` to tracked names, `@input`/`@json`/contracts, no build
-  decisions). Must not begin before PA1b.
+  Evidence: build clean (no warnings); `test-project-state` parity corpus green;
+  all six engine tests + public-header probe; CLI `test-config-validation`
+  (`unknown config key '<name>'`), `test-contracts`, `test-minify-integration`
+  (exact error-text greps), `test-content`, `test-pagination`,
+  `test-requirements`, `test-path-safety`, `test-metadata-safety`,
+  `test-template-optional`, `test-pathto-404`, `test-output-permissions`,
+  `test-pagination-equivalence` (18 comparisons) and
+  `test-incremental-state-transitions` (modified/hash/hybrid) all pass.
+- **PA2 ProjectHost** — a read-only `RenderHost` over the converged
+  `ProjectState`/`ProjectRead` layer so the existing Parser renders project
+  pages unchanged (`@pathto` to tracked names, `@input`/`@json`/contracts, no
+  build decisions). Must not begin before PA1b review.
 - **PA3 public project-aware API** — explicit construction only:
   `Engine(std::filesystem::path)` for project mode; default `Engine()` stays
   deterministic standalone (no CWD/upward discovery unless explicitly

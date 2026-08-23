@@ -4,7 +4,7 @@ CPPFLAGS ?= -Isrc -Iinclude -Iminifypp/include -Iminifypp/src
 LDFLAGS ?=
 LDLIBS ?=
 
-SOURCES := src/nift.cpp src/CLI.cpp src/Engine.cpp src/Context.cpp src/Value.cpp src/FileSystem.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp src/Parser.cpp src/ProjectInfo.cpp src/ProjectState.cpp src/WatchList.cpp src/BuildProgress.cpp
+SOURCES := src/nift.cpp src/CLI.cpp src/Engine.cpp src/Context.cpp src/Value.cpp src/FileSystem.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp src/Parser.cpp src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp src/WatchList.cpp src/BuildProgress.cpp
 OBJECTS := $(SOURCES:.cpp=.o)
 DEPFILES := $(OBJECTS:.o=.d)
 
