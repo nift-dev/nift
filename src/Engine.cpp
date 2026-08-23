@@ -6,6 +6,8 @@
 #include "RenderHost.h"
 #include "ValueInternal.h"
 
+#include <cstdlib>
+
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -20,6 +22,7 @@
 struct nift::Engine::Impl {
     std::filesystem::path root;
     std::function<std::optional<std::string>(std::string_view)> loader;
+    std::function<std::optional<std::string>(std::string_view)> environment_provider;
 
     // Long-lived application-wide value bindings (engine.set / set_json).
     std::unordered_map<std::string, std::shared_ptr<const json::Document>> defaults;
@@ -95,6 +98,20 @@ public:
             if (!inserted) result = it->second.get();
         }
         return result;
+    }
+
+    bool source_exists(const std::filesystem::path& path) const override {
+        if (impl_.loader) return impl_.loader(path.lexically_normal().generic_string()).has_value();
+        return filesystem::path_exists(path);
+    }
+    bool source_readable(const std::filesystem::path& path) const override {
+        if (impl_.loader) return impl_.loader(path.lexically_normal().generic_string()).has_value();
+        return filesystem::file_readable(path);
+    }
+    std::optional<std::string> environment(const std::string& name) const override {
+        if (impl_.environment_provider) return impl_.environment_provider(name);
+        if (const char* value = std::getenv(name.c_str())) return std::string(value);
+        return std::nullopt;
     }
 
     std::shared_ptr<const json::Document> read_shared_json(const std::filesystem::path& path,
@@ -177,6 +194,10 @@ Engine& Engine::operator=(Engine&&) noexcept = default;
 void Engine::set_root(std::filesystem::path root) { impl_->root = std::move(root); }
 void Engine::set_loader(std::function<std::optional<std::string>(std::string_view path)> loader) {
     impl_->loader = std::move(loader);
+}
+
+void Engine::set_environment_provider(std::function<std::optional<std::string>(std::string_view name)> provider) {
+    impl_->environment_provider = std::move(provider);
 }
 
 bool Engine::set(std::string name, Value value) {

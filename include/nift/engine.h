@@ -37,6 +37,11 @@ public:
     // the filesystem under the configured root.
     void set_loader(std::function<std::optional<std::string>(std::string_view path)> loader);
 
+    // Environment provider for @getenv. The default reads the process
+    // environment; a provider lets an application supply its own lookup
+    // (nullopt means unset).
+    void set_environment_provider(std::function<std::optional<std::string>(std::string_view name)> provider);
+
     // Long-lived application-wide value bindings, resolved (after any Context
     // overlay) before @json bindings, contracts and built-in metadata.
     // Returns false if the name is not a valid binding identifier or is a

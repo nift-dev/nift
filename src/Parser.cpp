@@ -456,7 +456,7 @@ bool Parser::resolve_json_value(const std::string& expression,
                         contract_path_argument;
                 return true;
             }
-            if (!filesystem::path_exists(contract_path)) {
+            if (!host_.source_exists(contract_path)) {
                 error = "contract '" + root_name + "': file does not exist: " + contract_path_argument;
                 return true;
             }
@@ -2164,7 +2164,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                         fail(source_path, source, i, "@content would result in an input loop through " + content_path.generic_string());
                         break;
                     }
-                    if (!filesystem::file_readable(content_path)) {
+                    if (!host_.source_readable(content_path)) {
                         fail(source_path, source, i, "content file is not readable");
                         break;
                     }
@@ -2328,7 +2328,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     // logical name with a directory). A bare in-memory source
                     // must never fall back to the process working directory.
                     const fs::path relative_to_source = source_path.parent_path() / input_path;
-                    if (!source_path.parent_path().empty() && filesystem::path_exists(relative_to_source)) {
+                    if (!source_path.parent_path().empty() && host_.source_exists(relative_to_source)) {
                         input_path = relative_to_source;
                     } else if (host_.root().empty()) {
                         fail(source_path, source, i, "@input cannot resolve relative path '" + parameters[0] + "' without a project root");
@@ -2337,17 +2337,18 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                         input_path = host_.root() / input_path;
                     }
                 }
-                if (!filesystem::path_exists(input_path)) { fail(source_path, source, i, "@input path does not exist: " + parameters[0]); break; }
+                if (!host_.source_exists(input_path)) { fail(source_path, source, i, "@input path does not exist: " + parameters[0]); break; }
                 input_path = fs::absolute(input_path).lexically_normal();
                 if (std::find(input_stack_.begin(), input_stack_.end(), input_path) != input_stack_.end()) {
                     fail(source_path, source, i, "@input would result in an input loop through " + input_path.generic_string());
                     break;
                 }
-                if (!filesystem::file_readable(input_path)) { fail(source_path, source, i, "input file is not readable"); break; }
+                if (!host_.source_readable(input_path)) { fail(source_path, source, i, "input file is not readable"); break; }
                 input_stack_.push_back(input_path);
                 result_.dependencies.insert(host_.relative(input_path));
                 const int insertion_code_block_depth = code_block_depth_;
                 const auto input_source = host_.read_shared_source(input_path);
+                if (!input_source) { fail(source_path, source, i, "input file is not readable"); break; }
                 const auto nested = parse(*input_source, input_path, depth + 1);
                 input_stack_.pop_back();
                 if (!nested.ok) break;
@@ -2389,7 +2390,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     fail(source_path, source, i, "getenv: " + interpolation_error); break;
                 }
                 parameters[0] = std::move(resolved);
-                if (const char* value = std::getenv(parameters[0].c_str())) output += value;
+                if (auto value = host_.environment(parameters[0])) output += *value;
                 i = end;
                 continue;
             }
@@ -2458,7 +2459,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     fail(source_path, source, i, "json: path must stay inside the Nift project: " + json_path_argument);
                     break;
                 }
-                if (!filesystem::path_exists(json_path)) {
+                if (!host_.source_exists(json_path)) {
                     fail(source_path, source, i, "json: file does not exist: " + json_path_argument);
                     break;
                 }
@@ -2479,7 +2480,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                              "json: schema path must stay inside the Nift project: " + schema_path_argument);
                         break;
                     }
-                    if (!filesystem::path_exists(schema_path)) {
+                    if (!host_.source_exists(schema_path)) {
                         fail(source_path, source, i, "json: schema file does not exist: " + schema_path_argument);
                         break;
                     }
@@ -2521,7 +2522,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                         fail(source_path, source, i, "dep: path must stay inside the Nift project: " + dependency);
                         break;
                     }
-                    if (!filesystem::path_exists(dependency_path)) {
+                    if (!host_.source_exists(dependency_path)) {
                         fail(source_path, source, i, "failed as dependency does not exist: " + dependency);
                         break;
                     }

@@ -72,8 +72,24 @@ details.
   frozen until an Embedded contract capability exists and a real conformance
   test exercises it. The public headers are self-contained (PIMPL `nift::Value`,
   no `json::Document`/`src` visibility); `test-public-header` compiles a
-  consumer with only `-Iinclude`.
-  Then CP4 loaders, CP5 `@pathto` (own review gate), CP6 CLI fully on the core,
+  consumer with only `-Iinclude`. Exception contract is truthful: moves are
+  pure `shared_ptr` moves (nothrow, no allocation); `impl_ == nullptr` is the
+  canonical Null representation (reads non-allocating, mutation materialises
+  on demand); static_asserts pin `is_nothrow_move_*` from the consumer view.
+- **CP4** (`...`): loader semantics. `@input`/`@content`/`@json`/`@dep` route
+  their source existence/readability through the host (`source_exists` /
+  `source_readable` / `read_shared_source` / `read_shared_json`), so a custom
+  `Engine::set_loader` supplies sources from memory with no filesystem; a
+  custom `Engine::set_environment_provider` supplies `@getenv`. Defaults
+  replicate the CLI exactly (`ProjectInfoHost` forwards to the filesystem).
+  Tests: `tests/engine_loaders.cpp` (`make test-engine-loaders`).
+  **Archaeology finding (preserved, not silently changed):** with an empty
+  engine root, `@json`/`@dep` containment uses `path_within(root, path)`,
+  which with an empty base resolves against the process working directory.
+  This mirrors the `@input` no-cwd guard decision and should be settled
+  deliberately (likely: require a root, or define empty-root containment as
+  no-containment) in a later checkpoint; it is not claimed as a contract yet.
+  Then CP5 `@pathto` (own review gate), CP6 CLI fully on the core,
   CP7a concurrency / CP7b pagination-through-host / CP7c API freeze + docs.
 
 Cadence: one or two checkpoints between reviews; CP5 is a hard review gate.

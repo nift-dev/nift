@@ -1,6 +1,11 @@
 #pragma once
 #include "RenderHost.h"
 #include "ProjectInfo.h"
+#include "FileSystem.h"
+
+#include <cstdlib>
+#include <optional>
+#include <string>
 
 // RenderHost adapter over ProjectInfo for the CLI. Every method forwards to the
 // exact pre-CP1 implementation, so rendering behaviour is unchanged.
@@ -37,6 +42,14 @@ public:
     std::shared_ptr<const json::Document> read_shared_json(const std::filesystem::path& path,
                                                            std::string& error) const override {
         return project_.read_shared_json(path, error);
+    }
+
+    bool source_exists(const std::filesystem::path& path) const override { return filesystem::path_exists(path); }
+    bool source_readable(const std::filesystem::path& path) const override { return filesystem::file_readable(path); }
+
+    std::optional<std::string> environment(const std::string& name) const override {
+        if (const char* value = std::getenv(name.c_str())) return std::string(value);
+        return std::nullopt;
     }
 
 private:

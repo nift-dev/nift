@@ -6,9 +6,10 @@
 
 #include <type_traits>
 
-// nift::Value move construction/assignment must be nothrow and free of
-// allocation: the moved-from source becomes a valid Null Value without the
-// move itself performing a potentially throwing allocation.
+// nift::Value move construction/assignment must be nothrow: the moved-from
+// source becomes a valid Null Value without the move itself performing a
+// potentially throwing allocation. The traits here prove nothrow directly;
+// the allocation-free implementation is established by inspection.
 static_assert(std::is_nothrow_move_constructible<nift::Value>::value,
               "nift::Value move construction must be nothrow");
 static_assert(std::is_nothrow_move_assignable<nift::Value>::value,

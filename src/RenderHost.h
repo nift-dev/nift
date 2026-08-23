@@ -49,4 +49,13 @@ public:
     virtual const std::string* read_shared_source(const std::filesystem::path& path) const = 0;
     virtual std::shared_ptr<const json::Document> read_shared_json(const std::filesystem::path& path,
                                                                    std::string& error) const = 0;
+
+    // Source existence/readability as seen by this host. For a filesystem host
+    // these are the ordinary filesystem checks; for a loader-backed host they
+    // are the loader's own view of whether a path has content.
+    virtual bool source_exists(const std::filesystem::path& path) const = 0;
+    virtual bool source_readable(const std::filesystem::path& path) const = 0;
+
+    // Environment lookup for @getenv. nullopt means the variable is unset.
+    virtual std::optional<std::string> environment(const std::string& name) const = 0;
 };

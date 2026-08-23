@@ -108,6 +108,14 @@ $(PUBLIC_HEADER_PROBE): tests/public_header_probe.cpp $(ENGINE_CORE_OBJECTS)
 test-public-header: $(PUBLIC_HEADER_PROBE)
 	$(PUBLIC_HEADER_PROBE)
 
+ENGINE_LOADERS_TEST := $(TEST_DIR)/engine-loaders$(EXEEXT)
+$(ENGINE_LOADERS_TEST): tests/engine_loaders.cpp $(ENGINE_CORE_OBJECTS)
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/engine_loaders.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
+
+test-engine-loaders: $(ENGINE_LOADERS_TEST)
+	$(ENGINE_LOADERS_TEST)
+
 
 test-comments: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/comments_smoke.sh
@@ -259,7 +267,7 @@ clean:
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
-.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-diagnostics test-minify test-json-schema-integration test-engine test-engine-bindings test-public-header test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
+.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-diagnostics test-minify test-json-schema-integration test-engine test-engine-bindings test-engine-loaders test-public-header test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
 
 
 test-cross-feature: $(TARGET)
