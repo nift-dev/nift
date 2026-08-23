@@ -188,7 +188,7 @@ orchestration over the same `render_composed` used by `render(page, template)`.
   caches are mutex-protected. Contract documented in `include/nift/engine.h`;
   `tests/engine_concurrency.cpp` proves the supported case (8 threads x 200
   renders on one Engine) and passes under ThreadSanitizer.
-- **CP7b** (`...`): pagination's remaining direct source/filesystem dependency
+- **CP7b** (`e3dcc42`): pagination's remaining direct source/filesystem dependency
   routed through the host boundary: the pagination template/separator
   existence and readability checks now use `source_exists` / `source_readable`,
   and reads already used `read_shared_source`. The only remaining
