@@ -59,6 +59,18 @@ New functionality should still satisfy Nift's architectural rules: extend the sm
 
 Useful post-plateau exploration may include AI/developer-experience experiments, additional real application patterns, documentation improvements and packaging ergonomics, but these should be judged by user value rather than used as excuses to reopen a completed hardening campaign.
 
+## Semantic archaeology / implementation-caveat audit
+
+Before any multi-implementation Nift specification is frozen, run a dedicated
+audit that aggressively discovers accidental behaviour, undefined edges,
+platform dependencies, implementation artifacts, inconsistent semantics and
+"probably fine" caveats, and classifies each finding as specified behaviour,
+bug, implementation detail, permitted platform variation, or unresolved. See
+`docs/handover/EMBED.md` for the classification scheme. The Embedded Nift
+programme (`nift-embed`) is the seed for this: every project-sensitive
+directive funnels through a small host seam, which is exactly where contracts
+versus implementation details become visible.
+
 ## Living-roadmap rule
 
 This remains a maintained risk assessment. Field findings, release incidents, new platform support, significant language features or architectural changes may add or reorder work. Production bugs should leave regressions where appropriate; new platforms expand evidence; performance and memory remain monitored; documentation and the website remain synchronized with current truth.

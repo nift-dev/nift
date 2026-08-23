@@ -20,6 +20,9 @@ struct nift::Engine::Impl {
     std::filesystem::path root;
     std::function<std::optional<std::string>(std::string_view)> loader;
 
+    // Long-lived application-wide value bindings (engine.set / set_json).
+    std::unordered_map<std::string, std::shared_ptr<const json::Document>> defaults;
+
     mutable std::mutex source_cache_mutex_;
     mutable std::unordered_map<std::string, std::unique_ptr<const std::string>> source_cache_;
     mutable std::mutex json_cache_mutex_;
@@ -37,7 +40,9 @@ namespace {
 
 class EngineHost : public RenderHost {
 public:
-    explicit EngineHost(nift::Engine::Impl& impl) : impl_(impl) {}
+    EngineHost(nift::Engine::Impl& impl,
+               const std::unordered_map<std::string, std::shared_ptr<const json::Document>>* render_bindings)
+        : impl_(impl), render_bindings_(render_bindings) {}
 
     const std::filesystem::path& root() const override { return impl_.root; }
     std::string relative(const std::filesystem::path& path) const override { return impl_.relative(path); }
@@ -51,6 +56,17 @@ public:
     }
 
     const TrackedInfo* find(const std::string&) const override { return nullptr; }
+
+    // Per-render Context overlays win over Engine defaults.
+    const std::shared_ptr<const json::Document>* binding(const std::string& name) const override {
+        if (render_bindings_) {
+            const auto it = render_bindings_->find(name);
+            if (it != render_bindings_->end()) return &it->second;
+        }
+        const auto it = impl_.defaults.find(name);
+        return it == impl_.defaults.end() ? nullptr : &it->second;
+    }
+
     bool is_contract_name(const std::string&) const override { return false; }
     const std::string* contract_source(const std::string&) const override { return nullptr; }
 
@@ -109,6 +125,7 @@ public:
 
 private:
     nift::Engine::Impl& impl_;
+    const std::unordered_map<std::string, std::shared_ptr<const json::Document>>* render_bindings_;
 };
 
 RenderSource to_render_source(const nift::Source& source, const nift::Engine::Impl& impl) {
@@ -161,16 +178,44 @@ void Engine::set_loader(std::function<std::optional<std::string>(std::string_vie
     impl_->loader = std::move(loader);
 }
 
+bool Engine::set(std::string name, Value value) {
+    if (!nift::detail::valid_binding_identifier(name) || nift::detail::structural_builtin_name(name))
+        return false;
+    impl_->defaults[std::move(name)] = std::make_shared<json::Document>(value.document());
+    return true;
+}
+bool Engine::set(std::string name, std::string value) {
+    return set(std::move(name), Value(std::move(value)));
+}
+bool Engine::set(std::string name, int value) {
+    return set(std::move(name), Value(value));
+}
+bool Engine::set(std::string name, bool value) {
+    return set(std::move(name), Value(value));
+}
+bool Engine::set_json(std::string name, std::string_view json_text) {
+    if (!nift::detail::valid_binding_identifier(name) || nift::detail::structural_builtin_name(name))
+        return false;
+    auto document = std::make_shared<json::Document>();
+    std::string error;
+    if (!json::Document::parse(std::string(json_text), *document, error)) return false;
+    impl_->defaults[std::move(name)] = std::move(document);
+    return true;
+}
+
 RenderResult Engine::render(const Source& page, const Source& page_template, const Context& context) {
     const RenderSource page_render_source = to_render_source(page, *impl_);
     const RenderSource template_render_source = to_render_source(page_template, *impl_);
     TrackedInfo info;
     info.name = context.page_name_;
     info.title = context.title_;
-    EngineHost host(*impl_);
+    std::unordered_map<std::string, std::shared_ptr<const json::Document>> render_bindings;
+    for (const auto& [name, value] : context.bindings_)
+        render_bindings[name] = std::make_shared<json::Document>(value.document());
+    EngineHost host(*impl_, &render_bindings);
     Parser parser(host, info);
     return RenderResultBuilder::build(parser.render_composed(template_render_source, page_render_source,
-                                                                  /*require_exactly_one_content=*/true));
+                                                              /*require_exactly_one_content=*/true));
 }
 
 RenderResult Engine::render(const Source& page, const Source& page_template) {
@@ -182,10 +227,13 @@ RenderResult Engine::render(const Source& partial, const Context& context) {
     TrackedInfo info;
     info.name = context.page_name_;
     info.title = context.title_;
-    EngineHost host(*impl_);
+    std::unordered_map<std::string, std::shared_ptr<const json::Document>> render_bindings;
+    for (const auto& [name, value] : context.bindings_)
+        render_bindings[name] = std::make_shared<json::Document>(value.document());
+    EngineHost host(*impl_, &render_bindings);
     Parser parser(host, info);
     return RenderResultBuilder::build(parser.render_composed(partial_render_source, std::nullopt,
-                                                                  /*require_exactly_one_content=*/false));
+                                                              /*require_exactly_one_content=*/false));
 }
 
 RenderResult Engine::render(const Source& partial) {

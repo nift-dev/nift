@@ -37,6 +37,17 @@ public:
     // the filesystem under the configured root.
     void set_loader(std::function<std::optional<std::string>(std::string_view path)> loader);
 
+    // Long-lived application-wide value bindings, resolved (after any Context
+    // overlay) before @json bindings, contracts and built-in metadata.
+    // Returns false if the name is not a valid binding identifier or is a
+    // structural built-in (name, content-path, output-path, template-path,
+    // loop), or if set_json text is not valid JSON.
+    bool set(std::string name, Value value);
+    bool set(std::string name, std::string value);
+    bool set(std::string name, int value);
+    bool set(std::string name, bool value);
+    bool set_json(std::string name, std::string_view json_text);
+
     // Full page + template composition (template contains @content; exactly one
     // @content is required). The page and template may each be text or path.
     RenderResult render(const Source& page, const Source& page_template);

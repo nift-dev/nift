@@ -33,6 +33,13 @@ public:
 
     virtual const TrackedInfo* find(const std::string& name) const = 0;
 
+    // Host-supplied value binding (Embedded Nift engine defaults/overlays).
+    // Returns a pointer to the shared document, or nullptr when the name is
+    // not supplied by the host. The parser resolves these before @json
+    // bindings and contracts. ProjectInfoHost returns nullptr (the CLI has no
+    // pre-supplied bindings), so CLI resolution is unchanged.
+    virtual const std::shared_ptr<const json::Document>* binding(const std::string& name) const = 0;
+
     // Project-contract namespaces (config.contracts): the parser needs to
     // refuse bindings that collide with a configured contract name, and to
     // resolve a contract name to its configured source path.

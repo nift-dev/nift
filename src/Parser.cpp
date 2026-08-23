@@ -436,43 +436,49 @@ bool Parser::resolve_json_value(const std::string& expression,
 
     std::shared_ptr<const json::Document> current;
     bool contract_binding = false;
-    const auto binding = json_bindings_.find(root_name);
-    if (binding != json_bindings_.end()) {
-        current = binding->second;
+    // Host-supplied bindings (Embedded Nift engine defaults / Context overlays)
+    // resolve before @json bindings, contracts and built-in metadata.
+    if (const auto* supplied = host_.binding(root_name)) {
+        current = *supplied;
     } else {
-        const std::string* contract_source = host_.contract_source(root_name);
-        if (!contract_source) return false;
-        contract_binding = true;
-
-        const std::string& contract_path_argument = *contract_source;
-        const fs::path contract_path = (host_.root() / contract_path_argument).lexically_normal();
-        if (!filesystem::path_within(host_.root(), contract_path)) {
-            error = "contract '" + root_name + "': path must stay inside the Nift project: " +
-                    contract_path_argument;
-            return true;
-        }
-        if (!filesystem::path_exists(contract_path)) {
-            error = "contract '" + root_name + "': file does not exist: " + contract_path_argument;
-            return true;
-        }
-
-        const auto cached = contract_bindings_.find(root_name);
-        if (cached != contract_bindings_.end()) {
-            current = cached->second;
+        const auto binding = json_bindings_.find(root_name);
+        if (binding != json_bindings_.end()) {
+            current = binding->second;
         } else {
-            std::string contract_error;
-            auto document = host_.read_shared_json(contract_path, contract_error);
-            if (!document) {
-                error = "contract '" + root_name + "': failed to parse " + contract_path_argument +
-                        (contract_error.empty() ? "" : " (" + contract_error + ")");
+            const std::string* contract_source = host_.contract_source(root_name);
+            if (!contract_source) return false;
+            contract_binding = true;
+
+            const std::string& contract_path_argument = *contract_source;
+            const fs::path contract_path = (host_.root() / contract_path_argument).lexically_normal();
+            if (!filesystem::path_within(host_.root(), contract_path)) {
+                error = "contract '" + root_name + "': path must stay inside the Nift project: " +
+                        contract_path_argument;
                 return true;
             }
-            contract_bindings_.emplace(root_name, document);
-            current = std::move(document);
-        }
+            if (!filesystem::path_exists(contract_path)) {
+                error = "contract '" + root_name + "': file does not exist: " + contract_path_argument;
+                return true;
+            }
 
-        result_.dependencies.insert(host_.relative(host_.root() / ".nift/config.json"));
-        result_.dependencies.insert(host_.relative(contract_path));
+            const auto cached = contract_bindings_.find(root_name);
+            if (cached != contract_bindings_.end()) {
+                current = cached->second;
+            } else {
+                std::string contract_error;
+                auto document = host_.read_shared_json(contract_path, contract_error);
+                if (!document) {
+                    error = "contract '" + root_name + "': failed to parse " + contract_path_argument +
+                            (contract_error.empty() ? "" : " (" + contract_error + ")");
+                    return true;
+                }
+                contract_bindings_.emplace(root_name, document);
+                current = std::move(document);
+            }
+
+            result_.dependencies.insert(host_.relative(host_.root() / ".nift/config.json"));
+            result_.dependencies.insert(host_.relative(contract_path));
+        }
     }
 
     while (position < expression.size()) {
@@ -2441,7 +2447,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     fail(source_path, source, i, "json: name '" + binding_name + "' conflicts with configured contract namespace");
                     break;
                 }
-                if (json_bindings_.count(binding_name)) {
+                if (host_.binding(binding_name) || json_bindings_.count(binding_name)) {
                     fail(source_path, source, i, "json: name '" + binding_name + "' is already bound");
                     break;
                 }

@@ -89,6 +89,13 @@ $(ENGINE_TEST): tests/engine_smoke.cpp $(ENGINE_CORE_OBJECTS)
 test-engine: $(ENGINE_TEST)
 	$(ENGINE_TEST)
 
+ENGINE_BINDINGS_TEST := $(TEST_DIR)/engine-bindings$(EXEEXT)
+$(ENGINE_BINDINGS_TEST): tests/engine_bindings.cpp $(ENGINE_CORE_OBJECTS)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/engine_bindings.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
+
+test-engine-bindings: $(ENGINE_BINDINGS_TEST)
+	$(ENGINE_BINDINGS_TEST)
+
 
 test-comments: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/comments_smoke.sh
@@ -240,7 +247,7 @@ clean:
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
-.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-diagnostics test-minify test-json-schema-integration test-engine test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
+.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-diagnostics test-minify test-json-schema-integration test-engine test-engine-bindings test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
 
 
 test-cross-feature: $(TARGET)

@@ -6,6 +6,27 @@
 
 namespace nift {
 
+class Value;
+
+// Mutable reference to a member/element inside a Value's document tree,
+// enabling idiomatic structured construction such as:
+//   Value user = Value::make_object();
+//   user["name"] = Value("Nick");
+//   user["projects"][0] = Value("nift");
+class ValueRef {
+public:
+    explicit ValueRef(json::Document* node) : node_(node) {}
+
+    ValueRef& operator=(const Value& value);
+    ValueRef& operator=(const ValueRef& other);
+
+    ValueRef operator[](const std::string& key) { return ValueRef(&(*node_)[key]); }
+    ValueRef operator[](std::size_t index) { return ValueRef(&(*node_)[index]); }
+
+private:
+    json::Document* node_;
+};
+
 // Nift's public value model. Backed internally by Jsonic++'s json::Document,
 // but nift::Value is Nift's contract rather than a Jsonic++ alias, so future
 // Nift implementations (Rust/Go/JS) define their own equivalent value type.
@@ -37,14 +58,26 @@ public:
 
     void push_back(const Value& value);
 
-    // Internal escape hatch for the Embedded Nift engine (CP3 value bindings
-    // build on this). Not part of the public construction surface yet.
+    ValueRef operator[](const std::string& key) { return ValueRef(&value_[key]); }
+    ValueRef operator[](std::size_t index) { return ValueRef(&value_[index]); }
+
+    // Internal escape hatch for the Embedded Nift engine (bindings build on
+    // this). Not part of the public construction surface beyond set().
     json::Document& document();
     const json::Document& document() const;
 
 private:
     json::Document value_;
 };
+
+inline ValueRef& ValueRef::operator=(const Value& value) {
+    *node_ = value.document();
+    return *this;
+}
+inline ValueRef& ValueRef::operator=(const ValueRef& other) {
+    *node_ = *other.node_;
+    return *this;
+}
 
 inline Value::Value(bool value) { value_.type = json::Type::Boolean; value_.boolean = value; }
 inline Value::Value(int value) { value_.type = json::Type::Number; value_.num = value; }

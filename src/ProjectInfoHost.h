@@ -21,6 +21,8 @@ public:
 
     const TrackedInfo* find(const std::string& name) const override { return project_.find(name); }
 
+    const std::shared_ptr<const json::Document>* binding(const std::string&) const override { return nullptr; }
+
     bool is_contract_name(const std::string& name) const override {
         return project_.config.contracts.count(name) != 0;
     }
