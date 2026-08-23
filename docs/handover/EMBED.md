@@ -111,6 +111,75 @@ and `.nift/config.json`, supplies `content_path`/`output_path`/
 `tracked_output_path`/loaders/contracts), and `render("about")` is then
 orchestration over the same `render_composed` used by `render(page, template)`.
 
+## Project-aware Engine programme (approved with amendments, PA1 done)
+
+The architecture was approved in principle with six amendments folded in below.
+Do **not** let the project-aware Engine depend on mutable `ProjectInfo`; it
+consumes a read-only snapshot and never becomes the build system.
+
+```text
+.nift/config.json ─┐
+                   ├──► ProjectState (read-only: config + tracked pages + path geometry + read caches)
+.nift/tracked.json ┘                          │
+                                              ▼
+                                         ProjectHost : RenderHost
+                                              │
+                     Engine(path) ────► render("page-name"[, context])  ──► existing shared core
+```
+
+### Programme (PA1–PA6)
+
+- **PA1 read-only ProjectState** — DONE. `src/ProjectState.{h,cpp}` mirrors
+  ProjectInfo's read semantics exactly (config + tracked validation, name
+  registry, path geometry, shared read caches) but owns no build/write/watch/
+  hash machinery and returns errors instead of printing. Never writes. Parity
+  evidence: `tests/project_state_parity.cpp` (valid parity vs ProjectInfo,
+  ~28 invalid accept/reject parity cases, zero-write guarantee on success and
+  failure, concurrent shared reads).
+- **PA2 ProjectHost** — a read-only `RenderHost` over ProjectState so the
+  existing Parser renders project pages unchanged (`@pathto` to tracked names,
+  `@input`/`@json`/contracts, no build decisions).
+- **PA3 public project-aware API** — explicit construction only:
+  `Engine(std::filesystem::path)` for project mode; default `Engine()` stays
+  deterministic standalone (no CWD/upward discovery unless explicitly
+  requested). `render("page-name"[, context])` over `render_composed` with
+  current-output set so `@pathto`/404 match the CLI. **Dependency and
+  requirement reporting is a requirement** (exact API is a PA3 decision):
+  `result.output()/dependencies()/requirements()`.
+- **PA4 staleness/reload/concurrency** — PA1 establishes immutable snapshot
+  semantics only (construct → load snapshot → concurrent renders forever; no
+  watching, no writes, no implicit reload). PA4 investigates reload separately;
+  atomic snapshot replacement (in-flight renders finish on snapshot A, later
+  renders see snapshot B) must be explored rather than assuming CP7a's
+  "mutation cannot overlap rendering" becomes the permanent contract.
+- **PA5 CLI ↔ Engine parity → portable conformance corpus** — not a handful of
+  examples. The seed of the cross-implementation corpus `nift-rs` will inherit
+  (CLI ↕ C++ project Engine ↕ nift-rs): tracked-name lookup, index/trailing-
+  slash geometry, content/template composition, metadata, Context overlays,
+  `@input`, `@json`, schema, contracts, `@getenv`, tracked + concrete `@pathto`,
+  404 geometry, dependencies, requirements, pagination, missing sources,
+  malformed config/tracking, unknown page, path containment/security.
+  Pagination API design stays open through PA1/PA2 but **must be resolved before
+  PA5 sign-off** — no magic context keys controlling Engine behaviour; derive a
+  typed/runtime API from existing CLI pagination semantics only if explicit page
+  selection is required.
+- **PA6 archaeology/docs/sign-off** — document the contract, record the
+  staleness/reload decision, resolve/forward the now-concrete archaeology items
+  (empty-root containment, repeated `tracked_output_path` lookup,
+  host-vs-contract precedence).
+
+### Decided semantics (proposed, to be confirmed at PA3/PA4 review)
+
+- Snapshot semantics: project state read once at construction; serves a stable
+  snapshot for all concurrent renders; never watches, never writes.
+- Page-name lookup: exact tracked name; `/` and trailing `/` map to index (same
+  geometry as the CLI). Unknown name → dedicated error (distinct from `@pathto`
+  404 rule).
+- Current output: the page's own `output_path`, so `@pathto`/404 behave like the
+  CLI.
+- Failure mode: controlled render/state errors for missing/malformed/stale
+  project state; never crashes.
+
 ## Architecture (agreed)
 
 - One long-lived `nift::Engine` per process (root, loaders, defaults, caches;
