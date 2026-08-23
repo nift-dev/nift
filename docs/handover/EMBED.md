@@ -178,7 +178,7 @@ orchestration over the same `render_composed` used by `render(page, template)`.
   as an explicit requirement: a project-backed Engine host consumes
   `.nift/tracked.json`/`config.json` and `render("page-name"[, context])` is
   orchestration over the same core.
-- **CP7a** (`...`): concurrency/thread-safety contract. Concurrent `render()`
+- **CP7a** (`1f3a15e`): concurrency/thread-safety contract. Concurrent `render()`
   calls on one Engine are supported and safe (provided no concurrent
   mutation); Engine mutators (set/set_json/set_loader/set_environment_provider/
   set_root) are not thread-safe with active renders (configure before serving —
