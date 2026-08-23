@@ -200,10 +200,12 @@ consumes a read-only snapshot and never becomes the build system.
   the page-name argument is authoritative (Context page_name ignored) and the
   project defines the current output (Context current_output ignored). Context
   title overrides the tracked title; the environment provider flows through
-  ProjectHost. Dependency/requirement reporting is live on the public result
-  (`result.dependencies()`/`result.requirements()`), e.g. `@pathto` emits its
-  destination as a requirement. Pagination API stays open (PA5): `render("blog/")`
-  returns the primary page. No reload/watch in PA3 (that is PA4).
+   ProjectHost. Dependency/requirement reporting is live on the public result
+   (`result.dependencies()`/`result.requirements()`), e.g. `@pathto` emits its
+   destination as a requirement. Pagination contract (decided at PA5, not open):
+   `render("blog/")` returns the primary pagination output only; explicit
+   arbitrary page selection is outside the current project-aware v1 API. No
+   reload/watch in PA3 (that is PA4).
 - **PA4 atomic reload lifecycle** — DONE. `Engine::reload(std::string* error)`
   implements atomic immutable snapshot replacement. The Engine holds
   `shared_ptr<const ProjectState>` per generation; a render captures its
@@ -278,11 +280,11 @@ consumes a read-only snapshot and never becomes the build system.
   **Pagination contract — DECIDED (not open):** the project-aware Engine v1
   renders a tracked page's primary pagination output; `render("blog/")` equals
   the CLI's primary output `public/blog/index.html` (a parity case). Explicit
-  arbitrary pagination-page selection is NOT part of the current contract and
-  is deferred to future API design; no magic Context keys, no hastily invented
-  `render(page, number)`.
-  Verified: `make test-conformance` 7/7 (3 parity with goldens + 4 reject with
-  semantic classes).
+   arbitrary pagination-page selection is NOT part of the current contract and
+   is deferred to future API design; no magic Context keys, no hastily invented
+   `render(page, number)`.
+   Verified: `make test-conformance` 9/9 (3 parity with canonical goldens +
+   6 reject semantic classes).
 - **PA6 archaeology/docs/sign-off** — DONE (findings classified above under
   "PA6 archaeology findings"). Stale "not implemented"/"provisional" handover
   text reconciled with the implemented PA1–PA5 behaviour; host-vs-contract
@@ -292,7 +294,7 @@ consumes a read-only snapshot and never becomes the build system.
   battery green: conformance 9/9, all project-aware/Engine tests, both TSan
   targets, and the CLI smoke/incremental/equivalence suites.
 
-### Decided semantics (proposed, to be confirmed at PA3/PA4 review)
+### Decided semantics (confirmed/final for the C++ behavioural reference)
 
 - Snapshot semantics: project state read once at construction; serves a stable
   snapshot for all concurrent renders; never watches, never writes.
@@ -385,10 +387,10 @@ consumes a read-only snapshot and never becomes the build system.
   (`make test-engine-pathto`).
 - **CP6** (`87f1050`): the CLI render entry is fully host-driven; the parser's
   only remaining direct filesystem calls are `path_within` containment and the
-  pagination path (CP7b). Project-aware rendering is recorded (not implemented)
-  as an explicit requirement: a project-backed Engine host consumes
-  `.nift/tracked.json`/`config.json` and `render("page-name"[, context])` is
-  orchestration over the same core.
+  pagination path (CP7b). Project-aware rendering was recorded here as an
+  explicit requirement and is now implemented by the PA1–PA5 programme below: a
+  project-backed Engine host consumes `.nift/tracked.json`/`config.json` and
+  `render("page-name"[, context])` is orchestration over the same core.
 - **CP7a** (`1f3a15e`): concurrency/thread-safety contract. Concurrent `render()`
   calls on one Engine are supported and safe (provided no concurrent
   mutation); Engine mutators (set/set_json/set_loader/set_environment_provider/
@@ -488,12 +490,20 @@ and accumulated evidence, classified rather than silently changed.
   Engine affects only where a subsequent `reload()` looks; project rendering
   uses the snapshot root, which is authoritative. Not exposed in the conformance
   corpus; recorded so it is not mistaken for a serving path.
-- **Permitted platform variation**: conformance goldens are generated on the
-  reference platform and are path-separator-agnostic by construction
-  (`generic_string`, relative project paths). A non-`/` separator or a host
-  locale difference that appears only on another OS is a permitted platform
-  variation, not a corpus defect; regenerate goldens only after a reviewed,
-  intentional semantic change.
+- **Permitted platform variation (tightened)**: canonical conformance outputs
+  are intended to be **platform-neutral**. The corpus normalizes project paths
+  through `generic_string()`/relative project geometry precisely so observable
+  results should not differ between platforms. A platform-specific mismatch
+  (e.g. a future Windows result `public\blog\index.html` where the canonical
+  golden says `public/blog/index.html`, or any unspecified locale-dependent
+  output) is a **conformance finding to investigate first**, not an
+  automatically permitted variation: it should go red and be triaged (bug /
+  deliberately permitted variation / specification change). A variation is
+  classified "permitted platform variation" only where the specification
+  explicitly allows it or a concrete reviewed platform dependency has been
+  identified and recorded. Goldens are regenerated only after a reviewed,
+  intentional semantic change - never merely because an implementation
+  disagrees.
 - **Unresolved (retained, not silently fixed)**: the items below and
   ASAN-FLAKE-001.
 
