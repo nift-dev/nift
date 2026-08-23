@@ -22,7 +22,7 @@ class RenderHost {
 public:
     virtual ~RenderHost() = default;
 
-    virtual std::filesystem::path root() const = 0;
+    virtual const std::filesystem::path& root() const = 0;
     virtual std::string relative(const std::filesystem::path& path) const = 0;
     virtual const std::string& output_dir() const = 0;
     virtual int build_threads() const = 0;

@@ -8,7 +8,7 @@ class ProjectInfoHost : public RenderHost {
 public:
     explicit ProjectInfoHost(ProjectInfo& project) : project_(project) {}
 
-    std::filesystem::path root() const override { return project_.root; }
+    const std::filesystem::path& root() const override { return project_.root; }
     std::string relative(const std::filesystem::path& path) const override { return project_.relative(path); }
     const std::string& output_dir() const override { return project_.config.output_dir; }
     int build_threads() const override { return project_.config.build_threads; }

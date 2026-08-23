@@ -2,6 +2,7 @@
 #include "Types.h"
 #include "RenderHost.h"
 #include <filesystem>
+#include <optional>
 #include <vector>
 #include <string>
 #include <memory>
@@ -9,13 +10,33 @@
 
 namespace json { class Document; }
 
+// Internal source of a template or page within a render. Either filesystem
+// backed (path is non-empty; content is read through the host) or in-memory
+// (path empty; text holds the content and logical_name provides an identity
+// for diagnostics and, later, relative @input resolution).
+struct RenderSource {
+    std::filesystem::path path;   // non-empty => filesystem-backed source
+    std::string text;             // in-memory content when path is empty
+    std::string logical_name;     // logical identity/base for text sources
+    std::string dependency;       // dependency spelling recorded for path sources
+};
+
 class Parser {
 public:
     Parser(RenderHost& host, TrackedInfo& tracked_info);
     RenderResult render();
 
+    // Shared template+page composition: parse template_source, let @content
+    // pull page_source, and (when require_exactly_one_content) enforce the
+    // exactly-one-@content rule. The CLI's render() and the embedded Engine
+    // both go through this path.
+    RenderResult render_composed(const RenderSource& template_source,
+                                 const std::optional<RenderSource>& page_source,
+                                 bool require_exactly_one_content);
+
 private:
     RenderHost& host_;
+    std::optional<RenderSource> page_source_;
     TrackedInfo& tracked_info_;
     std::vector<std::filesystem::path> input_stack_;
     RenderResult result_;

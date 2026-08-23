@@ -2141,26 +2141,44 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
 
             if (function == "content") {
                 if (has_parameters && !parameters.empty()) { fail(source_path, source, i, "content: expected 0 parameters"); break; }
+                if (!page_source_.has_value()) {
+                    fail(source_path, source, i, "@content requires a page source; render with a page and template, or use @input for a partial");
+                    break;
+                }
                 if (++result_.content_count > 1) {
                     fail(source_path, source, i, "@content may be executed exactly once for a templated tracked item");
                     break;
                 }
 
-                const fs::path content_path = fs::absolute(host_.content_path(tracked_info_)).lexically_normal();
-                if (std::find(input_stack_.begin(), input_stack_.end(), content_path) != input_stack_.end()) {
-                    fail(source_path, source, i, "@content would result in an input loop through " + content_path.generic_string());
-                    break;
+                std::string content_source;
+                fs::path content_identity;
+                if (!page_source_->path.empty()) {
+                    const fs::path content_path = fs::absolute(page_source_->path).lexically_normal();
+                    if (std::find(input_stack_.begin(), input_stack_.end(), content_path) != input_stack_.end()) {
+                        fail(source_path, source, i, "@content would result in an input loop through " + content_path.generic_string());
+                        break;
+                    }
+                    if (!filesystem::file_readable(content_path)) {
+                        fail(source_path, source, i, "content file is not readable");
+                        break;
+                    }
+                    content_identity = content_path;
+                    const auto cached = host_.read_shared_source(content_path);
+                    if (!cached) { fail(source_path, source, i, "content file is not readable"); break; }
+                    content_source = *cached;
+                    result_.dependencies.insert(page_source_->dependency.empty() ? host_.relative(content_path) : page_source_->dependency);
+                } else {
+                    content_identity = fs::path(page_source_->logical_name);
+                    if (!content_identity.empty() &&
+                        std::find(input_stack_.begin(), input_stack_.end(), content_identity) != input_stack_.end()) {
+                        fail(source_path, source, i, "@content would result in an input loop through " + content_identity.generic_string());
+                        break;
+                    }
+                    content_source = page_source_->text;
                 }
-
-                if (!filesystem::file_readable(content_path)) {
-                    fail(source_path, source, i, "content file is not readable");
-                    break;
-                }
-                input_stack_.push_back(content_path);
-                result_.dependencies.insert(host_.relative(content_path));
+                input_stack_.push_back(content_identity);
                 const int insertion_code_block_depth = code_block_depth_;
-                const std::string content_source = filesystem::read_file(content_path);
-                const auto nested = parse(content_source, content_path, depth + 1);
+                const auto nested = parse(content_source, content_identity, depth + 1);
                 input_stack_.pop_back();
 
                 if (!nested.ok) break;
@@ -2298,8 +2316,20 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 parameters[0] = std::move(resolved);
                 fs::path input_path = parameters[0];
                 if (input_path.is_relative()) {
+                    // Only resolve against the current source's directory when
+                    // that source actually has one (filesystem sources always
+                    // do; in-memory sources only if the caller supplied a
+                    // logical name with a directory). A bare in-memory source
+                    // must never fall back to the process working directory.
                     const fs::path relative_to_source = source_path.parent_path() / input_path;
-                    input_path = filesystem::path_exists(relative_to_source) ? relative_to_source : host_.root() / input_path;
+                    if (!source_path.parent_path().empty() && filesystem::path_exists(relative_to_source)) {
+                        input_path = relative_to_source;
+                    } else if (host_.root().empty()) {
+                        fail(source_path, source, i, "@input cannot resolve relative path '" + parameters[0] + "' without a project root");
+                        break;
+                    } else {
+                        input_path = host_.root() / input_path;
+                    }
                 }
                 if (!filesystem::path_exists(input_path)) { fail(source_path, source, i, "@input path does not exist: " + parameters[0]); break; }
                 input_path = fs::absolute(input_path).lexically_normal();
@@ -2520,6 +2550,38 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
     return result_;
 }
 
+RenderResult Parser::render_composed(const RenderSource& template_source,
+                                     const std::optional<RenderSource>& page_source,
+                                     bool require_exactly_one_content) {
+    std::string template_content;
+    fs::path template_identity;
+    if (!template_source.path.empty()) {
+        template_identity = fs::absolute(template_source.path).lexically_normal();
+        const auto cached = host_.read_shared_source(template_identity);
+        if (!cached) {
+            result_.ok = false;
+            result_.error = {tracked_info_.name, template_identity, 0, "template file is not readable"};
+            return result_;
+        }
+        template_content = *cached;
+    } else {
+        template_identity = fs::path(template_source.logical_name);
+        template_content = template_source.text;
+    }
+
+    page_source_ = page_source;
+    input_stack_.push_back(template_identity);
+    if (!template_source.dependency.empty()) result_.dependencies.insert(template_source.dependency);
+    auto result = parse(template_content, template_identity, 0);
+    input_stack_.pop_back();
+
+    if (result.ok && require_exactly_one_content && result.content_count != 1) {
+        result.ok = false;
+        result.error = {tracked_info_.name, template_identity, 0, "templated tracked items must execute exactly one @content; add @content through the template/input graph or omit the tracked template field"};
+    }
+    return result;
+}
+
 RenderResult Parser::render() {
     const fs::path content_path = host_.content_path(tracked_info_);
     if (tracked_info_.template_path.empty()) {
@@ -2546,15 +2608,16 @@ RenderResult Parser::render() {
         result_.error = {tracked_info_.name, template_path, 0, "template file is not readable"};
         return result_;
     }
-    input_stack_.push_back(fs::absolute(template_path).lexically_normal());
-    result_.dependencies.insert(tracked_info_.template_path);
-    const auto template_source = host_.read_shared_source(template_path);
+
+    RenderSource template_source;
+    template_source.path = template_path;
+    template_source.dependency = tracked_info_.template_path;
+    RenderSource page_render_source;
+    page_render_source.path = content_path;
+    page_render_source.dependency = host_.relative(content_path);
+
     pagination_collecting_ = tracked_info_.paginate.has_value();
-    auto result = parse(*template_source, template_path, 0);
-    if (result.ok && result.content_count != 1) {
-        result.ok = false;
-        result.error = {tracked_info_.name, template_path, 0, "templated tracked items must execute exactly one @content; add @content through the template/input graph or omit the tracked template field"};
-    }
+    auto result = render_composed(template_source, page_render_source, /*require_exactly_one_content=*/true);
     if (!result.ok || !tracked_info_.paginate.has_value()) return result;
     if (result.paginate_count != 1) {
         result.ok = false;
@@ -2620,6 +2683,7 @@ RenderResult Parser::render() {
             Parser page_parser(host_, tracked_info_);
             page_parser.json_bindings_ = json_bindings_;
             page_parser.contract_bindings_ = contract_bindings_;
+            page_parser.page_source_ = page_source_;
             page_parser.pagination_collecting_ = false;
             page_parser.pagination_context_active_ = true;
             page_parser.pagination_current_ = page;
