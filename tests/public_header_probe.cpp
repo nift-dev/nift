@@ -119,5 +119,28 @@ int main() {
         return 1;
     }
 
+    // Project-aware API surface (PA3): explicit construction from a path that
+    // is not a Nift project must be a controlled, non-throwing failure that the
+    // caller can observe via is_open()/open_error(), and render-by-name must
+    // surface that failure as a render error.
+    nift::Engine project_engine(std::filesystem::current_path() / ".build" / "public-header-non-project");
+    if (project_engine.is_open()) {
+        std::fprintf(stderr, "public-header probe: non-project root reported open\n");
+        return 1;
+    }
+    nift::RenderResult closed_result = project_engine.render("about");
+    if (closed_result.ok() || closed_result.error().message.empty()) {
+        std::fprintf(stderr, "public-header probe: closed project render was not a controlled error\n");
+        return 1;
+    }
+    nift::Context project_context;
+    project_context.set("app", std::string("X"));
+    nift::RenderResult closed_ctx_result = project_engine.render("about", project_context);
+    if (closed_ctx_result.ok()) {
+        std::fprintf(stderr, "public-header probe: closed project render with context was not an error\n");
+        return 1;
+    }
+    (void)project_engine.open_error();
+
     return 0;
 }

@@ -42,6 +42,33 @@ public:
     Engine(const Engine&) = delete;
     Engine& operator=(const Engine&) = delete;
 
+    // Project-aware construction (PA3): associates the Engine with a Nift
+    // project at `project_root`, loading and validating .nift/config.json and
+    // .nift/tracked.json into an immutable snapshot. Non-throwing: check
+    // is_open()/open_error(). The snapshot is never mutated and never reloaded
+    // implicitly; every render observes it for the Engine's lifetime. Project
+    // discovery is explicit only - default Engine() stays deterministic
+    // standalone and never walks the filesystem.
+    explicit Engine(std::filesystem::path project_root);
+
+    // Project-aware state.
+    // is_open(): the project snapshot was loaded and validated.
+    // open_error(): the construction failure message, empty when is_open().
+    bool is_open() const;
+    const std::string& open_error() const;
+
+    // Project-aware rendering by tracked page name, e.g. render("about").
+    // The page's content/template/output geometry comes from the project
+    // snapshot; @pathto, @input, @json, contracts, dependencies, requirements
+    // and pagination behave exactly like the CLI. The page-name argument is
+    // authoritative (Context::set_page_name is ignored) and the project defines
+    // the current output (Context::set_current_output is ignored). Context
+    // value overlays and title override Engine defaults and the tracked title.
+    // A failed project open or an unknown page name is a controlled error in
+    // the returned RenderResult, never a throw or process termination.
+    RenderResult render(std::string_view page_name);
+    RenderResult render(std::string_view page_name, const Context& context);
+
     // Base directory used to resolve relative path sources and relative @input
     // paths. Without a root, a relative @input path is an error rather than
     // being resolved silently against the process working directory.

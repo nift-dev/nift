@@ -3,6 +3,8 @@
 #include "FileSystem.h"
 #include "Json.h"
 #include "Parser.h"
+#include "ProjectHost.h"
+#include "ProjectState.h"
 #include "RenderHost.h"
 #include "ValueInternal.h"
 
@@ -31,6 +33,12 @@ struct nift::Engine::Impl {
     mutable std::unordered_map<std::string, std::unique_ptr<const std::string>> source_cache_;
     mutable std::mutex json_cache_mutex_;
     mutable std::unordered_map<std::string, std::shared_ptr<const json::Document>> json_cache_;
+
+    // Project-aware mode (PA3): the validated immutable snapshot, or the open
+    // failure when construction could not load a project.
+    std::unique_ptr<ProjectState> project_state;
+    bool project_open_ok = false;
+    std::string project_open_error;
 
     std::string relative(const std::filesystem::path& path) const {
         const std::filesystem::path normalized = path.lexically_normal();
@@ -197,6 +205,53 @@ Engine::Engine() : impl_(std::make_shared<Impl>()) {}
 Engine::~Engine() = default;
 Engine::Engine(Engine&&) noexcept = default;
 Engine& Engine::operator=(Engine&&) noexcept = default;
+
+Engine::Engine(std::filesystem::path project_root) : impl_(std::make_shared<Impl>()) {
+    impl_->root = std::move(project_root);
+    impl_->project_state = std::make_unique<ProjectState>();
+    std::string error;
+    if (impl_->project_state->open(impl_->root, error)) {
+        impl_->project_open_ok = true;
+    } else {
+        impl_->project_open_error = std::move(error);
+    }
+}
+
+bool Engine::is_open() const { return impl_->project_open_ok; }
+const std::string& Engine::open_error() const { return impl_->project_open_error; }
+
+RenderResult Engine::render(std::string_view page_name, const Context& context) {
+    RenderResult result;
+    if (!impl_->project_open_ok) {
+        result.ok_ = false;
+        result.error_.message = impl_->project_open_error.empty() ? std::string("not a Nift project") : impl_->project_open_error;
+        return result;
+    }
+
+    const TrackedInfo* page = impl_->project_state->find(std::string(page_name));
+    if (page == nullptr) {
+        result.ok_ = false;
+        result.error_.message = "unknown page name '" + std::string(page_name) + "'";
+        return result;
+    }
+
+    TrackedInfo info = *page;
+    if (!context.title_.empty()) info.title = context.title_;
+
+    // Context overlays win over Engine defaults; both are host bindings the
+    // parser resolves before @json/contracts, exactly like the standalone seam.
+    std::unordered_map<std::string, std::shared_ptr<const json::Document>> render_bindings = impl_->defaults;
+    for (const auto& [name, value] : context.bindings_)
+        render_bindings[name] = std::make_shared<json::Document>(ValueAccess::doc(value));
+
+    ProjectHost host(*impl_->project_state, &render_bindings, impl_->environment_provider);
+    Parser parser(host, info);
+    return RenderResultBuilder::build(parser.render());
+}
+
+RenderResult Engine::render(std::string_view page_name) {
+    return render(page_name, Context{});
+}
 
 void Engine::set_root(std::filesystem::path root) { impl_->root = std::move(root); }
 void Engine::set_loader(std::function<std::optional<std::string>(std::string_view path)> loader) {

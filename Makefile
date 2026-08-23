@@ -146,6 +146,17 @@ $(PROJECT_HOST_TEST): tests/project_host.cpp $(ENGINE_CORE_OBJECTS)
 test-project-host: $(PROJECT_HOST_TEST)
 	$(PROJECT_HOST_TEST)
 
+# PA3: the public project-aware Engine API - explicit Engine(root) construction,
+# render("page-name"[, context]), controlled failure behaviour, defaults/Context
+# overlay/environment precedence, dependency/requirement reporting, zero writes.
+ENGINE_PROJECT_TEST := $(TEST_DIR)/engine-project$(EXEEXT)
+$(ENGINE_PROJECT_TEST): tests/engine_project.cpp $(ENGINE_CORE_OBJECTS)
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/engine_project.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
+
+test-engine-project: $(ENGINE_PROJECT_TEST)
+	$(ENGINE_PROJECT_TEST)
+
 ENGINE_CONCURRENCY_TEST := $(TEST_DIR)/engine-concurrency$(EXEEXT)
 $(ENGINE_CONCURRENCY_TEST): tests/engine_concurrency.cpp $(ENGINE_CORE_OBJECTS)
 	mkdir -p $(TEST_DIR)
@@ -317,7 +328,7 @@ clean:
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
-.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-diagnostics test-minify test-json-schema-integration test-engine test-engine-bindings test-engine-loaders test-engine-pathto test-engine-concurrency test-project-state test-project-host test-public-header test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
+.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-diagnostics test-minify test-json-schema-integration test-engine test-engine-bindings test-engine-loaders test-engine-pathto test-engine-concurrency test-engine-project test-project-state test-project-host test-public-header test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
 
 
 test-cross-feature: $(TARGET)

@@ -186,13 +186,24 @@ consumes a read-only snapshot and never becomes the build system.
   loader probe-then-read, provisional host-vs-contract precedence) were
   exercised but deliberately not "fixed" — they remain recorded and
   unresolved. No public project-aware Engine API yet (that is PA3).
-- **PA3 public project-aware API** — explicit construction only:
-  `Engine(std::filesystem::path)` for project mode; default `Engine()` stays
-  deterministic standalone (no CWD/upward discovery unless explicitly
-  requested). `render("page-name"[, context])` over `render_composed` with
-  current-output set so `@pathto`/404 match the CLI. **Dependency and
-  requirement reporting is a requirement** (exact API is a PA3 decision):
-  `result.output()/dependencies()/requirements()`.
+- **PA3 public project-aware API** — DONE. `Engine(std::filesystem::path)`
+  loads and validates the immutable snapshot eagerly, non-throwing, with
+  `is_open()`/`open_error()` for construction status; default `Engine()` stays
+  deterministic standalone (no implicit discovery). `render("page-name"[, context])`
+  drives the same `Parser(host, info).render()` path the CLI uses, so
+  `@pathto`/404, `@input`, `@json`, contracts, pagination, dependencies and
+  requirements match the CLI exactly. Controlled failures (never throws, never
+  prints): non-project root, invalid config/tracking, unknown page name, and
+  render failures all surface as RenderResult errors (`open_error()` is
+  propagated for construction failures). Precedence preserved from the
+  standalone seam: Context overlays > Engine defaults > `@json` > contracts;
+  the page-name argument is authoritative (Context page_name ignored) and the
+  project defines the current output (Context current_output ignored). Context
+  title overrides the tracked title; the environment provider flows through
+  ProjectHost. Dependency/requirement reporting is live on the public result
+  (`result.dependencies()`/`result.requirements()`), e.g. `@pathto` emits its
+  destination as a requirement. Pagination API stays open (PA5): `render("blog/")`
+  returns the primary page. No reload/watch in PA3 (that is PA4).
 - **PA4 staleness/reload/concurrency** — PA1 establishes immutable snapshot
   semantics only (construct → load snapshot → concurrent renders forever; no
   watching, no writes, no implicit reload). PA4 investigates reload separately;
