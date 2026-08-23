@@ -1310,15 +1310,20 @@ bool Parser::evaluate_condition(const std::string& expression, bool& value, std:
 }
 
 std::string Parser::path_to(const std::string& argument) {
+    if (!host_.has_output_context()) {
+        result_.ok = false;
+        result_.error = {tracked_info_.name, {}, 0, "@pathto requires a path context; set the current output on the render context to resolve '" + argument + "'"};
+        return {};
+    }
     const fs::path output = host_.output_path(tracked_info_);
     const bool absolute_404 = (tracked_info_.name == "404");
     const fs::path base = output.parent_path();
     fs::path destination;
     bool index_page = false;
 
-    if (const TrackedInfo* target = host_.find(argument)) {
-        destination = host_.output_path(*target);
-        index_page = target->name == "/" || (!target->name.empty() && target->name.back() == '/');
+    if (const auto target = host_.tracked_output_path(argument)) {
+        destination = target->path;
+        index_page = target->index_page;
     } else {
         destination = (host_.root() / argument).lexically_normal();
         if (!filesystem::path_within(host_.root(), destination)) {
@@ -1326,7 +1331,7 @@ std::string Parser::path_to(const std::string& argument) {
             result_.error = {tracked_info_.name, {}, 0, "pathto: path must stay inside the Nift project: " + argument};
             return {};
         }
-        if (!filesystem::path_exists(destination)) {
+        if (!host_.source_exists(destination)) {
             result_.ok = false;
             result_.error = {tracked_info_.name, {}, 0, "'" + argument + "' is neither a tracked name nor a file that exists"};
             return {};
@@ -2365,7 +2370,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 }
                 parameters[0] = std::move(resolved);
 
-                if (!host_.find(parameters[0])) {
+                if (!host_.tracked_output_path(parameters[0])) {
                     const fs::path target_path = (host_.root() / parameters[0]).lexically_normal();
                     if (!filesystem::path_within(host_.root(), target_path)) {
                         fail(source_path, source, i, "@" + function + " path must stay inside the Nift project: " + parameters[0]);
@@ -2376,7 +2381,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 output += path_to(parameters[0]);
                 if (!result_.ok) { if (result_.error.source_file.empty()) fail(source_path, source, i, result_.error.message); break; }
                 fs::path requirement;
-                if (const TrackedInfo* target = host_.find(parameters[0])) requirement = host_.output_path(*target);
+                if (const auto target = host_.tracked_output_path(parameters[0])) requirement = target->path;
                 else requirement = host_.root() / parameters[0];
                 result_.reqs.insert(host_.relative(requirement.lexically_normal()));
                 i = end;

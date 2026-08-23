@@ -45,8 +45,9 @@ namespace {
 class EngineHost : public RenderHost {
 public:
     EngineHost(nift::Engine::Impl& impl,
-               const std::unordered_map<std::string, std::shared_ptr<const json::Document>>* render_bindings)
-        : impl_(impl), render_bindings_(render_bindings) {}
+               const std::unordered_map<std::string, std::shared_ptr<const json::Document>>* render_bindings,
+               const std::filesystem::path& current_output)
+        : impl_(impl), render_bindings_(render_bindings), current_output_(current_output) {}
 
     const std::filesystem::path& root() const override { return impl_.root; }
     std::string relative(const std::filesystem::path& path) const override { return impl_.relative(path); }
@@ -54,12 +55,17 @@ public:
     int build_threads() const override { return 1; }
 
     std::filesystem::path content_path(const TrackedInfo& info) const override { return impl_.root / info.name; }
-    std::filesystem::path output_path(const TrackedInfo& info) const override { return impl_.root / info.name; }
+    std::filesystem::path output_path(const TrackedInfo& info) const override {
+        return current_output_.empty() ? impl_.root / info.name : current_output_;
+    }
     std::filesystem::path pagination_output_path(const TrackedInfo& info, std::size_t) const override {
         return impl_.root / info.name;
     }
 
-    const TrackedInfo* find(const std::string&) const override { return nullptr; }
+    bool has_output_context() const override { return !current_output_.empty(); }
+    std::optional<TrackedOutput> tracked_output_path(const std::string&) const override {
+        return std::nullopt;
+    }
 
     // Per-render Context overlays win over Engine defaults.
     const std::shared_ptr<const json::Document>* binding(const std::string& name) const override {
@@ -144,6 +150,7 @@ public:
 private:
     nift::Engine::Impl& impl_;
     const std::unordered_map<std::string, std::shared_ptr<const json::Document>>* render_bindings_;
+    std::filesystem::path current_output_;
 };
 
 RenderSource to_render_source(const nift::Source& source, const nift::Engine::Impl& impl) {
@@ -234,7 +241,7 @@ RenderResult Engine::render(const Source& page, const Source& page_template, con
     std::unordered_map<std::string, std::shared_ptr<const json::Document>> render_bindings;
     for (const auto& [name, value] : context.bindings_)
         render_bindings[name] = std::make_shared<json::Document>(ValueAccess::doc(value));
-    EngineHost host(*impl_, &render_bindings);
+    EngineHost host(*impl_, &render_bindings, context.current_output_);
     Parser parser(host, info);
     return RenderResultBuilder::build(parser.render_composed(template_render_source, page_render_source,
                                                               /*require_exactly_one_content=*/true));
@@ -252,7 +259,7 @@ RenderResult Engine::render(const Source& partial, const Context& context) {
     std::unordered_map<std::string, std::shared_ptr<const json::Document>> render_bindings;
     for (const auto& [name, value] : context.bindings_)
         render_bindings[name] = std::make_shared<json::Document>(ValueAccess::doc(value));
-    EngineHost host(*impl_, &render_bindings);
+    EngineHost host(*impl_, &render_bindings, context.current_output_);
     Parser parser(host, info);
     return RenderResultBuilder::build(parser.render_composed(partial_render_source, std::nullopt,
                                                               /*require_exactly_one_content=*/false));

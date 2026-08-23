@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <filesystem>
 #include <set>
 #include <string>
 #include <string_view>
@@ -44,6 +45,11 @@ class Context {
 public:
     void set_page_name(std::string name) { page_name_ = std::move(name); }
 
+    // The generated output location of the current page, used by @pathto to
+    // compute relative paths (and by the 404 rule for root-absolute paths).
+    // Without it, @pathto has no path context and errors.
+    void set_current_output(std::filesystem::path output) { current_output_ = std::move(output); }
+
     // set_title and set("title", ...) write the same per-render title slot:
     // both override an Engine "title" default; the most recent write wins.
     void set_title(std::string title);
@@ -62,6 +68,7 @@ private:
     friend class Engine;
     std::string page_name_;
     std::string title_;
+    std::filesystem::path current_output_;
     std::unordered_map<std::string, Value> bindings_;
 };
 

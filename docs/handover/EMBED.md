@@ -89,8 +89,20 @@ details.
   This mirrors the `@input` no-cwd guard decision and should be settled
   deliberately (likely: require a root, or define empty-root containment as
   no-containment) in a later checkpoint; it is not claimed as a contract yet.
-  Then CP5 `@pathto` (own review gate), CP6 CLI fully on the core,
-  CP7a concurrency / CP7b pagination-through-host / CP7c API freeze + docs.
+- **CP5** (`...`): `@pathto`/`@pathtofile` through the host path capability.
+  `RenderHost` replaces the parser's tracked lookup with `has_output_context()`
+  and `tracked_output_path(name)` (CLI resolves tracked names; the embedded
+  engine has none and treats every argument as a concrete project path — no
+  fake project). The per-render `Context::set_current_output` supplies the
+  current output location; without it `@pathto` errors rather than guessing.
+  The shared relative-path computation, the 404 rule (page name "404" ->
+  root-absolute web paths), requirements recording and concrete-path existence
+  (via `source_exists`) are unchanged. Deferred to API hardening (CP7c): a
+  custom `set_path_resolver` callback; the default (root-relative, context
+  current output) is implemented. Tests: `tests/engine_pathto.cpp`
+  (`make test-engine-pathto`).
+  Then CP6 CLI fully on the core, CP7a concurrency / CP7b pagination-through-host /
+  CP7c API freeze + docs.
 
 Cadence: one or two checkpoints between reviews; CP5 is a hard review gate.
 

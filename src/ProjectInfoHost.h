@@ -24,7 +24,16 @@ public:
         return project_.pagination_output_path(info, page);
     }
 
-    const TrackedInfo* find(const std::string& name) const override { return project_.find(name); }
+    bool has_output_context() const override { return true; }
+    std::optional<TrackedOutput> tracked_output_path(const std::string& name) const override {
+        if (const TrackedInfo* target = project_.find(name)) {
+            TrackedOutput out;
+            out.path = project_.output_path(*target);
+            out.index_page = target->name == "/" || (!target->name.empty() && target->name.back() == '/');
+            return out;
+        }
+        return std::nullopt;
+    }
 
     const std::shared_ptr<const json::Document>* binding(const std::string&) const override { return nullptr; }
 

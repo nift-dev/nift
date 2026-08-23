@@ -3,6 +3,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace json { class Document; }
@@ -31,7 +32,23 @@ public:
     virtual std::filesystem::path output_path(const TrackedInfo& info) const = 0;
     virtual std::filesystem::path pagination_output_path(const TrackedInfo& info, std::size_t page) const = 0;
 
-    virtual const TrackedInfo* find(const std::string& name) const = 0;
+    // @pathto capability.
+    //
+    // has_output_context() reports whether the current page has a usable
+    // output location to compute paths from. A filesystem CLI page always
+    // does; an Embedded Nift render only does once the caller sets the current
+    // output on the per-render Context. If @pathto is used without it, the
+    // parser must error rather than invent a location.
+    virtual bool has_output_context() const = 0;
+    struct TrackedOutput {
+        std::filesystem::path path;
+        bool index_page = false;
+    };
+    // Output path of a tracked page name (nullopt when the name is not
+    // tracked). The CLI resolves tracked names through its tracking model; an
+    // Embedded engine has no tracked pages and returns nullopt, so @pathto
+    // treats every argument as a concrete project path.
+    virtual std::optional<TrackedOutput> tracked_output_path(const std::string& name) const = 0;
 
     // Host-supplied value binding (Embedded Nift engine defaults/overlays).
     // Returns a pointer to the shared document, or nullptr when the name is
