@@ -252,16 +252,64 @@ int main() {
         CHECK(r.output() == "5/1");
     }
     {
-        // Move transfers without copying.
+        // Move construction: destination has the value, source is a valid Null.
         nift::Value a = nift::Value::make_object();
         a["x"] = nift::Value(7);
         nift::Value moved = std::move(a);
-        moved["x"] = nift::Value(8);
+        CHECK(moved.is_object());
+        CHECK(a.is_null());          // safe inspection of moved-from
         nift::Context context;
         context.set("moved", moved);
         auto r = nift::Engine().render(nift::Source::text("$[moved.x]"), context);
         CHECK(r.ok());
-        CHECK(r.output() == "8");
+        CHECK(r.output() == "7");
+    }
+    {
+        // Move construction: moved-from source can be copied and reused.
+        nift::Value a = nift::Value::make_object();
+        a["x"] = nift::Value(7);
+        nift::Value moved = std::move(a);
+        nift::Value copied_from_moved_from = a;   // copy of moved-from (Null) is valid
+        CHECK(copied_from_moved_from.is_null());
+        a = nift::Value::make_object();            // reassign and reuse
+        a["y"] = nift::Value(9);
+        nift::Context context;
+        context.set("a", a);
+        context.set("moved", moved);
+        auto r = nift::Engine().render(nift::Source::text("$[a.y]/$[moved.x]"), context);
+        CHECK(r.ok());
+        CHECK(r.output() == "9/7");
+    }
+    {
+        // Move assignment: destination takes value, source becomes valid Null.
+        nift::Value a = nift::Value::make_object();
+        a["x"] = nift::Value(1);
+        nift::Value b = nift::Value::make_object();
+        b["y"] = nift::Value(2);
+        b = std::move(a);
+        CHECK(b.is_object());
+        CHECK(a.is_null());
+        nift::Context context;
+        context.set("b", b);
+        auto r = nift::Engine().render(nift::Source::text("$[b.x]"), context);
+        CHECK(r.ok());
+        CHECK(r.output() == "1");
+    }
+    {
+        // Move assignment: source can be assigned a new value and used.
+        nift::Value a = nift::Value::make_object();
+        a["x"] = nift::Value(1);
+        nift::Value b = nift::Value::make_object();
+        b = std::move(a);
+        CHECK(b.is_object());
+        a["z"] = nift::Value(3);     // moved-from source accepts mutation
+        CHECK(a.is_object());
+        nift::Context context;
+        context.set("a", a);
+        context.set("b", b);
+        auto r = nift::Engine().render(nift::Source::text("$[a.z]/$[b.x]"), context);
+        CHECK(r.ok());
+        CHECK(r.output() == "3/1");
     }
 
     if (failures == 0) {

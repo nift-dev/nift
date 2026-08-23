@@ -30,15 +30,26 @@ Value::Value(std::string value) : impl_(std::make_shared<Impl>()) {
     impl_->doc.string = std::move(value);
 }
 // Deep-copy value semantics: copying a Value produces an independent
-// equivalent value (mutation of either must not affect the other); moving
-// transfers ownership without copying.
+// equivalent value (mutation of either must not affect the other). Moving
+// transfers ownership without copying, and leaves the source as a valid Null
+// Value (the invariant is that impl_ is never null, so every public operation
+// is safe on a moved-from object: inspection, copying, reassignment and
+// mutation all behave normally).
 Value::Value(const Value& other) : impl_(std::make_shared<Impl>(*other.impl_)) {}
-Value::Value(Value&& other) noexcept = default;
+Value::Value(Value&& other) noexcept : impl_(std::move(other.impl_)) {
+    other.impl_ = std::make_shared<Impl>();
+}
 Value& Value::operator=(const Value& other) {
     if (this != &other) impl_ = std::make_shared<Impl>(*other.impl_);
     return *this;
 }
-Value& Value::operator=(Value&& other) noexcept = default;
+Value& Value::operator=(Value&& other) noexcept {
+    if (this != &other) {
+        impl_ = std::move(other.impl_);
+        other.impl_ = std::make_shared<Impl>();
+    }
+    return *this;
+}
 Value::~Value() = default;
 
 Value Value::make_array() {
