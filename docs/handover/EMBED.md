@@ -172,8 +172,23 @@ orchestration over the same `render_composed` used by `render(page, template)`.
   custom `set_path_resolver` callback; the default (root-relative, context
   current output) is implemented. Tests: `tests/engine_pathto.cpp`
   (`make test-engine-pathto`).
-  Then CP6 CLI fully on the core, CP7a concurrency / CP7b pagination-through-host /
-  CP7c API freeze + docs.
+- **CP6** (`87f1050`): the CLI render entry is fully host-driven; the parser's
+  only remaining direct filesystem calls are `path_within` containment and the
+  pagination path (CP7b). Project-aware rendering is recorded (not implemented)
+  as an explicit requirement: a project-backed Engine host consumes
+  `.nift/tracked.json`/`config.json` and `render("page-name"[, context])` is
+  orchestration over the same core.
+- **CP7a** (`...`): concurrency/thread-safety contract. Concurrent `render()`
+  calls on one Engine are supported and safe (provided no concurrent
+  mutation); Engine mutators (set/set_json/set_loader/set_environment_provider/
+  set_root) are not thread-safe with active renders (configure before serving —
+  documented, not serialized behind a global lock); Context is per-render and
+  must not be shared or mutated concurrently; the loader/environment provider
+  may be called concurrently and must be thread-safe (defaults are); internal
+  caches are mutex-protected. Contract documented in `include/nift/engine.h`;
+  `tests/engine_concurrency.cpp` proves the supported case (8 threads x 200
+  renders on one Engine) and passes under ThreadSanitizer.
+  Then CP7b pagination-through-host, CP7c API freeze + docs.
 
 Cadence: one or two checkpoints between reviews; CP5 is a hard review gate.
 

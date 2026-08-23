@@ -15,10 +15,24 @@ namespace nift {
 
 // Embedded Nift rendering engine.
 //
-// One Engine per process, configured once (root, loaders) and then shared
-// across concurrent renders; each render supplies its request-scoped state
-// through a Context. Rendering shares the exact parser/evaluator used by the
-// Nift CLI.
+// One Engine per process, configured once (root, loaders, defaults) and then
+// shared across concurrent renders; each render supplies its request-scoped
+// state through a per-render Context. Rendering shares the exact
+// parser/evaluator used by the Nift CLI.
+//
+// Thread-safety contract (CP7a):
+// - Concurrent render() calls on one Engine are supported and safe, provided
+//   the Engine is not being mutated concurrently.
+// - Engine mutation (set / set_json / set_loader / set_environment_provider /
+//   set_root) is NOT thread-safe with active renders. Configure the Engine
+//   before serving; do not call the mutators concurrently with render().
+// - Context is per-render state owned by the calling thread. It must not be
+//   shared across threads, and must not be mutated while a render that uses it
+//   is running.
+// - The loader and environment provider may be invoked concurrently by render
+//   threads, so they must be thread-safe. The defaults (filesystem and the
+//   process environment) are.
+// - The internal source/JSON caches are mutex-protected.
 class Engine {
 public:
     Engine();
