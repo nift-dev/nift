@@ -312,6 +312,38 @@ int main() {
         CHECK(r.output() == "3/1");
     }
 
+    // 12. Null internal representation (impl_ == nullptr) paths: default and
+    //     moved-from values behave as Null through reads and normal APIs.
+    {
+        nift::Value v;
+        CHECK(v.is_null());
+        CHECK(v.type() == nift::Value::Type::Null);
+        CHECK(v.string().empty());
+    }
+    {
+        // push_back of a Null value is safe and renders empty.
+        nift::Value array = nift::Value::make_array();
+        array.push_back(nift::Value(std::string("a")));
+        array.push_back(nift::Value());
+        nift::Context context;
+        context.set("array", array);
+        auto r = nift::Engine().render(nift::Source::text("$[array[0]]/$[array[1]]"), context);
+        CHECK(r.ok());
+        CHECK(r.output() == "a/null");
+    }
+    {
+        // A moved-from (Null) value is safe through Context/Engine.
+        nift::Value a = nift::Value::make_object();
+        a["x"] = nift::Value(1);
+        nift::Value moved = std::move(a);
+        nift::Context context;
+        context.set("moved", moved);
+        context.set("empty", a);   // the moved-from source, bound as a value
+        auto r = nift::Engine().render(nift::Source::text("$[moved.x]/$[empty]"), context);
+        CHECK(r.ok());
+        CHECK(r.output() == "1/null");
+    }
+
     if (failures == 0) {
         std::printf("engine bindings test passed\n");
         return 0;

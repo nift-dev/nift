@@ -4,6 +4,16 @@
 // json::Document, and must not need to know Jsonic++ exists.
 #include <nift/nift.h>
 
+#include <type_traits>
+
+// nift::Value move construction/assignment must be nothrow and free of
+// allocation: the moved-from source becomes a valid Null Value without the
+// move itself performing a potentially throwing allocation.
+static_assert(std::is_nothrow_move_constructible<nift::Value>::value,
+              "nift::Value move construction must be nothrow");
+static_assert(std::is_nothrow_move_assignable<nift::Value>::value,
+              "nift::Value move assignment must be nothrow");
+
 int main() {
     nift::Engine engine;
     nift::Context context;
