@@ -103,5 +103,21 @@ int main() {
     (void)r2.ok();
     (void)r3.ok();
 
+    // The documented structured-construction example must actually work: the
+    // array member is constructed with make_array() and assigned before use.
+    nift::Value user = nift::Value::make_object();
+    user["name"] = nift::Value(std::string("Nick"));
+    nift::Value projects = nift::Value::make_array();
+    projects.push_back(nift::Value(std::string("nift")));
+    projects.push_back(nift::Value(std::string("tscc")));
+    user["projects"] = projects;
+    nift::Engine doc_engine;
+    doc_engine.set("user", user);
+    nift::RenderResult doc_result = doc_engine.render(nift::Source::text("$[user.name]/$[user.projects[1]]"));
+    if (!doc_result.ok() || doc_result.output() != "Nick/tscc") {
+        std::fprintf(stderr, "public-header probe: documented value example did not render\n");
+        return 1;
+    }
+
     return 0;
 }

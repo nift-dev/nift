@@ -14,7 +14,13 @@ struct ValueAccess;   // internal implementation bridge (defined in src/)
 // enabling idiomatic structured construction such as:
 //   Value user = Value::make_object();
 //   user["name"] = Value("Nick");
-//   user["projects"][0] = Value("nift");
+//   Value projects = Value::make_array();
+//   projects.push_back(Value("nift"));
+//   user["projects"] = projects;
+//
+// Note: operator[](std::string) materialises a Null member as an Object, so
+// an array member must be constructed with make_array() and assigned before
+// it can be indexed.
 //
 // Lifetime contract: a ValueRef is a transient construction handle valid only
 // while the Value it was obtained from is alive and that Value's storage is
@@ -35,9 +41,9 @@ private:
 };
 
 // Nift's public value model. The internal representation is an implementation
-// detail: nift::Value is Nift's contract (and must stay that way for the
-// future independent Rust/Go/JS implementations), not an alias of the C++
-// backing store.
+// detail: nift::Value is Nift's contract, not an alias of the C++ backing
+// store. Ecosystem bindings expose the same value model natively, and an
+// independent Rust implementation reproduces it as a conformance experiment.
 //
 // Value semantics (CP7c contract):
 // - copy construction/assignment produce an independent equivalent value;

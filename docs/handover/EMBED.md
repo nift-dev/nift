@@ -20,11 +20,27 @@ core, multiple ways to use it:
       project/build use          runtime/library use
 ```
 
-Longer term the C++ implementation should become one of several complete Nift
-implementations (Rust, Go, JS, ...), each with CLI and embed API, sharing a
-portable behavioural contract and conformance tests. A consequence of this work
-is a formal distinction between genuine Nift contracts and C++ implementation
-details.
+The long-term architecture is one canonical C++ Nift core consumed through
+idiomatic ecosystem bindings, plus a single independent implementation
+experiment:
+
+```text
+C++ Nift core (shared parser/evaluator)
+    │
+    ├── Nift CLI
+    ├── C++ Embed (nift::Engine)
+    ├── thin ecosystem bindings (Node/JS, Python, Go, C#, Ruby, PHP, ...)
+    │        same parser/evaluator underneath; native-feeling APIs on top
+    └── Rust independent implementation (portability/conformance experiment)
+```
+
+Bindings mean a bug fix in Nift fixes every language simultaneously; the
+bindings do not maintain their own parser/evaluator. Rust is the deliberate
+independent implementation used to validate portability and conformance (and a
+thin Rust binding to the canonical core remains useful as a reference/oracle).
+A stable, minimal C ABI is the likely common binding boundary. A consequence of
+this work is a formal distinction between genuine Nift contracts and C++
+implementation details.
 
 ## Project-attached rendering (recorded requirement)
 
@@ -198,12 +214,17 @@ orchestration over the same `render_composed` used by `render(page, template)`.
   existence and reads named sources, so the existing host capabilities express
   it fully (no new capability required). CLI pagination semantics preserved
   (smoke, 18/18 incremental equivalence, ASan/UBSan and TSan pagination).
-- **CP7c** (`40fbb73`): API freeze + documentation + programme sign-off. The public
-  `include/nift/` surface was audited and the behavioural contracts below were
-  documented in the headers; the public-header probe now exercises every
-  public type/member with only `-Iinclude`. Final evidence: all six engine
-  tests (native + ASan/UBSan), TSan concurrency + TSan pagination, pagination
-  sanitizer, full CLI suite. See the sign-off sections below.
+- **CP7c** (`40fbb73` + repair): API freeze of the **standalone/shared core**.
+  The public `include/nift/` surface was audited and the behavioural contracts
+  below were documented in the headers; the public-header probe now exercises
+  every public type/member (and the documented value-construction example) with
+  only `-Iinclude`. Final evidence: all six engine tests (native + ASan/UBSan),
+  TSan concurrency + TSan pagination, pagination sanitizer, full CLI suite.
+  **What is frozen:** the standalone shared rendering core and its current
+  public surface, as the C++ behavioural reference. **What remains open:** the
+  project-aware layer (`render("page-name"[, context])` backed by real
+  `.nift/tracked.json`/`config.json` knowledge) and the ecosystem bindings /
+  C ABI / Rust experiment. See the sign-off sections below.
 
 ## Behavioural contracts established (C++ behavioural reference)
 
@@ -245,8 +266,11 @@ orchestration over the same `render_composed` used by `render(page, template)`.
   with existence/requirements is not yet designed).
 - **Value serialization** (e.g. `dump()` to JSON text) is not in the public
   API.
-- **Rust/Go/JS implementations** have not started; this C++ line is the
-  behavioural reference.
+- **Ecosystem bindings and the C ABI** have not started; the canonical C++
+  core (this line) is the behavioural reference for them.
+- **The Rust independent implementation** has not started; it is the one
+  deliberate independent experiment, used to validate portability and
+  conformance against this reference.
 
 ## Unresolved known issues
 
