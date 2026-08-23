@@ -157,6 +157,19 @@ $(ENGINE_PROJECT_TEST): tests/engine_project.cpp $(ENGINE_CORE_OBJECTS)
 test-engine-project: $(ENGINE_PROJECT_TEST)
 	$(ENGINE_PROJECT_TEST)
 
+# PA5: portable project-semantics conformance corpus. cpp_runner renders pages
+# through the public project-aware Engine; run_conformance.py runs every case
+# under tests/conformance/cases/ against both the Nift CLI and the Engine and
+# checks observable parity (byte-identical output + dependency/requirement sets)
+# and accept/reject parity.
+CPP_RUNNER := $(TEST_DIR)/cpp-runner$(EXEEXT)
+$(CPP_RUNNER): tests/conformance/cpp_runner.cpp $(ENGINE_CORE_OBJECTS)
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/conformance/cpp_runner.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
+
+test-conformance: $(CPP_RUNNER) $(TARGET)
+	CPP_RUNNER="$(CURDIR)/$(TEST_DIR)/cpp-runner" NIFT_BIN="$(CURDIR)/$(TARGET)" python3 tests/conformance/run_conformance.py
+
 # PA4: atomic immutable snapshot replacement - reload() keeps in-flight renders
 # on their snapshot, retains the last good snapshot on failure, zero writes,
 # concurrent render+reload safety, defaults/environment survival.
@@ -347,7 +360,7 @@ clean:
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
-.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-diagnostics test-minify test-json-schema-integration test-engine test-engine-bindings test-engine-loaders test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-project-state test-project-host test-public-header test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
+.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-diagnostics test-minify test-json-schema-integration test-engine test-engine-bindings test-engine-loaders test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-project-state test-project-host test-public-header test-conformance test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
 
 
 test-cross-feature: $(TARGET)

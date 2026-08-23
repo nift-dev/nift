@@ -1,0 +1,4 @@
+@json("data/items.json", data, "schemas/items.schema.json")
+@for(item : data.items by item.rank asc){$[loop.index]:$[item.name]
+}
+@content

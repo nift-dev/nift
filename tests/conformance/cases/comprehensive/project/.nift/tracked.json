@@ -1,0 +1,6 @@
+{"tracked":[
+ {"name":"/","title":"Home","template":"templates/template.html"},
+ {"name":"about","title":"About","template":"templates/page.html"},
+ {"name":"404","title":"Not Found","template":"templates/page.html"},
+ {"name":"blog/","title":"Blog","template":"templates/template.html","paginate":{"items-per-page":2}}
+]}

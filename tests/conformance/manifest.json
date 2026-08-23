@@ -1,0 +1,18 @@
+{
+  "purpose": "Portable project-semantics conformance corpus (PA5): executable evidence that the Nift CLI and the C++ project-aware Engine observe the same Nift project semantics, runnable against any implementation. Each case under cases/ is a fixture project + expected.json; run_conformance.py executes every case against the CLI and the Engine. nift-rs inherits this corpus later.",
+  "categories": {
+    "parity": "byte-identical CLI build output == Engine.render(page) output for the listed pages, plus matching dependency/requirement sets when the case sets deps_reqs:true.",
+    "reject": "both implementations reject the same invalid project or source state (CLI build fails; Engine render fails): accept/reject parity.",
+    "engine-only": "embedding contracts with no artificial CLI equivalent: Context value/title overlays, injected environment provider, unknown page, is_open()/open_error(). Executable evidence: tests/engine_project.cpp.",
+    "lifecycle": "C++ Engine serving contracts: atomic metadata-generation replacement via reload(), last-good retention on failed reload, zero-write serving. These are implementation contracts, NOT template-language semantics; nift-rs only inherits them if project-aware Rust adopts the same serving API. Executable evidence: tests/engine_reload.cpp."
+  },
+  "cases": {
+    "comprehensive": "tracked-name lookup; index/trailing-slash geometry; content/template composition; metadata (title/name/content-path/output-path); @input; @json; contracts; tracked @pathto; concrete @pathto; 404 root-absolute geometry; pagination primary page; dependencies; requirements.",
+    "schema": "JSON schema validation and schema dependency recording.",
+    "getenv": "@getenv default process-environment semantics (driver sets the variable for both implementations).",
+    "missing-source": "tracked page whose content source is missing: both reject.",
+    "bad-config": "unknown config key: both reject.",
+    "bad-tracking": "duplicate tracked name: both reject.",
+    "path-escape": "@pathto escaping the project root: both reject."
+  }
+}
