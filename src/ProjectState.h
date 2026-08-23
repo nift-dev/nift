@@ -21,6 +21,11 @@ namespace json { class Document; }
 // Validation mirrors ProjectInfo's read semantics exactly (same accept/reject
 // rules), but errors are returned rather than printed: an embedded consumer
 // must be able to turn a missing/malformed project into a controlled error.
+//
+// open() is transactional: on success a complete validated snapshot is
+// installed; on failure the object is left empty/unopened (no partial config
+// or tracked registry from the failed candidate is observable) and is valid
+// for another open().
 class ProjectState {
 public:
     ProjectState() = default;
@@ -30,8 +35,8 @@ public:
 
     // Opens and validates the snapshot rooted at `root`. On any failure
     // (missing/malformed config or tracking, invalid entries, duplicate names,
-    // conflicting paths) returns false with a non-empty `error` and the state
-    // is left empty/valid for another open(). Never writes to disk.
+    // conflicting paths) returns false with a non-empty `error` and leaves the
+    // object empty/unopened. Never writes to disk.
     bool open(const std::filesystem::path& root, std::string& error);
 
     // Registry access. `tracked` preserves tracked.json order; `find` is the
@@ -53,8 +58,7 @@ public:
     std::shared_ptr<const json::Document> read_shared_json(const std::filesystem::path& path, std::string& error) const;
 
 private:
-    bool load_config(const std::filesystem::path& path, std::string& error);
-    bool load_tracking(const std::filesystem::path& path, std::string& error);
+    void reset();
 
     std::filesystem::path root_;
     Config config_;

@@ -262,10 +262,97 @@ void test_invalid_parity() {
         CHECK(!error.empty());
         CHECK(!project_ok);
 
+        // Failed open is transactional: no config/tracked registry from the
+        // failed candidate is observable, and the object is empty/unopened.
+        CHECK(state.root().empty());
+        CHECK(configs_equal(state.config(), Config{}));
+        CHECK(state.tracked().empty());
+        CHECK(state.find("about") == nullptr);
+        CHECK(state.find("/") == nullptr);
+
         // Zero writes even on failure.
         CHECK(tree_snapshot(root) == before);
         if (tree_snapshot(root) != before)
             std::fprintf(stderr, "FAIL %s: ProjectState wrote to disk for case '%s'\n", __FILE__, test.name);
+    }
+}
+
+void test_open_sequences() {
+    // Successful open followed by a failed open: the failure must discard the
+    // previously installed snapshot, leaving the object empty/unopened.
+    {
+        const fs::path valid = make_fixture("seq-valid");
+        write_valid_project(valid);
+
+        ProjectState state;
+        std::string error;
+        CHECK(state.open(valid, error));
+        CHECK(state.find("about") != nullptr);
+
+        const fs::path broken = make_fixture("seq-broken");
+        write_file(broken / ".nift/config.json", kConfig);
+        write_file(broken / ".nift/tracked.json", "{ not json");
+
+        CHECK(!state.open(broken, error));
+        CHECK(!error.empty());
+        CHECK(state.root().empty());
+        CHECK(configs_equal(state.config(), Config{}));
+        CHECK(state.tracked().empty());
+        CHECK(state.find("about") == nullptr);
+        CHECK(state.find("/") == nullptr);
+    }
+
+    // Failed open followed by a successful open: the object recovers to a
+    // complete, validated snapshot.
+    {
+        const fs::path broken = make_fixture("seq-broken-2");
+        write_file(broken / ".nift/config.json", kConfig);
+        write_file(broken / ".nift/tracked.json", "{ not json");
+
+        ProjectState state;
+        std::string error;
+        CHECK(!state.open(broken, error));
+        CHECK(state.root().empty());
+        CHECK(state.tracked().empty());
+
+        const fs::path valid = make_fixture("seq-valid-2");
+        write_valid_project(valid);
+        CHECK(state.open(valid, error));
+        CHECK(state.find("about") != nullptr);
+        CHECK(state.find("blog/") != nullptr);
+        const TrackedInfo* home = state.find("/");
+        CHECK(home && state.content_path(*home) == valid / "content/index.html");
+    }
+
+    // Malformed config failure, and valid config + malformed/missing tracked
+    // failure, must each leave the object empty (no partial config from the
+    // failed candidate).
+    {
+        const fs::path bad_cfg = make_fixture("seq-bad-config");
+        write_file(bad_cfg / ".nift/config.json", R"({"config":{"bogus":1}})");
+        write_file(bad_cfg / ".nift/tracked.json", kTracked);
+
+        ProjectState state;
+        std::string error;
+        CHECK(!state.open(bad_cfg, error));
+        CHECK(configs_equal(state.config(), Config{}));
+        CHECK(state.tracked().empty());
+
+        const fs::path bad_tracked = make_fixture("seq-bad-tracked");
+        write_file(bad_tracked / ".nift/config.json", kConfig);
+        write_file(bad_tracked / ".nift/tracked.json", "{ not json");
+
+        CHECK(!state.open(bad_tracked, error));
+        CHECK(configs_equal(state.config(), Config{}));
+        CHECK(state.tracked().empty());
+
+        const fs::path missing_tracked = make_fixture("seq-missing-tracked");
+        write_file(missing_tracked / ".nift/config.json", kConfig);
+
+        CHECK(!state.open(missing_tracked, error));
+        CHECK(configs_equal(state.config(), Config{}));
+        CHECK(state.tracked().empty());
+        CHECK(state.root().empty());
     }
 }
 
@@ -298,6 +385,7 @@ void test_zero_writes() {
 int main() {
     test_valid_parity();
     test_invalid_parity();
+    test_open_sequences();
     test_zero_writes();
 
     if (failures == 0) {

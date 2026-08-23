@@ -43,28 +43,43 @@ bool valid_tracked_name(const std::string& name) {
     return !path.is_absolute() && !filesystem::has_parent_component(name);
 }
 
-} // namespace
-
-ProjectState::~ProjectState() = default;
-
-bool ProjectState::open(const std::filesystem::path& root, std::string& error) {
-    root_ = fs::absolute(root).lexically_normal();
-    config_ = Config{};
-    tracked_.clear();
-    tracked_index_.clear();
-    {
-        std::lock_guard<std::mutex> lock(source_cache_mutex_);
-        shared_source_cache_.clear();
-    }
-    {
-        std::lock_guard<std::mutex> lock(json_cache_mutex_);
-        shared_json_cache_.clear();
-    }
-    return load_config(root_ / ".nift/config.json", error) &&
-           load_tracking(root_ / ".nift/tracked.json", error);
+// Shared path geometry. These pure functions are used by both the transactional
+// snapshot loader (against local scratch state) and the public accessors
+// (against the committed snapshot), so geometry is defined exactly once.
+std::string mapped_name(const TrackedInfo& info) {
+    std::string name = info.name;
+    if (name == "/") name = "index";
+    else if (!name.empty() && name.back() == '/') name += "index";
+    return name;
 }
 
-bool ProjectState::load_config(const fs::path& path, std::string& error) {
+fs::path content_path_of(const fs::path& root, const Config& config, const TrackedInfo& info) {
+    return root / config.content_dir / (mapped_name(info) + (info.content_ext.empty() ? config.content_ext : info.content_ext));
+}
+
+fs::path output_path_of(const fs::path& root, const Config& config, const TrackedInfo& info) {
+    return root / config.output_dir / (mapped_name(info) + (info.output_ext.empty() ? config.output_ext : info.output_ext));
+}
+
+fs::path pagination_output_path_of(const fs::path& root, const Config& config, const TrackedInfo& info, std::size_t page) {
+    if (page <= 1) return output_path_of(root, config, info);
+    const std::string extension = info.output_ext.empty() ? config.output_ext : info.output_ext;
+    if (info.name == "/" || (!info.name.empty() && info.name.back() == '/')) {
+        const fs::path primary = output_path_of(root, config, info);
+        return primary.parent_path() / (std::to_string(page) + extension);
+    }
+    const fs::path primary = output_path_of(root, config, info);
+    return primary.parent_path() / (primary.stem().generic_string() + "-" + std::to_string(page) + extension);
+}
+
+std::string relative_of(const fs::path& root, const fs::path& path) {
+    const fs::path normalized = path.lexically_normal();
+    const fs::path relative_path = normalized.lexically_relative(root.lexically_normal());
+    return relative_path.empty() ? normalized.generic_string() : relative_path.generic_string();
+}
+
+bool load_config(const fs::path& root, Config& config, std::string& error) {
+    const fs::path path = root / ".nift/config.json";
     json::Document document;
     std::string parse_error;
     if (!load_json_file(path, document, parse_error) || !document.is_object() || !document.has("config") ||
@@ -74,21 +89,21 @@ bool ProjectState::load_config(const fs::path& path, std::string& error) {
     }
 
     const auto& value = document["config"];
-    if (!string_field(value, "content-dir", config_.content_dir) ||
-        !string_field(value, "content-ext", config_.content_ext) ||
-        !string_field(value, "output-dir", config_.output_dir) ||
-        !string_field(value, "output-ext", config_.output_ext) ||
-        !string_field(value, "default-template", config_.default_template) ||
-        !string_field(value, "incremental-mode", config_.incremental_mode)) {
+    if (!string_field(value, "content-dir", config.content_dir) ||
+        !string_field(value, "content-ext", config.content_ext) ||
+        !string_field(value, "output-dir", config.output_dir) ||
+        !string_field(value, "output-ext", config.output_ext) ||
+        !string_field(value, "default-template", config.default_template) ||
+        !string_field(value, "incremental-mode", config.incremental_mode)) {
         error = "config string fields must contain JSON strings";
         return false;
     }
 
-    if (config_.content_dir.empty()) {
+    if (config.content_dir.empty()) {
         error = "content-dir must be non-empty";
         return false;
     }
-    if (!filesystem::valid_extension(config_.content_ext) || !filesystem::valid_extension(config_.output_ext)) {
+    if (!filesystem::valid_extension(config.content_ext) || !filesystem::valid_extension(config.output_ext)) {
         error = "content-ext and output-ext must begin with '.' and cannot contain path separators";
         return false;
     }
@@ -101,10 +116,10 @@ bool ProjectState::load_config(const fs::path& path, std::string& error) {
             error = "build-threads must be an integer";
             return false;
         }
-        config_.build_threads = value["build-threads"].as_int();
+        config.build_threads = value["build-threads"].as_int();
     }
 
-    config_.contracts.clear();
+    config.contracts.clear();
     if (value.has("contracts")) {
         if (!value["contracts"].is_object()) {
             error = "contracts must be an object mapping names to project-relative JSON paths";
@@ -125,16 +140,16 @@ bool ProjectState::load_config(const fs::path& path, std::string& error) {
                 error = "contract '" + name + "' must map to a non-empty JSON path string";
                 return false;
             }
-            const fs::path contract_path = (root_ / source.string).lexically_normal();
-            if (!filesystem::path_within(root_, contract_path)) {
+            const fs::path contract_path = (root / source.string).lexically_normal();
+            if (!filesystem::path_within(root, contract_path)) {
                 error = "contract '" + name + "' path must stay inside the Nift project: " + source.string;
                 return false;
             }
-            config_.contracts.emplace(name, source.string);
+            config.contracts.emplace(name, source.string);
         }
     }
 
-    config_.minify_exts.clear();
+    config.minify_exts.clear();
     if (value.has("minify-exts")) {
         if (!value["minify-exts"].is_array()) {
             error = "minify-exts must be an array of extension strings";
@@ -153,11 +168,11 @@ bool ProjectState::load_config(const fs::path& path, std::string& error) {
             std::string normalized_extension = item.string;
             std::transform(normalized_extension.begin(), normalized_extension.end(), normalized_extension.begin(),
                            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-            config_.minify_exts.insert(std::move(normalized_extension));
+            config.minify_exts.insert(std::move(normalized_extension));
         }
     }
 
-    if (config_.incremental_mode != "modified" && config_.incremental_mode != "hash" && config_.incremental_mode != "hybrid") {
+    if (config.incremental_mode != "modified" && config.incremental_mode != "hash" && config.incremental_mode != "hybrid") {
         error = "incremental-mode must be modified, hash or hybrid";
         return false;
     }
@@ -178,14 +193,15 @@ bool ProjectState::load_config(const fs::path& path, std::string& error) {
     return true;
 }
 
-bool ProjectState::load_tracking(const fs::path& path, std::string& error) {
+bool load_tracking(const fs::path& root, const Config& config, std::vector<TrackedInfo>& tracked, std::string& error) {
+    const fs::path path = root / ".nift/tracked.json";
     if (!filesystem::path_exists(path)) {
         error = "invalid tracked.json (file does not exist)";
         return false;
     }
 
     const std::string source = filesystem::read_file(path);
-    tracked_.clear();
+    tracked.clear();
 
     bool entries_valid = true;
     std::string entry_error;
@@ -274,22 +290,22 @@ bool ProjectState::load_tracking(const fs::path& path, std::string& error) {
                 return false;
             }
 
-            const fs::path derived_content = content_path(info).lexically_normal();
-            const fs::path derived_output = output_path(info).lexically_normal();
-            const fs::path template_path = (root_ / info.template_path).lexically_normal();
+            const fs::path derived_content = content_path_of(root, config, info).lexically_normal();
+            const fs::path derived_output = output_path_of(root, config, info).lexically_normal();
+            const fs::path template_path = (root / info.template_path).lexically_normal();
             if (!info.template_path.empty() && (derived_content == template_path || derived_output == template_path)) {
                 entries_valid = false;
                 entry_error = "tracked template path cannot be the same as its content or output path";
                 return false;
             }
-            tracked_.emplace_back(std::move(info));
+            tracked.emplace_back(std::move(info));
             return true;
         }, parse_error);
 
     if (!parsed || !entries_valid) {
         const std::string details = entries_valid ? parse_error : entry_error;
         error = "invalid tracked.json" + (details.empty() ? "" : " (" + details + ")");
-        tracked_.clear();
+        tracked.clear();
         return false;
     }
 
@@ -297,14 +313,14 @@ bool ProjectState::load_tracking(const fs::path& path, std::string& error) {
     // same content path, no two entries resolving to the same output path.
     {
         std::vector<const std::string*> names;
-        names.reserve(tracked_.size());
-        for (const auto& info : tracked_) names.push_back(&info.name);
+        names.reserve(tracked.size());
+        for (const auto& info : tracked) names.push_back(&info.name);
         std::sort(names.begin(), names.end(),
                   [](const std::string* a, const std::string* b) { return *a < *b; });
         for (std::size_t i = 1; i < names.size(); ++i) {
             if (*names[i - 1] == *names[i]) {
                 error = "invalid tracked.json (duplicate tracked name '" + *names[i] + "')";
-                tracked_.clear();
+                tracked.clear();
                 return false;
             }
         }
@@ -312,31 +328,77 @@ bool ProjectState::load_tracking(const fs::path& path, std::string& error) {
 
     {
         std::vector<std::string> paths;
-        paths.reserve(tracked_.size());
-        for (const auto& info : tracked_)
-            paths.push_back(content_path(info).lexically_normal().generic_string());
+        paths.reserve(tracked.size());
+        for (const auto& info : tracked)
+            paths.push_back(content_path_of(root, config, info).lexically_normal().generic_string());
         std::sort(paths.begin(), paths.end());
         if (std::adjacent_find(paths.begin(), paths.end()) != paths.end()) {
             error = "invalid tracked.json (tracked entries resolve to the same content or output path)";
-            tracked_.clear();
+            tracked.clear();
             return false;
         }
 
         paths.clear();
-        for (const auto& info : tracked_)
-            paths.push_back(output_path(info).lexically_normal().generic_string());
+        for (const auto& info : tracked)
+            paths.push_back(output_path_of(root, config, info).lexically_normal().generic_string());
         std::sort(paths.begin(), paths.end());
         if (std::adjacent_find(paths.begin(), paths.end()) != paths.end()) {
             error = "invalid tracked.json (tracked entries resolve to the same content or output path)";
-            tracked_.clear();
+            tracked.clear();
             return false;
         }
     }
 
+    return true;
+}
+
+} // namespace
+
+ProjectState::~ProjectState() = default;
+
+bool ProjectState::open(const std::filesystem::path& root, std::string& error) {
+    // Build the candidate snapshot entirely in locals. Commit only if the whole
+    // snapshot validates, so a failure can never expose partial state.
+    const fs::path candidate_root = fs::absolute(root).lexically_normal();
+    Config candidate_config;
+    std::vector<TrackedInfo> candidate_tracked;
+
+    if (!load_config(candidate_root, candidate_config, error) ||
+        !load_tracking(candidate_root, candidate_config, candidate_tracked, error)) {
+        reset();
+        return false;
+    }
+
+    root_ = candidate_root;
+    config_ = std::move(candidate_config);
+    tracked_ = std::move(candidate_tracked);
     tracked_index_.clear();
     tracked_index_.reserve(tracked_.size());
     for (std::size_t i = 0; i < tracked_.size(); ++i) tracked_index_[tracked_[i].name] = i;
+    {
+        std::lock_guard<std::mutex> lock(source_cache_mutex_);
+        shared_source_cache_.clear();
+    }
+    {
+        std::lock_guard<std::mutex> lock(json_cache_mutex_);
+        shared_json_cache_.clear();
+    }
     return true;
+}
+
+void ProjectState::reset() {
+    root_.clear();
+    config_ = Config{};
+    tracked_.clear();
+    tracked_index_.clear();
+    {
+        std::lock_guard<std::mutex> lock(source_cache_mutex_);
+        shared_source_cache_.clear();
+    }
+    {
+        std::lock_guard<std::mutex> lock(json_cache_mutex_);
+        shared_json_cache_.clear();
+    }
 }
 
 const TrackedInfo* ProjectState::find(const std::string& name) const {
@@ -345,34 +407,19 @@ const TrackedInfo* ProjectState::find(const std::string& name) const {
 }
 
 fs::path ProjectState::content_path(const TrackedInfo& info) const {
-    std::string name = info.name;
-    if (name == "/") name = "index";
-    else if (!name.empty() && name.back() == '/') name += "index";
-    return root_ / config_.content_dir / (name + (info.content_ext.empty() ? config_.content_ext : info.content_ext));
+    return content_path_of(root_, config_, info);
 }
 
 fs::path ProjectState::output_path(const TrackedInfo& info) const {
-    std::string name = info.name;
-    if (name == "/") name = "index";
-    else if (!name.empty() && name.back() == '/') name += "index";
-    return root_ / config_.output_dir / (name + (info.output_ext.empty() ? config_.output_ext : info.output_ext));
+    return output_path_of(root_, config_, info);
 }
 
 fs::path ProjectState::pagination_output_path(const TrackedInfo& info, std::size_t page) const {
-    if (page <= 1) return output_path(info);
-    const std::string extension = info.output_ext.empty() ? config_.output_ext : info.output_ext;
-    if (info.name == "/" || (!info.name.empty() && info.name.back() == '/')) {
-        const fs::path primary = output_path(info);
-        return primary.parent_path() / (std::to_string(page) + extension);
-    }
-    const fs::path primary = output_path(info);
-    return primary.parent_path() / (primary.stem().generic_string() + "-" + std::to_string(page) + extension);
+    return pagination_output_path_of(root_, config_, info, page);
 }
 
 std::string ProjectState::relative(const fs::path& path) const {
-    const fs::path normalized = path.lexically_normal();
-    const fs::path relative_path = normalized.lexically_relative(root_.lexically_normal());
-    return relative_path.empty() ? normalized.generic_string() : relative_path.generic_string();
+    return relative_of(root_, path);
 }
 
 const std::string* ProjectState::read_shared_source(const fs::path& path) const {

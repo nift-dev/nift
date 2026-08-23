@@ -132,13 +132,36 @@ consumes a read-only snapshot and never becomes the build system.
 - **PA1 read-only ProjectState** — DONE. `src/ProjectState.{h,cpp}` mirrors
   ProjectInfo's read semantics exactly (config + tracked validation, name
   registry, path geometry, shared read caches) but owns no build/write/watch/
-  hash machinery and returns errors instead of printing. Never writes. Parity
-  evidence: `tests/project_state_parity.cpp` (valid parity vs ProjectInfo,
-  ~28 invalid accept/reject parity cases, zero-write guarantee on success and
-  failure, concurrent shared reads).
-- **PA2 ProjectHost** — a read-only `RenderHost` over ProjectState so the
-  existing Parser renders project pages unchanged (`@pathto` to tracked names,
-  `@input`/`@json`/contracts, no build decisions).
+  hash machinery and returns errors instead of printing. Never writes.
+  `open()` is transactional: on failure the object is left empty/unopened (no
+  partial config/tracked registry observable; direct sequence regressions for
+  malformed config, valid-config+malformed/missing tracked, success-then-
+  failure, failure-then-success). Parity evidence:
+  `tests/project_state_parity.cpp` (valid parity vs ProjectInfo, ~28 invalid
+  accept/reject parity cases, zero-write guarantee on success and failure,
+  concurrent shared reads).
+- **PA1b semantic convergence** — REQUIRED before ProjectHost. PA1 currently
+  mirrors ProjectInfo's read semantics in a second implementation, kept in
+  agreement by the parity harness. That parity harness is excellent migration
+  evidence and stays permanently as regression evidence, but it must NOT be the
+  permanent architecture: there must ultimately be **one implementation of Nift
+  project-read semantics**, not two synchronized by tests. Convergence options
+  (exact approach open, decided at review): extract shared pure
+  parsing/validation/geometry primitives that both `ProjectInfo` and the SSR
+  layer consume, or have `ProjectInfo` delegate its read side to ProjectState
+  (ProjectInfo's mutable tracked/build behaviour stays above the shared read
+  layer either way). The destination:
+  ```text
+               shared project-read layer
+                /                  \
+               /                    \
+      ProjectInfo                 ProjectHost
+    CLI build/write                SSR read-only
+  ```
+- **PA2 ProjectHost** — a read-only `RenderHost` over the *converged* shared
+  project-read layer so the existing Parser renders project pages unchanged
+  (`@pathto` to tracked names, `@input`/`@json`/contracts, no build
+  decisions). Must not begin before PA1b.
 - **PA3 public project-aware API** — explicit construction only:
   `Engine(std::filesystem::path)` for project mode; default `Engine()` stays
   deterministic standalone (no CWD/upward discovery unless explicitly
