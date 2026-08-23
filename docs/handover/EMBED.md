@@ -76,7 +76,7 @@ details.
   pure `shared_ptr` moves (nothrow, no allocation); `impl_ == nullptr` is the
   canonical Null representation (reads non-allocating, mutation materialises
   on demand); static_asserts pin `is_nothrow_move_*` from the consumer view.
-- **CP4** (`...`): loader semantics. `@input`/`@content`/`@json`/`@dep` route
+- **CP4** (`6159983`): loader semantics. `@input`/`@content`/`@json`/`@dep` route
   their source existence/readability through the host (`source_exists` /
   `source_readable` / `read_shared_source` / `read_shared_json`), so a custom
   `Engine::set_loader` supplies sources from memory with no filesystem; a
