@@ -188,7 +188,17 @@ orchestration over the same `render_composed` used by `render(page, template)`.
   caches are mutex-protected. Contract documented in `include/nift/engine.h`;
   `tests/engine_concurrency.cpp` proves the supported case (8 threads x 200
   renders on one Engine) and passes under ThreadSanitizer.
-  Then CP7b pagination-through-host, CP7c API freeze + docs.
+- **CP7b** (`...`): pagination's remaining direct source/filesystem dependency
+  routed through the host boundary: the pagination template/separator
+  existence and readability checks now use `source_exists` / `source_readable`,
+  and reads already used `read_shared_source`. The only remaining
+  `filesystem::` calls in the parser are `path_within` (shared containment
+  utility). Archaeology finding for CP7c/spec: pagination does not enumerate
+  directories — it discovers the conventional `.separator` by named-source
+  existence and reads named sources, so the existing host capabilities express
+  it fully (no new capability required). CLI pagination semantics preserved
+  (smoke, 18/18 incremental equivalence, ASan/UBSan and TSan pagination).
+  Then CP7c API freeze + docs.
 
 Cadence: one or two checkpoints between reviews; CP5 is a hard review gate.
 

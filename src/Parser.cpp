@@ -2650,7 +2650,7 @@ RenderResult Parser::render() {
     fs::path pagination_template = config.template_path.has_value()
         ? (host_.root() / *config.template_path).lexically_normal()
         : conventional(".paginate");
-    if (!filesystem::path_within(host_.root(), pagination_template) || !filesystem::file_readable(pagination_template)) {
+    if (!filesystem::path_within(host_.root(), pagination_template) || !host_.source_readable(pagination_template)) {
         result.ok = false;
         result.error = {tracked_info_.name, pagination_template, 0, "pagination template is missing, unreadable, or outside the project"};
         return result;
@@ -2659,9 +2659,9 @@ RenderResult Parser::render() {
     if (config.separator_path.has_value()) separator = (host_.root() / *config.separator_path).lexically_normal();
     else {
         const fs::path candidate = conventional(".separator");
-        if (filesystem::path_exists(candidate)) separator = candidate;
+        if (host_.source_exists(candidate)) separator = candidate;
     }
-    if (!separator.empty() && (!filesystem::path_within(host_.root(), separator) || !filesystem::file_readable(separator))) {
+    if (!separator.empty() && (!filesystem::path_within(host_.root(), separator) || !host_.source_readable(separator))) {
         result.ok = false;
         result.error = {tracked_info_.name, separator, 0, "pagination separator is unreadable or outside the project"};
         return result;
