@@ -2,7 +2,7 @@
 #include "FileSystem.h"
 #include "Json.h"
 #include "JsonSchema.h"
-#include "ProjectInfo.h"
+#include "RenderHost.h"
 
 #include <algorithm>
 #include <chrono>
@@ -258,8 +258,8 @@ std::string entity(const std::string& value, bool& ok) {
 }
 }
 
-Parser::Parser(ProjectInfo& project, TrackedInfo& tracked_info)
-    : project_(project), tracked_info_(tracked_info) {}
+Parser::Parser(RenderHost& host, TrackedInfo& tracked_info)
+    : host_(host), tracked_info_(tracked_info) {}
 
 void Parser::fail(const fs::path& source_path, const std::string& source, std::size_t offset, const std::string& message) {
     result_.ok = false;
@@ -303,8 +303,8 @@ void Parser::fail(const fs::path& source_path, const std::string& source, std::s
 std::string Parser::metadata(const std::string& key) const {
     if (key == "title") return tracked_info_.title;
     if (key == "name") return tracked_info_.name;
-    if (key == "content-path") return project_.relative(project_.content_path(tracked_info_));
-    if (key == "output-path") return project_.relative(project_.output_path(tracked_info_));
+    if (key == "content-path") return host_.relative(host_.content_path(tracked_info_));
+    if (key == "output-path") return host_.relative(host_.output_path(tracked_info_));
     if (key == "template-path") return tracked_info_.template_path;
 
     const auto now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
@@ -440,13 +440,13 @@ bool Parser::resolve_json_value(const std::string& expression,
     if (binding != json_bindings_.end()) {
         current = binding->second;
     } else {
-        const auto contract = project_.config.contracts.find(root_name);
-        if (contract == project_.config.contracts.end()) return false;
+        const std::string* contract_source = host_.contract_source(root_name);
+        if (!contract_source) return false;
         contract_binding = true;
 
-        const std::string& contract_path_argument = contract->second;
-        const fs::path contract_path = (project_.root / contract_path_argument).lexically_normal();
-        if (!filesystem::path_within(project_.root, contract_path)) {
+        const std::string& contract_path_argument = *contract_source;
+        const fs::path contract_path = (host_.root() / contract_path_argument).lexically_normal();
+        if (!filesystem::path_within(host_.root(), contract_path)) {
             error = "contract '" + root_name + "': path must stay inside the Nift project: " +
                     contract_path_argument;
             return true;
@@ -461,7 +461,7 @@ bool Parser::resolve_json_value(const std::string& expression,
             current = cached->second;
         } else {
             std::string contract_error;
-            auto document = project_.read_shared_json(contract_path, contract_error);
+            auto document = host_.read_shared_json(contract_path, contract_error);
             if (!document) {
                 error = "contract '" + root_name + "': failed to parse " + contract_path_argument +
                         (contract_error.empty() ? "" : " (" + contract_error + ")");
@@ -471,8 +471,8 @@ bool Parser::resolve_json_value(const std::string& expression,
             current = std::move(document);
         }
 
-        result_.dependencies.insert(project_.relative(project_.root / ".nift/config.json"));
-        result_.dependencies.insert(project_.relative(contract_path));
+        result_.dependencies.insert(host_.relative(host_.root() / ".nift/config.json"));
+        result_.dependencies.insert(host_.relative(contract_path));
     }
 
     while (position < expression.size()) {
@@ -658,9 +658,9 @@ std::string Parser::path_to_page(std::size_t page) {
         result_.error = {tracked_info_.name, {}, 0, "pathtopage: page must be between 1 and " + std::to_string(pagination_total_)};
         return {};
     }
-    const fs::path destination = project_.pagination_output_path(tracked_info_, page);
+    const fs::path destination = host_.pagination_output_path(tracked_info_, page);
     const fs::path base = pagination_current_output_.empty()
-        ? project_.output_path(tracked_info_).parent_path()
+        ? host_.output_path(tracked_info_).parent_path()
         : pagination_current_output_.parent_path();
     if (page == 1 && (tracked_info_.name == "/" || (!tracked_info_.name.empty() && tracked_info_.name.back() == '/'))) {
         fs::path relative_path = destination.parent_path().lexically_normal().lexically_relative(base.lexically_normal());
@@ -791,7 +791,7 @@ bool Parser::evaluate_collection_value(const std::string& expression, json::Docu
         std::unordered_set<std::string> seen;
         for (const auto& name : bindings) {
             if (!valid_binding_identifier(name)) { error = function + ": binding must be an identifier"; return false; }
-            if (reserved_binding_name(name) || project_.config.contracts.count(name)) { error = function + ": binding conflicts with a reserved namespace: " + name; return false; }
+            if (reserved_binding_name(name) || host_.is_contract_name(name)) { error = function + ": binding conflicts with a reserved namespace: " + name; return false; }
             if (!seen.insert(name).second) { error = function + ": bindings must be distinct identifiers"; return false; }
         }
         return true;
@@ -914,7 +914,7 @@ bool Parser::evaluate_collection_value(const std::string& expression, json::Docu
         const std::string initial = trim_copy(accumulator_clause.substr(equals + 1));
         std::vector<std::string> bindings;
         if (!parse_bindings(binding_text, bindings)) return false;
-        if (!valid_binding_identifier(accumulator) || reserved_binding_name(accumulator) || project_.config.contracts.count(accumulator)) { error = "reduce: accumulator must be a non-reserved identifier"; return false; }
+        if (!valid_binding_identifier(accumulator) || reserved_binding_name(accumulator) || host_.is_contract_name(accumulator)) { error = "reduce: accumulator must be a non-reserved identifier"; return false; }
         if (std::find(bindings.begin(), bindings.end(), accumulator) != bindings.end()) { error = "reduce: accumulator must be distinct from item bindings"; return false; }
         json::Document source; if (!collection_arg(source_text, source)) return false;
         json::Document accumulator_value; if (!evaluate_expression(initial, accumulator_value, error)) return false;
@@ -1304,18 +1304,18 @@ bool Parser::evaluate_condition(const std::string& expression, bool& value, std:
 }
 
 std::string Parser::path_to(const std::string& argument) {
-    const fs::path output = project_.output_path(tracked_info_);
+    const fs::path output = host_.output_path(tracked_info_);
     const bool absolute_404 = (tracked_info_.name == "404");
     const fs::path base = output.parent_path();
     fs::path destination;
     bool index_page = false;
 
-    if (const TrackedInfo* target = project_.find(argument)) {
-        destination = project_.output_path(*target);
+    if (const TrackedInfo* target = host_.find(argument)) {
+        destination = host_.output_path(*target);
         index_page = target->name == "/" || (!target->name.empty() && target->name.back() == '/');
     } else {
-        destination = (project_.root / argument).lexically_normal();
-        if (!filesystem::path_within(project_.root, destination)) {
+        destination = (host_.root() / argument).lexically_normal();
+        if (!filesystem::path_within(host_.root(), destination)) {
             result_.ok = false;
             result_.error = {tracked_info_.name, {}, 0, "pathto: path must stay inside the Nift project: " + argument};
             return {};
@@ -1334,7 +1334,7 @@ std::string Parser::path_to(const std::string& argument) {
     // is unchanged; only the path representation differs. Targets outside the
     // output directory keep the ordinary relative behaviour.
     if (absolute_404) {
-        const fs::path web_root = (project_.root / project_.config.output_dir).lexically_normal();
+        const fs::path web_root = (host_.root() / host_.output_dir()).lexically_normal();
         fs::path web_rel = destination.lexically_normal().lexically_relative(web_root.lexically_normal());
         const std::string web_rel_str = web_rel.generic_string();
         const bool escapes_web_root = web_rel_str == ".." || web_rel_str.rfind("../", 0) == 0;
@@ -1874,7 +1874,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                          "@for binding '" + binding_part + "' conflicts with built-in metadata");
                     break;
                 }
-                if (project_.config.contracts.count(binding_part)) {
+                if (host_.is_contract_name(binding_part)) {
                     fail(source_path, source, i,
                          "@for binding '" + binding_part + "' conflicts with configured contract namespace");
                     break;
@@ -1992,7 +1992,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                          "@for bindings cannot conflict with built-in metadata");
                     break;
                 }
-                if (project_.config.contracts.count(key_name) || project_.config.contracts.count(value_name)) {
+                if (host_.is_contract_name(key_name) || host_.is_contract_name(value_name)) {
                     fail(source_path, source, i,
                          "@for bindings cannot conflict with configured contract namespaces");
                     break;
@@ -2146,7 +2146,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     break;
                 }
 
-                const fs::path content_path = fs::absolute(project_.content_path(tracked_info_)).lexically_normal();
+                const fs::path content_path = fs::absolute(host_.content_path(tracked_info_)).lexically_normal();
                 if (std::find(input_stack_.begin(), input_stack_.end(), content_path) != input_stack_.end()) {
                     fail(source_path, source, i, "@content would result in an input loop through " + content_path.generic_string());
                     break;
@@ -2157,7 +2157,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     break;
                 }
                 input_stack_.push_back(content_path);
-                result_.dependencies.insert(project_.relative(content_path));
+                result_.dependencies.insert(host_.relative(content_path));
                 const int insertion_code_block_depth = code_block_depth_;
                 const std::string content_source = filesystem::read_file(content_path);
                 const auto nested = parse(content_source, content_path, depth + 1);
@@ -2299,7 +2299,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 fs::path input_path = parameters[0];
                 if (input_path.is_relative()) {
                     const fs::path relative_to_source = source_path.parent_path() / input_path;
-                    input_path = filesystem::path_exists(relative_to_source) ? relative_to_source : project_.root / input_path;
+                    input_path = filesystem::path_exists(relative_to_source) ? relative_to_source : host_.root() / input_path;
                 }
                 if (!filesystem::path_exists(input_path)) { fail(source_path, source, i, "@input path does not exist: " + parameters[0]); break; }
                 input_path = fs::absolute(input_path).lexically_normal();
@@ -2309,9 +2309,9 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 }
                 if (!filesystem::file_readable(input_path)) { fail(source_path, source, i, "input file is not readable"); break; }
                 input_stack_.push_back(input_path);
-                result_.dependencies.insert(project_.relative(input_path));
+                result_.dependencies.insert(host_.relative(input_path));
                 const int insertion_code_block_depth = code_block_depth_;
-                const auto input_source = project_.read_shared_source(input_path);
+                const auto input_source = host_.read_shared_source(input_path);
                 const auto nested = parse(*input_source, input_path, depth + 1);
                 input_stack_.pop_back();
                 if (!nested.ok) break;
@@ -2328,9 +2328,9 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 }
                 parameters[0] = std::move(resolved);
 
-                if (!project_.find(parameters[0])) {
-                    const fs::path target_path = (project_.root / parameters[0]).lexically_normal();
-                    if (!filesystem::path_within(project_.root, target_path)) {
+                if (!host_.find(parameters[0])) {
+                    const fs::path target_path = (host_.root() / parameters[0]).lexically_normal();
+                    if (!filesystem::path_within(host_.root(), target_path)) {
                         fail(source_path, source, i, "@" + function + " path must stay inside the Nift project: " + parameters[0]);
                         break;
                     }
@@ -2339,9 +2339,9 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 output += path_to(parameters[0]);
                 if (!result_.ok) { if (result_.error.source_file.empty()) fail(source_path, source, i, result_.error.message); break; }
                 fs::path requirement;
-                if (const TrackedInfo* target = project_.find(parameters[0])) requirement = project_.output_path(*target);
-                else requirement = project_.root / parameters[0];
-                result_.reqs.insert(project_.relative(requirement.lexically_normal()));
+                if (const TrackedInfo* target = host_.find(parameters[0])) requirement = host_.output_path(*target);
+                else requirement = host_.root() / parameters[0];
+                result_.reqs.insert(host_.relative(requirement.lexically_normal()));
                 i = end;
                 continue;
             }
@@ -2407,7 +2407,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     fail(source_path, source, i, "json: name '" + binding_name + "' conflicts with built-in metadata/reserved bindings");
                     break;
                 }
-                if (project_.config.contracts.count(binding_name)) {
+                if (host_.is_contract_name(binding_name)) {
                     fail(source_path, source, i, "json: name '" + binding_name + "' conflicts with configured contract namespace");
                     break;
                 }
@@ -2416,9 +2416,9 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     break;
                 }
 
-                const fs::path json_path = (project_.root / json_path_argument).lexically_normal();
-                const fs::path project_root = project_.root.lexically_normal();
-                if (!filesystem::path_within(project_root, json_path)) {
+                const fs::path json_path = (host_.root() / json_path_argument).lexically_normal();
+                const fs::path host_root = host_.root().lexically_normal();
+                if (!filesystem::path_within(host_root, json_path)) {
                     fail(source_path, source, i, "json: path must stay inside the Nift project: " + json_path_argument);
                     break;
                 }
@@ -2428,7 +2428,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 }
 
                 std::string json_error;
-                auto document = project_.read_shared_json(json_path, json_error);
+                auto document = host_.read_shared_json(json_path, json_error);
                 if (!document) {
                     fail(source_path, source, i, "json: failed to parse " + json_path_argument +
                          (json_error.empty() ? "" : " (" + json_error + ")"));
@@ -2437,8 +2437,8 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
 
                 if (parameters.size() == 3) {
                     const std::string& schema_path_argument = parameters[2];
-                    const fs::path schema_path = (project_.root / schema_path_argument).lexically_normal();
-                    if (!filesystem::path_within(project_root, schema_path)) {
+                    const fs::path schema_path = (host_.root() / schema_path_argument).lexically_normal();
+                    if (!filesystem::path_within(host_root, schema_path)) {
                         fail(source_path, source, i,
                              "json: schema path must stay inside the Nift project: " + schema_path_argument);
                         break;
@@ -2448,7 +2448,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                         break;
                     }
                     std::string schema_parse_error;
-                    auto schema = project_.read_shared_json(schema_path, schema_parse_error);
+                    auto schema = host_.read_shared_json(schema_path, schema_parse_error);
                     if (!schema) {
                         fail(source_path, source, i, "json: failed to parse schema " + schema_path_argument +
                              (schema_parse_error.empty() ? "" : " (" + schema_parse_error + ")"));
@@ -2461,12 +2461,12 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                              schema_path_argument + " (" + schema_validation_error + ")");
                         break;
                     }
-                    result_.dependencies.insert(project_.relative(schema_path));
+                    result_.dependencies.insert(host_.relative(schema_path));
                 }
 
                 json_bindings_.emplace(binding_name, std::move(document));
                 if (!json_binding_scopes_.empty()) json_binding_scopes_.back().push_back(binding_name);
-                result_.dependencies.insert(project_.relative(json_path));
+                result_.dependencies.insert(host_.relative(json_path));
                 i = end;
                 continue;
             }
@@ -2480,8 +2480,8 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                         break;
                     }
                     dependency = std::move(resolved);
-                    const fs::path dependency_path = (project_.root / dependency).lexically_normal();
-                    if (!filesystem::path_within(project_.root, dependency_path)) {
+                    const fs::path dependency_path = (host_.root() / dependency).lexically_normal();
+                    if (!filesystem::path_within(host_.root(), dependency_path)) {
                         fail(source_path, source, i, "dep: path must stay inside the Nift project: " + dependency);
                         break;
                     }
@@ -2489,7 +2489,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                         fail(source_path, source, i, "failed as dependency does not exist: " + dependency);
                         break;
                     }
-                    result_.dependencies.insert(project_.relative(dependency_path));
+                    result_.dependencies.insert(host_.relative(dependency_path));
                 }
                 if (!result_.ok) break;
                 i = end;
@@ -2521,7 +2521,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
 }
 
 RenderResult Parser::render() {
-    const fs::path content_path = project_.content_path(tracked_info_);
+    const fs::path content_path = host_.content_path(tracked_info_);
     if (tracked_info_.template_path.empty()) {
         if (!filesystem::file_readable(content_path)) {
             result_.ok = false;
@@ -2530,11 +2530,11 @@ RenderResult Parser::render() {
         }
         auto result = parse(filesystem::read_file(content_path), content_path, 0);
         result.content_used = true;
-        result.dependencies.insert(project_.relative(content_path));
+        result.dependencies.insert(host_.relative(content_path));
         return result;
     }
 
-    const fs::path template_path = project_.root / tracked_info_.template_path;
+    const fs::path template_path = host_.root() / tracked_info_.template_path;
     if (!filesystem::path_exists(template_path)) {
         result_.ok = false;
         result_.error = {tracked_info_.name, template_path, 0, "template file does not exist"};
@@ -2548,7 +2548,7 @@ RenderResult Parser::render() {
     }
     input_stack_.push_back(fs::absolute(template_path).lexically_normal());
     result_.dependencies.insert(tracked_info_.template_path);
-    const auto template_source = project_.read_shared_source(template_path);
+    const auto template_source = host_.read_shared_source(template_path);
     pagination_collecting_ = tracked_info_.paginate.has_value();
     auto result = parse(*template_source, template_path, 0);
     if (result.ok && result.content_count != 1) {
@@ -2567,27 +2567,27 @@ RenderResult Parser::render() {
         return content_path.parent_path() / (content_path.stem().generic_string() + suffix + ".html");
     };
     fs::path pagination_template = config.template_path.has_value()
-        ? (project_.root / *config.template_path).lexically_normal()
+        ? (host_.root() / *config.template_path).lexically_normal()
         : conventional(".paginate");
-    if (!filesystem::path_within(project_.root, pagination_template) || !filesystem::file_readable(pagination_template)) {
+    if (!filesystem::path_within(host_.root(), pagination_template) || !filesystem::file_readable(pagination_template)) {
         result.ok = false;
         result.error = {tracked_info_.name, pagination_template, 0, "pagination template is missing, unreadable, or outside the project"};
         return result;
     }
     fs::path separator;
-    if (config.separator_path.has_value()) separator = (project_.root / *config.separator_path).lexically_normal();
+    if (config.separator_path.has_value()) separator = (host_.root() / *config.separator_path).lexically_normal();
     else {
         const fs::path candidate = conventional(".separator");
         if (filesystem::path_exists(candidate)) separator = candidate;
     }
-    if (!separator.empty() && (!filesystem::path_within(project_.root, separator) || !filesystem::file_readable(separator))) {
+    if (!separator.empty() && (!filesystem::path_within(host_.root(), separator) || !filesystem::file_readable(separator))) {
         result.ok = false;
         result.error = {tracked_info_.name, separator, 0, "pagination separator is unreadable or outside the project"};
         return result;
     }
 
-    result_.dependencies.insert(project_.relative(pagination_template));
-    if (!separator.empty()) result_.dependencies.insert(project_.relative(separator));
+    result_.dependencies.insert(host_.relative(pagination_template));
+    if (!separator.empty()) result_.dependencies.insert(host_.relative(separator));
     const std::string base_output = result.output;
     const std::string marker = "\x1dNIFT_PAGINATE\x1d";
     const std::size_t marker_position = base_output.find(marker);
@@ -2600,14 +2600,14 @@ RenderResult Parser::render() {
         std::set<std::string> reqs;
     };
     std::vector<PageRender> pages(total);
-    const auto page_source = project_.read_shared_source(pagination_template);
-    const std::string* separator_source = separator.empty() ? nullptr : project_.read_shared_source(separator);
+    const auto page_source = host_.read_shared_source(pagination_template);
+    const std::string* separator_source = separator.empty() ? nullptr : host_.read_shared_source(separator);
 
     const unsigned hardware = std::max(1u, std::thread::hardware_concurrency());
     std::size_t thread_count = tracked_info_.paginate.has_value()
-        ? (project_.config.build_threads < 0
-            ? static_cast<std::size_t>(-static_cast<long long>(project_.config.build_threads)) * hardware
-            : (project_.config.build_threads == 0 ? hardware : static_cast<std::size_t>(project_.config.build_threads)))
+        ? (host_.build_threads() < 0
+            ? static_cast<std::size_t>(-static_cast<long long>(host_.build_threads())) * hardware
+            : (host_.build_threads() == 0 ? hardware : static_cast<std::size_t>(host_.build_threads())))
         : 1;
     thread_count = std::max<std::size_t>(1, std::min(thread_count, total));
     std::atomic<std::size_t> next_page{0};
@@ -2617,14 +2617,14 @@ RenderResult Parser::render() {
             const std::size_t page_index = next_page.fetch_add(1);
             if (page_index >= total) break;
             const std::size_t page = page_index + 1;
-            Parser page_parser(project_, tracked_info_);
+            Parser page_parser(host_, tracked_info_);
             page_parser.json_bindings_ = json_bindings_;
             page_parser.contract_bindings_ = contract_bindings_;
             page_parser.pagination_collecting_ = false;
             page_parser.pagination_context_active_ = true;
             page_parser.pagination_current_ = page;
             page_parser.pagination_total_ = total;
-            page_parser.pagination_current_output_ = project_.pagination_output_path(tracked_info_, page);
+            page_parser.pagination_current_output_ = host_.pagination_output_path(tracked_info_, page);
             page_parser.result_.content_count = result_.content_count;
 
             const std::size_t begin = page_index * config.items_per_page;

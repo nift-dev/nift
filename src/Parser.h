@@ -1,21 +1,21 @@
 #pragma once
 #include "Types.h"
+#include "RenderHost.h"
 #include <filesystem>
 #include <vector>
 #include <string>
 #include <memory>
 #include <unordered_map>
 
-class ProjectInfo;
 namespace json { class Document; }
 
 class Parser {
 public:
-    Parser(ProjectInfo& project, TrackedInfo& tracked_info);
+    Parser(RenderHost& host, TrackedInfo& tracked_info);
     RenderResult render();
 
 private:
-    ProjectInfo& project_;
+    RenderHost& host_;
     TrackedInfo& tracked_info_;
     std::vector<std::filesystem::path> input_stack_;
     RenderResult result_;

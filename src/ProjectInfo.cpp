@@ -1,4 +1,5 @@
 #include "ProjectInfo.h"
+#include "ProjectInfoHost.h"
 #include <minify/Minify.h>
 #include "BuildProgress.h"
 #include "Console.h"
@@ -947,7 +948,8 @@ bool ProjectInfo::build_one(TrackedInfo& info) {
         return false;
     }
 
-    Parser parser(*this, info);
+    ProjectInfoHost host(*this);
+    Parser parser(host, info);
     RenderResult result = parser.render();
     if (!result.ok) { print_build_error(result.error); return false; }
     if (!load_user_dependencies(info, result.dependencies, &result.error)) { print_build_error(result.error); return false; }
