@@ -89,7 +89,7 @@ details.
   This mirrors the `@input` no-cwd guard decision and should be settled
   deliberately (likely: require a root, or define empty-root containment as
   no-containment) in a later checkpoint; it is not claimed as a contract yet.
-- **CP5** (`...`): `@pathto`/`@pathtofile` through the host path capability.
+- **CP5** (`2266ca2`): `@pathto`/`@pathtofile` through the host path capability.
   `RenderHost` replaces the parser's tracked lookup with `has_output_context()`
   and `tracked_output_path(name)` (CLI resolves tracked names; the embedded
   engine has none and treats every argument as a concrete project path — no
