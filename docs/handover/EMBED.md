@@ -198,7 +198,69 @@ orchestration over the same `render_composed` used by `render(page, template)`.
   existence and reads named sources, so the existing host capabilities express
   it fully (no new capability required). CLI pagination semantics preserved
   (smoke, 18/18 incremental equivalence, ASan/UBSan and TSan pagination).
-  Then CP7c API freeze + docs.
+- **CP7c** (`...`): API freeze + documentation + programme sign-off. The public
+  `include/nift/` surface was audited and the behavioural contracts below were
+  documented in the headers; the public-header probe now exercises every
+  public type/member with only `-Iinclude`. Final evidence: all six engine
+  tests (native + ASan/UBSan), TSan concurrency + TSan pagination, pagination
+  sanitizer, full CLI suite. See the sign-off sections below.
+
+## Behavioural contracts established (C++ behavioural reference)
+
+- **Values** (`nift::Value`): deep-copy semantics; move leaves the source as a
+  valid Null and is nothrow; type-mismatched reads return type defaults;
+  `operator[](string)` materialises a Null as Object and throws
+  `std::runtime_error` on non-objects; `operator[](size_t)`/`push_back` require
+  an Array (assign `make_array()` first) and throw otherwise; a `ValueRef` is a
+  transient construction handle.
+- **Context / precedence**: Context overlay -> Engine default -> `@json`
+  binding -> contract binding -> built-in metadata; structural built-ins
+  (`name`, `content-path`, `output-path`, `template-path`, `loop`) rejected;
+  `set_title` and `set("title")` share one per-render slot. Host-vs-contract
+  precedence is provisional until an Embedded contract source exists.
+- **Loaders**: repeatable lookup functions (probe then read), may be called
+  concurrently, must be thread-safe.
+- **`@pathto`**: requires `Context::set_current_output` (and page name for the
+  404 rule); errors without it; the 404 rule yields root-absolute web paths;
+  standalone rendering has no tracked pages (concrete-project semantics);
+  requirements are recorded in `RenderResult::requirements()`.
+- **Pagination**: source requirements are named-source existence/readability
+  (no directory enumeration); expressed by the existing host capabilities.
+- **Concurrency**: concurrent `render()` on one Engine supported (no concurrent
+  mutation); Engine mutation is a pre-serve lifecycle boundary; Context is
+  per-render; loader/provider must tolerate concurrent invocation; caches
+  mutex-protected.
+- **Dependency discovery**: `RenderResult::dependencies()/requirements()`
+  spell root-relative paths (or as supplied without a root); persistence is
+  the host's decision.
+
+## Deliberately unsupported / future
+
+- **Engine mutation during active renders** is unsupported (documented, not
+  serialized).
+- **Project-aware rendering** (`render("page-name"[, context])` backed by real
+  `.nift/tracked.json`/`config.json` knowledge) is a recorded future
+  requirement, not implemented.
+- **Custom `set_path_resolver`** is deferred (a runtime route's interaction
+  with existence/requirements is not yet designed).
+- **Value serialization** (e.g. `dump()` to JSON text) is not in the public
+  API.
+- **Rust/Go/JS implementations** have not started; this C++ line is the
+  behavioural reference.
+
+## Unresolved known issues
+
+- **ASAN-FLAKE-001**: single historical GCC/ASan stack-instrumentation finding;
+  structurally in-bounds, not reproduced in 100k+ constructions, no
+  corroborating corruption. Retained; reopen-and-preserve-report on reappearance.
+- **Empty-root containment**: `@json`/`@dep`/`@pathto` containment with an
+  empty Engine root derives meaning from the process working directory via
+  `path_within`; preserved, to be settled deliberately in spec work.
+- **`tracked_output_path` repeated lookup**: queried more than once per
+  directive; hosts are deterministic so this is correct, but the seam assumes
+  stable lookup during a render (resolve-once is a possible later cleanup).
+- **Loader probe-then-read**: a custom loader may be called twice per source;
+  classified as an API-hardening item (repeatable lookup contract).
 
 Cadence: one or two checkpoints between reviews; CP5 is a hard review gate.
 

@@ -15,6 +15,11 @@ struct ValueAccess;   // internal implementation bridge (defined in src/)
 //   Value user = Value::make_object();
 //   user["name"] = Value("Nick");
 //   user["projects"][0] = Value("nift");
+//
+// Lifetime contract: a ValueRef is a transient construction handle valid only
+// while the Value it was obtained from is alive and that Value's storage is
+// not replaced (e.g. by move-assignment into it). Never retain a ValueRef
+// beyond the building expression it participates in.
 class ValueRef {
 public:
     ValueRef& operator=(const Value& value);
@@ -33,6 +38,19 @@ private:
 // detail: nift::Value is Nift's contract (and must stay that way for the
 // future independent Rust/Go/JS implementations), not an alias of the C++
 // backing store.
+//
+// Value semantics (CP7c contract):
+// - copy construction/assignment produce an independent equivalent value;
+//   mutating either copy does not affect the other
+// - move construction/assignment transfer ownership without copying and leave
+//   the source as a valid Null Value; moves are nothrow
+// - a default-constructed or moved-from Value is Null
+// - type-mismatched reads return the type's default: number() -> 0.0,
+//   boolean() -> false, string() -> empty
+// - operator[](string) materialises a Null Value as an Object and otherwise
+//   throws std::runtime_error on a non-object Value. operator[](size_t) and
+//   push_back require an Array Value (a Null member must first be assigned
+//   make_array()) and otherwise throw std::runtime_error.
 class Value {
 public:
     enum class Type { Null, Boolean, Number, String, Array, Object };

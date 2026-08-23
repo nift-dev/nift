@@ -48,7 +48,10 @@ public:
     void set_root(std::filesystem::path root);
 
     // Custom loader for @input/content/template paths. The default reads from
-    // the filesystem under the configured root.
+    // the filesystem under the configured root. A loader is a repeatable
+    // lookup function, not a one-shot stream: it may be called more than once
+    // per source (existence/readability probe then read), and may be called
+    // concurrently from render threads, so it must be thread-safe.
     void set_loader(std::function<std::optional<std::string>(std::string_view path)> loader);
 
     // Environment provider for @getenv. The default reads the process
@@ -69,6 +72,10 @@ public:
 
     // Full page + template composition (template contains @content; exactly one
     // @content is required). The page and template may each be text or path.
+    //
+    // @pathto requires a path context: set Context::set_current_output (and
+    // Context::set_page_name for the 404 rule). Without it, @pathto errors
+    // rather than guessing a location.
     RenderResult render(const Source& page, const Source& page_template);
     RenderResult render(const Source& page, const Source& page_template, const Context& context);
 

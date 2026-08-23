@@ -41,6 +41,12 @@ inline bool structural_builtin_name(const std::string& name) {
 // vary from request to request. Long-lived capabilities (loaders, root, default
 // values) belong to Engine; bindings set here override Engine defaults for this
 // render only.
+//
+// Value resolution precedence (CP7c contract): Context overlay -> Engine
+// default -> @json binding -> contract binding -> built-in metadata, with the
+// structural built-ins (name, content-path, output-path, template-path, loop)
+// rejected by set. Host-vs-contract precedence is provisional until an
+// Embedded contract source exists.
 class Context {
 public:
     void set_page_name(std::string name) { page_name_ = std::move(name); }

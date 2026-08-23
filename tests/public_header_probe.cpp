@@ -1,9 +1,13 @@
 // Public-header consumer probe. Compiled with ONLY -Iinclude (see the
 // test-public-header Makefile target), this proves the public Embedded Nift
 // headers are self-contained: a consumer must not need -Isrc, must not see
-// json::Document, and must not need to know Jsonic++ exists.
+// json::Document, Parser, RenderHost, ProjectInfo or other implementation
+// machinery, and must not need to know Jsonic++ exists. It exercises every
+// public type and member function so the whole surface compiles from a
+// consumer's point of view.
 #include <nift/nift.h>
 
+#include <cstdio>
 #include <type_traits>
 
 // nift::Value move construction/assignment must be nothrow: the moved-from
@@ -16,15 +20,88 @@ static_assert(std::is_nothrow_move_assignable<nift::Value>::value,
               "nift::Value move assignment must be nothrow");
 
 int main() {
-    nift::Engine engine;
-    nift::Context context;
-    nift::Value number(1);
-    nift::Value text(std::string("hello"));
-    nift::Value object = nift::Value::make_object();
-    object["key"] = text;
+    // Source variants.
+    nift::Source path_source = nift::Source::path(std::filesystem::path("a.html"));
+    nift::Source text_source = nift::Source::text(std::string("<p>x</p>"));
+    nift::Source named_text = nift::Source::text(std::string("<p>y</p>"), std::string("tpl.html"));
+    (void)path_source.is_path();
+    (void)text_source.is_text();
+    (void)named_text.path();
+    (void)named_text.text();
+    (void)named_text.logical_name();
+
+    // Value surface.
+    nift::Value null_value;
+    nift::Value bool_value(true);
+    nift::Value int_value(1);
+    nift::Value double_value(2.5);
+    nift::Value string_value(std::string("s"));
     nift::Value array = nift::Value::make_array();
-    array.push_back(number);
-    context.set_title(std::string("Title"));
-    context.set("count", 42);
-    return static_cast<int>(number.number()) == 1 ? 0 : 1;
+    array.push_back(int_value);
+    array[0] = string_value;
+    nift::Value object = nift::Value::make_object();
+    object["k"] = bool_value;
+    nift::Value arr_member = nift::Value::make_array();
+    arr_member.push_back(string_value);
+    object["arr"] = arr_member;
+    (void)null_value.is_null();
+    (void)object.is_object();
+    (void)array.is_array();
+    (void)int_value.type();
+    (void)int_value.number();
+    (void)bool_value.boolean();
+    (void)string_value.string();
+    nift::Value copy = object;
+    nift::Value moved = std::move(int_value);
+    nift::Value assigned;
+    assigned = object;
+    (void)copy;
+    (void)moved;
+    (void)assigned;
+    (void)null_value.is_null();
+
+    // RenderError + RenderResult surface (populated through a render).
+    nift::Engine engine;
+    engine.set_root(std::filesystem::temp_directory_path());
+    engine.set("title", std::string("T"));
+    engine.set("count", 42);
+    engine.set_environment_provider([](std::string_view) -> std::optional<std::string> {
+        return std::nullopt;
+    });
+    engine.set_loader([](std::string_view) -> std::optional<std::string> { return std::nullopt; });
+
+    nift::Context context;
+    context.set_page_name(std::string("page"));
+    context.set_current_output(std::filesystem::temp_directory_path() / "page.html");
+    context.set_title(std::string("CT"));
+    context.set("count", 7);
+    context.set_json("user", R"({"name":"Nick"})");
+
+    nift::RenderResult result = engine.render(
+        nift::Source::text("<h1>hi</h1>"),
+        nift::Source::text("<title>$[title]/$[count]/$[user.name]</title>@content"),
+        context);
+    nift::RenderResult partial = engine.render(nift::Source::text("<nav>N</nav>"), context);
+    nift::RenderResult path_result =
+        engine.render(nift::Source::path(std::filesystem::temp_directory_path() / "page.html"),
+                      nift::Source::text("<html>@content</html>"), context);
+    (void)result.ok();
+    (void)result.output();
+    (void)result.error().message;
+    (void)result.error().source;
+    (void)result.error().line;
+    (void)result.error().column;
+    (void)result.dependencies().size();
+    (void)result.requirements().size();
+    (void)partial.ok();
+    (void)path_result.ok();
+
+    // Engine overloads without context.
+    nift::RenderResult r2 = engine.render(nift::Source::text("<p>p</p>"),
+                                          nift::Source::text("<html>@content</html>"));
+    nift::RenderResult r3 = engine.render(nift::Source::text("<p>p</p>"));
+    (void)r2.ok();
+    (void)r3.ok();
+
+    return 0;
 }

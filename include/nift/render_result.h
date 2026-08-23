@@ -12,6 +12,10 @@ struct RenderResultBuilder;   // internal; defined in the engine implementation
 // The outcome of an Embedded Nift render: generated text plus the external
 // inputs the renderer discovered. Dependency discovery lives here; whether and
 // how those dependencies are persisted is the host's decision.
+//
+// dependencies()/requirements() spell paths relative to the Engine root when
+// a root is configured, and as supplied otherwise. Persistence (e.g. the CLI's
+// .info.json) is the caller's concern.
 class RenderResult {
 public:
     bool ok() const { return ok_; }
