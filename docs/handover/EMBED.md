@@ -204,12 +204,29 @@ consumes a read-only snapshot and never becomes the build system.
   (`result.dependencies()`/`result.requirements()`), e.g. `@pathto` emits its
   destination as a requirement. Pagination API stays open (PA5): `render("blog/")`
   returns the primary page. No reload/watch in PA3 (that is PA4).
-- **PA4 staleness/reload/concurrency** — PA1 establishes immutable snapshot
-  semantics only (construct → load snapshot → concurrent renders forever; no
-  watching, no writes, no implicit reload). PA4 investigates reload separately;
-  atomic snapshot replacement (in-flight renders finish on snapshot A, later
-  renders see snapshot B) must be explored rather than assuming CP7a's
-  "mutation cannot overlap rendering" becomes the permanent contract.
+- **PA4 atomic reload lifecycle** — DONE. `Engine::reload(std::string* error)`
+  implements atomic immutable snapshot replacement. The Engine holds
+  `shared_ptr<const ProjectState>` per generation; a render captures its
+  snapshot under a short mutex and then renders freely, so **in-flight renders
+  finish on the snapshot they started with** while later renders observe the
+  new one (stronger than CP7a's "mutation cannot overlap rendering", and that
+  relaxation is scoped to reload only - the other mutators stay non-concurrent).
+  A failed reload **retains the last known-good snapshot** (never fail-closed:
+  serving A → project becomes malformed → reload fails → A remains usable),
+  returns false with the error, and performs zero project writes. reload() is
+  also the retry path for an Engine constructed before its project existed.
+  `is_open()`/`open_error()` now read under the mutex; `open_error()` returns
+  by value (race-free). Engine defaults and the environment provider are
+  unaffected by reload; cache ownership is per generation (a fresh snapshot has
+  fresh caches). Staleness detection is deliberately the host's job - an
+  explicit reload() API, no filesystem watching in the embedded core, per the
+  "glue, not universe" direction. Evidence: `tests/engine_reload.cpp`
+  (new-page-after-reload, failed-reload-retains-last-good incl. recovery,
+  reload-as-open-retry, generation switch, 8-thread concurrent render + reload
+  flipper observing exactly one committed generation per render, zero-write
+  across success/failure reloads, defaults/environment survival) - all also
+  green under ThreadSanitizer (`test-engine-reload-tsan`, plus
+  `test-engine-concurrency-tsan` re-validated against the current core).
 - **PA5 CLI ↔ Engine parity → portable conformance corpus** — not a handful of
   examples. The seed of the cross-implementation corpus `nift-rs` will inherit
   (CLI ↕ C++ project Engine ↕ nift-rs): tracked-name lookup, index/trailing-

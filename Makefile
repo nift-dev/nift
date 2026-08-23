@@ -42,7 +42,7 @@ $(TARGET): $(OBJECTS)
 %.o: %.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -MMD -MP -c $< -o $@
 
--include $(DEPFILES)
+-include $(DEPFILES) $(patsubst %.o,%.d,$(SAN_OBJECTS) $(TSAN_OBJECTS))
 
 test-jsonic:
 	$(MAKE) -C jsonic test
@@ -157,6 +157,17 @@ $(ENGINE_PROJECT_TEST): tests/engine_project.cpp $(ENGINE_CORE_OBJECTS)
 test-engine-project: $(ENGINE_PROJECT_TEST)
 	$(ENGINE_PROJECT_TEST)
 
+# PA4: atomic immutable snapshot replacement - reload() keeps in-flight renders
+# on their snapshot, retains the last good snapshot on failure, zero writes,
+# concurrent render+reload safety, defaults/environment survival.
+ENGINE_RELOAD_TEST := $(TEST_DIR)/engine-reload$(EXEEXT)
+$(ENGINE_RELOAD_TEST): tests/engine_reload.cpp $(ENGINE_CORE_OBJECTS)
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/engine_reload.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
+
+test-engine-reload: $(ENGINE_RELOAD_TEST)
+	$(ENGINE_RELOAD_TEST)
+
 ENGINE_CONCURRENCY_TEST := $(TEST_DIR)/engine-concurrency$(EXEEXT)
 $(ENGINE_CONCURRENCY_TEST): tests/engine_concurrency.cpp $(ENGINE_CORE_OBJECTS)
 	mkdir -p $(TEST_DIR)
@@ -176,6 +187,14 @@ $(ENGINE_CONCURRENCY_TSAN): tests/engine_concurrency.cpp $(TSAN_CORE_OBJECTS)
 
 test-engine-concurrency-tsan: $(ENGINE_CONCURRENCY_TSAN)
 	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 $(ENGINE_CONCURRENCY_TSAN)
+
+ENGINE_RELOAD_TSAN := $(TEST_DIR)/engine-reload-tsan$(EXEEXT)
+$(ENGINE_RELOAD_TSAN): tests/engine_reload.cpp $(TSAN_CORE_OBJECTS)
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) -std=c++17 -pthread $(TSAN_FLAGS) tests/engine_reload.cpp $(TSAN_CORE_OBJECTS) $(LDLIBS) -o $@
+
+test-engine-reload-tsan: $(ENGINE_RELOAD_TSAN)
+	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 $(ENGINE_RELOAD_TSAN)
 
 
 test-comments: $(TARGET)
@@ -328,7 +347,7 @@ clean:
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
-.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-diagnostics test-minify test-json-schema-integration test-engine test-engine-bindings test-engine-loaders test-engine-pathto test-engine-concurrency test-engine-project test-project-state test-project-host test-public-header test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
+.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-diagnostics test-minify test-json-schema-integration test-engine test-engine-bindings test-engine-loaders test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-project-state test-project-host test-public-header test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
 
 
 test-cross-feature: $(TARGET)
@@ -394,7 +413,7 @@ benchmark-memory-10k: $(TARGET)
 
 $(TEST_DIR)/san/%.o: %.cpp
 	mkdir -p "$(dir $@)"
-	$(CXX) $(CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(SANITIZER_FLAGS) -c "$<" -o "$@"
+	$(CXX) $(CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(SANITIZER_FLAGS) -MMD -MP -c "$<" -o "$@"
 
 $(SAN_TARGET): $(SAN_OBJECTS)
 	mkdir -p "$(TEST_DIR)"
@@ -408,7 +427,7 @@ test-pagination-sanitize: $(SAN_TARGET)
 
 $(TEST_DIR)/tsan/%.o: %.cpp
 	mkdir -p "$(dir $@)"
-	$(CXX) $(CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(TSAN_FLAGS) -c "$<" -o "$@"
+	$(CXX) $(CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(TSAN_FLAGS) -MMD -MP -c "$<" -o "$@"
 
 $(TSAN_TARGET): $(TSAN_OBJECTS)
 	mkdir -p "$(TEST_DIR)"

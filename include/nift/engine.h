@@ -55,7 +55,18 @@ public:
     // is_open(): the project snapshot was loaded and validated.
     // open_error(): the construction failure message, empty when is_open().
     bool is_open() const;
-    const std::string& open_error() const;
+    std::string open_error() const;
+
+    // Replaces the immutable project snapshot atomically (PA4). In-flight
+    // renders finish on the snapshot they started with; later renders observe
+    // the new one. Returns true when the new snapshot loaded and validated;
+    // otherwise false (with `error` filled when provided) and the last known-
+    // good snapshot remains in service - reload never fails closed and never
+    // writes to the project. This is also how an Engine constructed before its
+    // project existed can later open it. The host application decides when a
+    // reload matters; the embedded Engine never watches the filesystem. The
+    // Engine defaults and environment provider are unaffected by a reload.
+    bool reload(std::string* error = nullptr);
 
     // Project-aware rendering by tracked page name, e.g. render("about").
     // The page's content/template/output geometry comes from the project

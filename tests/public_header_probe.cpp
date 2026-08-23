@@ -142,5 +142,17 @@ int main() {
     }
     (void)project_engine.open_error();
 
+    // PA4 reload surface: reloading a non-project Engine must fail in a
+    // controlled way with a non-empty error, never throw or terminate.
+    std::string reload_error;
+    if (project_engine.reload(&reload_error)) {
+        std::fprintf(stderr, "public-header probe: reload of a non-project root succeeded\n");
+        return 1;
+    }
+    if (reload_error.empty()) {
+        std::fprintf(stderr, "public-header probe: reload failure carried no error\n");
+        return 1;
+    }
+
     return 0;
 }
