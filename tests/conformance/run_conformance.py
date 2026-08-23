@@ -33,10 +33,11 @@ manifest classifies all of this explicitly.
 # implementation (CLI stderr or Engine render error); matching prose is not
 # itself a public contract.
 REJECT_CLASSES = {
+    "invalid-config-json": ["invalid project config"],
+    "invalid-tracking-json": ["invalid tracked.json"],
     "missing-source": ["content file"],
     "unknown-config-key": ["unknown config key"],
     "duplicate-tracked-name": ["duplicate tracked name"],
-    "invalid-tracking-json": ["invalid tracked.json"],
     "project-root-escape": ["path must stay inside the Nift project"],
 }
 import json

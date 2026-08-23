@@ -7,13 +7,16 @@
     "lifecycle": "C++ Engine serving contracts: atomic metadata-generation replacement via reload(), last-good retention on failed reload, zero-write serving. These are implementation contracts, NOT template-language semantics; nift-rs only inherits them if project-aware Rust adopts the same serving API. Executable evidence: tests/engine_reload.cpp."
   },
   "pagination-contract": "DECIDED (PA5): the project-aware Engine v1 renders a tracked page's primary pagination output. render(\"blog/\") == the CLI's primary output public/blog/index.html (verified as a parity case). Explicit arbitrary pagination-page selection is NOT part of the current project-aware Engine contract and is deferred to future API design; no magic Context keys, no hastily invented render(page, number).",
+  "reject-taxonomy": "The reject corpus distinguishes three classes of invalidity so nift-rs must reject for the intended reason, not merely fail somewhere: syntax-invalid project state (malformed-config, malformed-tracking: the project-state JSON itself cannot be parsed), semantically-invalid project state (bad-config unknown key, bad-tracking duplicate name: JSON parses but Nift rejects its semantics), and source/runtime invalidity (missing-source, path-escape).",
   "cases": {
     "comprehensive": "tracked-name lookup; index/trailing-slash geometry; content/template composition; metadata (title/name/content-path/output-path); @input; @json; contracts; tracked @pathto; concrete @pathto; 404 root-absolute geometry; pagination primary page; dependencies; requirements.",
     "schema": "JSON schema validation and schema dependency recording.",
     "getenv": "@getenv default process-environment semantics (driver sets the variable for both implementations).",
-    "missing-source": "tracked page whose content source is missing: both reject.",
-    "bad-config": "unknown config key: both reject.",
-    "bad-tracking": "duplicate tracked name: both reject.",
-    "path-escape": "@pathto escaping the project root: both reject."
+    "malformed-config": "syntax-invalid project state: .nift/config.json is malformed JSON; both reject (invalid-config-json).",
+    "malformed-tracking": "syntax-invalid project state: valid config, .nift/tracked.json is malformed JSON; both reject (invalid-tracking-json).",
+    "missing-source": "source/runtime invalidity: tracked page whose content source is missing; both reject (missing-source).",
+    "bad-config": "semantically-invalid project state: unknown config key; both reject (unknown-config-key).",
+    "bad-tracking": "semantically-invalid project state: duplicate tracked name; both reject (duplicate-tracked-name).",
+    "path-escape": "source/runtime invalidity: @pathto escaping the project root; both reject (project-root-escape)."
   }
 }
