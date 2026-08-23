@@ -165,10 +165,27 @@ consumes a read-only snapshot and never becomes the build system.
   `test-template-optional`, `test-pathto-404`, `test-output-permissions`,
   `test-pagination-equivalence` (18 comparisons) and
   `test-incremental-state-transitions` (modified/hash/hybrid) all pass.
-- **PA2 ProjectHost** — a read-only `RenderHost` over the converged
-  `ProjectState`/`ProjectRead` layer so the existing Parser renders project
-  pages unchanged (`@pathto` to tracked names, `@input`/`@json`/contracts, no
-  build decisions). Must not begin before PA1b review.
+- **PA2 ProjectHost** — DONE. `src/ProjectHost.h` is a per-render `RenderHost`
+  adapter over the read-only `ProjectState` snapshot (no engine/public API yet).
+  It supplies the existing Parser with project-backed content/template/input
+  loading (`read_shared_source`), JSON loading (`read_shared_json`), contracts
+  (`is_contract_name`/`contract_source`), tracked output lookup
+  (`tracked_output_path`), current-output geometry for `@pathto` incl. the 404
+  rule (`output_path`, `output_dir`, `has_output_context()=true`), and
+  pagination source/geometry (`pagination_output_path`, `build_threads`), plus
+  per-render host bindings (`binding`). Preserved: zero project writes, no
+  build decisions, no implicit tracking repair, no watch/hash ownership, the
+  existing rendering semantics, and the concurrency contract (snapshot read
+  caches are mutex-protected). Evidence: `tests/project_host.cpp` renders a
+  real project through `Parser(host, info).render()` exactly as the CLI's
+  `build_one` does and asserts byte-identical output for tracked `@pathto`
+  (confirmed against the actual `nift` CLI build, incl. `blog=blog/` and the
+  404 root-absolute rule), contracts, host bindings, `@input`, `@json` and 3
+  pagination pages; plus zero-write tree snapshots and 8-thread concurrent
+  renders. Retained archaeology items (repeated `tracked_output_path` lookup,
+  loader probe-then-read, provisional host-vs-contract precedence) were
+  exercised but deliberately not "fixed" — they remain recorded and
+  unresolved. No public project-aware Engine API yet (that is PA3).
 - **PA3 public project-aware API** — explicit construction only:
   `Engine(std::filesystem::path)` for project mode; default `Engine()` stays
   deterministic standalone (no CWD/upward discovery unless explicitly

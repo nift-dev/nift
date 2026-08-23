@@ -134,6 +134,18 @@ $(PROJECT_STATE_TEST): tests/project_state_parity.cpp $(ENGINE_CORE_OBJECTS)
 test-project-state: $(PROJECT_STATE_TEST)
 	$(PROJECT_STATE_TEST)
 
+# PA2: ProjectHost adapts the ProjectState snapshot to RenderHost so the
+# existing Parser renders real project pages (content/template/input, JSON,
+# contracts, tracked output lookup, @pathto geometry incl. 404, pagination)
+# with zero writes and no build decisions.
+PROJECT_HOST_TEST := $(TEST_DIR)/project-host$(EXEEXT)
+$(PROJECT_HOST_TEST): tests/project_host.cpp $(ENGINE_CORE_OBJECTS)
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/project_host.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
+
+test-project-host: $(PROJECT_HOST_TEST)
+	$(PROJECT_HOST_TEST)
+
 ENGINE_CONCURRENCY_TEST := $(TEST_DIR)/engine-concurrency$(EXEEXT)
 $(ENGINE_CONCURRENCY_TEST): tests/engine_concurrency.cpp $(ENGINE_CORE_OBJECTS)
 	mkdir -p $(TEST_DIR)
@@ -305,7 +317,7 @@ clean:
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
-.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-diagnostics test-minify test-json-schema-integration test-engine test-engine-bindings test-engine-loaders test-engine-pathto test-engine-concurrency test-project-state test-public-header test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
+.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-diagnostics test-minify test-json-schema-integration test-engine test-engine-bindings test-engine-loaders test-engine-pathto test-engine-concurrency test-project-state test-project-host test-public-header test-content test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
 
 
 test-cross-feature: $(TARGET)
