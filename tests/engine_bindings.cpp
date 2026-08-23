@@ -194,6 +194,76 @@ int main() {
         CHECK(r.output() == "ENGINE_ONLYx");
     }
 
+    // 11. Value copy semantics: copying a Value yields an independent
+    //     equivalent value; mutation of either copy must not affect the other.
+    {
+        // Object copy then mutate member.
+        nift::Value a = nift::Value::make_object();
+        a["x"] = nift::Value(1);
+        nift::Value b = a;
+        b["x"] = nift::Value(2);
+        nift::Context context;
+        context.set("a", a);
+        context.set("b", b);
+        auto r = nift::Engine().render(nift::Source::text("$[a.x]/$[b.x]"), context);
+        CHECK(r.ok());
+        CHECK(r.output() == "1/2");
+    }
+    {
+        // Array copy then mutate element.
+        nift::Value arr = nift::Value::make_array();
+        arr.push_back(nift::Value(10));
+        arr.push_back(nift::Value(11));
+        nift::Value copy = arr;
+        copy[0] = nift::Value(20);
+        nift::Context context;
+        context.set("arr", arr);
+        context.set("copy", copy);
+        auto r = nift::Engine().render(nift::Source::text("$[arr[0]]/$[copy[0]]"), context);
+        CHECK(r.ok());
+        CHECK(r.output() == "10/20");
+    }
+    {
+        // Copy assignment then mutate.
+        nift::Value a = nift::Value::make_object();
+        a["x"] = nift::Value(1);
+        nift::Value b = nift::Value::make_object();
+        b["y"] = nift::Value(9);
+        b = a;
+        b["x"] = nift::Value(2);
+        nift::Context context;
+        context.set("a", a);
+        context.set("b", b);
+        auto r = nift::Engine().render(nift::Source::text("$[a.x]/$[b.x]"), context);
+        CHECK(r.ok());
+        CHECK(r.output() == "1/2");
+    }
+    {
+        // Original mutation after copy does not affect the copy.
+        nift::Value a = nift::Value::make_object();
+        a["x"] = nift::Value(1);
+        nift::Value b = a;
+        a["x"] = nift::Value(5);
+        nift::Context context;
+        context.set("a", a);
+        context.set("b", b);
+        auto r = nift::Engine().render(nift::Source::text("$[a.x]/$[b.x]"), context);
+        CHECK(r.ok());
+        CHECK(r.output() == "5/1");
+    }
+    {
+        // Move transfers without copying.
+        nift::Value a = nift::Value::make_object();
+        a["x"] = nift::Value(7);
+        nift::Value moved = std::move(a);
+        moved["x"] = nift::Value(8);
+        nift::Context context;
+        context.set("moved", moved);
+        auto r = nift::Engine().render(nift::Source::text("$[moved.x]"), context);
+        CHECK(r.ok());
+        CHECK(r.output() == "8");
+    }
+
     if (failures == 0) {
         std::printf("engine bindings test passed\n");
         return 0;

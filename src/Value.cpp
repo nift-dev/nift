@@ -29,10 +29,16 @@ Value::Value(std::string value) : impl_(std::make_shared<Impl>()) {
     impl_->doc.type = json::Type::String;
     impl_->doc.string = std::move(value);
 }
-Value::Value(const Value&) = default;
-Value::Value(Value&&) noexcept = default;
-Value& Value::operator=(const Value&) = default;
-Value& Value::operator=(Value&&) noexcept = default;
+// Deep-copy value semantics: copying a Value produces an independent
+// equivalent value (mutation of either must not affect the other); moving
+// transfers ownership without copying.
+Value::Value(const Value& other) : impl_(std::make_shared<Impl>(*other.impl_)) {}
+Value::Value(Value&& other) noexcept = default;
+Value& Value::operator=(const Value& other) {
+    if (this != &other) impl_ = std::make_shared<Impl>(*other.impl_);
+    return *this;
+}
+Value& Value::operator=(Value&& other) noexcept = default;
 Value::~Value() = default;
 
 Value Value::make_array() {
