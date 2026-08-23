@@ -26,6 +26,75 @@ portable behavioural contract and conformance tests. A consequence of this work
 is a formal distinction between genuine Nift contracts and C++ implementation
 details.
 
+## Project-attached rendering (recorded requirement)
+
+"Embedded Nift must not fake tracked pages" means the Engine must not **invent**
+tracked-page state when none is supplied. It does **not** mean Embedded Nift
+should be incapable of using real Nift project state.
+
+An Engine associated with an actual Nift project should eventually be able to
+consume that project's `.nift/tracked.json` and obtain the same named-output
+semantics for `@pathto` as the CLI:
+
+```text
+standalone Engine
+    -> no tracking assumed; @pathto uses concrete-project semantics
+
+Engine attached to Nift project/tracking
+    -> real tracked-name resolution
+    -> normal @pathto semantics
+```
+
+This is the preferred path for SSR/server integration and the eventual Node
+binding (e.g. `new Engine({ root: "." })` discovering the project's tracking) —
+and is better than an arbitrary `set_path_resolver` callback for the normal
+case, because the project already knows what its names mean; the application
+should not have to explain Nift back to Nift.
+
+The host seam that makes this possible is `RenderHost::tracked_output_path()`:
+a project-backed Engine host would implement it by loading `.nift/tracked.json`
+(tracked name -> generated output + index flag), exactly as `ProjectInfoHost`
+does today. Not implemented in CP6; recorded here so the abstraction is not
+accidentally closed off.
+
+### Render by tracked page name (explicit requirement)
+
+A project-aware Engine should be able to render a tracked page by name:
+
+```cpp
+RenderResult render(std::string_view page_name);
+RenderResult render(std::string_view page_name, const Context& context);
+```
+
+Semantics: look up the page in the attached project's `.nift/tracked.json`,
+find its content/template/output metadata, render through the same shared core,
+and return the result. `@pathto("about")` then works naturally because the
+Engine instance holds the real tracked-name -> output mapping; `@input`,
+contracts, dependencies and runtime values compose through the existing core.
+
+Hierarchy (the common case is tiny; low-level control remains):
+
+```text
+High:   render("about")
+Medium: render("about", context)
+Low:    render(page_source, template_source, context)
+```
+
+Target DX (eventual Node binding):
+
+```js
+const nift = new Engine({ root: "." });
+app.get("/about", (req, res) => res.send(nift.render("about")));
+app.get("/user/:id", async (req, res) =>
+    res.send(nift.render("user", { user: await db.user(req.params.id) })));
+```
+
+Not implemented yet; recorded as an explicit requirement. A project-backed
+Engine host plugs into the existing `RenderHost` seam (loads `.nift/tracked.json`
+and `.nift/config.json`, supplies `content_path`/`output_path`/
+`tracked_output_path`/loaders/contracts), and `render("about")` is then
+orchestration over the same `render_composed` used by `render(page, template)`.
+
 ## Architecture (agreed)
 
 - One long-lived `nift::Engine` per process (root, loaders, defaults, caches;
@@ -92,8 +161,10 @@ details.
 - **CP5** (`2266ca2`): `@pathto`/`@pathtofile` through the host path capability.
   `RenderHost` replaces the parser's tracked lookup with `has_output_context()`
   and `tracked_output_path(name)` (CLI resolves tracked names; the embedded
-  engine has none and treats every argument as a concrete project path — no
-  fake project). The per-render `Context::set_current_output` supplies the
+  engine, with no tracking attached, treats every argument as a concrete
+  project path — it must not invent tracked state; a project-backed Engine host
+  can later implement `tracked_output_path` from `.nift/tracked.json`, see the
+  project-attached requirement above). The per-render `Context::set_current_output` supplies the
   current output location; without it `@pathto` errors rather than guessing.
   The shared relative-path computation, the 404 rule (page name "404" ->
   root-absolute web paths), requirements recording and concrete-path existence

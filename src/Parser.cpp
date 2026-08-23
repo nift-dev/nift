@@ -2597,25 +2597,31 @@ RenderResult Parser::render_composed(const RenderSource& template_source,
 RenderResult Parser::render() {
     const fs::path content_path = host_.content_path(tracked_info_);
     if (tracked_info_.template_path.empty()) {
-        if (!filesystem::file_readable(content_path)) {
+        if (!host_.source_readable(content_path)) {
             result_.ok = false;
             result_.error = {tracked_info_.name, content_path, 0, "content file is not readable"};
             return result_;
         }
-        auto result = parse(filesystem::read_file(content_path), content_path, 0);
+        const auto content_source = host_.read_shared_source(content_path);
+        if (!content_source) {
+            result_.ok = false;
+            result_.error = {tracked_info_.name, content_path, 0, "content file is not readable"};
+            return result_;
+        }
+        auto result = parse(*content_source, content_path, 0);
         result.content_used = true;
         result.dependencies.insert(host_.relative(content_path));
         return result;
     }
 
     const fs::path template_path = host_.root() / tracked_info_.template_path;
-    if (!filesystem::path_exists(template_path)) {
+    if (!host_.source_exists(template_path)) {
         result_.ok = false;
         result_.error = {tracked_info_.name, template_path, 0, "template file does not exist"};
         return result_;
     }
 
-    if (!filesystem::file_readable(template_path)) {
+    if (!host_.source_readable(template_path)) {
         result_.ok = false;
         result_.error = {tracked_info_.name, template_path, 0, "template file is not readable"};
         return result_;
