@@ -133,3 +133,70 @@ unaffected.
 ### Full regression
 
 46 targets / 177 PASS lines / exit 0.
+
+## CP3.2 correction (reviewer HOLD): TrackedInfo* lifetime across reconcile
+
+### Corrected build_names ordering
+
+CP3.1 moved targeted-job construction (TrackedInfo* pointers into `tracked`)
+BEFORE ownership acquisition so the empty-job check could run before creating
+.unfinished. That was unsafe: reconcile_watch() can structurally modify
+`tracked` (push_back discovered pages, erase disappeared ones), invalidating
+any captured pointers.
+
+Corrected ordering (CP3.2):
+```
+duplicate-string validation (no tracked access)     before acquisition
+acquire ownership; refuse live/stale/failed
+mutation_started = false
+reconcile_watch()  -> failure: finish_if_epoch_complete(1, ordinary); return
+reset_build_caches
+NOW resolve requested names against the reconciled tracked set
+   -> empty jobs: finish_if_epoch_complete(1, ordinary); return
+build_many; finish_if_epoch_complete(result, ordinary)
+```
+
+### Exact lifetime invariant
+
+> Any `TrackedInfo*`, reference, or iterator used for building is obtained only
+> after the last operation capable of structurally modifying `tracked` for that
+> build pass (reconcile_watch). Documented at the resolution point in
+> build_names.
+
+### Targeted/watch semantics verified
+
+- Newly-discovered watched page can be targeted (reconcile runs first).
+- A disappeared watched page resolves to "not tracking" (clean failure, never a
+  stale-pointer dereference).
+- Empty job set after reconcile with zero derived mutations clears the marker;
+  empty job set after reconcile DID delete derived output retains it - both
+  handled by the centralized completion rule.
+
+### Pointer/reference audit result
+
+- build_all: reconcile runs before job construction (no tracked mutation after).
+- WatchList::reconcile: find_if + erase within its loop; the element is
+  dereferenced only before erase; each iteration re-finds (no dangling reuse).
+- CLI track/untrack/rm/cp/mv: hold TrackedInfo copies, not pointers across
+  mutation. info/status: immediate use, no mutation between find and use.
+- The only hazard was build_names (fixed).
+
+### Regression cases (zero_mutation_smoke.py now 16)
+
+12 reconcile adds 200 pages (reallocation) -> existing targeted page builds
+   correctly (dangling-pointer regression caught by sanitizer builds)
+13 target a page newly discoverable through watch reconciliation -> builds
+14 target a watched page that disappears -> clean failure, no stale-pointer
+   dereference, marker retained (reconcile deleted output), --repair recovers
+15 empty resolved job set + zero reconcile mutation -> no marker
+16 empty resolved job set + reconcile performed a derived deletion -> marker
+   retained, --repair recovers
+
+### Performance
+
+build_names change is cold/error-path only; build_all hot path untouched. The
+CP3.1 confirmation (101.6 ms unchanged / 100.1 ms changed) stands.
+
+### Full regression
+
+46 targets / 199 PASS lines / exit 0.

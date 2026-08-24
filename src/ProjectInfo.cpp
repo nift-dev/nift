@@ -931,9 +931,12 @@ void ProjectInfo::finish_if_epoch_complete(ProjectOwnership& ownership, int resu
 int ProjectInfo::build_names(const std::vector<std::string>& names, bool, bool explain) {
     filesystem::begin_recovery_epoch();
 
-    // CP3.1: all validation that can safely run BEFORE acquisition happens
-    // here (reads only). Duplicate-name rejection and an empty job set must
-    // not create a marker, let alone leave one behind.
+    // Only validation that is genuinely independent of the CURRENT reconciled
+    // tracking state runs before acquisition: duplicate-string rejection reads
+    // nothing from `tracked`. Tracked-name resolution must NOT happen here:
+    // reconcile_watch() can structurally modify `tracked` (add discovered
+    // pages, erase disappeared ones), which would invalidate any TrackedInfo*
+    // captured across it.
     std::unordered_set<std::string> seen_names;
     for (const auto& name : names) {
         if (!seen_names.insert(name).second) {
@@ -941,15 +944,6 @@ int ProjectInfo::build_names(const std::vector<std::string>& names, bool, bool e
             return 1;
         }
     }
-    std::vector<BuildJob> jobs;
-    for (const auto& name : names) {
-        if (TrackedInfo* info = find(name)) jobs.push_back({info, {}});
-        else {
-            std::lock_guard<std::mutex> lock(console::output_mutex);
-            std::cout << "not tracking:\n " << name << '\n';
-        }
-    }
-    if (jobs.empty()) return 1;
 
     // Targeted builds are derived-state mutators and take the same ownership:
     // refuse on a live owner or a stale marker (repair is only reachable via
@@ -983,6 +977,29 @@ int ProjectInfo::build_names(const std::vector<std::string>& names, bool, bool e
         return 1;
     }
     reset_build_caches();
+
+    // CP3.2 lifetime invariant: TrackedInfo* jobs are obtained ONLY after the
+    // last operation that can structurally modify `tracked` for this pass
+    // (reconcile_watch above). This is what makes the pointers valid for
+    // build_many, and it also preserves the pre-CP3 semantic that watch
+    // reconciliation runs before targeted-name resolution (so a newly
+    // discovered watched page can be targeted, and a disappeared one is
+    // reported rather than dereferenced).
+    std::vector<BuildJob> jobs;
+    for (const auto& name : names) {
+        if (TrackedInfo* info = find(name)) jobs.push_back({info, {}});
+        else {
+            std::lock_guard<std::mutex> lock(console::output_mutex);
+            std::cout << "not tracking:\n " << name << '\n';
+        }
+    }
+    if (jobs.empty()) {
+        // Zero-derived-mutation controlled failure - unless reconcile itself
+        // performed a recovery-relevant deletion (mutation_started true), in
+        // which case the completion rule correctly retains the marker.
+        finish_if_epoch_complete(ownership, 1, /*repair=*/false);
+        return 1;
+    }
 
     const int result = build_many(jobs, true, explain, names.size());
     finish_if_epoch_complete(ownership, result, /*repair=*/false);

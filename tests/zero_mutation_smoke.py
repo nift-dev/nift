@@ -278,6 +278,87 @@ def main():
         check("11 build --repair recovers", rc == 0)
         check("11 marker cleared after repair", not marker(root))
 
+        # 12-16. Watched targeted-build regressions (CP3.2): TrackedInfo*
+        # pointers must be resolved ONLY after reconcile_watch (which can
+        # structurally modify `tracked`), so targeted builds survive vector
+        # reallocation and preserve discovery/removal semantics.
+
+        def watch_project(tag):
+            root = base / tag
+            root.mkdir()
+            scaffold(root, ["/"])
+            (root / "content/posts").mkdir(exist_ok=True)
+            return root
+
+        # 12. Reallocation: reconcile ADDS many pages (reallocates tracked);
+        #     an existing requested page must still build correctly. (Catches a
+        #     dangling TrackedInfo* under sanitizer builds.)
+        root = watch_project("t12")
+        rc, _ = run(root, "watch", "content/posts", ".html")
+        check("12 watch setup succeeds", rc == 0)
+        for i in range(200):
+            (root / "content/posts" / f"p{i}.html").write_text(f"<p>{i}</p>\n")
+        rc, _ = run(root, "build", "/")
+        check("12 existing page builds after tracked reallocation", rc == 0)
+        check("12 / output correct", (root / "public/index.html").read_text() == "<p>/</p>\n")
+
+        # 13. Newly-discoverable target: reconcile discovers a watched page and
+        #     the targeted build then resolves and builds it.
+        root = watch_project("t13")
+        rc, _ = run(root, "watch", "content/posts", ".html")
+        check("13 watch setup succeeds", rc == 0)
+        (root / "content/posts/new.html").write_text("<p>new</p>\n")
+        rc, _ = run(root, "build", "posts/new")
+        check("13 newly-discovered page builds", rc == 0)
+        check("13 output exists", (root / "public/posts/new.html").exists())
+
+        # 14. Disappearing watched target: reconcile removes it (and deletes its
+        #     output = derived mutation) before targeted resolution; the result
+        #     is a clean failure with the marker retained, never a stale-pointer
+        #     dereference.
+        root = watch_project("t14")
+        rc, _ = run(root, "watch", "content/posts", ".html")
+        check("14 watch setup succeeds", rc == 0)
+        (root / "content/posts/p1.html").write_text("<p>one</p>\n")
+        rc, _ = run(root, "build", "--all")
+        check("14 initial build succeeds", rc == 0)
+        (root / "content/posts/p1.html").unlink()
+        rc, _ = run(root, "build", "posts/p1")
+        check("14 disappearing-target build fails cleanly", rc != 0)
+        check("14 marker retained (reconcile deleted derived output)",
+              marker(root))
+        rc, _ = run(root, "build", "--repair")
+        check("14 --repair recovers", rc == 0)
+        check("14 marker cleared after repair", not marker(root))
+
+        # 15. Empty resolved job set, reconcile made ZERO derived mutations ->
+        #     no marker.
+        root = watch_project("t15")
+        rc, _ = run(root, "watch", "content/posts", ".html")
+        check("15 watch setup succeeds", rc == 0)
+        rc, _ = run(root, "build", "--all")
+        check("15 initial build succeeds", rc == 0)
+        rc, _ = run(root, "build", "never-existed")
+        check("15 unresolvable target fails", rc != 0)
+        check("15 no marker (zero mutations)", not marker(root))
+
+        # 16. Empty resolved job set while reconcile DID perform a derived
+        #     deletion -> marker retained.
+        root = watch_project("t16")
+        rc, _ = run(root, "watch", "content/posts", ".html")
+        check("16 watch setup succeeds", rc == 0)
+        (root / "content/posts/p1.html").write_text("<p>one</p>\n")
+        rc, _ = run(root, "build", "--all")
+        check("16 initial build succeeds", rc == 0)
+        (root / "content/posts/p1.html").unlink()   # reconcile will delete output
+        rc, _ = run(root, "build", "never-existed")  # no jobs, but reconcile mutated
+        check("16 unresolvable target fails", rc != 0)
+        check("16 marker retained (reconcile performed a derived deletion)",
+              marker(root))
+        rc, _ = run(root, "build", "--repair")
+        check("16 --repair recovers", rc == 0)
+        check("16 marker cleared after repair", not marker(root))
+
     if fails:
         print(f"\nFAILED: {len(fails)}: {fails}")
         sys.exit(1)
