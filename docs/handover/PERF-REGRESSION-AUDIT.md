@@ -489,3 +489,166 @@ bookkeeping; nothing new is executed per page merely by accident. The full
 build residual therefore stands as: the atomicity guarantee (~30 ms), the
 Embed render seam (~6 ms), and the pagination-lifecycle read (~2 ms) - the
 decision points for the reviewer are those three, not hidden bookkeeping.
+## .unfinished recovery-marker proposal: critical design evaluation
+
+### Proposal evaluated
+
+Replace per-file atomic persistence (temp + chmod + rename) with the historical
+direct in-place write plus a single project-level zero-byte marker
+`.nift/.unfinished`. Invariant: if the marker exists, the previous build must
+not be assumed to have completed consistently; the next build performs a
+conservative full rebuild (recovery). Prototype C (benchmark/prototype only)
+implements this in a HEAD worktree: `write_direct_file` / `write_direct_files`
+(in-place truncate with the historical writable-retry, final mode = source
+permissions) replacing the temp+rename path in `build_one`; the marker is
+created in `build_all` before any state mutation and removed only after a
+successful build; marker presence forces `effective_force` (full rebuild) and
+overrides incremental selection in `build-updated`.
+
+### Exact proposed invariant
+
+> Marker present on the project root at the start of a build
+>  <=>  the previous build did not complete normally
+> Recovery: rebuild every tracked page (disregarding incremental selection)
+>        and only then remove the marker.
+
+Ordering: create marker BEFORE the first mutation of generated output or
+persistent derived state; remove marker AFTER the final successful mutation.
+Per-page ordering within `build_one` is unchanged and load-bearing:
+output(s) -> stale pagination cleanup -> `.info.json` LAST.
+
+### Recovery algorithm (marker present)
+
+1. Warn ("previous or concurrent build did not present a clean completed
+   state; performing recovery build").
+2. Treat as a forced full build (`effective_force`), so `build-updated` also
+   rebuilds every page (no false green from fresh mtimes left by the
+   interrupted run).
+3. Ordinary `build_one` per page regenerates the output, pagination outputs,
+   stale-pagination cleanup, and `.info.json`.
+4. Remove the marker only if the entire build returned success; otherwise
+   retain it (failed recovery leaves the marker; the next invocation
+   continues recovery).
+
+### Failure-mode table (synthesized interruption states, recovery verified)
+
+```text
+state after interrupted direct-write build            recovery outcome
+marker created, nothing written                       full rebuild, clean            PASS
+output truncated halfway                              regenerated                     PASS
+output ok, .info.json truncated                       regenerated; pagination history
+                                                      lost but cleanup already ran
+                                                      (info written last)             PASS
+some pages new, some old                              full rebuild, clean            PASS
+pagination page-N truncated                           regenerated                     PASS
+pagination removed, stale page-2/3 remain, info ok    history intact -> stale removed  PASS
+metadata new / output old (either order)              regenerated                     PASS
+pagination shrink, info truncated (post-cleanup)      clean                           PASS
+interrupted during build-updated (torn page has fresh
+  mtime, incremental would skip it)                   marker overrides -> full rebuild PASS
+pagination removed, info truncated (post-cleanup)     clean                           PASS
+failed recovery (content missing)                     marker retained, exit 1          PASS
+info truncated AND stale page-2/3 still present       stale remains (UNREACHABLE state;
+                                                      requires info-before-cleanup
+                                                      ordering)              documented
+```
+
+The pagination cases are the important ones and are safe because `.info.json`
+is written LAST per page: a truncated info therefore implies that page's stale
+pagination cleanup already ran. The "info truncated AND stale outputs present"
+combination is not reachable under the current ordering; it is demonstrated
+(test 13) as the invariant the design depends on. If a future change reordered
+metadata writes before cleanup, recovery-by-full-rebuild would leave stale
+pagination outputs; closing that would require a directory sweep
+(remove `<name>-N` outputs beyond the current count, skipping tracked names),
+at the cost of a scan and a name-collision caveat.
+
+### Guarantee stated precisely
+
+- Process crash / SIGKILL / error-exit (machine keeps running): all writes
+  live in the kernel page cache, which survives process death. The marker is
+  created first and removed last, so it is present iff the build did not
+  complete. Recovery (full rebuild) regenerates every derived file. Sound
+  without fsync.
+- Power loss: NOT sound without fsync. Adding `fsync(marker)` once at build
+  start (one fsync per build, ~tens of microseconds) makes the marker durable
+  before any mutation, closing the whole build window. Residual: the instant
+  between the final mutation and marker removal - a power loss that persists
+  the removal but drops the last writes could leave a torn file with no
+  marker. This is the SAME class of window the per-file atomic model has
+  without per-file fsync (a rename persisted but data blocks lost), so the two
+  models are equivalent at the power-loss boundary unless per-file fsync
+  (database-grade, excluded by the reviewer) is added.
+- Concurrent same-project builds: direct writes can interleave truncate/write
+  and tear each other's outputs; per-file atomic gives last-writer-wins with
+  complete files. Explicitly a regression for an unsupported workflow (two
+  Nift builds against one project simultaneously).
+
+### A/B/C benchmark (10k, 20 interleaved samples)
+
+```text
+workload U (unchanged)   A 85.5 ms   B 129.8 ms  C 106.1 ms   C recovers ~24 ms
+workload C (changed)     A 84.5 ms   B 134.6 ms  C 104.0 ms   C recovers ~31 ms
+```
+
+Direct write + marker recovers the atomic-rename cost. Byte-identical outputs
+and info versus A on both workloads; the full regression battery (pagination,
+pagination-equivalence, output-permissions, crash-recovery, incremental-state
+transitions, conformance) passes against the prototype.
+
+### C-proto residual decomposition (benchmark-only toggles, 20 samples)
+
+```text
+workload U:  A 85.9 -> C 106.3 ms   residual +20.4 ms
+             previous-info read   ~12 ms   (pagination lifecycle, REQUIRED)
+             render seam           ~6 ms   (Embed architecture)
+             file_permissions      ~2 ms   (permission preservation, REQUIRED)
+workload C:  A 84.5 -> C 104.0 ms   residual +19.5 ms (same decomposition)
+```
+
+The direct write does NOT remove the per-page previous-`.info.json` read
+(~12 ms); that is the pagination-era historical-state cost present in B and C
+alike, orthogonal to persistence. It is reducible (drop the redundant
+`path_exists` probe before the checked read, ~5 ms; or a project-level
+"ever-paginated" registry to skip the read for never-paginated pages) but
+cannot be zeroed while the pagination lifecycle requires historical state.
+
+### Acceptance criteria
+
+```text
+1. marker detects interrupted mutation windows     YES (process crash/kill/error;
+                                                   power loss requires 1 fsync)
+2. recovery cannot false-green over corrupted out  YES (full rebuild; test 2,10)
+3. derived metadata reconstructed safely           YES (info/deps regenerated)
+4. pagination/stale-output lifecycle correct       YES under info-last ordering
+5. normal builds remove marker                     YES (verified)
+6. failed recovery leaves marker                   YES (test 12)
+7. direct-write materially recovers performance    YES (~24-31 ms, +23-24% -> ~+23%,
+                                                   but ~105 ms, not ~90 ms)
+8. implementation simpler overall                  YES (removes temp/rename/backup/
+                                                   getpid/staging machinery; adds
+                                                   marker lifecycle + recovery
+                                                   semantics + ordering invariant)
+```
+
+### Verdict: ADOPT (the reviewer's HYBRID collapses into ADOPT)
+
+Under the full-rebuild recovery model, every build-derived artifact (outputs,
+`.info.json`, pagination outputs, hash/deps state) is regenerable, so no
+per-page state requires per-file atomicity - the "small subset that deserves
+atomic replacement" turns out to be empty. The natural hybrid (atomic for
+`public/`, direct elsewhere, or vice versa) only re-adds cost without adding a
+recoverable guarantee. The recommendation is therefore to adopt the marker +
+direct-write model for all build-derived state, subject to:
+
+1. fsync the marker once at build start (power-loss window).
+2. Encode the per-page ordering invariant (output -> cleanup -> info last)
+   as a documented, regression-tested contract.
+3. Marker presence forces full rebuild for every build entry point
+   (build-all, build-updated, build-auto).
+
+If the ~20 ms residual (12 ms pagination read + 6 ms render + 2 ms
+permissions) is unacceptable, the pagination read is the next lever (registry
+or probe removal), not persistence. The atomic model remains the choice only
+if "outputs are never torn even before the next build" or concurrent
+same-project builds are required guarantees.
