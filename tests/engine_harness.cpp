@@ -75,7 +75,12 @@ int main(int argc, char** argv) {
         if (line.empty()) continue;
         const auto eq = line.find('=');
         if (eq == std::string::npos) continue;
-        engine.set(line.substr(0, eq), line.substr(eq + 1));
+        const std::string name = line.substr(0, eq);
+        const std::string value = line.substr(eq + 1);
+        // A "json:" prefix binds a JSON value instead of a string, so the
+        // differential can exercise arrays/objects/numbers/bools (NR10).
+        if (value.rfind("json:", 0) == 0) engine.set_json(name, value.substr(5));
+        else engine.set(name, value);
     }
 
     nift::Context context;
