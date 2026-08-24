@@ -370,6 +370,32 @@ bool write_readonly_files(const std::vector<std::pair<fs::path, std::string>>& f
     return true;
 }
 
+// CP3 direct in-place write. In-place truncation of an existing read-only
+// output fails on POSIX, so make it writable first (the historical direct-write
+// retry). A crash mid-write can leave a truncated file; that is the documented
+// risk recovered by the .unfinished marker + build --repair protocol.
+bool write_direct_file(const fs::path& path, const std::string& contents, fs::perms mode) {
+    ensure_parent_directory(path);
+    auto write_now = [&]() {
+        std::ofstream file(path, std::ios::binary | std::ios::trunc);
+        if (!file) return false;
+        file.write(contents.data(), static_cast<std::streamsize>(contents.size()));
+        return bool(file);
+    };
+    if (!write_now()) {
+        const fs::perms writable = fs::perms::owner_read | fs::perms::owner_write |
+                                   fs::perms::group_read | fs::perms::others_read;
+        if (!apply_mode(path, writable) || !write_now()) return false;
+    }
+    return apply_mode(path, mode);
+}
+
+bool write_direct_files(const std::vector<std::pair<fs::path, std::string>>& files, fs::perms mode) {
+    for (const auto& [path, contents] : files)
+        if (!write_direct_file(path, contents, mode)) return false;
+    return true;
+}
+
 bool remove_owned_file(const fs::path& path) {
     std::error_code error;
     const bool exists = fs::exists(path, error);

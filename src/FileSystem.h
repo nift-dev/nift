@@ -24,6 +24,18 @@ bool write_readonly_files(const std::vector<std::pair<std::filesystem::path, std
                                                           std::filesystem::perms::group_read |
                                                           std::filesystem::perms::others_read);
 std::filesystem::perms file_permissions(const std::filesystem::path& path);
+// CP3: direct in-place write for REGENERABLE build-derived state (generated
+// outputs, pagination outputs, .info.json). No compare, no temp+rename:
+// interruption safety is provided by the project-level lock + .unfinished +
+// mutation_started + build --repair protocol, not by atomic replacement.
+bool write_direct_file(const std::filesystem::path& path, const std::string& contents,
+                       std::filesystem::perms mode = std::filesystem::perms::owner_read |
+                                                        std::filesystem::perms::group_read |
+                                                        std::filesystem::perms::others_read);
+bool write_direct_files(const std::vector<std::pair<std::filesystem::path, std::string>>& files,
+                        std::filesystem::perms mode = std::filesystem::perms::owner_read |
+                                                        std::filesystem::perms::group_read |
+                                                        std::filesystem::perms::others_read);
 bool remove_owned_file(const std::filesystem::path& path);
 bool path_exists(const std::filesystem::path& path);
 bool file_exists(const std::filesystem::path& path);

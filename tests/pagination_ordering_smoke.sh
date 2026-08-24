@@ -41,13 +41,15 @@ test -f public/blog.html -a -f public/blog-2.html -a -f public/blog-3.html
 cat > .nift/tracked.json <<'JSON'
 {"tracked":[{"name":"blog","title":"Blog","template":"templates/template.html","paginate":{"items-per-page":3}}]}
 JSON
-strace -f -e trace=rename,unlink,unlinkat -o trace.txt "$NIFT_BIN" build --all >/dev/null 2>&1
+# CP3 direct writes: the output and .info.json are in-place writes, so the
+# observable order is the data-write sequence (-y decodes fd -> path).
+strace -f -y -e trace=write,unlink,unlinkat -o trace.txt "$NIFT_BIN" build --all >/dev/null 2>&1
 
-# Completed replacements/removals involving the blog page, in syscall order.
-grep -E 'rename\(|unlink(\(|at\()' trace.txt | grep 'blog' > ops.txt
-output_seq=$(grep -nE 'blog\.html"' ops.txt | grep -v 'blog-[0-9]' | tail -1 | cut -d: -f1)
-stale_seq=$(grep -nE 'blog-3\.html"' ops.txt | grep -vE 'rename' | tail -1 | cut -d: -f1)
-info_seq=$(grep -nE 'blog\.info\.json"' ops.txt | tail -1 | cut -d: -f1)
+# Sequence of blog-related data writes/removals in syscall order.
+grep -E 'write\(|unlink(\(|at\()' trace.txt | grep 'blog' > ops.txt
+output_seq=$(grep -nE 'blog\.html' ops.txt | grep -v 'blog-[0-9]' | tail -1 | cut -d: -f1)
+stale_seq=$(grep -nE 'blog-3\.html' ops.txt | tail -1 | cut -d: -f1)
+info_seq=$(grep -nE 'blog\.info\.json' ops.txt | tail -1 | cut -d: -f1)
 
 for v in output_seq stale_seq info_seq; do
     [ -n "${!v}" ] || { echo "FAIL: pagination ordering trace missing $v" >&2; exit 1; }
@@ -57,7 +59,7 @@ if [ "$output_seq" -ge "$info_seq" ]; then
     echo "FAIL: .info.json not written last (output $output_seq >= info $info_seq)" >&2
     exit 1
 fi
-if [ -n "$stale_seq" ] && [ "$stale_seq" -ge "$info_seq" ]; then
+if [ "$stale_seq" -ge "$info_seq" ]; then
     echo "FAIL: stale pagination cleanup not before .info.json (stale $stale_seq >= info $info_seq)" >&2
     exit 1
 fi

@@ -620,7 +620,7 @@ bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::s
     if (!reqs.empty()) output += "  ";
     output += "]\n}\n";
 
-    return filesystem::write_readonly_file(info_path(info), output);
+    return filesystem::write_direct_file(info_path(info), output);
 }
 
 bool ProjectInfo::build_one(TrackedInfo& info) {
@@ -693,16 +693,20 @@ bool ProjectInfo::build_one(TrackedInfo& info) {
     if (output_mode == fs::perms::unknown || output_mode == fs::perms::none)
         output_mode = fs::perms::owner_read | fs::perms::group_read | fs::perms::others_read;
 
+    // First recovery-relevant derived mutation of this page (outputs). The
+    // flag is set BEFORE the write: an interruption during the write is
+    // precisely the case the marker must protect.
+    mark_mutation();
     if (!result.pagination_outputs.empty()) {
         std::vector<std::pair<fs::path, std::string>> page_files;
         page_files.reserve(result.pagination_outputs.size());
         for (std::size_t page = 1; page <= result.pagination_outputs.size(); ++page)
             page_files.emplace_back(pagination_output_path(info, page), result.pagination_outputs[page - 1]);
-        if (!filesystem::write_readonly_files(page_files, output_mode)) {
+        if (!filesystem::write_direct_files(page_files, output_mode)) {
             print_build_error({info.name, output, 0, "failed to commit generated pagination outputs"});
             return false;
         }
-    } else if (!filesystem::write_readonly_file(output, result.output, output_mode)) {
+    } else if (!filesystem::write_direct_file(output, result.output, output_mode)) {
         print_build_error({info.name, output, 0, "failed to write generated output"});
         return false;
     }
@@ -860,6 +864,8 @@ int ProjectInfo::build_all(bool force, bool explain, bool repair) {
         return 1;
     }
 
+    mutation_started_.store(false, std::memory_order_relaxed);
+
     if (!reconcile_watch()) return 1; // marker retained: epoch not completed
     reset_build_caches();
 
@@ -897,7 +903,16 @@ int ProjectInfo::build_all(bool force, bool explain, bool repair) {
     }
 
     const int result = build_many(jobs, false, explain, tracked.size());
-    if (result == 0) ownership.finish(); // remove marker strictly after the final mutation
+    if (result == 0) {
+        ownership.finish(); // remove marker strictly after the final mutation
+    } else if (!repair && !mutation_started()) {
+        // Controlled failure with PROVEN zero recovery-relevant mutations:
+        // nothing was written/deleted, so nothing needs repair. Clear the
+        // marker. A crash/kill never reaches here (finish() only runs on the
+        // success/zero-mutation paths), and build --repair always retains on
+        // failure because its pre-existing stale evidence is unresolved.
+        ownership.finish();
+    }
     return result;
 }
 
@@ -929,6 +944,8 @@ int ProjectInfo::build_names(const std::vector<std::string>& names, bool, bool e
         return 1;
     }
 
+    mutation_started_.store(false, std::memory_order_relaxed);
+
     if (!reconcile_watch()) return 1; // marker retained
     reset_build_caches();
     std::unordered_set<std::string> seen_names;
@@ -948,7 +965,13 @@ int ProjectInfo::build_names(const std::vector<std::string>& names, bool, bool e
     }
     if (jobs.empty()) return 1;
     const int result = build_many(jobs, true, explain, names.size());
-    if (result == 0) ownership.finish();
+    if (result == 0) {
+        ownership.finish();
+    } else if (!mutation_started()) {
+        // Targeted builds are never repair; zero-mutation failure clears the
+        // marker (nothing was written/deleted).
+        ownership.finish();
+    }
     return result;
 }
 

@@ -47,9 +47,11 @@ def set_content(root: pathlib.Path, pages: int, bang: bool):
         (root / "content" / f"p{i}.html").write_text(f"<p>{i}{marker}</p>\n")
 
 
-def build(nift: str, root: pathlib.Path) -> float:
+def build(nift: str, root: pathlib.Path, args=None) -> float:
+    if args is None:
+        args = ["build", "--all"]
     start = time.perf_counter()
-    p = subprocess.run([nift, "build", "--all"], cwd=root, stdout=subprocess.DEVNULL,
+    p = subprocess.run([nift, *args], cwd=root, stdout=subprocess.DEVNULL,
                        stderr=subprocess.PIPE)
     if p.returncode:
         raise SystemExit(p.stderr.decode(errors="replace"))
@@ -82,13 +84,13 @@ with tempfile.TemporaryDirectory(prefix=f"nift-uc-{a.workload}-") as td:
     for name, nift in (("baseline", a.baseline), ("current", a.current)):
         copy = td / f"fix-{name}"
         shutil.copytree(root, copy)
-        build(nift, copy)
+        build(nift, copy, ["build-all"] if name == "baseline" else None)
         print(f"{name} output pages: {len(tree(copy))}")
     same = tree(td / "fix-baseline") == tree(td / "fix-current")
     print(f"output byte-identical: {same}")
 
     # Seed the on-disk outputs, then measure.
-    build(a.baseline, root)
+    build(a.baseline, root, ["build-all"])
     build(a.current, root)
     base_samples, cur_samples = [], []
     bang = False
@@ -96,7 +98,7 @@ with tempfile.TemporaryDirectory(prefix=f"nift-uc-{a.workload}-") as td:
         if a.workload == "C":
             bang = not bang
             set_content(root, a.pages, bang)
-        build(a.baseline, root)
+        build(a.baseline, root, ["build-all"])
         if a.workload == "C":
             bang = not bang
             set_content(root, a.pages, bang)
@@ -105,7 +107,7 @@ with tempfile.TemporaryDirectory(prefix=f"nift-uc-{a.workload}-") as td:
         if a.workload == "C":
             bang = not bang
             set_content(root, a.pages, bang)
-        base_samples.append(build(a.baseline, root))
+        base_samples.append(build(a.baseline, root, ["build-all"]))
         if a.workload == "C":
             bang = not bang
             set_content(root, a.pages, bang)

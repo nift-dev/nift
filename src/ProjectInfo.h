@@ -45,11 +45,20 @@ public:
     int build_all(bool force, bool explain = false, bool repair = false);
     int build_names(const std::vector<std::string>& names, bool force, bool explain = false);
 
+    // Zero-mutation failure distinction (CP2.2): monotonic flag set BEFORE any
+    // recovery-relevant derived mutation (output write, pagination write, stale
+    // output/pagination deletion, .info.json write). A controlled failure with
+    // the flag still false has proven zero derived mutations and may clear
+    // .unfinished; any mutation means repair is required.
+    void mark_mutation() { mutation_started_.store(true, std::memory_order_relaxed); }
+    bool mutation_started() const { return mutation_started_.load(std::memory_order_relaxed); }
+
     bool reconcile_watch();
     WatchList& watch_list();
 
 private:
     WatchList* watch_ = nullptr;
+    std::atomic<bool> mutation_started_{false};
     mutable std::unordered_map<std::string, std::size_t> tracked_index_;
     mutable std::unordered_set<std::string> tracked_output_index_;
     mutable bool tracked_output_index_valid_ = false;

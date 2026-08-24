@@ -162,6 +162,9 @@ bool WatchList::reconcile(ProjectInfo& project) {
                 if (!seen_names.count(value.string)) {
                     auto it = std::find_if(project.tracked.begin(), project.tracked.end(), [&](const TrackedInfo& info) { return info.name == value.string; });
                     if (it != project.tracked.end()) {
+                        // Removing generated output for a disappeared page is a
+                        // recovery-relevant derived mutation (CP2.2).
+                        project.mark_mutation();
                         filesystem::remove_owned_file(project.output_path(*it));
                         filesystem::remove_owned_file(project.info_path(*it));
                         filesystem::remove_owned_file(filesystem::hash_file_path(project.root, project.content_path(*it)));
