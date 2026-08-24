@@ -307,7 +307,7 @@ def main():
             },
         })
         write_json(root / "data/site.json", {"name": "repaired", "items": [{"value": 4}]})
-        run(root, "build")
+        run(root, "build", "--repair")
         add_case(cases, "failed-render-recovery", root)
 
         good_template = (root / "templates/page.html").read_text(encoding="utf-8")
@@ -326,7 +326,7 @@ def main():
             },
         })
         write(root / "templates/page.html", good_template)
-        run(root, "build")
+        run(root, "build", "--repair")
         add_case(cases, "malformed-parser-recovery", root)
 
     runner = ARGS.runner_os.lower()

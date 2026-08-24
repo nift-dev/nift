@@ -55,7 +55,7 @@ for r in range(a.rounds):
         tmpl.write_text("@input('missing-partial.html')\n@content\n")
         run([nift,"build", "--all"],root,expect=1)
         tmpl.write_text(good)
-        run([nift,"build"],root)
+        run([nift,"build", "--repair"],root)
         run([nift,"untrack","c"],root)
         run([nift,"rm","a"],root)
         run([nift,"info", "--all"],root)

@@ -270,6 +270,7 @@ EOF2
 if "$NIFT_BIN" build --all >/dev/null 2>&1; then
   echo "empty templated content unexpectedly succeeded without @content" >&2; exit 1
 fi
+rm -f .nift/.unfinished
 
 cat > templates/template.html <<'EOF2'
 @content
@@ -278,6 +279,7 @@ EOF2
 if "$NIFT_BIN" build --all >/dev/null 2>&1; then
   echo "duplicate @content across template/input graph unexpectedly succeeded" >&2; exit 1
 fi
+rm -f .nift/.unfinished
 
 cat > templates/template.html <<'EOF2'
 <#-- @content --#>

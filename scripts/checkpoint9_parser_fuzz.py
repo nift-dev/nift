@@ -95,6 +95,9 @@ def setup(root):
 
 def run_case(root,text,case_id,timeout):
     (root/'templates/template.html').write_text(text)
+    # Boundary cases are expected to fail; a failed build leaves .unfinished, so
+    # clear it before every case to keep the fuzz loop testing real behavior.
+    (root/'.nift/.unfinished').unlink(missing_ok=True)
     started=time.monotonic()
     try:
         p=subprocess.run([NIFT,'build', '--all'],cwd=root,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,

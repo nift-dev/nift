@@ -5,6 +5,7 @@
 #include <minify/Minify.h>
 #include <map>
 #include "ProjectInfo.h"
+#include "ProjectOwnership.h"
 #include "WatchList.h"
 #include "handover_content.h"
 
@@ -765,11 +766,11 @@ int run_cli(int argc, char** argv) {
 
         if (all_mode) return project.build_all(true, explain);
         if (repair_mode) {
-            // CP1 interim: repair is a distrust rebuild of every tracked page.
-            // The full repair semantics (refusal on a live build lock, stale
-            // sweep, marker lifecycle) are completed by the .unfinished
-            // productionization checkpoints.
-            return project.build_all(true, explain);
+            // CP2: repair is the only mode allowed to take over a stale marker
+            // (no live owner). It refuses on a live build like everything else.
+            // The CP1 forced-rebuild reconstruction path is retained; the full
+            // distrust/sweep semantics are completed by the CP4 campaign.
+            return project.build_all(true, explain, /*repair=*/true);
         }
         if (auto_mode) {
             BuildAutoQuitKey quit_key;
@@ -844,6 +845,14 @@ int run_cli(int argc, char** argv) {
 
     if (command == "untrack" || command == "rm" || command == "del") {
         if (argc < 3) return 1;
+        // Derived-state mutator: refuse while a live build owns the project.
+        // A stale marker (no live owner) does not make a single-page removal
+        // unsafe - only a concurrent mutator does - so these commands probe
+        // the lock rather than running a full build epoch.
+        if (ProjectOwnership::live_owner_exists(project.root / ".nift/.unfinished")) {
+            console::error("another build appears to be running; refusing to mutate build state");
+            return 1;
+        }
         for (int i = 2; i < argc; ++i) {
             const std::string name = argv[i];
             auto it = std::find_if(project.tracked.begin(), project.tracked.end(), [&](const TrackedInfo& info) { return info.name == name; });
@@ -858,6 +867,10 @@ int run_cli(int argc, char** argv) {
 
     if (command == "cp" || command == "copy" || command == "mv" || command == "move") {
         if (argc != 4) { console::error(command + " requires exactly a source and destination name"); return 1; }
+        if (ProjectOwnership::live_owner_exists(project.root / ".nift/.unfinished")) {
+            console::error("another build appears to be running; refusing to mutate build state");
+            return 1;
+        }
         const std::string source_name = argv[2];
         const std::string destination_name = argv[3];
         if ((destination_name != "/" && fs::path(destination_name).is_absolute()) || filesystem::has_parent_component(destination_name)) {

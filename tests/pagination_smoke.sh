@@ -63,10 +63,12 @@ cat > content/blog.html <<'EOF2'
 @item{x}
 EOF2
 if "$NIFT_BIN" build --all >/dev/null 2>&1; then echo 'pagination without @paginate unexpectedly succeeded' >&2; exit 1; fi
+rm -f .nift/.unfinished
 cat > content/blog.html <<'EOF2'
 @item{x}@paginate@paginate
 EOF2
 if "$NIFT_BIN" build --all >/dev/null 2>&1; then echo 'multiple @paginate unexpectedly succeeded' >&2; exit 1; fi
+rm -f .nift/.unfinished
 # Zero items is valid and emits the primary page with an empty paginate.items.
 cat > content/blog.html <<'EOF2'
 @paginate
@@ -82,6 +84,7 @@ cat > content/blog.html <<'EOF2'
 @paginate
 EOF2
 if "$NIFT_BIN" build --all >/dev/null 2>&1; then echo '@paginate without config unexpectedly succeeded' >&2; exit 1; fi
+rm -f .nift/.unfinished
 
 echo 'Pagination smoke test passed'
 
@@ -164,6 +167,7 @@ cat > content/blog.paginate.html <<'EOF2'
 $[paginate.items]
 EOF2
 if "$NIFT_BIN" build >/dev/null 2>&1; then echo 'broken pagination template unexpectedly succeeded' >&2; exit 1; fi
+rm -f .nift/.unfinished
 cmp old1 public/blog.html
 cmp old2 public/blog-2.html
 cmp old3 public/blog-3.html

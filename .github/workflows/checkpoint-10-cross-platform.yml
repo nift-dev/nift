@@ -74,6 +74,16 @@ jobs:
             --nift "$PWD\nift.exe" `
             --runner-os '${{ matrix.runner_os }}' `
             --output '.build\checkpoint-10\${{ matrix.id }}.json'
+      - name: Ownership lock+marker unit test (all platforms)
+        if: runner.os != 'Windows'
+        run: make test-ownership-unit
+      - name: Ownership lock+marker unit test on Windows
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: make test-ownership-unit
+      - name: Ownership lifecycle/concurrency suite (POSIX)
+        if: runner.os != 'Windows'
+        run: make test-ownership-concurrency
       - uses: actions/upload-artifact@v4
         with:
           name: checkpoint-10-${{ matrix.id }}

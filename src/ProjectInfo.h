@@ -42,7 +42,7 @@ public:
     std::vector<std::string> build_reasons(const TrackedInfo& info) const;
     bool needs_build(const TrackedInfo& info, std::string* reason = nullptr) const;
     bool build_one(TrackedInfo& info);
-    int build_all(bool force, bool explain = false);
+    int build_all(bool force, bool explain = false, bool repair = false);
     int build_names(const std::vector<std::string>& names, bool force, bool explain = false);
 
     bool reconcile_watch();

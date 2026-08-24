@@ -1,5 +1,6 @@
 #include "ProjectInfo.h"
 #include "ProjectInfoHost.h"
+#include "ProjectOwnership.h"
 #include "ProjectRead.h"
 #include <minify/Minify.h>
 #include "BuildProgress.h"
@@ -824,9 +825,42 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& jobs, bool targeted, bo
     return failed_count == 0 ? 0 : 1;
 }
 
-int ProjectInfo::build_all(bool force, bool explain) {
+int ProjectInfo::build_all(bool force, bool explain, bool repair) {
     filesystem::begin_recovery_epoch();
-    if (!reconcile_watch()) return 1;
+
+    // Acquire live-build ownership (OS lock + durable .unfinished marker)
+    // BEFORE the first derived-state mutation. The first mutation in the build
+    // path is reconcile_watch() (it removes outputs for disappeared watched
+    // pages and rewrites watched state). Load/validation happened in open().
+    //
+    // Ordinary builds refuse on a stale marker (previous epoch unfinished) or
+    // a live owner. build --repair is the only mode that may take over a stale
+    // marker; it refuses on a live owner just like everything else. No derived
+    // state is mutated before acquisition, and nothing is mutated after the
+    // marker is removed on success.
+    ProjectOwnership ownership(root / ".nift/.unfinished");
+    const ProjectOwnership::State ownership_state = ownership.acquire();
+    if (ownership_state == ProjectOwnership::State::Live) {
+        std::lock_guard<std::mutex> lock(console::output_mutex);
+        std::cerr << console::error_label() << " another build appears to be running;"
+                  << " refusing to mutate build state\n";
+        return 1;
+    }
+    if (ownership_state == ProjectOwnership::State::Failed) {
+        std::lock_guard<std::mutex> lock(console::output_mutex);
+        std::cerr << console::error_label() << " could not acquire the build lock ("
+                  << relative(root / ".nift/.unfinished") << ")\n";
+        return 1;
+    }
+    if (ownership_state == ProjectOwnership::State::Stale && !repair) {
+        std::lock_guard<std::mutex> lock(console::output_mutex);
+        std::cerr << console::error_label() << " unfinished build detected.\n";
+        std::cerr << "  Generated build state may be incomplete.\n";
+        std::cerr << "  Run " << console::good("nift build --repair") << " to reconstruct it.\n";
+        return 1;
+    }
+
+    if (!reconcile_watch()) return 1; // marker retained: epoch not completed
     reset_build_caches();
 
     std::vector<BuildJob> jobs;
@@ -862,12 +896,40 @@ int ProjectInfo::build_all(bool force, bool explain) {
             if (!reasons[i].empty()) jobs.push_back({&tracked[i], std::move(reasons[i])});
     }
 
-    return build_many(jobs, false, explain, tracked.size());
+    const int result = build_many(jobs, false, explain, tracked.size());
+    if (result == 0) ownership.finish(); // remove marker strictly after the final mutation
+    return result;
 }
 
 int ProjectInfo::build_names(const std::vector<std::string>& names, bool, bool explain) {
     filesystem::begin_recovery_epoch();
-    if (!reconcile_watch()) return 1;
+
+    // Targeted builds are derived-state mutators and take the same ownership:
+    // refuse on a live owner or a stale marker (repair is only reachable via
+    // `build --repair`).
+    ProjectOwnership ownership(root / ".nift/.unfinished");
+    const ProjectOwnership::State ownership_state = ownership.acquire();
+    if (ownership_state == ProjectOwnership::State::Live) {
+        std::lock_guard<std::mutex> lock(console::output_mutex);
+        std::cerr << console::error_label() << " another build appears to be running;"
+                  << " refusing to mutate build state\n";
+        return 1;
+    }
+    if (ownership_state == ProjectOwnership::State::Failed) {
+        std::lock_guard<std::mutex> lock(console::output_mutex);
+        std::cerr << console::error_label() << " could not acquire the build lock ("
+                  << relative(root / ".nift/.unfinished") << ")\n";
+        return 1;
+    }
+    if (ownership_state == ProjectOwnership::State::Stale) {
+        std::lock_guard<std::mutex> lock(console::output_mutex);
+        std::cerr << console::error_label() << " unfinished build detected.\n";
+        std::cerr << "  Generated build state may be incomplete.\n";
+        std::cerr << "  Run " << console::good("nift build --repair") << " to reconstruct it.\n";
+        return 1;
+    }
+
+    if (!reconcile_watch()) return 1; // marker retained
     reset_build_caches();
     std::unordered_set<std::string> seen_names;
     for (const auto& name : names) {
@@ -885,7 +947,9 @@ int ProjectInfo::build_names(const std::vector<std::string>& names, bool, bool e
         }
     }
     if (jobs.empty()) return 1;
-    return build_many(jobs, true, explain, names.size());
+    const int result = build_many(jobs, true, explain, names.size());
+    if (result == 0) ownership.finish();
+    return result;
 }
 
 bool ProjectInfo::reconcile_watch() { return watch_->reconcile(*this); }

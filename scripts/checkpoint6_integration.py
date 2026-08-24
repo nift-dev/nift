@@ -118,7 +118,7 @@ with tempfile.TemporaryDirectory(prefix="nift-cp6-integration-") as td:
             p=run(root,"build",ok=False); failures+=1
             if "minif" not in (p.stdout+p.stderr).lower(): raise RuntimeError("minifier failure did not propagate")
             (root/".nift/tracked.json").write_text(before); bump(root/".nift/tracked.json")
-        run(root,"build"); phases+=1
+        run(root,"build", "--repair"); phases+=1
         if not (root/"public/index.html").exists() or not (root/"public/assets/style.css").exists():
             raise RuntimeError("successful recovery lost output")
     # Final clean build must remain possible after all cross-component failures.

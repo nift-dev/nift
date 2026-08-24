@@ -8,6 +8,9 @@ trap 'rm -rf "$TMP"' EXIT
 make_project(){
     local d="$1"
     mkdir -p "$d/.nift" "$d/content" "$d/templates" "$d/public" "$d/data"
+    # A previously failed expected-failure build may share this dir name and
+    # leave .unfinished behind; start every fresh project clean.
+    rm -f "$d/.nift/.unfinished"
     cat >"$d/.nift/config.json" <<'JSON'
 {"config":{"content-dir":"content/","content-ext":".html","output-dir":"public/","output-ext":".html","default-template":"templates/template.html","build-threads":-1,"incremental-mode":"modified"}}
 JSON
@@ -706,6 +709,7 @@ if grep -Fq "'YES'" "$D_EXPR/public/index.html"; then echo 'expression ternary l
 # Invalid arithmetic fails cleanly.
 for expr in '1 / 0' '1 % 0' '1.5 % 1' "'x' + 1"; do
   printf '$[%s]\n' "$expr" > "$D_EXPR/content/index.html"
+  rm -f "$D_EXPR/.nift/.unfinished"
   if (cd "$D_EXPR" && "$NIFT_BIN" build --all >/dev/null 2>&1); then
     echo "invalid expression unexpectedly succeeded: $expr" >&2; exit 1
   fi

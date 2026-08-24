@@ -44,6 +44,7 @@ if (cd "$P" && "$NIFT_BIN" build >bad-data.log 2>&1); then
   echo "schema-invalid data unexpectedly built" >&2
   exit 1
 fi
+(cd "$P" && rm -f .nift/.unfinished)
 grep -Fq 'does not satisfy schema' "$P/bad-data.log"
 grep -Fq '$.items[0].rank' "$P/bad-data.log"
 
@@ -111,6 +112,7 @@ if (cd "$P" && "$NIFT_BIN" build --all >trav-data.log 2>&1); then
   echo "json traversal unexpectedly succeeded" >&2
   exit 1
 fi
+(cd "$P" && rm -f .nift/.unfinished)
 grep -Fq 'path must stay inside the Nift project' "$P/trav-data.log"
 
 printf '@json("data/ok.json", data, "../outside.json")\n@content\n' >"$P/templates/template.html"

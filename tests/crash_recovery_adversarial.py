@@ -35,9 +35,9 @@ def setup(root: Path, mode: str, n: int = 6000) -> None:
         (root / 'content' / f'p{i}.html').write_text(f'<p>{i}</p>\n')
 
 
-def build_ok(nift: str, root: Path) -> bool:
+def build_ok(nift: str, root: Path, *args) -> bool:
     try:
-        subprocess.run([nift, 'build', '--all'], cwd=root, check=True,
+        subprocess.run([nift, 'build', *args], cwd=root, check=True,
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
         return True
     except Exception:
@@ -117,10 +117,13 @@ def main() -> int:
                 label = f'{mode}:crash-{i}'
                 kill_during_build(nift, root, label)
                 assert_valid_json(root, label)
-                if not build_ok(nift, root):
-                    raise RuntimeError(f"{label}: next build failed after crash")
+                # CP2: an interrupted build leaves .unfinished, so the recovery
+                # invocation is `build --repair` (the only mode that may take
+                # over a stale marker). It must reconstruct and succeed.
+                if not build_ok(nift, root, '--repair'):
+                    raise RuntimeError(f"{label}: build --repair failed after crash")
 
-            # a further build must converge to the baseline clean output
+            # a further ordinary build must now converge to the baseline output
             if not build_ok(nift, root):
                 raise RuntimeError(f"{mode}: final build failed")
             if tree_hash(root / 'public') != baseline:

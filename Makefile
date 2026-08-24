@@ -4,7 +4,7 @@ CPPFLAGS ?= -Isrc -Iinclude -Iminifypp/include -Iminifypp/src
 LDFLAGS ?=
 LDLIBS ?=
 
-SOURCES := src/nift.cpp src/CLI.cpp src/Engine.cpp src/Context.cpp src/Value.cpp src/FileSystem.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp src/Parser.cpp src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp src/WatchList.cpp src/BuildProgress.cpp
+SOURCES := src/nift.cpp src/ProjectOwnership.cpp src/CLI.cpp src/Engine.cpp src/Context.cpp src/Value.cpp src/FileSystem.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp src/Parser.cpp src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp src/WatchList.cpp src/BuildProgress.cpp
 OBJECTS := $(SOURCES:.cpp=.o)
 DEPFILES := $(OBJECTS:.o=.d)
 
@@ -89,6 +89,14 @@ $(ENGINE_TEST): tests/engine_smoke.cpp $(ENGINE_CORE_OBJECTS)
 
 test-engine: $(ENGINE_TEST)
 	$(ENGINE_TEST)
+
+OWNERSHIP_UNIT_TEST := $(TEST_DIR)/ownership-unit$(EXEEXT)
+$(OWNERSHIP_UNIT_TEST): tests/ownership_unit.cpp $(ENGINE_CORE_OBJECTS)
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/ownership_unit.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
+
+test-ownership-unit: $(OWNERSHIP_UNIT_TEST)
+	$(OWNERSHIP_UNIT_TEST)
 
 ENGINE_BINDINGS_TEST := $(TEST_DIR)/engine-bindings$(EXEEXT)
 $(ENGINE_BINDINGS_TEST): tests/engine_bindings.cpp $(ENGINE_CORE_OBJECTS)
@@ -233,6 +241,12 @@ test-collections: $(TARGET)
 test-commands: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/commands_smoke.sh
 
+test-ownership-concurrency: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 tests/ownership_concurrency.py
+
+test-pagination-ordering: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/pagination_ordering_smoke.sh
+
 test-pagination: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/pagination_smoke.sh
 
@@ -371,7 +385,7 @@ clean:
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
-.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-diagnostics test-minify test-json-schema-integration test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
+.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-diagnostics test-minify test-json-schema-integration test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
 
 
 test-cross-feature: $(TARGET)

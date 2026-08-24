@@ -217,7 +217,7 @@ with tempfile.TemporaryDirectory(prefix="nift-cp8-") as td:
         if p.returncode==0: raise RuntimeError("file-size-limited build unexpectedly succeeded")
         assert_pair(root,prior,"partial/write-limit failure")
         # Failed temporary writes are cleaned by the writer itself or the next build.
-        run(root,"build", "--all",timeout=20)
+        run(root,"build", "--repair",timeout=20)
         if list((root/"public").glob("index.html.nift-tmp-*")):
             raise RuntimeError("temporary survived recovery after limited write")
         return {"exit":p.returncode,"limit_bytes":1024*1024}
