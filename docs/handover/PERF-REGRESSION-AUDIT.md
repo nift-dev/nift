@@ -33,28 +33,40 @@ conformance 9/9 pass, output byte-identical):
 - `ProjectInfo`: the previous `.info.json` pagination metadata is read only
   for paginated pages (it was read for every page).
 
-The regression is now fully attributed:
+The residual is now isolated by controlled benchmark-only experiments:
 
 ```text
-render path (parser via the RenderHost seam):  PARITY
-    render-only 10k: pre-embed ~0.06 s == current ~0.06 s
-    (measured with writes skipped at the write boundary)
+controlled render-only (writes skipped at the write boundary in both
+implementations, interleaved 20 samples, median):
+    A pre-embed   62.8 ms
+    B regressed   74.6 ms   +20.4%   (the redundant probes, pre-repair)
+    C repaired    68.3 ms   +8.9%    (small render residual remains)
 
-write path:                                   the residual
-    pre-embed writes  ~0.026 s  (direct truncate + chmod; non-atomic)
-    current writes    ~0.062 s  (crash-safe compare+touch or temp+rename,
-                                 output-permission preservation,
-                                 larger pagination-aware .info.json)
+render-only syscalls are identical (A ~100.7k, C ~102.1k calls), so the
++5.6 ms C-vs-A render residual is CPU-bound (RenderHost seam / parser
+refactor), not additional I/O.
+
+per-piece write isolation (full build, 20 samples, delta vs A):
+    full                        +35.0 ms
+    skip output write           +9.8 ms   -> output write ~ +22 ms
+    skip info write            +12.3 ms   -> info write   ~ +23 ms
+    skip both writes           +13.2 ms   -> writes ~ +22 ms; residual
+                                             ~ +13 ms (render +5.6 ms,
+                                             permissions/geometry ~+7 ms)
+
+internal phase timing (benchmark-only, per-build accumulated):
+    render ~250 ms atomic, writes+perms+geometry ~850 ms atomic
+    (~3.4x the render; write/metadata path is the leading measured cost)
 ```
 
-The current's write machinery is the crash-safe transactional design added
-during the embed era (checkpoint8 filesystem-transaction, recovery-epoch
-guard, output-permission preservation). The compare+touch fast-path was
-measured cheaper than always temp+rename (always-transactional was slower),
-and a direct-write replacement of `write_readonly_file` did not change the
-result — the residual is the write design itself, not a single removable
-probe. Statistical parity with pre-Embed is not achievable while preserving
-the crash-safety + permission + pagination-metadata guarantees.
+So the remaining residual is localized primarily outside the render path,
+with the write/metadata path the leading measured contributor (output and
+`.info.json` persistence each ~+22 ms of the +35 ms). A small CPU-bound
+render residual (+5.6 ms) and a permissions/geometry residual (~+7 ms) also
+contribute; exact attribution remains under investigation, and the costs
+currently grouped as "crash safety" (atomic temp+rename, compare-before-
+write, permission lookup, timestamp, pagination metadata) have not been
+separately decomposed yet.
 
 ## Historical baseline
 
@@ -200,10 +212,16 @@ semantics preserved             all 18 C++ test targets + conformance 9/9
 
 Per the audit protocol: the audit-identified regression (redundant probes) is
 repaired without weakening the reject-class/error contract. The remaining
-+40.6% is the measured cost of the embed-era crash-safe transactional-write,
-output-permission-preservation and pagination-metadata guarantees, which the
-pre-Embed baseline (direct non-atomic truncate writes, no permission
-preservation) did not provide. Whether that residual is an acceptable price
-for the safety guarantees is a deliberate decision for review; recovering
-statistical parity would require a redesign of the crash-safe write strategy,
-not the removal of further redundant probes.
++40.6% is currently localized primarily outside the render path, with the
+write/metadata path the leading measured contributor (controlled render-only
+benchmarking shows a small CPU-bound render residual, not render-path I/O).
+Exact attribution remains under investigation; whether the residual is an
+acceptable price for the embed-era safety guarantees is a deliberate decision
+for review.
+
+Sanitizer verification and checked-read regression coverage (this repair):
+- ASan+UBSan build: 10k build and conformance 9/9 pass with no sanitizer
+  findings over the repaired read/cache semantics.
+- tests/engine_source_read.cpp (new): valid empty files read as empty (not
+  failure), missing/directory/unreadable sources produce the typed failures,
+  and a failed read is not cached as valid empty content.
