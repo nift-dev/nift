@@ -11,6 +11,7 @@
 #include "WatchList.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <limits>
 #include <iostream>
@@ -916,6 +917,10 @@ int ProjectInfo::build_all(bool force, bool explain, bool repair) {
 
 void ProjectInfo::finish_if_epoch_complete(ProjectOwnership& ownership, int result, bool repair) {
     if (result == 0) {
+        // CP4: a successful repair additionally sweeps stale derived artifacts
+        // (orphans, pagination surplus, stale hashes) BEFORE the marker is
+        // removed, so the derived tree converges to the authoritative state.
+        if (repair) repair_derived_state();
         ownership.finish(); // remove marker strictly after the final mutation
     } else if (!repair && !mutation_started()) {
         // Controlled failure with PROVEN zero recovery-relevant mutations:
@@ -926,6 +931,156 @@ void ProjectInfo::finish_if_epoch_complete(ProjectOwnership& ownership, int resu
         ownership.finish();
     }
     // Otherwise retain: the destructor keeps the marker.
+}
+
+void ProjectInfo::repair_derived_state() {
+    // Ownership model (CP4-DESIGN.md): only files Nift can establish as its
+    // own derived artifacts are removed. The output tree is never wiped.
+    // current info paths identify the page (the info filename is derived from
+    // the OUTPUT path, not the page name - e.g. the "/" page's info is
+    // index.info.json - so the orphan check must compare info paths, not
+    // filename-derived names).
+    std::unordered_set<fs::path> current_info_paths;
+    current_info_paths.reserve(tracked.size());
+    std::unordered_set<fs::path> current_owned;
+    struct PaginationPattern { std::string base; std::string ext; };
+    std::unordered_map<std::string, std::vector<PaginationPattern>> patterns_by_dir;
+
+    for (const auto& info : tracked) {
+        current_info_paths.insert(info_path(info).lexically_normal());
+        const fs::path out = output_path(info).lexically_normal();
+        current_owned.insert(out);
+        // Current pagination count from the just-written .info.json (the
+        // rebuild succeeded, so every page's info is fresh and valid).
+        std::size_t pages = 0;
+        json::Document doc;
+        std::string error;
+        const fs::path ip = info_path(info);
+        if (load_json_file(ip, doc, error) && doc.is_object() &&
+            doc.has("pagination-pages") && doc["pagination-pages"].is_number() &&
+            std::isfinite(doc["pagination-pages"].num) && doc["pagination-pages"].num >= 1)
+            pages = static_cast<std::size_t>(doc["pagination-pages"].num);
+        if (pages >= 2) {
+            for (std::size_t n = 2; n <= pages; ++n)
+                current_owned.insert(pagination_output_path(info, n).lexically_normal());
+            // Register the in-use pagination namespace so the output-tree
+            // sweep can remove surplus pages N > count.
+            const std::string ext = info.output_ext.empty() ? config.output_ext : info.output_ext;
+            patterns_by_dir[out.parent_path().generic_string()].push_back(
+                {out.stem().generic_string(), ext});
+        }
+    }
+
+    // 1. Pagination surplus sweep over the output tree: remove files in a
+    //    currently-paginated tracked page's <base>-<N> namespace beyond the
+    //    current count. User files not matching any in-use namespace are left
+    //    alone. Files that are a tracked page's primary output are exempt (in
+    //    current_owned).
+    const fs::path output_root = root / config.output_dir;
+    {
+        std::error_code ec;
+        if (fs::is_directory(output_root, ec)) {
+            for (const auto& entry : fs::recursive_directory_iterator(output_root, ec)) {
+                if (ec) break;
+                if (!entry.is_regular_file(ec) || ec) continue;
+                const fs::path path = entry.path().lexically_normal();
+                if (current_owned.count(path)) continue;
+                const auto it = patterns_by_dir.find(path.parent_path().generic_string());
+                if (it == patterns_by_dir.end()) continue;
+                const std::string fname = path.stem().generic_string();
+                const std::string ext = path.extension().generic_string();
+                for (const auto& pattern : it->second) {
+                    if (ext != pattern.ext) continue;
+                    const std::size_t marker = pattern.base.size();
+                    if (fname.size() < marker + 2 || fname.compare(0, marker, pattern.base) != 0 ||
+                        fname[marker] != '-')
+                        continue;
+                    bool digits = true;
+                    for (std::size_t i = marker + 1; i < fname.size(); ++i)
+                        if (!std::isdigit(static_cast<unsigned char>(fname[i]))) { digits = false; break; }
+                    if (digits) {
+                        // <base>-<N> with N beyond the current count, in an
+                        // actively-paginated namespace: stale pagination.
+                        filesystem::remove_owned_file(path);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. Orphan .info.json sweep: every .info.json under .nift/public/ is
+    //    Nift-owned derived metadata. If its page is no longer tracked, remove
+    //    the info, the primary output (exact path from a readable info's
+    //    "output" field, else name + config output-ext), and any pagination
+    //    pages a readable info records.
+    const fs::path info_root = root / ".nift" / config.output_dir;
+    {
+        std::error_code ec;
+        if (fs::is_directory(info_root, ec)) {
+            for (const auto& entry : fs::recursive_directory_iterator(info_root, ec)) {
+                if (ec) break;
+                if (!entry.is_regular_file(ec) || ec) continue;
+                const fs::path path = entry.path();
+                const std::string filename = path.filename().generic_string();
+                constexpr const char* suffix = ".info.json";
+                if (filename.size() <= std::char_traits<char>::length(suffix) ||
+                    filename.compare(filename.size() - std::char_traits<char>::length(suffix),
+                                     std::char_traits<char>::length(suffix), suffix) != 0)
+                    continue;
+                if (current_info_paths.count(path.lexically_normal())) continue; // current page
+                const fs::path rel_info = path.lexically_relative(info_root).lexically_normal();
+                std::string name = rel_info.generic_string();
+                name.resize(name.size() - std::char_traits<char>::length(suffix));
+
+                bool removed_primary = false;
+                fs::path output_path_guess = root / config.output_dir / (name + config.output_ext);
+                json::Document doc;
+                std::string error;
+                if (load_json_file(path, doc, error) && doc.is_object() && doc.has("output") &&
+                    doc["output"].is_string()) {
+                    const std::string out = doc["output"].string;
+                    const fs::path out_path = (root / out).lexically_normal();
+                    output_path_guess = out_path;
+                    if (doc.has("pagination-pages") && doc["pagination-pages"].is_number() &&
+                        std::isfinite(doc["pagination-pages"].num) && doc["pagination-pages"].num >= 2) {
+                        const std::size_t pages = static_cast<std::size_t>(doc["pagination-pages"].num);
+                        const std::string ext = out_path.extension().generic_string();
+                        const std::string out_stem = out_path.stem().generic_string();
+                        for (std::size_t n = 2; n <= pages; ++n)
+                            filesystem::remove_owned_file(
+                                out_path.parent_path() / (out_stem + "-" + std::to_string(n) + ext));
+                    }
+                    removed_primary = filesystem::remove_owned_file(out_path);
+                }
+                if (!removed_primary) filesystem::remove_owned_file(output_path_guess);
+                std::error_code ignored;
+                std::filesystem::remove(path, ignored);
+            }
+        }
+    }
+
+    // 3. Stale stored-hash sweep: `.nift/**/*.hash` (mirroring the source
+    //    tree, excluding .nift/public and .nift/.watch) whose mirrored path no
+    //    longer exists is orphaned and removed.
+    {
+        std::error_code ec;
+        const fs::path nift_root = root / ".nift";
+        for (const auto& entry : fs::recursive_directory_iterator(nift_root, ec)) {
+            if (ec) break;
+            if (!entry.is_regular_file(ec) || ec) continue;
+            const fs::path path = entry.path();
+            if (path.extension() != ".hash") continue;
+            const fs::path rel = path.lexically_relative(nift_root);
+            if (rel.empty()) continue;
+            const std::string first = rel.begin()->generic_string();
+            if (first == "public" || first == ".watch" || first == "config.json" || first == "tracked.json")
+                continue;
+            const fs::path mirrored = root / rel;
+            if (!fs::is_regular_file(mirrored, ec))
+                std::filesystem::remove(path, ec);
+        }
+    }
 }
 
 int ProjectInfo::build_names(const std::vector<std::string>& names, bool, bool explain) {

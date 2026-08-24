@@ -53,6 +53,12 @@ public:
     // failure, or a crash - the latter never reaches here) -> retain.
     void finish_if_epoch_complete(ProjectOwnership& ownership, int result, bool repair);
 
+    // CP4 repair sweep: called after a successful repair rebuild. Removes only
+    // derived artifacts Nift can establish as its own (orphan .info.json and
+    // their outputs, pagination surplus of currently-paginated tracked pages,
+    // stale stored hashes). See docs/handover/CP4-DESIGN.md.
+    void repair_derived_state();
+
     // Zero-mutation failure distinction (CP2.2): monotonic flag set BEFORE any
     // recovery-relevant derived mutation (output write, pagination write, stale
     // output/pagination deletion, .info.json write). A controlled failure with
