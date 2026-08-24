@@ -1,13 +1,18 @@
 // NR12 benchmark: standalone C++ Engine ns/render for the same representative
 // Nift template the Rust bench uses (conditional greeting + 10-post loop).
-// Prints "<ns> ns/render\n" on stdout; consumed by nift-rs examples/bench.rs.
+// Runs N samples and prints the median "<median> ns/render\n" on stdout;
+// consumed by nift-rs examples/bench.rs.
 #include "nift/nift.h"
 
+#include <algorithm>
 #include <chrono>
+#include <cstdlib>
 #include <iostream>
 #include <string>
+#include <vector>
 
-int main() {
+int main(int argc, char** argv) {
+    const int samples = argc > 1 ? std::atoi(argv[1]) : 7;
     const int iterations = 50000;
     const int warmup = 2000;
 
@@ -28,13 +33,18 @@ int main() {
     nift::Source tpl(nift::Source::text("@content"));
     nift::Context context;
 
-    for (int i = 0; i < warmup; ++i) engine.render(page, tpl, context);
-
-    const auto start = std::chrono::steady_clock::now();
-    for (int i = 0; i < iterations; ++i) engine.render(page, tpl, context);
-    const auto end = std::chrono::steady_clock::now();
-    const double ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count() /
-                      static_cast<double>(iterations);
-    std::cout << ns << " ns/render\n";
+    std::vector<double> results;
+    results.reserve(static_cast<std::size_t>(samples));
+    for (int sample = 0; sample < samples; ++sample) {
+        for (int i = 0; i < warmup; ++i) engine.render(page, tpl, context);
+        const auto start = std::chrono::steady_clock::now();
+        for (int i = 0; i < iterations; ++i) engine.render(page, tpl, context);
+        const auto end = std::chrono::steady_clock::now();
+        results.push_back(std::chrono::duration_cast<std::chrono::nanoseconds>(end - start)
+                              .count() /
+                          static_cast<double>(iterations));
+    }
+    std::sort(results.begin(), results.end());
+    std::cout << results[results.size() / 2] << " ns/render\n";
     return 0;
 }
