@@ -1,5 +1,7 @@
 #include "nift/nift.h"
 #include <iostream>
+#include <optional>
+#include <set>
 #include <string>
 
 static std::string json_escape(const std::string& text) {
@@ -18,15 +20,25 @@ static std::string json_escape(const std::string& text) {
     return out;
 }
 
+static bool has_suffix(const std::string& text, const std::string& suffix) {
+    return text.size() >= suffix.size() && text.compare(text.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
 // Differential harness: renders via the standalone C++ Engine and prints a
-// stable observable JSON result (output, dependencies, requirements) or the
-// error message. Args:
-//   engine_harness <root> <page_text|-> <template_text|-> <page_name> <current_output|-> <page_path|-> <template_path|->
+// stable observable JSON result (output, dependencies, requirements,
+// optionally recorded loader keys) or the error message. Args:
+//   engine_harness <root> <page_text|-> <template_text|-> <page_name> <current_output|-> <page_path|-> <template_path|-> <mode> <seam|->
 // A "-" for text means empty text; page_path/template_path override the text
 // args when non-"-". Bindings are passed as simple "name=value" pairs on stdin
 // (one per line); values are inserted as strings.
+//
+// The optional "seam" argument installs deterministic fixture seams:
+//   "-"      no loader, no environment provider (default reads/process env)
+//   "loader" custom loader that serves a fixed fixture document per resolved
+//            path key and records every key it is asked for (loaderKeys)
+//   "env"    custom environment provider with fixed values
 int main(int argc, char** argv) {
-    if (argc < 8) { std::cerr << "usage: engine_harness root page template page_name current_output page_path template_path\n"; return 2; }
+    if (argc < 8) { std::cerr << "usage: engine_harness root page template page_name current_output page_path template_path [mode] [seam]\n"; return 2; }
     std::string root = argv[1];
     std::string page_text = argv[2] == std::string("-") ? std::string() : argv[2];
     std::string template_text = argv[3] == std::string("-") ? std::string() : argv[3];
@@ -35,9 +47,29 @@ int main(int argc, char** argv) {
     std::string page_path = argv[6] == std::string("-") ? std::string() : argv[6];
     std::string template_path = argv[7] == std::string("-") ? std::string() : argv[7];
     const std::string mode = argc > 8 ? argv[8] : "composed";
+    const std::string seam = argc > 9 ? argv[9] : "-";
 
     nift::Engine engine;
     engine.set_root(root);
+    std::set<std::string> loader_keys;
+    if (seam == "loader") {
+        engine.set_loader([&](std::string_view key) -> std::optional<std::string> {
+            loader_keys.insert(std::string(key));
+            const std::string k(key);
+            if (has_suffix(k, "/templates/template.html")) return "<main>@content</main>\n";
+            if (has_suffix(k, "/content/blog.html")) return "<p>LOADER-CONTENT</p>\n";
+            if (has_suffix(k, "/content/post.html")) return "@input(\"part.html\")\n";
+            if (has_suffix(k, "/content/part.html")) return "<p>LOADER-PART</p>\n";
+            return std::nullopt;
+        });
+    }
+    if (seam == "env") {
+        engine.set_environment_provider([](std::string_view name) -> std::optional<std::string> {
+            if (name == "NIFT_ENV_A") return "alpha";
+            if (name == "NIFT_ENV_B") return "beta";
+            return std::nullopt;
+        });
+    }
     std::string line;
     while (std::getline(std::cin, line)) {
         if (line.empty()) continue;
@@ -64,6 +96,11 @@ int main(int argc, char** argv) {
     std::cout << "],\"requirements\":[";
     first = true;
     for (const auto& r : result.requirements()) { if (!first) std::cout << ","; first = false; std::cout << "\"" << json_escape(r) << "\""; }
+    if (seam == "loader") {
+        std::cout << "],\"loaderKeys\":[";
+        first = true;
+        for (const auto& k : loader_keys) { if (!first) std::cout << ","; first = false; std::cout << "\"" << json_escape(k) << "\""; }
+    }
     std::cout << "]}\n";
     return 0;
 }
