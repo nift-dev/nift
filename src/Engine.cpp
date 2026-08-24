@@ -105,8 +105,11 @@ public:
             contents = impl_.loader(key);
             if (!contents) return nullptr;
         } else {
-            if (!filesystem::file_readable(path)) return nullptr;
-            contents = filesystem::read_file(path);
+            // The read is the authority: no separate file_readable probe
+            // (which opened the file a second time); read_file_checked classifies
+            // missing/unreadable/non-regular as nullopt -> nullptr.
+            contents = filesystem::read_file_checked(path);
+            if (!contents) return nullptr;
         }
         auto stored = std::make_unique<const std::string>(*contents);
         const std::string* result = stored.get();

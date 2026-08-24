@@ -3,10 +3,58 @@
 Question: did introducing the Embedded Nift architecture make ordinary Nift
 builds meaningfully slower than the last trustworthy pre-Embed baseline?
 
-**Result: YES — a material, repeatable regression was detected (+49.6% on the
-10,000-page full build). The cause is identified: redundant per-page
-filesystem probes added by the embed-era hardening. Integration should be
-held until this is understood and repaired.**
+**Result: YES — a material regression was detected (+49.6% median on the
+10,000-page full build) and partially repaired (+40.6% remaining). The
+audit-identified cause — redundant per-page filesystem probes from embed-era
+hardening — is fixed; the remaining residual is the deliberate cost of the
+embed-era crash-safe write + metadata guarantees that the baseline's direct
+(non-atomic) writes lacked. The render path is at parity.**
+
+## Repair result (three-way comparison)
+
+```text
+                     median    ratio vs A    delta vs A
+A Pre-Embed         87-88 ms      —            —
+B Regressed         130 ms       1.50x        +49.6%
+C Repaired          121 ms       1.41x        +40.6%
+```
+
+Repaired changes (semantics preserved — all 18 C++ test targets and
+conformance 9/9 pass, output byte-identical):
+
+- `Parser`: `@content`, `@input` and `render()` no longer perform a separate
+  `source_readable` probe before reading; the read (`read_shared_source`) is
+  the authority and its `nullptr` classifies the typed error. The template
+  path keeps one `source_exists` probe for the "does not exist" distinction.
+- `FileSystem`/`ProjectInfo`/`ProjectState`/`Engine`: `read_file_checked`
+  returns `nullopt` for missing/unreadable/non-regular (empty-but-valid files
+  return `Some("")`), so `read_shared_source` yields `nullptr` on failure
+  instead of a cached empty string (the dead `if (!cached)` guards now fire).
+- `ProjectInfo`: the previous `.info.json` pagination metadata is read only
+  for paginated pages (it was read for every page).
+
+The regression is now fully attributed:
+
+```text
+render path (parser via the RenderHost seam):  PARITY
+    render-only 10k: pre-embed ~0.06 s == current ~0.06 s
+    (measured with writes skipped at the write boundary)
+
+write path:                                   the residual
+    pre-embed writes  ~0.026 s  (direct truncate + chmod; non-atomic)
+    current writes    ~0.062 s  (crash-safe compare+touch or temp+rename,
+                                 output-permission preservation,
+                                 larger pagination-aware .info.json)
+```
+
+The current's write machinery is the crash-safe transactional design added
+during the embed era (checkpoint8 filesystem-transaction, recovery-epoch
+guard, output-permission preservation). The compare+touch fast-path was
+measured cheaper than always temp+rename (always-transactional was slower),
+and a direct-write replacement of `write_readonly_file` did not change the
+result — the residual is the write design itself, not a single removable
+probe. Statistical parity with pre-Embed is not achievable while preserving
+the crash-safety + permission + pagination-metadata guarantees.
 
 ## Historical baseline
 
@@ -137,17 +185,25 @@ are performed redundantly in the happy path.
 ```text
 NO MEANINGFUL REGRESSION        no
 REGRESSION DETECTED             yes — +49.6% (median) on the 10k full build
-cause                           redundant per-page filesystem probes
+audit-identified cause          redundant per-page filesystem probes
                                 (source_exists/source_readable + the
                                 ifstream readability open)
+repair                          probes removed; read is the authority;
+                                .info.json pagination read gated
+REGRESSION AFTER REPAIR         +40.6% — the deliberate crash-safe write +
+                                metadata guarantee cost (render at parity)
 reproducible                    yes — benchmark script committed, raw samples
                                 recorded
 output correctness              byte-identical
+semantics preserved             all 18 C++ test targets + conformance 9/9
 ```
 
-Per the audit protocol: **HOLD integration until the redundant probes are
-understood and repaired.** No optimization was performed during this audit.
-The natural repair (removing the redundant happy-path probes while keeping the
-controlled-error behaviour, e.g. probing once and reusing the result, or
-making `file_readable` avoid the ifstream open) should be a separate,
-measured change.
+Per the audit protocol: the audit-identified regression (redundant probes) is
+repaired without weakening the reject-class/error contract. The remaining
++40.6% is the measured cost of the embed-era crash-safe transactional-write,
+output-permission-preservation and pagination-metadata guarantees, which the
+pre-Embed baseline (direct non-atomic truncate writes, no permission
+preservation) did not provide. Whether that residual is an acceptable price
+for the safety guarantees is a deliberate decision for review; recovering
+statistical parity would require a redesign of the crash-safe write strategy,
+not the removal of further redundant probes.

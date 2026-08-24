@@ -21,16 +21,21 @@ namespace fs = std::filesystem;
 namespace filesystem {
 
 std::string read_file(const fs::path& path) {
+    return read_file_checked(path).value_or(std::string());
+}
+
+std::optional<std::string> read_file_checked(const fs::path& path) {
     std::error_code type_error;
-    if (!fs::is_regular_file(path, type_error)) return {};
+    if (!fs::is_regular_file(path, type_error)) return std::nullopt;
     std::ifstream file(path, std::ios::binary | std::ios::ate);
-    if (!file) return {};
+    if (!file) return std::nullopt;
     const std::streamoff size = file.tellg();
-    if (size <= 0) return {};
+    if (size < 0) return std::nullopt;
+    if (size == 0) return std::string();
     std::string contents(static_cast<std::size_t>(size), '\0');
     file.seekg(0);
     file.read(contents.data(), size);
-    if (!file && !file.eof()) return {};
+    if (!file && !file.eof()) return std::nullopt;
     return contents;
 }
 

@@ -2169,11 +2169,10 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                         fail(source_path, source, i, "@content would result in an input loop through " + content_path.generic_string());
                         break;
                     }
-                    if (!host_.source_readable(content_path)) {
-                        fail(source_path, source, i, "content file is not readable");
-                        break;
-                    }
                     content_identity = content_path;
+                    // The read is the authority: missing/unreadable content
+                    // yields nullptr -> the typed content error, with no
+                    // separate readability probe (performance-regression repair).
                     const auto cached = host_.read_shared_source(content_path);
                     if (!cached) { fail(source_path, source, i, "content file is not readable"); break; }
                     content_source = *cached;
@@ -2348,10 +2347,10 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     fail(source_path, source, i, "@input would result in an input loop through " + input_path.generic_string());
                     break;
                 }
-                if (!host_.source_readable(input_path)) { fail(source_path, source, i, "input file is not readable"); break; }
                 input_stack_.push_back(input_path);
                 result_.dependencies.insert(host_.relative(input_path));
                 const int insertion_code_block_depth = code_block_depth_;
+                // The read is the authority (no separate readability probe).
                 const auto input_source = host_.read_shared_source(input_path);
                 if (!input_source) { fail(source_path, source, i, "input file is not readable"); break; }
                 const auto nested = parse(*input_source, input_path, depth + 1);
@@ -2597,11 +2596,8 @@ RenderResult Parser::render_composed(const RenderSource& template_source,
 RenderResult Parser::render() {
     const fs::path content_path = host_.content_path(tracked_info_);
     if (tracked_info_.template_path.empty()) {
-        if (!host_.source_readable(content_path)) {
-            result_.ok = false;
-            result_.error = {tracked_info_.name, content_path, 0, "content file is not readable"};
-            return result_;
-        }
+        // The read is the authority: missing/unreadable content yields nullptr
+        // -> the typed content error, with no separate readability probe.
         const auto content_source = host_.read_shared_source(content_path);
         if (!content_source) {
             result_.ok = false;
@@ -2615,15 +2611,11 @@ RenderResult Parser::render() {
     }
 
     const fs::path template_path = host_.root() / tracked_info_.template_path;
+    // One existence probe distinguishes "does not exist" from the read's
+    // "not readable"; render_composed's read classifies the latter.
     if (!host_.source_exists(template_path)) {
         result_.ok = false;
         result_.error = {tracked_info_.name, template_path, 0, "template file does not exist"};
-        return result_;
-    }
-
-    if (!host_.source_readable(template_path)) {
-        result_.ok = false;
-        result_.error = {tracked_info_.name, template_path, 0, "template file is not readable"};
         return result_;
     }
 
@@ -2682,6 +2674,11 @@ RenderResult Parser::render() {
     };
     std::vector<PageRender> pages(total);
     const auto page_source = host_.read_shared_source(pagination_template);
+    if (!page_source) {
+        result_.ok = false;
+        result_.error = {tracked_info_.name, pagination_template, 0, "pagination template is missing, unreadable, or outside the project"};
+        return result_;
+    }
     const std::string* separator_source = separator.empty() ? nullptr : host_.read_shared_source(separator);
 
     const unsigned hardware = std::max(1u, std::thread::hardware_concurrency());

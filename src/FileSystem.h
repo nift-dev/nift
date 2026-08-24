@@ -1,11 +1,18 @@
 #pragma once
 #include <cstdint>
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <vector>
 
 namespace filesystem {
 std::string read_file(const std::filesystem::path& path);
+
+// The read as the single authority: `nullopt` when the file is missing, not a
+// regular file, or unreadable; `Some("")` for a valid empty file; `Some(...)`
+// otherwise. Lets callers classify one read into the typed error semantics
+// without separate exists/readable/open probes (performance-regression repair).
+std::optional<std::string> read_file_checked(const std::filesystem::path& path);
 void begin_recovery_epoch();
 bool write_file(const std::filesystem::path& path, const std::string& contents);
 bool write_readonly_file(const std::filesystem::path& path, const std::string& contents,

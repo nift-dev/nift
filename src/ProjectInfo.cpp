@@ -623,8 +623,11 @@ bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::s
 }
 
 bool ProjectInfo::build_one(TrackedInfo& info) {
+    // Only paginated pages consult the previous page-count metadata; reading it
+    // for every page was a redundant happy-path filesystem probe
+    // (performance-regression repair).
     std::size_t previous_pagination_pages = 0;
-    {
+    if (info.paginate.has_value()) {
         const fs::path previous_info_path = info_path(info);
         if (filesystem::path_exists(previous_info_path)) {
             json::Document previous; std::string previous_error;
