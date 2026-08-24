@@ -291,10 +291,7 @@ Findings:
   force-build.
 - Write-strategy microbenchmark (10k isolated writes, per-write):
   compare+touch 2.7us < direct(chmod+truncate) 4.1us < transactional(temp+rename)
-  7.2us. The atomic temp+rename is inherently ~3us/write more than the
-  baseline's non-atomic direct write (new inode + rename). No cheaper atomic
-  in-place replacement exists; removing the compare (unconditional write) makes
-  the unchanged workload slower, not faster.
+  7.2us.
 - The ".info.json for every page" is pre-Embed (aa60ab3 already wrote it); it
   is not a regression. The compare+touch persistence strategy and atomic
   temp+rename are the newer hardened-persistence costs.
@@ -343,3 +340,64 @@ pagination block for stale-output cleanup). The perf impact is negligible
 (~140 bytes of JSON and five key emissions per page), so this is an
 architecture/schema decision, not a performance fix. Not implemented in this
 pass (persisted-schema change deferred).
+
+## Final bounded persistence pass (reviewer request)
+
+### Transactional path decomposition
+
+Per-syscall microbenchmark (10k, Linux/this machine):
+
+```text
+open+write+close (temp)        3.9 us
+open+write+close (truncate)    3.2 us
+rename (temp -> output)        3.0 us
+chmod                          0.9 us
+stat                           0.7 us
+utimensat (touch)              0.7 us
+```
+
+The transactional path is open+write+close(temp) + chmod + rename ≈ 7.2-7.8 us;
+the direct path is chmod + truncate + chmod ≈ 4-5 us. The rename (new inode +
+directory entry) is the one operation the direct path does not perform and it
+is the operation that supplies atomic replacement; its ~3 us is the
+atomicity-specific component. The other transactional components
+(open+write+close of the temp vs truncate of the existing file) are
+comparable in cost to the direct path. No cheaper equivalent of atomic
+replacement was identified: rename/tempfile+link are the standard POSIX
+mechanisms and all create a fresh inode. This decomposition establishes the
+measured cost of the current implementation and its atomicity component, but
+does not claim a proof that no cheaper safe design exists; none was
+demonstrated here.
+
+### Unconditional write (no compare) on the changed workload
+
+Reviewer request: compare a forced changed-output path that keeps the compare
+(read old -> mismatch -> transactional write) against one that writes
+transactionally without the compare. 10k changed-output workload, 20
+interleaved samples, benchmark-only diagnostic (reverted after measurement):
+
+```text
+compare + transactional write    121.9 ms (median)
+unconditional transactional      127.4 ms (median)
+```
+
+Unexpected but decisive: unconditional writing is ~5.4 ms SLOWER on the
+changed workload. Reason: the per-page `.info.json` (dependencies, requires,
+content path) is byte-identical when only content bytes change, so on a
+changed workload the compare matches for the info write and substitutes a
+cheap touch, whereas unconditional writing rewrites 10,000 info files via
+temp+rename. On the ordinary output write the compare is cheap because the
+size check short-circuits before any read (content byte count changes).
+
+So the compare-before-write is not pure overhead: it is a churn-avoidance
+guard that pays for itself on the metadata writes that stay identical under
+content changes. Removing it makes BOTH workloads slower (unchanged:
+compare+touch 127.0 ms vs unconditional ~130 ms from the same diagnostic).
+
+Consequence for the desired architecture (render -> unconditional crash-safe
+write): it is semantically cleaner but measured slower, and the residual
+regression after any compare removal is still dominated by the atomic
+rename, not by the compare. The architectural preference for a single
+render decision is recorded; it trades ~5-7 ms/10k of churn-avoidance for
+simpler semantics. If adopted, the info-file identity note above means the
+cost appears mostly as rewritten info files on content-change builds.
