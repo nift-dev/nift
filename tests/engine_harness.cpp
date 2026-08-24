@@ -37,7 +37,7 @@ static bool has_suffix(const std::string& text, const std::string& suffix) {
 //   "loader" custom loader that serves a fixed fixture document per resolved
 //            path key and records every key it is asked for (loaderKeys)
 //   "env"    custom environment provider with fixed values
-int main(int argc, char** argv) {
+int run_main(int argc, char** argv) {
     if (argc < 8) { std::cerr << "usage: engine_harness root page template page_name current_output page_path template_path [mode] [seam]\n"; return 2; }
     std::string root = argv[1];
     std::string page_text = argv[2] == std::string("-") ? std::string() : argv[2];
@@ -109,3 +109,31 @@ int main(int argc, char** argv) {
     std::cout << "]}\n";
     return 0;
 }
+
+// On Windows, char argv is the ANSI codepage (mangles UTF-8 templates) and
+// text-mode stdout converts '\n' to '\r\n'; the differential compares
+// byte-identical output with the Rust harness, so the harness needs UTF-8
+// wide args and binary stdout.
+#ifdef _WIN32
+#include <windows.h>
+#include <fcntl.h>
+#include <io.h>
+#include <vector>
+int wmain(int argc, wchar_t** argv) {
+    _setmode(_fileno(stdout), _O_BINARY);
+    std::vector<std::string> utf8_args;
+    utf8_args.reserve(static_cast<std::size_t>(argc));
+    for (int i = 0; i < argc; ++i) {
+        const int size = WideCharToMultiByte(CP_UTF8, 0, argv[i], -1, nullptr, 0, nullptr, nullptr);
+        std::string arg(static_cast<std::size_t>(size > 0 ? size - 1 : 0), '\0');
+        WideCharToMultiByte(CP_UTF8, 0, argv[i], -1, arg.data(), size, nullptr, nullptr);
+        utf8_args.push_back(std::move(arg));
+    }
+    std::vector<char*> c_args;
+    c_args.reserve(utf8_args.size());
+    for (auto& arg : utf8_args) c_args.push_back(arg.data());
+    return run_main(argc, c_args.data());
+}
+#else
+int main(int argc, char** argv) { return run_main(argc, argv); }
+#endif
