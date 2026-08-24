@@ -866,7 +866,14 @@ int ProjectInfo::build_all(bool force, bool explain, bool repair) {
 
     mutation_started_.store(false, std::memory_order_relaxed);
 
-    if (!reconcile_watch()) return 1; // marker retained: epoch not completed
+    // reconcile_watch failure is a controlled failure subject to the same
+    // epoch-completion rule: if it failed BEFORE any recovery-relevant derived
+    // removal (mutation_started still false), nothing needs repair and the
+    // marker is cleared; if it removed outputs then failed, the marker stays.
+    if (!reconcile_watch()) {
+        finish_if_epoch_complete(ownership, 1, repair);
+        return 1;
+    }
     reset_build_caches();
 
     std::vector<BuildJob> jobs;
@@ -903,6 +910,11 @@ int ProjectInfo::build_all(bool force, bool explain, bool repair) {
     }
 
     const int result = build_many(jobs, false, explain, tracked.size());
+    finish_if_epoch_complete(ownership, result, repair);
+    return result;
+}
+
+void ProjectInfo::finish_if_epoch_complete(ProjectOwnership& ownership, int result, bool repair) {
     if (result == 0) {
         ownership.finish(); // remove marker strictly after the final mutation
     } else if (!repair && !mutation_started()) {
@@ -913,11 +925,31 @@ int ProjectInfo::build_all(bool force, bool explain, bool repair) {
         // failure because its pre-existing stale evidence is unresolved.
         ownership.finish();
     }
-    return result;
+    // Otherwise retain: the destructor keeps the marker.
 }
 
 int ProjectInfo::build_names(const std::vector<std::string>& names, bool, bool explain) {
     filesystem::begin_recovery_epoch();
+
+    // CP3.1: all validation that can safely run BEFORE acquisition happens
+    // here (reads only). Duplicate-name rejection and an empty job set must
+    // not create a marker, let alone leave one behind.
+    std::unordered_set<std::string> seen_names;
+    for (const auto& name : names) {
+        if (!seen_names.insert(name).second) {
+            console::error("duplicate tracked name requested for build: '" + name + "'");
+            return 1;
+        }
+    }
+    std::vector<BuildJob> jobs;
+    for (const auto& name : names) {
+        if (TrackedInfo* info = find(name)) jobs.push_back({info, {}});
+        else {
+            std::lock_guard<std::mutex> lock(console::output_mutex);
+            std::cout << "not tracking:\n " << name << '\n';
+        }
+    }
+    if (jobs.empty()) return 1;
 
     // Targeted builds are derived-state mutators and take the same ownership:
     // refuse on a live owner or a stale marker (repair is only reachable via
@@ -946,32 +978,14 @@ int ProjectInfo::build_names(const std::vector<std::string>& names, bool, bool e
 
     mutation_started_.store(false, std::memory_order_relaxed);
 
-    if (!reconcile_watch()) return 1; // marker retained
+    if (!reconcile_watch()) {
+        finish_if_epoch_complete(ownership, 1, /*repair=*/false);
+        return 1;
+    }
     reset_build_caches();
-    std::unordered_set<std::string> seen_names;
-    for (const auto& name : names) {
-        if (!seen_names.insert(name).second) {
-            console::error("duplicate tracked name requested for build: '" + name + "'");
-            return 1;
-        }
-    }
-    std::vector<BuildJob> jobs;
-    for (const auto& name : names) {
-        if (TrackedInfo* info = find(name)) jobs.push_back({info, {}});
-        else {
-            std::lock_guard<std::mutex> lock(console::output_mutex);
-            std::cout << "not tracking:\n " << name << '\n';
-        }
-    }
-    if (jobs.empty()) return 1;
+
     const int result = build_many(jobs, true, explain, names.size());
-    if (result == 0) {
-        ownership.finish();
-    } else if (!mutation_started()) {
-        // Targeted builds are never repair; zero-mutation failure clears the
-        // marker (nothing was written/deleted).
-        ownership.finish();
-    }
+    finish_if_epoch_complete(ownership, result, /*repair=*/false);
     return result;
 }
 

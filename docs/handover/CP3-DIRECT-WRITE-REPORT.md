@@ -87,3 +87,49 @@ invariant under direct writes.
 
 (committed by the CP3 checkpoint). Clean tree: no binaries, objects, or
 worktrees.
+
+## CP3.1 correction (reviewer HOLD): zero-mutation control-flow holes
+
+### All post-acquisition exit paths audited
+
+- `build_names`: duplicate-name rejection and empty-job-set validation moved
+  BEFORE ownership acquisition (reads only), so they neither create nor leave
+  a marker.
+- `build_all` / `build_names` reconcile-watch failure: routed through the
+  central completion rule (previously an unconditional `return 1` that left
+  the marker even when reconcile failed before any derived deletion).
+- Final result handling: unified.
+
+### Exact control-flow fix
+
+Added `ProjectInfo::finish_if_epoch_complete(ownership, result, repair)`:
+```
+result == success                              -> finish()
+result != success && !repair && !mutation_started -> finish()
+otherwise                                     -> retain
+```
+Every controlled exit after acquisition now routes through it; the only
+direct `return 1`s after acquisition are the Live/Failed/Stale refusals (no
+marker was created by us, and a stale marker correctly stays). `build --repair`
+failure always retains (pre-existing stale evidence).
+
+### New zero-mutation cases (tests/zero_mutation_smoke.py, now 11)
+
+- 8 duplicate-name targeted build -> nonzero, no marker
+- 9 targeted build with no resolvable jobs -> nonzero, no marker
+- 10 reconcile_watch controlled failure before derived deletion (corrupt watch
+  state) -> nonzero, no marker, page output intact
+- 11 reconcile_watch failure after derived deletion (disappeared page output
+  removed, then the watch-state save fails via a read-only state dir) ->
+  nonzero, mutation_started true, marker REMAINS, ordinary build refuses,
+  --repair recovers after restoring the authoritative project
+
+### Confirmation benchmark (10 samples, cold/error-path-only change)
+
+unchanged: A 81.4 / C 101.6 ms (+24.9%); changed: A 80.6 / C 100.1 ms
+(+24.3%) - consistent with the full CP3 run (104.9/102.3); the hot path is
+unaffected.
+
+### Full regression
+
+46 targets / 177 PASS lines / exit 0.

@@ -1,4 +1,5 @@
 #pragma once
+#include "ProjectOwnership.h"
 #include "Types.h"
 #include <atomic>
 #include <filesystem>
@@ -44,6 +45,13 @@ public:
     bool build_one(TrackedInfo& info);
     int build_all(bool force, bool explain = false, bool repair = false);
     int build_names(const std::vector<std::string>& names, bool force, bool explain = false);
+
+    // Central epoch-completion rule (CP3.1): every controlled exit after
+    // ownership acquisition routes through this. success -> clear marker;
+    // controlled failure + ordinary build + proven zero recovery-relevant
+    // mutations -> clear marker; anything else (any mutation, or a repair
+    // failure, or a crash - the latter never reaches here) -> retain.
+    void finish_if_epoch_complete(ProjectOwnership& ownership, int result, bool repair);
 
     // Zero-mutation failure distinction (CP2.2): monotonic flag set BEFORE any
     // recovery-relevant derived mutation (output write, pagination write, stale

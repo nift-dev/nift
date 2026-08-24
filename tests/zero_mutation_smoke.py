@@ -215,6 +215,69 @@ def main():
         rc, _ = run(root, "build")
         check("7 ordinary build succeeds after fix", rc == 0)
 
+        # 8. Targeted duplicate-name rejection: no derived mutation, no marker.
+        root = base / "t8"
+        root.mkdir()
+        scaffold(root, ["/"])
+        rc, _ = run(root, "build", "/", "/")
+        check("8 duplicate-name rejection returns nonzero", rc != 0)
+        check("8 no marker after duplicate-name rejection", not marker(root))
+
+        # 9. Targeted build with no resolvable jobs: no marker.
+        rc, _ = run(root, "build", "bogus")
+        check("9 no-resolvable-jobs returns nonzero", rc != 0)
+        check("9 no marker after empty targeted build", not marker(root))
+
+        # 10. reconcile_watch controlled failure BEFORE derived deletion
+        #     (corrupt watch state): zero mutations, marker cleared.
+        root = base / "t10"
+        root.mkdir()
+        scaffold(root, ["/"])
+        (root / "content/posts").mkdir(exist_ok=True)
+        (root / "content/posts/p1.html").write_text("<p>post</p>\n")
+        rc, _ = run(root, "watch", "content/posts", ".html")
+        check("10 watch setup succeeds", rc == 0)
+        rc, _ = run(root, "build", "--all")
+        check("10 initial watch build succeeds", rc == 0)
+        state = root / ".nift/.watch/content/posts/tracked.json"
+        check("10 watch state created", state.exists())
+        state.write_text("not-json{{{")
+        rc, _ = run(root, "build", "--all")
+        check("10 corrupt watch state build returns nonzero", rc != 0)
+        check("10 marker cleared (reconcile failed before any derived deletion)",
+              not marker(root))
+        check("10 watched page output intact", (root / "public/posts/p1.html").exists())
+
+        # 11. reconcile_watch failure AFTER derived deletion (output removed for
+        #     a disappeared page, then the watch-state save fails): marker
+        #     REMAINS; ordinary build refuses; --repair recovers once the
+        #     authoritative project is restored.
+        root = base / "t11"
+        root.mkdir()
+        scaffold(root, ["/"])
+        (root / "content/posts").mkdir(exist_ok=True)
+        (root / "content/posts/p1.html").write_text("<p>post</p>\n")
+        rc, _ = run(root, "watch", "content/posts", ".html")
+        check("11 watch setup succeeds", rc == 0)
+        rc, _ = run(root, "build", "--all")
+        check("11 initial watch build succeeds", rc == 0)
+        state_dir = root / ".nift/.watch/content/posts"
+        check("11 watch state dir created", state_dir.is_dir())
+        (root / "content/posts/p1.html").rename(root / "content/posts/p1.bak")
+        os.chmod(state_dir, 0o555)          # make the watch-state save fail
+        rc, _ = run(root, "build", "--all")
+        check("11 failed-reconcile build returns nonzero", rc != 0)
+        check("11 derived deletion happened (p1 output removed)",
+              not (root / "public/posts/p1.html").exists())
+        check("11 marker REMAINS (mutation_started true)", marker(root))
+        rc, err = run(root, "build")
+        check("11 ordinary build refuses", rc == 1 and "build --repair" in err)
+        os.chmod(state_dir, 0o755)          # restore watch-state writability
+        (root / "content/posts/p1.bak").rename(root / "content/posts/p1.html")
+        rc, _ = run(root, "build", "--repair")
+        check("11 build --repair recovers", rc == 0)
+        check("11 marker cleared after repair", not marker(root))
+
     if fails:
         print(f"\nFAILED: {len(fails)}: {fails}")
         sys.exit(1)
