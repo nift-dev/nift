@@ -269,3 +269,77 @@ acceptable price for Embedding/SSR is the deliberate decision for review;
 recovering statistical parity would require either reverting the extraction
 or redesigning the crash-safe write strategy, both outside this bounded
 scope.
+
+## Follow-up: changed-vs-unchanged persistence investigation
+
+Controlled changed-vs-unchanged 10k benchmark (20 interleaved samples, clean
+A and C, byte-identical outputs; workload C toggles all 10,000 content files
+outside the timed region so every measured build's outputs genuinely differ):
+
+```text
+              unchanged (U)          changed (C-workload)
+Pre-Embed A    85.4 ms                83.4 ms
+Current  C    127.0 ms  (+48.6%)    130.6 ms  (+56.5%)
+```
+
+Findings:
+
+- The regression is WORSE on the changed workload (+56.5% vs +48.6%): the
+  compare-before-write reads the old output, mismatches, then performs the
+  transactional write anyway, so the comparison is pure overhead when outputs
+  genuinely change. The compare only helps the (unusual) unchanged-output
+  force-build.
+- Write-strategy microbenchmark (10k isolated writes, per-write):
+  compare+touch 2.7us < direct(chmod+truncate) 4.1us < transactional(temp+rename)
+  7.2us. The atomic temp+rename is inherently ~3us/write more than the
+  baseline's non-atomic direct write (new inode + rename). No cheaper atomic
+  in-place replacement exists; removing the compare (unconditional write) makes
+  the unchanged workload slower, not faster.
+- The ".info.json for every page" is pre-Embed (aa60ab3 already wrote it); it
+  is not a regression. The compare+touch persistence strategy and atomic
+  temp+rename are the newer hardened-persistence costs.
+
+### Correctness bug found and fixed during this pass
+
+The earlier performance repair gated the previous-`.info.json` pagination read
+behind `info.paginate.has_value()`. That silently broke the paginated ->
+non-paginated transition: stale page-2..N outputs were no longer removed. The
+previous pagination state is historical state genuinely required for
+stale-output cleanup (a page whose pagination was removed no longer has
+`info.paginate` set). The gate is reverted; a pagination-lifecycle regression
+test (page count decreases, pagination removed) is added to
+`tests/pagination_smoke.sh`. The reverted read costs ~3 ms on the 10k build.
+
+### Historical attribution of the remaining ~+42 ms (A ~85 ms vs C ~127 ms)
+
+```text
+RenderHost seam + parser refactor      ~ +6 ms   Embed architecture
+                                            (render-only A 62.8 vs C 68.3 ms)
+crash-safe write machinery             ~ +30 ms  Newer hardened persistence
+   (compare+touch for unchanged, temp+rename for changed)
+previous-`.info.json` pagination read  ~ +3 ms   Pre-existing (restored)
+file_permissions + output metadata     ~ +2 ms   Newer hardening
+.info.json existence                   ~ 0       Pre-existing
+extra pagination fields                ~ 0       Pagination era (negligible)
+```
+
+Embedded Nift's rendering abstraction itself costs ~+6 ms. The dominant
+~+30 ms is the crash-safe transactional persistence (atomic temp+rename and
+the compare+touch fast path) introduced by the broader hardening programme —
+not intrinsic to embedding, but the price of the atomic-write and
+permission-preservation guarantees. Whether ~3.5 us/page for those guarantees
+is acceptable for Embedding/SSR is the deliberate review decision.
+
+### Pagination zero-cost analysis (report only; schema not changed)
+
+The five per-page pagination fields (`pagination`, `pagination-items-per-page`,
+`pagination-template`, `pagination-separator`, `pagination-pages`) are written
+for every page even when never paginated. Replacing five default-valued fields
+with "member absent = not paginated" is safe and desirable: the readers already
+`has()`-check the fields, old `.info.json` files remain readable (present
+fields are honoured, absent fields mean no pagination), and the pagination
+lifecycle still works (a previously-paginated page's old info retains the
+pagination block for stale-output cleanup). The perf impact is negligible
+(~140 bytes of JSON and five key emissions per page), so this is an
+architecture/schema decision, not a performance fix. Not implemented in this
+pass (persisted-schema change deferred).

@@ -623,11 +623,14 @@ bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::s
 }
 
 bool ProjectInfo::build_one(TrackedInfo& info) {
-    // Only paginated pages consult the previous page-count metadata; reading it
-    // for every page was a redundant happy-path filesystem probe
-    // (performance-regression repair).
+    // The previous pagination page count is historical state required for
+    // stale-output cleanup: when pagination is removed or its page count
+    // decreases, page-2..N outputs from the previous build must be removed.
+    // This read is therefore required for every page (a page whose pagination
+    // was removed no longer has info.paginate set, so gating the read on the
+    // current paginate would silently leave stale pagination outputs).
     std::size_t previous_pagination_pages = 0;
-    if (info.paginate.has_value()) {
+    {
         const fs::path previous_info_path = info_path(info);
         if (filesystem::path_exists(previous_info_path)) {
             json::Document previous; std::string previous_error;

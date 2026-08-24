@@ -218,3 +218,50 @@ EOF2
 grep -F 'class="next" href="./blog-2.html"' public/blog.html >/dev/null
 grep -F 'class="skip" href="./blog-2.html"' public/blog.html >/dev/null
 grep -F 'class="prev" href="./blog.html"' public/blog-2.html >/dev/null
+
+# --- Pagination lifecycle: stale-output cleanup ----------------------------
+# When pagination is removed or its items-per-page changes so the page count
+# decreases, the previous build's stale page-N outputs must be removed. The
+# previous pagination state (historical .info.json) must be consulted even
+# when the page is no longer paginated.
+cd "$TMP"
+rm -rf .nift content templates public data
+mkdir -p .nift content templates public data
+cat > .nift/config.json <<'JSON'
+{"config":{"content-dir":"content/","content-ext":".html","output-dir":"public/","output-ext":".html","default-template":"templates/template.html","build-threads":-1,"incremental-mode":"modified"}}
+JSON
+cat > .nift/tracked.json <<'JSON'
+{"tracked":[{"name":"blog","title":"Blog","template":"templates/template.html","paginate":{"items-per-page":1}}]}
+JSON
+echo '@content' > templates/template.html
+cat > content/blog.html <<'EOF2'
+@item{one}@item{two}@item{three}@paginate
+EOF2
+cat > content/blog.paginate.html <<'EOF2'
+<section>$[paginate.items]</section>
+EOF2
+
+# Paginated build produces page-2 and page-3.
+"$NIFT_BIN" build-all >/dev/null
+test -f public/blog.html && test -f public/blog-2.html && test -f public/blog-3.html
+
+# Page count decreases: items-per-page 1 -> 3 means only one page, so the
+# stale page-2/page-3 outputs must be removed.
+cat > .nift/tracked.json <<'JSON'
+{"tracked":[{"name":"blog","title":"Blog","template":"templates/template.html","paginate":{"items-per-page":3}}]}
+JSON
+"$NIFT_BIN" build-all >/dev/null
+test -f public/blog.html && test ! -f public/blog-2.html && test ! -f public/blog-3.html
+
+# Pagination removed entirely: the page is no longer paginated, but the
+# previous pagination state must still be consulted so stale page-N outputs
+# are cleaned up (regression: gating the historical read on the current
+# paginate flag left stale pagination outputs behind).
+cat > .nift/tracked.json <<'JSON'
+{"tracked":[{"name":"blog","title":"Blog","template":"templates/template.html"}]}
+JSON
+cat > content/blog.html <<'EOF2'
+<p>ordinary</p>
+EOF2
+"$NIFT_BIN" build-all >/dev/null
+test -f public/blog.html && test ! -f public/blog-2.html && test ! -f public/blog-3.html
