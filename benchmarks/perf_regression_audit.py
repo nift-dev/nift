@@ -14,7 +14,7 @@ Method:
   - timing: interleave baseline/current `build-all` full 10k builds, warmup
     first, report median/min/max/mean/stddev and the delta
 """
-import argparse, hashlib, json, pathlib, statistics, shutil, subprocess, tempfile, time
+import argparse, hashlib, json, os, pathlib, statistics, shutil, subprocess, tempfile, time
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--baseline", required=True, help="baseline nift binary")
@@ -22,6 +22,8 @@ ap.add_argument("--current", required=True, help="current nift binary")
 ap.add_argument("--pages", type=int, default=10000)
 ap.add_argument("--samples", type=int, default=20)
 ap.add_argument("--warmup", type=int, default=3)
+ap.add_argument("--render-only", action="store_true",
+                help="time renders with all output writes skipped (benchmark-only binaries)")
 a = ap.parse_args()
 
 
@@ -47,10 +49,13 @@ def make_fixture(root: pathlib.Path, pages: int):
         (root / "content" / f"p{i}.html").write_text(f"<p>{i}</p>\n")
 
 
-def build(nift: str, root: pathlib.Path) -> float:
+def build(nift: str, root: pathlib.Path, render_only: bool) -> float:
+    env = dict(os.environ)
+    if render_only:
+        env["NIFT_RENDER_ONLY"] = "1"
     start = time.perf_counter()
     p = subprocess.run([nift, "build-all"], cwd=root, stdout=subprocess.DEVNULL,
-                       stderr=subprocess.PIPE)
+                       stderr=subprocess.PIPE, env=env)
     if p.returncode:
         raise SystemExit(p.stderr.decode(errors="replace"))
     return time.perf_counter() - start
@@ -70,34 +75,36 @@ with tempfile.TemporaryDirectory(prefix="nift-perf-audit-") as td:
     fixture = td / "fixture"
     make_fixture(fixture, a.pages)
 
-    # --- correctness: identical output on both revisions -------------------
-    for name, nift in (("baseline", a.baseline), ("current", a.current)):
-        copy = td / f"fix-{name}"
-        shutil.copytree(fixture, copy)
-        build(nift, copy)
-        print(f"{name} output pages: {len(tree(copy))}")
+    # --- correctness: identical output on both revisions (skipped for
+    # render-only: no outputs are produced) ----------------------------------
+    if not a.render_only:
+        for name, nift in (("baseline", a.baseline), ("current", a.current)):
+            copy = td / f"fix-{name}"
+            shutil.copytree(fixture, copy)
+            build(nift, copy, False)
+            print(f"{name} output pages: {len(tree(copy))}")
 
-    base_tree = tree(td / "fix-baseline")
-    cur_tree = tree(td / "fix-current")
-    same = base_tree == cur_tree
-    print(f"output byte-identical: {same}")
-    if not same:
-        only_base = set(base_tree) - set(cur_tree)
-        only_cur = set(cur_tree) - set(base_tree)
-        print(f"  only baseline: {sorted(only_base)[:5]}")
-        print(f"  only current:  {sorted(only_cur)[:5]}")
-        differing = [k for k in set(base_tree) & set(cur_tree) if base_tree[k] != cur_tree[k]]
-        print(f"  differing hashes: {len(differing)}")
+        base_tree = tree(td / "fix-baseline")
+        cur_tree = tree(td / "fix-current")
+        same = base_tree == cur_tree
+        print(f"output byte-identical: {same}")
+        if not same:
+            only_base = set(base_tree) - set(cur_tree)
+            only_cur = set(cur_tree) - set(base_tree)
+            print(f"  only baseline: {sorted(only_base)[:5]}")
+            print(f"  only current:  {sorted(only_cur)[:5]}")
+            differing = [k for k in set(base_tree) & set(cur_tree) if base_tree[k] != cur_tree[k]]
+            print(f"  differing hashes: {len(differing)}")
 
-    # --- timing: interleaved full 10k builds --------------------------------
+    # --- timing: interleaved builds ------------------------------------------
     base_samples = []
     cur_samples = []
     for w in range(a.warmup):
-        build(a.baseline, fixture)
-        build(a.current, fixture)
+        build(a.baseline, fixture, a.render_only)
+        build(a.current, fixture, a.render_only)
     for i in range(a.samples):
-        base_samples.append(build(a.baseline, fixture))
-        cur_samples.append(build(a.current, fixture))
+        base_samples.append(build(a.baseline, fixture, a.render_only))
+        cur_samples.append(build(a.current, fixture, a.render_only))
 
 
 def report(label, samples):
@@ -109,7 +116,7 @@ def report(label, samples):
     print(f"  raw: {[f'{x:.6f}' for x in samples]}")
 
 
-print("--- 10k full build (interleaved, warmup {}, {} measured) ---".format(a.warmup, a.samples))
+print("--- 10k {} (interleaved, warmup {}, {} measured) ---".format("render-only" if a.render_only else "full build", a.warmup, a.samples))
 report("Pre-Embed Nift  ", base_samples)
 report("Current Nift    ", cur_samples)
 base_med = statistics.median(base_samples)
