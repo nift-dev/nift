@@ -45,19 +45,19 @@ fail() { echo "config-validation FAIL: $*" >&2; exit 1; }
 
 # GREEN control: a clean known-key config builds.
 make_project "clean" ''
-(cd "$TMP/clean" && "$NIFT_BIN" build-all >/dev/null 2>&1) \
+(cd "$TMP/clean" && "$NIFT_BIN" build --all >/dev/null 2>&1) \
   || fail "clean config did not build"
 
 # RED: a legacy old-Nift key must be rejected loudly.
 make_project "legacy" '"script-ext": ".f", "backup-scripts": true, "paginate-threads": -1,'
-out=$(cd "$TMP/legacy" && "$NIFT_BIN" build-all 2>&1); rc=$?
+out=$(cd "$TMP/legacy" && "$NIFT_BIN" build --all 2>&1); rc=$?
 [ "$rc" -eq 0 ] && fail "legacy key was silently accepted"
 echo "$out" | grep -q "unknown config key 'script-ext'" \
   || fail "expected clear unknown-config-key error, got: $(echo "$out" | head -1)"
 
 # RED: a typo key must also be rejected loudly.
 make_project "typo" '"content-dri": "content/",'
-out=$(cd "$TMP/typo" && "$NIFT_BIN" build-all 2>&1); rc=$?
+out=$(cd "$TMP/typo" && "$NIFT_BIN" build --all 2>&1); rc=$?
 [ "$rc" -eq 0 ] && fail "typo key was silently accepted"
 echo "$out" | grep -q "unknown config key 'content-dri'" \
   || fail "expected clear error for typo key, got: $(echo "$out" | head -1)"

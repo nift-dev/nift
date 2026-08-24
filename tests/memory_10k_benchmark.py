@@ -57,12 +57,12 @@ def peak(root, command):
 
 with tempfile.TemporaryDirectory(prefix="nift-memory-10k-") as td:
     root=pathlib.Path(td); fixture(root)
-    full=[peak(root,["build-all"]) for _ in range(args.runs)]
-    noop=[peak(root,["build-updated"]) for _ in range(args.runs)]
+    full=[peak(root,["build", "--all"]) for _ in range(args.runs)]
+    noop=[peak(root,["build"]) for _ in range(args.runs)]
     (root/"content"/f"p{args.pages//2}.html").write_text("<p>changed</p>\n")
-    single=peak(root,["build-updated"])
+    single=peak(root,["build"])
     (root/"templates/template.html").write_text("<main>@content</main>\n")
-    shared=peak(root,["build-updated"])
+    shared=peak(root,["build"])
 
     med_full=int(statistics.median(full))
     med_noop=int(statistics.median(noop))

@@ -15,13 +15,13 @@ printf '\n' >"$P/content/index.html"
 printf 'outside\n' >"$TMP/outside.txt"
 
 printf '<a href="@pathto('"'"'../outside.txt'"'"')">escape</a>\n@content\n' >"$P/templates/template.html"
-if (cd "$P" && "$NIFT_BIN" build-all >log 2>&1); then
+if (cd "$P" && "$NIFT_BIN" build --all >log 2>&1); then
   echo "@pathto traversal unexpectedly succeeded" >&2; exit 1
 fi
 grep -Fq '@pathto path must stay inside the Nift project' "$P/log"
 
 printf '@dep("../outside.txt")\n@content\n' >"$P/templates/template.html"
-if (cd "$P" && "$NIFT_BIN" build-all >log 2>&1); then
+if (cd "$P" && "$NIFT_BIN" build --all >log 2>&1); then
   echo "@dep traversal unexpectedly succeeded" >&2; exit 1
 fi
 grep -Fq 'dep: path must stay inside the Nift project' "$P/log"
@@ -32,7 +32,7 @@ cat >"$P/templates/template.html" <<'EOF'
 @dep("public/assets/a.txt")
 @content
 EOF
-(cd "$P" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$P" && "$NIFT_BIN" build --all >/dev/null)
 grep -Fq 'assets/a.txt' "$P/public/index.html"
 grep -Fq '"public/assets/a.txt"' "$P/.nift/public/index.info.json"
 

@@ -43,7 +43,7 @@ EOF2
 cat > templates/shared-separator.html <<'EOF2'
 /
 EOF2
-"$NIFT_BIN" build-all >/dev/null
+"$NIFT_BIN" build --all >/dev/null
 # Root/index naming: index.html, 2.html, 3.html; six items (one before + five loop) => 3 pages.
 test -f public/index.html && test -f public/2.html && test -f public/3.html
 grep -F '<section>before' public/index.html >/dev/null
@@ -62,16 +62,16 @@ grep -F '/' public/blog.html >/dev/null
 cat > content/blog.html <<'EOF2'
 @item{x}
 EOF2
-if "$NIFT_BIN" build-all >/dev/null 2>&1; then echo 'pagination without @paginate unexpectedly succeeded' >&2; exit 1; fi
+if "$NIFT_BIN" build --all >/dev/null 2>&1; then echo 'pagination without @paginate unexpectedly succeeded' >&2; exit 1; fi
 cat > content/blog.html <<'EOF2'
 @item{x}@paginate@paginate
 EOF2
-if "$NIFT_BIN" build-all >/dev/null 2>&1; then echo 'multiple @paginate unexpectedly succeeded' >&2; exit 1; fi
+if "$NIFT_BIN" build --all >/dev/null 2>&1; then echo 'multiple @paginate unexpectedly succeeded' >&2; exit 1; fi
 # Zero items is valid and emits the primary page with an empty paginate.items.
 cat > content/blog.html <<'EOF2'
 @paginate
 EOF2
-"$NIFT_BIN" build-all >/dev/null
+"$NIFT_BIN" build --all >/dev/null
 grep -F 'class="page-1"></div>' public/blog.html >/dev/null
 # Pagination directives without tracked pagination are rejected.
 python3 - <<'PY'
@@ -81,7 +81,7 @@ PY
 cat > content/blog.html <<'EOF2'
 @paginate
 EOF2
-if "$NIFT_BIN" build-all >/dev/null 2>&1; then echo '@paginate without config unexpectedly succeeded' >&2; exit 1; fi
+if "$NIFT_BIN" build --all >/dev/null 2>&1; then echo '@paginate without config unexpectedly succeeded' >&2; exit 1; fi
 
 echo 'Pagination smoke test passed'
 
@@ -104,7 +104,7 @@ EOF2
 cat > content/blog.html <<'EOF2'
 @item{a}@item{b}@item{c}@paginate
 EOF2
-"$NIFT_BIN" build-all >/dev/null
+"$NIFT_BIN" build --all >/dev/null
 test -f public/blog.html && test -f public/blog-2.html && test -f public/blog-3.html
 grep -F '"pagination-pages": 3' .nift/public/blog.info.json >/dev/null
 rm public/blog-2.html
@@ -155,7 +155,7 @@ EOF2
 cat > content/blog.paginate.html <<'EOF2'
 $[paginate.items]-$[paginate.current]
 EOF2
-"$NIFT_BIN" build-all >/dev/null
+"$NIFT_BIN" build --all >/dev/null
 cp public/blog.html old1
 cp public/blog-2.html old2
 cp public/blog-3.html old3
@@ -185,11 +185,11 @@ EOF2
 : > content/archive.html
 for i in $(seq 1 200); do printf '@item{item-%03d}\n' "$i" >> content/archive.html; done
 echo '@paginate' >> content/archive.html
-"$NIFT_BIN" build-all >/dev/null
+"$NIFT_BIN" build --all >/dev/null
 count=$(find public -maxdepth 1 -type f -name 'archive*.html' | wc -l)
 test "$count" -eq 100
 find public -maxdepth 1 -type f -name 'archive*.html' -print0 | sort -z | xargs -0 sha256sum > before.sha
-"$NIFT_BIN" build-all >/dev/null
+"$NIFT_BIN" build --all >/dev/null
 find public -maxdepth 1 -type f -name 'archive*.html' -print0 | sort -z | xargs -0 sha256sum > after.sha
 cmp before.sha after.sha
 
@@ -214,7 +214,7 @@ EOF2
 cat > content/blog.paginate.html <<'EOF2'
 <section>$[paginate.items]</section><nav>@if(!paginate.first){<a class="prev" href="@pathtopage(-1)">prev</a>} @if(!paginate.last){<a class="next" href="@pathtopage(+1)">next</a>} @if(!paginate.last){<a class="skip" href="@pathtopage(+$[nav.offset])">skip</a>}</nav>
 EOF2
-"$NIFT_BIN" build-all >/dev/null
+"$NIFT_BIN" build --all >/dev/null
 grep -F 'class="next" href="./blog-2.html"' public/blog.html >/dev/null
 grep -F 'class="skip" href="./blog-2.html"' public/blog.html >/dev/null
 grep -F 'class="prev" href="./blog.html"' public/blog-2.html >/dev/null
@@ -242,7 +242,7 @@ cat > content/blog.paginate.html <<'EOF2'
 EOF2
 
 # Paginated build produces page-2 and page-3.
-"$NIFT_BIN" build-all >/dev/null
+"$NIFT_BIN" build --all >/dev/null
 test -f public/blog.html && test -f public/blog-2.html && test -f public/blog-3.html
 
 # Page count decreases: items-per-page 1 -> 3 means only one page, so the
@@ -250,7 +250,7 @@ test -f public/blog.html && test -f public/blog-2.html && test -f public/blog-3.
 cat > .nift/tracked.json <<'JSON'
 {"tracked":[{"name":"blog","title":"Blog","template":"templates/template.html","paginate":{"items-per-page":3}}]}
 JSON
-"$NIFT_BIN" build-all >/dev/null
+"$NIFT_BIN" build --all >/dev/null
 test -f public/blog.html && test ! -f public/blog-2.html && test ! -f public/blog-3.html
 
 # Pagination removed entirely: the page is no longer paginated, but the
@@ -263,5 +263,5 @@ JSON
 cat > content/blog.html <<'EOF2'
 <p>ordinary</p>
 EOF2
-"$NIFT_BIN" build-all >/dev/null
+"$NIFT_BIN" build --all >/dev/null
 test -f public/blog.html && test ! -f public/blog-2.html && test ! -f public/blog-3.html

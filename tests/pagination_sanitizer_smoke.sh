@@ -18,7 +18,7 @@ EOF2
 : > content/archive.html
 for i in $(seq 1 24); do printf '@item{item-%s}\n' "$i" >> content/archive.html; done
 printf '@paginate\n' >> content/archive.html
-"$NIFT_BIN" build-all >/dev/null
+"$NIFT_BIN" build --all >/dev/null
 test -f public/archive.html && test -f public/archive-12.html
 # Exercise lifecycle shrink and complete regeneration under sanitizer.
 cat > content/archive.html <<'EOF2'

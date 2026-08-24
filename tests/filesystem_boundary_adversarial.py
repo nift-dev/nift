@@ -77,7 +77,7 @@ def main() -> int:
             p.write_text(f'<p>{n}</p>\n')
         before_outside = outside_public_files(root)
 
-        p = subprocess.run([nift, 'build-all'], cwd=root, text=True,
+        p = subprocess.run([nift, 'build', '--all'], cwd=root, text=True,
                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60)
         if p.returncode < 0:
             raise RuntimeError(f"build terminated by signal {-p.returncode}")
@@ -121,7 +121,7 @@ def main() -> int:
         rejected.write_text('<p>evil</p>\n')
         tracked(root, ['/'] + ADVERSARIAL_NAMES + [REJECTED_NAME])
         before_rej = outside_public_files(root)
-        pr = subprocess.run([nift, 'build-all'], cwd=root, text=True,
+        pr = subprocess.run([nift, 'build', '--all'], cwd=root, text=True,
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=60)
         if pr.returncode == 0:
             raise RuntimeError(f"parent-reference name {REJECTED_NAME!r} was accepted")

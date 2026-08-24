@@ -89,7 +89,7 @@ def _lines(path):
 
 
 def run_parity(name, case, case_dir, project, extra_env):
-    cli = run([NIFT, "build-all"], project, extra_env)
+    cli = run([NIFT, "build", "--all"], project, extra_env)
     if cli.returncode != 0:
         return f"{name}: CLI build failed: {cli.stderr[:400]}"
     pages = list(case["pages"])
@@ -139,7 +139,7 @@ def run_reject(name, case, project, extra_env):
     klass = case.get("expect")
     if not klass:
         return f"{name}: reject case missing semantic 'expect' class"
-    cli = run([NIFT, "build-all"], project, extra_env)
+    cli = run([NIFT, "build", "--all"], project, extra_env)
     if cli.returncode == 0:
         return f"{name}: CLI unexpectedly succeeded"
     if not _matches_class(cli.stderr, klass):

@@ -28,7 +28,7 @@ cat >"$P/content/index.html" <<'EOF'
 @for(x : data.items){<i>@pathto('public/assets/a.txt')</i>}
 EOF
 printf '{"items":[1,2,3]}\n' >"$P/data.json"
-(cd "$P" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$P" && "$NIFT_BIN" build --all >/dev/null)
 python3 -S - "$P/.nift/public/index.info.json" <<'PY'
 import json,sys
 d=json.load(open(sys.argv[1]))
@@ -40,7 +40,7 @@ rm "$P/public/assets/a.txt"
 (cd "$P" && "$NIFT_BIN" status >status.log)
 grep -Fq 'required path missing: public/assets/a.txt' "$P/status.log"
 printf '<p>repaired</p>\n' >"$P/content/index.html"
-(cd "$P" && "$NIFT_BIN" build-updated >/dev/null)
+(cd "$P" && "$NIFT_BIN" build >/dev/null)
 python3 -S - "$P/.nift/public/index.info.json" <<'PY'
 import json,sys
 d=json.load(open(sys.argv[1]))
@@ -50,7 +50,7 @@ PY
 # A malformed req entry is a rebuild reason, not a crash.
 P="$TMP/malformed"; mkproj "$P"
 printf '<p>ok</p>\n' >"$P/content/index.html"
-(cd "$P" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$P" && "$NIFT_BIN" build --all >/dev/null)
 python3 -S - "$P/.nift/public/index.info.json" <<'PY'
 import json,sys,os
 p=sys.argv[1]
@@ -59,7 +59,7 @@ d=json.load(open(p)); d["reqs"]=[123]; json.dump(d,open(p,"w"))
 PY
 (cd "$P" && "$NIFT_BIN" status >status.log)
 grep -Fq 'page build metadata has an invalid requirement' "$P/status.log"
-(cd "$P" && "$NIFT_BIN" build-updated >/dev/null)
+(cd "$P" && "$NIFT_BIN" build >/dev/null)
 
 # A tracked-name pathto records the target output, but the producer owns its own
 # build state. A missing tracked output must not make the referring page stale or
@@ -73,14 +73,14 @@ printf '<a href="@pathto('"'"'about'"'"')">About</a>\n' >"$P/content/index.html"
 printf '<p>about</p>\n' >"$P/content/about.html"
 # Build only the referrer first so its recorded requirement points at an output
 # that has never existed. A normal incremental build should then build only about.
-(cd "$P" && "$NIFT_BIN" build-names / >/dev/null)
+(cd "$P" && "$NIFT_BIN" build / >/dev/null)
 grep -Fq '"public/about.html"' "$P/.nift/public/index.info.json"
 test ! -f "$P/public/about.html"
 (cd "$P" && "$NIFT_BIN" status >status.log)
 grep -Fq 'about' "$P/status.log"
 ! grep -Fq 'required path missing: public/about.html' "$P/status.log"
 ! grep -Fxq '/' "$P/status.log"
-(cd "$P" && "$NIFT_BIN" build-updated >build.log)
+(cd "$P" && "$NIFT_BIN" build >build.log)
 test -f "$P/public/about.html"
 ! grep -Fq 'required path missing: public/about.html' "$P/build.log"
 
@@ -89,7 +89,7 @@ test -f "$P/public/about.html"
 # producer itself failed. This keeps build success non-transitive and easy to explain.
 rm "$P/public/about.html"
 printf '@input("missing-partial.html")\n' >"$P/content/about.html"
-if (cd "$P" && "$NIFT_BIN" build-updated >producer-fail.log 2>&1); then
+if (cd "$P" && "$NIFT_BIN" build >producer-fail.log 2>&1); then
   echo "tracked producer failure unexpectedly succeeded" >&2
   exit 1
 fi
@@ -102,7 +102,7 @@ grep -Fq 'while building about' "$P/producer-fail.log"
 # outside the project root.
 P="$TMP/poisoned"; mkproj "$P"
 printf '<p>ok</p>\n' >"$P/content/index.html"
-(cd "$P" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$P" && "$NIFT_BIN" build --all >/dev/null)
 printf 'outside\n' >"$TMP/outside.txt"
 python3 -S - "$P/.nift/public/index.info.json" <<'PY'
 import json,sys,os
@@ -112,7 +112,7 @@ PY
 (cd "$P" && "$NIFT_BIN" status >poison-req.log)
 grep -Fq 'page build metadata has an invalid requirement' "$P/poison-req.log"
 
-(cd "$P" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$P" && "$NIFT_BIN" build --all >/dev/null)
 python3 -S - "$P/.nift/public/index.info.json" <<'PY'
 import json,sys,os
 p=sys.argv[1]; os.chmod(p,0o644)

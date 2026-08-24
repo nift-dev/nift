@@ -28,7 +28,7 @@ python3 -S - "$P/.nift/config.json" <<'PY'
 import json,sys
 p=sys.argv[1]; d=json.load(open(p)); d["config"]["minify-exts"]=[".html"]; json.dump(d,open(p,"w"))
 PY
-(cd "$P" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$P" && "$NIFT_BIN" build --all >/dev/null)
 grep -Fq '<div> Hello world </div>' "$P/public/index.html"
 grep -Fq '.x { color : red ; margin : 0  1rem ; }' "$P/public/assets/style.css"
 grep -Fq '"minify": true' "$P/.nift/public/index.info.json"
@@ -43,7 +43,7 @@ for x in d["tracked"]:
     if x["name"]=="assets/style": x["minify"]=True
 json.dump(d,open(p,"w"))
 PY
-(cd "$P" && "$NIFT_BIN" build-updated >/dev/null)
+(cd "$P" && "$NIFT_BIN" build >/dev/null)
 grep -Fq '<div>   Hello   world </div>' "$P/public/index.html"
 grep -Fq '.x{color:red;margin:0 1rem;}' "$P/public/assets/style.css"
 grep -Fq '"minify": false' "$P/.nift/public/index.info.json"
@@ -62,7 +62,7 @@ p=sys.argv[1]; os.chmod(p,0o644); d=json.load(open(p)); d["config"]["minify-exts
 PY
 (cd "$P" && "$NIFT_BIN" status >status.log)
 grep -Fq 'minification setting changed' "$P/status.log"
-(cd "$P" && "$NIFT_BIN" build-updated >/dev/null)
+(cd "$P" && "$NIFT_BIN" build >/dev/null)
 grep -Fq '.x{color:red;margin:0 1rem;}' "$P/public/assets/style.css"
 
 # Minified page metadata records a minifier format version so future safer/
@@ -74,14 +74,14 @@ p=sys.argv[1]; os.chmod(p,0o644); d=json.load(open(p)); d["minify-version"]=999;
 PY
 (cd "$P" && "$NIFT_BIN" status >version-status.log)
 grep -Fq 'minifier version changed' "$P/version-status.log"
-(cd "$P" && "$NIFT_BIN" build-updated >/dev/null)
+(cd "$P" && "$NIFT_BIN" build >/dev/null)
 
 # Removing a global extension should rebuild back to unminified source output.
 python3 -S - "$P/.nift/config.json" <<'PY'
 import json,sys,os
 p=sys.argv[1]; os.chmod(p,0o644); d=json.load(open(p)); d["config"]["minify-exts"]=[]; json.dump(d,open(p,"w"))
 PY
-(cd "$P" && "$NIFT_BIN" build-updated >/dev/null)
+(cd "$P" && "$NIFT_BIN" build >/dev/null)
 grep -Fq '<div>   Hello   world </div>' "$P/public/index.html"
 
 # Invalid config and tracked overrides fail cleanly.
@@ -111,7 +111,7 @@ grep -Fq 'tracked minify override must be a boolean' "$P/bad.log"
 
 # Per-file minify true on unsupported output extension fails before overwriting prior output.
 P="$TMP/failure-preserve"; mkproj "$P"
-(cd "$P" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$P" && "$NIFT_BIN" build --all >/dev/null)
 cp "$P/public/index.html" "$P/old"
 cp "$P/.nift/public/index.info.json" "$P/oldinfo"
 python3 -S - "$P/.nift/tracked.json" <<'PY'
@@ -121,7 +121,7 @@ d["tracked"][0]["output-ext"]=".txt"; d["tracked"][0]["minify"]=True
 json.dump(d,open(p,"w"))
 PY
 # This output path has changed, so old index.html remains untouched; build must fail.
-if (cd "$P" && "$NIFT_BIN" build-updated >fail.log 2>&1); then echo "unsupported forced minify succeeded" >&2; exit 1; fi
+if (cd "$P" && "$NIFT_BIN" build >fail.log 2>&1); then echo "unsupported forced minify succeeded" >&2; exit 1; fi
 grep -Fq 'no minifier is available for output extension .txt' "$P/fail.log"
 cmp "$P/public/index.html" "$P/old"
 
@@ -174,11 +174,11 @@ cat >"$P/.nift/tracked.json" <<'JSON'
 JSON
 printf '@content\n' >"$P/templates/template.json"
 printf '{ "ok" : true }\n' >"$P/content/index.json"
-(cd "$P" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$P" && "$NIFT_BIN" build --all >/dev/null)
 cp "$P/public/index.json" "$P/old-output"
 cp "$P/.nift/public/index.info.json" "$P/old-info"
 printf '{ "broken": }\n' >"$P/content/index.json"
-if (cd "$P" && "$NIFT_BIN" build-updated >bad-json.log 2>&1); then
+if (cd "$P" && "$NIFT_BIN" build >bad-json.log 2>&1); then
   echo "invalid JSON minification unexpectedly succeeded" >&2; exit 1
 fi
 grep -Fq 'minification failed: invalid JSON' "$P/bad-json.log"
@@ -196,7 +196,7 @@ json.dump({"tracked":[{"name":f"page/{i}","title":f"P{i}","template":"templates/
 PY
 printf '<main>   @content   </main>\n' >"$P/templates/template.html"
 for i in $(seq 0 79); do printf '<span>   %s   </span>\n' "$i" >"$P/content/page/$i.html"; done
-(cd "$P" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$P" && "$NIFT_BIN" build --all >/dev/null)
 for i in 0 7 31 79; do
   grep -Fq "<main> <span> $i </span> </main>" "$P/public/page/$i.html"
 done

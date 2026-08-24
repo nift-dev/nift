@@ -25,7 +25,7 @@ JSON
 
 expect_build_failure() {
     local d="$1" expected="$2"
-    if (cd "$d" && "$NIFT_BIN" build-all >log 2>&1); then
+    if (cd "$d" && "$NIFT_BIN" build --all >log 2>&1); then
         echo "expected build failure containing: $expected" >&2
         exit 1
     fi
@@ -38,7 +38,7 @@ expect_build_failure() {
 
 expect_open_failure() {
     local d="$1" expected="$2"
-    if (cd "$d" && "$NIFT_BIN" build-all >log 2>&1); then
+    if (cd "$d" && "$NIFT_BIN" build --all >log 2>&1); then
         echo "expected project/config failure containing: $expected" >&2
         exit 1
     fi
@@ -64,7 +64,7 @@ ENABLED=$[routes.enabled]
 VERSION=$[routes.version]
 @content
 EOF_TEMPLATE
-(cd "$D" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$D" && "$NIFT_BIN" build --all >/dev/null)
 grep -Fx 'LIST=/api/users' "$D/public/index.html" >/dev/null
 grep -Fx 'DETAIL=/api/users/{id}' "$D/public/index.html" >/dev/null
 grep -Fx 'ENABLED=true' "$D/public/index.html" >/dev/null
@@ -82,7 +82,7 @@ python3 - "$D/.nift/routes.json" <<'PY'
 import os, sys, time
 p=sys.argv[1]; t=time.time()+2; os.utime(p,(t,t))
 PY
-(cd "$D" && "$NIFT_BIN" build-updated >/dev/null)
+(cd "$D" && "$NIFT_BIN" build >/dev/null)
 grep -Fx 'LIST=/v2/users' "$D/public/index.html" >/dev/null
 
 # Changing the config mapping also invalidates users because config is part of
@@ -95,7 +95,7 @@ d=json.load(open(p)); d['config']['contracts']['routes']='.nift/routes-v3.json'
 open(p,'w').write(json.dumps(d,separators=(',',':'))+'\n')
 t=time.time()+4; os.utime(p,(t,t))
 PY
-(cd "$D" && "$NIFT_BIN" build-updated >/dev/null)
+(cd "$D" && "$NIFT_BIN" build >/dev/null)
 grep -Fx 'LIST=/v3/users' "$D/public/index.html" >/dev/null
 grep -F '".nift/routes-v3.json"' "$D/.nift/public/index.info.json" >/dev/null
 
@@ -113,7 +113,7 @@ cat > "$D/templates/template.html" <<'EOF_INTEGRATION'
 }
 @content
 EOF_INTEGRATION
-(cd "$D" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$D" && "$NIFT_BIN" build --all >/dev/null)
 grep -Fq 'PARTIAL-A' "$D/public/index.html"
 grep -Fq 'ENABLED' "$D/public/index.html"
 grep -Fq 'ITEM=A' "$D/public/index.html"
@@ -126,7 +126,7 @@ grep -F '"templates/a.html"' "$D/.nift/public/index.info.json" >/dev/null
 D="$TMP/unconfigured"
 make_project "$D"
 printf '%s\n' 'VALUE=$[routes.users.list]' '@content' > "$D/templates/template.html"
-(cd "$D" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$D" && "$NIFT_BIN" build --all >/dev/null)
 grep -F '$[routes.users.list]' "$D/public/index.html" >/dev/null
 
 # The same namespace remains valid as an explicit local @json binding when no
@@ -135,7 +135,7 @@ D="$TMP/local-json"
 make_project "$D"
 printf '{"users":{"list":"/local"}}\n' > "$D/data/routes.json"
 printf '%s\n' '@json("data/routes.json", routes)' 'VALUE=$[routes.users.list]' '@content' > "$D/templates/template.html"
-(cd "$D" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$D" && "$NIFT_BIN" build --all >/dev/null)
 grep -Fx 'VALUE=/local' "$D/public/index.html" >/dev/null
 
 # Contract-specific failures are clear and occur only for declared namespaces.

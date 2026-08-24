@@ -19,7 +19,7 @@ cat >"$P/.nift/tracked.json" <<'JSON'
 JSON
 printf '@content\n' >"$P/templates/template.html"
 printf '<p>GOOD-V1</p>\n' >"$P/content/index.html"
-(cd "$P" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$P" && "$NIFT_BIN" build --all >/dev/null)
 cp "$P/public/index.html" "$P/old-output"
 cp "$P/.nift/public/index.info.json" "$P/old-info"
 
@@ -27,7 +27,7 @@ cat >"$P/templates/template.html" <<'EOF'
 @json("data/missing.json", broken)
 @content
 EOF
-if (cd "$P" && "$NIFT_BIN" build-updated >failed.log 2>&1); then
+if (cd "$P" && "$NIFT_BIN" build >failed.log 2>&1); then
   echo "broken render unexpectedly succeeded" >&2; exit 1
 fi
 cmp "$P/public/index.html" "$P/old-output"
@@ -38,7 +38,7 @@ grep -Fq 'needs rebuilding' "$P/status.log"
 # Repair after failure must work without deleting persistent metadata manually.
 printf '@content\n' >"$P/templates/template.html"
 printf '<p>GOOD-V2</p>\n' >"$P/content/index.html"
-(cd "$P" && "$NIFT_BIN" build-updated >/dev/null)
+(cd "$P" && "$NIFT_BIN" build >/dev/null)
 grep -Fq 'GOOD-V2' "$P/public/index.html"
 
 # Multi-page build: one failed page must not stop independent pages succeeding,
@@ -53,7 +53,7 @@ json.dump({"tracked":items},open(sys.argv[1],"w"))
 PY
 printf '@content\n' >"$P/templates/template.html"
 for i in $(seq 0 19); do printf '<p>OLD-%s</p>\n' "$i" >"$P/content/p$i.html"; done
-(cd "$P" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$P" && "$NIFT_BIN" build --all >/dev/null)
 cp "$P/public/p7.html" "$P/p7-old"
 cp "$P/.nift/public/p7.info.json" "$P/p7-info-old"
 
@@ -62,16 +62,16 @@ printf '@json("data/missing.json", x)\n' >"$P/content/p7.html"
 for i in $(seq 0 19); do
   if [ "$i" != 7 ]; then printf '<p>NEW-%s</p>\n' "$i" >"$P/content/p$i.html"; fi
 done
-if (cd "$P" && "$NIFT_BIN" build-updated >partial.log 2>&1); then
+if (cd "$P" && "$NIFT_BIN" build >partial.log 2>&1); then
   echo "partial failed build returned success" >&2; exit 1
 fi
 cmp "$P/public/p7.html" "$P/p7-old"
 cmp "$P/.nift/public/p7.info.json" "$P/p7-info-old"
 for i in 0 1 2 6 8 12 19; do grep -Fq "NEW-$i" "$P/public/p$i.html"; done
 
-# Repair only failed page; subsequent build-updated must converge to clean state.
+# Repair only failed page; subsequent build must converge to clean state.
 printf '<p>NEW-7</p>\n' >"$P/content/p7.html"
-(cd "$P" && "$NIFT_BIN" build-updated >/dev/null)
+(cd "$P" && "$NIFT_BIN" build >/dev/null)
 grep -Fq 'NEW-7' "$P/public/p7.html"
 (cd "$P" && "$NIFT_BIN" status >clean.log)
 ! grep -Fq 'needs rebuilding' "$P/clean.log"
@@ -100,7 +100,7 @@ cat >"$P/templates/template.html" <<'EOF'
 @input("templates/parts/list.html")
 @content
 EOF
-(cd "$P" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$P" && "$NIFT_BIN" build --all >/dev/null)
 for i in 0 1 17 63 119; do
   grep -Fq "<title>T$i</title>" "$P/public/page/$i.html"
   grep -Fq 'abc' "$P/public/page/$i.html"
@@ -109,12 +109,12 @@ for i in 0 1 17 63 119; do
 done
 
 # Repeat concurrent forced builds to exercise shared caches and readonly rewrites.
-for n in 1 2 3; do (cd "$P" && "$NIFT_BIN" build-all >/dev/null); done
+for n in 1 2 3; do (cd "$P" && "$NIFT_BIN" build --all >/dev/null); done
 
 # Failed shared schema update: all selected pages fail, existing outputs remain.
 cp "$P/public/page/0.html" "$P/shared-old"
 printf '%s\n' '{"type":"object","properties":{"items":{"type":"string"}}}' >"$P/schemas/shared.json"
-if (cd "$P" && "$NIFT_BIN" build-updated >schema-many.log 2>&1); then
+if (cd "$P" && "$NIFT_BIN" build >schema-many.log 2>&1); then
   echo "invalid shared schema unexpectedly succeeded" >&2; exit 1
 fi
 cmp "$P/public/page/0.html" "$P/shared-old"
@@ -123,7 +123,7 @@ cmp "$P/public/page/0.html" "$P/shared-old"
 cat >"$P/schemas/shared.json" <<'JSON'
 {"type":"object","required":["items"],"properties":{"items":{"type":"array"}}}
 JSON
-(cd "$P" && "$NIFT_BIN" build-updated >/dev/null)
+(cd "$P" && "$NIFT_BIN" build >/dev/null)
 (cd "$P" && "$NIFT_BIN" status >final.log)
 ! grep -Fq 'needs rebuilding' "$P/final.log"
 

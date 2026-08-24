@@ -17,7 +17,7 @@ cat >"$P/content/index.html" <<'EOF'
 EOF
 
 # Omission makes content the parsed top-level Nift source.
-(cd "$P" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$P" && "$NIFT_BIN" build --all >/dev/null)
 grep -Fq '<main>Home</main>' "$P/public/index.html"
 python3 -S - "$P/.nift/public/index.info.json" <<'PY'
 import json, sys
@@ -35,7 +35,7 @@ d = json.load(open(p))
 d["tracked"][0]["template"] = "templates/page.html"
 json.dump(d, open(p, "w"))
 PY
-(cd "$P" && "$NIFT_BIN" build-updated >/dev/null)
+(cd "$P" && "$NIFT_BIN" build >/dev/null)
 grep -Fq '<body><main>Home</main>' "$P/public/index.html"
 grep -Fq '"templates/page.html"' "$P/.nift/public/index.info.json"
 
@@ -47,7 +47,7 @@ d = json.load(open(p))
 del d["tracked"][0]["template"]
 json.dump(d, open(p, "w"))
 PY
-(cd "$P" && "$NIFT_BIN" build-updated >/dev/null)
+(cd "$P" && "$NIFT_BIN" build >/dev/null)
 ! grep -Fq '"templates/page.html"' "$P/.nift/public/index.info.json"
 printf '<body>changed</body>\n' >"$P/templates/page.html"
 (cd "$P" && "$NIFT_BIN" status >status.log)

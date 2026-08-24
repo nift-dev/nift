@@ -26,7 +26,7 @@ for MODE in modified hash hybrid; do
 <a href="@pathto('public/assets/a.txt')">$[site.value]</a>
 @content
 EOF
-  (cd "$P" && "$NIFT_BIN" build-all >/dev/null)
+  (cd "$P" && "$NIFT_BIN" build --all >/dev/null)
 
   # Requirement content change alone must never trigger rebuild.
   sleep 1
@@ -43,13 +43,13 @@ EOF
   printf '{"value":2}\n' >"$P/data/site.json"
   (cd "$P" && "$NIFT_BIN" status >status-json.log)
   grep -Fq 'needs rebuilding' "$P/status-json.log"
-  (cd "$P" && "$NIFT_BIN" build-updated >/dev/null)
+  (cd "$P" && "$NIFT_BIN" build >/dev/null)
   grep -Fq '>2</a>' "$P/public/index.html"
 
   # Schema change must also trigger rebuild and can invalidate unchanged data.
   sleep 1
   printf '%s\n' '{"type":"object","properties":{"value":{"type":"integer","maximum":1}}}' >"$P/schemas/site.json"
-  if (cd "$P" && "$NIFT_BIN" build-updated >schema-fail.log 2>&1); then
+  if (cd "$P" && "$NIFT_BIN" build >schema-fail.log 2>&1); then
     echo "$MODE: schema invalidation did not fail" >&2
     exit 1
   fi
@@ -57,7 +57,7 @@ EOF
 
   # Repair by changing schema again.
   printf '%s\n' '{"type":"object","properties":{"value":{"type":"integer","maximum":5}}}' >"$P/schemas/site.json"
-  (cd "$P" && "$NIFT_BIN" build-updated >/dev/null)
+  (cd "$P" && "$NIFT_BIN" build >/dev/null)
 
   # Deleting a schema marks rebuild; changing template to stop using it must repair.
   rm "$P/schemas/site.json"
@@ -67,7 +67,7 @@ EOF
 <a href="@pathto('public/assets/a.txt')">asset</a>
 @content
 EOF
-  (cd "$P" && "$NIFT_BIN" build-updated >/dev/null)
+  (cd "$P" && "$NIFT_BIN" build >/dev/null)
   ! grep -Fq '"schemas/site.json"' "$P/.nift/public/index.info.json"
 
   # Deleting a req marks rebuild; recreating it before build should make page clean again.

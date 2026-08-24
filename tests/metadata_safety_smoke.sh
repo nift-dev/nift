@@ -19,7 +19,7 @@ JSON
 # Corrupt page-info must not make status trust paths outside the project.
 P="$TMP/corrupt"; mkproj "$P"
 printf '<p>ok</p>\n' >"$P/content/index.html"
-(cd "$P" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$P" && "$NIFT_BIN" build --all >/dev/null)
 chmod u+w "$P/.nift/public/index.info.json"
 python3 -S - "$P/.nift/public/index.info.json" <<'PY'
 import json,sys
@@ -41,7 +41,7 @@ printf 'inside\n' >"$P/public/assets/inside.txt"
 printf 'outside\n' >"$TMP/outside-target.txt"
 ln -s "inside.txt" "$P/public/assets/link.txt"
 printf '<a href="@pathto('"'"'public/assets/link.txt'"'"')">x</a>\n' >"$P/content/index.html"
-(cd "$P" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$P" && "$NIFT_BIN" build --all >/dev/null)
 rm "$P/public/assets/link.txt"
 ln -s "$TMP/outside-target.txt" "$P/public/assets/link.txt"
 (cd "$P" && "$NIFT_BIN" status >status.log)
@@ -57,7 +57,7 @@ printf 'inside\n' >"$P/public/inside-dir/file.txt"
 printf 'outside\n' >"$TMP/outside-dir/file.txt"
 ln -s "inside-dir" "$P/public/linkdir"
 printf '<a href="@pathto('"'"'public/linkdir/file.txt'"'"')">x</a>\n' >"$P/content/index.html"
-(cd "$P" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$P" && "$NIFT_BIN" build --all >/dev/null)
 rm "$P/public/linkdir"
 ln -s "$TMP/outside-dir" "$P/public/linkdir"
 (cd "$P" && "$NIFT_BIN" status >status.log)

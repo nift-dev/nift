@@ -275,10 +275,10 @@ void print_commands() {
     std::cout << console::heading("Nift commands") << "\n\n";
 
     std::cout << console::dim("Build") << '\n';
-    row("build(-updated)", "[options]", "Build files that need updating");
-    row("build-all", "[options]", "Build every tracked file");
-    row("build-names", "[options] <names>", "Build selected tracked names");
-    row("build-auto", "[options]", "Continuously build changed files");
+    row("build", "[names...] [options]", "Incremental build, or explicitly build the named pages");
+    row("build --all", "", "Build all tracked pages");
+    row("build --auto", "", "Automatic/watch build");
+    row("build --repair", "", "Repair/reconstruct derived build state");
 
     std::cout << '\n' << console::dim("Project") << '\n';
     row("track", "<name> [title] [template]", "Track a new file");
@@ -288,10 +288,12 @@ void print_commands() {
     row("watch / unwatch", "<directory>", "Manage watched directories");
 
     std::cout << '\n' << console::dim("Inspect") << '\n';
-    row("info", "[names...]", "Show tracked file information");
-    row("info-all", "", "Show all tracked information");
+    row("info", "[names...]", "Show project or page information");
+    row("info --all", "", "Show all tracked-page information");
+    row("info --watching", "", "Show watching information");
+    row("info --tracking", "", "Show tracking information");
+    row("info --names", "", "List tracked names");
     row("status", "[-p]", "Show pages that need rebuilding and why");
-    row("info-watching", "", "Show watched directories");
 
     std::cout << '\n' << console::dim("General") << '\n';
     row("init", "[--target=platform] [--ext=.ext] [--handover]", "Create a Nift project");
@@ -301,27 +303,10 @@ void print_commands() {
     row("commands", "", "Show this command reference");
 }
 
-bool valid_options(int argc, char** argv, int start) {
-    for (int i = start; i < argc; ++i) {
-        const std::string value = argv[i];
-        if (!value.empty() && value[0] == '-' && value != "-p" && value != "-n" && value != "-s") return false;
-    }
-    return true;
-}
-
 bool has_option(int argc, char** argv, int start, const std::string& option) {
     for (int i = start; i < argc; ++i)
         if (argv[i] == option) return true;
     return false;
-}
-
-bool options_only(int argc, char** argv, int start) {
-    if (!valid_options(argc, argv, start)) return false;
-    for (int i = start; i < argc; ++i) {
-        const std::string value = argv[i];
-        if (value.empty() || value[0] != '-') return false;
-    }
-    return true;
 }
 
 fs::path user_dependencies_path(const ProjectInfo& project, const TrackedInfo& info) {
@@ -720,11 +705,31 @@ int run_cli(int argc, char** argv) {
         return failed ? 1 : 0;
     }
 
+    // Historical spellings removed by the CLI unification. These return an
+    // error that points at the replacement; they perform no action and are
+    // intentionally not advertised by `nift commands` (same precedent as the
+    // earlier init-html removal).
+    static const std::pair<const char*, const char*> removed_command_hints[] = {
+        {"build-all", "use 'nift build --all' instead"},
+        {"build-updated", "use 'nift build' instead"},
+        {"build-names", "use 'nift build <names...>' instead"},
+        {"build-auto", "use 'nift build --auto' instead"},
+        {"info-all", "use 'nift info --all' instead"},
+        {"info-watching", "use 'nift info --watching' instead"},
+        {"info-tracking", "use 'nift info --tracking' instead"},
+        {"info-names", "use 'nift info --names' instead"},
+    };
+    for (const auto& [removed, hint] : removed_command_hints) {
+        if (command == removed) {
+            console::error("command '" + std::string(removed) + "' has been removed; " + hint);
+            return 1;
+        }
+    }
+
     const std::set<std::string> project_commands = {
-        "build-all", "build-updated", "build", "build-names", "build-auto",
+        "build", "info", "status",
         "track", "untrack", "rm", "del", "cp", "copy", "mv", "move",
-        "info", "info-all", "info-names", "info-tracking", "status",
-        "watch", "unwatch", "info-watching"
+        "watch", "unwatch"
     };
     if (!project_commands.count(command)) {
         console::error("unknown command '" + command + "'");
@@ -732,73 +737,88 @@ int run_cli(int argc, char** argv) {
         return 1;
     }
 
-    const bool timed_command = command == "build-all" || command == "build-updated" || command == "build" || command == "build-names";
+    const bool timed_command = command == "build";
     CommandTimer command_timer(timed_command);
 
     ProjectInfo project;
     if (!project.open()) return 1;
 
-    if (command == "build-all") {
-        if (!options_only(argc, argv, 2)) { console::error("build-all accepts options only"); return 1; }
-        return project.build_all(true, has_option(argc, argv, 2, "-p"));
-    }
-    if (command == "build-updated" || (command == "build" && argc == 2)) {
-        if (!options_only(argc, argv, 2)) { console::error("build-updated accepts options only"); return 1; }
-        return project.build_all(false, has_option(argc, argv, 2, "-p"));
-    }
-    if (command == "build" || command == "build-names") {
-        if (!valid_options(argc, argv, 2)) { console::error("unknown build option"); return 1; }
+    if (command == "build") {
+        // Modes are mutually exclusive: positional names, --all, --auto,
+        // --repair. -p (explain rebuild reasons) is orthogonal and combinable.
+        bool all_mode = false, auto_mode = false, repair_mode = false, explain = false;
         std::vector<std::string> names;
-        for (int i = 2; i < argc; ++i) if (argv[i][0] != '-') names.emplace_back(argv[i]);
-        if (names.empty()) { console::error("build-names requires at least one tracked name"); return 1; }
-        return project.build_names(names, true, has_option(argc, argv, 2, "-p"));
-    }
-    if (command == "build-auto") {
-        if (!options_only(argc, argv, 2)) { console::error("build-auto accepts options only"); return 1; }
-        BuildAutoQuitKey quit_key;
-        std::cout << console::heading("Nift build-auto") << '\n';
-        std::cout << console::dim("watching for changes every 200 ms") << '\n';
-        std::cout << "build output: " << console::path(build_auto_log_path) << '\n';
-        if (quit_key.interactive())
-            std::cout << "press " << console::good("q") << " to stop\n";
-        else
-            std::cout << console::dim("non-interactive mode; stop the process to exit") << '\n';
-        std::cout << std::flush;
-
-        bool stop_requested = false;
-        while (!stop_requested) {
-            stop_requested = quit_key.pressed();
-            if (stop_requested) break;
-
-            std::string captured_output;
-            int result = 0;
-            {
-                console::ScopedPlainOutput plain_output;
-                ScopedStreamCapture capture;
-                ProjectInfo fresh;
-                if (!fresh.open()) result = 1;
-                else result = fresh.build_all(false);
-                captured_output = capture.str();
-            }
-
-            if (!write_if_changed(build_auto_log_path, captured_output)) {
-                console::error("failed to write build-auto output log");
-                return 1;
-            }
-            if (result != 0) return result;
-
-            const auto sleep_step = std::chrono::milliseconds(20);
-            auto remaining = build_auto_poll_interval;
-            while (remaining.count() > 0 && !stop_requested) {
-                const auto delay = std::min(remaining, sleep_step);
-                std::this_thread::sleep_for(delay);
-                remaining -= delay;
-                stop_requested = quit_key.pressed();
-            }
+        int mode_flags = 0;
+        for (int i = 2; i < argc; ++i) {
+            const std::string arg = argv[i];
+            if (arg == "--all") { all_mode = true; ++mode_flags; }
+            else if (arg == "--auto") { auto_mode = true; ++mode_flags; }
+            else if (arg == "--repair") { repair_mode = true; ++mode_flags; }
+            else if (arg == "-p") explain = true;
+            else if (!arg.empty() && arg[0] == '-') { console::error("unknown build option '" + arg + "'"); return 1; }
+            else names.emplace_back(arg);
+        }
+        if (mode_flags > 1 || (mode_flags == 1 && !names.empty())) {
+            console::error("build modes are mutually exclusive");
+            return 1;
         }
 
-        std::cout << console::good("build-auto stopped") << '\n';
-        return 0;
+        if (all_mode) return project.build_all(true, explain);
+        if (repair_mode) {
+            // CP1 interim: repair is a distrust rebuild of every tracked page.
+            // The full repair semantics (refusal on a live build lock, stale
+            // sweep, marker lifecycle) are completed by the .unfinished
+            // productionization checkpoints.
+            return project.build_all(true, explain);
+        }
+        if (auto_mode) {
+            BuildAutoQuitKey quit_key;
+            std::cout << console::heading("Nift build --auto") << '\n';
+            std::cout << console::dim("watching for changes every 200 ms") << '\n';
+            std::cout << "build output: " << console::path(build_auto_log_path) << '\n';
+            if (quit_key.interactive())
+                std::cout << "press " << console::good("q") << " to stop\n";
+            else
+                std::cout << console::dim("non-interactive mode; stop the process to exit") << '\n';
+            std::cout << std::flush;
+
+            bool stop_requested = false;
+            while (!stop_requested) {
+                stop_requested = quit_key.pressed();
+                if (stop_requested) break;
+
+                std::string captured_output;
+                int result = 0;
+                {
+                    console::ScopedPlainOutput plain_output;
+                    ScopedStreamCapture capture;
+                    ProjectInfo fresh;
+                    if (!fresh.open()) result = 1;
+                    else result = fresh.build_all(false);
+                    captured_output = capture.str();
+                }
+
+                if (!write_if_changed(build_auto_log_path, captured_output)) {
+                    console::error("failed to write build-auto output log");
+                    return 1;
+                }
+                if (result != 0) return result;
+
+                const auto sleep_step = std::chrono::milliseconds(20);
+                auto remaining = build_auto_poll_interval;
+                while (remaining.count() > 0 && !stop_requested) {
+                    const auto delay = std::min(remaining, sleep_step);
+                    std::this_thread::sleep_for(delay);
+                    remaining -= delay;
+                    stop_requested = quit_key.pressed();
+                }
+            }
+
+            std::cout << console::good("build --auto stopped") << '\n';
+            return 0;
+        }
+        if (!names.empty()) return project.build_names(names, true, explain);
+        return project.build_all(false, explain);
     }
 
     if (command == "track") {
@@ -900,13 +920,7 @@ int run_cli(int argc, char** argv) {
         return 0;
     }
 
-    if (command == "info" || command == "info-all" || command == "info-names" || command == "info-tracking" || command == "status") {
-        if (argc > 2 && !valid_options(argc, argv, 2)) return 1;
-        if (command != "info" && !options_only(argc, argv, 2)) {
-            console::error(command + " accepts options only");
-            return 1;
-        }
-
+    if (command == "info" || command == "status") {
         if (command == "status") {
             struct StatusEntry {
                 const TrackedInfo* info = nullptr;
@@ -984,26 +998,61 @@ int run_cli(int argc, char** argv) {
                 std::cout << '\n';
             }
 
-            std::cout << "\nrun " << console::good("nift build-updated") << " to rebuild "
+            std::cout << "\nrun " << console::good("nift build") << " to rebuild "
                       << (pending.size() == 1 ? "this page" : "these pages") << '\n';
             return 0;
         }
 
-        if (command == "info-names") {
-            json::Document names = json::Document::make_object();
-            names["tracked"] = json::Document::make_array();
-            for (const auto& info : project.tracked) names["tracked"].push_back(info.name);
-            print_json_document(names, "Tracked names", "Names currently managed by this Nift project.");
+        // Modes are mutually exclusive: positional names, --all, --watching,
+        // --tracking, --names. -p is not used by info. --all is the explicit
+        // spelling of the default all-entries view and needs no state.
+        bool watching_mode = false, tracking_mode = false, names_mode = false;
+        std::vector<std::string> names;
+        int mode_flags = 0;
+        for (int i = 2; i < argc; ++i) {
+            const std::string arg = argv[i];
+            if (arg == "--all") { ++mode_flags; }
+            else if (arg == "--watching") { watching_mode = true; ++mode_flags; }
+            else if (arg == "--tracking") { tracking_mode = true; ++mode_flags; }
+            else if (arg == "--names") { names_mode = true; ++mode_flags; }
+            else if (!arg.empty() && arg[0] == '-') { console::error("unknown info option '" + arg + "'"); return 1; }
+            else names.emplace_back(arg);
+        }
+        if (mode_flags > 1 || (mode_flags == 1 && !names.empty())) {
+            console::error("info modes are mutually exclusive");
+            return 1;
+        }
+
+        if (watching_mode) {
+            print_json_document(watch_json(project.watch_list()), "Watching information",
+                                "Directories Nift scans automatically and the extension rules applied to each one.");
+            return 0;
+        }
+        if (tracking_mode) {
+            json::Document result = json::Document::make_object();
+            result["tracking-file"] = ".nift/tracked.json";
+            result["tracked-count"] = static_cast<int>(project.tracked.size());
+            result["tracked"] = json::Document::make_array();
+            for (const auto& info : project.tracked) result["tracked"].push_back(tracked_entry_json(project, info));
+            print_json_document(result, "Tracking information",
+                                "Tracking state plus the resolved paths Nift uses for each entry.");
+            return 0;
+        }
+        if (names_mode) {
+            json::Document names_doc = json::Document::make_object();
+            names_doc["tracked"] = json::Document::make_array();
+            for (const auto& info : project.tracked) names_doc["tracked"].push_back(info.name);
+            print_json_document(names_doc, "Tracked names", "Names currently managed by this Nift project.");
             return 0;
         }
 
-        if (command == "info" && argc > 2) {
+        // --all is the explicit spelling of the default all-entries view.
+        if (!names.empty()) {
             json::Document result = json::Document::make_object();
             result["tracked"] = json::Document::make_array();
             bool has_untracked = false;
-            for (int i = 2; i < argc; ++i) {
-                if (argv[i][0] == '-') continue;
-                const TrackedInfo* info = project.find(argv[i]);
+            for (const auto& name : names) {
+                const TrackedInfo* info = project.find(name);
                 if (info) {
                     result["tracked"].push_back(tracked_entry_json(project, *info));
                 } else {
@@ -1011,7 +1060,7 @@ int run_cli(int argc, char** argv) {
                         result["not-tracking"] = json::Document::make_array();
                         has_untracked = true;
                     }
-                    result["not-tracking"].push_back(argv[i]);
+                    result["not-tracking"].push_back(name);
                 }
             }
             print_json_document(result, "Tracked file information", "Resolved paths and metadata for the requested tracked names.");
@@ -1019,17 +1068,9 @@ int run_cli(int argc, char** argv) {
         }
 
         json::Document result = json::Document::make_object();
-        if (command == "info-tracking") {
-            result["tracking-file"] = ".nift/tracked.json";
-            result["tracked-count"] = static_cast<int>(project.tracked.size());
-        }
         result["tracked"] = json::Document::make_array();
         for (const auto& info : project.tracked) result["tracked"].push_back(tracked_entry_json(project, info));
-        const std::string heading = command == "info-tracking" ? "Tracking information" : "All tracked file information";
-        const std::string explanation = command == "info-tracking"
-            ? "Tracking state plus the resolved paths Nift uses for each entry."
-            : "Complete metadata for every tracked entry in the project.";
-        print_json_document(result, heading, explanation);
+        print_json_document(result, "All tracked file information", "Complete metadata for every tracked entry in the project.");
         return 0;
     }
 
@@ -1046,12 +1087,6 @@ int run_cli(int argc, char** argv) {
     if (command == "unwatch") {
         if (argc != 3) { console::error("unwatch requires exactly one directory"); return 1; }
         return project.watch_list().remove(project, argv[2]) ? 0 : 1;
-    }
-    if (command == "info-watching") {
-        if (argc != 2) { console::error("info-watching does not accept additional arguments"); return 1; }
-        print_json_document(watch_json(project.watch_list()), "Watching information",
-                            "Directories Nift scans automatically and the extension rules applied to each one.");
-        return 0;
     }
 
     return 1;

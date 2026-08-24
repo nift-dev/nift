@@ -97,7 +97,7 @@ def run_case(root,text,case_id,timeout):
     (root/'templates/template.html').write_text(text)
     started=time.monotonic()
     try:
-        p=subprocess.run([NIFT,'build-all'],cwd=root,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
+        p=subprocess.run([NIFT,'build', '--all'],cwd=root,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
                          timeout=timeout,env=SAN_ENV)
     except subprocess.TimeoutExpired:
         raise RuntimeError(f'case {case_id} timed out')

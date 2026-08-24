@@ -42,7 +42,7 @@ def make_stub_nift(path: Path) -> None:
 
 
 def make_sabotaged_nift(path: Path, real: Path) -> None:
-    """A wrapper around the real `nift` that, after `build-all`, drops a
+    """A wrapper around the real `nift` that, after `build --all`, drops a
     spurious file into `public/` — simulating an incremental-vs-clean bug the
     pagination guard must detect."""
     body = (
@@ -50,7 +50,7 @@ def make_sabotaged_nift(path: Path, real: Path) -> None:
         f"real={real}\n"
         '"$real" "$@"\n'
         'rc=$?\n'
-        'if [ "$rc" = 0 ] && [ "$1" = "build-all" ] && [ -d public ]; then\n'
+        'if [ "$rc" = 0 ] && [ "$1" = "build", "--all" ] && [ -d public ]; then\n'
         '  echo sabotage >> public/sabotage-marker\n'
         'fi\n'
         'if [ "$rc" = 0 ] && [ "$1" = "build" ] && [ -d public ]; then\n'

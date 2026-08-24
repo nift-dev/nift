@@ -30,7 +30,7 @@ $[title]
 after
 EOF
 
-"$NIFT_BIN" build-all >/dev/null
+"$NIFT_BIN" build --all >/dev/null
 
 grep -F 'before' public/index.html >/dev/null
 grep -F 'after' public/index.html >/dev/null

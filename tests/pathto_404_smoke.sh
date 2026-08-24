@@ -40,7 +40,7 @@ cat >"$P/content/404.html" <<'EOF'
 <a href="@pathto('guides/')">Guides</a>
 <link rel="stylesheet" href="@pathto('assets/css/style')">
 EOF
-(cd "$P" && "$NIFT_BIN" build-all >log 2>&1) || { echo "log:"; cat "$P/log"; fail "404 project did not build"; }
+(cd "$P" && "$NIFT_BIN" build --all >log 2>&1) || { echo "log:"; cat "$P/log"; fail "404 project did not build"; }
 for want in 'href="/"' 'href="/about.html"' 'href="/docs.html"' \
             'href="/docs/getting-started.html"' 'href="/guides/"' \
             'href="/assets/css/style.css"'; do
@@ -53,7 +53,7 @@ cat >"$P/content/index.html" <<'EOF'
 <a href="@pathto('docs/getting-started')">Start</a>
 <link rel="stylesheet" href="@pathto('assets/css/style')">
 EOF
-(cd "$P" && "$NIFT_BIN" build-all >/dev/null 2>&1) || fail "normal page did not build"
+(cd "$P" && "$NIFT_BIN" build --all >/dev/null 2>&1) || fail "normal page did not build"
 grep -Fq 'href="./"' "$P/public/index.html" || grep -Fq 'href="./index.html"' "$P/public/index.html" \
   || fail "normal page root link is not relative (got: $(cat "$P/public/index.html"))"
 grep -Fq 'href="docs/getting-started.html"' "$P/public/index.html" \
@@ -63,7 +63,7 @@ grep -Fq 'href="assets/css/style.css"' "$P/public/index.html" \
 
 # Existence/dependency checking must be intact on the 404 page too.
 printf '<a href="@pathto('"'"'missing'"'"')">x</a>\n' >"$P/content/404.html"
-(cd "$P" && "$NIFT_BIN" build-all >log 2>&1) && fail "404 @pathto to a missing target was accepted"
+(cd "$P" && "$NIFT_BIN" build --all >log 2>&1) && fail "404 @pathto to a missing target was accepted"
 grep -Fq "neither a tracked name nor a file that exists" "$P/log" \
   || fail "404 @pathto missing-target did not report the usual existence error (got: $(cat "$P/log" 2>/dev/null))"
 

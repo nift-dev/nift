@@ -11,7 +11,7 @@ pre-Embed commit.
 Method:
   - one immutable 10k-page fixture (the established performance_10k layout)
   - correctness: build both revisions on separate copies, compare output trees
-  - timing: interleave baseline/current `build-all` full 10k builds, warmup
+  - timing: interleave baseline/current `build --all` full 10k builds, warmup
     first, report median/min/max/mean/stddev and the delta
 """
 import argparse, hashlib, json, os, pathlib, statistics, shutil, subprocess, tempfile, time
@@ -54,7 +54,7 @@ def build(nift: str, root: pathlib.Path, render_only: bool) -> float:
     if render_only:
         env["NIFT_RENDER_ONLY"] = "1"
     start = time.perf_counter()
-    p = subprocess.run([nift, "build-all"], cwd=root, stdout=subprocess.DEVNULL,
+    p = subprocess.run([nift, "build", "--all"], cwd=root, stdout=subprocess.DEVNULL,
                        stderr=subprocess.PIPE, env=env)
     if p.returncode:
         raise SystemExit(p.stderr.decode(errors="replace"))

@@ -19,7 +19,7 @@ Nift has completed its planned Checkpoints 0–10 deliberate hardening campaign.
 - Automatic and explicit dependency support
 - Human-friendly build errors with source locations
 - `status` command showing what needs rebuilding and why
-- Continuous `build-auto` mode
+- Continuous `build --auto` mode
 - JSON-based project and build metadata
 - No prescribed frontend framework or application architecture
 - Small native C++ executable with no runtime framework dependency
@@ -65,22 +65,22 @@ project is ready for AI-assisted and human-directed work.
 See [`docs/PLATFORM-TARGETS.md`](docs/PLATFORM-TARGETS.md) for the supported
 targets, generated files, extension contract, and platform boundaries.
 
-Build the project:
+Build incrementally (rebuilds only what changed):
 
 ```bash
-nift build-all
+nift build
 ```
 
-Rebuild only files affected by changes:
+Rebuild every tracked page:
 
 ```bash
-nift build-updated
+nift build --all
 ```
 
 Or watch continuously:
 
 ```bash
-nift build-auto
+nift build --auto
 ```
 
 Run:

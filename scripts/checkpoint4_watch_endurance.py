@@ -43,7 +43,7 @@ def signal_monitored_leaf(supervisor_pid, sig):
     desc=descendants(supervisor_pid)
     if not desc:
         return False
-    # Leaves first; normally this is the Nift build-auto child beneath Valgrind.
+    # Leaves first; normally this is the Nift build --auto child beneath Valgrind.
     leaves=[pid for pid in desc if not child_pids(pid)]
     targets=leaves or desc[-1:]
     sent=False
@@ -57,7 +57,7 @@ def wait_for_rebuild(output_path, previous_mtime_ns, proc, timeout):
     deadline=time.monotonic()+timeout
     while time.monotonic() < deadline:
         if proc.poll() is not None:
-            raise RuntimeError(f"build-auto exited early with {proc.returncode}: {proc.stderr.read()}")
+            raise RuntimeError(f"build --auto exited early with {proc.returncode}: {proc.stderr.read()}")
         try:
             current=output_path.stat().st_mtime_ns
             if current != previous_mtime_ns:
@@ -80,12 +80,12 @@ with tempfile.TemporaryDirectory(prefix="nift-cp4-watch-") as td:
     (root/"templates/template.html").write_text(
         '@json("data/state.json", state, "schemas/state.schema.json")\n'
         '<a href="$[routes.home]">$[state.name]-$[state.n]</a>\n@content\n')
-    subprocess.run([nift,"build-all"],cwd=root,check=True,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True)
+    subprocess.run([nift,"build", "--all"],cwd=root,check=True,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True)
     # Use a dedicated process group/session. This matters when --nift is a
-    # supervisor such as valgrind_nift.sh: build-auto runs underneath Valgrind,
+    # supervisor such as valgrind_nift.sh: build --auto runs underneath Valgrind,
     # and signalling only the supervisor PID can leave the monitored process
     # alive while Valgrind waits forever for it to exit.
-    p=subprocess.Popen([nift,"build-auto"],cwd=root,stdin=subprocess.DEVNULL,
+    p=subprocess.Popen([nift,"build", "--auto"],cwd=root,stdin=subprocess.DEVNULL,
                        stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True,start_new_session=True)
     samples=[]; started=time.monotonic()
     try:

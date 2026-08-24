@@ -4,7 +4,7 @@
 This specifically protects against doing directory-wide recovery or validation
 once per generated file. The Checkpoint 8 transactional-writer regression made
 a flat N-page build O(N^2) by scanning the output directory before every write.
-Fixture creation is excluded from timing. Each measured `nift build-all` toggles
+Fixture creation is excluded from timing. Each measured `nift build --all` toggles
 the shared template so every generated page changes; the guard therefore measures
 the transactional output path rather than an identical-output fast path.
 """
@@ -34,7 +34,7 @@ def fixture(root,n):
 
 def run_build(root):
     started=time.perf_counter()
-    p=subprocess.run([args.nift,"build-all"],cwd=root,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
+    p=subprocess.run([args.nift,"build", "--all"],cwd=root,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
     if p.returncode: raise SystemExit(p.stderr.decode(errors="replace"))
     return time.perf_counter()-started
 

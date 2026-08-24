@@ -37,7 +37,7 @@ cat >"$P/templates/template.html" <<'EOF'
 @content
 EOF
 printf '\n' >"$P/content/index.html"
-(cd "$P" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$P" && "$NIFT_BIN" build --all >/dev/null)
 grep -Fq '"public/assets/a.txt"' "$P/.nift/public/index.info.json"
 ! grep -Fq '"public/assets/b.txt"' "$P/.nift/public/index.info.json"
 
@@ -49,7 +49,7 @@ data,info=sys.argv[1:3]
 st=os.stat(info)
 os.utime(data,ns=(st.st_atime_ns,st.st_mtime_ns+1000000))
 PYMTIME
-(cd "$P" && "$NIFT_BIN" build-updated >/dev/null)
+(cd "$P" && "$NIFT_BIN" build >/dev/null)
 grep -Fq '"public/assets/b.txt"' "$P/.nift/public/index.info.json"
 ! grep -Fq '"public/assets/a.txt"' "$P/.nift/public/index.info.json"
 
@@ -62,7 +62,7 @@ data,info=sys.argv[1:3]
 st=os.stat(info)
 os.utime(data,ns=(st.st_atime_ns,st.st_mtime_ns+1000000))
 PYMTIME
-(cd "$P" && "$NIFT_BIN" build-updated >/dev/null)
+(cd "$P" && "$NIFT_BIN" build >/dev/null)
 grep -Fq '"public/assets/a.txt"' "$P/.nift/public/index.info.json"
 ! grep -Fq '"public/assets/b.txt"' "$P/.nift/public/index.info.json"
 
@@ -87,23 +87,23 @@ cat >"$P/templates/parts/item.html" <<'EOF'
 <span>$[loop.index]:$[item.name]:@pathto('public/assets/$[item.name].txt')</span>
 EOF
 printf '\n' >"$P/content/index.html"
-(cd "$P" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$P" && "$NIFT_BIN" build --all >/dev/null)
 grep -Fq '<span>1:a:assets/a.txt</span>' "$P/public/index.html"
 grep -Fq '<span>2:b:assets/b.txt</span>' "$P/public/index.html"
 grep -Fq '"public/assets/a.txt"' "$P/.nift/public/index.info.json"
 grep -Fq '"public/assets/b.txt"' "$P/.nift/public/index.info.json"
 
 # Tracked output req disappears, both producer and consumer should be candidates;
-# build-updated must recreate producer and then allow consumer to succeed.
+# build must recreate producer and then allow consumer to succeed.
 P="$TMP/tracked-repair"; mkproj "$P"
 cat >"$P/templates/template.html" <<'EOF'
 <a href="@pathto('about')">about</a>
 @content
 EOF
 printf '\n' >"$P/content/index.html"
-(cd "$P" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$P" && "$NIFT_BIN" build --all >/dev/null)
 rm "$P/public/about.html"
-(cd "$P" && "$NIFT_BIN" build-updated >/dev/null)
+(cd "$P" && "$NIFT_BIN" build >/dev/null)
 test -f "$P/public/about.html"
 grep -Fq '"public/about.html"' "$P/.nift/public/index.info.json"
 
@@ -111,7 +111,7 @@ grep -Fq '"public/about.html"' "$P/.nift/public/index.info.json"
 P="$TMP/corrupt-meta"; mkproj "$P"
 printf '@content\n' >"$P/templates/template.html"
 printf '<p>x</p>\n' >"$P/content/index.html"
-(cd "$P" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$P" && "$NIFT_BIN" build --all >/dev/null)
 python3 -S - "$P/.nift/public/index.info.json" <<'PY'
 import json,sys,os
 p=sys.argv[1]; os.chmod(p,0o644)
@@ -119,6 +119,6 @@ d=json.load(open(p)); d["reqs"]=["../../definitely-outside"]; json.dump(d,open(p
 PY
 (cd "$P" && "$NIFT_BIN" status >status.log)
 grep -Eq 'needs rebuilding|required path missing|invalid requirement' "$P/status.log"
-(cd "$P" && "$NIFT_BIN" build-updated >/dev/null)
+(cd "$P" && "$NIFT_BIN" build >/dev/null)
 
 echo "Cross-feature smoke test passed"

@@ -133,7 +133,7 @@ def compare_incremental_to_clean(nift: str, project: Path, label: str):
     inc = tree_hash(project / 'public')
     assert_output_correct(project, f'{label}:incremental')
     reset_generated(project)
-    run(nift, project, 'build-all')
+    run(nift, project, 'build', '--all')
     clean = tree_hash(project / 'public')
     assert_output_correct(project, f'{label}:clean')
     if inc != clean:
@@ -152,7 +152,7 @@ def main():
             project = base / mode
             project.mkdir()
             write_project(project, mode)
-            run(nift, project, 'build-all')
+            run(nift, project, 'build', '--all')
             assert_output_correct(project, f'{mode}:initial')
 
             # Content changes without changing page count.

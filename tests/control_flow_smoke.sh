@@ -132,7 +132,7 @@ COMMENT_BRACES_OK
 @content
 EOF
 
-(cd "$D" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$D" && "$NIFT_BIN" build --all >/dev/null)
 
 OUT="$D/public/index.html"
 grep -Fq 'IF_TRUE' "$OUT"
@@ -191,7 +191,7 @@ cat >"$D2/templates/template.html" <<'EOF'
 AFTER=$[item]
 @content
 EOF
-(cd "$D2" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$D2" && "$NIFT_BIN" build --all >/dev/null)
 grep -Fq 'AFTER=$[item]' "$D2/public/index.html"
 
 # Nested loops may shadow the same variable and restore the outer binding.
@@ -210,7 +210,7 @@ OUTER2=$[item.name]
 }
 @content
 EOF
-(cd "$D3" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$D3" && "$NIFT_BIN" build --all >/dev/null)
 grep -Fq 'OUTER1=g1' "$D3/public/index.html"
 grep -Fq 'OUTER2=g1' "$D3/public/index.html"
 grep -Fq 'OUTER1=g2' "$D3/public/index.html"
@@ -257,7 +257,7 @@ cat >"$D4/templates/template.html" <<'EOF'
 }</div>
 @content
 EOF
-(cd "$D4" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$D4" && "$NIFT_BIN" build --all >/dev/null)
 OUT4="$D4/public/index.html"
 grep -Eq '^    <p>FOR=one</p>$' "$OUT4"
 grep -Eq '^    <p>FOR=two</p>$' "$OUT4"
@@ -275,7 +275,7 @@ expect_failure(){
     make_project "$d"
     printf '%s\n' "$data" >"$d/data/site.json"
     printf '%s\n' "$template" >"$d/templates/template.html"
-    if (cd "$d" && "$NIFT_BIN" build-all >log 2>&1); then
+    if (cd "$d" && "$NIFT_BIN" build --all >log 2>&1); then
         echo "$name unexpectedly succeeded" >&2
         exit 1
     fi
@@ -338,7 +338,7 @@ cat >"$D5/templates/template.html" <<'TMPL_META'
 AFTER=$[loop.index]
 @content
 TMPL_META
-(cd "$D5" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$D5" && "$NIFT_BIN" build --all >/dev/null)
 OUT="$D5/public/index.html"
 grep -Fq '1/4:new-a:first=true:last=false' "$OUT"
 grep -Fq '2/4:new-b:first=false:last=false' "$OUT"
@@ -367,7 +367,7 @@ OUTER-AFTER=$[loop.index]/$[loop.length]:$[group.name]
 }
 @content
 TMPL_NEST
-(cd "$D6" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$D6" && "$NIFT_BIN" build --all >/dev/null)
 grep -Fq 'OUTER-BEFORE=1/2:g1' "$D6/public/index.html"
 grep -Fq 'INNER=1/2:a' "$D6/public/index.html"
 grep -Fq 'INNER=2/2:b' "$D6/public/index.html"
@@ -383,7 +383,7 @@ expect_cf_failure() {
     make_project "$d"
     printf '%s\n' "$json_source" >"$d/data/site.json"
     printf '%s\n' "$template" >"$d/templates/template.html"
-    if (cd "$d" && "$NIFT_BIN" build-all >log 2>&1); then
+    if (cd "$d" && "$NIFT_BIN" build --all >log 2>&1); then
         echo "$name unexpectedly succeeded" >&2
         exit 1
     fi
@@ -419,7 +419,7 @@ C@for((key,val) : site.obj){BAD}D
 LOOP=$[loop.index]
 @content
 TMPL_EMPTY
-(cd "$D7" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$D7" && "$NIFT_BIN" build --all >/dev/null)
 grep -Fq 'AB' "$D7/public/index.html"
 grep -Fq 'CD' "$D7/public/index.html"
 grep -Fq 'LOOP=$[loop.index]' "$D7/public/index.html"
@@ -435,7 +435,7 @@ cat >"$D8/templates/template.html" <<'TMPL_STABLE'
 @for((key,val) : site.obj by key asc){$[key]}
 @content
 TMPL_STABLE
-(cd "$D8" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$D8" && "$NIFT_BIN" build --all >/dev/null)
 grep -Fq 'abc' "$D8/public/index.html"
 grep -Fq 'amz' "$D8/public/index.html"
 
@@ -450,7 +450,7 @@ cat >"$D9/templates/template.html" <<'TMPL_LAZY'
 @for(item : site.items){@if(false){$[item.nope]}OK}
 @content
 TMPL_LAZY
-(cd "$D9" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$D9" && "$NIFT_BIN" build --all >/dev/null)
 grep -Fq 'GOOD' "$D9/public/index.html"
 grep -Fq 'OK' "$D9/public/index.html"
 
@@ -500,7 +500,7 @@ EMPTY-AFTER=$[loop.index]
 @if(site.nonemptyString){STRING-TRUE}else{BAD-STRING}
 @content
 TMPL_BOUND
-(cd "$D7" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$D7" && "$NIFT_BIN" build --all >/dev/null)
 OUT7="$D7/public/index.html"
 ! grep -Fq 'SHOULD-NOT-RENDER=' "$OUT7"
 grep -Fq 'EMPTY-AFTER=$[loop.index]' "$OUT7"
@@ -550,7 +550,7 @@ cat > content/index.html <<'EOF'
 @if((d.b || d.a) && d.n >= 5){PARENS}
 @if(d.a || d.b && false){PRECEDENCE}
 EOF
-"$NIFT_BIN" build-all >/dev/null
+"$NIFT_BIN" build --all >/dev/null
 grep -F 'AND' public/index.html >/dev/null
 grep -F 'OR' public/index.html >/dev/null
 grep -F 'SHORT_OR' public/index.html >/dev/null
@@ -587,7 +587,7 @@ $[d.no ? @dep('short-missing.txt')]
 $[d.yes ? d.yes ? NESTED-SHORTHAND]
 $[d.no ? BAD : d.yes ? NESTED : BAD2]
 EOF2
-"$NIFT_BIN" build-all >/dev/null
+"$NIFT_BIN" build --all >/dev/null
 grep -F 'class=" active "' public/index.html >/dev/null || grep -F 'class="active"' public/index.html >/dev/null
 grep -F 'YES-ternary' public/index.html >/dev/null
 grep -F 'SAFE' public/index.html >/dev/null
@@ -629,7 +629,7 @@ LITERAL_DIRECTIVE=[$[d.yes ? '@input(\'missing-literal.html\')' : 'wrong']]
 SOURCE_BRANCH=[$[d.yes ? <em>'quoted source stays source'</em> : wrong]]
 @content
 EOF_TERNARY_STR
-( cd "$D_TERNARY_STR" && "$NIFT_BIN" build-all >/dev/null )
+( cd "$D_TERNARY_STR" && "$NIFT_BIN" build --all >/dev/null )
 TERNARY_STR_OUT="$D_TERNARY_STR/public/index.html"
 grep -Fq 'SINGLE_TRUE=[yes]' "$TERNARY_STR_OUT"
 grep -Fq 'SINGLE_FALSE=[no]' "$TERNARY_STR_OUT"
@@ -673,13 +673,13 @@ cat > content/index.html <<'EOF2'
 $[true ? 'a?b:c]d' : no]
 $[false ? no : 'x:y?z]']
 EOF2
-"$NIFT_BIN" build-all >/dev/null
+"$NIFT_BIN" build --all >/dev/null
 grep -F ' a?b:c]d ' public/index.html >/dev/null || grep -F 'a?b:c]d' public/index.html >/dev/null
 grep -F 'x:y?z]' public/index.html >/dev/null
 cat > content/index.html <<'EOF2'
 $[? yes : no]
 EOF2
-if "$NIFT_BIN" build-all >/dev/null 2>&1; then echo 'malformed ternary unexpectedly succeeded' >&2; exit 1; fi
+if "$NIFT_BIN" build --all >/dev/null 2>&1; then echo 'malformed ternary unexpectedly succeeded' >&2; exit 1; fi
 
 # Pure value expressions support numeric arithmetic with conventional precedence,
 # parentheses, unary signs, conditions, and lazy logical evaluation.
@@ -694,7 +694,7 @@ $[2 + 3 * 4]|$[(2 + 3) * 4]|$[-2 + 5]|$[10 / 4]|$[10 % 3]
 $[2 + 3 > 4]|$[true && !false]
 $[2 + 3 > 4 ? 'YES' : 'NO']
 EOF_EXPR
-( cd "$D_EXPR" && "$NIFT_BIN" build-all >/dev/null )
+( cd "$D_EXPR" && "$NIFT_BIN" build --all >/dev/null )
 grep -F '14|20|3|2.5|1' "$D_EXPR/public/index.html" >/dev/null
 grep -F 'COND' "$D_EXPR/public/index.html" >/dev/null
 grep -F 'SHORT' "$D_EXPR/public/index.html" >/dev/null
@@ -706,7 +706,7 @@ if grep -Fq "'YES'" "$D_EXPR/public/index.html"; then echo 'expression ternary l
 # Invalid arithmetic fails cleanly.
 for expr in '1 / 0' '1 % 0' '1.5 % 1' "'x' + 1"; do
   printf '$[%s]\n' "$expr" > "$D_EXPR/content/index.html"
-  if (cd "$D_EXPR" && "$NIFT_BIN" build-all >/dev/null 2>&1); then
+  if (cd "$D_EXPR" && "$NIFT_BIN" build --all >/dev/null 2>&1); then
     echo "invalid expression unexpectedly succeeded: $expr" >&2; exit 1
   fi
 done

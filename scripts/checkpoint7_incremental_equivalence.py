@@ -62,7 +62,7 @@ def setup(root,mode):
     (root/"content/docs").mkdir(parents=True,exist_ok=True)
     (root/"content/docs/index.html").write_text("<p>docs-0</p>\n")
     (root/"content/index.html").write_text('<p>home-0 <a href="@pathto(\'about\')">about</a></p>\n')
-    run(root,"build-all")
+    run(root,"build", "--all")
 def mutate(root,rng,step):
     ops=["content","template","json","contract","schema","config_threads","dependency",
          "add","rename","remove","metadata"]
@@ -127,7 +127,7 @@ with tempfile.TemporaryDirectory(prefix="nift-cp7-") as td:
         ops=[]
         for step in range(a.steps):
             op=mutate(root,rng,step); ops.append(op)
-            run(root,"build-updated")
+            run(root,"build")
             inc=tree(root)
             # A clean rebuild in the same logical project is the oracle. Remove
             # generated output + page build metadata, then build every tracked entry.
@@ -142,7 +142,7 @@ with tempfile.TemporaryDirectory(prefix="nift-cp7-") as td:
                 if opath.exists(): opath.unlink()
             info=root/".nift/public"
             if info.exists(): shutil.rmtree(info)
-            run(root,"build-all")
+            run(root,"build", "--all")
             clean=tree(root)
             total+=1
             if inc!=clean:

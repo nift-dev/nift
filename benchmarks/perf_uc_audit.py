@@ -49,7 +49,7 @@ def set_content(root: pathlib.Path, pages: int, bang: bool):
 
 def build(nift: str, root: pathlib.Path) -> float:
     start = time.perf_counter()
-    p = subprocess.run([nift, "build-all"], cwd=root, stdout=subprocess.DEVNULL,
+    p = subprocess.run([nift, "build", "--all"], cwd=root, stdout=subprocess.DEVNULL,
                        stderr=subprocess.PIPE)
     if p.returncode:
         raise SystemExit(p.stderr.decode(errors="replace"))

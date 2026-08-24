@@ -46,19 +46,19 @@ for r in range(a.rounds):
         run([nift,"track","a",f"A{r}"],root)
         run([nift,"cp","a","b"],root)
         run([nift,"mv","b","c"],root)
-        run([nift,"build-all"],root)
+        run([nift,"build", "--all"],root)
         run([nift,"build"],root)
         run([nift,"status"],root)
         # controlled parser failure, then repair
         tmpl=root/"templates/template.html"
         good=tmpl.read_text()
         tmpl.write_text("@input('missing-partial.html')\n@content\n")
-        run([nift,"build-all"],root,expect=1)
+        run([nift,"build", "--all"],root,expect=1)
         tmpl.write_text(good)
-        run([nift,"build-updated"],root)
+        run([nift,"build"],root)
         run([nift,"untrack","c"],root)
         run([nift,"rm","a"],root)
-        run([nift,"info-all"],root)
+        run([nift,"info", "--all"],root)
 env=os.environ.copy(); env["NIFT_BIN"]=nift
 for t in tests:
     run(["bash",t],repo,env=env)

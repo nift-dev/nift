@@ -61,7 +61,7 @@ printf 'logo\n' > public/assets/logo.txt
 printf '{}\n' > data/state.json
 printf '{}\n' > data/nested-state.json
 
-NIFT_CONTENT_TEST='from-env' "$NIFT_BIN" build-all >/dev/null
+NIFT_CONTENT_TEST='from-env' "$NIFT_BIN" build --all >/dev/null
 
 grep -F '<a href="assets/logo.txt">asset</a>' public/index.html >/dev/null
 grep -F '<strong>Content parser test</strong>' public/index.html >/dev/null
@@ -85,7 +85,7 @@ cat > content/index.html <<'EOF'
 @input('index.html')
 EOF
 
-if "$NIFT_BIN" build-all >/dev/null 2>&1; then
+if "$NIFT_BIN" build --all >/dev/null 2>&1; then
   echo "content/input recursion unexpectedly succeeded" >&2
   exit 1
 fi
@@ -143,7 +143,7 @@ cat > content/fragment.html <<'EOF'
 gamma</code></pre>
 EOF
 
-"$NIFT_BIN" build-all >/dev/null
+"$NIFT_BIN" build --all >/dev/null
 
 grep -F $'<pre class="example"><code>first\n  second\nthird</code></pre>' public/index.html >/dev/null || {
   echo "template indentation leaked into @content <pre> block" >&2
@@ -196,7 +196,7 @@ about
 EOF
 printf 'body{}\n' > public/assets/generated.css
 
-"$NIFT_BIN" build-all >/dev/null
+"$NIFT_BIN" build --all >/dev/null
 grep -F 'href="assets/generated.css"' public/index.html >/dev/null
 grep -F 'href="./about.html"' public/index.html >/dev/null
 grep -F '"public/assets/generated.css"' .nift/public/index.info.json >/dev/null
@@ -219,7 +219,7 @@ cat > content/index.html <<'EOF'
 <p>No generated stylesheet is required any more.</p>
 <a href="@pathto('about')">About</a>
 EOF
-"$NIFT_BIN" build-updated >/dev/null
+"$NIFT_BIN" build >/dev/null
 grep -F 'No generated stylesheet is required any more.' public/index.html >/dev/null
 if grep -F 'public/assets/generated.css' .nift/public/index.info.json >/dev/null; then
   echo "successful rebuild retained a removed requirement" >&2
@@ -232,9 +232,9 @@ printf 'body{}\n' > public/assets/generated.css
 cat > content/index.html <<'EOF'
 <link href="@pathto('public/assets/generated.css')" rel="stylesheet">
 EOF
-"$NIFT_BIN" build-all >/dev/null
+"$NIFT_BIN" build --all >/dev/null
 rm public/assets/generated.css
-if "$NIFT_BIN" build-updated >missing-rebuild.log 2>&1; then
+if "$NIFT_BIN" build >missing-rebuild.log 2>&1; then
   echo "missing requirement unexpectedly rebuilt successfully" >&2
   exit 1
 fi
@@ -262,12 +262,12 @@ EOF2
 cat > templates/slot.html <<'EOF2'
 @content
 EOF2
-"$NIFT_BIN" build-all >/dev/null
+"$NIFT_BIN" build --all >/dev/null
 
 cat > templates/template.html <<'EOF2'
 <p>no insertion</p>
 EOF2
-if "$NIFT_BIN" build-all >/dev/null 2>&1; then
+if "$NIFT_BIN" build --all >/dev/null 2>&1; then
   echo "empty templated content unexpectedly succeeded without @content" >&2; exit 1
 fi
 
@@ -275,7 +275,7 @@ cat > templates/template.html <<'EOF2'
 @content
 @input('slot.html')
 EOF2
-if "$NIFT_BIN" build-all >/dev/null 2>&1; then
+if "$NIFT_BIN" build --all >/dev/null 2>&1; then
   echo "duplicate @content across template/input graph unexpectedly succeeded" >&2; exit 1
 fi
 
@@ -284,4 +284,4 @@ cat > templates/template.html <<'EOF2'
 @if(false){@content}
 @input('slot.html')
 EOF2
-"$NIFT_BIN" build-all >/dev/null
+"$NIFT_BIN" build --all >/dev/null

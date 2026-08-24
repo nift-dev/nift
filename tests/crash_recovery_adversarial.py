@@ -2,7 +2,7 @@
 """BH7 guard: persistence / crash / recovery adversarial.
 
 Guarantee: interrupting Nift mid-build (SIGKILL at multiple points during
-build-all) leaves the project crash-safe: the tracked and config metadata
+build --all) leaves the project crash-safe: the tracked and config metadata
 remain valid JSON, the next build succeeds, and a further build converges to
 the clean output. A tool whose metadata writes are non-atomic (corrupt after a
 crash) or whose output never converges is caught here.
@@ -37,7 +37,7 @@ def setup(root: Path, mode: str, n: int = 6000) -> None:
 
 def build_ok(nift: str, root: Path) -> bool:
     try:
-        subprocess.run([nift, 'build-all'], cwd=root, check=True,
+        subprocess.run([nift, 'build', '--all'], cwd=root, check=True,
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
         return True
     except Exception:
@@ -45,7 +45,7 @@ def build_ok(nift: str, root: Path) -> bool:
 
 
 def kill_during_build(nift: str, root: Path, label: str, timeout: float = 10.0) -> None:
-    """Start a build-all, wait for OBSERVABLE build-write progress (the first
+    """Start a build --all, wait for OBSERVABLE build-write progress (the first
     output file appearing in public/), then SIGKILL the still-live process so
     the crash genuinely interrupts transactional/build activity. Fails (rather
     than passing) if the process exits before any output is written, or if
@@ -57,7 +57,7 @@ def kill_during_build(nift: str, root: Path, label: str, timeout: float = 10.0) 
     # Put the command in its own process group. This matters for test-of-test
     # wrappers: killing only a shell wrapper can leave the real Nift child
     # running, which would make a red-team crash attack meaningless.
-    proc = subprocess.Popen([nift, 'build-all'], cwd=root, start_new_session=True,
+    proc = subprocess.Popen([nift, 'build', '--all'], cwd=root, start_new_session=True,
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     deadline = time.time() + timeout
     progress = False

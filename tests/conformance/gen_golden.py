@@ -38,7 +38,7 @@ def main():
             shutil.copytree(case_dir / "project", project)
             env = dict(os.environ)
             env.update(meta.get("env") or {})
-            cli = subprocess.run([NIFT, "build-all"], cwd=str(project), env=env,
+            cli = subprocess.run([NIFT, "build", "--all"], cwd=str(project), env=env,
                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             if cli.returncode != 0:
                 print(f"SKIP {name}: CLI build failed; no golden written")

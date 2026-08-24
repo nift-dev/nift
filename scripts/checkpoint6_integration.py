@@ -86,7 +86,7 @@ with tempfile.TemporaryDirectory(prefix="nift-cp6-integration-") as td:
     tracked["tracked"].append({"name":"assets/style","title":"Style","template":"templates/style.css",
                                "content-ext":".css","output-ext":".css"})
     (root/".nift/tracked.json").write_text(json.dumps(tracked,separators=(",",":"))+"\n")
-    run(root,"build-all")
+    run(root,"build", "--all")
     if "<section> page 0 </section>" not in (root/"public/index.html").read_text():
         raise RuntimeError("HTML was not minified through integrated build")
     if ".x{color:red;margin:0 1rem;}" not in (root/"public/assets/style.css").read_text():
@@ -106,7 +106,7 @@ with tempfile.TemporaryDirectory(prefix="nift-cp6-integration-") as td:
             # Propagate a Jsonic++ parse failure through Nift, then repair it.
             good=(root/"data/state.json").read_text()
             (root/"data/state.json").write_text('{"broken":'); bump(root/"data/state.json")
-            p=run(root,"build-updated",ok=False); failures+=1
+            p=run(root,"build",ok=False); failures+=1
             if "failed to parse" not in (p.stdout+p.stderr): raise RuntimeError("JSON failure did not propagate")
             (root/"data/state.json").write_text(good); bump(root/"data/state.json")
         else:
@@ -115,14 +115,14 @@ with tempfile.TemporaryDirectory(prefix="nift-cp6-integration-") as td:
             before=(root/".nift/tracked.json").read_text()
             doc=json.loads(before); doc["tracked"][-1]["output-ext"]=".txt"; doc["tracked"][-1]["minify"]=True
             (root/".nift/tracked.json").write_text(json.dumps(doc,separators=(",",":"))+"\n"); bump(root/".nift/tracked.json")
-            p=run(root,"build-updated",ok=False); failures+=1
+            p=run(root,"build",ok=False); failures+=1
             if "minif" not in (p.stdout+p.stderr).lower(): raise RuntimeError("minifier failure did not propagate")
             (root/".nift/tracked.json").write_text(before); bump(root/".nift/tracked.json")
-        run(root,"build-updated"); phases+=1
+        run(root,"build"); phases+=1
         if not (root/"public/index.html").exists() or not (root/"public/assets/style.css").exists():
             raise RuntimeError("successful recovery lost output")
     # Final clean build must remain possible after all cross-component failures.
-    run(root,"build-all")
+    run(root,"build", "--all")
 out=pathlib.Path(a.output); out.parent.mkdir(parents=True,exist_ok=True)
 data={"schema_version":1,"checkpoint":"6-integration","commit":commit(),"platform":platform.platform(),
       "rounds":a.rounds,"pages":a.pages,"successful_recovery_phases":phases,

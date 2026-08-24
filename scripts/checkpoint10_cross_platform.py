@@ -211,33 +211,33 @@ def main():
         root = pathlib.Path(directory) / "project"
         setup_project(root)
 
-        run(root, "build-all")
+        run(root, "build", "--all")
         add_case(cases, "clean-build", root, exit_class="success")
 
         before = output_tree(root)
-        run(root, "build-updated")
+        run(root, "build")
         add_case(cases, "no-op-incremental", root, exit_class="success",
                  output_unchanged=(before == output_tree(root)))
 
         write(root / "content/index.html", "<main>home-two</main>\n")
         stale = status_class(root)
-        run(root, "build-updated")
+        run(root, "build")
         add_case(cases, "content-invalidation", root, stale_before=stale)
 
         page = (root / "templates/page.html").read_text(encoding="utf-8")
         write(root / "templates/page.html", "<header>template-two</header>\n" + page)
         stale = status_class(root)
-        run(root, "build-updated")
+        run(root, "build")
         add_case(cases, "template-invalidation", root, stale_before=stale)
 
         write(root / "templates/parts/shared.html", "<strong>shared-two</strong>\n")
         stale = status_class(root)
-        run(root, "build-updated")
+        run(root, "build")
         add_case(cases, "input-dependency-invalidation", root, stale_before=stale)
 
         write_json(root / "data/site.json", {"name": "Nift 4", "items": [{"value": 3}]})
         stale = status_class(root)
-        run(root, "build-updated")
+        run(root, "build")
         add_case(cases, "json-invalidation", root, stale_before=stale)
 
         write_json(root / "schemas/site.schema.json", {
@@ -246,12 +246,12 @@ def main():
                            "items": {"type": "array", "maxItems": 4}}
         })
         stale = status_class(root)
-        run(root, "build-updated")
+        run(root, "build")
         add_case(cases, "schema-invalidation", root, stale_before=stale)
 
         write_json(root / ".nift/routes.json", {"home": "/v4/", "docs": "/manual/"})
         stale = status_class(root)
-        run(root, "build-updated")
+        run(root, "build")
         add_case(cases, "contract-invalidation", root, stale_before=stale)
 
         required_output = root / "public/docs/index.html"
@@ -268,20 +268,20 @@ def main():
             required_output.unlink()
             readonly_delete_adjustment = True
         stale = status_class(root)
-        run(root, "build-updated")
+        run(root, "build")
         add_case(cases, "requirement-recovery", root, stale_before=stale,
                  required_output_restored=(root / "public/docs/index.html").is_file())
 
         write(root / "content/extra.html", "<p>extra</p>\n")
         run(root, "track", "extra", "Extra", "templates/page.html")
-        run(root, "build-updated")
+        run(root, "build")
         add_case(cases, "tracked-add", root)
         run(root, "mv", "extra", "moved/extra")
-        run(root, "build-updated")
+        run(root, "build")
         add_case(cases, "tracked-move", root,
                  old_output_absent=not (root / "public/extra.html").exists())
         run(root, "rm", "moved/extra")
-        run(root, "build-updated")
+        run(root, "build")
         add_case(cases, "tracked-remove", root,
                  removed_output_absent=not (root / "public/moved/extra.html").exists())
 
@@ -293,7 +293,7 @@ def main():
         last_good = normalized_bytes(root / "public/index.html")
         last_metadata = normalized_bytes(root / ".nift/public/index.info.json")
         write_json(root / "data/site.json", {"name": "broken", "items": "not-an-array"})
-        failed = run(root, "build-updated", expect=1)
+        failed = run(root, "build", expect=1)
         cases.append({
             "name": "failed-render-preservation",
             "classification": "portable",
@@ -307,13 +307,13 @@ def main():
             },
         })
         write_json(root / "data/site.json", {"name": "repaired", "items": [{"value": 4}]})
-        run(root, "build-updated")
+        run(root, "build")
         add_case(cases, "failed-render-recovery", root)
 
         good_template = (root / "templates/page.html").read_text(encoding="utf-8")
         last_good = normalized_bytes(root / "public/index.html")
         write(root / "templates/page.html", "@if(true){unterminated\n")
-        failed = run(root, "build-updated", expect=1)
+        failed = run(root, "build", expect=1)
         cases.append({
             "name": "malformed-parser-input",
             "classification": "portable",
@@ -326,7 +326,7 @@ def main():
             },
         })
         write(root / "templates/page.html", good_template)
-        run(root, "build-updated")
+        run(root, "build")
         add_case(cases, "malformed-parser-recovery", root)
 
     runner = ARGS.runner_os.lower()

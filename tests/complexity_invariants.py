@@ -51,7 +51,7 @@ def main() -> int:
             root = base / mode
             root.mkdir()
             setup(root, mode)
-            run(nift, root, 'build-all')
+            run(nift, root, 'build', '--all')
             before = stamps(root)
 
             # a no-op build must not rewrite any output

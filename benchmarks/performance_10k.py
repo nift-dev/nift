@@ -25,14 +25,14 @@ with tempfile.TemporaryDirectory(prefix='nift-10k-') as td:
 
     # Warm filesystem/page-state caches once so the reported figures describe
     # steady-state command performance rather than first-touch storage latency.
-    timed(root,'build-all')
-    full=[timed(root,'build-all') for _ in range(a.full_runs)]
-    noop=[timed(root,'build-updated') for _ in range(a.noop_runs)]
+    timed(root,'build', '--all')
+    full=[timed(root,'build', '--all') for _ in range(a.full_runs)]
+    noop=[timed(root,'build') for _ in range(a.noop_runs)]
     page=root/'content'/f'p{a.pages//2}.html'; original=page.read_text(); page.write_text(original+'<!-- edit -->\n')
-    single=timed(root,'build-updated')
-    page.write_text(original); timed(root,'build-updated')
+    single=timed(root,'build')
+    page.write_text(original); timed(root,'build')
     template=root/'templates/template.html'; original_template=template.read_text(); template.write_text(original_template+'\n')
-    shared=timed(root,'build-updated')
+    shared=timed(root,'build')
 
     print(f'{a.pages} pages')
     print(f'full build median: {statistics.median(full):.6f}s')

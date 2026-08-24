@@ -91,7 +91,7 @@ def main() -> int:
             root = base / case_id
             root.mkdir()
             setup(root, template, site, extra)
-            p = run(NIFT, root, 'build-all')
+            p = run(NIFT, root, 'build', '--all')
             if expect_success:
                 if p.returncode != 0:
                     raise RuntimeError(f"{case_id}: expected success but exited {p.returncode}")

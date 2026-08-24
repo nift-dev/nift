@@ -17,7 +17,7 @@ On the development host after one untimed warm build, `benchmark-10k` measured:
 | Modified-mode case | v1.0.41 checkpoint |
 |---|---:|
 | Full build, 10k pages | ~0.21–0.26 s median |
-| No-op `build-updated` | ~0.09–0.10 s median |
+| No-op `build` (incremental) | ~0.09–0.10 s median |
 | One content page changed | ~0.09–0.11 s |
 | Shared template changed, rebuild 10k | ~0.31–0.35 s |
 
@@ -35,7 +35,7 @@ site this made output work approximately O(n²).
 The fix preserves atomic same-directory staging while making stale-temp recovery
 epoch-scoped and lazy. A build pass starts a new recovery epoch; each parent is
 scanned at most once when it next receives a write in that epoch. That restores a
-recovery opportunity in long-running `build-auto` sessions without scanning on
+recovery opportunity in long-running `build --auto` sessions without scanning on
 idle/no-write polls. Temporary files whose recorded owner PID is still live are
 preserved so overlapping writers are not destroyed. PID reuse may conservatively
 delay cleanup; Nift prefers leaking a stale temp over deleting a potentially live one.
@@ -55,7 +55,7 @@ permits 7× for platform/filesystem noise. On the fix workspace it measured abou
 family even at 100→400 changed pages (about 8.9× in the reproduction), and larger
 fixtures become dramatically worse.
 
-Repeated `build-all` of byte-identical output is also optimized safely: Nift still
+Repeated `build --all` of byte-identical output is also optimized safely: Nift still
 renders and validates every page, but it avoids a temp-write/rename for unchanged
 bytes and refreshes the file mtime instead so modified-mode state remains current.
 Any changed bytes still use the transactional temp→replace path.
@@ -67,7 +67,7 @@ Absolute timings remain machine-specific; the durable regression evidence is bot
 restored historical full-build performance and near-linear changed-output scaling.
 The maintained Checkpoint 8 and independent black-box recovery cases also prove
 that a dead-owner temp created after an earlier scan in a long-running
-`build-auto` process survives idle time but is removed on the next relevant build
+`build --auto` process survives idle time but is removed on the next relevant build
 activity. That test is demonstrated to fail the previous once-per-process repair.
 
 ## v1.0.42 memory checkpoint

@@ -30,7 +30,7 @@ cat >"$P/schemas/items.schema.json" <<'EOF'
 {"type":"object","required":["items"],"properties":{"items":{"type":"array","items":{"type":"object","required":["name","rank"],"properties":{"name":{"type":"string"},"rank":{"type":"integer"}},"additionalProperties":false}}},"additionalProperties":false}
 EOF
 printf '\n' >"$P/content/index.html"
-(cd "$P" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$P" && "$NIFT_BIN" build --all >/dev/null)
 grep -Fq '1:a' "$P/public/index.html"
 grep -Fq '2:b' "$P/public/index.html"
 grep -Fq '"data/items.json"' "$P/.nift/public/index.info.json"
@@ -40,7 +40,7 @@ grep -Fq '"schemas/items.schema.json"' "$P/.nift/public/index.info.json"
 cat >"$P/data/items.json" <<'EOF'
 {"items":[{"name":"oops","rank":"2"}]}
 EOF
-if (cd "$P" && "$NIFT_BIN" build-updated >bad-data.log 2>&1); then
+if (cd "$P" && "$NIFT_BIN" build >bad-data.log 2>&1); then
   echo "schema-invalid data unexpectedly built" >&2
   exit 1
 fi
@@ -51,11 +51,11 @@ grep -Fq '$.items[0].rank' "$P/bad-data.log"
 cat >"$P/data/items.json" <<'EOF'
 {"items":[{"name":"ok","rank":2}]}
 EOF
-(cd "$P" && "$NIFT_BIN" build-updated >/dev/null)
+(cd "$P" && "$NIFT_BIN" build >/dev/null)
 cat >"$P/schemas/items.schema.json" <<'EOF'
 {"type":"object","properties":{"items":{"type":"array","items":{"type":"object","required":["name","rank"],"properties":{"name":{"type":"string"},"rank":{"type":"integer","maximum":1}}}}}}
 EOF
-if (cd "$P" && "$NIFT_BIN" build-updated >bad-schema-change.log 2>&1); then
+if (cd "$P" && "$NIFT_BIN" build >bad-schema-change.log 2>&1); then
   echo "schema change failed to invalidate dependent page" >&2
   exit 1
 fi
@@ -72,7 +72,7 @@ OK
 @content
 EOF
 printf '\n' >"$P/content/index.html"
-(cd "$P" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$P" && "$NIFT_BIN" build --all >/dev/null)
 grep -Fq 'OK' "$P/public/index.html"
 
 # Same schema path loaded in nested input should remain a dependency and binding
@@ -95,7 +95,7 @@ cat >"$P/schemas/item.schema.json" <<'EOF'
 {"type":"object","required":["name"],"properties":{"name":{"type":"string"}}}
 EOF
 printf '\n' >"$P/content/index.html"
-(cd "$P" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$P" && "$NIFT_BIN" build --all >/dev/null)
 grep -Fq 'IN=Ada' "$P/public/index.html"
 grep -Fq 'AFTER=Ada' "$P/public/index.html"
 grep -Fq '"schemas/item.schema.json"' "$P/.nift/public/index.info.json"
@@ -107,14 +107,14 @@ printf '{}\n' >"$P/data/ok.json"
 printf '{}\n' >"$P/schemas/ok.json"
 printf '@json("../outside.json", data)\n@content\n' >"$P/templates/template.html"
 printf '\n' >"$P/content/index.html"
-if (cd "$P" && "$NIFT_BIN" build-all >trav-data.log 2>&1); then
+if (cd "$P" && "$NIFT_BIN" build --all >trav-data.log 2>&1); then
   echo "json traversal unexpectedly succeeded" >&2
   exit 1
 fi
 grep -Fq 'path must stay inside the Nift project' "$P/trav-data.log"
 
 printf '@json("data/ok.json", data, "../outside.json")\n@content\n' >"$P/templates/template.html"
-if (cd "$P" && "$NIFT_BIN" build-all >trav-schema.log 2>&1); then
+if (cd "$P" && "$NIFT_BIN" build --all >trav-schema.log 2>&1); then
   echo "schema traversal unexpectedly succeeded" >&2
   exit 1
 fi

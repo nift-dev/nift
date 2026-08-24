@@ -29,9 +29,9 @@ for workers,minify in [(1,False),(4,False),(-1,False),(4,True)]:
     (root/".nift/tracked.json").write_text(json.dumps({"tracked":[{"name":f"p{i}","title":f"P{i}","template":"templates/template.html"} for i in range(a.pages)]},separators=(",",":")))
     (root/"templates/template.html").write_text("<main>@content</main>\n")
     for i in range(a.pages): (root/"content"/f"p{i}.html").write_text(f"<p> page {i} </p>\n")
-    full=peak(root,["build-all"]); noop=peak(root,["build-updated"])
-    (root/"content"/f"p{a.pages//2}.html").write_text("<p>changed</p>\n"); single=peak(root,["build-updated"])
-    (root/"templates/template.html").write_text("<section>@content</section>\n"); shared=peak(root,["build-updated"])
+    full=peak(root,["build", "--all"]); noop=peak(root,["build"])
+    (root/"content"/f"p{a.pages//2}.html").write_text("<p>changed</p>\n"); single=peak(root,["build"])
+    (root/"templates/template.html").write_text("<section>@content</section>\n"); shared=peak(root,["build"])
     cases.append({"workers":workers,"minify":minify,"full_peak_rss_kib":full,"noop_peak_rss_kib":noop,"single_peak_rss_kib":single,"shared_peak_rss_kib":shared})
 out=pathlib.Path(a.output); out.parent.mkdir(parents=True,exist_ok=True)
 data={"schema_version":1,"checkpoint":"4-large-project","commit":git_commit(),"platform":platform.platform(),"pages":a.pages,"cases":cases,"pass":True}

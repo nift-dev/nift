@@ -66,7 +66,7 @@ def main() -> int:
           ("rewrite-unrelated-pages", make_wrapper("tothers", f"real={NIFT}\n" + '"$real" "$@"\nrc=$?\nif [ "$rc" = 0 ] && grep -q 7-CHANGED content/p7.html 2>/dev/null; then for f in public/*.html; do [ "$f" = public/p7.html ] || { chmod u+w "$f"; touch "$f"; }; done; fi\nexit $rc\n'), 1)]),
         ("bh9", "filesystem_boundary_adversarial.py",
          [("real-nift", NIFT, 0),
-          ("index-only-fake", make_wrapper("fake", 'if [ "$1" = "build-all" ] && [ -f .nift/tracked.json ]; then\n  mkdir -p public; echo hi > public/index.html; exit 0\nfi\nexit 1\n'), 1)]),
+          ("index-only-fake", make_wrapper("fake", 'if [ "$1" = "build", "--all" ] && [ -f .nift/tracked.json ]; then\n  mkdir -p public; echo hi > public/index.html; exit 0\nfi\nexit 1\n'), 1)]),
         ("bh3", "pagination_incremental_equivalence.py",
          [("real-nift", NIFT, 0),
           ("wrong-current-nav", make_wrapper("badnav", f"""real={NIFT}
@@ -85,7 +85,7 @@ exit $rc
           ("same-wrong-content-in-incremental-and-clean", make_wrapper("wrongboth", f"""real={NIFT}
 "$real" "$@"
 rc=$?
-if [ "$rc" = 0 ] && {{ [ "$1" = build ] || [ "$1" = build-all ]; }} && grep -q B2 content/b.html 2>/dev/null && ! grep -q 'T2:' templates/template.html 2>/dev/null && [ -f public/b.html ]; then
+if [ "$rc" = 0 ] && {{ [ "$1" = build ] && [ "$2" = --all ]; }} && grep -q B2 content/b.html 2>/dev/null && ! grep -q 'T2:' templates/template.html 2>/dev/null && [ -f public/b.html ]; then
   chmod u+w public/b.html; echo '<p>WRONG</p>' > public/b.html
 fi
 exit $rc
@@ -95,7 +95,7 @@ exit $rc
           ("wrong-valid-page-content", make_wrapper("wrongpages", f"""real={NIFT}
 "$real" "$@"
 rc=$?
-if [ "$rc" = 0 ] && [ "$1" = build-all ] && [ -d public ]; then
+if [ "$rc" = 0 ] && [ "$1" = build ] && [ "$2" = --all ] && [ -d public ]; then
   find public -type f -name '*.html' -exec sh -c 'chmod u+w "$1"; echo WRONG > "$1"' _ {{}} \\;
 fi
 exit $rc
@@ -103,7 +103,7 @@ exit $rc
           ("valid-build-returns-nonzero", make_wrapper("nonzero", f"""real={NIFT}
 "$real" "$@"
 rc=$?
-if [ "$1" = build-all ] && [ "$rc" = 0 ]; then exit 7; fi
+if [ "$1" = build ] && [ "$2" = --all ] && [ "$rc" = 0 ]; then exit 7; fi
 exit $rc
 """), 1)]),
         ("bh6", "init_scaffold_functional_truth.py",

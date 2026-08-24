@@ -83,7 +83,7 @@ def transition(nift: str, proj: Path, mode: str, expected: set[str], label: str)
     shutil.copytree(proj, fresh)
     shutil.rmtree(fresh / 'public')
     (fresh / 'public').mkdir()
-    run(nift, fresh, 'build-all')
+    run(nift, fresh, 'build', '--all')
     if public_hash(fresh) != public_hash(proj):
         raise RuntimeError(f"{mode}:{label}: incremental/clean bytes differ after transition")
 
@@ -100,7 +100,7 @@ def main() -> int:
             proj.mkdir()
             setup(proj, mode, ['a', 'b', 'c'])
             expected = {'a.html', 'b.html', 'c.html'}
-            run(nift, proj, 'build-all')
+            run(nift, proj, 'build', '--all')
             assert_outputs(proj, expected, f'{mode}:baseline')
 
             # content change
@@ -146,7 +146,7 @@ def main() -> int:
             shutil.copytree(proj, fresh)
             shutil.rmtree(fresh / 'public')
             (fresh / 'public').mkdir()
-            run(nift, fresh, 'build-all')
+            run(nift, fresh, 'build', '--all')
             if public_set(fresh) != public_set(proj) or public_hash(fresh) != public_hash(proj):
                 raise RuntimeError(f"{mode}:equivalence: incremental/clean mismatch")
             print(f'{mode}: PASS')

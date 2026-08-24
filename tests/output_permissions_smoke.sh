@@ -33,7 +33,7 @@ mode() {
   esac
 }
 
-(cd "$P" && "$NIFT_BIN" build-all >/dev/null 2>&1) || fail "project did not build"
+(cd "$P" && "$NIFT_BIN" build --all >/dev/null 2>&1) || fail "project did not build"
 [ "$(mode "$P/public/script.sh")" = "755" ] || fail "executable script output lost exec bit (got $(mode "$P/public/script.sh"))"
 [ "$(mode "$P/public/helper.sh")" = "700" ] || fail "0700 script output wrong mode (got $(mode "$P/public/helper.sh"))"
 [ "$(mode "$P/public/index.html")" = "644" ] || fail "0644 content output wrong mode (got $(mode "$P/public/index.html"))"
@@ -41,7 +41,7 @@ mode() {
 
 # Deterministic across rebuilds regardless of the output's prior mode.
 chmod 600 "$P/public/script.sh"
-(cd "$P" && "$NIFT_BIN" build-all >/dev/null 2>&1) || fail "rebuild failed"
+(cd "$P" && "$NIFT_BIN" build --all >/dev/null 2>&1) || fail "rebuild failed"
 [ "$(mode "$P/public/script.sh")" = "755" ] || fail "rebuild did not restore source permissions (got $(mode "$P/public/script.sh"))"
 
 echo "output-permissions smoke test passed: outputs preserve source permissions deterministically"

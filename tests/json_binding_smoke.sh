@@ -63,7 +63,7 @@ cat > "$D/templates/nested.html" <<'EOF'
 NESTED=$[site.example[3].test]
 EOF
 
-(cd "$D" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$D" && "$NIFT_BIN" build --all >/dev/null)
 
 grep -Fx 'NAME=Nift' "$D/public/index.html" >/dev/null
 grep -Fx 'VERSION=4' "$D/public/index.html" >/dev/null
@@ -83,7 +83,7 @@ expect_failure() {
     make_project "$d"
     printf '%s\n' "$json_source" > "$d/data/test.json"
     printf '%s\n' "$template" > "$d/templates/template.html"
-    if (cd "$d" && "$NIFT_BIN" build-all >log 2>&1); then
+    if (cd "$d" && "$NIFT_BIN" build --all >log 2>&1); then
         echo "$name unexpectedly succeeded" >&2
         exit 1
     fi
@@ -118,7 +118,7 @@ expect_failure render-object 'cannot render JSON object' \
 D="$TMP/missing-file"
 make_project "$D"
 printf '%s\n' '@json("data/nope.json", data)' > "$D/templates/template.html"
-if (cd "$D" && "$NIFT_BIN" build-all >log 2>&1); then
+if (cd "$D" && "$NIFT_BIN" build --all >log 2>&1); then
     echo "missing-file unexpectedly succeeded" >&2
     exit 1
 fi
@@ -128,7 +128,7 @@ D="$TMP/traversal"
 make_project "$D"
 printf '{}\n' > "$TMP/outside.json"
 printf '%s\n' '@json("../../outside.json", data)' > "$D/templates/template.html"
-if (cd "$D" && "$NIFT_BIN" build-all >log 2>&1); then
+if (cd "$D" && "$NIFT_BIN" build --all >log 2>&1); then
     echo "traversal unexpectedly succeeded" >&2
     exit 1
 fi
@@ -156,7 +156,7 @@ cat >"$D/templates/template.html" <<'TMPL_SCHEMA'
 SCHEMA=$[products.products[0].name]:$[products.products[0].price]
 @content
 TMPL_SCHEMA
-(cd "$D" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$D" && "$NIFT_BIN" build --all >/dev/null)
 grep -Fq 'SCHEMA=Widget:12.5' "$D/public/index.html"
 grep -Fq '"data/products.json"' "$D/.nift/public/index.info.json"
 grep -Fq '"data/products.schema.json"' "$D/.nift/public/index.info.json"
@@ -168,7 +168,7 @@ schema_failure() {
     printf '%s\n' "$data" >"$d/data/test.json"
     printf '%s\n' "$schema" >"$d/data/test.schema.json"
     printf '%s\n' '@json("data/test.json", data, "data/test.schema.json")' >"$d/templates/template.html"
-    if (cd "$d" && "$NIFT_BIN" build-all >log 2>&1); then
+    if (cd "$d" && "$NIFT_BIN" build --all >log 2>&1); then
         echo "$name unexpectedly succeeded" >&2
         exit 1
     fi
@@ -189,14 +189,14 @@ make_project "$D"
 printf '%s\n' '{}' >"$D/data/test.json"
 printf '%s\n' '{"type":' >"$D/data/test.schema.json"
 printf '%s\n' '@json("data/test.json", data, "data/test.schema.json")' >"$D/templates/template.html"
-if (cd "$D" && "$NIFT_BIN" build-all >log 2>&1); then echo "schema-malformed unexpectedly succeeded" >&2; exit 1; fi
+if (cd "$D" && "$NIFT_BIN" build --all >log 2>&1); then echo "schema-malformed unexpectedly succeeded" >&2; exit 1; fi
 grep -F 'json: failed to parse schema data/test.schema.json' "$D/log" >/dev/null
 
 D="$TMP/schema-missing"
 make_project "$D"
 printf '%s\n' '{}' >"$D/data/test.json"
 printf '%s\n' '@json("data/test.json", data, "data/missing.schema.json")' >"$D/templates/template.html"
-if (cd "$D" && "$NIFT_BIN" build-all >log 2>&1); then echo "schema-missing unexpectedly succeeded" >&2; exit 1; fi
+if (cd "$D" && "$NIFT_BIN" build --all >log 2>&1); then echo "schema-missing unexpectedly succeeded" >&2; exit 1; fi
 grep -F 'json: schema file does not exist: data/missing.schema.json' "$D/log" >/dev/null
 
 D="$TMP/schema-traversal"
@@ -204,7 +204,7 @@ make_project "$D"
 printf '%s\n' '{}' >"$D/data/test.json"
 printf '%s\n' '{}' >"$TMP/outside.schema.json"
 printf '%s\n' '@json("data/test.json", data, "../../outside.schema.json")' >"$D/templates/template.html"
-if (cd "$D" && "$NIFT_BIN" build-all >log 2>&1); then echo "schema-traversal unexpectedly succeeded" >&2; exit 1; fi
+if (cd "$D" && "$NIFT_BIN" build --all >log 2>&1); then echo "schema-traversal unexpectedly succeeded" >&2; exit 1; fi
 grep -F 'json: schema path must stay inside the Nift project' "$D/log" >/dev/null
 
 echo "JSON Schema binding extensions passed"
@@ -226,7 +226,7 @@ make_project "$D"
 printf '%s\n' '3' >"$D/data/test.json"
 printf '%s\n' '{"$defs":{"a/b":{"type":"number"}},"$ref":"#/$defs/a~1b"}' >"$D/data/test.schema.json"
 printf '%s\n' '@json("data/test.json", data, "data/test.schema.json")' '@content' >"$D/templates/template.html"
-(cd "$D" && "$NIFT_BIN" build-all >/dev/null)
+(cd "$D" && "$NIFT_BIN" build --all >/dev/null)
 
 echo "JSON Schema integration adversarial extensions passed"
 
@@ -252,14 +252,14 @@ cat > content/index.html <<'EOF2'
 @join(d.tags, ', ')
 @join($[d.mixed], '|')
 EOF2
-"$NIFT_BIN" build-all >/dev/null
+"$NIFT_BIN" build --all >/dev/null
 grep -F 'C++, Nift, tooling' public/index.html >/dev/null
 grep -F '1|true|null|x' public/index.html >/dev/null
 cat > content/index.html <<'EOF2'
 @json('data/join.json', d)
 @join(d.bad, ',')
 EOF2
-if "$NIFT_BIN" build-all >/dev/null 2>&1; then echo '@join accepted object item' >&2; exit 1; fi
+if "$NIFT_BIN" build --all >/dev/null 2>&1; then echo '@join accepted object item' >&2; exit 1; fi
 
 # @substr is zero-based, length-based, and slices on UTF-8 code-point boundaries.
 cd "$TMP"
@@ -281,9 +281,9 @@ cat > content/index.html <<'EOF2'
 @json('data/substr.json', d)
 @substr($[d.text], 0, 4)|@substr($[d.text], 5, 1)|@substr($[d.text], 7, 99)|@substr($[d.text], 99, 3)|@substr($[d.text], 0, 0)
 EOF2
-"$NIFT_BIN" build-all >/dev/null
+"$NIFT_BIN" build --all >/dev/null
 grep -F 'café|😄|tooling||' public/index.html >/dev/null
 cat > content/index.html <<'EOF2'
 @substr('abc', -1, 2)
 EOF2
-if "$NIFT_BIN" build-all >/dev/null 2>&1; then echo '@substr accepted negative position' >&2; exit 1; fi
+if "$NIFT_BIN" build --all >/dev/null 2>&1; then echo '@substr accepted negative position' >&2; exit 1; fi

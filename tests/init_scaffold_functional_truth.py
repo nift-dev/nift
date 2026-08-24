@@ -84,7 +84,7 @@ def main() -> int:
         # a clean rebuild must reproduce the init'd output exactly
         shutil.rmtree(root / 'public')
         shutil.rmtree(root / '.nift' / 'public')
-        run(nift, root, 'build-all')
+        run(nift, root, 'build', '--all')
         if tree_hash(root / 'public') != init_pub:
             raise RuntimeError("clean rebuild does not reproduce init'd public output")
         if tree_hash(root / '.nift' / 'public') != init_meta:
