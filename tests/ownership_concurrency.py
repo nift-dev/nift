@@ -17,6 +17,7 @@ import fcntl
 import json
 import os
 import pathlib
+import shutil
 import signal
 import subprocess
 import sys
@@ -139,7 +140,62 @@ def main():
         check("6 repair acquires after SIGKILL", rc == 0)
         check("6 marker removed after repair", not (root / ".nift/.unfinished").exists())
 
-        # 7. Two-process stress: concurrent real builds never corrupt or hang.
+        # 7. MUTATOR FIRST: a mutator holds full ownership; a concurrently
+        #    starting build must refuse (CP2.1 TOCTOU regression).
+        #    Uses the env-gated NIFT_TEST_OWNERSHIP_HOLD hook so the mutator's
+        #    ownership is held deterministically, not by timing.
+        hold_dir = pathlib.Path(tempfile.mkdtemp(prefix="nift-own-hold-"))
+        for label, mutator_args in [
+            ("untrack", ["untrack", "p0"]),
+            ("mv", ["mv", "p1", "p9"]),
+            ("rm", ["rm", "p2"]),
+        ]:
+            hold_env = dict(os.environ, NIFT_TEST_OWNERSHIP_HOLD=str(hold_dir))
+            proc = subprocess.Popen([NIFT, *mutator_args], cwd=root,
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, env=hold_env)
+            # Wait for the mutator to signal it acquired ownership.
+            for _ in range(2000):
+                if (hold_dir / "acquired").exists():
+                    break
+                if proc.poll() is not None:
+                    break
+                time.sleep(0.005)
+            check(f"7 mutator {mutator_args[0]} acquired ownership",
+                  (hold_dir / "acquired").exists())
+            rc, err = run(root, "build", "--all")
+            check(f"7 build refuses while {mutator_args[0]} owns (mutator first)",
+                  rc == 1 and "another build appears to be running" in err)
+            (hold_dir / "release").touch()
+            proc.wait(timeout=60)
+            check(f"7 {mutator_args[0]} completed after release", proc.returncode == 0)
+            (hold_dir / "release").unlink(missing_ok=True)
+        check("7 no marker after mutators completed", not (root / ".nift/.unfinished").exists())
+        shutil.rmtree(hold_dir, ignore_errors=True)
+
+        # 7b. MUTATOR VS MUTATOR: one mutator owns; a second conflicting
+        #     mutator must refuse.
+        hold_dir2 = pathlib.Path(tempfile.mkdtemp(prefix="nift-own-hold2-"))
+        hold_env = dict(os.environ, NIFT_TEST_OWNERSHIP_HOLD=str(hold_dir2))
+        proc = subprocess.Popen([NIFT, "rm", "p3"], cwd=root,
+                                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, env=hold_env)
+        for _ in range(2000):
+            if (hold_dir2 / "acquired").exists():
+                break
+            time.sleep(0.005)
+        check("7b rm owns the lock", (hold_dir2 / "acquired").exists())
+        rc, err = run(root, "untrack", "p4")
+        check("7b untrack refuses while rm owns", rc == 1 and "another build appears to be running" in err)
+        rc, err = run(root, "cp", "p5", "p8")
+        check("7b cp refuses while rm owns", rc == 1 and "another build appears to be running" in err)
+        (hold_dir2 / "release").touch()
+        proc.wait(timeout=60)
+        (hold_dir2 / "release").unlink(missing_ok=True)
+        shutil.rmtree(hold_dir2, ignore_errors=True)
+        check("7b no marker after mutator completed", not (root / ".nift/.unfinished").exists())
+
+        # 8. Two-process stress: concurrent real builds never corrupt or hang.
+        #    (uses a separate large project so the mutated tracked set above
+        #    does not interfere)
         big = pathlib.Path(td) / "big"
         big.mkdir()
         scaffold(big, pages=2000)
@@ -165,10 +221,10 @@ def main():
                     break
             if not concurrent_ok:
                 break
-        check("7 concurrent builds: >=1 succeeds and refusals are live-lock", concurrent_ok)
+        check("8 concurrent builds: >=1 succeeds and refusals are live-lock", concurrent_ok)
         after = {f.name: f.read_bytes() for f in (big / "public").glob("*.html")}
-        check("7 concurrent builds leave byte-identical outputs", after == reference)
-        check("7 no marker left after all concurrent builds completed", not (big / ".nift/.unfinished").exists())
+        check("8 concurrent builds leave byte-identical outputs", after == reference)
+        check("8 no marker left after all concurrent builds completed", not (big / ".nift/.unfinished").exists())
 
     if fails:
         print(f"\nFAILED: {len(fails)}: {fails}")

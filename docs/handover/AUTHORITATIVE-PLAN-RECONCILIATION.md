@@ -207,3 +207,20 @@ commit, STOP for review.
 
 Stopping for review here. No production code changed; no worktrees, binaries,
 or objects in the tree.
+
+## Retained requirement: Rust CLI/semantic parity (post-CP4)
+
+Because `nift-rs` is an independent conformance implementation of Nift, the
+new public CLI/behavioural surface must eventually be reflected there. In
+particular `nift build --repair` is a public behavioural contract, not a C++
+implementation detail. Once its final semantics are frozen (post-CP4), nift-rs
+must expose equivalent externally observable repair behaviour - distrust
+derived build state, reconstruct from authoritative project inputs, do not
+false-green over corrupt derived state, produce conformant final outputs/state
+- implemented idiomatically in Rust (no need to copy C++ lock/marker
+internals). Add this to the post-CP4 Rust parity/conformance work. The same
+applies to the CLI normalization (build/build X/build --all/build --auto/
+build --repair, info ...) where applicable to the Rust surface. Do NOT
+implement final Rust repair semantics while the C++ repair contract is still
+evolving; freeze C++ first, then port the contract and add cross-implementation
+conformance coverage.

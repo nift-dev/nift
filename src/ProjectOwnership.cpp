@@ -1,6 +1,10 @@
 #include "ProjectOwnership.h"
 
+#include <chrono>
+#include <cstdlib>
+#include <fstream>
 #include <system_error>
+#include <thread>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -81,6 +85,47 @@ bool durable_sync(void* file) {
 #endif
 }
 
+// On POSIX, syncing the newly created marker file flushes its contents and
+// inode but NOT the parent-directory entry that links the name to the inode.
+// A power loss can persist the file without the directory entry (or vice
+// versa). Flushing the parent directory closes that window so the stated
+// guarantee ("marker durable before any derived mutation") holds. This is one
+// extra fsync per build, not per output.
+void durable_sync_parent(const std::filesystem::path& path) {
+#ifdef _WIN32
+    // NTFS journals metadata so the creation is durably visible; a directory
+    // handle is not opened/flushed here. The documented Windows power-loss
+    // guarantee is therefore "file data + metadata flushed via
+    // FlushFileBuffers; creation is journaled by NTFS" - narrower than the
+    // POSIX parent-directory fsync, and stated precisely (see CP2.1 report).
+    (void)path;
+#else
+    const std::filesystem::path parent = path.parent_path();
+    if (parent.empty()) return;
+    const int dfd = ::open(parent.c_str(), O_RDONLY | O_DIRECTORY);
+    if (dfd < 0) return;
+    ::fsync(dfd);
+    ::close(dfd);
+#endif
+}
+
+// Test-only synchronization hook (sanctioned by the CP2.1 review). When
+// NIFT_TEST_OWNERSHIP_HOLD=<dir> is set, a successfully acquired owner writes
+// <dir>/acquired and then blocks until <dir>/release appears, so concurrency
+// tests can deterministically hold a real mutator's ownership while a second
+// command is exercised. Never active in normal use.
+static void test_hold_after_acquire() {
+    const char* hold = std::getenv("NIFT_TEST_OWNERSHIP_HOLD");
+    if (!hold || !*hold) return;
+    const std::filesystem::path dir(hold);
+    std::error_code ignored;
+    { std::ofstream(dir / "acquired"); }
+    while (!std::filesystem::exists(dir / "release", ignored)) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    std::filesystem::remove(dir / "acquired", ignored);
+}
+
 void close_file(void*& file) {
 #ifdef _WIN32
     if (file) {
@@ -111,19 +156,25 @@ ProjectOwnership::State ProjectOwnership::acquire() {
         // the marker durable before any derived-state mutation.
         file_ = created_file;
         if (!try_lock(file_)) { close_file(file_); return State::Live; }
-        if (!durable_sync(file_)) {
-            // fsync unsupported/blocked: proceed without claiming durability
-            // (documented power-loss caveat) rather than refusing outright.
-        }
+        // Marker durability: flush the file and its parent-directory entry so
+        // the marker is durably established before any derived mutation. Both
+        // operations are once per build, not per output. On failure to sync,
+        // proceed without claiming durability (documented power-loss caveat)
+        // rather than refusing outright.
+        durable_sync(file_);
+        durable_sync_parent(marker_);
         owned_ = true;
+        test_hold_after_acquire();
         return State::Clean;
     }
 
     // The marker already exists (either stale, or held by a live build).
     if (!open_existing(marker_, file_)) return State::Failed;
     if (!try_lock(file_)) { close_file(file_); return State::Live; }
-    if (!durable_sync(file_)) { /* see above */ }
+    durable_sync(file_);
+    durable_sync_parent(marker_);
     owned_ = true;
+    test_hold_after_acquire();
     return State::Stale;
 }
 

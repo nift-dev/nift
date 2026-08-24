@@ -4,6 +4,7 @@
 // pending, see the CP2 report).
 #include "ProjectOwnership.h"
 
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -27,7 +28,10 @@ static int failures = 0;
 #endif
 
 int main() {
-    const fs::path dir = fs::temp_directory_path() / ("nift-ownership-unit-" + std::to_string(::getpid() % 100000));
+    // Portable unique suffix (no getpid/unistd dependency; MSYS2 UCRT exposes
+    // getpid only incidentally): use the steady clock.
+    const auto suffix = std::chrono::steady_clock::now().time_since_epoch().count();
+    const fs::path dir = fs::temp_directory_path() / ("nift-ownership-unit-" + std::to_string(suffix));
     fs::create_directories(dir);
     const fs::path marker = dir / ".unfinished";
 

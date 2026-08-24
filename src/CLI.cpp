@@ -845,12 +845,24 @@ int run_cli(int argc, char** argv) {
 
     if (command == "untrack" || command == "rm" || command == "del") {
         if (argc < 3) return 1;
-        // Derived-state mutator: refuse while a live build owns the project.
-        // A stale marker (no live owner) does not make a single-page removal
-        // unsafe - only a concurrent mutator does - so these commands probe
-        // the lock rather than running a full build epoch.
-        if (ProjectOwnership::live_owner_exists(project.root / ".nift/.unfinished")) {
+        // CP2.1: these mutators run a full ownership epoch instead of a probe,
+        // so the lock is held continuously for the whole mutation window (no
+        // TOCTOU against a concurrently starting build). A live owner and a
+        // stale .unfinished both refuse: stale derived state is untrusted and
+        // only `build --repair` may mutate it. A crash mid-mutation leaves
+        // .unfinished, so the next build refuses and --repair restores.
+        ProjectOwnership ownership(project.root / ".nift/.unfinished");
+        const ProjectOwnership::State ownership_state = ownership.acquire();
+        if (ownership_state == ProjectOwnership::State::Live) {
             console::error("another build appears to be running; refusing to mutate build state");
+            return 1;
+        }
+        if (ownership_state == ProjectOwnership::State::Failed) {
+            console::error("could not acquire the build lock");
+            return 1;
+        }
+        if (ownership_state == ProjectOwnership::State::Stale) {
+            console::error("unfinished build detected; generated build state may be incomplete. run `nift build --repair` to reconstruct it before changing tracking.");
             return 1;
         }
         for (int i = 2; i < argc; ++i) {
@@ -862,15 +874,13 @@ int run_cli(int argc, char** argv) {
             project.tracked.erase(it);
             project.invalidate_tracked_index();
         }
-        return project.save_tracking() ? 0 : 1;
+        const bool ok = project.save_tracking();
+        if (ok) ownership.finish();
+        return ok ? 0 : 1;
     }
 
     if (command == "cp" || command == "copy" || command == "mv" || command == "move") {
         if (argc != 4) { console::error(command + " requires exactly a source and destination name"); return 1; }
-        if (ProjectOwnership::live_owner_exists(project.root / ".nift/.unfinished")) {
-            console::error("another build appears to be running; refusing to mutate build state");
-            return 1;
-        }
         const std::string source_name = argv[2];
         const std::string destination_name = argv[3];
         if ((destination_name != "/" && fs::path(destination_name).is_absolute()) || filesystem::has_parent_component(destination_name)) {
@@ -895,6 +905,25 @@ int run_cli(int argc, char** argv) {
         const fs::path destination_sidecar = user_dependencies_path(project, destination);
         if (filesystem::path_exists(destination_content) || filesystem::path_exists(destination_sidecar)) {
             console::error("destination content or dependency sidecar already exists and is not tracked");
+            return 1;
+        }
+
+        // CP2.1: full ownership epoch for the mutation window (no probe). All
+        // validation above runs before acquisition, so a validation failure
+        // does not leave a marker; a crash during the mutations below leaves
+        // .unfinished so the next build refuses and --repair restores.
+        ProjectOwnership ownership(project.root / ".nift/.unfinished");
+        const ProjectOwnership::State ownership_state = ownership.acquire();
+        if (ownership_state == ProjectOwnership::State::Live) {
+            console::error("another build appears to be running; refusing to mutate build state");
+            return 1;
+        }
+        if (ownership_state == ProjectOwnership::State::Failed) {
+            console::error("could not acquire the build lock");
+            return 1;
+        }
+        if (ownership_state == ProjectOwnership::State::Stale) {
+            console::error("unfinished build detected; generated build state may be incomplete. run `nift build --repair` to reconstruct it before changing tracking.");
             return 1;
         }
 
@@ -930,6 +959,7 @@ int run_cli(int argc, char** argv) {
         }
 
         if (command == "mv" || command == "move") remove_page_build_state(project, source_copy, true);
+        ownership.finish();
         return 0;
     }
 
