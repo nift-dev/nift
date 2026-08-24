@@ -401,3 +401,91 @@ rename, not by the compare. The architectural preference for a single
 render decision is recorded; it trades ~5-7 ms/10k of churn-avoidance for
 simpler semantics. If adopted, the info-file identity note above means the
 cost appears mostly as rewritten info files on content-change builds.
+
+## Comparative per-page profiling pass (non-render, non-write work)
+
+### Method
+
+Pre-Embed aa60ab3 (A) vs current HEAD (C), both built with the same -O2
+flags, on identical 10k fixtures. Workloads measured as steady-state rebuilds
+(unchanged) and content-toggled rebuilds (changed). Evidence: `strace -c`
+syscall profiles, per-path newfstatat attribution, and a benchmark-only
+build_one instrumented with env toggles to isolate each added component
+(reverted after measurement).
+
+### Per-page syscall comparison (300-page rebuild, same fixture)
+
+```text
+                      A (pre-Embed)   C (current)
+newfstatat            4.1 / page     14-15 / page   +10-11
+openat + close          3 / page        5 / page      +2
+lseek                 3.0 / page      6 / page       +3
+read                  1.0 / page      3-4 / page     +2-3
+write                 2.0 / page      1 / page         (touch replaces)
+chmod                 4.0 / page      1 / page
+rename                    0            1 / page   (atomic, changed path)
+utimensat                 0            1-2 / page (touch fast path)
+getpid                    0            1 / page   (temp naming, changed path)
+```
+
+Per-path newfstatat (C, 300 pages): info.json 7, output html 3, content 3,
+deps.json 1, template 1. A stats only content (2), deps (1) and template (1)
+- it never stats the output or info file.
+
+### Attribution of every added per-page step (historical origin)
+
+```text
+1. previous .info.json read (path_exists + read: 2 stat + open + read)
+     pagination lifecycle   REQUIRED - this is the state whose removal caused
+     the stale-output bug; a page currently non-paginated may have been
+     paginated before. Measured ~2 ms / 10k (changed workload).
+2. file_permissions(content) (1 stat)
+     hardening               REQUIRED - output permission preservation
+     (test-output-permissions). Measured ~0 (within noise).
+3. output compare (2 stat, +read when size matches)
+4. info compare (2 stat + read)
+     compare+touch           KEEP - reviewer accepted; net win (~5 ms saved
+     on the changed workload because the info stays identical).
+5. atomic replacement (temp open/write/close + chmod + rename + getpid)
+     hardening/atomicity     the ~30 ms component (~3 us/page, rename).
+6. is_readonly stat + utimensat touch on the unchanged fast path
+     compare+touch           KEEP.
+```
+
+### Benchmark-only isolation of the non-write additions
+
+Changed workload, 20 interleaved samples, 10k, same fixture protocol as
+perf_uc_audit:
+
+```text
+baseline               117.1 ms
+skip previous-info read 115.0 ms   (-2.0 ms, -1.7%)
+skip file_permissions   119.1 ms   (+2.1 ms, within noise)
+skip both               115.7 ms
+```
+
+The pagination-history read is ~2 ms; permission preservation is
+immeasurable. Neither is avoidable without breaking the pagination lifecycle
+or the output-permissions guarantee.
+
+### Conclusion: the regression is accounted for; no accidental bookkeeping
+
+The reviewer's hypothesis - that "surrounding per-page work" beyond render
+and persistence might explain a large part of the residual - is not supported
+by the comparative data. The added per-page syscalls are almost entirely:
+
+```text
+atomic rename machinery     ~25-30 ms   (crash-safe replacement, hardening)
+render seam                  ~5.6 ms    (Embed architecture)
+pagination-history read      ~2 ms      (pagination lifecycle, REQUIRED)
+file_permissions             ~0         (permission preservation, REQUIRED)
+compare                      ~0 net     (compare+touch win, KEEP)
+path construction / dispatch
+  / locks / pagination branches / geometry      not measurable
+```
+
+No "clearly unnecessary overhead" was found in the non-render, non-write
+bookkeeping; nothing new is executed per page merely by accident. The full
+build residual therefore stands as: the atomicity guarantee (~30 ms), the
+Embed render seam (~6 ms), and the pagination-lifecycle read (~2 ms) - the
+decision points for the reviewer are those three, not hidden bookkeeping.
