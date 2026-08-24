@@ -131,3 +131,87 @@ spellings. Mechanical mapping: `build-all` -> `build --all`, `build-updated`
 --auto`, plus help/error/unknown-command text and the new `--repair` mode.
 The hidden hazard is scripts that assert on CLI error/output text mentioning
 the old verbs; those must be updated in the same pass.
+
+## Final grammar revision (names-as-mode; `--names` removed)
+
+Supersedes the `build --names` form in the section above. Confirmed from the
+current code: `info` ALREADY accepts positional tracked names directly
+(CLI.cpp:1000-1019: `if (command == "info" && argc > 2)`), so `build` is the
+one being normalized to match it.
+
+### Final surface
+
+```
+nift build              incremental build of whatever is stale
+nift build /            build only index
+nift build about blog   build only those named pages
+nift build --all
+nift build --auto
+nift build --repair
+
+nift info
+nift info /
+nift info about blog
+nift info --all
+nift info --watching
+```
+
+### Mode exclusivity (names are themselves a mode)
+
+build modes: positional names / --all / --auto / --repair
+info modes:   positional names / --all / --watching
+
+More than one mode is a hard error, before any project open / side effect:
+
+```
+nift build / --all          error: build modes are mutually exclusive
+nift build about --repair   error
+nift info / --all           error
+nift info about --watching  error
+nift build --all --repair   error
+```
+
+`-p` stays orthogonal (combinable with any mode).
+
+### Factual notes / open decisions to confirm
+
+1. `info` bare currently returns complete metadata for EVERY tracked entry
+   (CLI.cpp:1021-1033); `info --all` is therefore an explicit spelling of the
+   same all-entries view, not a distinct mode. That is fine for grammar
+   symmetry (`build` bare = incremental vs `--all` = full is a real
+   distinction; for `info` the two coincide). Document the equivalence rather
+   than inventing a different "normal" info view.
+2. `info-names` (list of tracked names, CLI.cpp:992-997) is a distinct query,
+   not a mode of `info`. Recommendation: keep it as a top-level verb
+   (tests/tracking_scaling_benchmark.py:36,:55 depend on it).
+3. `info-tracking` (CLI.cpp:1022-1032) and `status` (CLI.cpp:910) are separate
+   queries with no in-repo `info-tracking` invocation; `status` stays as
+   `nift status` (23 files depend on it). Recommend keeping both as-is; if
+   `info-tracking` is ever folded it would be `info --tracking`.
+4. `nift build /` is compact and unambiguous: `/` is the tracked index name.
+
+### Updated migration mappings
+
+```
+build-all X  ->  build --all        (~37 script/test/benchmark files)
+build-updated -> build              (~17 files)
+build-names X  ->  build X          (tests/requirements_smoke.sh:76: `build /`)
+build-auto  ->  build --auto        (scripts/checkpoint8_filesystem_transaction.py,
+                                     scripts/checkpoint4_watch_endurance.py)
+info-all    ->  info --all          (scripts/checkpoint3_core_memory.py:61)
+info-watching -> info --watching    (no in-repo invocations)
+info-names  ->  unchanged           (tests/tracking_scaling_benchmark.py:36,:55)
+status      ->  unchanged           (23 files)
+```
+
+The rest of the inventory in section D (docs, CI-indirect, conformance
+runner/gen_golden using build-all, src/handover_content.h already using only
+bare `nift build`, nift-rs unaffected at code level) is unchanged. The hidden
+hazard remains scripts asserting on CLI error/output text naming the old
+verbs (`unknown command`, `commands` help, `info-all`/`info-names` spellings).
+
+### Answer to the reviewer's symmetry point
+
+Agree: `build /` and `info /` being symmetric is a small, intentional polish
+and the cleanest version so far. No `--names` flag. Positional names as a
+mutually exclusive mode is correct and mirrors how `info` already behaves.
