@@ -165,3 +165,42 @@ repair, concurrency).
 ### Full regression
 
 47 targets / 341 PASS lines / exit 0.
+
+## CP4.2 correction (reviewer HOLD): pagination ownership predicate N >= 2
+
+### Exact pagination ownership predicate
+
+A file is deleted by the pagination surplus sweep only when ALL of:
+- its extension matches a currently-paginated tracked page's namespace,
+- its stem is `<base>-<suffix>` for that page's base,
+- the suffix is entirely decimal digits AND parses to a numeric index N >= 2
+  without overflow,
+- the path is not in current_owned (a current tracked primary output or a
+  current pagination member 2..count).
+
+`parse_pagination_index` (added) handles leading zeros that numerically fall
+below 2 (`-00`, `-01`, `-0001`) and oversized/overflowing suffixes by FAILING
+CLOSED (preserve). Nift pagination starts at `-2`, so `-0` and `-1` are user
+files and preserved.
+
+### New ownership cases (repair_campaign.py)
+
+- blog-0 / blog-1 / blog-00 / blog-01 / blog-0001 / blog-99999999999999999999
+  (overflow) with recognizable user content: preserved byte-for-byte after
+  repair.
+- current members blog-2 / blog-3: correct after repair.
+- stale blog-9 (N>=2 surplus): removed.
+- tracked primary collision: a page literally named "blog-5" owns
+  public/blog-5.html inside blog's pagination namespace; the current_owned
+  exemption preserves it, while a stale blog-9 is removed.
+
+### Repair campaign result
+
+All repair_campaign.py checks pass (11 corruption cases, pagination shrink
+with corrupt info, hostile-metadata, sweep-failure, hash-mode, interrupted
+repair, concurrency, and the new ownership-predicate cases).
+
+### Full regression
+
+47 targets / 357 PASS lines / exit 0. Repair-only change; ordinary-build hot
+path untouched (no performance run needed).

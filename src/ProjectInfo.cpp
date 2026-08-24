@@ -930,6 +930,29 @@ int ProjectInfo::finish_if_epoch_complete(ProjectOwnership& ownership, int resul
     return 0;
 }
 
+namespace {
+// Parses a decimal pagination-page suffix beginning at `begin` in `s`. Returns
+// true and sets `page` (>= 2) only when the suffix is entirely decimal digits,
+// numerically >= 2, and representable without overflow. Everything else -
+// non-digits, leading zeros that parse below 2 (e.g. "-00", "-01", "-0001"),
+// oversized/overflowing values - returns false so callers PRESERVE the file.
+bool parse_pagination_index(const std::string& s, std::size_t begin, std::size_t& page) {
+    if (begin >= s.size()) return false;
+    std::uint64_t value = 0;
+    for (std::size_t i = begin; i < s.size(); ++i) {
+        const unsigned char c = static_cast<unsigned char>(s[i]);
+        if (c < '0' || c > '9') return false;
+        const std::uint64_t digit = static_cast<std::uint64_t>(c - '0');
+        if (value > (std::numeric_limits<std::uint64_t>::max() - digit) / 10) return false;
+        value = value * 10 + digit;
+    }
+    if (value < 2 || value > static_cast<std::uint64_t>(std::numeric_limits<std::size_t>::max()))
+        return false;
+    page = static_cast<std::size_t>(value);
+    return true;
+}
+} // namespace
+
 bool ProjectInfo::repair_derived_state() {
     // Ownership model (CP4-DESIGN.md): only files Nift can establish as its
     // own derived artifacts are removed. The output tree is never wiped, and
@@ -990,13 +1013,16 @@ bool ProjectInfo::repair_derived_state() {
                     if (fname.size() < marker + 2 || fname.compare(0, marker, pattern.base) != 0 ||
                         fname[marker] != '-')
                         continue;
-                    bool digits = true;
-                    for (std::size_t i = marker + 1; i < fname.size(); ++i)
-                        if (!std::isdigit(static_cast<unsigned char>(fname[i]))) { digits = false; break; }
-                    if (digits) {
+                    // The suffix must be entirely decimal digits and parse to a
+                    // numeric index N >= 2 (Nift pagination starts at -2, so
+                    // -0 and -1 are NOT in the owned namespace). Leading zeros
+                    // that numerically fall below 2, and oversized/overflowing
+                    // suffixes, fail closed (preserve the file).
+                    std::size_t page_index = 0;
+                    if (parse_pagination_index(fname, marker + 1, page_index)) {
                         if (!filesystem::remove_owned_file(path)) return false;
-                        break;
                     }
+                    break; // this file belongs to this page's namespace (kept or removed)
                 }
             }
         }

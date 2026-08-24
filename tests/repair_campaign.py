@@ -366,6 +366,62 @@ def main():
         check("hash-mode: valid content hash kept",
               (r / ".nift/content/index.html.hash").exists())
 
+        # Pagination ownership predicate: only <base>-<N> with N >= 2 is in the
+        # owned namespace. -0/-1 and leading-zero-below-2 / overflow suffixes
+        # are user files and must be preserved; stale N>=2 surplus is removed;
+        # current members and a tracked page whose PRIMARY collides with the
+        # namespace are preserved.
+        r = base / "pagination-ownership"
+        r.mkdir()
+        canonical_project(r)
+        rc, _ = run(r, "build", "--all")
+        user = {
+            "blog-0.html": "USER-0",
+            "blog-1.html": "USER-1",
+            "blog-00.html": "USER-00",
+            "blog-01.html": "USER-01",
+            "blog-0001.html": "USER-0001",
+            "blog-99999999999999999999.html": "USER-BIG",   # overflows uint64
+        }
+        for name, content in user.items():
+            (r / "public" / name).write_text(content)
+        (r / "public/blog-9.html").write_text("<section>stale</section>\n")
+        rc, _ = run(r, "build", "--repair")
+        check("pagination-ownership: repair succeeds", rc == 0)
+        for name, content in user.items():
+            check(f"pagination-ownership: {name} preserved byte-for-byte",
+                  (r / "public" / name).read_text() == content)
+        check("pagination-ownership: current page-2 correct",
+              (r / "public/blog-2.html").read_text()
+              == "<main><title>Blog</title></main>\n<section>two</section>\n\n")
+        check("pagination-ownership: current page-3 correct",
+              (r / "public/blog-3.html").read_text()
+              == "<main><title>Blog</title></main>\n<section>three</section>\n\n")
+        check("pagination-ownership: stale N>=2 surplus removed",
+              not (r / "public/blog-9.html").exists())
+        check("pagination-ownership: no marker", not marker(r))
+
+        # Tracked primary collision: a tracked page literally named "blog-5"
+        # owns public/blog-5.html, which lies inside blog's pagination
+        # namespace. The current_owned exemption must preserve it.
+        r = base / "pagination-primary-collision"
+        r.mkdir()
+        canonical_project(r)
+        (r / "content/blog-5.html").write_text("<p>a real page named blog-5</p>\n")
+        _add_tracked(r, "blog-5")
+        rc, _ = run(r, "build", "--all")
+        check("pagination-primary-collision: initial build succeeds", rc == 0)
+        check("pagination-primary-collision: blog-5 page output exists",
+              (r / "public/blog-5.html").exists())
+        (r / "public/blog-9.html").write_text("<section>stale</section>\n")
+        rc, _ = run(r, "build", "--repair")
+        check("pagination-primary-collision: repair succeeds", rc == 0)
+        check("pagination-primary-collision: tracked primary blog-5 preserved",
+              (r / "public/blog-5.html").read_text()
+              == "<main><title>blog-5</title></main>\n<p>a real page named blog-5</p>\n")
+        check("pagination-primary-collision: stale surplus removed",
+              not (r / "public/blog-9.html").exists())
+
     if fails:
         print(f"\nFAILED: {len(fails)}: {fails}")
         sys.exit(1)
