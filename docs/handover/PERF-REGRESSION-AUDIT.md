@@ -225,3 +225,47 @@ Sanitizer verification and checked-read regression coverage (this repair):
 - tests/engine_source_read.cpp (new): valid empty files read as empty (not
   failure), missing/directory/unreadable sources produce the typed failures,
   and a failed read is not cached as valid empty content.
+
+## Bounded performance decision investigation
+
+Deliberately bounded; no broad optimization was performed.
+
+Render residual (~+5.6 ms / +8.9% render-only, CPU-bound; syscalls equal):
+
+```text
+A pre-embed render-only   62.8 ms
+C repaired render-only    68.3 ms
+```
+
+The render CPU delta is the RenderHost seam + parser refactor cost (the CLI
+routes through ProjectInfoHost). It is a deliberate architectural boundary
+(the CP1 extraction); removing it would revert the extraction. ~8.9% on the
+render path is the measured price of that abstraction.
+
+Write/metadata residual (~+30 ms of the +35 ms; A writes ~23 ms vs C writes
+~53 ms, computed as full minus render-only per implementation):
+
+```text
+decomposition of the crash-safe output write (unchanged files):
+    compare+touch fast path        97 ms   (stat + read existing + touch)
+    always transactional           130 ms  (temp write + rename)
+so the committed compare+touch fast path is already the cheaper crash-safe
+option; a baseline-style direct truncate write is non-atomic (not an option
+without dropping the crash-safety guarantee).
+```
+
+The write cost is the crash-safe transactional design (compare+touch for
+unchanged, atomic temp+rename for changed), output-permission preservation
+(file_permissions) and pagination-aware `.info.json` metadata. Per-page
+internal phase timing (benchmark-only) shows the write/metadata work ~3.4x
+the render CPU.
+
+Conclusion of the bounded investigation: beyond the already-repaired
+redundant probes, no obviously avoidable chunk was found. The remaining
+~+35 ms is the deliberate cost of (a) the RenderHost extraction (~+6 ms
+render CPU) and (b) the crash-safe write + permission + pagination-metadata
+guarantees (~+29 ms). Whether ~3.5 us/page for those guarantees is an
+acceptable price for Embedding/SSR is the deliberate decision for review;
+recovering statistical parity would require either reverting the extraction
+or redesigning the crash-safe write strategy, both outside this bounded
+scope.
