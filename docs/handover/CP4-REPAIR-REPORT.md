@@ -97,3 +97,71 @@ from CP3. The repair sweep is a cold branch on the repair-only path.
 (committed by the CP4 checkpoint). Clean tree: no binaries, objects, or
 extra worktrees. Rust build --repair parity remains the recorded post-CP4
 requirement (implement only after this C++ contract is frozen).
+
+## CP4.1 correction (reviewer HOLD): trust boundary + sweep error propagation
+
+### Final public-file ownership rule
+
+Repair deletes a public/output-tree file ONLY where ownership is established
+independently of derived metadata:
+- current tracked page primary outputs (authoritative tracked.json + config),
+- current pagination outputs (the successful current render), and
+- the currently-paginated `<base>-<N>` namespace beyond the current count
+  (documented namespace-collision rule).
+Derived metadata is never used to authorize deletion.
+
+### Orphan-output limitation
+
+An orphan `.info.json` is unquestionably Nift-owned (its location proves it) and
+is deleted. Its historical public output is PRESERVED: the output path is only
+knowable from the derived metadata, which `--repair` must distrust (a
+corrupt-but-valid info could name any path; a custom historical output
+extension makes a default-ext guess unsafe). The former `info["output"]`
+deletion and the `name + config.output_ext` fallback are REMOVED.
+
+### Malicious/corrupt metadata cases (hostile tests)
+
+- orphan info `"output": "public/keepme.txt"` + user keepme.txt -> preserved
+- orphan info `"output": "../outside.txt"` -> nothing outside the project touched
+- orphan info `"output": "/absolute/path"` -> cannot delete
+- corrupt orphan info + user file at the guessed default path -> preserved
+- orphan page historically custom ext (.php) + user file at default ext
+  (.html) -> default-ext user file preserved
+All: repair succeeds, orphan .info.json removed, user file preserved.
+
+### Sweep error semantics
+
+`repair_derived_state()` now returns bool; REQUIRED operations propagate
+failure and repair retains .unfinished and returns non-zero:
+- pagination surplus removal (remove_owned_file failure),
+- orphan .info.json removal (fs::remove error),
+- incomplete output-tree or .nift/public traversal (no silent break+certify).
+
+BEST-EFFORT: stale stored-hash cleanup is regenerable cache hygiene; hash
+failures do not fail repair (hashes are invalidated independently by
+stored_hash_changed). Documented.
+
+### Hash-sweep result (verified)
+
+The previous mirrored-path check kept the `.hash` suffix, so every stored hash
+was classified stale. Fixed: `mirrored.replace_extension()` strips the suffix
+before the existence test. Hash-mode campaign case confirms an orphaned hash
+(data source deleted + @dep removed) is removed while valid hashes are kept.
+
+### Sweep-failure test
+
+Read-only `.nift/public/<dir>/` blocks the required orphan-info removal:
+repair returns non-zero, marker retained, ordinary build refuses; restore the
+directory mode -> second repair succeeds and clears the marker. (Permission-
+based; skipped when running as root.)
+
+### Repair campaign count/results
+
+All repair_campaign.py checks pass (hostile-metadata, sweep-failure, hash-mode,
+the 11 corruption cases with the orphan case reframed to the conservative
+preserve rule, pagination shrink with corrupt info, failure, interrupted
+repair, concurrency).
+
+### Full regression
+
+47 targets / 341 PASS lines / exit 0.

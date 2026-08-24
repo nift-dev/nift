@@ -148,6 +148,21 @@ def main():
             rc, _ = run(r, "build", "--all")
             (r / "public/keepme.txt").write_text("USER FILE\n")
             mutate(r)
+            if name == "orphan removed page":
+                # Conservative orphan-output rule: the orphan .info.json is
+                # removed, but the historical public output is PRESERVED (its
+                # path is only knowable from distrustable derived metadata).
+                rc, _ = run(r, "build", "--repair")
+                check("orphan: repair succeeds", rc == 0)
+                check("orphan: marker cleared", not marker(r))
+                check("orphan: orphan .info.json removed",
+                      not (r / ".nift/public/oldpage.info.json").exists())
+                check("orphan: historical output preserved (limitation)",
+                      (r / "public/oldpage.html").exists())
+                check("orphan: user file preserved", (r / "public/keepme.txt").exists())
+                rc, _ = run(r, "build")
+                check("orphan: ordinary build after repair clean", rc == 0)
+                continue
             repair_and_verify(r, canonical_user, name.replace(" ", "-"))
             check(f"{name}: user file preserved", (r / "public/keepme.txt").exists())
 
@@ -262,6 +277,94 @@ def main():
         (hold2 / "release").unlink(missing_ok=True)
         shutil.rmtree(hold2, ignore_errors=True)
         check("repair-concurrency: no marker after both complete", not marker(r))
+
+        # Hostile-metadata protection: a corrupt-but-valid orphan .info.json
+        # must NOT authorize deleting a public file. The orphan sweep now
+        # deletes only the metadata itself; public outputs are preserved unless
+        # ownership is established independently (never from derived metadata).
+        hostile_targets = [
+            ("hostile-output-path", '{"output": "public/keepme.txt"}', "public/keepme.txt"),
+            ("hostile-traversal", '{"output": "../outside.txt"}', None),
+            ("hostile-absolute", '{"output": "/tmp/nift-hostile-abs"}', None),
+            ("hostile-corrupt-guess", "not-json{{{{", "public/evil.html"),
+            ("hostile-custom-ext", '{"output": "public/evil.php"}', "public/evil.html"),
+        ]
+        for hname, info_content, user_file in hostile_targets:
+            r = base / hname
+            r.mkdir()
+            canonical_project(r)
+            rc, _ = run(r, "build", "--all")
+            # a "never-tracked" page name -> its .info.json is an orphan
+            force_write(r / ".nift/public/evil.info.json", info_content)
+            if user_file:
+                (r / user_file).write_text("USER DATA\n")
+            rc, _ = run(r, "build", "--repair")
+            check(f"{hname}: repair succeeds", rc == 0)
+            check(f"{hname}: marker cleared", not marker(r))
+            check(f"{hname}: orphan .info.json removed",
+                  not (r / ".nift/public/evil.info.json").exists())
+            if user_file:
+                check(f"{hname}: user file preserved", (r / user_file).exists())
+            check(f"{hname}: no output beyond project deleted",
+                  not (r / "keepme.txt").exists() and not (r.parent / "outside.txt").exists())
+
+        # Sweep-failure: a REQUIRED orphan-info removal fails (read-only
+        # containing dir) -> repair non-zero, marker retained, ordinary build
+        # refuses; restore -> second repair succeeds. (Permission-based; root
+        # bypasses POSIX mode bits, so it is skipped when running as root.)
+        if os.geteuid() != 0:
+            r = base / "sweep-failure"
+            r.mkdir()
+            canonical_project(r)
+            (r / "content/gone").mkdir()
+            (r / "content/gone/sub.html").write_text("<p>gone</p>\n")
+            _add_tracked(r, "gone/sub")
+            rc, _ = run(r, "build", "--all")
+            check("sweep-failure: initial build succeeds", rc == 0)
+            _remove_tracked(r, "gone/sub")
+            (r / ".nift/public/gone").chmod(0o555)  # blocks orphan-info removal
+            rc, _ = run(r, "build", "--repair")
+            check("sweep-failure: repair returns non-zero", rc != 0)
+            check("sweep-failure: marker retained", marker(r))
+            rc, _ = run(r, "build")
+            check("sweep-failure: ordinary build refuses", rc == 1)
+            (r / ".nift/public/gone").chmod(0o755)
+            rc, _ = run(r, "build", "--repair")
+            check("sweep-failure: second repair succeeds", rc == 0)
+            check("sweep-failure: marker cleared", not marker(r))
+            check("sweep-failure: orphan info removed",
+                  not (r / ".nift/public/gone/sub.info.json").exists())
+
+        # Hash-mode: stored hashes are regenerable cache. Repair removes an
+        # orphaned hash (mirrored source gone) and keeps valid ones. The @dep
+        # reference is removed at the same time as the source so the page still
+        # builds (deleting a still-referenced dependency is a repair failure).
+        r = base / "hash-mode"
+        r.mkdir()
+        for d in (".nift", "content", "templates", "public", "data"):
+            (r / d).mkdir()
+        (r / ".nift/config.json").write_text(
+            '{"config":{"content-dir":"content/","output-dir":"public/",'
+            '"default-template":"templates/template.html","build-threads":-1,'
+            '"incremental-mode":"hash"}}')
+        (r / ".nift/tracked.json").write_text(
+            '{"tracked":[{"name":"/","title":"Home","template":"templates/template.html"}]}')
+        (r / "templates/template.html").write_text("@content\\n@dep('data/state.json')\\n")
+        (r / "content/index.html").write_text("<p>home</p>\n")
+        (r / "data/state.json").write_text("{}\\n")
+        rc, _ = run(r, "build", "--all")
+        check("hash-mode: initial build succeeds", rc == 0)
+        check("hash-mode: hashes written",
+              (r / ".nift/content/index.html.hash").exists()
+              and (r / ".nift/data/state.json.hash").exists())
+        (r / "data/state.json").unlink()                     # orphan the state hash
+        (r / "templates/template.html").write_text("@content\\n")
+        rc, _ = run(r, "build", "--repair")
+        check("hash-mode: repair succeeds", rc == 0)
+        check("hash-mode: orphaned data hash removed",
+              not (r / ".nift/data/state.json.hash").exists())
+        check("hash-mode: valid content hash kept",
+              (r / ".nift/content/index.html.hash").exists())
 
     if fails:
         print(f"\nFAILED: {len(fails)}: {fails}")

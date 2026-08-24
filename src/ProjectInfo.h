@@ -47,17 +47,21 @@ public:
     int build_names(const std::vector<std::string>& names, bool force, bool explain = false);
 
     // Central epoch-completion rule (CP3.1): every controlled exit after
-    // ownership acquisition routes through this. success -> clear marker;
-    // controlled failure + ordinary build + proven zero recovery-relevant
-    // mutations -> clear marker; anything else (any mutation, or a repair
-    // failure, or a crash - the latter never reaches here) -> retain.
-    void finish_if_epoch_complete(ProjectOwnership& ownership, int result, bool repair);
+    // ownership acquisition routes through this and returns the command exit
+    // code. A failure clears the marker only for an ordinary build with proven
+    // zero recovery-relevant mutations; success clears it; a repair whose
+    // required sweep fails retains the marker and returns failure.
+    int finish_if_epoch_complete(ProjectOwnership& ownership, int result, bool repair);
 
     // CP4 repair sweep: called after a successful repair rebuild. Removes only
-    // derived artifacts Nift can establish as its own (orphan .info.json and
-    // their outputs, pagination surplus of currently-paginated tracked pages,
-    // stale stored hashes). See docs/handover/CP4-DESIGN.md.
-    void repair_derived_state();
+    // derived artifacts Nift can establish as its own: pagination surplus of
+    // currently-paginated tracked pages (REQUIRED, failures propagate) and
+    // orphan .info.json metadata (REQUIRED); stale stored hashes are
+    // best-effort cache hygiene. Historical public outputs of removed pages are
+    // PRESERVED (their paths are only knowable from distrustable derived
+    // metadata - documented limitation). Returns false if a required sweep
+    // operation fails (repair must not certify convergence).
+    bool repair_derived_state();
 
     // Zero-mutation failure distinction (CP2.2): monotonic flag set BEFORE any
     // recovery-relevant derived mutation (output write, pagination write, stale

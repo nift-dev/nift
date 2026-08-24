@@ -872,8 +872,7 @@ int ProjectInfo::build_all(bool force, bool explain, bool repair) {
     // removal (mutation_started still false), nothing needs repair and the
     // marker is cleared; if it removed outputs then failed, the marker stays.
     if (!reconcile_watch()) {
-        finish_if_epoch_complete(ownership, 1, repair);
-        return 1;
+        return finish_if_epoch_complete(ownership, 1, repair);
     }
     reset_build_caches();
 
@@ -911,35 +910,32 @@ int ProjectInfo::build_all(bool force, bool explain, bool repair) {
     }
 
     const int result = build_many(jobs, false, explain, tracked.size());
-    finish_if_epoch_complete(ownership, result, repair);
-    return result;
+    return finish_if_epoch_complete(ownership, result, repair);
 }
 
-void ProjectInfo::finish_if_epoch_complete(ProjectOwnership& ownership, int result, bool repair) {
-    if (result == 0) {
-        // CP4: a successful repair additionally sweeps stale derived artifacts
-        // (orphans, pagination surplus, stale hashes) BEFORE the marker is
-        // removed, so the derived tree converges to the authoritative state.
-        if (repair) repair_derived_state();
-        ownership.finish(); // remove marker strictly after the final mutation
-    } else if (!repair && !mutation_started()) {
-        // Controlled failure with PROVEN zero recovery-relevant mutations:
-        // nothing was written/deleted, so nothing needs repair. Clear the
-        // marker. A crash/kill never reaches here (finish() only runs on the
-        // success/zero-mutation paths), and build --repair always retains on
-        // failure because its pre-existing stale evidence is unresolved.
-        ownership.finish();
+int ProjectInfo::finish_if_epoch_complete(ProjectOwnership& ownership, int result, bool repair) {
+    if (result != 0) {
+        // A failure occurred: clear the marker only for an ordinary build with
+        // PROVEN zero recovery-relevant mutations; build --repair always
+        // retains on failure because its pre-existing stale evidence is
+        // unresolved. The command still reports failure.
+        if (!repair && !mutation_started()) ownership.finish();
+        return result;
     }
-    // Otherwise retain: the destructor keeps the marker.
+    // Success. A successful repair additionally runs the required sweep BEFORE
+    // the marker is removed; if a required sweep operation fails, repair has
+    // not converged, so the marker is retained and the command fails.
+    if (repair && !repair_derived_state()) return 1;
+    ownership.finish(); // remove marker strictly after the final mutation
+    return 0;
 }
 
-void ProjectInfo::repair_derived_state() {
+bool ProjectInfo::repair_derived_state() {
     // Ownership model (CP4-DESIGN.md): only files Nift can establish as its
-    // own derived artifacts are removed. The output tree is never wiped.
-    // current info paths identify the page (the info filename is derived from
-    // the OUTPUT path, not the page name - e.g. the "/" page's info is
-    // index.info.json - so the orphan check must compare info paths, not
-    // filename-derived names).
+    // own derived artifacts are removed. The output tree is never wiped, and
+    // derived metadata is never used to authorize deleting a public file.
+    // Current info paths identify the page (the info filename derives from the
+    // OUTPUT path, not the page name - the "/" page's info is index.info.json).
     std::unordered_set<fs::path> current_info_paths;
     current_info_paths.reserve(tracked.size());
     std::unordered_set<fs::path> current_owned;
@@ -955,8 +951,7 @@ void ProjectInfo::repair_derived_state() {
         std::size_t pages = 0;
         json::Document doc;
         std::string error;
-        const fs::path ip = info_path(info);
-        if (load_json_file(ip, doc, error) && doc.is_object() &&
+        if (load_json_file(info_path(info), doc, error) && doc.is_object() &&
             doc.has("pagination-pages") && doc["pagination-pages"].is_number() &&
             std::isfinite(doc["pagination-pages"].num) && doc["pagination-pages"].num >= 1)
             pages = static_cast<std::size_t>(doc["pagination-pages"].num);
@@ -964,25 +959,25 @@ void ProjectInfo::repair_derived_state() {
             for (std::size_t n = 2; n <= pages; ++n)
                 current_owned.insert(pagination_output_path(info, n).lexically_normal());
             // Register the in-use pagination namespace so the output-tree
-            // sweep can remove surplus pages N > count.
+            // sweep can remove surplus pages N > count (ownership established
+            // by the current render).
             const std::string ext = info.output_ext.empty() ? config.output_ext : info.output_ext;
             patterns_by_dir[out.parent_path().generic_string()].push_back(
                 {out.stem().generic_string(), ext});
         }
     }
 
-    // 1. Pagination surplus sweep over the output tree: remove files in a
-    //    currently-paginated tracked page's <base>-<N> namespace beyond the
-    //    current count. User files not matching any in-use namespace are left
-    //    alone. Files that are a tracked page's primary output are exempt (in
-    //    current_owned).
-    const fs::path output_root = root / config.output_dir;
+    // 1. Pagination surplus sweep (REQUIRED): files in a currently-paginated
+    //    tracked page's <base>-<N> namespace beyond the current count. A
+    //    traversal error or a failed removal means repair has not converged.
     {
         std::error_code ec;
+        const fs::path output_root = root / config.output_dir;
         if (fs::is_directory(output_root, ec)) {
             for (const auto& entry : fs::recursive_directory_iterator(output_root, ec)) {
-                if (ec) break;
-                if (!entry.is_regular_file(ec) || ec) continue;
+                if (ec) return false; // incomplete traversal: do not certify success
+                std::error_code fec;
+                if (!entry.is_regular_file(fec) || fec) continue;
                 const fs::path path = entry.path().lexically_normal();
                 if (current_owned.count(path)) continue;
                 const auto it = patterns_by_dir.find(path.parent_path().generic_string());
@@ -999,9 +994,7 @@ void ProjectInfo::repair_derived_state() {
                     for (std::size_t i = marker + 1; i < fname.size(); ++i)
                         if (!std::isdigit(static_cast<unsigned char>(fname[i]))) { digits = false; break; }
                     if (digits) {
-                        // <base>-<N> with N beyond the current count, in an
-                        // actively-paginated namespace: stale pagination.
-                        filesystem::remove_owned_file(path);
+                        if (!filesystem::remove_owned_file(path)) return false;
                         break;
                     }
                 }
@@ -1009,18 +1002,21 @@ void ProjectInfo::repair_derived_state() {
         }
     }
 
-    // 2. Orphan .info.json sweep: every .info.json under .nift/public/ is
-    //    Nift-owned derived metadata. If its page is no longer tracked, remove
-    //    the info, the primary output (exact path from a readable info's
-    //    "output" field, else name + config output-ext), and any pagination
-    //    pages a readable info records.
-    const fs::path info_root = root / ".nift" / config.output_dir;
+    // 2. Orphan .info.json sweep (REQUIRED): every .info.json under
+    //    .nift/public/ is Nift-owned derived metadata, so an orphan's metadata
+    //    is deleted. Its historical public output is PRESERVED: the only way
+    //    to know that output's path/extension is the derived metadata itself,
+    //    which repair must distrust (a corrupt-but-valid info could name any
+    //    path, and a custom historical output extension makes a default-ext
+    //    guess unsafe). This is the documented orphan-output limitation.
     {
         std::error_code ec;
+        const fs::path info_root = root / ".nift" / config.output_dir;
         if (fs::is_directory(info_root, ec)) {
             for (const auto& entry : fs::recursive_directory_iterator(info_root, ec)) {
-                if (ec) break;
-                if (!entry.is_regular_file(ec) || ec) continue;
+                if (ec) return false; // incomplete traversal
+                std::error_code fec;
+                if (!entry.is_regular_file(fec) || fec) continue;
                 const fs::path path = entry.path();
                 const std::string filename = path.filename().generic_string();
                 constexpr const char* suffix = ".info.json";
@@ -1029,46 +1025,25 @@ void ProjectInfo::repair_derived_state() {
                                      std::char_traits<char>::length(suffix), suffix) != 0)
                     continue;
                 if (current_info_paths.count(path.lexically_normal())) continue; // current page
-                const fs::path rel_info = path.lexically_relative(info_root).lexically_normal();
-                std::string name = rel_info.generic_string();
-                name.resize(name.size() - std::char_traits<char>::length(suffix));
-
-                bool removed_primary = false;
-                fs::path output_path_guess = root / config.output_dir / (name + config.output_ext);
-                json::Document doc;
-                std::string error;
-                if (load_json_file(path, doc, error) && doc.is_object() && doc.has("output") &&
-                    doc["output"].is_string()) {
-                    const std::string out = doc["output"].string;
-                    const fs::path out_path = (root / out).lexically_normal();
-                    output_path_guess = out_path;
-                    if (doc.has("pagination-pages") && doc["pagination-pages"].is_number() &&
-                        std::isfinite(doc["pagination-pages"].num) && doc["pagination-pages"].num >= 2) {
-                        const std::size_t pages = static_cast<std::size_t>(doc["pagination-pages"].num);
-                        const std::string ext = out_path.extension().generic_string();
-                        const std::string out_stem = out_path.stem().generic_string();
-                        for (std::size_t n = 2; n <= pages; ++n)
-                            filesystem::remove_owned_file(
-                                out_path.parent_path() / (out_stem + "-" + std::to_string(n) + ext));
-                    }
-                    removed_primary = filesystem::remove_owned_file(out_path);
-                }
-                if (!removed_primary) filesystem::remove_owned_file(output_path_guess);
-                std::error_code ignored;
-                std::filesystem::remove(path, ignored);
+                std::error_code rec;
+                std::filesystem::remove(path, rec);
+                if (rec) return false; // required metadata removal failed
             }
         }
     }
 
-    // 3. Stale stored-hash sweep: `.nift/**/*.hash` (mirroring the source
-    //    tree, excluding .nift/public and .nift/.watch) whose mirrored path no
-    //    longer exists is orphaned and removed.
+    // 3. Stale stored-hash sweep (BEST-EFFORT cache hygiene): stored hashes
+    //    are regenerable and invalidated independently (stored_hash_changed
+    //    treats a missing hash as changed), so a failure here does not fail
+    //    repair. Removes hashes whose mirrored SOURCE path no longer exists
+    //    (the .hash suffix is stripped before mirroring).
     {
         std::error_code ec;
         const fs::path nift_root = root / ".nift";
         for (const auto& entry : fs::recursive_directory_iterator(nift_root, ec)) {
-            if (ec) break;
-            if (!entry.is_regular_file(ec) || ec) continue;
+            if (ec) break; // best-effort
+            std::error_code fec;
+            if (!entry.is_regular_file(fec) || fec) continue;
             const fs::path path = entry.path();
             if (path.extension() != ".hash") continue;
             const fs::path rel = path.lexically_relative(nift_root);
@@ -1076,11 +1051,15 @@ void ProjectInfo::repair_derived_state() {
             const std::string first = rel.begin()->generic_string();
             if (first == "public" || first == ".watch" || first == "config.json" || first == "tracked.json")
                 continue;
-            const fs::path mirrored = root / rel;
-            if (!fs::is_regular_file(mirrored, ec))
-                std::filesystem::remove(path, ec);
+            fs::path mirrored = root / rel;
+            mirrored.replace_extension(); // strip the trailing .hash
+            std::error_code mec;
+            if (!fs::is_regular_file(mirrored, mec))
+                std::filesystem::remove(path, mec);
         }
     }
+
+    return true;
 }
 
 int ProjectInfo::build_names(const std::vector<std::string>& names, bool, bool explain) {
@@ -1128,8 +1107,7 @@ int ProjectInfo::build_names(const std::vector<std::string>& names, bool, bool e
     mutation_started_.store(false, std::memory_order_relaxed);
 
     if (!reconcile_watch()) {
-        finish_if_epoch_complete(ownership, 1, /*repair=*/false);
-        return 1;
+        return finish_if_epoch_complete(ownership, 1, /*repair=*/false);
     }
     reset_build_caches();
 
@@ -1152,13 +1130,11 @@ int ProjectInfo::build_names(const std::vector<std::string>& names, bool, bool e
         // Zero-derived-mutation controlled failure - unless reconcile itself
         // performed a recovery-relevant deletion (mutation_started true), in
         // which case the completion rule correctly retains the marker.
-        finish_if_epoch_complete(ownership, 1, /*repair=*/false);
-        return 1;
+        return finish_if_epoch_complete(ownership, 1, /*repair=*/false);
     }
 
     const int result = build_many(jobs, true, explain, names.size());
-    finish_if_epoch_complete(ownership, result, /*repair=*/false);
-    return result;
+    return finish_if_epoch_complete(ownership, result, /*repair=*/false);
 }
 
 bool ProjectInfo::reconcile_watch() { return watch_->reconcile(*this); }
