@@ -32,10 +32,6 @@ struct nift_engine {
     void* loader_user = nullptr;
     nift_environment_callback env_cb = nullptr;
     void* env_user = nullptr;
-    // A host callback returned an unexpected status; consumed by the next
-    // render call on this engine (approximate attribution under concurrent
-    // failing callbacks is documented caller misuse).
-    std::atomic<int> pending_callback_status{0};
 };
 
 struct nift_context {
@@ -80,27 +76,76 @@ nift::Source to_source(const nift_source* src) {
     return nift::Source::text(std::string(src->data, src->length));
 }
 
-// Install a C loader callback onto the engine. Only NIFT_OK (with a value,
-// possibly empty) and NIFT_ERROR_NOT_FOUND are defined loader outcomes; any
-// other status is recorded and surfaces as NIFT_ERROR_CALLBACK on the next
-// render (the C++ loader has no error channel, so the render continues as a
-// controlled "source unreadable" failure).
+// Source-kind validation: only NIFT_SOURCE_TEXT / NIFT_SOURCE_PATH are defined.
+bool valid_source_kind(const nift_source* src) {
+    return src->kind == NIFT_SOURCE_TEXT || src->kind == NIFT_SOURCE_PATH;
+}
+
+// Per-render callback-error attribution.
+//
+// A host callback that returns an unexpected (non-OK, non-NOT_FOUND) status is
+// surfaced as that status (NIFT_ERROR_CALLBACK) on the RENDER that invoked it.
+// Callback state is thread_local and render-scoped by an RAII guard, so
+// concurrent renders on different threads each consume only their own callback
+// errors - there is no shared engine-global slot to steal.
+//
+// The C++ Engine invokes loader/environment callbacks synchronously on the
+// render's calling thread for standalone renders and for the project render's
+// main-thread work. One exception: the pagination page loop may invoke the
+// environment provider on its own worker threads. Those threads have no active
+// render scope, so a hard env-callback failure there degrades to "unset"
+// (NIFT_ERROR_NOT_FOUND), because the C++ callback interface
+// (std::optional<std::string>) has no error channel. This is documented
+// explicitly; no cross-render state is shared.
+struct RenderCallbackScope {
+    nift_status status = NIFT_OK;  // NIFT_OK means no callback error
+    nift_status take_status() {
+        const nift_status current = status;
+        status = NIFT_OK;
+        return current;
+    }
+};
+
+thread_local RenderCallbackScope* tls_render_scope = nullptr;
+
+class RenderScopeGuard {
+public:
+    RenderScopeGuard() { tls_render_scope = &scope_; }
+    ~RenderScopeGuard() { tls_render_scope = nullptr; }
+    RenderScopeGuard(const RenderScopeGuard&) = delete;
+    RenderScopeGuard& operator=(const RenderScopeGuard&) = delete;
+
+private:
+    RenderCallbackScope scope_;
+};
+
+// Normalize a callback result into the C++ optional, honoring the empty-vs-
+// missing distinction. Records a hard callback status into the active render
+// scope (if any); on a thread with no scope the error degrades to absent.
+std::optional<std::string> callback_result(nift_status status, const nift_string& out) {
+    if (status == NIFT_OK) {
+        if (out.data == nullptr && out.length > 0) {
+            // Invalid callback output: NULL data with a positive length.
+            if (tls_render_scope != nullptr) tls_render_scope->status = NIFT_ERROR_CALLBACK;
+            return std::nullopt;
+        }
+        // NIFT_OK + length 0 is a valid EMPTY value (present, empty string);
+        // NIFT_OK + non-empty is the value.
+        return std::string(out.data == nullptr ? "" : out.data, out.length);
+    }
+    if (status == NIFT_ERROR_NOT_FOUND) return std::nullopt;
+    if (tls_render_scope != nullptr) tls_render_scope->status = status;
+    return std::nullopt;
+}
+
 void install_loader(nift_engine* engine) {
     nift_loader_callback cb = engine->loader_cb;
     void* user = engine->loader_user;
     if (cb == nullptr) return;
-    engine->engine.set_loader([engine, cb, user](std::string_view path) -> std::optional<std::string> {
+    engine->engine.set_loader([cb, user](std::string_view path) -> std::optional<std::string> {
         nift_string out{nullptr, 0};
         const nift_status status = cb(user, path.data(), path.size(), &out);
-        if (status == NIFT_OK) {
-            if (out.data == nullptr || out.length == 0) return std::nullopt;
-            return std::string(out.data, out.length);
-        }
-        if (status != NIFT_ERROR_NOT_FOUND) {
-            engine->pending_callback_status.store(static_cast<int>(status),
-                                                  std::memory_order_relaxed);
-        }
-        return std::nullopt;
+        return callback_result(status, out);
     });
 }
 
@@ -108,23 +153,11 @@ void install_environment(nift_engine* engine) {
     nift_environment_callback cb = engine->env_cb;
     void* user = engine->env_user;
     if (cb == nullptr) return;
-    engine->engine.set_environment_provider([engine, cb, user](std::string_view name) -> std::optional<std::string> {
+    engine->engine.set_environment_provider([cb, user](std::string_view name) -> std::optional<std::string> {
         nift_string out{nullptr, 0};
         const nift_status status = cb(user, name.data(), name.size(), &out);
-        if (status == NIFT_OK) {
-            if (out.data == nullptr || out.length == 0) return std::nullopt;
-            return std::string(out.data, out.length);
-        }
-        if (status != NIFT_ERROR_NOT_FOUND) {
-            engine->pending_callback_status.store(static_cast<int>(status),
-                                                  std::memory_order_relaxed);
-        }
-        return std::nullopt;
+        return callback_result(status, out);
     });
-}
-
-bool consume_callback_error(nift_engine* engine) {
-    return engine->pending_callback_status.exchange(0, std::memory_order_relaxed) != 0;
 }
 
 }  // namespace
@@ -221,9 +254,15 @@ nift_status nift_engine_set_string(nift_engine* engine, const char* name,
 }
 
 nift_status nift_engine_set_int(nift_engine* engine, const char* name,
-                                size_t name_len, long long value) {
+                                size_t name_len, int32_t value) {
     if (engine == nullptr) return NIFT_ERROR_INVALID_ARGUMENT;
     return set_engine_binding(engine, name, name_len, nift::Value(static_cast<int>(value)));
+}
+
+nift_status nift_engine_set_number(nift_engine* engine, const char* name,
+                                   size_t name_len, double value) {
+    if (engine == nullptr) return NIFT_ERROR_INVALID_ARGUMENT;
+    return set_engine_binding(engine, name, name_len, nift::Value(value));
 }
 
 nift_status nift_engine_set_bool(nift_engine* engine, const char* name,
@@ -339,10 +378,16 @@ nift_status nift_context_set_string(nift_context* context, const char* name,
 }
 
 nift_status nift_context_set_int(nift_context* context, const char* name,
-                                 size_t name_len, long long value) {
+                                 size_t name_len, int32_t value) {
     if (context == nullptr) return NIFT_ERROR_INVALID_ARGUMENT;
     return set_context_binding(context, name, name_len,
                                nift::Value(static_cast<int>(value)));
+}
+
+nift_status nift_context_set_number(nift_context* context, const char* name,
+                                    size_t name_len, double value) {
+    if (context == nullptr) return NIFT_ERROR_INVALID_ARGUMENT;
+    return set_context_binding(context, name, name_len, nift::Value(value));
 }
 
 nift_status nift_context_set_bool(nift_context* context, const char* name,
@@ -369,9 +414,15 @@ nift_status nift_context_set_json(nift_context* context, const char* name,
 
 static nift_status wrap_render(nift_engine* engine, nift::RenderResult result,
                                nift_render_result** out_result) {
-    if (consume_callback_error(engine)) {
-        if (out_result != nullptr) *out_result = nullptr;
-        return NIFT_ERROR_CALLBACK;
+    // Consume this render's own callback-error status (thread_local scope).
+    // A callback hard-error makes the render a mechanical failure, not a
+    // render outcome.
+    if (tls_render_scope != nullptr) {
+        const nift_status callback_status = tls_render_scope->take_status();
+        if (callback_status != NIFT_OK) {
+            if (out_result != nullptr) *out_result = nullptr;
+            return callback_status;
+        }
     }
     *out_result = new (std::nothrow) nift_render_result{std::move(result)};
     return *out_result == nullptr ? NIFT_ERROR_INTERNAL : NIFT_OK;
@@ -385,6 +436,7 @@ nift_status nift_engine_render_page(nift_engine* engine,
     if (!valid_input(page_name, page_name_len)) return NIFT_ERROR_INVALID_ARGUMENT;
     *out_result = nullptr;
     try {
+        RenderScopeGuard scope;
         if (context != nullptr) {
             return wrap_render(engine,
                                engine->engine.render(std::string_view(page_name, page_name_len),
@@ -408,10 +460,13 @@ static nift_status render_sources(nift_engine* engine, const nift_source* page,
     if (!valid_input(page->data, page->length) ||
         !valid_input(page_template->data, page_template->length))
         return NIFT_ERROR_INVALID_ARGUMENT;
+    if (!valid_source_kind(page) || !valid_source_kind(page_template))
+        return NIFT_ERROR_INVALID_ARGUMENT;
     if (page->logical_name != nullptr && page->logical_name_length == 0)
         return NIFT_ERROR_INVALID_ARGUMENT;
     *out_result = nullptr;
     try {
+        RenderScopeGuard scope;
         nift::Source page_source = to_source(page);
         nift::Source template_source = to_source(page_template);
         if (context != nullptr) {
@@ -443,10 +498,13 @@ nift_status nift_engine_render_partial(nift_engine* engine,
     if (engine == nullptr || out_result == nullptr) return NIFT_ERROR_INVALID_ARGUMENT;
     if (partial == nullptr || !valid_input(partial->data, partial->length))
         return NIFT_ERROR_INVALID_ARGUMENT;
+    if (!valid_source_kind(partial))
+        return NIFT_ERROR_INVALID_ARGUMENT;
     if (partial->logical_name != nullptr && partial->logical_name_length == 0)
         return NIFT_ERROR_INVALID_ARGUMENT;
     *out_result = nullptr;
     try {
+        RenderScopeGuard scope;
         nift::Source partial_source = to_source(partial);
         if (context != nullptr) {
             return wrap_render(engine,

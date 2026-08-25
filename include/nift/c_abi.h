@@ -16,6 +16,7 @@
 #define NIFT_C_ABI_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -83,7 +84,15 @@ typedef struct {
     size_t logical_name_length;
 } nift_source;
 
-/* Host seams (called by render threads; must be thread-safe). */
+/* Host seams (called by render threads; must be thread-safe). Callback
+ * output semantics: NIFT_OK + length 0 = valid empty value; NIFT_OK +
+ * non-empty = value; NIFT_OK + data==NULL + length>0 = invalid callback
+ * output (NIFT_ERROR_CALLBACK); NIFT_ERROR_NOT_FOUND = absent/unset. A hard
+ * callback error is attributed to the render that invoked it (per-render
+ * state; concurrent renders never steal each other's callback error).
+ * NOTE: the C++ project render may invoke the ENVIRONMENT provider on its own
+ * pagination worker threads, where a hard env failure degrades to "unset"
+ * (the C++ callback interface has no error channel). */
 /* Loader: return NIFT_OK and fill *out (borrowed, copied by the engine) when
  * the source exists; NIFT_ERROR_NOT_FOUND when it does not; any other status
  * becomes NIFT_ERROR_CALLBACK and the render fails with a controlled error. */
@@ -128,7 +137,9 @@ nift_status nift_engine_set_string(nift_engine* engine, const char* name,
                                    size_t name_len, const char* value,
                                    size_t value_len);
 nift_status nift_engine_set_int(nift_engine* engine, const char* name,
-                                size_t name_len, long long value);
+                                size_t name_len, int32_t value);
+nift_status nift_engine_set_number(nift_engine* engine, const char* name,
+                                   size_t name_len, double value);
 nift_status nift_engine_set_bool(nift_engine* engine, const char* name,
                                  size_t name_len, int value);
 /* JSON text (UTF-8, length). Malformed JSON -> NIFT_ERROR_INVALID_ARGUMENT. */
@@ -163,7 +174,9 @@ nift_status nift_context_set_string(nift_context* context, const char* name,
                                     size_t name_len, const char* value,
                                     size_t value_len);
 nift_status nift_context_set_int(nift_context* context, const char* name,
-                                 size_t name_len, long long value);
+                                 size_t name_len, int32_t value);
+nift_status nift_context_set_number(nift_context* context, const char* name,
+                                    size_t name_len, double value);
 nift_status nift_context_set_bool(nift_context* context, const char* name,
                                   size_t name_len, int value);
 nift_status nift_context_set_json(nift_context* context, const char* name,

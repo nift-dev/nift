@@ -207,3 +207,37 @@ pagination render.
 Representative repeated render (binding + loop), 20k iterations, median of 7:
 direct C++ 4438 ns/render vs C ABI 4551 ns/render = **+113 ns (+2.5%)** — a
 thin translation layer.
+
+## CP10.1 repairs (2026-08-25)
+
+- **Callback-error attribution is per-render, concurrency-safe.** Removed the
+  engine-global `pending_callback_status` slot (two concurrent renders could
+  steal each other's callback error). Each ABI render now establishes a
+  thread_local RAII `RenderCallbackScope`; loader/env callbacks write their
+  hard-error status into the scope active on the thread that invoked them, and
+  the render consumes only its own scope. Deterministic concurrent tests force
+  render A's loader to hard-fail and render B's loader to succeed with a
+  guaranteed overlap (B waits until A's loader ran); both completion orders and
+  two-simultaneous-failures are covered. Loader callbacks run only on the
+  calling thread; the C++ project render may invoke the ENVIRONMENT provider on
+  its own pagination worker threads, which have no render scope, so a hard
+  env-callback failure there degrades to "unset" (NIFT_ERROR_NOT_FOUND) - the
+  C++ callback interface (`std::optional<std::string>`) has no error channel.
+  This is documented; no cross-render state is shared.
+- **Empty vs missing callback values are distinct.** `NIFT_OK` + length 0 is a
+  valid empty value (empty source / variable set to ""); `NIFT_ERROR_NOT_FOUND`
+  is absent; `NIFT_OK` + `data==NULL` + `length>0` is invalid callback output
+  (`NIFT_ERROR_CALLBACK`). Regression cases cover empty loader source, missing
+  loader source, empty env value, missing env value.
+- **Integer width is exact.** `nift_engine_set_int` / `nift_context_set_int`
+  now take `int32_t` (no silent long-long->int truncation); added
+  `nift_engine_set_number` / `nift_context_set_number` (`double`) for the
+  complete scalar number model. INT32_MIN/INT32_MAX round-trip exactly.
+- **Source kind is validated.** `nift_source_kind` must be
+  `NIFT_SOURCE_TEXT`/`NIFT_SOURCE_PATH`; any other value is
+  `NIFT_ERROR_INVALID_ARGUMENT` (adversarial case added).
+
+Re-verified after the repairs: C ABI adversarial battery (incl. deterministic
+concurrent attribution) PASS 5/5, pure-C consumer PASS, targeted ASan/UBSan
+clean, shared corpus **26/26** (C++ API / nift-rs / C ABI) + negative
+self-test PASS, direct C++ ~4.1 us vs C ABI ~4.1 us (~+1%) overhead.

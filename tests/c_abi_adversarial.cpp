@@ -10,10 +10,14 @@
 #include "nift/c_abi.h"
 
 #include <atomic>
+#include <condition_variable>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <limits>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -369,6 +373,264 @@ void test_large_and_unicode() {
     nift_engine_free(engine);
 }
 
+void test_integer_width_and_number() {
+    nift_engine* engine = nift_engine_new();
+    nift_context* context = nift_context_new();
+    // int32_t bounds must round-trip exactly (no silent narrowing).
+    CHECK(nift_engine_set_int(engine, "imin", 4, INT32_MIN) == NIFT_OK);
+    CHECK(nift_engine_set_int(engine, "imax", 4, INT32_MAX) == NIFT_OK);
+    CHECK(nift_engine_set_number(engine, "dbl", 3, 3.5) == NIFT_OK);
+    CHECK(nift_context_set_int(context, "cmin", 4, INT32_MIN) == NIFT_OK);
+    CHECK(nift_context_set_number(context, "cdbl", 4, -2.25) == NIFT_OK);
+    nift_source page{};
+    page.kind = NIFT_SOURCE_TEXT;
+    const std::string text = "$[imin]|$[imax]|$[dbl]|$[cmin]|$[cdbl]";
+    page.data = text.data();
+    page.length = text.size();
+    nift_source tpl{};
+    tpl.kind = NIFT_SOURCE_TEXT;
+    const std::string tpl_text = "<main>@content</main>";
+    tpl.data = tpl_text.data();
+    tpl.length = tpl_text.size();
+    nift_render_result* result = nullptr;
+    CHECK(nift_engine_render(engine, &page, &tpl, context, &result) == NIFT_OK);
+    CHECK(nift_render_result_ok(result) == 1);
+    nift_string output{};
+    CHECK(nift_render_result_output(result, &output) == NIFT_OK);
+    CHECK(read_view(output) == "<main>-2147483648|2147483647|3.5|-2147483648|-2.25</main>");
+    nift_render_result_free(result);
+    nift_context_free(context);
+    nift_engine_free(engine);
+}
+
+void test_source_kind_validation() {
+    nift_engine* engine = nift_engine_new();
+    nift_source bad{};
+    bad.kind = static_cast<nift_source_kind>(37);  // not NIFT_SOURCE_TEXT/PATH
+    bad.data = "x";
+    bad.length = 1;
+    nift_source tpl{};
+    tpl.kind = NIFT_SOURCE_TEXT;
+    tpl.data = "<main>@content</main>";
+    tpl.length = 22;
+    nift_render_result* result = nullptr;
+    CHECK(nift_engine_render(engine, &bad, &tpl, nullptr, &result) == NIFT_ERROR_INVALID_ARGUMENT);
+    CHECK(nift_engine_render_partial(engine, &bad, nullptr, &result) == NIFT_ERROR_INVALID_ARGUMENT);
+    CHECK(nift_engine_render(engine, &tpl, &bad, nullptr, &result) == NIFT_ERROR_INVALID_ARGUMENT);
+    nift_engine_free(engine);
+}
+
+// Deterministic loader: NIFT_OK+empty for one path (empty source), NOT_FOUND
+// for another (missing source), and a special "empty-env"/"unset-env" pair for
+// the environment provider.
+struct EmptyState {
+    const char* empty_path = "/content/empty.html";
+    const char* missing_path = "/content/missing.html";
+};
+
+nift_status empty_loader(void* user_data, const char* path, size_t path_len, nift_string* out) {
+    auto* state = static_cast<EmptyState*>(user_data);
+    const std::string key(path, path_len);
+    if (key.find(state->empty_path) != std::string::npos) {
+        out->data = nullptr;
+        out->length = 0;
+        return NIFT_OK;  // existing empty file
+    }
+    if (key.find(state->missing_path) != std::string::npos) return NIFT_ERROR_NOT_FOUND;
+    return NIFT_ERROR_NOT_FOUND;
+}
+
+nift_status empty_env(void* user_data, const char* name, size_t name_len, nift_string* out) {
+    const std::string key(name, name_len);
+    if (key == "EMPTY") {
+        out->data = nullptr;
+        out->length = 0;
+        return NIFT_OK;  // set to empty string
+    }
+    return NIFT_ERROR_NOT_FOUND;  // unset
+}
+
+void test_callback_empty_vs_missing() {
+    nift_engine* engine = nift_engine_new();
+    EmptyState state;
+    CHECK(nift_engine_set_loader(engine, empty_loader, &state) == NIFT_OK);
+    CHECK(nift_engine_set_environment_provider(engine, empty_env, nullptr) == NIFT_OK);
+
+    nift_source empty_page{};
+    empty_page.kind = NIFT_SOURCE_PATH;
+    const std::string empty_path = "content/empty.html";
+    empty_page.data = empty_path.data();
+    empty_page.length = empty_path.size();
+    nift_source missing_page{};
+    missing_page.kind = NIFT_SOURCE_PATH;
+    const std::string missing_path = "content/missing.html";
+    missing_page.data = missing_path.data();
+    missing_page.length = missing_path.size();
+    nift_source tpl{};
+    tpl.kind = NIFT_SOURCE_TEXT;
+    const std::string tpl_text = "<main>@content</main>";
+    tpl.data = tpl_text.data();
+    tpl.length = tpl_text.size();
+
+    // Existing EMPTY source renders (present, empty) - not a missing-source error.
+    nift_render_result* result = nullptr;
+    CHECK(nift_engine_render(engine, &empty_page, &tpl, nullptr, &result) == NIFT_OK);
+    CHECK(nift_render_result_ok(result) == 1);
+    nift_string output{};
+    CHECK(nift_render_result_output(result, &output) == NIFT_OK);
+    CHECK(read_view(output) == "<main></main>");
+    nift_render_result_free(result);
+
+    // Missing source is a controlled render failure, not a callback error.
+    CHECK(nift_engine_render(engine, &missing_page, &tpl, nullptr, &result) == NIFT_OK);
+    CHECK(nift_render_result_ok(result) == 0);
+    nift_string err{};
+    CHECK(nift_render_result_error_message(result, &err) == NIFT_OK);
+    nift_render_result_free(result);
+
+    // Empty env value vs unset env value.
+    nift_source env_page{};
+    env_page.kind = NIFT_SOURCE_TEXT;
+    const std::string env_text = "@getenv(EMPTY)|@getenv(MISSING)";
+    env_page.data = env_text.data();
+    env_page.length = env_text.size();
+    CHECK(nift_engine_render(engine, &env_page, &tpl, nullptr, &result) == NIFT_OK);
+    CHECK(nift_render_result_ok(result) == 1);
+    CHECK(nift_render_result_output(result, &output) == NIFT_OK);
+    CHECK(read_view(output) == "<main>|</main>");
+    nift_render_result_free(result);
+
+    nift_engine_free(engine);
+}
+
+// Deterministic concurrent callback-error attribution. One engine, one loader.
+// Render A's loader hard-fails; render B's loader succeeds but waits until A's
+// loader has run (guaranteed overlap). Each render must receive exactly its own
+// callback status: A -> NIFT_ERROR_CALLBACK, B -> NIFT_OK with the correct
+// output. thread_local scoping makes completion order irrelevant.
+thread_local bool g_is_a_thread = false;
+
+struct ConcurrentState {
+    std::mutex mutex;
+    std::condition_variable cv;
+    bool a_loader_ran = false;
+};
+
+nift_status concurrent_loader(void* user_data, const char* path, size_t path_len, nift_string* out) {
+    auto* state = static_cast<ConcurrentState*>(user_data);
+    if (g_is_a_thread) {
+        {
+            std::lock_guard<std::mutex> lock(state->mutex);
+            state->a_loader_ran = true;
+        }
+        state->cv.notify_all();
+        return NIFT_ERROR_CALLBACK;
+    }
+    {
+        std::unique_lock<std::mutex> lock(state->mutex);
+        state->cv.wait(lock, [&] { return state->a_loader_ran; });
+    }
+    const std::string key(path, path_len);
+    if (key.find("/templates/template.html") != std::string::npos) {
+        static const std::string tpl = "<main>@content</main>";
+        out->data = tpl.data();
+        out->length = tpl.size();
+        return NIFT_OK;
+    }
+    static const std::string ok = "<p>B-OK</p>";
+    out->data = ok.data();
+    out->length = ok.size();
+    return NIFT_OK;
+}
+
+thread_local std::string g_last_output;
+
+nift_status render_with_loader(nift_engine* engine, bool is_a) {
+    g_is_a_thread = is_a;
+    nift_source page{};
+    page.kind = NIFT_SOURCE_PATH;
+    const std::string path = "content/blog.html";
+    page.data = path.data();
+    page.length = path.size();
+    nift_source tpl{};
+    tpl.kind = NIFT_SOURCE_PATH;
+    const std::string tpl_path = "templates/template.html";
+    tpl.data = tpl_path.data();
+    tpl.length = tpl_path.size();
+    nift_render_result* result = nullptr;
+    const nift_status status = nift_engine_render(engine, &page, &tpl, nullptr, &result);
+    if (status == NIFT_OK && result != nullptr) {
+        nift_string output{};
+        if (nift_render_result_output(result, &output) == NIFT_OK) {
+            g_last_output = read_view(output);
+        }
+        nift_render_result_free(result);
+    } else if (result != nullptr) {
+        nift_render_result_free(result);
+    }
+    return status;
+}
+
+void test_concurrent_callback_attribution() {
+    // A fails, B succeeds, overlapping (both start orders).
+    for (int order = 0; order < 2; ++order) {
+        nift_engine* engine = nift_engine_new();
+        ConcurrentState state;
+        CHECK(nift_engine_set_loader(engine, concurrent_loader, &state) == NIFT_OK);
+
+        nift_status a_status = NIFT_OK, b_status = NIFT_OK;
+        std::string a_output, b_output;
+        std::thread a([&] {
+            a_status = render_with_loader(engine, true);
+            a_output = g_last_output;
+        });
+        std::thread b([&] {
+            if (order == 1) {
+                // Reverse start order: B starts first but still waits for A's
+                // loader inside the callback.
+            }
+            b_status = render_with_loader(engine, false);
+            b_output = g_last_output;
+        });
+        a.join();
+        b.join();
+        CHECK(a_status == NIFT_ERROR_CALLBACK);
+        CHECK(b_status == NIFT_OK);
+        CHECK(b_output == "<main><p>B-OK</p></main>");
+        nift_engine_free(engine);
+    }
+
+    // Two simultaneous callback failures: both reports must be NIFT_ERROR_CALLBACK.
+    nift_engine* engine = nift_engine_new();
+    ConcurrentState state;
+    CHECK(nift_engine_set_loader(engine, concurrent_loader, &state) == NIFT_OK);
+    // Force both to fail: B becomes a failing thread for this round.
+    nift_status s1 = NIFT_OK, s2 = NIFT_OK;
+    std::thread t1([&] { s1 = render_with_loader(engine, true); });
+    std::thread t2([&] {
+        g_is_a_thread = true;  // second failing render
+        nift_source page{};
+        page.kind = NIFT_SOURCE_PATH;
+        const std::string path = "content/blog.html";
+        page.data = path.data();
+        page.length = path.size();
+        nift_source tpl{};
+        tpl.kind = NIFT_SOURCE_PATH;
+        const std::string tpl_path = "templates/template.html";
+        tpl.data = tpl_path.data();
+        tpl.length = tpl_path.size();
+        nift_render_result* result = nullptr;
+        s2 = nift_engine_render(engine, &page, &tpl, nullptr, &result);
+        if (result != nullptr) nift_render_result_free(result);
+        g_is_a_thread = false;
+    });
+    t1.join();
+    t2.join();
+    CHECK(s1 == NIFT_ERROR_CALLBACK);
+    CHECK(s2 == NIFT_ERROR_CALLBACK);
+    nift_engine_free(engine);
+}
+
 void test_concurrent_renders() {
     nift_engine* engine = nift_engine_new();
     CHECK(engine != nullptr);
@@ -411,6 +673,10 @@ int main() {
     test_project_and_pagination();
     test_repeated_create_destroy();
     test_large_and_unicode();
+    test_integer_width_and_number();
+    test_source_kind_validation();
+    test_callback_empty_vs_missing();
+    test_concurrent_callback_attribution();
     test_concurrent_renders();
 
     if (failures == 0) {
