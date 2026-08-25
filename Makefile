@@ -4,7 +4,7 @@ CPPFLAGS ?= -Isrc -Iinclude -Iminifypp/include -Iminifypp/src
 LDFLAGS ?=
 LDLIBS ?=
 
-SOURCES := src/nift.cpp src/ProjectOwnership.cpp src/CLI.cpp src/Engine.cpp src/Context.cpp src/Value.cpp src/FileSystem.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp src/Parser.cpp src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp src/WatchList.cpp src/BuildProgress.cpp
+SOURCES := src/nift.cpp src/ProjectOwnership.cpp src/CLI.cpp src/Engine.cpp src/Context.cpp src/Value.cpp src/FileSystem.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp src/Parser.cpp src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp src/WatchList.cpp src/BuildProgress.cpp src/c_abi.cpp
 OBJECTS := $(SOURCES:.cpp=.o)
 DEPFILES := $(OBJECTS:.o=.d)
 
@@ -242,6 +242,49 @@ test-engine-reload-tsan: $(ENGINE_RELOAD_TSAN)
 	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 $(ENGINE_RELOAD_TSAN)
 
 
+# CP10: Nift Embed C ABI. Static + shared libraries over the engine core, and
+# an adversarial/lifetime test that exercises only the public C header.
+C_ABI_CORE := $(filter-out src/nift.o src/CLI.o,$(OBJECTS))
+C_ABI_PIC := $(patsubst %.o,$(TEST_DIR)/pic/%.o,$(C_ABI_CORE))
+
+$(TEST_DIR)/pic/%.o: %.cpp
+	mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -fPIC -c $< -o $@
+
+libnift_c.a: $(C_ABI_CORE)
+	ar rcs $@ $(C_ABI_CORE)
+
+libnift_c.so: $(C_ABI_PIC)
+	$(CXX) $(CXXFLAGS) -shared -o $@ $(C_ABI_PIC)
+
+C_ABI_TEST := $(TEST_DIR)/c-abi-adversarial$(EXEEXT)
+$(C_ABI_TEST): tests/c_abi_adversarial.cpp libnift_c.a
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/c_abi_adversarial.cpp libnift_c.a $(LDLIBS) -o $@
+
+test-c-abi: $(C_ABI_TEST)
+	$(C_ABI_TEST)
+
+# Pure-C consumer proof: the public header must compile as C and the static
+# library must link into a C program.
+C_ABI_C_SMOKE := $(TEST_DIR)/c-abi-smoke$(EXEEXT)
+$(C_ABI_C_SMOKE): tests/c_abi_smoke.c libnift_c.a
+	mkdir -p $(TEST_DIR)
+	$(CC) $(CPPFLAGS) tests/c_abi_smoke.c libnift_c.a $(LDLIBS) -lstdc++ -lm -pthread -o $@
+
+test-c-abi-c-smoke: $(C_ABI_C_SMOKE)
+	$(C_ABI_C_SMOKE)
+
+# CP10: direct C++ Engine::render vs C ABI render overhead benchmark.
+C_ABI_BENCH := $(TEST_DIR)/c-abi-bench$(EXEEXT)
+$(C_ABI_BENCH): tests/c_abi_bench.cpp libnift_c.a
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/c_abi_bench.cpp libnift_c.a $(LDLIBS) -o $@
+
+benchmark-c-abi: $(C_ABI_BENCH)
+	$(C_ABI_BENCH)
+
+
 test-comments: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/comments_smoke.sh
 
@@ -407,7 +450,7 @@ clean:
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
-.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-diagnostics test-minify test-json-schema-integration test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
+.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-diagnostics test-minify test-json-schema-integration test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
 
 
 test-cross-feature: $(TARGET)
