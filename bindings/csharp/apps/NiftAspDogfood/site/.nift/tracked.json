@@ -1,0 +1,1 @@
+{"tracked":[{"name":"home","title":"Home","template":"templates/template.html"},{"name":"blog","title":"Blog","template":"templates/template.html","paginate":{"items-per-page":1}}]}

@@ -1,8 +1,9 @@
 # Nift Embed programme — remaining roadmap (canonical)
 
-Status: synchronized 2026-08-25 after CP11 (Go binding) and the tracking-forensics
-detour. Repository heads at that point: `nift-embed e3d6267`, `nift-rs 1e429bd`,
-`nift-embed-regression-suite 47ef21a`.
+Status: synchronized 2026-08-26 after CP12/CP12.1 (contract strengthening) and
+the product-scope decision that Python joins the initial production binding set.
+Repository heads at that point: `nift-embed 5ab5a8a`, `nift-rs 808b9a0`,
+`nift-embed-regression-suite f4c3c55`.
 
 Sequencing principle: **production bindings attack the frozen C ABI before the
 final hardening/performance campaigns**, exactly as Go did. Go found three real
@@ -11,41 +12,64 @@ Error(diagnostic) transport) before those assumptions propagated. Do not call a
 campaign "final" while new FFI/runtime boundaries are still to come.
 
 ```text
-CP12  strengthen contracts
-CP13  C# + ASP.NET dogfood
-CP14  Node/JS + HTTP dogfood
-CP15  full historical + expanded regression campaign
-CP16  sanitizer / memory / platform campaign
-CP17  final performance campaign
-CP18  merge decision + canonicalization
+CP13  C# + ASP.NET Core dogfood
+CP14  Node/JavaScript + HTTP dogfood
+CP15  Python + real Python web-app dogfood
+CP16  full historical + expanded regression campaign
+CP17  sanitizer / memory / platform campaign
+CP18  final performance campaign
+CP19  merge decision + canonicalization
         ↓
 packages + website + release
 ```
 
-## CP12 — broader shared regression-suite expansion
+## Product scope: the initial production binding set
 
-Expand the implementation-neutral corpus: CLI/build contract modules, Embed
-semantic cases, failure/recovery families, host-resource cases, pagination
-cases. Expectations stay implementation-neutral.
+Nift Embed is consistent with Nift's philosophy precisely because it lets Nift
+remain glue inside somebody else's backend rather than becoming the backend
+framework itself. Nift should NOT grow: HTTP framework, router, ORM, database
+layer, auth framework, job system, deployment runtime, application framework.
+The model stays:
 
-Acceptance: expanded frozen corpus; C++ API PASS, nift-rs PASS, C ABI PASS, Go
-PASS; negative anti-agreement PASS. Gives the next bindings a stronger contract
-to attack.
+```text
+user's backend/framework
+        ↓
+    Nift Embed
+        ↓
+template rendering
+```
+
+The intended initial production binding set is **C++, Go, C#, JavaScript/Node,
+Python**, with **Rust as the independent experimental/conformance
+implementation**. **Python is the final planned initial production binding.**
+
+After Python, STOP adding languages by default. Additional bindings after the
+initial release require: demonstrated user demand, OR a compelling dogfood/use
+case, OR a materially different runtime/FFI model that teaches us something
+important. Do not turn language coverage into a completeness contest. The
+product-level mental model remains: *Nift is a fast templating and build tool.
+Nift Embed lets applications use the same templating engine directly.* Bindings
+are distribution/integration surfaces, not new Nift subsystems.
 
 ## CP13 — C# production binding
 
 Architecture: idiomatic C# API → P/Invoke native interop → Nift C ABI → canonical
 C++ Embed. No Nift semantic reimplementation.
 
-Cover the same public surface as Go: Engine, Context, bindings, render sources,
-RenderPage, pagination, dependencies, requirements, loader/environment providers,
-Found/NotFound/Error(diagnostic), ABI compatibility, lifetime/disposal. C#
-becomes another shared-corpus adapter.
+Cover the same public surface as Go: Engine, Context, Engine-default vs Context
+binding precedence, string/number/bool/JSON values, composed/partial/page
+renders, pagination, dependencies, requirements, loader/environment providers,
+Found/NotFound/Error(diagnostic), invalid-binding/setup failures, malformed-JSON
+failure family, ABI compatibility, lifetime/disposal (SafeHandle/IDisposable,
+delegate rooting — do not copy Go's ownership machinery mechanically). C# becomes
+another shared-corpus adapter (fifth).
 
 Dogfood requirement: a small real **ASP.NET Core application** using Nift Embed —
-long-lived Engine, repeated + concurrent requests, request-specific bindings,
-partial/template loading, host-resource callbacks, Error(diagnostic), pagination
-where practical. Uses the .NET 10 SDK already on the machine.
+long-lived Engine, repeated + concurrent requests, request-specific Context,
+Engine defaults + Context precedence, partial/template loading, host-resource
+callbacks, Error(diagnostic), pagination where practical, deterministic disposal.
+Uses the .NET 10 SDK already on the machine (verify `dotnet --list-runtimes`
+before assuming an ASP.NET runtime package is required).
 
 STOP FOR REVIEW after CP13.
 
@@ -65,14 +89,30 @@ practical concerns as the ASP.NET dogfood.
 
 STOP FOR REVIEW after CP14.
 
-## CP15 — full historical + expanded regression campaign
+## CP15 — Python production binding
+
+Architecture: Python API → Python C-API/FFI boundary → Nift C ABI → canonical C++
+Embed. No Nift semantic reimplementation.
+
+Attention: GIL interaction with C++ pagination worker callbacks, callback buffer
+lifetime across the Python boundary, reference counting and object lifetime,
+UTF-8/native string ownership, exceptions across the native boundary, concurrent
+render behaviour, `error_prefix` semantic-family handling (do not manufacture C++
+parser wording). Python becomes another shared-corpus adapter.
+
+Dogfood requirement: a small real Python web application (e.g. WSGI/ASGI)
+exercising the same practical concerns as the ASP.NET dogfood.
+
+This is the final planned initial production binding. STOP FOR REVIEW after CP15.
+
+## CP16 — full historical + expanded regression campaign
 
 Run the complete campaign now that the production binding set is present:
 historical Nift regression suite, ruthless/focused suites, shared Embed corpus
-across C++, Rust, C ABI, Go, C#, Node. Divergence becomes an explicit contract
-decision, not an adapter exception.
+across C++, Rust, C ABI, Go, C#, Node, Python. Divergence becomes an explicit
+contract decision, not an adapter exception.
 
-## CP16 — sanitizer / memory / platform campaign
+## CP17 — sanitizer / memory / platform campaign
 
 ASan, UBSan, TSan where applicable, race detector where applicable, native/FFI
 lifetime stress, repeated engine construction/destruction, concurrent renders,
@@ -88,21 +128,21 @@ Go callback-output buffer lifetime bound
     (do NOT resurrect free-on-next-callback; CP11 proved it unsafe)
 loaderKeys separator normalization
 write_file_atomic-style helper audit
-cross-platform binding behaviour (C#, Node included)
+cross-platform binding behaviour (C#, Node, Python included)
 ```
 
-## CP17 — final performance campaign
+## CP18 — final performance campaign
 
 Split:
 
 - **A. Nift CLI/build**: pre-Embed baseline vs final canonical candidate — 10k
   full build, no-op incremental, single-page incremental, shared-dependency
   rebuild, many-directory, modified/hash/hybrid.
-- **B. Embed/API/bindings**: direct C++, C ABI, Go, C#, Node — raw render
+- **B. Embed/API/bindings**: direct C++, C ABI, Go, C#, Node, Python — raw render
   overhead and a realistic repeated/server render workload. Differences are
   evidence, not automatic blockers.
 
-## CP18 — merge decision and canonicalization
+## CP19 — merge decision and canonicalization
 
 - `nift-embed` → canonical main Nift repository.
 - `nift-embed-regression-suite` → canonical Nift regression infrastructure.
@@ -112,17 +152,17 @@ Split:
   independent experimental/conformance implementation, not a second canonical
   Nift.
 
-## After CP18 — packaging, website, release
+## After CP19 — packaging, website, release
 
-Language package/distribution, public Nift Embed docs (C++, Go, C#, Node/JS),
-real server examples, website navigation/content, release notes, release
-CI/artifacts, final release. Decide later whether additional bindings are
-required before the first public Embed release.
+Language package/distribution (C++, Go, C#, Node/JS, Python), public Nift Embed
+docs, real server examples, website navigation/content, release notes, release
+CI/artifacts, final release. The initial production binding set is complete; no
+new languages by default after this.
 
 ## Permanent gates
 
 C++ conformance, CLI/build contracts, Rust tests, NR6, NR12, shared Embed corpus,
-negative anti-agreement, Go race tests, C# binding tests, Node binding tests,
-zero-mutation/recovery contracts, clean repository state. The zero-`unsafe`
-requirement remains scoped to jsonic-rs / minify-rs / nift-rs and does not apply
-mechanically to FFI bindings where native interop is inherent.
+negative anti-agreement, Go race tests, C# binding tests (incl. ASP.NET
+Core dogfood smoke), Node binding tests, Python binding tests, zero-mutation/recovery contracts, clean repository state.
+The zero-`unsafe` requirement remains scoped to jsonic-rs / minify-rs / nift-rs
+and does not apply mechanically to FFI bindings where native interop is inherent.
