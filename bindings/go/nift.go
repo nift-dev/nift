@@ -126,13 +126,17 @@ type callbackSet struct {
 	mu       sync.Mutex
 	loader   HostLoader
 	env      HostEnvironment
-	idObject *int64            // user_data token passed into C (heap int64, no Go pointers)
+	token    unsafe.Pointer   // C-owned user_data token (C.malloc); C retains it
 	bufs     []unsafe.Pointer // C-allocated callback-output buffers, freed on engine Close
 }
 
 func (c *callbackSet) freeAll() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if c.token != nil {
+		C.free(c.token)
+		c.token = nil
+	}
 	for _, buf := range c.bufs {
 		C.free(buf)
 	}
@@ -161,11 +165,15 @@ func (c *callbackSet) putC(value string, out *C.nift_string) {
 
 func (e *Engine) register() int64 {
 	id := nextCallbackID.Add(1)
-	// The id object is a Go heap int64 (no Go pointers) so it is a valid
-	// user_data token to pass into C and back through the callbacks.
-	idObj := new(int64)
-	*idObj = id
-	callbackRegistry.Store(id, &callbackSet{idObject: idObj})
+	// The user_data token is C-owned memory (C.malloc), NOT a Go heap object:
+	// C retains it for the engine's lifetime and supplies it to callbacks from
+	// any thread (including C++ pagination workers). C pointers may be freely
+	// retained and passed back; Go heap pointers may not. The registry keeps
+	// the Go closure state keyed by the integer id stored in the token, so C
+	// never holds a Go pointer.
+	token := C.malloc(C.size_t(unsafe.Sizeof(int64(0))))
+	*(*int64)(token) = id
+	callbackRegistry.Store(id, &callbackSet{token: token})
 	e.id = id
 	return id
 }
@@ -325,7 +333,7 @@ func (e *Engine) SetLoader(loader HostLoader) {
 		C.nift_engine_set_loader(e.engine, nil, nil)
 		return
 	}
-	C.nift_go_set_loader(e.engine, unsafe.Pointer(v.(*callbackSet).idObject))
+	C.nift_go_set_loader(e.engine, v.(*callbackSet).token)
 }
 
 // SetEnvironmentProvider installs an environment provider.
@@ -336,7 +344,7 @@ func (e *Engine) SetEnvironmentProvider(env HostEnvironment) {
 		C.nift_engine_set_environment_provider(e.engine, nil, nil)
 		return
 	}
-	C.nift_go_set_env(e.engine, unsafe.Pointer(v.(*callbackSet).idObject))
+	C.nift_go_set_env(e.engine, v.(*callbackSet).token)
 }
 
 func goString(s string) (*C.char, C.size_t) {

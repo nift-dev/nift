@@ -59,10 +59,18 @@ race detector.
 29-case implementation-neutral corpus through this binding, requiring Go ==
 frozen expectation alongside C++ / nift-rs / C ABI.
 
-## Known limitation
+## Known limitations
 
 Host-provider callback output is copied into C buffers retained until the engine
 is closed (concurrent pagination-worker callbacks make freeing a peer's buffer
 unsafe). Callback memory grows with total host invocations over an engine's
 lifetime and is reclaimed at `Close`; a per-render buffer pool is deferred to the
 hardening campaign.
+
+`HostResult.Error` is exposed for a host failure diagnostic, but the current
+frozen C ABI callback signature transports only a generic failure: the C++ side
+maps any hard callback status to the fixed "host callback failed" message. The
+full `ERROR(diagnostic)` host-resource contract is preserved for native C++
+providers; a foreign binding's diagnostic is pending the smallest proposed ABI
+repair (reuse the callback's `out` as the failure diagnostic; no signature
+change). See the CP11.1 review proposal.
