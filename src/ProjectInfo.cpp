@@ -932,12 +932,16 @@ int ProjectInfo::finish_if_epoch_complete(ProjectOwnership& ownership, int resul
 
 namespace {
 // Parses a decimal pagination-page suffix beginning at `begin` in `s`. Returns
-// true and sets `page` (>= 2) only when the suffix is entirely decimal digits,
-// numerically >= 2, and representable without overflow. Everything else -
-// non-digits, leading zeros that parse below 2 (e.g. "-00", "-01", "-0001"),
-// oversized/overflowing values - returns false so callers PRESERVE the file.
+// true and sets `page` (>= 2) only when the suffix matches Nift's canonical
+// pagination grammar: entirely decimal digits, NO leading zero (Nift emits
+// unpadded std::to_string(page), so "-02"/"-003" are paths Nift never
+// generates), numerically >= 2, and representable without overflow. Everything
+// else - non-digits, leading zeros ("-0", "-00", "-01", "-02", "-0009"),
+// values below 2, oversized/overflowing values - returns false so callers
+// PRESERVE the file.
 bool parse_pagination_index(const std::string& s, std::size_t begin, std::size_t& page) {
     if (begin >= s.size()) return false;
+    if (s[begin] == '0') return false; // non-canonical leading zero
     std::uint64_t value = 0;
     for (std::size_t i = begin; i < s.size(); ++i) {
         const unsigned char c = static_cast<unsigned char>(s[i]);

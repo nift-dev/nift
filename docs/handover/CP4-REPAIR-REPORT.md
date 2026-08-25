@@ -204,3 +204,37 @@ repair, concurrency, and the new ownership-predicate cases).
 
 47 targets / 357 PASS lines / exit 0. Repair-only change; ordinary-build hot
 path untouched (no performance run needed).
+
+## CP4.3 correction (reviewer HOLD): canonical pagination-path grammar
+
+### Canonical pagination-path grammar
+
+The pagination output formatter (project_read::pagination_output_path_of) emits
+`<base>-<std::to_string(page)>.<ext>` for page >= 2 - ordinary unpadded decimal
+(e.g. blog-2.html, blog-3.html). Nift never generates zero-padded forms.
+
+### Formatter/parser consistency
+
+parse_pagination_index now rejects a leading '0' before numeric parsing, so the
+accepted grammar is EXACTLY the formatter's: entirely decimal, no leading zero,
+N >= 2, no overflow. This makes the repair ownership predicate match the
+formatter rather than maintaining two definitions of the pagination namespace.
+A leading '0' (e.g. "02", "003", "0009") is not a path Nift could have
+produced, so it fails closed (preserve) regardless of its numeric value.
+
+### New zero-padded >=2 cases (repair_campaign.py)
+
+blog-02 / blog-03 / blog-0002 / blog-0003 / blog-0009 with recognizable user
+content: all preserved byte-for-byte after `build --repair`. Continuing proofs:
+blog-2/blog-3 current canonical outputs correct; stale blog-9 (canonical
+surplus) removed; blog-0/1/00/01/0001/overflow preserved; tracked primary
+blog-5 collision preserved.
+
+### Repair campaign result
+
+All repair_campaign.py checks pass.
+
+### Full regression
+
+47 targets / 362 PASS lines / exit 0. Repair-only change; ordinary-build hot
+path untouched (no performance run needed).

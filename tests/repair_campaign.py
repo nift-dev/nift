@@ -381,6 +381,13 @@ def main():
             "blog-00.html": "USER-00",
             "blog-01.html": "USER-01",
             "blog-0001.html": "USER-0001",
+            # zero-padded but numerically >= 2: NOT canonical Nift paths (Nift
+            # emits unpadded std::to_string), so they are user files
+            "blog-02.html": "USER-02",
+            "blog-03.html": "USER-03",
+            "blog-0002.html": "USER-0002",
+            "blog-0003.html": "USER-0003",
+            "blog-0009.html": "USER-0009",
             "blog-99999999999999999999.html": "USER-BIG",   # overflows uint64
         }
         for name, content in user.items():
