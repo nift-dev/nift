@@ -301,9 +301,12 @@ void test_pagination_template_host_error() {
 }
 
 // Deterministic multi-page error selection: with a single build worker the
-// pagination page loop renders pages in page order; the first failing page in
-// page order determines the returned diagnostic (frozen consequence of the
-// concurrent page-render aggregation).
+// pagination page loop renders pages in page order, and the first failing page
+// in page order determines the returned diagnostic. This freezes the public
+// page-order rule for multiple failures; it does NOT by itself prove
+// completion-order independence under multiple concurrent workers (the
+// implementation aggregates page results by page index, so that property is
+// deferred to the broader concurrency/hardening campaign).
 void test_pagination_error_selection_order() {
     const fs::path root = fs::temp_directory_path() / "nift-host-seam-order";
     fs::remove_all(root);
