@@ -220,12 +220,29 @@ void test_pagination_through_public_api(const fs::path& root) {
     nift::RenderResult blog = engine.render("blog/");
     CHECK(blog.ok());
     if (blog.ok()) {
-        // Pagination API design stays open (PA5); the public render returns the
-        // primary page, exactly as the CLI emits public/blog/index.html.
+        // CP8: the public render exposes the complete pagination set -- output
+        // is always page 1 and pagination() carries pages 2..N ascending with
+        // page numbers and per-page rendered output.
         CHECK(contains(blog.output(), "class=\"page-1\""));
         CHECK(contains(blog.output(), "onetwo"));
         CHECK(std::find(blog.dependencies().begin(), blog.dependencies().end(), std::string("data/items.json")) != blog.dependencies().end());
         CHECK(std::find(blog.dependencies().begin(), blog.dependencies().end(), std::string("content/blog/index.paginate.html")) != blog.dependencies().end());
+
+        const auto& pages = blog.pagination();
+        CHECK(pages.size() == 2);
+        if (pages.size() == 2) {
+            CHECK(pages[0].page == 2);
+            CHECK(pages[1].page == 3);
+            CHECK(contains(pages[0].output, "class=\"page-2\""));
+            CHECK(contains(pages[0].output, "threefour"));
+            CHECK(contains(pages[1].output, "class=\"page-3\""));
+            CHECK(contains(pages[1].output, "five"));
+        }
+
+        // Non-paginated pages expose an empty pagination set.
+        nift::RenderResult about = engine.render("about");
+        CHECK(about.ok());
+        CHECK(about.pagination().empty());
     }
 }
 

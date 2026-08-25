@@ -90,7 +90,19 @@ int run_main(int argc, char** argv) {
     nift::Source page = page_path.empty() ? nift::Source::text(page_text) : nift::Source::path(page_path);
     nift::Source tpl = template_path.empty() ? nift::Source::text(template_text) : nift::Source::path(template_path);
 
-    auto result = mode == "partial" ? engine.render(page, context) : engine.render(page, tpl, context);
+    nift::RenderResult result;
+    if (mode == "page") {
+        // Tracked-page render (project-aware): renders the named tracked page
+        // and exposes complete pagination.
+        std::string reload_error;
+        if (!engine.reload(&reload_error)) {
+            std::cout << "{\"ok\":false,\"error\":\"" << json_escape(reload_error) << "\"}\n";
+            return 0;
+        }
+        result = engine.render(page_name, context);
+    } else {
+        result = mode == "partial" ? engine.render(page, context) : engine.render(page, tpl, context);
+    }
     if (!result.ok()) {
         std::cout << "{\"ok\":false,\"error\":\"" << json_escape(result.error().message) << "\"}\n";
         return 0;
@@ -101,6 +113,13 @@ int run_main(int argc, char** argv) {
     std::cout << "],\"requirements\":[";
     first = true;
     for (const auto& r : result.requirements()) { if (!first) std::cout << ","; first = false; std::cout << "\"" << json_escape(r) << "\""; }
+    std::cout << "],\"pagination\":[";
+    first = true;
+    for (const auto& p : result.pagination()) {
+        if (!first) std::cout << ",";
+        first = false;
+        std::cout << "{\"page\":" << p.page << ",\"output\":\"" << json_escape(p.output) << "\"}";
+    }
     if (seam == "loader") {
         std::cout << "],\"loaderKeys\":[";
         first = true;

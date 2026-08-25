@@ -200,6 +200,14 @@ struct RenderResultBuilder {
         }
         result.dependencies_.assign(internal.dependencies.begin(), internal.dependencies.end());
         result.requirements_.assign(internal.reqs.begin(), internal.reqs.end());
+        // Complete pagination: the internal vector holds pages 1..N (page 1 is
+        // `output`); expose pages 2..N ascending with their page numbers.
+        if (internal.pagination_outputs.size() > 1) {
+            result.pagination_.reserve(internal.pagination_outputs.size() - 1);
+            for (std::size_t i = 1; i < internal.pagination_outputs.size(); ++i) {
+                result.pagination_.push_back({i + 1, internal.pagination_outputs[i]});
+            }
+        }
         return result;
     }
 };
