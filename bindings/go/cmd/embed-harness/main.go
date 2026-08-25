@@ -52,21 +52,41 @@ func main() {
 
 	// Bindings on stdin: name=value lines; json: prefix binds JSON.
 	var loaderKeys []string
+	context := nift.NewContext()
 	scanner := bufio.NewScanner(os.Stdin)
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line == "" {
 			continue
 		}
+		// A "@ctx " prefix binds the pair on the render Context instead of the
+		// Engine, exercising the context-over-engine precedence contract.
+		onContext := strings.HasPrefix(line, "@ctx ")
+		if onContext {
+			line = line[len("@ctx "):]
+		}
 		eq := strings.IndexByte(line, '=')
 		if eq < 0 {
 			continue
 		}
 		name, value := line[:eq], line[eq+1:]
+		var err error
 		if strings.HasPrefix(value, "json:") {
-			_ = engine.SetJSON(name, value[len("json:"):])
+			if onContext {
+				err = context.SetJSON(name, value[len("json:"):])
+			} else {
+				err = engine.SetJSON(name, value[len("json:"):])
+			}
 		} else {
-			_ = engine.SetString(name, value)
+			if onContext {
+				err = context.SetString(name, value)
+			} else {
+				err = engine.SetString(name, value)
+			}
+		}
+		if err != nil {
+			fmt.Printf(`{"ok":false,"error":"invalid binding name: %s"}`+"\n", name)
+			os.Exit(0)
 		}
 	}
 
@@ -108,22 +128,21 @@ func main() {
 		})
 	}
 
-	ctx := nift.NewContext()
-	defer ctx.Close()
+	defer context.Close()
 	if pageName != "" {
-		ctx.SetPageName(pageName)
+		context.SetPageName(pageName)
 	}
 	if currentOutput != "" {
-		ctx.SetCurrentOutput(currentOutput)
+		context.SetCurrentOutput(currentOutput)
 	}
 
 	var result nift.Result
 	var err error
 	switch mode {
 	case "page":
-		result, err = engine.RenderPage(pageName, ctx)
+		result, err = engine.RenderPage(pageName, context)
 	case "partial":
-		result, err = engine.RenderPartial(pageText, ctx)
+		result, err = engine.RenderPartial(pageText, context)
 	default: // composed
 		page := nift.RenderSource{}
 		if pagePath != "" {
@@ -137,7 +156,7 @@ func main() {
 		} else {
 			tpl = nift.RenderSource{Text: templateText}
 		}
-		result, err = engine.RenderSources(page, tpl, ctx)
+		result, err = engine.RenderSources(page, tpl, context)
 	}
 	if err != nil {
 		emit(map[string]any{"ok": false, "error": err.Error()})

@@ -83,20 +83,34 @@ int run_main(int argc, char** argv) {
             return {nift::HostStatus::Error, "", "host exploded"};
         });
     }
+    nift::Context context;
     std::string line;
     while (std::getline(std::cin, line)) {
         if (line.empty()) continue;
+        // A "@ctx " prefix binds the pair on the render Context instead of the
+        // Engine, exercising the context-over-engine precedence contract.
+        bool on_context = line.rfind("@ctx ", 0) == 0;
+        if (on_context) line = line.substr(5);
         const auto eq = line.find('=');
         if (eq == std::string::npos) continue;
         const std::string name = line.substr(0, eq);
         const std::string value = line.substr(eq + 1);
-        // A "json:" prefix binds a JSON value instead of a string, so the
-        // differential can exercise arrays/objects/numbers/bools (NR10).
-        if (value.rfind("json:", 0) == 0) engine.set_json(name, value.substr(5));
-        else engine.set(name, value);
+        bool ok;
+        if (value.rfind("json:", 0) == 0) {
+            // A "json:" prefix binds a JSON value instead of a string, so the
+            // differential can exercise arrays/objects/numbers/bools (NR10).
+            ok = on_context ? context.set_json(name, value.substr(5))
+                            : engine.set_json(name, value.substr(5));
+        } else {
+            ok = on_context ? context.set(name, value) : engine.set(name, value);
+        }
+        if (!ok) {
+            std::cout << "{\"ok\":false,\"error\":\"invalid binding name: "
+                      << json_escape(name) << "\"}\n";
+            return 0;
+        }
     }
 
-    nift::Context context;
     if (!page_name.empty()) context.set_page_name(page_name);
     if (!current_output.empty()) context.set_current_output(current_output);
 
