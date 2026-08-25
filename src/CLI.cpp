@@ -838,9 +838,24 @@ int run_cli(int argc, char** argv) {
         }
         project.tracked.push_back(std::move(candidate));
         project.invalidate_tracked_index();
+        // Persist authoritative tracking state FIRST, then create the content
+        // file (order B). A failed save leaves tracked.json unchanged (the
+        // in-memory entry is popped so the process state matches); a failed
+        // content creation leaves a tracked entry with a missing content file,
+        // which the next build reports precisely ("content file does not exist")
+        // -- far more recoverable than an orphan content file Nift has no
+        // knowledge of. track never participates in the build ownership epoch.
+        if (!project.save_tracking()) {
+            project.tracked.pop_back();
+            project.invalidate_tracked_index();
+            return 1;
+        }
         const fs::path new_content = project.content_path(project.tracked.back());
-        if (!filesystem::path_exists(new_content) && !filesystem::write_file(new_content, "")) return 1;
-        return project.save_tracking() ? 0 : 1;
+        if (!filesystem::path_exists(new_content) && !filesystem::write_file(new_content, "")) {
+            console::error("could not create tracked content file: " + new_content.generic_string());
+            return 1;
+        }
+        return 0;
     }
 
     if (command == "untrack" || command == "rm" || command == "del") {
