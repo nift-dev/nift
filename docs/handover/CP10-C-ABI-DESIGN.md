@@ -315,3 +315,26 @@ and all 7 C++ `read_shared_source` sites + `environment` preserve host errors;
 the only intentional transformations are MissingSource/NotFound -> canonical
 missing/optional diagnostics and boolean existence probes that let the
 subsequent authoritative read surface the real error. Rust workspace 221/221.
+
+## CP11 — first production binding: Go (2026-08-25)
+
+`bindings/go` is a thin, idiomatic, ownership-safe cgo binding over the frozen
+C ABI, living with nift-embed (one compatibility unit; not a separate repo).
+It translates types, ownership and callbacks only — no Nift semantics are
+reimplemented in Go. Covers engine/context/bindings, render sources
+(text/path/mixed), RenderPage with complete pagination, dependencies/
+requirements, loader/environment providers (Found/NotFound/Error), panic
+containment at the exported cgo boundary, ABI-version compatibility, and full
+Go-owned result conversion.
+
+Go unit/lifetime/callback/concurrency tests pass under `go test -race`,
+including `TestPaginationWorkerEnvCallback`: C++ pagination worker threads
+invoke the Go environment provider and the failure/success crosses back
+correctly (the critical CP10 boundary). The neutral-protocol harness
+(`cmd/embed-harness`) plus `embed/adapters/go-embed` drive the shared corpus:
+**29/29 with C++ API / nift-rs / C ABI / Go all equal to the frozen
+expectations**, negative anti-agreement self-test passes. cgo render overhead
+~1.8us/render over the direct C ABI (~5.9us vs ~4.1us). Documented limitation:
+host-provider callback buffers are retained until engine Close (safe under
+concurrent pagination-worker callbacks); a per-render pool is deferred to the
+hardening campaign.
