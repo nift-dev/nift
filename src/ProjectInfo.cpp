@@ -26,11 +26,18 @@ namespace {
 constexpr std::size_t detailed_build_output_limit = 10;
 constexpr std::size_t summary_path_sample_limit = 5;
 
+// A directory is a Nift project root only where the relevant project state
+// exists: BOTH .nift/config.json and .nift/tracked.json. There is no global
+// Nift configuration; in particular the historical ~/.nift global config
+// directory (config.json with no tracked.json) must never be mistaken for a
+// project root by the upward walk.
 fs::path find_project_root(fs::path path = fs::current_path()) {
     std::error_code error;
     path = fs::absolute(path, error);
     while (true) {
-        if (filesystem::path_exists(path / ".nift/config.json")) return path;
+        if (filesystem::path_exists(path / ".nift/config.json") &&
+            filesystem::path_exists(path / ".nift/tracked.json"))
+            return path;
         const fs::path parent = path.parent_path();
         if (parent == path) return {};
         path = parent;
@@ -45,7 +52,7 @@ WatchList& ProjectInfo::watch_list() { return *watch_; }
 bool ProjectInfo::open() {
     root = find_project_root();
     if (root.empty()) {
-        console::error("not inside a Nift project");
+        console::error("not a Nift project");
         return false;
     }
     return load_config() && load_tracking() && watch_->load(root);

@@ -81,6 +81,12 @@ bool valid_tracked_name(const std::string& name) {
 
 bool load_config(const fs::path& root, Config& config, std::string& error) {
     const fs::path path = root / ".nift/config.json";
+    // A root without .nift/config.json is not a Nift project at all; it must
+    // never be reported as a config diagnostic (no global config participates).
+    if (!filesystem::path_exists(path)) {
+        error = "not a Nift project";
+        return false;
+    }
     json::Document document;
     std::string parse_error;
     if (!load_json_file(path, document, parse_error) || !document.is_object() || !document.has("config") ||
@@ -196,8 +202,11 @@ bool load_config(const fs::path& root, Config& config, std::string& error) {
 
 bool load_tracking(const fs::path& root, const Config& config, std::vector<TrackedInfo>& tracked, std::string& error) {
     const fs::path path = root / ".nift/tracked.json";
+    // A root without .nift/tracked.json lacks the relevant project state; it is
+    // not a Nift project (the historical ~/.nift global config dir has only
+    // config.json and must not be treated as a project).
     if (!filesystem::path_exists(path)) {
-        error = "invalid tracked.json (file does not exist)";
+        error = "not a Nift project";
         return false;
     }
 

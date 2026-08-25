@@ -13,6 +13,16 @@ bool ProjectState::open(const std::filesystem::path& root, std::string& error) {
     // Build the candidate snapshot entirely in locals. Commit only if the whole
     // snapshot validates, so a failure can never expose partial state.
     const fs::path candidate_root = fs::absolute(root).lexically_normal();
+    // A root is a Nift project only where the relevant project state exists:
+    // BOTH .nift/config.json and .nift/tracked.json. No global config
+    // participates; in particular a historical ~/.nift global config dir
+    // (config.json with old keys, no tracked.json) must never be parsed.
+    if (!filesystem::path_exists(candidate_root / ".nift/config.json") ||
+        !filesystem::path_exists(candidate_root / ".nift/tracked.json")) {
+        error = "not a Nift project";
+        reset();
+        return false;
+    }
     Config candidate_config;
     std::vector<TrackedInfo> candidate_tracked;
 
