@@ -232,7 +232,7 @@ static void remove_stale_temporaries(const fs::path& path) {
         }
     }
 
-    RecentParent recent{std::string(parent_view), epoch};
+    RecentParent recent{native_path_string(parent_view), epoch};
     if (recent_count < recent_parents.size()) recent_parents[recent_count++] = std::move(recent);
     else {
         for (std::size_t i = 1; i < recent_parents.size(); ++i) recent_parents[i - 1] = std::move(recent_parents[i]);
