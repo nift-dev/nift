@@ -754,6 +754,74 @@ void test_c_abi_env_host_failure() {
     nift_engine_free(project);
 }
 
+// Hard callback failures must preserve a SUPPLIED diagnostic exactly: the
+// callback's out is the failure diagnostic (non-empty), and an empty out falls
+// back to the generic "host callback failed".
+nift_status diagnostic_loader(void* user_data, const char* path, size_t path_len, nift_string* out) {
+    const std::string key(path, path_len);
+    if (key.find("/templates/template.html") != std::string::npos) {
+        static const std::string tpl = "<main>@content</main>";
+        out->data = tpl.data();
+        out->length = tpl.size();
+        return NIFT_OK;
+    }
+    static const std::string diag = "loader exploded";
+    out->data = diag.data();
+    out->length = diag.size();
+    return NIFT_ERROR_CALLBACK;
+}
+
+nift_status diagnostic_env(void* user_data, const char* name, size_t name_len, nift_string* out) {
+    static const std::string diag = "env exploded";
+    out->data = diag.data();
+    out->length = diag.size();
+    return NIFT_ERROR_CALLBACK;
+}
+
+void test_callback_diagnostic_preservation() {
+    // Loader: the page read fails with the supplied diagnostic preserved.
+    nift_engine* engine = nift_engine_new();
+    CHECK(nift_engine_set_loader(engine, diagnostic_loader, nullptr) == NIFT_OK);
+    nift_source page{};
+    page.kind = NIFT_SOURCE_PATH;
+    const std::string page_path = "content/blog.html";
+    page.data = page_path.data();
+    page.length = page_path.size();
+    nift_source tpl{};
+    tpl.kind = NIFT_SOURCE_PATH;
+    const std::string tpl_path = "templates/template.html";
+    tpl.data = tpl_path.data();
+    tpl.length = tpl_path.size();
+    nift_render_result* result = nullptr;
+    CHECK(nift_engine_render(engine, &page, &tpl, nullptr, &result) == NIFT_OK);
+    CHECK(nift_render_result_ok(result) == 0);
+    nift_string err{};
+    CHECK(nift_render_result_error_message(result, &err) == NIFT_OK);
+    CHECK(read_view(err) == "loader exploded");
+    nift_render_result_free(result);
+    nift_engine_free(engine);
+
+    // Environment: @getenv fails with the supplied diagnostic preserved.
+    nift_engine* env_engine = nift_engine_new();
+    CHECK(nift_engine_set_environment_provider(env_engine, diagnostic_env, nullptr) == NIFT_OK);
+    nift_source env_page{};
+    env_page.kind = NIFT_SOURCE_TEXT;
+    const std::string env_text = "@getenv(X)";
+    env_page.data = env_text.data();
+    env_page.length = env_text.size();
+    nift_source env_tpl{};
+    env_tpl.kind = NIFT_SOURCE_TEXT;
+    const std::string env_tpl_text = "<main>@content</main>";
+    env_tpl.data = env_tpl_text.data();
+    env_tpl.length = env_tpl_text.size();
+    CHECK(nift_engine_render(env_engine, &env_page, &env_tpl, nullptr, &result) == NIFT_OK);
+    CHECK(nift_render_result_ok(result) == 0);
+    CHECK(nift_render_result_error_message(result, &err) == NIFT_OK);
+    CHECK(read_view(err) == "getenv: env exploded");
+    nift_render_result_free(result);
+    nift_engine_free(env_engine);
+}
+
 int main() {
     test_version_and_handles();
     test_bindings_and_context();
@@ -764,6 +832,7 @@ int main() {
     test_integer_width_and_number();
     test_source_kind_validation();
     test_callback_empty_vs_missing();
+    test_callback_diagnostic_preservation();
     test_concurrent_callback_attribution();
     test_c_abi_env_host_failure();
     test_concurrent_renders();

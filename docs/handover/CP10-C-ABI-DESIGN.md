@@ -338,3 +338,26 @@ expectations**, negative anti-agreement self-test passes. cgo render overhead
 host-provider callback buffers are retained until engine Close (safe under
 concurrent pagination-worker callbacks); a per-render pool is deferred to the
 hardening campaign.
+
+## CP11.1 — C ABI callback diagnostic transport (2026-08-25)
+
+The frozen C ABI callback could express FOUND/NOT_FOUND/ERROR but not
+ERROR(diagnostic): `callback_result()` ignored `out` on a hard status and
+returned the generic "host callback failed". The semantic completion (no
+signature/enum/struct/symbol change; no ABI version bump) reuses the existing
+`nift_string* out` as the failure diagnostic channel:
+
+```text
+NIFT_OK              out = value (length 0 = valid empty)
+NIFT_ERROR_NOT_FOUND out ignored (absent/unset)
+hard callback status out = diagnostic (non-empty)
+                     out empty -> "host callback failed"
+```
+
+The Go binding now places `HostResult.Error` into `out` on `HostError`, so
+`Error("host exploded")` reaches the failed RenderResult exactly. The shared
+corpus host-error cases (env standalone, env pagination, loader standalone)
+now expect the specific supplied diagnostic ("host exploded" / "getenv: host
+exploded"), 29/29 across C++ / nift-rs / C ABI / Go. Exact-preservation tests
+added in the C ABI adversarial battery, the pure-C consumer, and the Go binding
+(including the C++ pagination-worker -> C -> Go callback path under -race).

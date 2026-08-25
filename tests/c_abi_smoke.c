@@ -9,6 +9,8 @@
 
 #include "nift/c_abi.h"
 
+static nift_status smoke_loader(void* user_data, const char* path, size_t path_len, nift_string* out);
+
 int main(void) {
     if (strcmp(nift_abi_version(), NIFT_ABI_VERSION) != 0) return 1;
     if (nift_abi_version_major() != 1) return 1;
@@ -43,8 +45,45 @@ int main(void) {
     if (strncmp(output.data, "<main>site=hello</main>", output.length) != 0) return 1;
 
     nift_render_result_free(result);
+
+    /* Host failure with a supplied diagnostic must be preserved exactly. */
+    engine = nift_engine_new();
+    if (engine == NULL) return 1;
+    if (nift_engine_set_loader(engine, smoke_loader, NULL) != NIFT_OK) return 1;
+    page.kind = NIFT_SOURCE_PATH;
+    page.data = "content/blog.html";
+    page.length = 18;
+    tpl.kind = NIFT_SOURCE_PATH;
+    tpl.data = "templates/template.html";
+    tpl.length = 25;
+    result = NULL;
+    if (nift_engine_render(engine, &page, &tpl, NULL, &result) != NIFT_OK) return 1;
+    if (nift_render_result_ok(result) != 0) return 1;
+    {
+        nift_string err;
+        if (nift_render_result_error_message(result, &err) != NIFT_OK) return 1;
+        if (err.length != 14) return 1; /* strlen("loader exploded") */
+        if (strncmp(err.data, "loader exploded", err.length) != 0) return 1;
+    }
+    nift_render_result_free(result);
     nift_engine_free(engine);
 
     printf("C ABI C-consumer smoke passed\n");
     return 0;
+}
+
+static nift_status smoke_loader(void* user_data, const char* path, size_t path_len, nift_string* out) {
+    const char* suffix;
+    size_t suffix_len;
+    (void)user_data;
+    if (path_len >= 25 && strncmp(path + path_len - 25, "/templates/template.html", 25) == 0) {
+        suffix = "<main>@content</main>";
+        suffix_len = 20;
+        out->data = suffix;
+        out->length = suffix_len;
+        return NIFT_OK;
+    }
+    out->data = "loader exploded";
+    out->length = 14;
+    return NIFT_ERROR_CALLBACK;
 }

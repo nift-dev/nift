@@ -50,7 +50,7 @@ func TestPaginationWorkerEnvCallback(t *testing.T) {
 	if r.OK {
 		t.Fatal("expected the pagination-worker host failure to fail the render")
 	}
-	if r.Error == nil || !strings.Contains(r.Error.Message, "host callback failed") {
+	if r.Error == nil || !strings.Contains(r.Error.Message, "host exploded") {
 		t.Fatalf("expected host failure diagnostic, got %+v", r.Error)
 	}
 

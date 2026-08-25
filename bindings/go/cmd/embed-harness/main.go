@@ -89,7 +89,7 @@ func main() {
 		})
 	case "loader-error":
 		engine.SetLoader(func(string) nift.HostResult {
-			return nift.HostResult{Status: nift.HostError, Error: "host callback failed"}
+			return nift.HostResult{Status: nift.HostError, Error: "host exploded"}
 		})
 	case "env":
 		engine.SetEnvironmentProvider(func(name string) nift.HostResult {
@@ -104,7 +104,7 @@ func main() {
 		})
 	case "env-error":
 		engine.SetEnvironmentProvider(func(string) nift.HostResult {
-			return nift.HostResult{Status: nift.HostError, Error: "host callback failed"}
+			return nift.HostResult{Status: nift.HostError, Error: "host exploded"}
 		})
 	}
 

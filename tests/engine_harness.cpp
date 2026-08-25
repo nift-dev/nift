@@ -75,12 +75,12 @@ int run_main(int argc, char** argv) {
     // caller thread and pagination workers.
     if (seam == "env-error") {
         engine.set_environment_provider([](std::string_view) -> nift::HostResult {
-            return {nift::HostStatus::Error, "", "host callback failed"};
+            return {nift::HostStatus::Error, "", "host exploded"};
         });
     }
     if (seam == "loader-error") {
         engine.set_loader([](std::string_view) -> nift::HostResult {
-            return {nift::HostStatus::Error, "", "host callback failed"};
+            return {nift::HostStatus::Error, "", "host exploded"};
         });
     }
     std::string line;

@@ -197,8 +197,10 @@ func hostResultToC(cb *callbackSet, res HostResult, out *C.nift_string) C.nift_s
 		out.length = 0
 		return C.NIFT_ERROR_NOT_FOUND
 	default:
-		out.data = nil
-		out.length = 0
+		// HostError: place the diagnostic into `out`; the C ABI bridge copies it
+		// synchronously and uses it as the failed RenderResult diagnostic (an
+		// empty diagnostic falls back to the generic "host callback failed").
+		cb.putC(res.Error, out)
 		return C.NIFT_ERROR_CALLBACK
 	}
 }

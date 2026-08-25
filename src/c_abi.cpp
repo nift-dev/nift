@@ -86,6 +86,12 @@ bool valid_source_kind(const nift_source* src) {
 // through the render computation itself: the RenderResult is failed with the
 // diagnostic, identically on the caller thread and on the pagination worker
 // threads. No side channel or TLS attribution is involved.
+//
+// The callback's `out` is the VALUE channel on NIFT_OK and the DIAGNOSTIC
+// channel on a hard failure: a non-empty `out` with a hard status becomes the
+// HostResult::Error diagnostic; an empty `out` falls back to the generic
+// "host callback failed" (foreign callbacks that predate the diagnostic
+// channel keep their previous behaviour).
 nift::HostResult callback_result(nift_status status, const nift_string& out) {
     if (status == NIFT_OK) {
         if (out.data == nullptr && out.length > 0) {
@@ -96,7 +102,10 @@ nift::HostResult callback_result(nift_status status, const nift_string& out) {
         return {nift::HostStatus::Found, std::string(out.data == nullptr ? "" : out.data, out.length), ""};
     }
     if (status == NIFT_ERROR_NOT_FOUND) return {nift::HostStatus::NotFound, "", ""};
-    return {nift::HostStatus::Error, "", "host callback failed"};
+    const std::string diagnostic =
+        (out.data != nullptr && out.length > 0) ? std::string(out.data, out.length)
+                                                : std::string("host callback failed");
+    return {nift::HostStatus::Error, "", diagnostic};
 }
 
 void install_loader(nift_engine* engine) {

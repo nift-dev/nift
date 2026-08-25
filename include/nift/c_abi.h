@@ -85,17 +85,21 @@ typedef struct {
 } nift_source;
 
 /* Host seams (called by render threads; must be thread-safe). Callback output
- * semantics: NIFT_OK + length 0 = valid empty value; NIFT_OK + non-empty =
- * value; NIFT_OK + data==NULL + length>0 = malformed callback output; any
- * other (non-NOT_FOUND) status = host failure. A host failure travels through
- * the render computation itself and is reported as a failed RenderResult with
- * the diagnostic, identically on the caller thread and on the pagination
- * worker threads - the render calls still return NIFT_OK (the operation
- * completed mechanically) and the RESULT carries ok=false. No side channel
- * or TLS attribution is involved. */
+ * semantics per status:
+ *   NIFT_OK                out = the returned value (length 0 = valid empty)
+ *   NIFT_ERROR_NOT_FOUND   out ignored (absent/unset)
+ *   hard failure (other)   out = the failure diagnostic (borrowed, copied by
+ *                          the engine); empty out = generic "host callback
+ *                          failed"
+ * A host failure travels through the render computation itself and is
+ * reported as a failed RenderResult with the diagnostic, identically on the
+ * caller thread and on the pagination worker threads - the render calls still
+ * return NIFT_OK (the operation completed mechanically) and the RESULT carries
+ * ok=false. No side channel or TLS attribution is involved. */
 /* Loader: return NIFT_OK and fill *out (borrowed, copied by the engine) when
  * the source exists; NIFT_ERROR_NOT_FOUND when it does not; any other status
- * is a host failure reported on the failed RenderResult. */
+ * is a host failure reported on the failed RenderResult, with *out used as the
+ * diagnostic when non-empty. */
 typedef nift_status (*nift_loader_callback)(void* user_data, const char* path,
                                             size_t path_len, nift_string* out);
 /* Environment provider: NIFT_OK + value when set, NIFT_ERROR_NOT_FOUND when
