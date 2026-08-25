@@ -157,6 +157,20 @@ void begin_recovery_epoch() {
     recovery_epoch.fetch_add(1, std::memory_order_relaxed);
 }
 
+// Native path string/view aliases: std::filesystem::path stores wchar_t on
+// Windows and char on POSIX, so the recovery hot path must not assume the
+// native() representation is narrow.
+using native_path_string = std::basic_string<fs::path::value_type>;
+using native_path_view = std::basic_string_view<fs::path::value_type>;
+
+static std::string native_to_narrow(const native_path_view& view) {
+#if defined(_WIN32)
+    return fs::path(view).string();
+#else
+    return std::string(view);
+#endif
+}
+
 static void remove_stale_temporaries(const fs::path& path) {
     // Recovery once ran before every generated-file write, making a flat N-page
     // build O(N^2). Each parent is now scanned at most once per recovery epoch.
@@ -169,30 +183,33 @@ static void remove_stale_temporaries(const fs::path& path) {
     // taken from the path's internal string (no fs::path allocation). This is
     // the hot repeated-write path (flat N-page tree), so it must avoid any
     // allocation; the full parent path is only materialized on a miss.
-    const std::string& native = path.native();
-    const std::size_t sep = native.find_last_of("/\\");
+    static constexpr fs::path::value_type k_separators[] = {
+        static_cast<fs::path::value_type>('/'), static_cast<fs::path::value_type>('\\'),
+        fs::path::value_type(0)};
+    const native_path_string& native = path.native();
+    const std::size_t sep = native.find_last_of(k_separators);
     // A path with no parent separator has parent "." (empty view).
-    const std::string_view parent_view =
-        sep == std::string::npos ? std::string_view() : std::string_view(native).substr(0, sep);
+    const native_path_view parent_view =
+        sep == std::string::npos ? native_path_view() : native_path_view(native).substr(0, sep);
 
     // Micro-cache avoids path normalization, hashing and locking on the hot
     // repeated-write path. The epoch is part of the key so persistent threads
     // cannot accidentally turn once-per-build recovery back into once-per-process.
-    struct RecentParent { std::string parent; std::uint64_t epoch = 0; };
+    struct RecentParent { native_path_string parent; std::uint64_t epoch = 0; };
     thread_local std::array<RecentParent, 4> recent_parents;
     thread_local std::size_t recent_count = 0;
     for (std::size_t i = 0; i < recent_count; ++i)
-        if (recent_parents[i].epoch == epoch && std::string_view(recent_parents[i].parent) == parent_view)
+        if (recent_parents[i].epoch == epoch && native_path_view(recent_parents[i].parent) == parent_view)
             return;
 
-    const fs::path parent = sep == std::string::npos ? fs::path(".") : fs::path(std::string(parent_view));
+    const fs::path parent = sep == std::string::npos ? fs::path(".") : fs::path(parent_view);
     // Build-derived paths are already absolute and normalized, so the parent
     // string is directly usable as the recovery key; only fall back to
     // absolute/normalize for non-absolute paths. Scanning an already-scanned
     // equivalent spelling is harmless (removal is idempotent).
     std::string key;
     if (path.is_absolute()) {
-        key.assign(parent_view);
+        key = native_to_narrow(parent_view);
     } else {
         std::error_code key_error;
         key = fs::absolute(parent, key_error).lexically_normal().string();
