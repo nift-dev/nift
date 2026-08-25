@@ -145,12 +145,11 @@ func main() {
 	}
 
 	if !result.OK {
+		// Errors carry only ok/error (no loaderKeys), matching the other
+		// adapters: loaderKeys are part of the successful result.
 		doc := map[string]any{"ok": false}
 		if result.Error != nil {
 			doc["error"] = result.Error.Message
-		}
-		if seam == "loader" {
-			doc["loaderKeys"] = relativeKeys(root, loaderKeys)
 		}
 		emit(doc)
 		return
