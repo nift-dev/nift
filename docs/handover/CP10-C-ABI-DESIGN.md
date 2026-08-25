@@ -276,3 +276,28 @@ C ABI paginated env-failure tests; Rust `nr15_host_seam.rs` with the idiomatic
 sequential, so propagation is inherent). C++ conformance 9/9, CLI 25/25, Rust
 218/218, NR6/NR12, embed corpus 26/26 (C++/Rust/C ABI), ASan/UBSan clean,
 overhead ~+1.2%.
+
+## CP10.3 — no hidden "Error means optional absence" exceptions (2026-08-25)
+
+- C++ pagination separator: `HostSource` status is now checked — `NotFound` ->
+  no separator, `Error` -> the render FAILS with the host diagnostic (Found
+  empty is a valid empty separator). The old `.content`-without-status was a
+  latent contract violation.
+- Rust: the pagination separator no longer `.ok()`s away the error; a
+  MissingSource read means "no separator", a host Error fails the render. The
+  standalone/render_tracked read sites no longer rewrite non-MissingSource
+  errors to "not readable", so host diagnostics survive (C++ parity).
+- Audit: all C++ `read_shared_source` sites check status; Rust `read_source`
+  sites propagate via `map_err`/`?` (only MissingSource gets the reference
+  message); `environment` handles Error everywhere.
+- Regression tests: C++ `tests/host_seam.cpp` (separator Found/NotFound/Error
+  via a custom host; deterministic page-order error selection) and Rust
+  `nr15_host_seam.rs` equivalents.
+- Shared corpus: three new frozen host-error cases
+  (`host-env-error-standalone`, `host-env-error-pagination`,
+  `host-loader-error`) with `env-error`/`loader-error` adapter seams. The
+  pagination-separator loader-error path is covered by the parser-level custom
+  host tests: neither the C++ nor the Rust project render routes the pagination
+  separator through the engine loader seam (both read the project's sources
+  from the snapshot/filesystem), so it is not expressible through the neutral
+  corpus. Corpus total 29/29 across C++ API / nift-rs / C ABI.

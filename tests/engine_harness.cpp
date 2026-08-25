@@ -70,6 +70,19 @@ int run_main(int argc, char** argv) {
             return std::nullopt;
         });
     }
+    // Host-error seams (CP10.3): the provider returns a controlled host
+    // failure so the render fails with the diagnostic, identically on the
+    // caller thread and pagination workers.
+    if (seam == "env-error") {
+        engine.set_environment_provider([](std::string_view) -> nift::HostResult {
+            return {nift::HostStatus::Error, "", "host callback failed"};
+        });
+    }
+    if (seam == "loader-error") {
+        engine.set_loader([](std::string_view) -> nift::HostResult {
+            return {nift::HostStatus::Error, "", "host callback failed"};
+        });
+    }
     std::string line;
     while (std::getline(std::cin, line)) {
         if (line.empty()) continue;

@@ -10,6 +10,15 @@
 #include "nift/context.h"
 #include "nift/source.h"
 
+// Internal headers for the parser-level separator host-error tests (the
+// built-in project host reads the pagination separator from disk, so the
+// HostResult::Error path needs a custom host to exercise deterministically).
+#include "Parser.h"
+#include "ProjectHost.h"
+#include "ProjectState.h"
+#include "Types.h"
+
+#include <atomic>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
@@ -156,12 +165,118 @@ void test_paginated_env_failure_concurrent_attribution() {
     }
 }
 
+// A host that reports a deterministic HostStatus for the pagination separator
+// path and otherwise reads through the project host (disk).
+class SeparatorProbeHost : public ProjectHost {
+public:
+    SeparatorProbeHost(const ProjectState& state, nift::HostStatus separator_status,
+                       std::string separator_error)
+        : ProjectHost(state, nullptr, nullptr),
+          separator_status_(separator_status),
+          separator_error_(std::move(separator_error)) {}
+
+    HostSource read_shared_source(const fs::path& path) const override {
+        if (path.filename().string().find(".separator.html") != std::string::npos) {
+            if (separator_status_ == nift::HostStatus::Error)
+                return {nift::HostStatus::Error, nullptr, separator_error_};
+            if (separator_status_ == nift::HostStatus::NotFound)
+                return {nift::HostStatus::NotFound, nullptr, ""};
+            static const std::string empty;
+            return {nift::HostStatus::Found, &empty, ""};
+        }
+        return ProjectHost::read_shared_source(path);
+    }
+
+private:
+    nift::HostStatus separator_status_;
+    std::string separator_error_;
+};
+
+// Pagination separator: NotFound -> no separator (optional in ABSENCE only);
+// Found empty -> valid empty separator; Error -> the render FAILS with the
+// host diagnostic (Error != NotFound).
+void test_pagination_separator_host_error() {
+    const fs::path root = fs::temp_directory_path() / "nift-host-seam-sep";
+    fs::remove_all(root);
+    write_file(root / ".nift/config.json",
+               R"({"config":{"content-dir":"content/","output-dir":"public/","default-template":"templates/template.html","build-threads":1,"incremental-mode":"modified"}})");
+    write_file(root / ".nift/tracked.json",
+               R"({"tracked":[{"name":"blog","title":"Blog","template":"templates/template.html","paginate":{"items-per-page":1}}]})");
+    write_file(root / "templates/template.html", "<main>$[title]</main>\n@content");
+    write_file(root / "content/blog.html", "@item{one}@item{two}@paginate");
+    write_file(root / "content/blog.paginate.html",
+               "<section>$[paginate.items]-$[paginate.current]/$[paginate.total]</section>");
+    write_file(root / "content/blog.separator.html", "--sep--");
+
+    ProjectState state;
+    std::string open_error;
+    CHECK(state.open(root, open_error));
+    TrackedInfo info = *state.find("blog");
+
+    // Error -> render fails with the host diagnostic.
+    {
+        SeparatorProbeHost host(state, nift::HostStatus::Error, "separator backend failed");
+        Parser parser(host, info);
+        RenderResult result = parser.render();
+        CHECK(!result.ok);
+        CHECK(result.error.message.find("separator backend failed") != std::string::npos);
+    }
+    // NotFound -> no separator; render succeeds.
+    {
+        SeparatorProbeHost host(state, nift::HostStatus::NotFound, "");
+        Parser parser(host, info);
+        RenderResult result = parser.render();
+        CHECK(result.ok);
+        CHECK(result.output.find("--sep--") == std::string::npos);
+    }
+    // Found empty -> valid empty separator; render succeeds.
+    {
+        SeparatorProbeHost host(state, nift::HostStatus::Found, "");
+        Parser parser(host, info);
+        RenderResult result = parser.render();
+        CHECK(result.ok);
+        CHECK(result.output.find("--sep--") == std::string::npos);
+    }
+}
+
+// Deterministic multi-page error selection: with a single build worker the
+// pagination page loop renders pages in page order; the first failing page in
+// page order determines the returned diagnostic (frozen consequence of the
+// concurrent page-render aggregation).
+void test_pagination_error_selection_order() {
+    const fs::path root = fs::temp_directory_path() / "nift-host-seam-order";
+    fs::remove_all(root);
+    write_file(root / ".nift/config.json",
+               R"({"config":{"content-dir":"content/","output-dir":"public/","default-template":"templates/template.html","build-threads":1,"incremental-mode":"modified"}})");
+    write_file(root / ".nift/tracked.json",
+               R"({"tracked":[{"name":"blog","title":"Blog","template":"templates/template.html","paginate":{"items-per-page":1}}]})");
+    write_file(root / "templates/template.html", "<main>$[title]</main>\n@content");
+    write_file(root / "content/blog.html", "@item{one}@item{two}@paginate");
+    write_file(root / "content/blog.paginate.html",
+               "<section>@getenv(FAIL) $[paginate.current]</section>");
+    nift::Engine engine(root);
+    CHECK(engine.is_open());
+    std::atomic<int> calls{0};
+    engine.set_environment_provider([&](std::string_view) -> nift::HostResult {
+        const int call = calls.fetch_add(1);
+        return {nift::HostStatus::Error, "",
+                call == 0 ? "error-one" : "error-two"};
+    });
+    nift::RenderResult result = engine.render("blog");
+    CHECK(!result.ok());
+    // Page 1 is the first failing page in page order -> "error-one".
+    CHECK(result.error().message.find("error-one") != std::string::npos);
+    CHECK(result.error().message.find("error-two") == std::string::npos);
+}
+
 }  // namespace
 
 int main() {
     test_standalone_env_failure();
     test_paginated_env_failure_on_worker();
     test_paginated_env_failure_concurrent_attribution();
+    test_pagination_separator_host_error();
+    test_pagination_error_selection_order();
 
     if (failures == 0) {
         std::printf("host seam test passed\n");

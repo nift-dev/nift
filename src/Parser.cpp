@@ -2701,10 +2701,19 @@ RenderResult Parser::render() {
         result_.error = {tracked_info_.name, pagination_template, 0, "pagination template is missing, unreadable, or outside the project"};
         return result_;
     }
-    // The separator is optional and best-effort: a host error degrades to no
-    // separator (the render does not fail on an optional separator read).
-    const std::string* separator_source =
-        separator.empty() ? nullptr : host_.read_shared_source(separator).content;
+    // The separator is OPTIONAL only in its absence: NotFound means "no
+    // separator", but a host ERROR must fail the render with its diagnostic
+    // (Error != NotFound). Found with an empty value is a valid empty separator.
+    const std::string* separator_source = nullptr;
+    if (!separator.empty()) {
+        const auto separator_read = host_.read_shared_source(separator);
+        if (separator_read.status == nift::HostStatus::Error) {
+            result_.ok = false;
+            result_.error = {tracked_info_.name, separator, 0, separator_read.error};
+            return result_;
+        }
+        separator_source = separator_read.content;
+    }
 
     const unsigned hardware = std::max(1u, std::thread::hardware_concurrency());
     std::size_t thread_count = tracked_info_.paginate.has_value()
