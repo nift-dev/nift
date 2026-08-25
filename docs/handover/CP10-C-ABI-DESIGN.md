@@ -301,3 +301,17 @@ overhead ~+1.2%.
   separator through the engine loader seam (both read the project's sources
   from the snapshot/filesystem), so it is not expressible through the neutral
   corpus. Corpus total 29/29 across C++ API / nift-rs / C ABI.
+
+## CP10.4 — Rust pagination-template host-error preservation (2026-08-25)
+
+The last error-rewriting survivor in Rust was the pagination-template read
+(`map_err(|_| ...)`), which discarded every underlying error. It now preserves
+non-`MissingSource` host errors (NotFound keeps the canonical
+missing/unreadable pagination-template diagnostic), matching the C++ `HostSource`
+status handling. C++/Rust parity tests probe the pagination template with
+Error ("pagination template backend failed" survives) and NotFound (canonical
+diagnostic). Final semantic audit: all 6 Rust `read_source` sites + `environment`
+and all 7 C++ `read_shared_source` sites + `environment` preserve host errors;
+the only intentional transformations are MissingSource/NotFound -> canonical
+missing/optional diagnostics and boolean existence probes that let the
+subsequent authoritative read surface the real error. Rust workspace 221/221.

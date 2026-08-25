@@ -239,6 +239,67 @@ void test_pagination_separator_host_error() {
     }
 }
 
+// A host that probes the pagination-template path deterministically.
+class PaginationTemplateProbeHost : public ProjectHost {
+public:
+    PaginationTemplateProbeHost(const ProjectState& state, nift::HostStatus status,
+                                std::string error)
+        : ProjectHost(state, nullptr, nullptr), status_(status), error_(std::move(error)) {}
+
+    HostSource read_shared_source(const fs::path& path) const override {
+        if (path.filename().string().find(".paginate.html") != std::string::npos) {
+            if (status_ == nift::HostStatus::Error)
+                return {nift::HostStatus::Error, nullptr, error_};
+            if (status_ == nift::HostStatus::NotFound)
+                return {nift::HostStatus::NotFound, nullptr, ""};
+            static const std::string tmpl("<section>$[paginate.items]</section>");
+            return {nift::HostStatus::Found, &tmpl, ""};
+        }
+        return ProjectHost::read_shared_source(path);
+    }
+
+private:
+    nift::HostStatus status_;
+    std::string error_;
+};
+
+// Pagination-template host-error parity: Error must preserve the host
+// diagnostic; NotFound keeps the canonical missing/unreadable message.
+void test_pagination_template_host_error() {
+    const fs::path root = fs::temp_directory_path() / "nift-host-seam-pgtmpl";
+    fs::remove_all(root);
+    write_file(root / ".nift/config.json",
+               R"({"config":{"content-dir":"content/","output-dir":"public/","default-template":"templates/template.html","build-threads":1,"incremental-mode":"modified"}})");
+    write_file(root / ".nift/tracked.json",
+               R"({"tracked":[{"name":"blog","title":"Blog","template":"templates/template.html","paginate":{"items-per-page":1}}]})");
+    write_file(root / "templates/template.html", "<main>$[title]</main>\n@content");
+    write_file(root / "content/blog.html", "@item{one}@item{two}@paginate");
+    write_file(root / "content/blog.paginate.html",
+               "<section>$[paginate.items]</section>");
+
+    ProjectState state;
+    std::string open_error;
+    CHECK(state.open(root, open_error));
+    TrackedInfo info = *state.find("blog");
+
+    // Error -> the host diagnostic survives.
+    PaginationTemplateProbeHost error_host(state, nift::HostStatus::Error, "pagination template backend failed");
+    {
+        Parser parser(error_host, info);
+        RenderResult result = parser.render();
+        CHECK(!result.ok);
+        CHECK(result.error.message.find("pagination template backend failed") != std::string::npos);
+    }
+    // NotFound -> canonical missing/unreadable pagination-template diagnostic.
+    PaginationTemplateProbeHost notfound_host(state, nift::HostStatus::NotFound, "");
+    {
+        Parser parser(notfound_host, info);
+        RenderResult result = parser.render();
+        CHECK(!result.ok);
+        CHECK(result.error.message.find("pagination template is missing, unreadable, or outside the project") != std::string::npos);
+    }
+}
+
 // Deterministic multi-page error selection: with a single build worker the
 // pagination page loop renders pages in page order; the first failing page in
 // page order determines the returned diagnostic (frozen consequence of the
@@ -276,6 +337,7 @@ int main() {
     test_paginated_env_failure_on_worker();
     test_paginated_env_failure_concurrent_attribution();
     test_pagination_separator_host_error();
+    test_pagination_template_host_error();
     test_pagination_error_selection_order();
 
     if (failures == 0) {
