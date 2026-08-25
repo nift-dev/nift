@@ -23,8 +23,8 @@
 
 struct nift::Engine::Impl {
     std::filesystem::path root;
-    std::function<std::optional<std::string>(std::string_view)> loader;
-    std::function<std::optional<std::string>(std::string_view)> environment_provider;
+    std::function<nift::HostResult(std::string_view)> loader;
+    std::function<nift::HostResult(std::string_view)> environment_provider;
 
     // Long-lived application-wide value bindings (engine.set / set_json).
     std::unordered_map<std::string, std::shared_ptr<const json::Document>> defaults;
@@ -92,47 +92,61 @@ public:
     bool is_contract_name(const std::string&) const override { return false; }
     const std::string* contract_source(const std::string&) const override { return nullptr; }
 
-    const std::string* read_shared_source(const std::filesystem::path& path) const override {
+    HostSource read_shared_source(const std::filesystem::path& path) const override {
         const std::string key = path.lexically_normal().generic_string();
         {
             std::lock_guard<std::mutex> lock(impl_.source_cache_mutex_);
             const auto it = impl_.source_cache_.find(key);
-            if (it != impl_.source_cache_.end()) return it->second.get();
+            if (it != impl_.source_cache_.end())
+                return {nift::HostStatus::Found, it->second.get(), ""};
         }
 
         std::optional<std::string> contents;
         if (impl_.loader) {
-            contents = impl_.loader(key);
-            if (!contents) return nullptr;
+            nift::HostResult result = impl_.loader(key);
+            if (result.status == nift::HostStatus::Error)
+                return {nift::HostStatus::Error, nullptr, std::move(result.error)};
+            if (result.status == nift::HostStatus::NotFound)
+                return {nift::HostStatus::NotFound, nullptr, ""};
+            contents = std::move(result.value);
         } else {
             // The read is the authority: no separate file_readable probe
             // (which opened the file a second time); read_file_checked classifies
-            // missing/unreadable/non-regular as nullopt -> nullptr.
+            // missing/unreadable/non-regular as nullopt -> NotFound.
             contents = filesystem::read_file_checked(path);
-            if (!contents) return nullptr;
+            if (!contents) return {nift::HostStatus::NotFound, nullptr, ""};
         }
         auto stored = std::make_unique<const std::string>(*contents);
-        const std::string* result = stored.get();
+        const std::string* result_ptr = stored.get();
         {
             std::lock_guard<std::mutex> lock(impl_.source_cache_mutex_);
             auto [it, inserted] = impl_.source_cache_.emplace(key, std::move(stored));
-            if (!inserted) result = it->second.get();
+            if (!inserted) result_ptr = it->second.get();
         }
-        return result;
+        return {nift::HostStatus::Found, result_ptr, ""};
     }
 
     bool source_exists(const std::filesystem::path& path) const override {
-        if (impl_.loader) return impl_.loader(path.lexically_normal().generic_string()).has_value();
+        if (impl_.loader) {
+            nift::HostResult result = impl_.loader(path.lexically_normal().generic_string());
+            // A host failure is treated as "exists" so the subsequent read
+            // surfaces the distinct host-error diagnostic.
+            return result.status != nift::HostStatus::NotFound;
+        }
         return filesystem::path_exists(path);
     }
     bool source_readable(const std::filesystem::path& path) const override {
-        if (impl_.loader) return impl_.loader(path.lexically_normal().generic_string()).has_value();
+        if (impl_.loader) {
+            nift::HostResult result = impl_.loader(path.lexically_normal().generic_string());
+            return result.status != nift::HostStatus::NotFound;
+        }
         return filesystem::file_readable(path);
     }
-    std::optional<std::string> environment(const std::string& name) const override {
+    nift::HostResult environment(const std::string& name) const override {
         if (impl_.environment_provider) return impl_.environment_provider(name);
-        if (const char* value = std::getenv(name.c_str())) return std::string(value);
-        return std::nullopt;
+        if (const char* value = std::getenv(name.c_str()))
+            return {nift::HostStatus::Found, std::string(value), ""};
+        return {nift::HostStatus::NotFound, "", ""};
     }
 
     std::shared_ptr<const json::Document> read_shared_json(const std::filesystem::path& path,
@@ -146,8 +160,10 @@ public:
 
         std::optional<std::string> contents;
         if (impl_.loader) {
-            contents = impl_.loader(key);
-            if (!contents) { error = "JSON file does not exist"; return {}; }
+            nift::HostResult result = impl_.loader(key);
+            if (result.status == nift::HostStatus::Error) { error = std::move(result.error); return {}; }
+            if (result.status == nift::HostStatus::NotFound) { error = "JSON file does not exist"; return {}; }
+            contents = std::move(result.value);
         } else {
             if (!filesystem::file_readable(path)) { error = "JSON file is not readable"; return {}; }
             contents = filesystem::read_file(path);
@@ -297,12 +313,28 @@ RenderResult Engine::render(std::string_view page_name) {
 }
 
 void Engine::set_root(std::filesystem::path root) { impl_->root = std::move(root); }
-void Engine::set_loader(std::function<std::optional<std::string>(std::string_view path)> loader) {
+void Engine::set_loader(std::function<nift::HostResult(std::string_view path)> loader) {
     impl_->loader = std::move(loader);
 }
 
-void Engine::set_environment_provider(std::function<std::optional<std::string>(std::string_view name)> provider) {
+void Engine::set_loader(std::function<std::optional<std::string>(std::string_view path)> loader) {
+    impl_->loader = [loader = std::move(loader)](std::string_view path) -> nift::HostResult {
+        std::optional<std::string> value = loader(path);
+        if (value) return {nift::HostStatus::Found, std::move(*value), ""};
+        return {nift::HostStatus::NotFound, "", ""};
+    };
+}
+
+void Engine::set_environment_provider(std::function<nift::HostResult(std::string_view name)> provider) {
     impl_->environment_provider = std::move(provider);
+}
+
+void Engine::set_environment_provider(std::function<std::optional<std::string>(std::string_view name)> provider) {
+    impl_->environment_provider = [provider = std::move(provider)](std::string_view name) -> nift::HostResult {
+        std::optional<std::string> value = provider(name);
+        if (value) return {nift::HostStatus::Found, std::move(*value), ""};
+        return {nift::HostStatus::NotFound, "", ""};
+    };
 }
 
 bool Engine::set(std::string name, Value value) {

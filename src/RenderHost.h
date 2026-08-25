@@ -1,5 +1,6 @@
 #pragma once
 #include "Types.h"
+#include "nift/host_result.h"
 
 #include <filesystem>
 #include <memory>
@@ -63,7 +64,17 @@ public:
     virtual bool is_contract_name(const std::string& name) const = 0;
     virtual const std::string* contract_source(const std::string& name) const = 0;
 
-    virtual const std::string* read_shared_source(const std::filesystem::path& path) const = 0;
+    // A source read with a host-resource status. For a loader-backed host a
+    // HostStatus::Error carries the loader's failure diagnostic; the content
+    // pointer is into the host's cache and is valid exactly as the previous
+    // read_shared_source pointer contract. NotFound is the ordinary missing/
+    // unreadable source.
+    struct HostSource {
+        nift::HostStatus status = nift::HostStatus::NotFound;
+        const std::string* content = nullptr;
+        std::string error;
+    };
+    virtual HostSource read_shared_source(const std::filesystem::path& path) const = 0;
     virtual std::shared_ptr<const json::Document> read_shared_json(const std::filesystem::path& path,
                                                                    std::string& error) const = 0;
 
@@ -73,6 +84,7 @@ public:
     virtual bool source_exists(const std::filesystem::path& path) const = 0;
     virtual bool source_readable(const std::filesystem::path& path) const = 0;
 
-    // Environment lookup for @getenv. nullopt means the variable is unset.
-    virtual std::optional<std::string> environment(const std::string& name) const = 0;
+    // Environment lookup for @getenv. NotFound means the variable is unset;
+    // Error is a controlled host failure that fails the render.
+    virtual nift::HostResult environment(const std::string& name) const = 0;
 };

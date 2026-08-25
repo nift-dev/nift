@@ -32,7 +32,7 @@ public:
     explicit ProjectHost(
         const ProjectState& state,
         const std::unordered_map<std::string, std::shared_ptr<const json::Document>>* render_bindings = nullptr,
-        std::function<std::optional<std::string>(std::string_view)> environment_provider = nullptr)
+        std::function<nift::HostResult(std::string_view)> environment_provider = nullptr)
         : state_(state), render_bindings_(render_bindings), environment_provider_(std::move(environment_provider)) {}
 
     const std::filesystem::path& root() const override { return state_.root(); }
@@ -75,8 +75,10 @@ public:
         return it == state_.config().contracts.end() ? nullptr : &it->second;
     }
 
-    const std::string* read_shared_source(const std::filesystem::path& path) const override {
-        return state_.read_shared_source(path);
+    HostSource read_shared_source(const std::filesystem::path& path) const override {
+        const std::string* content = state_.read_shared_source(path);
+        if (content == nullptr) return {nift::HostStatus::NotFound, nullptr, ""};
+        return {nift::HostStatus::Found, content, ""};
     }
     std::shared_ptr<const json::Document> read_shared_json(const std::filesystem::path& path,
                                                            std::string& error) const override {
@@ -86,14 +88,15 @@ public:
     bool source_exists(const std::filesystem::path& path) const override { return filesystem::path_exists(path); }
     bool source_readable(const std::filesystem::path& path) const override { return filesystem::file_readable(path); }
 
-    std::optional<std::string> environment(const std::string& name) const override {
+    nift::HostResult environment(const std::string& name) const override {
         if (environment_provider_) return environment_provider_(name);
-        if (const char* value = std::getenv(name.c_str())) return std::string(value);
-        return std::nullopt;
+        if (const char* value = std::getenv(name.c_str()))
+            return {nift::HostStatus::Found, std::string(value), ""};
+        return {nift::HostStatus::NotFound, "", ""};
     }
 
 private:
     const ProjectState& state_;
     const std::unordered_map<std::string, std::shared_ptr<const json::Document>>* render_bindings_;
-    std::function<std::optional<std::string>(std::string_view)> environment_provider_;
+    std::function<nift::HostResult(std::string_view)> environment_provider_;
 };

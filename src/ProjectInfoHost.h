@@ -45,8 +45,10 @@ public:
         return it == project_.config.contracts.end() ? nullptr : &it->second;
     }
 
-    const std::string* read_shared_source(const std::filesystem::path& path) const override {
-        return project_.read_shared_source(path);
+    HostSource read_shared_source(const std::filesystem::path& path) const override {
+        const std::string* content = project_.read_shared_source(path);
+        if (content == nullptr) return {nift::HostStatus::NotFound, nullptr, ""};
+        return {nift::HostStatus::Found, content, ""};
     }
     std::shared_ptr<const json::Document> read_shared_json(const std::filesystem::path& path,
                                                            std::string& error) const override {
@@ -56,9 +58,10 @@ public:
     bool source_exists(const std::filesystem::path& path) const override { return filesystem::path_exists(path); }
     bool source_readable(const std::filesystem::path& path) const override { return filesystem::file_readable(path); }
 
-    std::optional<std::string> environment(const std::string& name) const override {
-        if (const char* value = std::getenv(name.c_str())) return std::string(value);
-        return std::nullopt;
+    nift::HostResult environment(const std::string& name) const override {
+        if (const char* value = std::getenv(name.c_str()))
+            return {nift::HostStatus::Found, std::string(value), ""};
+        return {nift::HostStatus::NotFound, "", ""};
     }
 
 private:

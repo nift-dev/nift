@@ -275,6 +275,15 @@ $(C_ABI_C_SMOKE): tests/c_abi_smoke.c libnift_c.a
 test-c-abi-c-smoke: $(C_ABI_C_SMOKE)
 	$(C_ABI_C_SMOKE)
 
+# CP10.2: Embed host-seam failure contract (C++ Engine level).
+HOST_SEAM_TEST := $(TEST_DIR)/host-seam$(EXEEXT)
+$(HOST_SEAM_TEST): tests/host_seam.cpp $(ENGINE_CORE_OBJECTS)
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/host_seam.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
+
+test-host-seam: $(HOST_SEAM_TEST)
+	$(HOST_SEAM_TEST)
+
 # CP10: direct C++ Engine::render vs C ABI render overhead benchmark.
 C_ABI_BENCH := $(TEST_DIR)/c-abi-bench$(EXEEXT)
 $(C_ABI_BENCH): tests/c_abi_bench.cpp libnift_c.a
@@ -450,7 +459,7 @@ clean:
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
-.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-diagnostics test-minify test-json-schema-integration test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
+.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-diagnostics test-minify test-json-schema-integration test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke test-host-seam benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
 
 
 test-cross-feature: $(TARGET)

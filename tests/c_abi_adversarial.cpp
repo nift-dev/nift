@@ -216,8 +216,15 @@ void test_callbacks() {
     failing_state.fail = true;
     CHECK(nift_engine_set_loader(failing, test_loader, &failing_state) == NIFT_OK);
     result = nullptr;
-    CHECK(nift_engine_render(failing, &page, &tpl, nullptr, &result) == NIFT_ERROR_CALLBACK);
-    CHECK(result == nullptr);
+    // A host callback failure is a rendering outcome: the call is mechanically
+    // valid (NIFT_OK) and the RESULT is failed with the diagnostic.
+    CHECK(nift_engine_render(failing, &page, &tpl, nullptr, &result) == NIFT_OK);
+    CHECK(result != nullptr);
+    CHECK(nift_render_result_ok(result) == 0);
+    nift_string cb_err{};
+    CHECK(nift_render_result_error_message(result, &cb_err) == NIFT_OK);
+    CHECK(read_view(cb_err).find("host callback failed") != std::string::npos);
+    nift_render_result_free(result);
     nift_engine_free(failing);
 
     // Environment provider with user_data.
@@ -543,9 +550,9 @@ nift_status concurrent_loader(void* user_data, const char* path, size_t path_len
     return NIFT_OK;
 }
 
-thread_local std::string g_last_output;
-
-nift_status render_with_loader(nift_engine* engine, bool is_a) {
+// Renders through a path source + the shared loader. Returns true when the
+// result is ok; captures the output (ok) or the diagnostic (failed).
+bool render_with_loader(nift_engine* engine, bool is_a, std::string* output_or_error) {
     g_is_a_thread = is_a;
     nift_source page{};
     page.kind = NIFT_SOURCE_PATH;
@@ -559,75 +566,51 @@ nift_status render_with_loader(nift_engine* engine, bool is_a) {
     tpl.length = tpl_path.size();
     nift_render_result* result = nullptr;
     const nift_status status = nift_engine_render(engine, &page, &tpl, nullptr, &result);
-    if (status == NIFT_OK && result != nullptr) {
-        nift_string output{};
-        if (nift_render_result_output(result, &output) == NIFT_OK) {
-            g_last_output = read_view(output);
-        }
-        nift_render_result_free(result);
-    } else if (result != nullptr) {
-        nift_render_result_free(result);
-    }
-    return status;
+    if (status != NIFT_OK || result == nullptr) return false;
+    const bool ok = nift_render_result_ok(result) == 1;
+    nift_string text{};
+    if (ok) nift_render_result_output(result, &text);
+    else nift_render_result_error_message(result, &text);
+    if (output_or_error) *output_or_error = read_view(text);
+    nift_render_result_free(result);
+    return ok;
 }
 
 void test_concurrent_callback_attribution() {
-    // A fails, B succeeds, overlapping (both start orders).
+    // A fails, B succeeds, overlapping (both start orders). A host failure is
+    // a rendering outcome (result not ok with the diagnostic); B succeeds.
     for (int order = 0; order < 2; ++order) {
         nift_engine* engine = nift_engine_new();
         ConcurrentState state;
         CHECK(nift_engine_set_loader(engine, concurrent_loader, &state) == NIFT_OK);
 
-        nift_status a_status = NIFT_OK, b_status = NIFT_OK;
-        std::string a_output, b_output;
-        std::thread a([&] {
-            a_status = render_with_loader(engine, true);
-            a_output = g_last_output;
-        });
-        std::thread b([&] {
-            if (order == 1) {
-                // Reverse start order: B starts first but still waits for A's
-                // loader inside the callback.
-            }
-            b_status = render_with_loader(engine, false);
-            b_output = g_last_output;
-        });
+        bool a_ok = true, b_ok = true;
+        std::string a_text, b_text;
+        std::thread a([&] { a_ok = render_with_loader(engine, true, &a_text); });
+        std::thread b([&] { b_ok = render_with_loader(engine, false, &b_text); });
         a.join();
         b.join();
-        CHECK(a_status == NIFT_ERROR_CALLBACK);
-        CHECK(b_status == NIFT_OK);
-        CHECK(b_output == "<main><p>B-OK</p></main>");
+        CHECK(!a_ok);
+        CHECK(a_text.find("host callback failed") != std::string::npos);
+        CHECK(b_ok);
+        CHECK(b_text == "<main><p>B-OK</p></main>");
         nift_engine_free(engine);
     }
 
-    // Two simultaneous callback failures: both reports must be NIFT_ERROR_CALLBACK.
+    // Two simultaneous callback failures: both renders fail independently.
     nift_engine* engine = nift_engine_new();
     ConcurrentState state;
     CHECK(nift_engine_set_loader(engine, concurrent_loader, &state) == NIFT_OK);
-    // Force both to fail: B becomes a failing thread for this round.
-    nift_status s1 = NIFT_OK, s2 = NIFT_OK;
-    std::thread t1([&] { s1 = render_with_loader(engine, true); });
-    std::thread t2([&] {
-        g_is_a_thread = true;  // second failing render
-        nift_source page{};
-        page.kind = NIFT_SOURCE_PATH;
-        const std::string path = "content/blog.html";
-        page.data = path.data();
-        page.length = path.size();
-        nift_source tpl{};
-        tpl.kind = NIFT_SOURCE_PATH;
-        const std::string tpl_path = "templates/template.html";
-        tpl.data = tpl_path.data();
-        tpl.length = tpl_path.size();
-        nift_render_result* result = nullptr;
-        s2 = nift_engine_render(engine, &page, &tpl, nullptr, &result);
-        if (result != nullptr) nift_render_result_free(result);
-        g_is_a_thread = false;
-    });
+    bool ok1 = true, ok2 = true;
+    std::string text1, text2;
+    std::thread t1([&] { ok1 = render_with_loader(engine, true, &text1); });
+    std::thread t2([&] { ok2 = render_with_loader(engine, true, &text2); });
     t1.join();
     t2.join();
-    CHECK(s1 == NIFT_ERROR_CALLBACK);
-    CHECK(s2 == NIFT_ERROR_CALLBACK);
+    CHECK(!ok1);
+    CHECK(!ok2);
+    CHECK(text1.find("host callback failed") != std::string::npos);
+    CHECK(text2.find("host callback failed") != std::string::npos);
     nift_engine_free(engine);
 }
 
@@ -666,6 +649,111 @@ void test_concurrent_renders() {
 
 }  // namespace
 
+// Host-failure environment provider for the paginated-worker tests: FAIL_BARRIER
+// -> hard failure, OK_BARRIER -> value, otherwise unset.
+nift_status host_failure_env(void* user_data, const char* name, size_t name_len, nift_string* out) {
+    const std::string key(name, name_len);
+    if (key == "FAIL_BARRIER") return NIFT_ERROR_CALLBACK;
+    if (key == "OK_BARRIER") {
+        static const std::string ok = "ok";
+        out->data = ok.data();
+        out->length = ok.size();
+        return NIFT_OK;
+    }
+    return NIFT_ERROR_NOT_FOUND;
+}
+
+fs::path make_two_page_pagination_project() {
+    fs::path root = fs::temp_directory_path() / "nift-c-abi-pg-two";
+    fs::remove_all(root);
+    write_file(root / ".nift/config.json",
+               R"({"config":{"content-dir":"content/","output-dir":"public/","default-template":"templates/template.html","build-threads":-1,"incremental-mode":"modified"}})");
+    write_file(root / ".nift/tracked.json",
+               R"({"tracked":[
+ {"name":"blog","title":"Blog","template":"templates/template.html","paginate":{"items-per-page":1}},
+ {"name":"other","title":"Other","template":"templates/template.html","paginate":{"items-per-page":1}}
+]})");
+    write_file(root / "templates/template.html", "<main>$[title]</main>\n@content");
+    write_file(root / "content/blog.html", "@item{one}@item{two}@item{three}@paginate");
+    write_file(root / "content/other.html", "@item{a}@item{b}@paginate");
+    write_file(root / "content/blog.paginate.html",
+               "<section>@getenv(FAIL_BARRIER) page $[paginate.current]</section>");
+    write_file(root / "content/other.paginate.html",
+               "<section>@getenv(OK_BARRIER) page $[paginate.current]</section>");
+    return root;
+}
+
+// A host env failure is a rendering outcome (result not ok with the
+// diagnostic), identically for standalone renders and pagination worker
+// renders - no thread-dependent semantic difference.
+void test_c_abi_env_host_failure() {
+    // Standalone.
+    nift_engine* engine = nift_engine_new();
+    CHECK(nift_engine_set_environment_provider(engine, host_failure_env, nullptr) == NIFT_OK);
+    nift_source page{};
+    page.kind = NIFT_SOURCE_TEXT;
+    const std::string text = "@getenv(FAIL_BARRIER)";
+    page.data = text.data();
+    page.length = text.size();
+    nift_source tpl{};
+    tpl.kind = NIFT_SOURCE_TEXT;
+    const std::string tpl_text = "<main>@content</main>";
+    tpl.data = tpl_text.data();
+    tpl.length = tpl_text.size();
+    nift_render_result* result = nullptr;
+    CHECK(nift_engine_render(engine, &page, &tpl, nullptr, &result) == NIFT_OK);
+    CHECK(nift_render_result_ok(result) == 0);
+    nift_string err{};
+    CHECK(nift_render_result_error_message(result, &err) == NIFT_OK);
+    CHECK(read_view(err).find("host callback failed") != std::string::npos);
+    nift_render_result_free(result);
+    nift_engine_free(engine);
+
+    // Pagination worker path: blog hits the failing env, other the succeeding
+    // one; outcomes match the standalone semantics.
+    const fs::path root = make_two_page_pagination_project();
+    const std::string root_str = root.string();
+    nift_engine* project = nift_engine_open(root_str.data(), root_str.size());
+    CHECK(nift_engine_is_open(project) == 1);
+    CHECK(nift_engine_set_environment_provider(project, host_failure_env, nullptr) == NIFT_OK);
+
+    result = nullptr;
+    CHECK(nift_engine_render_page(project, nullptr, "blog", 4, &result) == NIFT_OK);
+    CHECK(nift_render_result_ok(result) == 0);
+    CHECK(nift_render_result_error_message(result, &err) == NIFT_OK);
+    CHECK(read_view(err).find("host callback failed") != std::string::npos);
+    nift_render_result_free(result);
+
+    result = nullptr;
+    CHECK(nift_engine_render_page(project, nullptr, "other", 5, &result) == NIFT_OK);
+    CHECK(nift_render_result_ok(result) == 1);
+    nift_string output{};
+    CHECK(nift_render_result_output(result, &output) == NIFT_OK);
+    CHECK(read_view(output).find("ok") != std::string::npos);
+    nift_render_result_free(result);
+
+    // Concurrent paginated renders: blog fails, other succeeds, both orders.
+    for (int order = 0; order < 2; ++order) {
+        nift_render_result* fail_result = nullptr;
+        nift_render_result* ok_result = nullptr;
+        std::thread failing([&] {
+            fail_result = nullptr;
+            CHECK(nift_engine_render_page(project, nullptr, "blog", 4, &fail_result) == NIFT_OK);
+            CHECK(nift_render_result_ok(fail_result) == 0);
+        });
+        std::thread ok([&] {
+            ok_result = nullptr;
+            CHECK(nift_engine_render_page(project, nullptr, "other", 5, &ok_result) == NIFT_OK);
+            CHECK(nift_render_result_ok(ok_result) == 1);
+        });
+        if (order == 0) { failing.join(); ok.join(); }
+        else { ok.join(); failing.join(); }
+        if (fail_result) nift_render_result_free(fail_result);
+        if (ok_result) nift_render_result_free(ok_result);
+    }
+    nift_engine_free(project);
+}
+
 int main() {
     test_version_and_handles();
     test_bindings_and_context();
@@ -677,6 +765,7 @@ int main() {
     test_source_kind_validation();
     test_callback_empty_vs_missing();
     test_concurrent_callback_attribution();
+    test_c_abi_env_host_failure();
     test_concurrent_renders();
 
     if (failures == 0) {

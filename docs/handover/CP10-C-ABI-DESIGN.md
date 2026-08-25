@@ -241,3 +241,38 @@ Re-verified after the repairs: C ABI adversarial battery (incl. deterministic
 concurrent attribution) PASS 5/5, pure-C consumer PASS, targeted ASan/UBSan
 clean, shared corpus **26/26** (C++ API / nift-rs / C ABI) + negative
 self-test PASS, direct C++ ~4.1 us vs C ABI ~4.1 us (~+1%) overhead.
+
+## CP10.2 — host callback failure is a first-class Embed contract (2026-08-25)
+
+The CP10.1 worker-thread finding showed the C ABI could not reliably
+manufacture a third callback state over the C++ provider seam (which only had
+value / absent). The underlying Embed host-resource contract was therefore
+upgraded to value / absent / **error** for both loader and environment
+providers:
+
+- `nift::HostResult` (public `include/nift/host_result.h`): `Found(value)` /
+  `NotFound` / `Error(diagnostic)`.
+- `Engine::set_loader` / `set_environment_provider` gain HostResult overloads;
+  the `std::optional<std::string>` forms remain as convenience overloads
+  (value -> Found, nullopt -> NotFound).
+- `RenderHost::environment` returns `HostResult`; `RenderHost::read_shared_source`
+  returns a `HostSource` with a status + error channel. A host Error travels
+  through the render computation: the @getenv handler and every source read
+  fail the render with the diagnostic, **including pagination worker threads**
+  (the pagination page loop already fails the overall result when any page
+  fails, so a worker host error fails the whole render - no silent "unset").
+- The C ABI maps `NIFT_OK`/`NIFT_ERROR_NOT_FOUND`/other directly onto
+  Found/NotFound/Error; **the thread_local callback-error side channel is
+  removed entirely**. A host failure is a rendering outcome: the render calls
+  return `NIFT_OK` (mechanically valid) and the `RenderResult` carries
+  `ok=false` with the diagnostic, identically whether the callback ran on the
+  caller thread or a pagination worker. Malformed callback output
+  (`NIFT_OK` + NULL + positive length) is a controlled render error.
+
+Tests: C++ `tests/host_seam.cpp` (standalone + paginated env failure, NotFound
+= unset, concurrent blog-fails/other-succeeds attribution, both orders);
+C ABI paginated env-failure tests; Rust `nr15_host_seam.rs` with the idiomatic
+`HostResult` enum + `set_*_result` provider forms (Rust pagination is
+sequential, so propagation is inherent). C++ conformance 9/9, CLI 25/25, Rust
+218/218, NR6/NR12, embed corpus 26/26 (C++/Rust/C ABI), ASan/UBSan clean,
+overhead ~+1.2%.

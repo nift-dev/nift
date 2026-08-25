@@ -8,10 +8,13 @@
 #include <string_view>
 
 #include "nift/context.h"
+#include "nift/host_result.h"
 #include "nift/render_result.h"
 #include "nift/source.h"
 
 namespace nift {
+
+
 
 // Embedded Nift rendering engine.
 //
@@ -101,11 +104,19 @@ public:
     // lookup function, not a one-shot stream: it may be called more than once
     // per source (existence/readability probe then read), and may be called
     // concurrently from render threads, so it must be thread-safe.
+    //
+    // Two forms: the full HostResult form (Found / NotFound / Error, where
+    // Error fails the render with the diagnostic), and the convenience
+    // std::optional form (value -> Found, nullopt -> NotFound; no error
+    // channel).
+    void set_loader(std::function<HostResult(std::string_view path)> loader);
     void set_loader(std::function<std::optional<std::string>(std::string_view path)> loader);
 
     // Environment provider for @getenv. The default reads the process
-    // environment; a provider lets an application supply its own lookup
-    // (nullopt means unset).
+    // environment. As with the loader, the full form supports a controlled
+    // host failure; the convenience form has no error channel (nullopt means
+    // unset).
+    void set_environment_provider(std::function<HostResult(std::string_view name)> provider);
     void set_environment_provider(std::function<std::optional<std::string>(std::string_view name)> provider);
 
     // Long-lived application-wide value bindings, resolved (after any Context

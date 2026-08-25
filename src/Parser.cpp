@@ -2174,8 +2174,9 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     // yields nullptr -> the typed content error, with no
                     // separate readability probe (performance-regression repair).
                     const auto cached = host_.read_shared_source(content_path);
-                    if (!cached) { fail(source_path, source, i, "content file is not readable"); break; }
-                    content_source = *cached;
+                    if (cached.status == nift::HostStatus::Error) { fail(source_path, source, i, cached.error); break; }
+                    if (!cached.content) { fail(source_path, source, i, "content file is not readable"); break; }
+                    content_source = *cached.content;
                     result_.dependencies.insert(page_source_->dependency.empty() ? host_.relative(content_path) : page_source_->dependency);
                 } else {
                     content_identity = fs::path(page_source_->logical_name);
@@ -2352,8 +2353,9 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 const int insertion_code_block_depth = code_block_depth_;
                 // The read is the authority (no separate readability probe).
                 const auto input_source = host_.read_shared_source(input_path);
-                if (!input_source) { fail(source_path, source, i, "input file is not readable"); break; }
-                const auto nested = parse(*input_source, input_path, depth + 1);
+                if (input_source.status == nift::HostStatus::Error) { fail(source_path, source, i, input_source.error); break; }
+                if (!input_source.content) { fail(source_path, source, i, "input file is not readable"); break; }
+                const auto nested = parse(*input_source.content, input_path, depth + 1);
                 input_stack_.pop_back();
                 if (!nested.ok) break;
                 append_indented(output, nested.output, indent, insertion_code_block_depth);
@@ -2394,7 +2396,12 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     fail(source_path, source, i, "getenv: " + interpolation_error); break;
                 }
                 parameters[0] = std::move(resolved);
-                if (auto value = host_.environment(parameters[0])) output += *value;
+                nift::HostResult env = host_.environment(parameters[0]);
+                if (env.status == nift::HostStatus::Found) output += env.value;
+                else if (env.status == nift::HostStatus::Error) {
+                    fail(source_path, source, i, "getenv: " + env.error);
+                    break;
+                }
                 i = end;
                 continue;
             }
@@ -2569,12 +2576,17 @@ RenderResult Parser::render_composed(const RenderSource& template_source,
     if (!template_source.path.empty()) {
         template_identity = fs::absolute(template_source.path).lexically_normal();
         const auto cached = host_.read_shared_source(template_identity);
-        if (!cached) {
+        if (cached.status == nift::HostStatus::Error) {
+            result_.ok = false;
+            result_.error = {tracked_info_.name, template_identity, 0, cached.error};
+            return result_;
+        }
+        if (!cached.content) {
             result_.ok = false;
             result_.error = {tracked_info_.name, template_identity, 0, "template file is not readable"};
             return result_;
         }
-        template_content = *cached;
+        template_content = *cached.content;
     } else {
         template_identity = fs::path(template_source.logical_name);
         template_content = template_source.text;
@@ -2599,12 +2611,17 @@ RenderResult Parser::render() {
         // The read is the authority: missing/unreadable content yields nullptr
         // -> the typed content error, with no separate readability probe.
         const auto content_source = host_.read_shared_source(content_path);
-        if (!content_source) {
+        if (content_source.status == nift::HostStatus::Error) {
+            result_.ok = false;
+            result_.error = {tracked_info_.name, content_path, 0, content_source.error};
+            return result_;
+        }
+        if (!content_source.content) {
             result_.ok = false;
             result_.error = {tracked_info_.name, content_path, 0, "content file is not readable"};
             return result_;
         }
-        auto result = parse(*content_source, content_path, 0);
+        auto result = parse(*content_source.content, content_path, 0);
         result.content_used = true;
         result.dependencies.insert(host_.relative(content_path));
         return result;
@@ -2674,12 +2691,20 @@ RenderResult Parser::render() {
     };
     std::vector<PageRender> pages(total);
     const auto page_source = host_.read_shared_source(pagination_template);
-    if (!page_source) {
+    if (page_source.status == nift::HostStatus::Error) {
+        result_.ok = false;
+        result_.error = {tracked_info_.name, pagination_template, 0, page_source.error};
+        return result_;
+    }
+    if (!page_source.content) {
         result_.ok = false;
         result_.error = {tracked_info_.name, pagination_template, 0, "pagination template is missing, unreadable, or outside the project"};
         return result_;
     }
-    const std::string* separator_source = separator.empty() ? nullptr : host_.read_shared_source(separator);
+    // The separator is optional and best-effort: a host error degrades to no
+    // separator (the render does not fail on an optional separator read).
+    const std::string* separator_source =
+        separator.empty() ? nullptr : host_.read_shared_source(separator).content;
 
     const unsigned hardware = std::max(1u, std::thread::hardware_concurrency());
     std::size_t thread_count = tracked_info_.paginate.has_value()
@@ -2723,7 +2748,7 @@ RenderResult Parser::render() {
                 items += result_.pagination_items[index];
             }
             page_parser.pagination_items_text_ = std::move(items);
-            const auto rendered_page = page_parser.parse(*page_source, pagination_template, 0);
+            const auto rendered_page = page_parser.parse(*page_source.content, pagination_template, 0);
             if (!rendered_page.ok) {
                 pages[page_index].error = rendered_page.error;
                 continue;

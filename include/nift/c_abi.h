@@ -84,18 +84,18 @@ typedef struct {
     size_t logical_name_length;
 } nift_source;
 
-/* Host seams (called by render threads; must be thread-safe). Callback
- * output semantics: NIFT_OK + length 0 = valid empty value; NIFT_OK +
- * non-empty = value; NIFT_OK + data==NULL + length>0 = invalid callback
- * output (NIFT_ERROR_CALLBACK); NIFT_ERROR_NOT_FOUND = absent/unset. A hard
- * callback error is attributed to the render that invoked it (per-render
- * state; concurrent renders never steal each other's callback error).
- * NOTE: the C++ project render may invoke the ENVIRONMENT provider on its own
- * pagination worker threads, where a hard env failure degrades to "unset"
- * (the C++ callback interface has no error channel). */
+/* Host seams (called by render threads; must be thread-safe). Callback output
+ * semantics: NIFT_OK + length 0 = valid empty value; NIFT_OK + non-empty =
+ * value; NIFT_OK + data==NULL + length>0 = malformed callback output; any
+ * other (non-NOT_FOUND) status = host failure. A host failure travels through
+ * the render computation itself and is reported as a failed RenderResult with
+ * the diagnostic, identically on the caller thread and on the pagination
+ * worker threads - the render calls still return NIFT_OK (the operation
+ * completed mechanically) and the RESULT carries ok=false. No side channel
+ * or TLS attribution is involved. */
 /* Loader: return NIFT_OK and fill *out (borrowed, copied by the engine) when
  * the source exists; NIFT_ERROR_NOT_FOUND when it does not; any other status
- * becomes NIFT_ERROR_CALLBACK and the render fails with a controlled error. */
+ * is a host failure reported on the failed RenderResult. */
 typedef nift_status (*nift_loader_callback)(void* user_data, const char* path,
                                             size_t path_len, nift_string* out);
 /* Environment provider: NIFT_OK + value when set, NIFT_ERROR_NOT_FOUND when
