@@ -10,6 +10,9 @@
 #include <thread>
 #include <sys/stat.h>
 #include <unordered_map>
+#ifndef _WIN32
+#include <dirent.h>
+#endif
 #ifdef _WIN32
 #include <windows.h>
 #else
@@ -62,8 +65,8 @@ static void ensure_parent_directory(const fs::path& path) {
     }
 }
 
-static bool temporary_owner_pid(const std::string& name, unsigned long long& pid) {
-    constexpr const char* marker = ".nift-tmp-";
+static bool temporary_owner_pid(std::string_view name, unsigned long long& pid) {
+    constexpr std::string_view marker = ".nift-tmp-";
     const std::size_t marker_pos = name.rfind(marker);
     if (marker_pos == std::string::npos) return false;
     const std::size_t pid_begin = marker_pos + 10;
@@ -100,6 +103,43 @@ static bool process_is_alive(unsigned long long pid) {
 #endif
 }
 
+// Remove crash-leftover .nift-tmp-* files in `parent` using raw directory
+// enumeration (no per-entry fs::path allocation). The caller holds the
+// recovery mutex and the once-per-epoch-per-parent decision is already made.
+static void scan_parent_for_stale_temporaries(const fs::path& parent) {
+#ifdef _WIN32
+    std::wstring pattern = parent.native();
+    if (pattern.empty()) pattern = L".";
+    if (pattern.back() != L'\\' && pattern.back() != L'/') pattern += L'\\';
+    pattern += L'*';
+    WIN32_FIND_DATAW find_data;
+    HANDLE h_find = ::FindFirstFileW(pattern.c_str(), &find_data);
+    if (h_find == INVALID_HANDLE_VALUE) return;
+    do {
+        const std::wstring wide_name(find_data.cFileName);
+        std::string name;
+        name.reserve(wide_name.size());
+        for (const wchar_t w : wide_name) name.push_back(static_cast<char>(w));
+        unsigned long long owner_pid = 0;
+        if (!temporary_owner_pid(name, owner_pid) || process_is_alive(owner_pid)) continue;
+        std::error_code ignored;
+        fs::remove(parent / wide_name, ignored);
+    } while (::FindNextFileW(h_find, &find_data));
+    ::FindClose(h_find);
+#else
+    DIR* dir = ::opendir(parent.c_str());
+    if (!dir) return;
+    while (const dirent* entry = ::readdir(dir)) {
+        const char* name = entry->d_name;
+        unsigned long long owner_pid = 0;
+        if (!temporary_owner_pid(name, owner_pid) || process_is_alive(owner_pid)) continue;
+        std::error_code ignored;
+        fs::remove(parent / name, ignored);
+    }
+    ::closedir(dir);
+#endif
+}
+
 namespace {
 std::atomic<std::uint64_t> recovery_epoch{0};
 std::mutex recovery_mutex;
@@ -123,45 +163,59 @@ static void remove_stale_temporaries(const fs::path& path) {
     // An epoch begins before each build pass; short-lived non-build commands use
     // their process-lifetime epoch. Temp names carry their owner PID so an
     // overlapping live Nift process is preserved conservatively.
-    const fs::path parent = path.parent_path().empty() ? fs::path(".") : path.parent_path();
     const std::uint64_t epoch = recovery_epoch.load(std::memory_order_relaxed);
 
-    // This micro-cache avoids path normalization, hashing and locking on the hot
+    // Cheap parent identity: the byte span before the last native separator,
+    // taken from the path's internal string (no fs::path allocation). This is
+    // the hot repeated-write path (flat N-page tree), so it must avoid any
+    // allocation; the full parent path is only materialized on a miss.
+    const std::string& native = path.native();
+    const std::size_t sep = native.find_last_of("/\\");
+    // A path with no parent separator has parent "." (empty view).
+    const std::string_view parent_view =
+        sep == std::string::npos ? std::string_view() : std::string_view(native).substr(0, sep);
+
+    // Micro-cache avoids path normalization, hashing and locking on the hot
     // repeated-write path. The epoch is part of the key so persistent threads
     // cannot accidentally turn once-per-build recovery back into once-per-process.
-    struct RecentParent { fs::path path; std::uint64_t epoch = 0; };
+    struct RecentParent { std::string parent; std::uint64_t epoch = 0; };
     thread_local std::array<RecentParent, 4> recent_parents;
     thread_local std::size_t recent_count = 0;
     for (std::size_t i = 0; i < recent_count; ++i)
-        if (recent_parents[i].epoch == epoch && recent_parents[i].path == parent) return;
+        if (recent_parents[i].epoch == epoch && std::string_view(recent_parents[i].parent) == parent_view)
+            return;
 
-    std::error_code key_error;
-    fs::path key_path = fs::absolute(parent, key_error);
-    if (key_error) key_path = parent;
-    const std::string key = key_path.lexically_normal().string();
+    const fs::path parent = sep == std::string::npos ? fs::path(".") : fs::path(std::string(parent_view));
+    // Build-derived paths are already absolute and normalized, so the parent
+    // string is directly usable as the recovery key; only fall back to
+    // absolute/normalize for non-absolute paths. Scanning an already-scanned
+    // equivalent spelling is harmless (removal is idempotent).
+    std::string key;
+    if (path.is_absolute()) {
+        key.assign(parent_view);
+    } else {
+        std::error_code key_error;
+        key = fs::absolute(parent, key_error).lexically_normal().string();
+    }
 
     {
         std::lock_guard<std::mutex> lock(recovery_mutex);
         const auto found = recovered_parent_epochs.find(key);
         if (found == recovered_parent_epochs.end() || found->second != epoch) {
-            std::error_code error;
 #ifdef NIFT_TEST_RECOVERY_STATS
             recovery_scan_count.fetch_add(1, std::memory_order_relaxed);
 #endif
-            for (const auto& entry : fs::directory_iterator(parent, error)) {
-                if (error) break;
-                const std::string name = entry.path().filename().string();
-                unsigned long long owner_pid = 0;
-                if (!temporary_owner_pid(name, owner_pid) || process_is_alive(owner_pid)) continue;
-                std::error_code ignored;
-                fs::remove(entry.path(), ignored);
-            }
-            if (error) return;
+            // Enumerate raw directory names without per-entry fs::path
+            // allocations: on a flat N-thousand-file output tree the previous
+            // directory_iterator loop (path+filename+string per entry)
+            // dominated the recovery cost. Temp names are ASCII, so the
+            // narrow-name check is lossless for matching purposes.
+            scan_parent_for_stale_temporaries(parent);
             recovered_parent_epochs[key] = epoch;
         }
     }
 
-    RecentParent recent{parent, epoch};
+    RecentParent recent{std::string(parent_view), epoch};
     if (recent_count < recent_parents.size()) recent_parents[recent_count++] = std::move(recent);
     else {
         for (std::size_t i = 1; i < recent_parents.size(); ++i) recent_parents[i - 1] = std::move(recent_parents[i]);
