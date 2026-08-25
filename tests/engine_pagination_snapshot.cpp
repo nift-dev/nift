@@ -5,12 +5,13 @@
 //
 // Deterministic interleave (no sleeps): the pagination template renders
 // @getenv("BARRIER") on every page, so the environment provider callback fires
-// inside the page-assembly loop -- after the snapshot was captured and page 1
-// was composed. The provider blocks on a condition variable; the test thread
-// observes "entered", reloads generation B, then releases the barrier. Every
-// page also renders $[title] (a snapshot value), so a result that mixed
-// generations would show GEN-A on some pages and GEN-B on others. The single
-// result must be entirely GEN-A and the next render entirely GEN-B.
+// during pagination assembly -- after the render has captured its project
+// snapshot and before the complete multi-page RenderResult has been assembled.
+// The provider blocks on a condition variable; the test thread observes
+// "entered", reloads generation B, then releases the barrier. Every page also
+// renders $[title] (a snapshot value), so a result that mixed generations
+// would show GEN-A on some pages and GEN-B on others. The single result must
+// be entirely GEN-A and the next render entirely GEN-B.
 #include "nift/nift.h"
 
 #include <atomic>
@@ -48,18 +49,12 @@ void write_file(const fs::path& path, const std::string& contents) {
     fs::create_directories(path.parent_path(), error);
     std::ofstream out(path, std::ios::binary);
     out << contents;
-}
-
-// Atomic replace so a concurrent reload() never reads a torn candidate file.
-void write_file_atomic(const fs::path& path, const std::string& contents) {
-    std::error_code error;
-    fs::create_directories(path.parent_path(), error);
-    const fs::path tmp = path.string() + ".tmp";
-    {
-        std::ofstream out(tmp, std::ios::binary);
-        out << contents;
+    // Failure to flush/close would silently leave a partial fixture; surface it.
+    out.flush();
+    if (!out.good()) {
+        std::fprintf(stderr, "FAIL %s:%d: could not write %s\n", __FILE__, __LINE__, path.c_str());
+        std::exit(1);
     }
-    fs::rename(tmp, path, error);
 }
 
 fs::path fixture_base() { return fs::current_path() / ".build" / "engine-pagination-snapshot-fixtures"; }
@@ -139,7 +134,7 @@ void test_concurrent_reload_single_snapshot(const fs::path& root) {
     }
 
     // Publish generation B while the render is mid-flight.
-    write_file_atomic(root / ".nift/tracked.json", tracked_with_title("GEN-B"));
+    write_file(root / ".nift/tracked.json", tracked_with_title("GEN-B"));
     std::string reload_error;
     CHECK(engine.reload(&reload_error));
 
@@ -169,7 +164,7 @@ void test_failed_reload_retains_last_good(const fs::path& root) {
     CHECK(result_is_entirely(first, "GEN-A", "GEN-B", true));
 
     // Disk becomes invalid; reload must fail and retain generation A.
-    write_file_atomic(root / ".nift/tracked.json", "{ not json");
+    write_file(root / ".nift/tracked.json", "{ not json");
     std::string reload_error;
     CHECK(!engine.reload(&reload_error));
     CHECK(!reload_error.empty());
@@ -179,7 +174,7 @@ void test_failed_reload_retains_last_good(const fs::path& root) {
     CHECK(result_is_entirely(after_failed, "GEN-A", "GEN-B", true));
 
     // A later valid reload recovers; the next render observes the new generation.
-    write_file_atomic(root / ".nift/tracked.json", tracked_with_title("GEN-C"));
+    write_file(root / ".nift/tracked.json", tracked_with_title("GEN-C"));
     CHECK(engine.reload(&reload_error));
     nift::RenderResult recovered = engine.render("blog");
     CHECK(result_is_entirely(recovered, "GEN-C", "GEN-A", true));

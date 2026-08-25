@@ -200,9 +200,11 @@ test-engine-reload: $(ENGINE_RELOAD_TEST)
 # CP8.1: pagination-specific snapshot/reload invariant. A paginated render's
 # complete page set must come from one immutable snapshot; a deterministic
 # environment-provider barrier (an @getenv("BARRIER") in the pagination
-# template) interleaves reload() mid-render and asserts the single result is
-# entirely one generation, the next render sees the new generation, and a
-# failed reload retains the last known-good pagination generation.
+# template) interleaves reload() during pagination assembly -- after the
+# snapshot is captured and before the complete multi-page RenderResult exists
+# -- and asserts the single result is entirely one generation, the next render
+# sees the new generation, and a failed reload retains the last known-good
+# pagination generation.
 ENGINE_PAGINATION_SNAPSHOT_TEST := $(TEST_DIR)/engine-pagination-snapshot$(EXEEXT)
 $(ENGINE_PAGINATION_SNAPSHOT_TEST): tests/engine_pagination_snapshot.cpp $(ENGINE_CORE_OBJECTS)
 	mkdir -p $(TEST_DIR)
