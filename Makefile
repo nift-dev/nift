@@ -197,6 +197,20 @@ $(ENGINE_RELOAD_TEST): tests/engine_reload.cpp $(ENGINE_CORE_OBJECTS)
 test-engine-reload: $(ENGINE_RELOAD_TEST)
 	$(ENGINE_RELOAD_TEST)
 
+# CP8.1: pagination-specific snapshot/reload invariant. A paginated render's
+# complete page set must come from one immutable snapshot; a deterministic
+# environment-provider barrier (an @getenv("BARRIER") in the pagination
+# template) interleaves reload() mid-render and asserts the single result is
+# entirely one generation, the next render sees the new generation, and a
+# failed reload retains the last known-good pagination generation.
+ENGINE_PAGINATION_SNAPSHOT_TEST := $(TEST_DIR)/engine-pagination-snapshot$(EXEEXT)
+$(ENGINE_PAGINATION_SNAPSHOT_TEST): tests/engine_pagination_snapshot.cpp $(ENGINE_CORE_OBJECTS)
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/engine_pagination_snapshot.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
+
+test-engine-pagination-snapshot: $(ENGINE_PAGINATION_SNAPSHOT_TEST)
+	$(ENGINE_PAGINATION_SNAPSHOT_TEST)
+
 ENGINE_CONCURRENCY_TEST := $(TEST_DIR)/engine-concurrency$(EXEEXT)
 $(ENGINE_CONCURRENCY_TEST): tests/engine_concurrency.cpp $(ENGINE_CORE_OBJECTS)
 	mkdir -p $(TEST_DIR)
@@ -391,7 +405,7 @@ clean:
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
-.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-diagnostics test-minify test-json-schema-integration test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
+.PHONY: benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-diagnostics test-minify test-json-schema-integration test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
 
 
 test-cross-feature: $(TARGET)
