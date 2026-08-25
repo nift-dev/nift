@@ -376,6 +376,11 @@ bool write_readonly_files(const std::vector<std::pair<fs::path, std::string>>& f
 // risk recovered by the .unfinished marker + build --repair protocol.
 bool write_direct_file(const fs::path& path, const std::string& contents, fs::perms mode) {
     ensure_parent_directory(path);
+    // Direct writes do not create temps, but crash-leftover .nift-tmp-* files
+    // (from authoritative/atomic writes or older builds) must still be
+    // recovered by a relevant build pass. The epoch cache makes this a single
+    // directory scan per parent per build pass (never the historical O(N^2)).
+    remove_stale_temporaries(path);
     auto write_now = [&]() {
         std::ofstream file(path, std::ios::binary | std::ios::trunc);
         if (!file) return false;

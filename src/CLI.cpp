@@ -965,6 +965,18 @@ int run_cli(int argc, char** argv) {
 
     if (command == "info" || command == "status") {
         if (command == "status") {
+            // status takes no names and only the -p explain option; reject
+            // unknown options and stray positional arguments like build/info.
+            for (int i = 2; i < argc; ++i) {
+                const std::string arg = argv[i];
+                if (!arg.empty() && arg[0] == '-') {
+                    if (arg != "-p") { console::error("unknown status option '" + arg + "'"); return 1; }
+                } else {
+                    console::error("status takes no page names");
+                    return 1;
+                }
+            }
+
             struct StatusEntry {
                 const TrackedInfo* info = nullptr;
                 std::vector<std::string> reasons;
