@@ -141,3 +141,101 @@ func TestBufferReclaimDoesNotRaceNewRenderAdmission(t *testing.T) {
 		t.Fatalf("%d callback buffers retained after quiescence (must be 0)", n)
 	}
 }
+
+func TestNonRenderOperationRacesEngineClose(t *testing.T) {
+	e := NewEngine()
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	nativeOpTestHook = func() {
+		close(entered)
+		<-release
+	}
+	defer func() { nativeOpTestHook = nil }()
+
+	opDone := make(chan error, 1)
+	go func() { opDone <- e.SetString("s", "x") }()
+	<-entered // setter admitted, holding the lifecycle mutex before the native call
+
+	closeDone := make(chan struct{})
+	go func() { e.Close(); close(closeDone) }()
+	select {
+	case <-closeDone:
+		t.Fatal("Close completed while an admitted non-render operation held the lifecycle mutex")
+	case <-time.After(150 * time.Millisecond):
+	}
+
+	close(release)
+	if err := <-opDone; err != nil {
+		t.Fatalf("admitted setter failed: %v", err)
+	}
+	<-closeDone // Close proceeds only after the operation returns
+	if err := e.SetString("s", "y"); err == nil {
+		t.Fatal("expected a closed engine to reject a new setter")
+	}
+	if e.IsOpen() {
+		t.Fatal("expected IsOpen to be false after Close")
+	}
+	e.Close() // idempotent
+}
+
+func TestNonRenderOperationRacesContextClose(t *testing.T) {
+	c := NewContext()
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	nativeOpTestHook = func() {
+		close(entered)
+		<-release
+	}
+	defer func() { nativeOpTestHook = nil }()
+
+	opDone := make(chan error, 1)
+	go func() { opDone <- c.SetString("s", "x") }()
+	<-entered // setter admitted, holding the context lifecycle mutex
+
+	closeDone := make(chan struct{})
+	go func() { c.Close(); close(closeDone) }()
+	select {
+	case <-closeDone:
+		t.Fatal("Close completed while an admitted context operation held the lifecycle mutex")
+	case <-time.After(150 * time.Millisecond):
+	}
+
+	close(release)
+	if err := <-opDone; err != nil {
+		t.Fatalf("admitted context setter failed: %v", err)
+	}
+	<-closeDone
+	if err := c.SetString("s", "y"); err == nil {
+		t.Fatal("expected a closed context to reject a new setter")
+	}
+	c.Close() // idempotent
+}
+
+func TestQueryOperationRacesEngineClose(t *testing.T) {
+	e := NewEngine()
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	nativeOpTestHook = func() {
+		close(entered)
+		<-release
+	}
+	defer func() { nativeOpTestHook = nil }()
+
+	opDone := make(chan bool, 1)
+	go func() { opDone <- e.IsOpen() }()
+	<-entered // query admitted, holding the lifecycle mutex
+
+	closeDone := make(chan struct{})
+	go func() { e.Close(); close(closeDone) }()
+	select {
+	case <-closeDone:
+		t.Fatal("Close completed while an admitted query held the lifecycle mutex")
+	case <-time.After(150 * time.Millisecond):
+	}
+
+	close(release)
+	if got := <-opDone; got {
+		t.Fatal("admitted IsOpen unexpectedly true")
+	}
+	<-closeDone
+}

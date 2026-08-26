@@ -89,3 +89,29 @@ rejected that design. The repaired invariants:
   try/finally uses entered-flags so an EnterRender rejection never decrements
   a count it did not increment. Deterministic dispose-during-render tests via
   a loader-callback rendezvous. C# suite 21 -> 23.
+
+## Non-render native-operation lifecycle (CP17 round 3)
+
+Round 2 enforced admission/lifetime only around renders; non-render native
+operations still had a check-then-free-then-native-call window (alive() then
+the native call, with Close able to destroy between). Now every public
+native-touching method is a lifecycle admission:
+
+- Go: IsOpen, OpenError, SetRoot, Reload, SetLoader, SetEnvironmentProvider
+  and every binding setter hold `Engine.lifecycle` (or `Context.lifecycle`)
+  across the native call and reject a closed engine inside that critical
+  section, so Close can never free the engine/context mid-call. The same
+  test-only hook (nativeOpTestHook) forces the "operation admitted, Close
+  concurrently blocked" window deterministically; tests cover an engine
+  setter, a context setter and a query racing Close.
+- C#: the same pattern via Engine/Context `Guarded(...)`, which holds
+  `_lifecycle` across the native call and throws ObjectDisposedException if
+  disposed. A test-only NativeOpTestHook forces the window; tests cover an
+  engine setter, a query (IsOpen) and a context setter racing Dispose.
+
+The invariant now holds at the native-handle boundary generally:
+
+```text
+operation admitted before Close -> native resource stays alive until it returns
+Close wins admission -> operation rejected before native use
+```

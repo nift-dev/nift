@@ -80,13 +80,13 @@ public sealed class Context : IDisposable
         _handle = null;
     }
 
-    public void SetPageName(string name) => Mutate(Native.nift_context_set_page_name, name);
+    public void SetPageName(string name) => Guarded(() => Mutate(Native.nift_context_set_page_name, name));
 
-    public void SetCurrentOutput(string path) => Mutate(Native.nift_context_set_current_output, path);
+    public void SetCurrentOutput(string path) => Guarded(() => Mutate(Native.nift_context_set_current_output, path));
 
-    public void SetTitle(string title) => Mutate(Native.nift_context_set_title, title);
+    public void SetTitle(string title) => Guarded(() => Mutate(Native.nift_context_set_title, title));
 
-    public void SetString(string name, string value) => Mutate(Native.nift_context_set_string, name, value);
+    public void SetString(string name, string value) => Guarded(() => Mutate(Native.nift_context_set_string, name, value));
 
     public void SetInt(string name, int value) => SetScalar(Native.nift_context_set_int, name, value);
 
@@ -123,6 +123,21 @@ public sealed class Context : IDisposable
     {
         using VarString vars = new(name);
         CheckStatus(setter(Handle.DangerousGetHandle(), vars.Name, vars.NameLen, value), name);
+    }
+
+    // Guarded serializes every non-render native operation under the lifecycle
+    // mutex and rejects a disposed context, so a concurrent Dispose can never
+    // free the native context between the disposed check and the native call.
+    internal static Action? NativeOpTestHook; // test-only; invoked inside Guarded under the lifecycle lock
+
+    private void Guarded(Action action)
+    {
+        lock (_lifecycle)
+        {
+            ObjectDisposedException.ThrowIf(_disposed || _destroyed, this);
+            NativeOpTestHook?.Invoke();
+            action();
+        }
     }
 
     private static void CheckStatus(int status, string name)

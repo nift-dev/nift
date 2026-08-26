@@ -34,6 +34,9 @@ internal static class Program
         Run("context disposal safety", TestContextDispose);
         Run("dispose engine during in-flight render is deferred", TestDisposeEngineDuringRender);
         Run("dispose context during in-flight render is deferred", TestDisposeContextDuringRender);
+        Run("non-render operation vs Dispose: engine setter", TestSetterRacesDispose);
+        Run("non-render operation vs Dispose: query", TestQueryRacesDispose);
+        Run("non-render operation vs Dispose: context setter", TestContextSetterRacesDispose);
 
         Console.WriteLine($"\nC# binding tests: {_passed} passed, {_failed} failed");
         return _failed == 0 ? 0 : 1;
@@ -473,6 +476,89 @@ internal static class Program
         AssertOk(result!, "dispose-during-render result");
         AssertEq(result!.Output, "<main><b>ctx</b></main>", "dispose-during-render output");
         engine.Dispose();
+    }
+
+
+    private static void TestSetterRacesDispose()
+    {
+        var engine = Engine.New();
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        Nift.Engine.NativeOpTestHook = () => { entered.Set(); release.Wait(TimeSpan.FromSeconds(10)); };
+        try
+        {
+            Exception? opEx = null;
+            var thread = new Thread(() => { try { engine.SetString("s", "x"); } catch (Exception ex) { opEx = ex; } });
+            thread.Start();
+            Assert(entered.Wait(TimeSpan.FromSeconds(10)), "setter never entered the guarded section");
+            bool disposedWhileOp = false;
+            var disposeThread = new Thread(() => { engine.Dispose(); disposedWhileOp = true; });
+            disposeThread.Start();
+            Thread.Sleep(100);
+            Assert(!disposedWhileOp, "Dispose must block while an admitted operation holds the lifecycle mutex");
+            release.Set();
+            thread.Join();
+            Assert(opEx is null, "admitted setter threw: " + opEx);
+            disposeThread.Join();
+            bool rejected = false;
+            try { engine.SetString("s", "y"); } catch (ObjectDisposedException) { rejected = true; }
+            Assert(rejected, "disposed engine must reject a new setter");
+        }
+        finally { Nift.Engine.NativeOpTestHook = null; }
+    }
+
+    private static void TestQueryRacesDispose()
+    {
+        var engine = Engine.New();
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        Nift.Engine.NativeOpTestHook = () => { entered.Set(); release.Wait(TimeSpan.FromSeconds(10)); };
+        try
+        {
+            bool? query = null;
+            var thread = new Thread(() => { query = engine.IsOpen(); });
+            thread.Start();
+            Assert(entered.Wait(TimeSpan.FromSeconds(10)), "query never entered the guarded section");
+            bool disposedWhileOp = false;
+            var disposeThread = new Thread(() => { engine.Dispose(); disposedWhileOp = true; });
+            disposeThread.Start();
+            Thread.Sleep(100);
+            Assert(!disposedWhileOp, "Dispose must block while an admitted query holds the lifecycle mutex");
+            release.Set();
+            thread.Join();
+            disposeThread.Join();
+            Assert(query == false, "admitted IsOpen should report false");
+            Assert(disposedWhileOp, "Dispose should complete after the query");
+        }
+        finally { Nift.Engine.NativeOpTestHook = null; }
+    }
+
+    private static void TestContextSetterRacesDispose()
+    {
+        var ctx = new Context();
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        Nift.Context.NativeOpTestHook = () => { entered.Set(); release.Wait(TimeSpan.FromSeconds(10)); };
+        try
+        {
+            Exception? opEx = null;
+            var thread = new Thread(() => { try { ctx.SetString("s", "x"); } catch (Exception ex) { opEx = ex; } });
+            thread.Start();
+            Assert(entered.Wait(TimeSpan.FromSeconds(10)), "context setter never entered the guarded section");
+            bool disposedWhileOp = false;
+            var disposeThread = new Thread(() => { ctx.Dispose(); disposedWhileOp = true; });
+            disposeThread.Start();
+            Thread.Sleep(100);
+            Assert(!disposedWhileOp, "Context.Dispose must block while an admitted operation holds the lifecycle mutex");
+            release.Set();
+            thread.Join();
+            Assert(opEx is null, "admitted context setter threw: " + opEx);
+            disposeThread.Join();
+            bool rejected = false;
+            try { ctx.SetString("s", "y"); } catch (ObjectDisposedException) { rejected = true; }
+            Assert(rejected, "disposed context must reject a new setter");
+        }
+        finally { Nift.Context.NativeOpTestHook = null; }
     }
 
 }

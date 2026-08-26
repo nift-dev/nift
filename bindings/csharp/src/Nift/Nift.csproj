@@ -9,4 +9,7 @@
     <RootNamespace>Nift</RootNamespace>
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
   </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Nift.Tests" />
+  </ItemGroup>
 </Project>

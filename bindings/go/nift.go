@@ -213,6 +213,12 @@ func (e *Engine) register() int64 {
 	return id
 }
 
+// nativeOpTestHook, when set, is invoked inside a lifecycle-gated non-render
+// native operation while the lifecycle mutex is held (after admission, before
+// the native call). Test-only; used to force the "operation admitted, Close
+// concurrently blocked" window deterministically.
+var nativeOpTestHook func()
+
 // reclaimTestHook, when set, is invoked inside the quiescent-reclamation
 // critical section while the lifecycle mutex is held. Test-only; used to force
 // the "epoch reached zero but reclamation in progress" window so a concurrent
@@ -263,6 +269,9 @@ func (c *Context) beginRenderCtx() error {
 	if c.closed.Load() {
 		return errors.New("Context has been closed")
 	}
+	if nativeOpTestHook != nil {
+		nativeOpTestHook()
+	}
 	c.renderCount.Add(1)
 	return nil
 }
@@ -296,22 +305,6 @@ func (c *Context) destroyNowLocked() {
 		C.nift_context_free(c.ctx)
 		c.ctx = nil
 	}
-}
-
-func (c *Context) alive() error {
-	if c.closed.Load() {
-		return errors.New("Context has been closed")
-	}
-	return nil
-}
-
-// alive returns an error when the engine has been logically disposed (new
-// operations must be rejected; the native engine may already be destroyed).
-func (e *Engine) alive() error {
-	if e.closed.Load() {
-		return errors.New("Engine has been closed")
-	}
-	return nil
 }
 
 func (e *Engine) unregister() {
@@ -426,13 +419,32 @@ func (e *Engine) Close() {
 	}
 }
 
-// IsOpen reports whether a project snapshot is loaded.
+// IsOpen reports whether a project snapshot is loaded. Holds the lifecycle
+// mutex across the native call so a concurrent Close cannot free the engine
+// mid-call; a closed engine reports false.
 func (e *Engine) IsOpen() bool {
+	e.lifecycle.Lock()
+	defer e.lifecycle.Unlock()
+	if e.closed.Load() {
+		return false
+	}
+	if nativeOpTestHook != nil {
+		nativeOpTestHook()
+	}
 	return C.nift_engine_is_open(e.engine) != 0
 }
 
-// OpenError returns the project-open diagnostic (empty when open).
+// OpenError returns the project-open diagnostic (empty when open). Holds the
+// lifecycle mutex across the native call; a closed engine returns "".
 func (e *Engine) OpenError() string {
+	e.lifecycle.Lock()
+	defer e.lifecycle.Unlock()
+	if e.closed.Load() {
+		return ""
+	}
+	if nativeOpTestHook != nil {
+		nativeOpTestHook()
+	}
 	var s C.nift_string
 	if C.nift_engine_open_error(e.engine, &s) != C.NIFT_OK {
 		return ""
@@ -440,10 +452,20 @@ func (e *Engine) OpenError() string {
 	return C.GoStringN(s.data, C.int(s.length))
 }
 
-// SetRoot sets the base directory for relative source resolution.
+// SetRoot sets the base directory for relative source resolution. Holds the
+// lifecycle mutex across the native call so a concurrent Close cannot free
+// the engine mid-call.
 func (e *Engine) SetRoot(root string) {
 	r := C.CString(root)
 	defer C.free(unsafe.Pointer(r))
+	e.lifecycle.Lock()
+	defer e.lifecycle.Unlock()
+	if e.closed.Load() {
+		return
+	}
+	if nativeOpTestHook != nil {
+		nativeOpTestHook()
+	}
 	C.nift_engine_set_root(e.engine, r, C.size_t(len(root)))
 }
 
@@ -451,8 +473,13 @@ func (e *Engine) SetRoot(root string) {
 // for mechanical failures; a failed reload returns a non-nil error carrying the
 // diagnostic and keeps the last known-good generation in service.
 func (e *Engine) Reload() error {
-	if err := e.alive(); err != nil {
-		return err
+	e.lifecycle.Lock()
+	defer e.lifecycle.Unlock()
+	if e.closed.Load() {
+		return errors.New("Engine has been closed")
+	}
+	if nativeOpTestHook != nil {
+		nativeOpTestHook()
 	}
 	var s C.nift_string
 	status := C.nift_engine_reload(e.engine, &s)
@@ -469,11 +496,16 @@ func (e *Engine) Reload() error {
 // SetLoader installs a loader provider. Engine mutation is not thread-safe
 // with active renders.
 func (e *Engine) SetLoader(loader HostLoader) {
-	if err := e.alive(); err != nil {
-		return
-	}
 	v, _ := callbackRegistry.Load(e.id)
 	v.(*callbackSet).loader = loader
+	e.lifecycle.Lock()
+	defer e.lifecycle.Unlock()
+	if e.closed.Load() {
+		return
+	}
+	if nativeOpTestHook != nil {
+		nativeOpTestHook()
+	}
 	if loader == nil {
 		C.nift_engine_set_loader(e.engine, nil, nil)
 		return
@@ -483,11 +515,16 @@ func (e *Engine) SetLoader(loader HostLoader) {
 
 // SetEnvironmentProvider installs an environment provider.
 func (e *Engine) SetEnvironmentProvider(env HostEnvironment) {
-	if err := e.alive(); err != nil {
-		return
-	}
 	v, _ := callbackRegistry.Load(e.id)
 	v.(*callbackSet).env = env
+	e.lifecycle.Lock()
+	defer e.lifecycle.Unlock()
+	if e.closed.Load() {
+		return
+	}
+	if nativeOpTestHook != nil {
+		nativeOpTestHook()
+	}
 	if env == nil {
 		C.nift_engine_set_environment_provider(e.engine, nil, nil)
 		return
@@ -511,52 +548,77 @@ func bindingNameError(status C.nift_status) error {
 
 // SetString sets a long-lived default string binding.
 func (e *Engine) SetString(name, value string) error {
-	if err := e.alive(); err != nil {
-		return err
-	}
 	n, nl := goString(name)
 	v, vl := goString(value)
+	e.lifecycle.Lock()
+	defer e.lifecycle.Unlock()
+	if e.closed.Load() {
+		return errors.New("Engine has been closed")
+	}
+	if nativeOpTestHook != nil {
+		nativeOpTestHook()
+	}
 	return bindingNameError(C.nift_engine_set_string(e.engine, n, nl, v, vl))
 }
 
 // SetInt sets a long-lived default int32 binding.
 func (e *Engine) SetInt(name string, value int32) error {
-	if err := e.alive(); err != nil {
-		return err
-	}
 	n, nl := goString(name)
+	e.lifecycle.Lock()
+	defer e.lifecycle.Unlock()
+	if e.closed.Load() {
+		return errors.New("Engine has been closed")
+	}
+	if nativeOpTestHook != nil {
+		nativeOpTestHook()
+	}
 	return bindingNameError(C.nift_engine_set_int(e.engine, n, nl, C.int32_t(value)))
 }
 
 // SetNumber sets a long-lived default double binding.
 func (e *Engine) SetNumber(name string, value float64) error {
-	if err := e.alive(); err != nil {
-		return err
-	}
 	n, nl := goString(name)
+	e.lifecycle.Lock()
+	defer e.lifecycle.Unlock()
+	if e.closed.Load() {
+		return errors.New("Engine has been closed")
+	}
+	if nativeOpTestHook != nil {
+		nativeOpTestHook()
+	}
 	return bindingNameError(C.nift_engine_set_number(e.engine, n, nl, C.double(value)))
 }
 
 // SetBool sets a long-lived default boolean binding.
 func (e *Engine) SetBool(name string, value bool) error {
-	if err := e.alive(); err != nil {
-		return err
-	}
 	n, nl := goString(name)
 	v := C.int(0)
 	if value {
 		v = 1
+	}
+	e.lifecycle.Lock()
+	defer e.lifecycle.Unlock()
+	if e.closed.Load() {
+		return errors.New("Engine has been closed")
+	}
+	if nativeOpTestHook != nil {
+		nativeOpTestHook()
 	}
 	return bindingNameError(C.nift_engine_set_bool(e.engine, n, nl, v))
 }
 
 // SetJSON sets a long-lived default JSON binding. Malformed JSON is a Go error.
 func (e *Engine) SetJSON(name, json string) error {
-	if err := e.alive(); err != nil {
-		return err
-	}
 	n, nl := goString(name)
 	j, jl := goString(json)
+	e.lifecycle.Lock()
+	defer e.lifecycle.Unlock()
+	if e.closed.Load() {
+		return errors.New("Engine has been closed")
+	}
+	if nativeOpTestHook != nil {
+		nativeOpTestHook()
+	}
 	return bindingNameError(C.nift_engine_set_json(e.engine, n, nl, j, jl))
 }
 
@@ -705,79 +767,119 @@ func (c *Context) ptr() *C.nift_context {
 
 // SetPageName sets the page identity.
 func (c *Context) SetPageName(name string) {
-	if err := c.alive(); err != nil {
+	n, nl := goString(name)
+	c.lifecycle.Lock()
+	defer c.lifecycle.Unlock()
+	if c.closed.Load() {
 		return
 	}
-	n, nl := goString(name)
+	if nativeOpTestHook != nil {
+		nativeOpTestHook()
+	}
 	C.nift_context_set_page_name(c.ctx, n, nl)
 }
 
 // SetCurrentOutput sets the generated output location used by @pathto.
 func (c *Context) SetCurrentOutput(path string) {
-	if err := c.alive(); err != nil {
+	p, pl := goString(path)
+	c.lifecycle.Lock()
+	defer c.lifecycle.Unlock()
+	if c.closed.Load() {
 		return
 	}
-	p, pl := goString(path)
+	if nativeOpTestHook != nil {
+		nativeOpTestHook()
+	}
 	C.nift_context_set_current_output(c.ctx, p, pl)
 }
 
 // SetTitle sets the per-render title.
 func (c *Context) SetTitle(title string) {
-	if err := c.alive(); err != nil {
+	t, tl := goString(title)
+	c.lifecycle.Lock()
+	defer c.lifecycle.Unlock()
+	if c.closed.Load() {
 		return
 	}
-	t, tl := goString(title)
+	if nativeOpTestHook != nil {
+		nativeOpTestHook()
+	}
 	C.nift_context_set_title(c.ctx, t, tl)
 }
 
 // SetString sets a request-scoped string binding.
 func (c *Context) SetString(name, value string) error {
-	if err := c.alive(); err != nil {
-		return err
-	}
 	n, nl := goString(name)
 	v, vl := goString(value)
+	c.lifecycle.Lock()
+	defer c.lifecycle.Unlock()
+	if c.closed.Load() {
+		return errors.New("Context has been closed")
+	}
+	if nativeOpTestHook != nil {
+		nativeOpTestHook()
+	}
 	return bindingNameError(C.nift_context_set_string(c.ctx, n, nl, v, vl))
 }
 
 // SetInt sets a request-scoped int32 binding.
 func (c *Context) SetInt(name string, value int32) error {
-	if err := c.alive(); err != nil {
-		return err
-	}
 	n, nl := goString(name)
+	c.lifecycle.Lock()
+	defer c.lifecycle.Unlock()
+	if c.closed.Load() {
+		return errors.New("Context has been closed")
+	}
+	if nativeOpTestHook != nil {
+		nativeOpTestHook()
+	}
 	return bindingNameError(C.nift_context_set_int(c.ctx, n, nl, C.int32_t(value)))
 }
 
 // SetNumber sets a request-scoped double binding.
 func (c *Context) SetNumber(name string, value float64) error {
-	if err := c.alive(); err != nil {
-		return err
-	}
 	n, nl := goString(name)
+	c.lifecycle.Lock()
+	defer c.lifecycle.Unlock()
+	if c.closed.Load() {
+		return errors.New("Context has been closed")
+	}
+	if nativeOpTestHook != nil {
+		nativeOpTestHook()
+	}
 	return bindingNameError(C.nift_context_set_number(c.ctx, n, nl, C.double(value)))
 }
 
 // SetBool sets a request-scoped boolean binding.
 func (c *Context) SetBool(name string, value bool) error {
-	if err := c.alive(); err != nil {
-		return err
-	}
 	n, nl := goString(name)
 	v := C.int(0)
 	if value {
 		v = 1
+	}
+	c.lifecycle.Lock()
+	defer c.lifecycle.Unlock()
+	if c.closed.Load() {
+		return errors.New("Context has been closed")
+	}
+	if nativeOpTestHook != nil {
+		nativeOpTestHook()
 	}
 	return bindingNameError(C.nift_context_set_bool(c.ctx, n, nl, v))
 }
 
 // SetJSON sets a request-scoped JSON binding.
 func (c *Context) SetJSON(name, json string) error {
-	if err := c.alive(); err != nil {
-		return err
-	}
 	n, nl := goString(name)
 	j, jl := goString(json)
+	c.lifecycle.Lock()
+	defer c.lifecycle.Unlock()
+	if c.closed.Load() {
+		return errors.New("Context has been closed")
+	}
+	if nativeOpTestHook != nil {
+		nativeOpTestHook()
+	}
 	return bindingNameError(C.nift_context_set_json(c.ctx, n, nl, j, jl))
 }
 

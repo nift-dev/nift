@@ -114,58 +114,79 @@ public sealed class Engine : IDisposable
         _handle.Dispose();
     }
 
-    public bool IsOpen() => _handle.IsInvalid == false && Native.nift_engine_is_open(_handle.DangerousGetHandle()) != 0;
+    // Guarded serializes every non-render native operation under the lifecycle
+    // mutex and rejects a disposed engine, so a concurrent Dispose can never
+    // free the native engine between the disposed check and the native call.
+    internal static Action? NativeOpTestHook; // test-only; invoked inside Guarded under the lifecycle lock
 
-    public string OpenError()
+    private void Guarded(Action action)
+    {
+        lock (_lifecycle)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            NativeOpTestHook?.Invoke();
+            action();
+        }
+    }
+
+    private T Guarded<T>(Func<T> action)
+    {
+        lock (_lifecycle)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            NativeOpTestHook?.Invoke();
+            return action();
+        }
+    }
+
+    public bool IsOpen() => Guarded(() => _handle.IsInvalid == false && Native.nift_engine_is_open(_handle.DangerousGetHandle()) != 0);
+
+    public string OpenError() => Guarded(() =>
     {
         int rc = Native.nift_engine_open_error(_handle.DangerousGetHandle(), out NiftString out_);
         return rc == NativeStatus.Ok ? Utf8.FromNative(out_) : "";
-    }
+    });
 
     /// <summary>Base directory for resolving relative path sources and relative @input.</summary>
-    public void SetRoot(string root)
+    public void SetRoot(string root) => Guarded(() =>
     {
-        EnsureNotDisposed();
         using VarString vars = new(root);
         int rc = Native.nift_engine_set_root(_handle.DangerousGetHandle(), vars.Name, vars.NameLen);
         if (rc != NativeStatus.Ok)
         {
             throw new NiftException("nift_engine_set_root failed");
         }
-    }
+    });
 
     /// <summary>Atomic snapshot replacement (Engine::reload). Safe concurrently with renders.</summary>
-    public void Reload()
+    public void Reload() => Guarded(() =>
     {
-        EnsureNotDisposed();
         int rc = Native.nift_engine_reload(_handle.DangerousGetHandle(), out NiftString errorOut);
         if (rc != NativeStatus.Ok)
         {
             throw new NiftException(Utf8.FromNative(errorOut) is { Length: > 0 } message ? message : "nift_engine_reload failed");
         }
-    }
+    });
 
-    public void SetLoader(HostLoader? loader)
+    public void SetLoader(HostLoader? loader) => Guarded(() =>
     {
-        EnsureNotDisposed();
         _loader = loader;
         int rc = Native.nift_engine_set_loader(_handle.DangerousGetHandle(), _loaderBridge, GCHandle.ToIntPtr(_userDataHandle));
         if (rc != NativeStatus.Ok)
         {
             throw new NiftException("nift_engine_set_loader failed");
         }
-    }
+    });
 
-    public void SetEnvironmentProvider(HostEnvironment? env)
+    public void SetEnvironmentProvider(HostEnvironment? env) => Guarded(() =>
     {
-        EnsureNotDisposed();
         _env = env;
         int rc = Native.nift_engine_set_environment_provider(_handle.DangerousGetHandle(), _envBridge, GCHandle.ToIntPtr(_userDataHandle));
         if (rc != NativeStatus.Ok)
         {
             throw new NiftException("nift_engine_set_environment_provider failed");
         }
-    }
+    });
 
     public void SetString(string name, string value) => SetStringValue(Native.nift_engine_set_string, name, value);
 
@@ -405,43 +426,35 @@ public sealed class Engine : IDisposable
         return status;
     }
 
-    private void EnsureNotDisposed()
+    private void SetStringValue(EngineStringSetter setter, string name, string value) => Guarded(() =>
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-    }
-
-    private void SetStringValue(EngineStringSetter setter, string name, string value)
-    {
-        EnsureNotDisposed();
         using VarString vars = new(name, value);
         int rc = setter(_handle.DangerousGetHandle(), vars.Name, vars.NameLen, vars.Value, vars.ValueLen);
         if (rc != NativeStatus.Ok)
         {
             throw new NiftException($"invalid binding name: {name}");
         }
-    }
+    });
 
-    private void SetScalar(EngineScalarSetter setter, string name, int value)
+    private void SetScalar(EngineScalarSetter setter, string name, int value) => Guarded(() =>
     {
-        EnsureNotDisposed();
         using VarString vars = new(name);
         int rc = setter(_handle.DangerousGetHandle(), vars.Name, vars.NameLen, value);
         if (rc != NativeStatus.Ok)
         {
             throw new NiftException($"invalid binding name: {name}");
         }
-    }
+    });
 
-    private void SetDouble(EngineDoubleSetter setter, string name, double value)
+    private void SetDouble(EngineDoubleSetter setter, string name, double value) => Guarded(() =>
     {
-        EnsureNotDisposed();
         using VarString vars = new(name);
         int rc = setter(_handle.DangerousGetHandle(), vars.Name, vars.NameLen, value);
         if (rc != NativeStatus.Ok)
         {
             throw new NiftException($"invalid binding name: {name}");
         }
-    }
+    });
 
     private delegate int EngineStringSetter(IntPtr engine, IntPtr name, UIntPtr name_len, IntPtr value, UIntPtr value_len);
     private delegate int EngineScalarSetter(IntPtr engine, IntPtr name, UIntPtr name_len, int value);
