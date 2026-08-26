@@ -88,7 +88,7 @@ jobs:
       - name: Filesystem boundary (BH9)
         run: make test-filesystem-boundary
   binding-gates:
-    name: Production binding gates (Go, C#, Node) on Linux
+    name: Production binding gates (Go, C#, Node, Python) on Linux
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -114,6 +114,12 @@ jobs:
         run: |
           bash bindings/node/build.sh
           node --expose-gc bindings/node/test/nift.test.js
+      - name: Install Python dev headers
+        run: sudo apt-get update && sudo apt-get install -y python3-dev
+      - name: Python binding build + tests
+        run: |
+          bash bindings/python/build.sh
+          cd bindings/python && python3 -m unittest tests.test_nift
 
   aggregate-evidence:
     name: Aggregate evidence (${{ matrix.os }})
