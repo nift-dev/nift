@@ -67,20 +67,43 @@ use is provably complete (same-thread sequentiality + synchronous copy) and
 freed at thread exit. This is bounded (per thread) and is NOT the cross-thread
 free-on-next-callback pattern that CP11 ruled out.
 
-### Resource / lifetime rules (documented, tested)
+### Resource / lifetime rules (enforced, tested)
 
-- Renders are async: `await` the result before closing the Context/Engine that
-  produced it. Closing an Engine or Context while its render is in flight is a
-  use-after-free (the native handles are freed eagerly). The binding keeps the
-  JS objects rooted (`napi_ref`) so GC cannot collect them mid-render, but
-  explicit `close()` must happen after the promise settles. The HTTP dogfood
-  exposed both variants of this mistake during CP14 and was corrected to await
-  before closing.
-- `close()` is deterministic; the GC finalizer is the backstop for engines and
-  contexts that are dropped without closing.
-- Disposed objects reject further use ("Engine has been disposed").
-- Shutdown while callbacks are quiescent is safe: `close()` releases the
-  threadsafe functions and frees the engine.
+Renders are async, and an Engine/Context **cannot** be freed while a render is
+in flight. This is an enforced binding invariant, not a caller obligation:
+
+```text
+render begins
+    ↓
+Engine/Context native lifetime retained (render_count incremented)
+    ↓
+close() called
+    ↓
+new operations rejected immediately (disposed)
+but native resources NOT freed while renders use them
+    ↓
+render settles
+    ↓
+last in-flight reference released (render_count -> 0)
+    ↓
+native resource destroyed safely
+```
+
+- `BeginRender` stores the Engine/Context **wraps** and increments a per-wrapper
+  `render_count`; `RenderComplete` decrements it. `close()` sets `disposed`
+  immediately (new operations throw "Engine/Context has been disposed") and
+  destroys the native resource immediately if no render is in flight, otherwise
+  defers destruction to the last `RenderComplete`. All of this happens on the
+  JS thread, so no locking is required.
+- The TSFNs stay alive while any render is in flight, so in-flight
+  loader/environment callbacks remain serviceable even after `close()`.
+- `napi_ref`s root the JS objects for the render duration (GC cannot collect
+  an Engine/Context with an outstanding render); the GC finalizer destroys the
+  native resource only when `render_count == 0` and is otherwise idempotent.
+- `close()` is idempotent. The HTTP dogfood's original await-before-close
+  mistake is no longer a hazard; the dogfood keeps awaiting simply because the
+  result is a Promise.
+- Shutdown while callbacks are quiescent is safe.
 
 ## Shared semantic surface
 

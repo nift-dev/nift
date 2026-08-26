@@ -295,6 +295,95 @@ function makeProject() {
     e.close();
   });
 
+  await test("close engine during in-flight render: safe + deterministic", async () => {
+    const e = Engine.new();
+    e.setRoot("/");
+    e.setLoader((p) => (p.endsWith("/p.html") ? "<p>PART</p>" : null));
+    const p = e.render('@input("p.html")', "<main>@content</main>");
+    e.close(); // must NOT free the native engine while the render is in flight
+    const r = await p;
+    assert.strictEqual(r.ok, true);
+    assert.strictEqual(r.output, "<main><p>PART</p></main>");
+    assert.throws(() => e.render("x", "y"), /disposed/);
+  });
+
+  await test("close context during in-flight render: safe + deterministic", async () => {
+    const e = Engine.new();
+    const c = new Context();
+    c.setString("s", "ctx");
+    const p = e.render("$[s]", "<main>@content</main>", c);
+    c.close(); // must NOT free the native context while the render is in flight
+    const r = await p;
+    assert.strictEqual(r.ok, true);
+    assert.strictEqual(r.output, "<main>ctx</main>");
+    assert.throws(() => c.setString("x", "y"), /disposed/);
+    e.close();
+  });
+
+  await test("close engine during render with loader/env callbacks (tsfns survive)", async () => {
+    const e = Engine.new();
+    e.setRoot("/");
+    e.setLoader((p) => {
+      if (p.endsWith("/p.html")) return "<p>PART</p>";
+      if (p.endsWith("/e.html")) return "@getenv(GREETING)";
+      return null;
+    });
+    e.setEnvironmentProvider((n) => (n === "GREETING" ? "hi" : null));
+    const p = e.render('@input("e.html")', "<main>@content</main>");
+    e.close(); // in-flight render may still need the loader/env TSFNs
+    const r = await p;
+    assert.strictEqual(r.ok, true);
+    assert.strictEqual(r.output, "<main>hi</main>");
+  });
+
+  await test("close engine + contexts during concurrent renders", async () => {
+    const e = Engine.new();
+    e.setRoot("/");
+    e.setLoader((p) => (p.endsWith("/p.html") ? "<p>P</p>" : null));
+    const promises = [];
+    for (let i = 0; i < 24; i++) {
+      const c = new Context();
+      c.setInt("n", i);
+      promises.push(
+        e.render('@input("p.html")', "<main>$[n]</main>@content", c).then((r) => r.ok)
+      );
+      c.close(); // close while its render is outstanding
+    }
+    e.close(); // close while several renders are outstanding
+    const results = await Promise.all(promises);
+    assert.strictEqual(results.length, 24);
+    assert.ok(results.every((ok) => ok === true), "all concurrent renders settled ok");
+    await new Promise((resolve) => setImmediate(resolve));
+  });
+
+  await test("repeated/idempotent close", async () => {
+    const e = Engine.new();
+    const p = e.render("x", "<main>@content</main>");
+    e.close();
+    e.close();
+    e.close();
+    await p;
+    const c = new Context();
+    c.close();
+    c.close();
+  });
+
+  await test("GC pressure after close-during-render", async () => {
+    for (let i = 0; i < 40; i++) {
+      const e = Engine.new();
+      e.setRoot("/");
+      e.setLoader((p) => (p.endsWith("/p.html") ? "<p>P</p>" : null));
+      const c = new Context();
+      c.setInt("n", i);
+      const p = e.render('@input("p.html")', "<main>$[n]</main>@content", c);
+      e.close();
+      c.close();
+      const r = await p;
+      assert.strictEqual(r.ok, true);
+    }
+    if (global.gc) global.gc();
+  });
+
   await test("long-lived engine across many renders", async () => {
     const e = Engine.new();
     e.setString("site", "persist");

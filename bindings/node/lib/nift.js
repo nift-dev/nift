@@ -5,6 +5,11 @@
 // the loader/environment host callbacks, which run on the JS thread. Host
 // callbacks must therefore return synchronously: return a string (Found),
 // null/undefined (NotFound), or throw (Error with the diagnostic).
+//
+// Lifetime: close() rejects new operations immediately but defers native
+// destruction until in-flight renders quiesce, so an Engine/Context is never
+// freed while a render is using it (enforced invariant, not a caller
+// obligation).
 "use strict";
 
 const native = require("../build/nift_node.node");

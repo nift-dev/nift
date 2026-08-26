@@ -179,12 +179,21 @@ struct EngineWrap {
   napi_ref env_ref = nullptr;
   napi_threadsafe_function loader_tsfn = nullptr;
   napi_threadsafe_function env_tsfn = nullptr;
+  // Lifetime invariant: close() marks disposed immediately (new operations are
+  // rejected) but defers native destruction until the last in-flight render
+  // quiesces (render_count reaches zero), so an async render can never outlive
+  // its native Engine/Context. All mutations happen on the JS thread, so no
+  // lock is required.
+  size_t render_count = 0;
   bool disposed = false;
+  bool destroyed = false;
 };
 
 struct ContextWrap {
   nift_context* ctx = nullptr;
+  size_t render_count = 0;
   bool disposed = false;
+  bool destroyed = false;
 };
 
 // ---------------------------------------------------------------------------
@@ -328,10 +337,13 @@ void CompleteEnvironmentCallback(napi_env env, napi_value js_cb, void* context,
 // Async render request
 // ---------------------------------------------------------------------------
 
+void DestroyEngine(EngineWrap* e);
+void DestroyContext(ContextWrap* c);
+
 struct RenderReq {
   napi_env env = nullptr;
-  nift_engine* engine = nullptr;
-  nift_context* ctx = nullptr;
+  EngineWrap* engine = nullptr;
+  ContextWrap* ctx = nullptr;
   int mode = kModeComposed;
   std::string page_name;
   std::string page;
@@ -356,24 +368,27 @@ void BuildSource(const std::string& data, bool is_path, nift_source* out) {
 
 void RenderExecute(napi_env env, void* data) {
   RenderReq* req = static_cast<RenderReq*>(data);
+  // The wraps' native handles are guaranteed valid: BeginRender incremented
+  // render_count, and native destruction is deferred until it reaches zero.
+  nift_engine* engine = req->engine->engine;
+  nift_context* ctx = req->ctx != nullptr ? req->ctx->ctx : nullptr;
   switch (req->mode) {
     case kModePage:
-      req->rc = nift_engine_render_page(req->engine, req->ctx,
+      req->rc = nift_engine_render_page(engine, ctx,
                                         req->page_name.data(), req->page_name.size(),
                                         &req->result);
       break;
     case kModePartial: {
       nift_source partial;
       BuildSource(req->page, req->page_is_path, &partial);
-      req->rc = nift_engine_render_partial(req->engine, &partial, req->ctx,
-                                           &req->result);
+      req->rc = nift_engine_render_partial(engine, &partial, ctx, &req->result);
       break;
     }
     default: {
       nift_source page, tpl;
       BuildSource(req->page, req->page_is_path, &page);
       BuildSource(req->tpl, req->tpl_is_path, &tpl);
-      req->rc = nift_engine_render(req->engine, &page, &tpl, req->ctx, &req->result);
+      req->rc = nift_engine_render(engine, &page, &tpl, ctx, &req->result);
       break;
     }
   }
@@ -470,6 +485,21 @@ void RenderComplete(napi_env env, napi_status status, void* data) {
   }
 
   if (req->result != nullptr) nift_render_result_free(req->result);
+
+  // Release the in-flight render's claim on the Context/Engine; if close()
+  // was already requested, destroy the native resource once the last render
+  // quiesces (deferred destruction).
+  if (req->ctx != nullptr) {
+    req->ctx->render_count--;
+    if (req->ctx->disposed && req->ctx->render_count == 0) {
+      DestroyContext(req->ctx);
+    }
+  }
+  req->engine->render_count--;
+  if (req->engine->disposed && req->engine->render_count == 0) {
+    DestroyEngine(req->engine);
+  }
+
   if (req->engine_ref != nullptr) NAPI_CHECK(env, napi_delete_reference(env, req->engine_ref));
   if (req->ctx_ref != nullptr) NAPI_CHECK(env, napi_delete_reference(env, req->ctx_ref));
   NAPI_CHECK(env, napi_delete_async_work(env, req->work));
@@ -489,15 +519,18 @@ EngineWrap* UnwrapEngine(napi_env env, napi_value value) {
     ThrowJs(env, "Nift native: expected an Engine");
     return nullptr;
   }
-  if (e->disposed) {
+  if (e->disposed || e->destroyed) {
     ThrowJs(env, "Nift native: Engine has been disposed");
     return nullptr;
   }
   return e;
 }
 
-void FinalizeEngine(napi_env env, void* data, void* hint) {
-  EngineWrap* e = static_cast<EngineWrap*>(data);
+// Frees the native Engine and its host-callback TSFNs. Must only run when
+// render_count == 0 (no in-flight render can still need them). Idempotent.
+void DestroyEngine(EngineWrap* e) {
+  if (e->destroyed) return;
+  e->destroyed = true;
   if (e->loader_ref != nullptr) napi_delete_reference(e->env, e->loader_ref);
   if (e->env_ref != nullptr) napi_delete_reference(e->env, e->env_ref);
   if (e->loader_tsfn != nullptr) {
@@ -507,6 +540,18 @@ void FinalizeEngine(napi_env env, void* data, void* hint) {
     napi_release_threadsafe_function(e->env_tsfn, napi_tsfn_release);
   }
   if (e->engine != nullptr) nift_engine_free(e->engine);
+  e->engine = nullptr;
+  e->loader_ref = nullptr;
+  e->env_ref = nullptr;
+  e->loader_tsfn = nullptr;
+  e->env_tsfn = nullptr;
+}
+
+void FinalizeEngine(napi_env env, void* data, void* hint) {
+  // The JS object became unreachable: no render is in flight (each render
+  // holds a napi_ref to it), so render_count is zero and destroy is safe.
+  EngineWrap* e = static_cast<EngineWrap*>(data);
+  DestroyEngine(e);
   delete e;
 }
 
@@ -558,9 +603,10 @@ napi_value EngineDispose(napi_env env, napi_callback_info info) {
   EngineWrap* e = nullptr;
   if (napi_unwrap(env, this_value, reinterpret_cast<void**>(&e)) == napi_ok &&
       e != nullptr) {
-    // Remove the wrap so the GC finalizer cannot run again, then free eagerly.
-    NAPI_CHECK(env, napi_remove_wrap(env, this_value, reinterpret_cast<void**>(&e)));
-    FinalizeEngine(env, e, nullptr);
+    e->disposed = true;
+    if (e->render_count == 0) {
+      DestroyEngine(e);  // no in-flight render; destroy immediately
+    }
   }
   return this_value;
 }
@@ -769,8 +815,9 @@ napi_value BeginRender(napi_env env, napi_callback_info info, int mode) {
 
   RenderReq* req = new RenderReq();
   req->env = env;
-  req->engine = e->engine;
+  req->engine = e;
   req->mode = mode;
+  e->render_count++;
 
   napi_value ctx_value = nullptr;
   if (mode == kModePage) {
@@ -778,16 +825,19 @@ napi_value BeginRender(napi_env env, napi_callback_info info, int mode) {
     if (argc >= 2) ctx_value = args[1];
   } else if (mode == kModeComposed) {
     if (argc >= 1 && !SourceArg(env, args[0], &req->page, &req->page_is_path)) {
+      e->render_count--;
       delete req;
       return ThrowJs(env, "render(page, template, ctx) expects strings or {path}/{text} objects");
     }
     if (argc >= 2 && !SourceArg(env, args[1], &req->tpl, &req->tpl_is_path)) {
+      e->render_count--;
       delete req;
       return ThrowJs(env, "render(page, template, ctx) expects strings or {path}/{text} objects");
     }
     if (argc >= 3) ctx_value = args[2];
   } else {
     if (argc >= 1 && !SourceArg(env, args[0], &req->page, &req->page_is_path)) {
+      e->render_count--;
       delete req;
       return ThrowJs(env, "renderPartial(partial, ctx) expects a string or {path}/{text} object");
     }
@@ -800,10 +850,12 @@ napi_value BeginRender(napi_env env, napi_callback_info info, int mode) {
     if (t != napi_null && t != napi_undefined) {
       ContextWrap* c = UnwrapContext(env, ctx_value, "Context");
       if (c == nullptr) {
+        e->render_count--;
         delete req;
         return nullptr;
       }
-      req->ctx = c->ctx;
+      req->ctx = c;
+      c->render_count++;
       NAPI_CHECK(env, napi_create_reference(env, ctx_value, 1, &req->ctx_ref));
     }
   }
@@ -845,16 +897,23 @@ ContextWrap* UnwrapContext(napi_env env, napi_value value, const char* what) {
     ThrowJs(env, std::string("Nift native: expected ") + what);
     return nullptr;
   }
-  if (c->disposed) {
+  if (c->disposed || c->destroyed) {
     ThrowJs(env, "Nift native: Context has been disposed");
     return nullptr;
   }
   return c;
 }
 
+void DestroyContext(ContextWrap* c) {
+  if (c->destroyed) return;
+  c->destroyed = true;
+  if (c->ctx != nullptr) nift_context_free(c->ctx);
+  c->ctx = nullptr;
+}
+
 void FinalizeContext(napi_env env, void* data, void* hint) {
   ContextWrap* c = static_cast<ContextWrap*>(data);
-  if (c->ctx != nullptr) nift_context_free(c->ctx);
+  DestroyContext(c);
   delete c;
 }
 
@@ -876,8 +935,10 @@ napi_value ContextDispose(napi_env env, napi_callback_info info) {
   ContextWrap* c = nullptr;
   if (napi_unwrap(env, this_value, reinterpret_cast<void**>(&c)) == napi_ok &&
       c != nullptr) {
-    NAPI_CHECK(env, napi_remove_wrap(env, this_value, reinterpret_cast<void**>(&c)));
-    FinalizeContext(env, c, nullptr);
+    c->disposed = true;
+    if (c->render_count == 0) {
+      DestroyContext(c);
+    }
   }
   return this_value;
 }
