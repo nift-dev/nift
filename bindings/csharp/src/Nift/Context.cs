@@ -11,13 +11,20 @@ namespace Nift;
 public sealed class Context : IDisposable
 {
     private SafeHandle? _handle;
+    private readonly object _lifecycle = new();
+    private int _renderCount;
+    private bool _disposed;
+    private bool _destroyed;
 
     internal SafeHandle Handle
     {
         get
         {
-            ObjectDisposedException.ThrowIf(_handle is null, this);
-            return _handle;
+            lock (_lifecycle)
+            {
+                ObjectDisposedException.ThrowIf(_disposed || _destroyed, this);
+                return _handle!;
+            }
         }
     }
 
@@ -26,8 +33,49 @@ public sealed class Context : IDisposable
         _handle = new ContextHandle(Native.nift_context_new());
     }
 
+    /// <summary>Logically disposes the context: new use is rejected
+    /// immediately, but the native context is freed only after the last
+    /// in-flight render using it quiesces. Idempotent.</summary>
     public void Dispose()
     {
+        lock (_lifecycle)
+        {
+            _disposed = true;
+            if (_renderCount == 0)
+            {
+                DestroyNow();
+            }
+        }
+    }
+
+    internal void EnterRender()
+    {
+        lock (_lifecycle)
+        {
+            ObjectDisposedException.ThrowIf(_disposed || _destroyed, this);
+            _renderCount++;
+        }
+    }
+
+    internal void ExitRender()
+    {
+        lock (_lifecycle)
+        {
+            _renderCount--;
+            if (_renderCount == 0 && _disposed)
+            {
+                DestroyNow();
+            }
+        }
+    }
+
+    private void DestroyNow()
+    {
+        if (_destroyed)
+        {
+            return;
+        }
+        _destroyed = true;
         _handle?.Dispose();
         _handle = null;
     }

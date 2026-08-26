@@ -45,6 +45,7 @@ static inline void nift_go_set_env(nift_engine* engine, void* user_data) {
 import "C"
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -105,22 +106,33 @@ type Result struct {
 // Context carries per-render page identity and bindings.
 type Context struct {
 	ctx *C.nift_context
+	lifecycle  sync.Mutex
+	closed     atomic.Bool
+	renderCount atomic.Int32
 }
 
 // Engine is a thin handle over a C ABI engine. Concurrent renders on one
 // Engine are safe; configuration (bindings, providers, root) must happen
 // before concurrent use.
+//
+// Lifetime invariant (CP17): the lifecycle mutex couples render ADMISSION with
+// quiescent reclamation, so "the render epoch reached zero" and "callback
+// buffers are freed" cannot be separated by a new render starting. beginRender
+// holds the lifecycle mutex while incrementing renderCount; the render-done
+// closure holds it while decrementing and, at zero, reclaiming the callback
+// buffers (or destroying the engine if Close was already called). Lock order
+// is always lifecycle -> callbackSet.mu; callbacks take only callbackSet.mu,
+// so there is no inversion.
 type Engine struct {
 	engine *C.nift_engine
 	id     int64
-	// renderCount tracks in-flight renders; when it returns to zero, every
-	// callback-output buffer is dead (the C ABI copies each callback `out`
-	// synchronously immediately after the callback returns, and no callback
-	// can run while no render is in flight), so the buffers are reclaimed.
-	// This bounds callback memory to peak concurrent render activity instead
-	// of the engine's whole lifetime. NOT free-on-next-callback (which CP11
-	// proved unsafe cross-thread); freeing happens only when no render is
-	// running at all.
+	lifecycle sync.Mutex
+	closed    atomic.Bool
+	// renderCount tracks in-flight renders; when it returns to zero and no new
+	// render can be admitted (we hold the lifecycle mutex), every callback
+	// buffer is dead (the C ABI copies each callback `out` synchronously) and
+	// is reclaimed. Bounded by peak concurrent render activity; NOT
+	// free-on-next-callback.
 	renderCount atomic.Int32
 }
 
@@ -201,30 +213,111 @@ func (e *Engine) register() int64 {
 	return id
 }
 
-// beginRender marks a render as in flight (so Close/callback handling know a
-// callback may still be running) and returns a done func that reclaims the
-// callback-output buffers once the last in-flight render completes.
-func (e *Engine) beginRender() func() {
+// reclaimTestHook, when set, is invoked inside the quiescent-reclamation
+// critical section while the lifecycle mutex is held. Test-only; used to force
+// the "epoch reached zero but reclamation in progress" window so a concurrent
+// render admission attempt is exercised deterministically.
+var reclaimTestHook func()
+
+// beginRender admits a render. It holds the lifecycle mutex while
+// incrementing renderCount, so a render can never be admitted between another
+// render's zero-transition and its buffer reclamation. Rejects a closed
+// engine. The returned done must run exactly once.
+func (e *Engine) beginRender() (func(), error) {
+	e.lifecycle.Lock()
+	defer e.lifecycle.Unlock()
+	if e.closed.Load() {
+		return nil, errors.New("Engine has been closed")
+	}
 	e.renderCount.Add(1)
 	var once sync.Once
-	return func() {
+	done := func() {
 		once.Do(func() {
+			// Hold the lifecycle mutex across decrement and reclamation so no
+			// new render can be admitted between "epoch reached zero" and the
+			// buffers being freed (the CP17 quiescent-reclamation race).
+			e.lifecycle.Lock()
+			defer e.lifecycle.Unlock()
 			if e.renderCount.Add(-1) == 0 {
-				if v, ok := callbackRegistry.Load(e.id); ok {
+				if reclaimTestHook != nil {
+					reclaimTestHook()
+				}
+				if e.closed.Load() {
+					e.destroyNowLocked()
+				} else if v, ok := callbackRegistry.Load(e.id); ok {
 					v.(*callbackSet).freeBuffers()
 				}
 			}
 		})
 	}
+	return done, nil
 }
 
-func (e *Engine) unregister() {
+// beginRenderCtx admits a render on a Context (lifecycle-gated, rejects a
+// closed Context). Must be paired with endRenderCtx. Callers acquire the
+// Engine lifecycle before the Context lifecycle (and release in reverse), so
+// nested lifecycle locks never invert.
+func (c *Context) beginRenderCtx() error {
+	c.lifecycle.Lock()
+	defer c.lifecycle.Unlock()
+	if c.closed.Load() {
+		return errors.New("Context has been closed")
+	}
+	c.renderCount.Add(1)
+	return nil
+}
+
+func (c *Context) endRenderCtx() {
+	c.lifecycle.Lock()
+	defer c.lifecycle.Unlock()
+	if c.renderCount.Add(-1) == 0 && c.closed.Load() {
+		c.destroyNowLocked()
+	}
+}
+
+// destroyNowLocked frees the native engine, callback token and callback
+// buffers. Must be called with the lifecycle mutex held and renderCount == 0
+// (or as the final deferred destruction once the last render quiesces).
+func (e *Engine) destroyNowLocked() {
 	if e.id != 0 {
 		if v, ok := callbackRegistry.LoadAndDelete(e.id); ok {
 			v.(*callbackSet).freeAll()
 		}
 		e.id = 0
 	}
+	if e.engine != nil {
+		C.nift_engine_free(e.engine)
+		e.engine = nil
+	}
+}
+
+func (c *Context) destroyNowLocked() {
+	if c.ctx != nil {
+		C.nift_context_free(c.ctx)
+		c.ctx = nil
+	}
+}
+
+func (c *Context) alive() error {
+	if c.closed.Load() {
+		return errors.New("Context has been closed")
+	}
+	return nil
+}
+
+// alive returns an error when the engine has been logically disposed (new
+// operations must be rejected; the native engine may already be destroyed).
+func (e *Engine) alive() error {
+	if e.closed.Load() {
+		return errors.New("Engine has been closed")
+	}
+	return nil
+}
+
+func (e *Engine) unregister() {
+	e.lifecycle.Lock()
+	defer e.lifecycle.Unlock()
+	e.destroyNowLocked()
 }
 
 func hostResultToC(cb *callbackSet, res HostResult, out *C.nift_string) C.nift_status {
@@ -320,13 +413,17 @@ func OpenEngine(root string) *Engine {
 	return e
 }
 
-// Close destroys the engine. The Engine must not be used afterwards.
+// Close logically disposes the engine: new operations are rejected
+// immediately, but native destruction (engine, callback token, callback
+// buffers) is deferred until the last in-flight render quiesces, so a render
+// on another goroutine can never use freed native state. Close is idempotent.
 func (e *Engine) Close() {
-	if e.engine != nil {
-		C.nift_engine_free(e.engine)
-		e.engine = nil
+	e.lifecycle.Lock()
+	defer e.lifecycle.Unlock()
+	e.closed.Store(true)
+	if e.renderCount.Load() == 0 {
+		e.destroyNowLocked()
 	}
-	e.unregister()
 }
 
 // IsOpen reports whether a project snapshot is loaded.
@@ -354,6 +451,9 @@ func (e *Engine) SetRoot(root string) {
 // for mechanical failures; a failed reload returns a non-nil error carrying the
 // diagnostic and keeps the last known-good generation in service.
 func (e *Engine) Reload() error {
+	if err := e.alive(); err != nil {
+		return err
+	}
 	var s C.nift_string
 	status := C.nift_engine_reload(e.engine, &s)
 	if status == C.NIFT_OK {
@@ -369,6 +469,9 @@ func (e *Engine) Reload() error {
 // SetLoader installs a loader provider. Engine mutation is not thread-safe
 // with active renders.
 func (e *Engine) SetLoader(loader HostLoader) {
+	if err := e.alive(); err != nil {
+		return
+	}
 	v, _ := callbackRegistry.Load(e.id)
 	v.(*callbackSet).loader = loader
 	if loader == nil {
@@ -380,6 +483,9 @@ func (e *Engine) SetLoader(loader HostLoader) {
 
 // SetEnvironmentProvider installs an environment provider.
 func (e *Engine) SetEnvironmentProvider(env HostEnvironment) {
+	if err := e.alive(); err != nil {
+		return
+	}
 	v, _ := callbackRegistry.Load(e.id)
 	v.(*callbackSet).env = env
 	if env == nil {
@@ -405,6 +511,9 @@ func bindingNameError(status C.nift_status) error {
 
 // SetString sets a long-lived default string binding.
 func (e *Engine) SetString(name, value string) error {
+	if err := e.alive(); err != nil {
+		return err
+	}
 	n, nl := goString(name)
 	v, vl := goString(value)
 	return bindingNameError(C.nift_engine_set_string(e.engine, n, nl, v, vl))
@@ -412,18 +521,27 @@ func (e *Engine) SetString(name, value string) error {
 
 // SetInt sets a long-lived default int32 binding.
 func (e *Engine) SetInt(name string, value int32) error {
+	if err := e.alive(); err != nil {
+		return err
+	}
 	n, nl := goString(name)
 	return bindingNameError(C.nift_engine_set_int(e.engine, n, nl, C.int32_t(value)))
 }
 
 // SetNumber sets a long-lived default double binding.
 func (e *Engine) SetNumber(name string, value float64) error {
+	if err := e.alive(); err != nil {
+		return err
+	}
 	n, nl := goString(name)
 	return bindingNameError(C.nift_engine_set_number(e.engine, n, nl, C.double(value)))
 }
 
 // SetBool sets a long-lived default boolean binding.
 func (e *Engine) SetBool(name string, value bool) error {
+	if err := e.alive(); err != nil {
+		return err
+	}
 	n, nl := goString(name)
 	v := C.int(0)
 	if value {
@@ -434,25 +552,47 @@ func (e *Engine) SetBool(name string, value bool) error {
 
 // SetJSON sets a long-lived default JSON binding. Malformed JSON is a Go error.
 func (e *Engine) SetJSON(name, json string) error {
+	if err := e.alive(); err != nil {
+		return err
+	}
 	n, nl := goString(name)
 	j, jl := goString(json)
 	return bindingNameError(C.nift_engine_set_json(e.engine, n, nl, j, jl))
+}
+
+// renderFrame admits the render on the Engine (lifecycle-gated) and, when a
+// Context is supplied, on the Context too. The Engine lifecycle is acquired
+// before the Context lifecycle and released after it, so nested lifecycle
+// locks never invert across concurrent renders.
+func (e *Engine) renderFrame(ctx *Context, fn func() (Result, error)) (Result, error) {
+	done, err := e.beginRender()
+	if err != nil {
+		return Result{}, err
+	}
+	defer done()
+	if ctx != nil {
+		if err := ctx.beginRenderCtx(); err != nil {
+			return Result{}, err
+		}
+		defer ctx.endRenderCtx()
+	}
+	return fn()
 }
 
 // RenderPage renders a tracked page by name with complete pagination. A host
 // failure is a rendering outcome (Result.OK == false with the diagnostic); the
 // returned error is reserved for mechanical ABI failures.
 func (e *Engine) RenderPage(name string, ctx *Context) (Result, error) {
-	done := e.beginRender()
-	defer done()
-	n, nl := goString(name)
-	var r *C.nift_render_result
-	status := C.nift_engine_render_page(e.engine, ctx.ptr(), n, nl, &r)
-	if status != C.NIFT_OK {
-		return Result{}, abiStatusError(status)
-	}
-	defer C.nift_render_result_free(r)
-	return convertResult(r), nil
+	return e.renderFrame(ctx, func() (Result, error) {
+		n, nl := goString(name)
+		var r *C.nift_render_result
+		status := C.nift_engine_render_page(e.engine, ctx.ptr(), n, nl, &r)
+		if status != C.NIFT_OK {
+			return Result{}, abiStatusError(status)
+		}
+		defer C.nift_render_result_free(r)
+		return convertResult(r), nil
+	})
 }
 
 // RenderSource is a page/template input: either in-memory text or a path
@@ -474,35 +614,35 @@ func sourceToC(src RenderSource) C.nift_source {
 
 // RenderSources composes arbitrary page/template sources (text or path).
 func (e *Engine) RenderSources(page, template RenderSource, ctx *Context) (Result, error) {
-	done := e.beginRender()
-	defer done()
-	pageSrc := sourceToC(page)
-	tplSrc := sourceToC(template)
-	var r *C.nift_render_result
-	status := C.nift_engine_render(e.engine, &pageSrc, &tplSrc, ctx.ptr(), &r)
-	if status != C.NIFT_OK {
-		return Result{}, abiStatusError(status)
-	}
-	defer C.nift_render_result_free(r)
-	return convertResult(r), nil
+	return e.renderFrame(ctx, func() (Result, error) {
+		pageSrc := sourceToC(page)
+		tplSrc := sourceToC(template)
+		var r *C.nift_render_result
+		status := C.nift_engine_render(e.engine, &pageSrc, &tplSrc, ctx.ptr(), &r)
+		if status != C.NIFT_OK {
+			return Result{}, abiStatusError(status)
+		}
+		defer C.nift_render_result_free(r)
+		return convertResult(r), nil
+	})
 }
 
 // Render composes a page and template (both text). The template must contain
 // exactly one @content.
 func (e *Engine) Render(page, template string, ctx *Context) (Result, error) {
-	done := e.beginRender()
-	defer done()
-	pageSrc := C.nift_source{kind: C.NIFT_SOURCE_TEXT}
-	pageSrc.data, pageSrc.length = goString(page)
-	tplSrc := C.nift_source{kind: C.NIFT_SOURCE_TEXT}
-	tplSrc.data, tplSrc.length = goString(template)
-	var r *C.nift_render_result
-	status := C.nift_engine_render(e.engine, &pageSrc, &tplSrc, ctx.ptr(), &r)
-	if status != C.NIFT_OK {
-		return Result{}, abiStatusError(status)
-	}
-	defer C.nift_render_result_free(r)
-	return convertResult(r), nil
+	return e.renderFrame(ctx, func() (Result, error) {
+		pageSrc := C.nift_source{kind: C.NIFT_SOURCE_TEXT}
+		pageSrc.data, pageSrc.length = goString(page)
+		tplSrc := C.nift_source{kind: C.NIFT_SOURCE_TEXT}
+		tplSrc.data, tplSrc.length = goString(template)
+		var r *C.nift_render_result
+		status := C.nift_engine_render(e.engine, &pageSrc, &tplSrc, ctx.ptr(), &r)
+		if status != C.NIFT_OK {
+			return Result{}, abiStatusError(status)
+		}
+		defer C.nift_render_result_free(r)
+		return convertResult(r), nil
+	})
 }
 
 // RenderPath composes a page and template loaded from paths resolved against
@@ -518,17 +658,17 @@ func (e *Engine) RenderPath(pagePath, templatePath string, ctx *Context) (Result
 // RenderPartial renders a standalone partial/fragment. A partial containing
 // @content is an error (Result.OK == false).
 func (e *Engine) RenderPartial(page string, ctx *Context) (Result, error) {
-	done := e.beginRender()
-	defer done()
-	src := C.nift_source{kind: C.NIFT_SOURCE_TEXT}
-	src.data, src.length = goString(page)
-	var r *C.nift_render_result
-	status := C.nift_engine_render_partial(e.engine, &src, ctx.ptr(), &r)
-	if status != C.NIFT_OK {
-		return Result{}, abiStatusError(status)
-	}
-	defer C.nift_render_result_free(r)
-	return convertResult(r), nil
+	return e.renderFrame(ctx, func() (Result, error) {
+		src := C.nift_source{kind: C.NIFT_SOURCE_TEXT}
+		src.data, src.length = goString(page)
+		var r *C.nift_render_result
+		status := C.nift_engine_render_partial(e.engine, &src, ctx.ptr(), &r)
+		if status != C.NIFT_OK {
+			return Result{}, abiStatusError(status)
+		}
+		defer C.nift_render_result_free(r)
+		return convertResult(r), nil
+	})
 }
 
 // ---------------------------------------------------------------------------
@@ -541,10 +681,18 @@ func NewContext() *Context {
 }
 
 // Close destroys the context.
+// Close logically disposes the Context: new use is rejected immediately, but
+// the native context is freed only after the last in-flight render using it
+// quiesces. Close is idempotent.
 func (c *Context) Close() {
-	if c != nil && c.ctx != nil {
-		C.nift_context_free(c.ctx)
-		c.ctx = nil
+	if c == nil {
+		return
+	}
+	c.lifecycle.Lock()
+	defer c.lifecycle.Unlock()
+	c.closed.Store(true)
+	if c.renderCount.Load() == 0 {
+		c.destroyNowLocked()
 	}
 }
 
@@ -557,24 +705,36 @@ func (c *Context) ptr() *C.nift_context {
 
 // SetPageName sets the page identity.
 func (c *Context) SetPageName(name string) {
+	if err := c.alive(); err != nil {
+		return
+	}
 	n, nl := goString(name)
 	C.nift_context_set_page_name(c.ctx, n, nl)
 }
 
 // SetCurrentOutput sets the generated output location used by @pathto.
 func (c *Context) SetCurrentOutput(path string) {
+	if err := c.alive(); err != nil {
+		return
+	}
 	p, pl := goString(path)
 	C.nift_context_set_current_output(c.ctx, p, pl)
 }
 
 // SetTitle sets the per-render title.
 func (c *Context) SetTitle(title string) {
+	if err := c.alive(); err != nil {
+		return
+	}
 	t, tl := goString(title)
 	C.nift_context_set_title(c.ctx, t, tl)
 }
 
 // SetString sets a request-scoped string binding.
 func (c *Context) SetString(name, value string) error {
+	if err := c.alive(); err != nil {
+		return err
+	}
 	n, nl := goString(name)
 	v, vl := goString(value)
 	return bindingNameError(C.nift_context_set_string(c.ctx, n, nl, v, vl))
@@ -582,18 +742,27 @@ func (c *Context) SetString(name, value string) error {
 
 // SetInt sets a request-scoped int32 binding.
 func (c *Context) SetInt(name string, value int32) error {
+	if err := c.alive(); err != nil {
+		return err
+	}
 	n, nl := goString(name)
 	return bindingNameError(C.nift_context_set_int(c.ctx, n, nl, C.int32_t(value)))
 }
 
 // SetNumber sets a request-scoped double binding.
 func (c *Context) SetNumber(name string, value float64) error {
+	if err := c.alive(); err != nil {
+		return err
+	}
 	n, nl := goString(name)
 	return bindingNameError(C.nift_context_set_number(c.ctx, n, nl, C.double(value)))
 }
 
 // SetBool sets a request-scoped boolean binding.
 func (c *Context) SetBool(name string, value bool) error {
+	if err := c.alive(); err != nil {
+		return err
+	}
 	n, nl := goString(name)
 	v := C.int(0)
 	if value {
@@ -604,6 +773,9 @@ func (c *Context) SetBool(name string, value bool) error {
 
 // SetJSON sets a request-scoped JSON binding.
 func (c *Context) SetJSON(name, json string) error {
+	if err := c.alive(); err != nil {
+		return err
+	}
 	n, nl := goString(name)
 	j, jl := goString(json)
 	return bindingNameError(C.nift_context_set_json(c.ctx, n, nl, j, jl))

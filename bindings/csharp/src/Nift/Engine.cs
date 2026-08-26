@@ -23,7 +23,10 @@ public sealed class Engine : IDisposable
     private readonly EnvironmentCallbackNative _envBridge;
     private HostLoader? _loader;
     private HostEnvironment? _env;
-    private bool _disposed;
+    private readonly object _lifecycle = new();
+    private int _renderCount;
+    private bool _disposed;   // logical dispose requested
+    private bool _destroyed;  // native resources freed
 
     private Engine(IntPtr handle)
     {
@@ -57,13 +60,51 @@ public sealed class Engine : IDisposable
         return new Engine(handle);
     }
 
+    /// <summary>Logically disposes the engine: new operations are rejected
+    /// immediately, but native destruction is deferred until the last
+    /// in-flight render quiesces (an in-flight render on another thread can
+    /// never use freed native state). Idempotent.</summary>
     public void Dispose()
     {
-        if (_disposed)
+        lock (_lifecycle)
+        {
+            _disposed = true;
+            if (_renderCount == 0)
+            {
+                DestroyNow();
+            }
+        }
+        GC.SuppressFinalize(this);
+    }
+
+    private void EnterRender()
+    {
+        lock (_lifecycle)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            _renderCount++;
+        }
+    }
+
+    private void ExitRender()
+    {
+        lock (_lifecycle)
+        {
+            _renderCount--;
+            if (_renderCount == 0 && _disposed)
+            {
+                DestroyNow();
+            }
+        }
+    }
+
+    private void DestroyNow()
+    {
+        if (_destroyed)
         {
             return;
         }
-        _disposed = true;
+        _destroyed = true;
         if (_userDataHandle.IsAllocated)
         {
             _userDataHandle.Free();
@@ -71,7 +112,6 @@ public sealed class Engine : IDisposable
         _loader = null;
         _env = null;
         _handle.Dispose();
-        GC.SuppressFinalize(this);
     }
 
     public bool IsOpen() => _handle.IsInvalid == false && Native.nift_engine_is_open(_handle.DangerousGetHandle()) != 0;
@@ -140,21 +180,53 @@ public sealed class Engine : IDisposable
     /// <summary>Project-aware tracked-page render with complete pagination.</summary>
     public RenderResult RenderPage(string pageName, Context? ctx = null)
     {
-        EnsureNotDisposed();
-        using VarString vars = new(pageName);
-        IntPtr contextHandle = ctx is null ? IntPtr.Zero : ctx.Handle.DangerousGetHandle();
-        int rc = Native.nift_engine_render_page(_handle.DangerousGetHandle(), contextHandle, vars.Name, vars.NameLen, out IntPtr resultPtr);
-        return ConsumeResult(rc, resultPtr);
+        bool ctxEntered = false;
+        bool entered = false;
+        try
+        {
+            if (ctx != null)
+            {
+                ctx.EnterRender();
+                ctxEntered = true;
+            }
+            EnterRender();
+            entered = true;
+            using VarString vars = new(pageName);
+            IntPtr contextHandle = ctx is null ? IntPtr.Zero : ctx.Handle.DangerousGetHandle();
+            int rc = Native.nift_engine_render_page(_handle.DangerousGetHandle(), contextHandle, vars.Name, vars.NameLen, out IntPtr resultPtr);
+            return ConsumeResult(rc, resultPtr);
+        }
+        finally
+        {
+            if (entered) ExitRender();
+            if (ctxEntered) ctx.ExitRender();
+        }
     }
 
     /// <summary>Full page + template composition (template must contain exactly one @content).</summary>
     public RenderResult Render(RenderSource page, RenderSource template, Context? ctx = null)
     {
-        EnsureNotDisposed();
-        IntPtr contextHandle = ctx is null ? IntPtr.Zero : ctx.Handle.DangerousGetHandle();
-        using var sources = new NativeSources(page, template);
-        int rc = Native.nift_engine_render(_handle.DangerousGetHandle(), in sources.Page, in sources.Template, contextHandle, out IntPtr resultPtr);
-        return ConsumeResult(rc, resultPtr);
+        bool ctxEntered = false;
+        bool entered = false;
+        try
+        {
+            if (ctx != null)
+            {
+                ctx.EnterRender();
+                ctxEntered = true;
+            }
+            EnterRender();
+            entered = true;
+            IntPtr contextHandle = ctx is null ? IntPtr.Zero : ctx.Handle.DangerousGetHandle();
+            using var sources = new NativeSources(page, template);
+            int rc = Native.nift_engine_render(_handle.DangerousGetHandle(), in sources.Page, in sources.Template, contextHandle, out IntPtr resultPtr);
+            return ConsumeResult(rc, resultPtr);
+        }
+        finally
+        {
+            if (entered) ExitRender();
+            if (ctxEntered) ctx.ExitRender();
+        }
     }
 
     /// <summary>Convenience: render in-memory page and template text.</summary>
@@ -164,11 +236,27 @@ public sealed class Engine : IDisposable
     /// <summary>Standalone partial/fragment render (a partial containing @content is an error).</summary>
     public RenderResult RenderPartial(RenderSource partial, Context? ctx = null)
     {
-        EnsureNotDisposed();
-        IntPtr contextHandle = ctx is null ? IntPtr.Zero : ctx.Handle.DangerousGetHandle();
-        using var sources = new NativeSources(partial);
-        int rc = Native.nift_engine_render_partial(_handle.DangerousGetHandle(), in sources.Partial, contextHandle, out IntPtr resultPtr);
-        return ConsumeResult(rc, resultPtr);
+        bool ctxEntered = false;
+        bool entered = false;
+        try
+        {
+            if (ctx != null)
+            {
+                ctx.EnterRender();
+                ctxEntered = true;
+            }
+            EnterRender();
+            entered = true;
+            IntPtr contextHandle = ctx is null ? IntPtr.Zero : ctx.Handle.DangerousGetHandle();
+            using var sources = new NativeSources(partial);
+            int rc = Native.nift_engine_render_partial(_handle.DangerousGetHandle(), in sources.Partial, contextHandle, out IntPtr resultPtr);
+            return ConsumeResult(rc, resultPtr);
+        }
+        finally
+        {
+            if (entered) ExitRender();
+            if (ctxEntered) ctx.ExitRender();
+        }
     }
 
     public RenderResult RenderPartial(string partial, Context? ctx = null)

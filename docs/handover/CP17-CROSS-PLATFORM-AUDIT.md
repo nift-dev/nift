@@ -49,3 +49,43 @@ Building and exercising the C#/Node/Python bindings on Windows and macOS
 native runners (per-OS library naming, header discovery, extension suffix)
 remains for the packaging/release stage; the underlying C ABI they consume is
 already 3-OS verified.
+
+## FFI disposal-lifetime audit (Go + C#, CP17 round 2)
+
+The CP17 round-1 Go callback-buffer reclamation used only an atomic render
+counter, which does not create an epoch boundary: a new render could start
+between "the last old render observed zero" and "its buffers were freed",
+reintroducing the cross-thread callback-output UAF CP11 rules out. Review
+rejected that design. The repaired invariants:
+
+### Go (nift.go)
+
+- `Engine.lifecycle` (sync.Mutex) couples render ADMISSION with quiescent
+  RECLAMATION: beginRender holds it while incrementing renderCount; the
+  render-done closure holds it across the decrement AND the buffer free (or
+  deferred destruction), so no new render can be admitted between the zero
+  transition and reclamation. Lock order is always lifecycle -> callbackSet.mu;
+  callbacks take only callbackSet.mu, so there is no inversion.
+- `Engine.Close()`/`Context.Close()` are logical: they mark the object closed
+  (new operations rejected via alive()/beginRender) and DEFER native
+  destruction until the last in-flight render quiesces (the render-done
+  closure performs it). An in-flight render on another goroutine can never use
+  freed engine/context/token/buffer state.
+- Deterministic tests: close-engine and close-context during a render use a
+  loader-callback rendezvous (render provably in native execution before
+  close, released after); the reclamation-admission race is forced with a
+  test-only hook that blocks inside the critical section while a new render
+  attempts admission (it must block until reclamation completes). All under
+  `go test -race`.
+
+### C# (Nift.csproj)
+
+- The C# binding had no deferred destruction: Engine/Context Dispose freed the
+  native SafeHandle/GCHandle immediately, so a concurrent Dispose during an
+  in-flight render could free native state. Enforced the same invariant:
+  render methods EnterRender/ExitRender around the native call; Dispose marks
+  disposed immediately (new operations throw ObjectDisposedException) and
+  defers native destruction until the last in-flight render quiesces. The
+  try/finally uses entered-flags so an EnterRender rejection never decrements
+  a count it did not increment. Deterministic dispose-during-render tests via
+  a loader-callback rendezvous. C# suite 21 -> 23.

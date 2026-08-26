@@ -32,6 +32,8 @@ internal static class Program
         Run("lifetime: repeated create/dispose", TestRepeatedCreateDispose);
         Run("delegate rooting survives GC", TestDelegateRooting);
         Run("context disposal safety", TestContextDispose);
+        Run("dispose engine during in-flight render is deferred", TestDisposeEngineDuringRender);
+        Run("dispose context during in-flight render is deferred", TestDisposeContextDuringRender);
 
         Console.WriteLine($"\nC# binding tests: {_passed} passed, {_failed} failed");
         return _failed == 0 ? 0 : 1;
@@ -404,6 +406,73 @@ internal static class Program
         Assert(!failed.Ok, "env throw must fail the render");
         Assert(failed.ErrorMessage is not null && failed.ErrorMessage.Contains("boom"),
             $"env exception diagnostic: {failed.ErrorMessage}");
+    }
+
+
+    private static void TestDisposeEngineDuringRender()
+    {
+        var engine = Engine.New();
+        engine.SetRoot("/");
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        engine.SetLoader(path =>
+        {
+            entered.Set();
+            release.Wait(TimeSpan.FromSeconds(10));
+            return path.EndsWith("/p.html") ? HostResult.Found("<p>PART</p>") : HostResult.NotFound();
+        });
+        RenderResult? result = null;
+        Exception? renderEx = null;
+        var thread = new Thread(() =>
+        {
+            try { result = engine.Render("@input(\"p.html\")", "<main>@content</main>"); }
+            catch (Exception ex) { renderEx = ex; }
+        });
+        thread.Start();
+        Assert(entered.Wait(TimeSpan.FromSeconds(10)), "render never entered native execution");
+        engine.Dispose(); // must defer native destruction
+        bool rejected = false;
+        try { engine.Render("x", "y"); }
+        catch (ObjectDisposedException) { rejected = true; }
+        Assert(rejected, "disposed engine must reject a new render");
+        release.Set();
+        thread.Join();
+        Assert(renderEx is null, "render threw: " + renderEx);
+        AssertOk(result!, "dispose-during-render result");
+        AssertEq(result!.Output, "<main><p>PART</p></main>", "dispose-during-render output");
+        engine.Dispose(); // idempotent
+    }
+
+    private static void TestDisposeContextDuringRender()
+    {
+        var engine = Engine.New();
+        engine.SetRoot("/");
+        var ctx = new Context();
+        ctx.SetString("s", "ctx");
+        using var entered = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
+        engine.SetLoader(path =>
+        {
+            entered.Set();
+            release.Wait(TimeSpan.FromSeconds(10));
+            return path.EndsWith("/p.html") ? HostResult.Found("<b>$[s]</b>") : HostResult.NotFound();
+        });
+        RenderResult? result = null;
+        Exception? renderEx = null;
+        var thread = new Thread(() =>
+        {
+            try { result = engine.Render("@input(\"p.html\")", "<main>@content</main>", ctx); }
+            catch (Exception ex) { renderEx = ex; }
+        });
+        thread.Start();
+        Assert(entered.Wait(TimeSpan.FromSeconds(10)), "render never entered native execution");
+        ctx.Dispose(); // must defer native context destruction
+        release.Set();
+        thread.Join();
+        Assert(renderEx is null, "render threw: " + renderEx);
+        AssertOk(result!, "dispose-during-render result");
+        AssertEq(result!.Output, "<main><b>ctx</b></main>", "dispose-during-render output");
+        engine.Dispose();
     }
 
 }
