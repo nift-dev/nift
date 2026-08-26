@@ -114,8 +114,9 @@ extension to `nift/_nift<EXT_SUFFIX>.so`.
   main thread provably closes the Engine/Context while an in-flight native
   render uses it, then releases the callback and asserts the render settles
   correctly. The concurrent case uses an explicit latch (all N renders signal
-  in-flight before close). Repeated-close and GC-pressure remain stress
-  coverage.
+  in-flight before close). The GC-pressure test is also deterministic (same
+  rendezvous, then gc.collect() while the native render is retained); the
+  repeated-close test remains stress coverage.
 - `tests/embed_harness.py` — the shared-corpus adapter (seventh); the corpus
   runs 36/36 across C++, nift-rs, C ABI, Go, C#, Node and Python plus the
   negative anti-agreement self-test.

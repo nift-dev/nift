@@ -380,10 +380,21 @@ class TestLifetime(unittest.TestCase):
         c.close()
 
     def test_gc_pressure_after_close_during_render(self):
-        for i in range(40):
+        # Deterministic: each iteration uses the loader callback as a
+        # rendezvous so close() + GC pressure provably happen while a native
+        # render is retained (in-flight), then the render is released.
+        for i in range(20):
             e = Engine.new()
             e.set_root("/")
-            e.set_loader(lambda p: "<p>P</p>" if p.endswith("/p.html") else None)
+            entered = threading.Event()
+            release = threading.Event()
+
+            def loader(p):
+                entered.set()
+                release.wait(10)
+                return "<p>P</p>" if p.endswith("/p.html") else None
+
+            e.set_loader(loader)
             c = Context()
             c.set_int("n", i)
             result = {}
@@ -393,10 +404,14 @@ class TestLifetime(unittest.TestCase):
 
             t = threading.Thread(target=worker)
             t.start()
+            self.assertTrue(entered.wait(10), "render never entered native execution")
             e.close()
             c.close()
+            gc.collect()  # GC pressure while the native render is retained
+            release.set()
             t.join()
             self.assertTrue(result["r"].ok)
+            self.assertIn(f"<main>{i}</main>", result["r"].output)
         gc.collect()
 
     def test_disposed_use_rejected(self):
