@@ -38,7 +38,7 @@ grep -Fq 'needs rebuilding' "$P/status.log"
 # Repair after failure must work without deleting persistent metadata manually.
 printf '@content\n' >"$P/templates/template.html"
 printf '<p>GOOD-V2</p>\n' >"$P/content/index.html"
-(cd "$P" && "$NIFT_BIN" build >/dev/null)
+(cd "$P" && "$NIFT_BIN" build --repair >/dev/null)
 grep -Fq 'GOOD-V2' "$P/public/index.html"
 
 # Multi-page build: one failed page must not stop independent pages succeeding,
@@ -71,7 +71,7 @@ for i in 0 1 2 6 8 12 19; do grep -Fq "NEW-$i" "$P/public/p$i.html"; done
 
 # Repair only failed page; subsequent build must converge to clean state.
 printf '<p>NEW-7</p>\n' >"$P/content/p7.html"
-(cd "$P" && "$NIFT_BIN" build >/dev/null)
+(cd "$P" && "$NIFT_BIN" build --repair >/dev/null)
 grep -Fq 'NEW-7' "$P/public/p7.html"
 (cd "$P" && "$NIFT_BIN" status >clean.log)
 ! grep -Fq 'needs rebuilding' "$P/clean.log"
@@ -123,7 +123,7 @@ cmp "$P/public/page/0.html" "$P/shared-old"
 cat >"$P/schemas/shared.json" <<'JSON'
 {"type":"object","required":["items"],"properties":{"items":{"type":"array"}}}
 JSON
-(cd "$P" && "$NIFT_BIN" build >/dev/null)
+(cd "$P" && "$NIFT_BIN" build --repair >/dev/null)
 (cd "$P" && "$NIFT_BIN" status >final.log)
 ! grep -Fq 'needs rebuilding' "$P/final.log"
 

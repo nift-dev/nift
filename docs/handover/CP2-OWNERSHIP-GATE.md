@@ -38,9 +38,12 @@ acquire()
 A freshly created marker is therefore **never observable unlocked by another
 process**: the creator locks it before releasing the gate. The correctness
 argument is mutual exclusion (the gate serializes the create+lock window), not
-a sleep/retry heuristic. The gate hold time is microseconds; the build's
-long-lived ownership remains the non-blocking marker flock (unchanged
-semantics: Clean / Stale / Live / Failed).
+a sleep/retry heuristic. The gate is held only across the short marker
+create/classify/lock critical section, never across the build (filesystem and
+scheduler latency can make any single acquisition take longer than a nominal
+figure, so the contractual property is the critical-section scope, not an
+elapsed-time bound); the build's long-lived ownership remains the non-blocking
+marker flock (unchanged semantics: Clean / Stale / Live / Failed).
 
 - The gate is released before `test_hold_after_acquire()` so the
   NIFT_TEST_OWNERSHIP_HOLD hook still yields Live refusals to concurrent

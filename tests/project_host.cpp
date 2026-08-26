@@ -149,8 +149,8 @@ void test_host_capabilities(const ProjectState& state) {
     CHECK(root_path.has_value() && root_path->path == state.root() / "public/index.html" && root_path->index_page);
     CHECK(!host.tracked_output_path("unknown").has_value());
 
-    const std::string* source = host.read_shared_source(state.root() / "content/about.html");
-    CHECK(source != nullptr && contains(*source, "About"));
+    const RenderHost::HostSource source = host.read_shared_source(state.root() / "content/about.html");
+    CHECK(source.status == nift::HostStatus::Found && source.content != nullptr && contains(*source.content, "About"));
     std::string json_error;
     auto document = host.read_shared_json(state.root() / "content/site.json", json_error);
     CHECK(document != nullptr);
