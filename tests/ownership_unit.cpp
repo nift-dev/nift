@@ -8,10 +8,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
-#include <signal.h>
 #include <string>
-#include <sys/wait.h>
-#include <unistd.h>
 
 namespace fs = std::filesystem;
 
@@ -25,6 +22,7 @@ static int failures = 0;
     } while (0)
 
 #ifndef _WIN32
+#include <signal.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
