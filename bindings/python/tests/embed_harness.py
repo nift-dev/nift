@@ -17,10 +17,16 @@ def emit(doc):
 
 
 def relative_keys(root, keys):
-    prefix = root.rstrip("/\\") + "/"
+    # Separator normalization: the engine reports loader keys with forward
+    # slashes (generic_string) on every platform.
+    def norm(s):
+        return s.replace("\\", "/")
+
+    prefix = norm(root).rstrip("/") + "/"
     seen = set()
     for k in keys:
-        seen.add(k[len(prefix):] if k.startswith(prefix) else k)
+        kn = norm(k)
+        seen.add(kn[len(prefix):] if kn.startswith(prefix) else kn)
     return sorted(seen)
 
 

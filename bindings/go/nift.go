@@ -113,6 +113,15 @@ type Context struct {
 type Engine struct {
 	engine *C.nift_engine
 	id     int64
+	// renderCount tracks in-flight renders; when it returns to zero, every
+	// callback-output buffer is dead (the C ABI copies each callback `out`
+	// synchronously immediately after the callback returns, and no callback
+	// can run while no render is in flight), so the buffers are reclaimed.
+	// This bounds callback memory to peak concurrent render activity instead
+	// of the engine's whole lifetime. NOT free-on-next-callback (which CP11
+	// proved unsafe cross-thread); freeing happens only when no render is
+	// running at all.
+	renderCount atomic.Int32
 }
 
 // ---------------------------------------------------------------------------
@@ -137,6 +146,20 @@ func (c *callbackSet) freeAll() {
 		C.free(c.token)
 		c.token = nil
 	}
+	c.freeBuffersLocked()
+}
+
+// freeBuffers releases all retained callback-output buffers. Safe only when
+// no render is in flight (the caller guarantees it): every callback's `out`
+// was copied synchronously by the C ABI before its render completed, so no
+// buffer is still referenced by native code.
+func (c *callbackSet) freeBuffers() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.freeBuffersLocked()
+}
+
+func (c *callbackSet) freeBuffersLocked() {
 	for _, buf := range c.bufs {
 		C.free(buf)
 	}
@@ -176,6 +199,23 @@ func (e *Engine) register() int64 {
 	callbackRegistry.Store(id, &callbackSet{token: token})
 	e.id = id
 	return id
+}
+
+// beginRender marks a render as in flight (so Close/callback handling know a
+// callback may still be running) and returns a done func that reclaims the
+// callback-output buffers once the last in-flight render completes.
+func (e *Engine) beginRender() func() {
+	e.renderCount.Add(1)
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			if e.renderCount.Add(-1) == 0 {
+				if v, ok := callbackRegistry.Load(e.id); ok {
+					v.(*callbackSet).freeBuffers()
+				}
+			}
+		})
+	}
 }
 
 func (e *Engine) unregister() {
@@ -403,6 +443,8 @@ func (e *Engine) SetJSON(name, json string) error {
 // failure is a rendering outcome (Result.OK == false with the diagnostic); the
 // returned error is reserved for mechanical ABI failures.
 func (e *Engine) RenderPage(name string, ctx *Context) (Result, error) {
+	done := e.beginRender()
+	defer done()
 	n, nl := goString(name)
 	var r *C.nift_render_result
 	status := C.nift_engine_render_page(e.engine, ctx.ptr(), n, nl, &r)
@@ -432,6 +474,8 @@ func sourceToC(src RenderSource) C.nift_source {
 
 // RenderSources composes arbitrary page/template sources (text or path).
 func (e *Engine) RenderSources(page, template RenderSource, ctx *Context) (Result, error) {
+	done := e.beginRender()
+	defer done()
 	pageSrc := sourceToC(page)
 	tplSrc := sourceToC(template)
 	var r *C.nift_render_result
@@ -446,6 +490,8 @@ func (e *Engine) RenderSources(page, template RenderSource, ctx *Context) (Resul
 // Render composes a page and template (both text). The template must contain
 // exactly one @content.
 func (e *Engine) Render(page, template string, ctx *Context) (Result, error) {
+	done := e.beginRender()
+	defer done()
 	pageSrc := C.nift_source{kind: C.NIFT_SOURCE_TEXT}
 	pageSrc.data, pageSrc.length = goString(page)
 	tplSrc := C.nift_source{kind: C.NIFT_SOURCE_TEXT}
@@ -472,6 +518,8 @@ func (e *Engine) RenderPath(pagePath, templatePath string, ctx *Context) (Result
 // RenderPartial renders a standalone partial/fragment. A partial containing
 // @content is an error (Result.OK == false).
 func (e *Engine) RenderPartial(page string, ctx *Context) (Result, error) {
+	done := e.beginRender()
+	defer done()
 	src := C.nift_source{kind: C.NIFT_SOURCE_TEXT}
 	src.data, src.length = goString(page)
 	var r *C.nift_render_result

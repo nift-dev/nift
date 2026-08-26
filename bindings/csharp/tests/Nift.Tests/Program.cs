@@ -21,6 +21,7 @@ internal static class Program
         Run("invalid engine binding name -> setup failure", TestInvalidEngineBinding);
         Run("invalid context binding name -> setup failure", TestInvalidContextBinding);
         Run("malformed JSON content render failure family", TestMalformedJsonFailure);
+        Run("loader exception containment across the native boundary", TestLoaderExceptionContainment);
         Run("loader: found / not-found / missing input", TestLoader);
         Run("environment: found / not-found / error diagnostic", TestEnvironment);
         Run("pagination (three pages)", TestPagination);
@@ -387,4 +388,22 @@ internal static class Program
         }
         Assert(threw, "disposed context must reject use");
     }
+
+    private static void TestLoaderExceptionContainment()
+    {
+        using var engine = Engine.New();
+        engine.SetRoot("/");
+        engine.SetLoader(_ => throw new InvalidOperationException("host exploded"));
+        var result = engine.Render("@input(\"p.html\")", "<main>@content</main>");
+        Assert(!result.Ok, "loader throw must fail the render");
+        AssertEq(result.ErrorMessage, "host exploded", "exception diagnostic must survive exactly");
+
+        using var failing = Engine.New();
+        failing.SetEnvironmentProvider(_ => throw new InvalidOperationException("boom"));
+        var failed = failing.Render("@getenv(X)", "<main>@content</main>");
+        Assert(!failed.Ok, "env throw must fail the render");
+        Assert(failed.ErrorMessage is not null && failed.ErrorMessage.Contains("boom"),
+            $"env exception diagnostic: {failed.ErrorMessage}");
+    }
+
 }

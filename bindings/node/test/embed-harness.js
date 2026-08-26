@@ -13,10 +13,14 @@ function emit(doc) {
 }
 
 function relativeKeys(root, keys) {
-  const prefix = root.replace(/[\\/]+$/, "") + "/";
+  // Separator normalization: the engine reports loader keys with forward
+  // slashes (generic_string) on every platform.
+  const norm = (s) => s.replace(/\\/g, "/");
+  const prefix = norm(root).replace(/\/+$/, "") + "/";
   const seen = new Set();
   for (const k of keys) {
-    seen.add(k.startsWith(prefix) ? k.slice(prefix.length) : k);
+    const kn = norm(k);
+    seen.add(kn.startsWith(prefix) ? kn.slice(prefix.length) : kn);
   }
   return [...seen].sort();
 }

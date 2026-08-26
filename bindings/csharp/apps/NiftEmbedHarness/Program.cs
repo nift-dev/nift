@@ -210,11 +210,15 @@ internal static class Program
 
     private static string[] RelativeKeys(string root, ConcurrentQueue<string> keys)
     {
-        string prefix = root.TrimEnd('/') + "/";
+        // Separator normalization: the engine reports loader keys with forward
+        // slashes (generic_string) on every platform.
+        static string Norm(string s) => s.Replace('\\', '/');
+        string prefix = Norm(root).TrimEnd('/') + "/";
         var seen = new HashSet<string>();
         foreach (string key in keys)
         {
-            string relative = key.StartsWith(prefix, StringComparison.Ordinal) ? key[prefix.Length..] : key;
+            string kn = Norm(key);
+            string relative = kn.StartsWith(prefix, StringComparison.Ordinal) ? kn[prefix.Length..] : kn;
             seen.Add(relative);
         }
         return seen.OrderBy(k => k, StringComparer.Ordinal).ToArray();

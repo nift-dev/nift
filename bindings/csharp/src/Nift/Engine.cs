@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Reflection;
 using System.Text;
 using Nift.Interop;
 
@@ -253,15 +254,40 @@ public sealed class Engine : IDisposable
     private int OnLoader(IntPtr userData, IntPtr path, UIntPtr pathLen, ref NiftString out_)
     {
         string pathString = Utf8.FromNative(path, pathLen);
-        HostResult result = _loader?.Invoke(pathString) ?? HostResult.NotFound();
+        HostResult result = InvokeSafely(_loader, pathString, out_);
         return FillHostResult(result, ref out_);
     }
 
     private int OnEnvironment(IntPtr userData, IntPtr name, UIntPtr nameLen, ref NiftString out_)
     {
         string nameString = Utf8.FromNative(name, nameLen);
-        HostResult result = _env?.Invoke(nameString) ?? HostResult.NotFound();
+        HostResult result = InvokeSafely(_env, nameString, out_);
         return FillHostResult(result, ref out_);
+    }
+
+    // A user host callback must never throw across the native callback
+    // boundary (that is undefined behaviour in C++); a throw is contained and
+    // surfaced as a controlled host Error whose diagnostic is the exception
+    // message, matching the exact-diagnostic contract of the other bindings.
+    private HostResult InvokeSafely<T>(T? callback, string arg, NiftString out_) where T : Delegate
+    {
+        if (callback is null)
+        {
+            return HostResult.NotFound();
+        }
+        try
+        {
+            object? value = callback.DynamicInvoke(arg);
+            return value is HostResult host ? host : HostResult.NotFound();
+        }
+        catch (TargetInvocationException ex)
+        {
+            return HostResult.Failure(ex.InnerException?.Message ?? ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return HostResult.Failure(ex.Message);
+        }
     }
 
     private static int FillHostResult(HostResult result, ref NiftString out_)

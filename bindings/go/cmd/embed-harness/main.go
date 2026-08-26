@@ -200,11 +200,16 @@ func main() {
 }
 
 func relativeKeys(root string, keys []string) []string {
-	prefix := strings.TrimRight(root, "/\\") + "/"
+	// Separator normalization: the engine reports loader keys with forward
+	// slashes (generic_string) on every platform, so normalize both the root
+	// prefix and each key before stripping.
+	norm := func(s string) string { return strings.ReplaceAll(s, "\\", "/") }
+	prefix := strings.TrimRight(norm(root), "/") + "/"
 	seen := map[string]bool{}
 	out := make([]string, 0, len(keys))
 	for _, k := range keys {
-		r := strings.TrimPrefix(k, prefix)
+		kn := norm(k)
+		r := strings.TrimPrefix(kn, prefix)
 		if !seen[r] {
 			seen[r] = true
 			out = append(out, r)
