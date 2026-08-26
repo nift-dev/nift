@@ -9,6 +9,7 @@ on:
       - 'scripts/**'
       - 'jsonic/**'
       - 'minifypp/**'
+      - 'bindings/**'
       - 'Makefile'
       - 'docs/guarantees/**'
       - '.github/workflows/test-integrity.yml'
@@ -24,6 +25,7 @@ on:
       - 'scripts/**'
       - 'jsonic/**'
       - 'minifypp/**'
+      - 'bindings/**'
       - 'Makefile'
       - 'docs/guarantees/**'
       - '.github/workflows/test-integrity.yml'
@@ -63,6 +65,12 @@ jobs:
         run: make -j2
       - name: Contract suite
         run: make test-contracts
+      - name: Canonical C++ conformance, host seam, C ABI
+        run: |
+          make test-conformance
+          make test-host-seam
+          make test-c-abi
+          make test-c-abi-c-smoke
       - name: Init targets
         run: make test-init-targets
       - name: Pagination incremental equivalence
@@ -79,6 +87,27 @@ jobs:
         run: make test-complexity-invariants
       - name: Filesystem boundary (BH9)
         run: make test-filesystem-boundary
+  binding-gates:
+    name: Production binding gates (Go, C#) on Linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build native libraries
+        run: make -j2 libnift_c.a libnift_c.so
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: bindings/go/go.mod
+      - name: Go binding tests
+        run: |
+          cd bindings/go
+          go test ./...
+          go test -race ./...
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: C# binding tests
+        run: dotnet run --project bindings/csharp/tests/Nift.Tests/Nift.Tests.csproj
+
   aggregate-evidence:
     name: Aggregate evidence (${{ matrix.os }})
     needs: static-integrity
