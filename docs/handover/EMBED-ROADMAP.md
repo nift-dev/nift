@@ -131,16 +131,28 @@ write_file_atomic-style helper audit
 cross-platform binding behaviour (C#, Node, Python included)
 ```
 
-## CP18 — final performance campaign
+## CP17 — sanitizer / memory / platform campaign — ACCEPTED 2026-08-26
+
+Sanitizer (ASan/UBSan + TSan), Go/C# native-lifetime enforcement (render epoch,
+render and non-render disposal, provider installers, callback containment),
+loaderKeys separator normalization, write-path audit, cross-platform binding
+audit. Acceptance recorded in the regression-suite contract history.
+
+## CP18 — final performance campaign — COMPLETE 2026-08-26
 
 Split:
 
-- **A. Nift CLI/build**: pre-Embed baseline vs final canonical candidate — 10k
-  full build, no-op incremental, single-page incremental, shared-dependency
-  rebuild, many-directory, modified/hash/hybrid.
+- **A. Nift CLI/build**: 10k full build, no-op incremental, single-page
+  incremental, shared-dependency rebuild, many-directory, modified/hash/hybrid.
 - **B. Embed/API/bindings**: direct C++, C ABI, Go, C#, Node, Python — raw render
   overhead and a realistic repeated/server render workload. Differences are
   evidence, not automatic blockers.
+
+Results: see docs/handover/CP18-PERFORMANCE-REPORT.md. 10k builds ~0.1 s and
+near-linear; raw render 1.4-2.8 us for C++/C ABI/Go/C#/Python and ~12.8 us for
+Node (async bridge); server totals sub-20 ms/1000 everywhere. Benchmark-only
+fixes (stale CLI grammar in two suite scripts); no optimization changed
+observable semantics.
 
 ## CP19 — merge decision and canonicalization
 
