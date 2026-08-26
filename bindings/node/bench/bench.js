@@ -8,21 +8,27 @@ const { performance } = require("perf_hooks");
   const page = "<p>$[site]</p>";
   const tpl = "<main>@content</main>";
   const n = 50000;
-  let start = performance.now();
-  for (let i = 0; i < n; i++) {
-    const r = await e.render(page, tpl);
-    if (!r.ok) throw new Error(r.error);
+  const rounds = 3;
+  let rawBest = Infinity, reqBest = Infinity;
+  for (let r = 0; r < rounds; r++) {
+    let start = performance.now();
+    for (let i = 0; i < n; i++) { // raw: no request Context, engine-default binding
+      const res = await e.render(page, tpl);
+      if (!res.ok) throw new Error(res.error);
+    }
+    const raw = (performance.now() - start) * 1e6 / n;
+    if (raw < rawBest) rawBest = raw;
+    start = performance.now();
+    for (let i = 0; i < 1000; i++) { // request-loop: fresh Context per request
+      const c = new Context();
+      c.setString("who", "w");
+      const res = await e.render(page, tpl, c);
+      if (!res.ok) throw new Error(res.error);
+      c.close();
+    }
+    const req = performance.now() - start;
+    if (req < reqBest) reqBest = req;
   }
-  const raw = (performance.now() - start) * 1e6 / n;
-  start = performance.now();
-  for (let i = 0; i < 1000; i++) {
-    const c = new Context();
-    c.setString("who", "w");
-    const r = await e.render(page, tpl, c);
-    if (!r.ok) throw new Error(r.error);
-    c.close();
-  }
-  const server = performance.now() - start;
   e.close();
-  console.log(`node raw=${Math.round(raw)} ns/render server=${Math.round(server)} ms/1000`);
+  console.log(`node raw=${Math.round(rawBest)} ns/render request-loop=${Math.round(reqBest)} ms/1000 rounds=${rounds}`);
 })();

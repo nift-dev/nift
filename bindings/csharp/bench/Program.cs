@@ -8,21 +8,28 @@ engine.SetString("site", "nift");
 const string page = "<p>$[site]</p>";
 const string tpl = "<main>@content</main>";
 const int n = 50000;
-var sw = Stopwatch.StartNew();
-for (int i = 0; i < n; i++)
+const int rounds = 3;
+double rawBest = double.MaxValue, reqBest = double.MaxValue;
+for (int r = 0; r < rounds; r++)
 {
-    var r = engine.Render(page, tpl);
-    if (!r.Ok) throw new Exception(r.ErrorMessage);
+    var sw = Stopwatch.StartNew();
+    for (int i = 0; i < n; i++) // raw: no request Context, engine-default binding
+    {
+        var rr = engine.Render(page, tpl);
+        if (!rr.Ok) throw new Exception(rr.ErrorMessage);
+    }
+    double raw = sw.Elapsed.TotalNanoseconds / n;
+    if (raw < rawBest) rawBest = raw;
+    sw.Restart();
+    for (int i = 0; i < 1000; i++) // request-loop: fresh Context per request
+    {
+        using var c = new Context();
+        c.SetString("who", "w");
+        var rr = engine.Render(page, tpl, c);
+        if (!rr.Ok) throw new Exception(rr.ErrorMessage);
+    }
+    double req = sw.ElapsedMilliseconds;
+    if (req < reqBest) reqBest = req;
 }
-double raw = sw.Elapsed.TotalNanoseconds / n;
-sw.Restart();
-for (int i = 0; i < 1000; i++)
-{
-    using var c = new Context();
-    c.SetString("who", "w");
-    var r = engine.Render(page, tpl, c);
-    if (!r.Ok) throw new Exception(r.ErrorMessage);
-}
-long server = sw.ElapsedMilliseconds;
 engine.Dispose();
-Console.WriteLine($"cs raw={raw} ns/render server={server} ms/1000");
+Console.WriteLine($"cs raw={rawBest:F0} ns/render request-loop={reqBest:F0} ms/1000 rounds={rounds}");
