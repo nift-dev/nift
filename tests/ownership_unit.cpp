@@ -8,7 +8,10 @@
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
+#include <signal.h>
 #include <string>
+#include <sys/wait.h>
+#include <unistd.h>
 
 namespace fs = std::filesystem;
 
