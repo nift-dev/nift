@@ -131,7 +131,7 @@ def main():
             ("orphan removed page", lambda r: (
                 (r / "content/oldpage.html").write_text("<p>old</p>\n"),
                 _add_tracked(r, "oldpage"),
-                subprocess.run([NIFT, "build", "--all"], cwd=r, stdout=subprocess.DEVNULL),
+                subprocess.run([NIFT, "build", "--all"], cwd=r, stdout=subprocess.DEVNULL, check=True),
                 _remove_tracked(r, "oldpage"))),
             ("mixed corruption", lambda r: (
                 (r / "public/index.html").unlink(),

@@ -14,8 +14,8 @@
 set -euo pipefail
 NIFT_BIN="${NIFT_BIN:-$(pwd)/nift}"
 if ! command -v strace >/dev/null 2>&1; then
-    echo "Pagination ordering smoke test SKIPPED (strace unavailable)"
-    exit 0
+    echo "Pagination ordering smoke test SKIPPED (strace unavailable): the ordering guarantee is NOT verified" >&2
+    exit 77
 fi
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/nift-pagination-order.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
