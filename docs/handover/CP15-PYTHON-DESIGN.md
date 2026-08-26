@@ -103,14 +103,19 @@ extension to `nift/_nift<EXT_SUFFIX>.so`.
 
 ## Testing
 
-- `tests/test_nift.py` — 20 focused tests: bindings, precedence, invalid
+- `tests/test_nift.py` — 21 focused tests: bindings, precedence, invalid
   bindings, malformed-JSON family, loader/env Found/NotFound/Error, page/
   pagination, partial, path sources, 64-way concurrent renders with callbacks,
-  pagination callbacks from C++ worker threads, close-during-render lifetime
-  adversarial cases (engine and context closed on one thread while another
-  renders, close under 24 concurrent renders, repeated close, GC pressure),
-  disposed-use rejection, exception containment, long-lived engine, repeated
-  create/dispose.
+  pagination callbacks from C++ worker threads, disposed-use rejection,
+  exception containment, long-lived engine, repeated create/dispose.
+  The close-during-render lifetime contract tests are DETERMINISTIC: a
+  loader/environment callback acts as a rendezvous (it fires only after the
+  render has entered native execution and incremented render_count), so the
+  main thread provably closes the Engine/Context while an in-flight native
+  render uses it, then releases the callback and asserts the render settles
+  correctly. The concurrent case uses an explicit latch (all N renders signal
+  in-flight before close). Repeated-close and GC-pressure remain stress
+  coverage.
 - `tests/embed_harness.py` — the shared-corpus adapter (seventh); the corpus
   runs 36/36 across C++, nift-rs, C ABI, Go, C#, Node and Python plus the
   negative anti-agreement self-test.

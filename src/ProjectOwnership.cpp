@@ -155,7 +155,33 @@ ProjectOwnership::State ProjectOwnership::acquire() {
         // Brand-new marker: no prior unfinished state. Take the lock and make
         // the marker durable before any derived-state mutation.
         file_ = created_file;
-        if (!try_lock(file_)) { close_file(file_); return State::Live; }
+        if (!try_lock(file_)) {
+            close_file(file_);
+            file_ = nullptr;
+            // create/lock window race: another process opened the marker we
+            // just created (O_CREAT|O_EXCL) and flocked it first. That process
+            // classifies it as Stale (marker exists, no live owner) and
+            // refuses immediately; its destructor releases the flock while
+            // leaving the marker. The marker is OUR own creation (the file did
+            // not exist before this acquire), so it has no prior build state to
+            // distrust: briefly retry reopening and acquiring it. A genuinely
+            // live concurrent build would have made exclusive_create fail
+            // (marker already present), so this path only runs in the race.
+            for (int attempt = 0; attempt < 200; ++attempt) {
+                std::this_thread::sleep_for(std::chrono::microseconds(500));
+                if (!open_existing(marker_, file_)) continue;
+                if (try_lock(file_)) {
+                    durable_sync(file_);
+                    durable_sync_parent(marker_);
+                    owned_ = true;
+                    test_hold_after_acquire();
+                    return State::Clean;
+                }
+                close_file(file_);
+                file_ = nullptr;
+            }
+            return State::Live;
+        }
         // Marker durability: flush the file and its parent-directory entry so
         // the marker is durably established before any derived mutation. Both
         // operations are once per build, not per output. On failure to sync,
@@ -169,6 +195,24 @@ ProjectOwnership::State ProjectOwnership::acquire() {
     }
 
     // The marker already exists (either stale, or held by a live build).
+    if (!open_existing(marker_, file_)) return State::Failed;
+    if (!try_lock(file_)) { close_file(file_); return State::Live; }
+
+    // We won the flock on an existing marker. It is either genuinely stale (a
+    // crashed build) or freshly created by a concurrent process that has not
+    // yet locked it (the O_CREAT|O_EXCL create/lock window). A concurrent
+    // creator retries acquisition for ~100ms, so release the lock and briefly
+    // watch: if a live owner appears within the window, report Live (the
+    // loser of the race); otherwise re-acquire and report Stale.
+    close_file(file_);
+    file_ = nullptr;
+    for (int attempt = 0; attempt < 20; ++attempt) {
+        std::this_thread::sleep_for(std::chrono::microseconds(250));
+        if (!open_existing(marker_, file_)) continue;
+        if (!try_lock(file_)) { close_file(file_); file_ = nullptr; return State::Live; }
+        close_file(file_);
+        file_ = nullptr;
+    }
     if (!open_existing(marker_, file_)) return State::Failed;
     if (!try_lock(file_)) { close_file(file_); return State::Live; }
     durable_sync(file_);

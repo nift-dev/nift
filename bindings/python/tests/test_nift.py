@@ -224,9 +224,20 @@ class TestConcurrency(unittest.TestCase):
 
 class TestLifetime(unittest.TestCase):
     def test_close_engine_during_render_on_other_thread(self):
+        # Deterministic rendezvous: the loader callback fires only after the
+        # render has entered native execution (render_count incremented), so
+        # close() provably happens during an in-flight native render.
         e = Engine.new()
         e.set_root("/")
-        e.set_loader(lambda p: "<p>PART</p>" if p.endswith("/p.html") else None)
+        entered = threading.Event()
+        release = threading.Event()
+
+        def loader(p):
+            entered.set()
+            release.wait(10)
+            return "<p>PART</p>" if p.endswith("/p.html") else None
+
+        e.set_loader(loader)
         result = {}
 
         def worker():
@@ -234,7 +245,9 @@ class TestLifetime(unittest.TestCase):
 
         t = threading.Thread(target=worker)
         t.start()
-        e.close()  # must not free the native engine while the render is in flight
+        self.assertTrue(entered.wait(10), "render never entered native execution")
+        e.close()  # provably during an in-flight native render
+        release.set()
         t.join()
         r = result["r"]
         self.assertTrue(r.ok)
@@ -244,28 +257,95 @@ class TestLifetime(unittest.TestCase):
 
     def test_close_context_during_render_on_other_thread(self):
         e = Engine.new()
+        e.set_root("/")
         c = Context()
         c.set_string("s", "ctx")
+        entered = threading.Event()
+        release = threading.Event()
+
+        def loader(p):
+            entered.set()
+            release.wait(10)
+            return "<b>$[s]</b>" if p.endswith("/p.html") else None
+
+        e.set_loader(loader)
         result = {}
 
         def worker():
-            result["r"] = e.render("$[s]", "<main>@content</main>", c)
+            result["r"] = e.render('@input("p.html")', "<main>@content</main>", c)
 
         t = threading.Thread(target=worker)
         t.start()
-        c.close()
+        self.assertTrue(entered.wait(10), "render never entered native execution")
+        c.close()  # provably during an in-flight native render
+        release.set()
         t.join()
         r = result["r"]
         self.assertTrue(r.ok)
-        self.assertEqual(r.output, "<main>ctx</main>")
+        self.assertEqual(r.output, "<main><b>ctx</b></main>")
         with self.assertRaises(RuntimeError):
             c.set_string("x", "y")
         e.close()
 
-    def test_close_engine_during_concurrent_renders(self):
+    def test_close_engine_while_loader_and_env_required(self):
+        # The in-flight render still needs the loader AND environment callback
+        # infrastructure after close(); the env callback fires after close()
+        # because the loaded content references @getenv.
         e = Engine.new()
         e.set_root("/")
-        e.set_loader(lambda p: "<p>P</p>" if p.endswith("/p.html") else None)
+        entered = threading.Event()
+        release = threading.Event()
+        calls = []
+
+        def loader(p):
+            calls.append("loader")
+            entered.set()
+            release.wait(10)
+            return "@getenv(TAG)" if p.endswith("/e.html") else None
+
+        def env(n):
+            calls.append("env")
+            return "worker" if n == "TAG" else None
+
+        e.set_loader(loader)
+        e.set_environment_provider(env)
+        result = {}
+
+        def worker():
+            result["r"] = e.render('@input("e.html")', "<main>@content</main>")
+
+        t = threading.Thread(target=worker)
+        t.start()
+        self.assertTrue(entered.wait(10), "render never entered native execution")
+        e.close()  # loader/env callbacks still required by the in-flight render
+        release.set()
+        t.join()
+        r = result["r"]
+        self.assertTrue(r.ok)
+        self.assertIn("worker", r.output)
+        self.assertIn("loader", calls)
+        self.assertIn("env", calls)
+
+    def test_close_engine_during_concurrent_renders(self):
+        # Explicit latch: every render signals (via its loader callback) that
+        # it is in native execution before the main thread closes the engine.
+        e = Engine.new()
+        e.set_root("/")
+        n = 24
+        lock = threading.Lock()
+        entered_count = [0]
+        all_entered = threading.Event()
+        release = threading.Event()
+
+        def loader(p):
+            with lock:
+                entered_count[0] += 1
+                if entered_count[0] == n:
+                    all_entered.set()
+            release.wait(10)
+            return "<p>P</p>" if p.endswith("/p.html") else None
+
+        e.set_loader(loader)
         results = []
         errors = []
 
@@ -279,14 +359,16 @@ class TestLifetime(unittest.TestCase):
             except Exception as ex:  # pragma: no cover
                 errors.append(ex)
 
-        threads = [threading.Thread(target=worker, args=(i,)) for i in range(24)]
+        threads = [threading.Thread(target=worker, args=(i,)) for i in range(n)]
         for t in threads:
             t.start()
-        e.close()  # close while several renders are outstanding
+        self.assertTrue(all_entered.wait(10), "not all renders entered native execution")
+        e.close()  # provably during N in-flight renders
+        release.set()
         for t in threads:
             t.join()
         self.assertEqual(errors, [])
-        self.assertEqual(len(results), 24)
+        self.assertEqual(len(results), n)
         self.assertTrue(all(results))
 
     def test_repeated_close(self):
