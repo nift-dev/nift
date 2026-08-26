@@ -107,6 +107,13 @@ jobs:
           dotnet-version: '10.0.x'
       - name: C# binding tests
         run: dotnet run --project bindings/csharp/tests/Nift.Tests/Nift.Tests.csproj
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Node binding build + tests
+        run: |
+          bash bindings/node/build.sh
+          node --expose-gc bindings/node/test/nift.test.js
 
   aggregate-evidence:
     name: Aggregate evidence (${{ matrix.os }})
