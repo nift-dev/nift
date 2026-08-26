@@ -50,7 +50,7 @@ int main() {
 
     // 2. Stale marker (no live owner) -> Stale; repair path may proceed.
     {
-        { std::FILE* f = std::fopen(marker.c_str(), "w"); std::fclose(f); }
+        { std::FILE* f = std::fopen(marker.string().c_str(), "w"); std::fclose(f); }
         ProjectOwnership o(marker);
         const auto s = o.acquire();
         CHECK("stale acquire returns Stale", s == ProjectOwnership::State::Stale);
