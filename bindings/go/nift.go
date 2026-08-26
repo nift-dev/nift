@@ -148,7 +148,7 @@ type callbackSet struct {
 	loader   HostLoader
 	env      HostEnvironment
 	token    unsafe.Pointer   // C-owned user_data token (C.malloc); C retains it
-	bufs     []unsafe.Pointer // C-allocated callback-output buffers, freed on engine Close
+	bufs     []unsafe.Pointer // C-allocated callback-output buffers, reclaimed at each lifecycle-gated quiescent render epoch (or at Close for the final retained state)
 }
 
 func (c *callbackSet) freeAll() {
@@ -179,11 +179,12 @@ func (c *callbackSet) freeBuffersLocked() {
 }
 
 // putC stores `value` into the callback output using a C-allocated buffer so no
-// Go pointer ever crosses into C. The C++ engine copies the value
-// synchronously during the callback; the buffer is retained until the engine is
-// closed, because concurrent callbacks (e.g. pagination workers) make freeing a
-// peer's buffer unsafe. Callback output memory therefore grows with total host
-// invocations over an engine's lifetime and is reclaimed at Close.
+// Go pointer ever crosses into C. The C++ engine copies the value synchronously
+// during the callback; the buffer is then dead. The buffers are reclaimed as a
+// single lifecycle-gated quiescent render epoch (renderCount returning to zero
+// while holding Engine.lifecycle, so no new render can be admitted), bounding
+// callback memory to peak concurrent render activity rather than the engine's
+// whole lifetime; Close reclaims whatever final retained state remains.
 func (c *callbackSet) putC(value string, out *C.nift_string) {
 	if value == "" {
 		out.data = nil
