@@ -239,3 +239,44 @@ func TestQueryOperationRacesEngineClose(t *testing.T) {
 	}
 	<-closeDone
 }
+
+func TestSetLoaderAfterCloseDoesNotPanic(t *testing.T) {
+	e := NewEngine()
+	e.Close()
+	// Must be rejected cleanly (no registry lookup on e.id==0 after Close).
+	e.SetLoader(func(path string) HostResult { return HostResult{} })
+	e.SetEnvironmentProvider(func(name string) HostResult { return HostResult{} })
+}
+
+func TestProviderInstallRacesEngineClose(t *testing.T) {
+	e := NewEngine()
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	nativeOpTestHook = func() {
+		close(entered)
+		<-release
+	}
+	defer func() { nativeOpTestHook = nil }()
+
+	opDone := make(chan struct{})
+	go func() {
+		e.SetLoader(func(path string) HostResult {
+			return HostResult{Status: HostFound, Value: "<p>P</p>"}
+		})
+		close(opDone)
+	}()
+
+	<-entered // SetLoader admitted, holding the lifecycle mutex before registry/native access
+	closeDone := make(chan struct{})
+	go func() { e.Close(); close(closeDone) }()
+	select {
+	case <-closeDone:
+		t.Fatal("Close completed while an admitted provider install held the lifecycle mutex")
+	case <-time.After(150 * time.Millisecond):
+	}
+
+	close(release)
+	<-opDone
+	<-closeDone
+	e.Close() // idempotent
+}

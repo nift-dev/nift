@@ -496,8 +496,10 @@ func (e *Engine) Reload() error {
 // SetLoader installs a loader provider. Engine mutation is not thread-safe
 // with active renders.
 func (e *Engine) SetLoader(loader HostLoader) {
-	v, _ := callbackRegistry.Load(e.id)
-	v.(*callbackSet).loader = loader
+	// Provider installation is a single lifecycle-protected operation: the
+	// closed check, the e.id read, the registry lookup, the callback-state
+	// mutation and the native install all happen under the lifecycle mutex, so
+	// Close can never free the registry entry / engine between them.
 	e.lifecycle.Lock()
 	defer e.lifecycle.Unlock()
 	if e.closed.Load() {
@@ -506,17 +508,21 @@ func (e *Engine) SetLoader(loader HostLoader) {
 	if nativeOpTestHook != nil {
 		nativeOpTestHook()
 	}
+	v, ok := callbackRegistry.Load(e.id)
+	if !ok {
+		return
+	}
+	set := v.(*callbackSet)
+	set.loader = loader
 	if loader == nil {
 		C.nift_engine_set_loader(e.engine, nil, nil)
 		return
 	}
-	C.nift_go_set_loader(e.engine, v.(*callbackSet).token)
+	C.nift_go_set_loader(e.engine, set.token)
 }
 
 // SetEnvironmentProvider installs an environment provider.
 func (e *Engine) SetEnvironmentProvider(env HostEnvironment) {
-	v, _ := callbackRegistry.Load(e.id)
-	v.(*callbackSet).env = env
 	e.lifecycle.Lock()
 	defer e.lifecycle.Unlock()
 	if e.closed.Load() {
@@ -525,11 +531,17 @@ func (e *Engine) SetEnvironmentProvider(env HostEnvironment) {
 	if nativeOpTestHook != nil {
 		nativeOpTestHook()
 	}
+	v, ok := callbackRegistry.Load(e.id)
+	if !ok {
+		return
+	}
+	set := v.(*callbackSet)
+	set.env = env
 	if env == nil {
 		C.nift_engine_set_environment_provider(e.engine, nil, nil)
 		return
 	}
-	C.nift_go_set_env(e.engine, v.(*callbackSet).token)
+	C.nift_go_set_env(e.engine, set.token)
 }
 
 func goString(s string) (*C.char, C.size_t) {

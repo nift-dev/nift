@@ -115,3 +115,19 @@ The invariant now holds at the native-handle boundary generally:
 operation admitted before Close -> native resource stays alive until it returns
 Close wins admission -> operation rejected before native use
 ```
+
+## Provider-setter lifecycle (CP17 round 4)
+
+Round 3 left SetLoader / SetEnvironmentProvider loading the callback registry
+and reading e.id OUTSIDE the lifecycle mutex: after Close (e.id==0, registry
+entry deleted) they could nil-dereference before reaching the closed check, and
+the e.id read raced Close's write. Both methods now begin with the lifecycle
+admission (lock, closed check, test hook, e.id read, registry lookup with an
+explicit `!ok` guard, callback-state mutation, native install) as one protected
+operation. Regression tests: SetLoader/SetEnvironmentProvider after Close do
+not panic, and a provider install races Close deterministically (admitted under
+lifecycle, Close blocked until the install completes). A final audit of every
+e.engine / e.id / callbackRegistry / c.ctx access confirms each is
+lifecycle-gated, render-count protected, or construction/destruction-only.
+Provider replacement remains covered by the documented
+configuration-before-concurrent-use rule (not newly concurrent-safe).
