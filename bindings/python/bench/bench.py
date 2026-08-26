@@ -10,17 +10,18 @@ page = "<p>$[site]</p>"
 tpl = "<main>@content</main>"
 n = 50000
 rounds = 3
-raw_best = float("inf")
-req_best = float("inf")
+r = e.render(page, tpl)  # warm-up (unreported)
+if not r.ok:
+    raise SystemExit(r.error)
+raw_samples = []
+req_samples = []
 for _ in range(rounds):
     start = time.perf_counter()
     for _ in range(n):  # raw: no request Context, engine-default binding
         r = e.render(page, tpl)
         if not r.ok:
             raise SystemExit(r.error)
-    raw = (time.perf_counter() - start) * 1e9 / n
-    if raw < raw_best:
-        raw_best = raw
+    raw_samples.append((time.perf_counter() - start) * 1e9 / n)
     start = time.perf_counter()
     for _ in range(1000):  # request-loop: fresh Context per request
         c = Context()
@@ -29,8 +30,9 @@ for _ in range(rounds):
         if not r.ok:
             raise SystemExit(r.error)
         c.close()
-    req = (time.perf_counter() - start) * 1000
-    if req < req_best:
-        req_best = req
+    req_samples.append((time.perf_counter() - start) * 1000)
+raw_samples.sort()
+req_samples.sort()
 e.close()
-print(f"py raw={int(raw_best)} ns/render request-loop={int(req_best)} ms/1000 rounds={rounds}")
+print(f"py raw={int(raw_samples[rounds // 2])} ns/render "
+      f"request-loop={int(req_samples[rounds // 2])} ms/1000 rounds={rounds}")

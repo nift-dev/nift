@@ -9,7 +9,10 @@ const string page = "<p>$[site]</p>";
 const string tpl = "<main>@content</main>";
 const int n = 50000;
 const int rounds = 3;
-double rawBest = double.MaxValue, reqBest = double.MaxValue;
+// Warm-up round (unreported) so the JIT settles before measuring.
+engine.Render(page, tpl);
+double[] rawSamples = new double[rounds];
+double[] reqSamples = new double[rounds];
 for (int r = 0; r < rounds; r++)
 {
     var sw = Stopwatch.StartNew();
@@ -18,8 +21,7 @@ for (int r = 0; r < rounds; r++)
         var rr = engine.Render(page, tpl);
         if (!rr.Ok) throw new Exception(rr.ErrorMessage);
     }
-    double raw = sw.Elapsed.TotalNanoseconds / n;
-    if (raw < rawBest) rawBest = raw;
+    rawSamples[r] = sw.Elapsed.TotalNanoseconds / n;
     sw.Restart();
     for (int i = 0; i < 1000; i++) // request-loop: fresh Context per request
     {
@@ -28,8 +30,9 @@ for (int r = 0; r < rounds; r++)
         var rr = engine.Render(page, tpl, c);
         if (!rr.Ok) throw new Exception(rr.ErrorMessage);
     }
-    double req = sw.ElapsedMilliseconds;
-    if (req < reqBest) reqBest = req;
+    reqSamples[r] = sw.ElapsedMilliseconds;
 }
+Array.Sort(rawSamples);
+Array.Sort(reqSamples);
 engine.Dispose();
-Console.WriteLine($"cs raw={rawBest:F0} ns/render request-loop={reqBest:F0} ms/1000 rounds={rounds}");
+Console.WriteLine($"cs raw={rawSamples[rounds / 2]:F0} ns/render request-loop={reqSamples[rounds / 2]:F0} ms/1000 rounds={rounds}");
