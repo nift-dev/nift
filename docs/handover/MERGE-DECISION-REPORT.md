@@ -182,22 +182,49 @@ Fresh measurements on this machine (linux/amd64, g++ 14, `-O2`):
 | Metric | CLI-only link | Full CLI (includes embedded engine) | Delta |
 |---|---|---|---|
 | Binary size | 1,256,712 B | 1,380,240 B | **+123,528 B (~9%)** |
-| Startup (`--version`) | ~3 ms | ~3 ms | negligible |
-| Build time (`make -j2`) | ~17 s | ~17 s + ~16 s for `libnift_c.a`/`.so` link | link-only |
+| Startup (`--version`, 200x median) | ~1.3 ms/invocation | ~1.3 ms/invocation | identical |
+| Clean build `make -j2 nift` (3x) | n/a (reduced set) | 16.1 / 16.6 / 16.9 s | embedding-only objects = ~4 s of that |
+| `make libnift_c.so` | n/a | ~15.5 s | **compiles 15 PIC objects + shared link** |
 
-Observations:
-- The embedded engine (Engine/Context/C ABI) is already linked into the CLI
-  binary because the CLI and the engine share the parser and project semantics.
-  The marginal cost to an ordinary CLI user is **~120 KB of binary**, a ~3 ms
-  startup (identical), and no additional runtime dependencies (`ldd nift` is
-  libstdc++/libm/libgcc/libc only - the same set as a CLI-only build).
-- Embedding adds **no** runtime or build dependencies to the CLI beyond g++.
-  The Go/.NET/Node/Python toolchains are only needed when building a binding;
-  they are not needed to build the CLI or the C ABI.
-- **Isolation requirement:** in any merged layout, the CLI target must link
-  only the core objects it needs and must NOT require the bindings or the C ABI
-  to build. The 120 KB is a semantic-sharing cost that already exists and is
-  not increased by a merge if targets stay separated.
+CORRECTION: the earlier report described the additional native-library build as
+"link-only". That is wrong. `make libnift_c.so` (measured ~15.5 s) compiles the
+full source set with `-fPIC` (15 PIC objects) and then links the shared library;
+it is not merely an archive/link step. The embedding-only objects
+(`Engine.cpp`+`Context.cpp`+`c_abi.cpp`) take ~4 s of a full CLI build, so a
+CLI-only build saves ~4 s of compile time.
+
+Rigorous reduced-CLI verification (CLI linked without `Engine.o`, `Context.o`,
+`c_abi.o`):
+- **Regression:** the reduced binary passes the complete CLI regression surface
+  (parser/content, commands/grammar, comments, contracts, JSON + JSON-Schema,
+  pagination + ordering, template-optional, requirements, metadata-safety,
+  path-safety, init-targets, control-flow, cross-feature, config-validation,
+  diagnostics, console, minify, incremental modes, zero-mutation, repair
+  campaign, ownership/concurrency, incremental state-transition adversarial,
+  parser/value composition adversarial, complexity invariants).
+- **Behaviour:** building the same multi-page paginated project with the full
+  and reduced binaries produces **byte-identical output** (same file list, same
+  file contents; only the directory mtime tar entry differs).
+- **Performance:** 200x `--version` median identical (~1.3 ms/invocation).
+- **No CLI command relies on Engine/Context/C ABI:** the reduced binary links
+  and all CLI commands/tests pass; `nm` on `nift.o`/`CLI.o` shows no references
+  to those classes at the command layer.
+- **Cross-platform linking** (Windows/macOS) cannot be validated on this Linux
+  host; the reduced object set is portable C++17 and the CI matrix must verify
+  it per-platform. Note: `c_abi.cpp` contains the exported C symbols; a CLI-only
+  target simply omits that object - no symbol collision.
+
+Other observations (unchanged):
+- The embedded engine is already linked into the CLI because the CLI and the
+  engine share the parser and project semantics. Marginal cost to an ordinary
+  CLI user: ~120 KB binary, identical startup, no additional runtime deps
+  (`ldd nift` = libstdc++/libm/libgcc/libc - the same set as a CLI-only build).
+- Embedding adds no runtime/build deps to the CLI beyond g++. Binding toolchains
+  (Go/.NET/Node/Python) are needed only when building that binding.
+- **Isolation requirement:** in any merged layout the CLI target must link only
+  the core objects it needs and must NOT require the bindings or the C ABI to
+  build. The ~120 KB is an already-incurred semantic-sharing cost; a merge does
+  not increase it if targets stay separated.
 
 **Conclusion:** ordinary CLI users pay a small, already-incurred, measurable
 cost (~120 KB, no deps). A merge does not increase it provided the CLI remains
@@ -398,3 +425,41 @@ This checkpoint produced analysis, measurements and a recommendation only.
 No canonical Nift modification, history merge, repository move, package
 publication, or website/release work was performed. The next decision point is
 the packaging/website checkpoint, gated on this report.
+## CP20 design review (2026-08-27) - assessment of the merge + distribution proposal
+
+The proposal (canonical source integration + strict build/package/documentation
+isolation) is endorsed with the following structural refinements:
+
+- **Adopt directory-based isolation** (`src/embed/` for Engine/Context/C ABI) so
+  the CLI target's object filter is a directory glob, not a fragile filename
+  list, and the boundary is visible in the layout.
+- **Name the CLI target explicitly**: `make nift` builds the REDUCED CLI object
+  set; CI must test that reduced binary (a full-object `nift` is a development
+  convenience, not the shipped artifact).
+- **Makefile**: `make` == `make nift` (CLI only). `make embed` = native library
+  (libnift_c.a/.so + headers + pkg-config) in one target - do NOT split C++ API
+  vs C ABI into separate targets. `make go-binding|csharp-binding|node-binding|
+  python-binding`, `make bindings`, `make test*` mirrors, `make install` =
+  CLI-only, `make install-embed` = native headers/libs.
+- **Synchronized versions**: all packages carry the canonical Nift version;
+  simplest workable policy = republish every binding on every release (patch
+  churn acceptable); fall back to minor-sync + patch-on-change only if patch
+  cadence becomes high.
+- **CI model**: a single workflow always runs `cli` (reduced target) + 
+  `conformance` (shared corpus) to avoid path-filter false-green gaps; binding
+  jobs run on shared-core or binding-local paths; packaging jobs separate.
+- **ABI contract is the biggest technical caveat**: co-locating the C ABI in
+  the canonical repo makes the canonical parser/engine's ABI a public contract;
+  the report must add an explicit C-ABI-major policy and treat binding
+  conformance as blocking for shared-core changes.
+- **Underspecified before merge**: which CLI becomes canonical (nift-embed's
+  v4.0.7 shares the parser; the pre-Embed reference must be reconciled or
+  explicitly superseded); the regression suite's home (recommend the shared
+  corpus lives in canonical `tests/conformance/`); history-integration
+  mechanics (recommend `--allow-unrelated-histories` subtree-style move + a
+  read-only archived nift-embed with a redirect README; never rewrite/delete);
+  Windows .lib/.dll + Node/Python native matrix verification on CI.
+
+Strongest objection: the public-ABI + binding-conformance coupling inside the
+canonical repo is the only mechanism that can slow ordinary CLI development; it
+is acceptable if the ABI-major policy and per-target CI gates are explicit.
