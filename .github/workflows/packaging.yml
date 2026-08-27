@@ -44,7 +44,7 @@ jobs:
         run: |
           make -j2
           make embed
-          VERSION="$(./nift --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+          NIFT_BIN=./nift; [ -f ./nift.exe ] && NIFT_BIN=./nift.exe; VERSION="$("$NIFT_BIN" --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
           bash packaging/matrix-build.sh "${{ matrix.target }}" "$VERSION"
       - name: Upload packaged artifacts
         uses: actions/upload-artifact@v4

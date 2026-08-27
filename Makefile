@@ -308,7 +308,9 @@ embed-prefix: libnift_c.a libnift_c.so
 	mkdir -p dist/embed-prefix/include/nift dist/embed-prefix/lib/pkgconfig
 	cp include/nift/*.h dist/embed-prefix/include/nift/
 	cp libnift_c.a libnift_c.so dist/embed-prefix/lib/
-	cp packaging/nift.pc dist/embed-prefix/lib/pkgconfig/
+	sed -e "s/__VERSION__/$(./nift --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)/" \
+	    -e "s|__LIBS__|-L\$${libdir} -Wl,-Bstatic -lnift_c -Wl,-Bdynamic -lstdc++ -lm -pthread|" \
+	    packaging/nift.pc.in > dist/embed-prefix/lib/pkgconfig/nift.pc
 
 go-binding: embed
 	cd bindings/go && PKG_CONFIG_PATH="$(CURDIR)/dist/embed-prefix/lib/pkgconfig" go build -o embed-harness ./cmd/embed-harness
