@@ -95,6 +95,11 @@ jobs:
           inc="$(sed -n 's/^includedir=//p' "$pc" | sed 's|\${prefix}|'"$pfx"'|g')"
           lib="$(sed -n 's/^libdir=//p' "$pc" | sed 's|\${prefix}|'"$pfx"'|g')"
           libs="$(sed -n 's/^Libs: *//p' "$pc" | sed 's|\${libdir}|'"$lib"'|g')"
+          # mingw ld/gcc need native Windows paths, not msys /tmp/... paths.
+          if command -v cygpath >/dev/null 2>&1; then
+            inc="$(cygpath -w "$inc")"
+            lib="$(cygpath -w "$lib")"
+          fi
           for a in "$@"; do
             case "$a" in
               --cflags) echo "-I$inc" ;;
