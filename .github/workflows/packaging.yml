@@ -49,7 +49,8 @@ jobs:
           make -j2
           make embed
           NIFT_BIN=./nift; [ -f ./nift.exe ] && NIFT_BIN=./nift.exe
-          VERSION="$("$NIFT_BIN" --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+          VERSION="$("$NIFT_BIN" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+          echo "NIFT_BIN=$NIFT_BIN VERSION=$VERSION"
           set +e
           bash -x packaging/matrix-build.sh "${{ matrix.target }}" "$VERSION" --require-smoke > /tmp/matrix.out 2>&1
           rc=$?
