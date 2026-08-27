@@ -81,7 +81,29 @@ jobs:
           rm -rf /tmp/gomod /tmp/gocons && mkdir -p /tmp/gomod /tmp/gocons
           tar -cf - bindings/go | ( cd /tmp/gomod && tar -xf - --strip-components=2 )
           cd /tmp/gocons
-          printf 'module example.com/consumer\n\ngo 1.26\n\nrequire nift.dev/embed/v4 v4.0.7\n\nreplace nift.dev/embed/v4 => /tmp/gomod\n' > go.mod
+          # Windows: go.mod replace needs a native path; and cgo invokes pkg-config
+          # (Strawberry Perl's is broken), so prepend a minimal nift-only wrapper.
+          REPLACE_DIR="$(command -v cygpath >/dev/null 2>&1 && cygpath -w /tmp/gomod || echo /tmp/gomod)"
+          if [ "${{ matrix.target }}" = "windows-x86_64" ]; then
+            mkdir -p /tmp/pcwrapper
+            cat > /tmp/pcwrapper/pkg-config <<'PC'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          pc=/tmp/nift-static-prefix/lib/pkgconfig/nift.pc
+          pfx="$(sed -n 's/^prefix=//p' "$pc")"
+          inc="$(sed -n 's/^includedir=//p' "$pc" | sed "s|\${prefix}|$pfx|g")"
+          lib="$(sed -n 's/^libdir=//p' "$pc" | sed "s|\${prefix}|$pfx|g")"
+          for a in "$@"; do
+            case "$a" in
+              --cflags) echo "-I$inc" ;;
+              --libs)   echo "$(sed -n 's/^Libs: *//p' "$pc" | sed "s|\${libdir}|$lib|g")" ;;
+            esac
+          done
+          PC
+            chmod +x /tmp/pcwrapper/pkg-config
+            export PATH="/tmp/pcwrapper:$PATH"
+          fi
+          printf 'module example.com/consumer\n\ngo 1.26\n\nrequire nift.dev/embed/v4 v4.0.7\n\nreplace nift.dev/embed/v4 => %s\n' "$REPLACE_DIR" > go.mod
           cat > main.go <<'GO'
           package main
           import ("fmt"; "os"; nift "nift.dev/embed/v4")
