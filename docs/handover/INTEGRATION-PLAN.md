@@ -35,14 +35,14 @@ The integration target is an **exact reviewed commit SHA**, not a moving branch.
 The proposed SHA is the HEAD of `nift-embed` at the time of review:
 
 ```
-proposed integration SHA: da8e52a <full-SHA-to-be-confirmed-at-integration>
+proposed integration SHA: da8e52a37eba90b904b5f97237aebb32b65263e4
 ```
 
-The proposed target is the substantive pre-integration revision commit
-`da8e52a...`. The plan text is finalized in the commit immediately following it
-(which only fixes this SHA line); the reviewer authorizes an EXACT commit. The
-SHA line is re-verified and fixed at integration time (phase 1) to the exact
-approved commit - which must be a strict descendant of `8a818f2`.
+This is the substantive pre-integration revision commit. The reviewer
+authorizes an EXACT commit; the SHA line is re-verified at integration time
+(phase 1) and must be a strict descendant of `8a818f2`. (The plan text itself
+is finalized in the commit immediately following this one, which only fixes
+this SHA line.)
 
 Immediately before integration, confirm ALL of:
 - canonical `main` still equals `8a818f2b1b55c5e88da0479b71302e8f4cd83d90`;
