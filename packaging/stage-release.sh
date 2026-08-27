@@ -71,9 +71,12 @@ tar xzf "$SDIST" -C "$WHEEL_TMP"
 ( cd "$WHEEL_TMP"/nift-$VERSION && NIFT_VERSION="$VERSION" python3 -m pip wheel --no-deps --no-build-isolation -w "$OUT" . >/dev/null 2>&1 )
 echo "built sdist + wheel: $(ls "$OUT" | grep -E 'nift-.*\.(whl|tar.gz)$' | tr '\n' ' ')"
 
-# 4. npm (stamped package.json in a temp tree)
+# 4. npm (stamped package.json in a temp tree). The addon is built in canonical
+#    (the temp tree lacks the native sources), then the whole binding incl. the
+#    built addon is copied and the version stamped.
 NPM_TMP="$(mktemp -d /tmp/nift-npm.XXXXXX)"
 trap 'rm -rf "$BUNDLE_STAGE" "$WHEEL_TMP" "$NPM_TMP"' EXIT
+make node-binding >/dev/null 2>&1
 cp -r bindings/node/. "$NPM_TMP/"
 python3 - "$NPM_TMP/package.json" "$VERSION" <<'PY'
 import json, sys
