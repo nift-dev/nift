@@ -108,7 +108,12 @@ int main(void) {
     return 0;
 }
 C
-  ( cd "$CONSUMER" && ${CC:-gcc} consumer.c -o consumer $(PKG_CONFIG_PATH="$CONSUMER/prefix/lib/pkgconfig" pkg-config --cflags --libs nift) )
+  echo "--- bundle nift.pc ---"
+  cat "$CONSUMER/prefix/lib/pkgconfig/nift.pc"
+  echo "--- pkg-config flags ---"
+  PKG_CONFIG_PATH="$CONSUMER/prefix/lib/pkgconfig" pkg-config --cflags --libs nift
+  echo "--- compile+link consumer ---"
+  ( cd "$CONSUMER" && PKG_CONFIG_PATH="$CONSUMER/prefix/lib/pkgconfig" ${CC:-gcc} -v consumer.c -o consumer $(PKG_CONFIG_PATH="$CONSUMER/prefix/lib/pkgconfig" pkg-config --cflags --libs nift) 2>&1 )
   "$CONSUMER/consumer"
   # Dependency inspection: report what the consumer links. Static (no Nift
   # shared dependency) is the enforced default on Linux (the static .pc); on
