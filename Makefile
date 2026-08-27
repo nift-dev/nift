@@ -335,7 +335,7 @@ test-node-binding: node-binding
 	cd bindings/node && node --test test/nift.test.js
 
 test-python-binding: python-binding
-	cd bindings/python && python3 -m pytest tests/ -q
+	cd bindings/python && python3 -m unittest tests.test_nift
 
 test-bindings: test-go-binding test-csharp-binding test-node-binding test-python-binding
 
