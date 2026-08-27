@@ -97,8 +97,10 @@ jobs:
           libs="$(sed -n 's/^Libs: *//p' "$pc" | sed 's|\${libdir}|'"$lib"'|g')"
           # mingw ld/gcc need native Windows paths, not msys /tmp/... paths.
           if command -v cygpath >/dev/null 2>&1; then
-            inc="$(cygpath -w "$inc")"
-            lib="$(cygpath -w "$lib")"
+            # -m (mixed) gives C:/... forward slashes: cgo's splitQuoted treats
+            # backslashes as escapes, which would corrupt a -w Windows path.
+            inc="$(cygpath -m "$inc")"
+            lib="$(cygpath -m "$lib")"
           fi
           for a in "$@"; do
             case "$a" in
