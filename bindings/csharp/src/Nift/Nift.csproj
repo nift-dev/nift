@@ -11,8 +11,8 @@
   </PropertyGroup>
   <PropertyGroup>
     <PackageId>Nift</PackageId>
-    <Version>4.0.7</Version>
-    <Description>Nift Embed .NET binding: Nift template rendering for .NET applications over the frozen Nift C ABI. Exposes the Embedded Nift API from Nift 4.0.7.</Description>
+    <Version>$(Version)</Version>
+    <Description>Nift Embed .NET binding: Nift template rendering for .NET applications over the frozen Nift C ABI.</Description>
     <Authors>antimatroid</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>

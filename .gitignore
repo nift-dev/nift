@@ -29,3 +29,4 @@ bindings/python/nift/_nift*.so
 dist/
 *.egg-info/
 bindings/python/build/
+bindings/python/native/

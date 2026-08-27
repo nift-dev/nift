@@ -1,7 +1,7 @@
 {
   "name": "nift",
-  "version": "4.0.7",
-  "description": "Nift Embed Node binding: Nift template rendering for Node.js applications (N-API addon over the frozen Nift C ABI). Exposes the Embedded Nift API from Nift 4.0.7.",
+  "version": "0.0.0",
+  "description": "Nift Embed Node binding: Nift template rendering for Node.js applications (N-API addon over the frozen Nift C ABI).",
   "main": "lib/nift.js",
   "license": "MIT",
   "engines": {

@@ -101,7 +101,6 @@ jobs:
         run: |
           cd bindings/go
           export PKG_CONFIG_PATH="$(pwd)/../../dist/embed-prefix/lib/pkgconfig"
-          export LD_LIBRARY_PATH="$(pwd)/../../dist/embed-prefix/lib"
           go test ./...
           go test -race ./...
       - uses: actions/setup-dotnet@v4

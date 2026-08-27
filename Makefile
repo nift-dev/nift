@@ -311,7 +311,7 @@ embed-prefix: libnift_c.a libnift_c.so
 	cp packaging/nift.pc dist/embed-prefix/lib/pkgconfig/
 
 go-binding: embed
-	cd bindings/go && PKG_CONFIG_PATH="$(CURDIR)/dist/embed-prefix/lib/pkgconfig" LD_LIBRARY_PATH="$(CURDIR)/dist/embed-prefix/lib" go build -o embed-harness ./cmd/embed-harness
+	cd bindings/go && PKG_CONFIG_PATH="$(CURDIR)/dist/embed-prefix/lib/pkgconfig" go build -o embed-harness ./cmd/embed-harness
 
 csharp-binding: libnift_c.so
 	cd bindings/csharp/apps/NiftEmbedHarness && dotnet build -v q --nologo
@@ -341,7 +341,7 @@ test-embed: test-c-abi test-c-abi-c-smoke test-engine test-engine-bindings \
 	test-engine-render-api test-conformance
 
 test-go-binding: go-binding
-	cd bindings/go && PKG_CONFIG_PATH="$(CURDIR)/dist/embed-prefix/lib/pkgconfig" LD_LIBRARY_PATH="$(CURDIR)/dist/embed-prefix/lib" go test -race ./...
+	cd bindings/go && PKG_CONFIG_PATH="$(CURDIR)/dist/embed-prefix/lib/pkgconfig" go test -race ./...
 
 test-csharp-binding: csharp-binding
 	cd bindings/csharp/tests/Nift.Tests && dotnet run -v q --nologo

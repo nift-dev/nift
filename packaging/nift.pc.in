@@ -1,0 +1,14 @@
+# Relocatable nift.pc: prefix resolves from the .pc location, so it works both
+# from a source checkout and when installed at <prefix>/lib/pkgconfig/nift.pc.
+# Generated per target by packaging/stage-release.sh from this template; the
+# Libs line is target-correct (ELF/GNU for Linux, Mach-O for macOS).
+prefix=${pcfiledir}/../..
+exec_prefix=${prefix}
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: nift
+Description: Nift Embedded rendering library (frozen C ABI; Nift __VERSION__)
+Version: __VERSION__
+Libs: __LIBS__
+Cflags: -I${includedir}
