@@ -8,12 +8,14 @@ package nift
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
 
-func dynamicName(i int) string { return fmt.Sprintf("key%d", i) }
+func dynamicName(i int) string  { return fmt.Sprintf("key%d", i) }
 func dynamicValue(i int) string { return strings.Repeat(fmt.Sprintf("v%d|", i), i%4+2) }
 
 func TestPointerPinningEngineSetters(t *testing.T) {
@@ -59,11 +61,11 @@ func TestPointerPinningContextSetters(t *testing.T) {
 	defer e.Close()
 	ctx := NewContext()
 	defer ctx.Close()
-	page := filepath.Join(root, "content", "about.html")
 	// Heap-built page identity, current output and title.
 	ctx.SetPageName(dynamicName(1))
-	ctx.SetCurrentOutput(filepath.Join(root, "public", dynamicName(2)+".html"))
-	ctx.SetTitle(strings.Repeat("T", 12))
+	ctx.SetCurrentOutput(filepath.Join(root, "index.html"))
+	title := strings.Repeat("T", 12)
+	ctx.SetTitle(title)
 	for i := 0; i < 6; i++ {
 		name := dynamicName(i + 10)
 		if err := ctx.SetString(name, dynamicValue(i)); err != nil {
@@ -72,7 +74,7 @@ func TestPointerPinningContextSetters(t *testing.T) {
 		if err := ctx.SetInt("i"+name, int32(i)); err != nil {
 			t.Fatalf("Context.SetInt: %v", err)
 		}
-		if err := ctx.SetNumber("n"+name, float64(i)/2); err != nil {
+		if err := ctx.SetNumber("n"+name, float64(i*2)); err != nil {
 			t.Fatalf("Context.SetNumber: %v", err)
 		}
 		if err := ctx.SetBool("b"+name, i%2 == 1); err != nil {
@@ -83,14 +85,57 @@ func TestPointerPinningContextSetters(t *testing.T) {
 			t.Fatalf("Context.SetJSON: %v", err)
 		}
 	}
-	// Rendering with the dynamic request bindings + path source.
-	name := dynamicName(10)
-	r, err := e.RenderPathWithContext(page, ctx)
+	// Render text referencing every dynamically added context binding and
+	// assert the exact output (built from the same runtime helpers).
+	var refs, expected []string
+	for i := 0; i < 6; i++ {
+		name := dynamicName(i + 10)
+		refs = append(refs, "$["+name+"]", "$[i"+name+"]", "$[n"+name+"]",
+			"$[b"+name+"]", "$[j"+name+".j]")
+		expected = append(expected, dynamicValue(i), strconv.Itoa(i), strconv.Itoa(i*2),
+			strconv.FormatBool(i%2 == 1), strconv.Itoa(i))
+	}
+	r, err := e.RenderTextWithContext(strings.Join(refs, "|"), ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_ = name
-	_ = r
+	if !r.OK {
+		t.Fatalf("context-bindings render failed: %+v", r.Error)
+	}
+	if r.Output != strings.Join(expected, "|") {
+		t.Fatalf("context-bindings render: got %q want %q", r.Output, strings.Join(expected, "|"))
+	}
+	// SetCurrentOutput is observable through @pathto (relative to the output
+	// location), on a plain filesystem engine like the C++ engine_pathto test.
+	fsRoot := t.TempDir()
+	if err := os.WriteFile(filepath.Join(fsRoot, "index.html"), []byte("<h1>home</h1>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(fsRoot, "about.html"), []byte("<h1>about</h1>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	pe := NewEngine()
+	defer pe.Close()
+	pe.SetRoot(fsRoot)
+	pctx := NewContext()
+	defer pctx.Close()
+	pctx.SetCurrentOutput(filepath.Join(fsRoot, "index.html"))
+	pt, err := pe.RenderSources(RenderSource{Text: "page"},
+		RenderSource{Text: `<a href="@pathto('about.html')">A</a>@content`}, pctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !pt.OK || pt.Output != `<a href="./about.html">A</a>page` {
+		t.Fatalf("context current_output via @pathto: ok=%v out=%q err=%+v", pt.OK, pt.Output, pt.Error)
+	}
+	// SetTitle is observable through a composed render's template.
+	tt, err := e.RenderSources(RenderSource{Text: "page"}, RenderSource{Text: "<h1>$[title]</h1>@content"}, ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !tt.OK || tt.Output != "<h1>"+title+"</h1>page" {
+		t.Fatalf("context title: ok=%v out=%q err=%+v", tt.OK, tt.Output, tt.Error)
+	}
 	// Exercise dynamic page name through a tracked render (unknown name -> error).
 	unknown := dynamicName(1000)
 	ru, err := e.RenderWithContext(unknown, ctx)
