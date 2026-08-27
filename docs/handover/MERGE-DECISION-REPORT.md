@@ -463,3 +463,67 @@ isolation) is endorsed with the following structural refinements:
 Strongest objection: the public-ABI + binding-conformance coupling inside the
 canonical repo is the only mechanism that can slow ordinary CLI development; it
 is acceptable if the ABI-major policy and per-target CI gates are explicit.
+
+## 11. Settled architecture (accepted 2026-08-27)
+
+One canonical Nift repository containing the CLI, shared templating
+implementation, native Embedded Nift API/C ABI and production bindings, with
+strict build, installation, packaging, CI and documentation isolation.
+`nift-embed` does not remain an active duplicate C++ tree. `nift-rs` stays the
+independent experimental/conformance implementation. Source integration does
+not make Embedded Nift mandatory and does not turn Nift into a backend
+framework.
+
+Fixed boundaries:
+- `make` / `make nift` build only the ordinary reduced CLI; `make embed`,
+  `make go-binding|csharp-binding|node-binding|python-binding`, `make bindings`,
+  `make nift embed bindings` are explicit. `make test*` mirrors. `make install`
+  installs only the CLI; `make install-embed` installs the native
+  headers/libraries/pkg-config.
+- CLI CI tests the reduced CLI binary (embedding-only objects excluded).
+- Native install via a dedicated `install-embed.sh` (checksum-verified, per-user
+  default + `--system`, never silently building/downloading unverified
+  artifacts) and a PowerShell/ZIP path for Windows.
+- Go uses the separately installed native library (pkg-config + `NIFT_NATIVE_LIB`
+  override), never bundled; ABI-major compatibility check at engine init.
+- Initial native matrix: Linux glibc x86-64/arm64, macOS x86-64/arm64, Windows
+  x86-64. No initial musl prebuilts; source build is the fallback.
+- C# NuGet RID assets (linux-x64/arm64, osx-x64/arm64, win-x64); Node N-API
+  prebuilts + source fallback; Python abi3 if straightforward else per-CPython
+  wheels + sdist.
+- Synchronized versions: every published component carries the canonical Nift
+  version; simplest policy publishes all required components each release
+  (incl. patches); registry prerelease syntax may differ mechanically.
+- Documentation: homepage and primary install pages untouched; a dedicated
+  Embedded Nift section (own install pages per language, API refs,
+  lifecycle/concurrency, examples/dogfoods, deployment, SSR-vs-other
+  architecture guidance) reached by a restrained nav link.
+- GitHub Releases: CLI binaries + SHA256SUMS primary; optional native embed
+  bundles per target; bindings live in their ecosystems (Go module, NuGet, npm,
+  PyPI); Releases are not a second registry.
+- Release publication: build once, test fully, record hashes/provenance, draft
+  release, attach verified CLI+native artifacts, publish each language package
+  via independent idempotent jobs, retry only failed jobs, finalize only when
+  all required components are accounted for. "version already exists" is
+  success only if the existing package matches expected version/content/digest/
+  provenance; otherwise a fatal version-collision error.
+- CI categories: CLI; native embed/C ABI; shared conformance; per-binding
+  correctness; packaging smoke; release packaging; sanitizer/fuzz/lifetime.
+  Shared parser/project/API/C ABI changes run all binding conformance gates;
+  binding-local changes run CLI/core sanity + conformance + that binding.
+  Unknown/new shared paths default to the complete matrix (no silent skip);
+  the path-classification mechanism has an integrity/liveness guard. Release
+  candidates always run the complete matrix.
+- Regression-suite ownership: neutral conformance corpus + direct runners move
+  into canonical `tests/conformance/`; heavy campaigns/perf harnesses/
+  orchestration stay in the suite repo; release validation pins the suite
+  commit.
+
+## 12. Pre-integration plan
+
+See docs/handover/INTEGRATION-PLAN.md. Verified: merge base 8a818f2 == canonical
+main; 0 canonical-only commits; embed is a strict descendant; integration is a
+fast-forward; embed `src/` is a strict superset of canonical `src/` (no
+canonical-only CLI behaviour discarded). C ABI policy, Makefile/directory
+layout, reduced-CLI target, conformance ownership, validation matrix and
+rollback plan are specified there. NOT EXECUTED - awaiting authorization.
