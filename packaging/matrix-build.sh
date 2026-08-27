@@ -119,7 +119,20 @@ C
   # shared dependency) is the enforced default on Linux (the static .pc); on
   # macOS/Windows the native bundle's shared library is the platform convention,
   # so the render above proves it loads and the dependency is reported.
-  DEP="$( (command -v ldd >/dev/null 2>&1 && ldd "$CONSUMER/consumer" 2>/dev/null | grep -i nift)        || (command -v otool >/dev/null 2>&1 && otool -L "$CONSUMER/consumer" 2>/dev/null | grep -i nift)        || (command -v objdump >/dev/null 2>&1 && objdump -p "$CONSUMER/consumer" 2>/dev/null | grep -i nift)        || true )"
+  echo "--- dependency inspection ---"
+  if command -v readelf >/dev/null 2>&1; then
+    echo "NEEDED entries:"; readelf -d "$CONSUMER/consumer" 2>/dev/null | grep -i "NEEDED" || echo "(none)"
+    DEP="$(readelf -d "$CONSUMER/consumer" 2>/dev/null | grep -iE 'NEEDED.*nift' || true)"
+  elif command -v ldd >/dev/null 2>&1; then
+    ldd "$CONSUMER/consumer" 2>/dev/null || true
+    DEP="$(ldd "$CONSUMER/consumer" 2>/dev/null | grep -i nift || true)"
+  elif command -v otool >/dev/null 2>&1; then
+    otool -L "$CONSUMER/consumer" 2>/dev/null || true
+    DEP="$(otool -L "$CONSUMER/consumer" 2>/dev/null | grep -i nift || true)"
+  else
+    objdump -p "$CONSUMER/consumer" 2>/dev/null | grep -iE 'dll|nift' || true
+    DEP="$(objdump -p "$CONSUMER/consumer" 2>/dev/null | grep -i nift || true)"
+  fi
   if [ "$OS" = "linux" ] && [ -n "$DEP" ]; then
     echo "FAIL: Linux consumer links a Nift shared library (static is the default)" >&2
     exit 1
