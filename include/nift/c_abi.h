@@ -217,6 +217,23 @@ nift_status nift_engine_render_partial(nift_engine* engine,
                                        const nift_context* context,
                                        nift_render_result** out_result);
 
+/* Standalone filesystem-source render (nift_engine_render_path): the path is
+ * ALWAYS a filesystem path - a missing path is a controlled missing-path error
+ * and is never reinterpreted as template text. Standalone in-memory-source
+ * render (nift_engine_render_text): the text is ALWAYS template source and is
+ * never checked against the filesystem. Both are partial renders (no @content
+ * slot). ctx may be NULL (a fresh empty context). These distinct entry points
+ * let production bindings render a path or text source without ever inferring
+ * the source kind from filesystem state. */
+nift_status nift_engine_render_path(nift_engine* engine,
+                                    const nift_context* context,
+                                    const char* path, size_t path_len,
+                                    nift_render_result** out_result);
+nift_status nift_engine_render_text(nift_engine* engine,
+                                    const nift_context* context,
+                                    const char* text, size_t text_len,
+                                    nift_render_result** out_result);
+
 /* ------------------------------------------------------------------------ */
 /* Result                                                                   */
 /* ------------------------------------------------------------------------ */

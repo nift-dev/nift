@@ -68,6 +68,25 @@ int main(void) {
     nift_render_result_free(result);
     nift_engine_free(engine);
 
+    /* CP19: distinct render_text / render_path entry points. */
+    engine = nift_engine_new();
+    if (engine == NULL) return 1;
+    if (nift_engine_set_string(engine, "site", 4, "hello", 5) != NIFT_OK) return 1;
+    result = NULL;
+    if (nift_engine_render_text(engine, NULL, "site=$[site]", 12, &result) != NIFT_OK) return 1;
+    if (nift_render_result_ok(result) != 1) return 1;
+    if (nift_render_result_output(result, &output) != NIFT_OK) return 1;
+    if (output.length != 10 || strncmp(output.data, "site=hello", 10) != 0) return 1;
+    nift_render_result_free(result);
+
+    /* render_path is ALWAYS a path: a missing file is a controlled error and
+     * is never reinterpreted as literal template text. */
+    result = NULL;
+    if (nift_engine_render_path(engine, NULL, "no-such-file.html", 17, &result) != NIFT_OK) return 1;
+    if (nift_render_result_ok(result) != 0) return 1;
+    nift_render_result_free(result);
+    nift_engine_free(engine);
+
     printf("C ABI C-consumer smoke passed\n");
     return 0;
 }

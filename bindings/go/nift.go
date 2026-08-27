@@ -47,6 +47,7 @@ import "C"
 import (
 	"errors"
 	"fmt"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"unsafe"
@@ -105,9 +106,9 @@ type Result struct {
 
 // Context carries per-render page identity and bindings.
 type Context struct {
-	ctx *C.nift_context
-	lifecycle  sync.Mutex
-	closed     atomic.Bool
+	ctx         *C.nift_context
+	lifecycle   sync.Mutex
+	closed      atomic.Bool
 	renderCount atomic.Int32
 }
 
@@ -124,8 +125,8 @@ type Context struct {
 // is always lifecycle -> callbackSet.mu; callbacks take only callbackSet.mu,
 // so there is no inversion.
 type Engine struct {
-	engine *C.nift_engine
-	id     int64
+	engine    *C.nift_engine
+	id        int64
 	lifecycle sync.Mutex
 	closed    atomic.Bool
 	// renderCount tracks in-flight renders; when it returns to zero and no new
@@ -144,11 +145,11 @@ var callbackRegistry sync.Map // int64 -> *callbackSet
 var nextCallbackID atomic.Int64
 
 type callbackSet struct {
-	mu       sync.Mutex
-	loader   HostLoader
-	env      HostEnvironment
-	token    unsafe.Pointer   // C-owned user_data token (C.malloc); C retains it
-	bufs     []unsafe.Pointer // C-allocated callback-output buffers, reclaimed at each lifecycle-gated quiescent render epoch (or at Close for the final retained state)
+	mu     sync.Mutex
+	loader HostLoader
+	env    HostEnvironment
+	token  unsafe.Pointer   // C-owned user_data token (C.malloc); C retains it
+	bufs   []unsafe.Pointer // C-allocated callback-output buffers, reclaimed at each lifecycle-gated quiescent render epoch (or at Close for the final retained state)
 }
 
 func (c *callbackSet) freeAll() {
@@ -552,6 +553,18 @@ func goString(s string) (*C.char, C.size_t) {
 	return (*C.char)(unsafe.Pointer(unsafe.StringData(s))), C.size_t(len(s))
 }
 
+// pinStrings pins the backing data of the given strings so Go pointers to it
+// may be passed to C (Go 1.26 requires Go pointers crossing to C to be
+// pinned). The Pinner must be Unpin()-ed (via defer) once the C call has
+// completed. Calling with an empty string is a no-op.
+func pinStrings(p *runtime.Pinner, strs ...string) {
+	for _, s := range strs {
+		if s != "" {
+			p.Pin(unsafe.StringData(s))
+		}
+	}
+}
+
 func bindingNameError(status C.nift_status) error {
 	if status != C.NIFT_OK {
 		return abiStatusError(status)
@@ -654,12 +667,37 @@ func (e *Engine) renderFrame(ctx *Context, fn func() (Result, error)) (Result, e
 	return fn()
 }
 
-// RenderPage renders a tracked page by name with complete pagination. A host
-// failure is a rendering outcome (Result.OK == false with the diagnostic); the
-// returned error is reserved for mechanical ABI failures.
-func (e *Engine) RenderPage(name string, ctx *Context) (Result, error) {
+// Render renders a tracked project page by name with a fresh empty context.
+// The name is ALWAYS a tracked page name - it is never interpreted as a
+// filesystem path or literal template source, and an unknown tracked name is a
+// controlled unknown-page error. A host failure is a rendering outcome
+// (Result.OK == false with the diagnostic); the returned error is reserved for
+// mechanical ABI failures.
+func (e *Engine) Render(name string) (Result, error) {
+	return e.renderFrame(nil, func() (Result, error) {
+		n, nl := goString(name)
+		var _pin runtime.Pinner
+		pinStrings(&_pin, name)
+		defer _pin.Unpin()
+		var r *C.nift_render_result
+		status := C.nift_engine_render_page(e.engine, nil, n, nl, &r)
+		if status != C.NIFT_OK {
+			return Result{}, abiStatusError(status)
+		}
+		defer C.nift_render_result_free(r)
+		return convertResult(r), nil
+	})
+}
+
+// RenderWithContext renders a tracked project page by name with request-scoped
+// context. The name is ALWAYS a tracked page name (never a path or literal
+// source); an unknown tracked name is a controlled unknown-page error.
+func (e *Engine) RenderWithContext(name string, ctx *Context) (Result, error) {
 	return e.renderFrame(ctx, func() (Result, error) {
 		n, nl := goString(name)
+		var _pin runtime.Pinner
+		pinStrings(&_pin, name)
+		defer _pin.Unpin()
 		var r *C.nift_render_result
 		status := C.nift_engine_render_page(e.engine, ctx.ptr(), n, nl, &r)
 		if status != C.NIFT_OK {
@@ -687,11 +725,16 @@ func sourceToC(src RenderSource) C.nift_source {
 	return C.nift_source{kind: C.NIFT_SOURCE_TEXT, data: t, length: tl}
 }
 
-// RenderSources composes arbitrary page/template sources (text or path).
+// RenderSources composes arbitrary page/template sources (text or path). The
+// source kinds are explicit (RenderSource.IsPath), never inferred from
+// filesystem state. ctx may be nil for a fresh empty context.
 func (e *Engine) RenderSources(page, template RenderSource, ctx *Context) (Result, error) {
 	return e.renderFrame(ctx, func() (Result, error) {
 		pageSrc := sourceToC(page)
 		tplSrc := sourceToC(template)
+		var _pin runtime.Pinner
+		pinStrings(&_pin, page.Text, page.Path, template.Text, template.Path)
+		defer _pin.Unpin()
 		var r *C.nift_render_result
 		status := C.nift_engine_render(e.engine, &pageSrc, &tplSrc, ctx.ptr(), &r)
 		if status != C.NIFT_OK {
@@ -702,16 +745,18 @@ func (e *Engine) RenderSources(page, template RenderSource, ctx *Context) (Resul
 	})
 }
 
-// Render composes a page and template (both text). The template must contain
-// exactly one @content.
-func (e *Engine) Render(page, template string, ctx *Context) (Result, error) {
-	return e.renderFrame(ctx, func() (Result, error) {
-		pageSrc := C.nift_source{kind: C.NIFT_SOURCE_TEXT}
-		pageSrc.data, pageSrc.length = goString(page)
-		tplSrc := C.nift_source{kind: C.NIFT_SOURCE_TEXT}
-		tplSrc.data, tplSrc.length = goString(template)
+// RenderPath renders a standalone filesystem source (the file at path) as a
+// partial with a fresh empty context. The path is ALWAYS a filesystem path: a
+// missing path is a controlled missing-path error and is never reinterpreted
+// as literal template text.
+func (e *Engine) RenderPath(path string) (Result, error) {
+	return e.renderFrame(nil, func() (Result, error) {
+		p, pl := goString(path)
+		var _pin runtime.Pinner
+		pinStrings(&_pin, path)
+		defer _pin.Unpin()
 		var r *C.nift_render_result
-		status := C.nift_engine_render(e.engine, &pageSrc, &tplSrc, ctx.ptr(), &r)
+		status := C.nift_engine_render_path(e.engine, nil, p, pl, &r)
 		if status != C.NIFT_OK {
 			return Result{}, abiStatusError(status)
 		}
@@ -720,24 +765,56 @@ func (e *Engine) Render(page, template string, ctx *Context) (Result, error) {
 	})
 }
 
-// RenderPath composes a page and template loaded from paths resolved against
-// the engine root. Used for loader-backed and on-disk path renders.
-func (e *Engine) RenderPath(pagePath, templatePath string, ctx *Context) (Result, error) {
-	return e.RenderSources(
-		RenderSource{IsPath: true, Path: pagePath},
-		RenderSource{IsPath: true, Path: templatePath},
-		ctx,
-	)
+// RenderPathWithContext renders a standalone filesystem source (the file at
+// path) as a partial with request-scoped context. The path is ALWAYS a
+// filesystem path; a missing path is a controlled missing-path error.
+func (e *Engine) RenderPathWithContext(path string, ctx *Context) (Result, error) {
+	return e.renderFrame(ctx, func() (Result, error) {
+		p, pl := goString(path)
+		var _pin runtime.Pinner
+		pinStrings(&_pin, path)
+		defer _pin.Unpin()
+		var r *C.nift_render_result
+		status := C.nift_engine_render_path(e.engine, ctx.ptr(), p, pl, &r)
+		if status != C.NIFT_OK {
+			return Result{}, abiStatusError(status)
+		}
+		defer C.nift_render_result_free(r)
+		return convertResult(r), nil
+	})
 }
 
-// RenderPartial renders a standalone partial/fragment. A partial containing
-// @content is an error (Result.OK == false).
-func (e *Engine) RenderPartial(page string, ctx *Context) (Result, error) {
-	return e.renderFrame(ctx, func() (Result, error) {
-		src := C.nift_source{kind: C.NIFT_SOURCE_TEXT}
-		src.data, src.length = goString(page)
+// RenderText renders the supplied bytes as a standalone in-memory source
+// (partial) with a fresh empty context. The text is ALWAYS template source: it
+// is never checked against the filesystem, so it cannot be misinterpreted as a
+// page or path name.
+func (e *Engine) RenderText(text string) (Result, error) {
+	return e.renderFrame(nil, func() (Result, error) {
+		t, tl := goString(text)
+		var _pin runtime.Pinner
+		pinStrings(&_pin, text)
+		defer _pin.Unpin()
 		var r *C.nift_render_result
-		status := C.nift_engine_render_partial(e.engine, &src, ctx.ptr(), &r)
+		status := C.nift_engine_render_text(e.engine, nil, t, tl, &r)
+		if status != C.NIFT_OK {
+			return Result{}, abiStatusError(status)
+		}
+		defer C.nift_render_result_free(r)
+		return convertResult(r), nil
+	})
+}
+
+// RenderTextWithContext renders the supplied bytes as a standalone in-memory
+// source (partial) with request-scoped context. The text is ALWAYS template
+// source and is never checked against the filesystem.
+func (e *Engine) RenderTextWithContext(text string, ctx *Context) (Result, error) {
+	return e.renderFrame(ctx, func() (Result, error) {
+		t, tl := goString(text)
+		var _pin runtime.Pinner
+		pinStrings(&_pin, text)
+		defer _pin.Unpin()
+		var r *C.nift_render_result
+		status := C.nift_engine_render_text(e.engine, ctx.ptr(), t, tl, &r)
 		if status != C.NIFT_OK {
 			return Result{}, abiStatusError(status)
 		}

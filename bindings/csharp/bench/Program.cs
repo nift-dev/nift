@@ -10,7 +10,7 @@ const string tpl = "<main>@content</main>";
 const int n = 50000;
 const int rounds = 3;
 // Warm-up round (unreported) so the JIT settles before measuring.
-engine.Render(page, tpl);
+engine.Render(RenderSource.Text(page), RenderSource.Text(tpl));
 double[] rawSamples = new double[rounds];
 double[] reqSamples = new double[rounds];
 for (int r = 0; r < rounds; r++)
@@ -18,7 +18,7 @@ for (int r = 0; r < rounds; r++)
     var sw = Stopwatch.StartNew();
     for (int i = 0; i < n; i++) // raw: no request Context, engine-default binding
     {
-        var rr = engine.Render(page, tpl);
+        var rr = engine.Render(RenderSource.Text(page), RenderSource.Text(tpl));
         if (!rr.Ok) throw new Exception(rr.ErrorMessage);
     }
     rawSamples[r] = sw.Elapsed.TotalNanoseconds / n;
@@ -27,7 +27,7 @@ for (int r = 0; r < rounds; r++)
     {
         using var c = new Context();
         c.SetString("who", "w");
-        var rr = engine.Render(page, tpl, c);
+        var rr = engine.Render(RenderSource.Text(page), RenderSource.Text(tpl), c);
         if (!rr.Ok) throw new Exception(rr.ErrorMessage);
     }
     reqSamples[r] = sw.ElapsedMilliseconds;

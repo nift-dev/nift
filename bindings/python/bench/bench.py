@@ -10,7 +10,7 @@ page = "<p>$[site]</p>"
 tpl = "<main>@content</main>"
 n = 50000
 rounds = 3
-r = e.render(page, tpl)  # warm-up (unreported)
+r = e.render_sources(page, tpl)  # warm-up (unreported)
 if not r.ok:
     raise SystemExit(r.error)
 raw_samples = []
@@ -18,7 +18,7 @@ req_samples = []
 for _ in range(rounds):
     start = time.perf_counter()
     for _ in range(n):  # raw: no request Context, engine-default binding
-        r = e.render(page, tpl)
+        r = e.render_sources(page, tpl)
         if not r.ok:
             raise SystemExit(r.error)
     raw_samples.append((time.perf_counter() - start) * 1e9 / n)
@@ -26,7 +26,7 @@ for _ in range(rounds):
     for _ in range(1000):  # request-loop: fresh Context per request
         c = Context()
         c.set_string("who", "w")
-        r = e.render(page, tpl, c)
+        r = e.render_sources(page, tpl, c)
         if not r.ok:
             raise SystemExit(r.error)
         c.close()

@@ -91,6 +91,12 @@ internal static partial class Native
     [DllImport(Lib, EntryPoint = "nift_engine_render_partial", CallingConvention = Cdecl)]
     internal static extern int nift_engine_render_partial(IntPtr engine, in NiftSource partial, IntPtr context, out IntPtr result);
 
+    [DllImport(Lib, EntryPoint = "nift_engine_render_path", CallingConvention = Cdecl)]
+    internal static extern int nift_engine_render_path(IntPtr engine, IntPtr context, IntPtr path, UIntPtr path_len, out IntPtr result);
+
+    [DllImport(Lib, EntryPoint = "nift_engine_render_text", CallingConvention = Cdecl)]
+    internal static extern int nift_engine_render_text(IntPtr engine, IntPtr context, IntPtr text, UIntPtr text_len, out IntPtr result);
+
     [DllImport(Lib, EntryPoint = "nift_render_result_free", CallingConvention = Cdecl)]
     internal static extern void nift_render_result_free(IntPtr result);
 

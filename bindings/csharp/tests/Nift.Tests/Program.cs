@@ -37,6 +37,7 @@ internal static class Program
         Run("non-render operation vs Dispose: engine setter", TestSetterRacesDispose);
         Run("non-render operation vs Dispose: query", TestQueryRacesDispose);
         Run("non-render operation vs Dispose: context setter", TestContextSetterRacesDispose);
+        Run("CP19 render API", TestRenderApi);
 
         Console.WriteLine($"\nC# binding tests: {_passed} passed, {_failed} failed");
         return _failed == 0 ? 0 : 1;
@@ -144,7 +145,7 @@ internal static class Program
         var engine = Engine.Open(fixture.Root);
         Assert(engine.IsOpen(), "project engine should be open");
         AssertEq(engine.OpenError(), "", "open error empty");
-        var result = engine.RenderPage("blog");
+        var result = engine.Render("blog");
         AssertOk(result, "page render");
         engine.Dispose();
     }
@@ -152,7 +153,7 @@ internal static class Program
     private static void TestComposedRender()
     {
         using var engine = Engine.New();
-        var result = engine.Render("<p>hello</p>", "<main>@content</main>");
+        var result = engine.Render(RenderSource.Text("<p>hello</p>"), RenderSource.Text("<main>@content</main>"));
         AssertOk(result, "composed render");
         AssertEq(result.Output, "<main><p>hello</p></main>", "composed output");
     }
@@ -165,7 +166,7 @@ internal static class Program
         engine.SetNumber("n", 1.5);
         engine.SetBool("b", true);
         engine.SetJSON("v", "{\"x\":1,\"y\":\"z\"}");
-        var result = engine.Render("$[s]|$[i]|$[n]|$[b]|$[v.x]|$[v.y]", "<main>@content</main>");
+        var result = engine.Render(RenderSource.Text("$[s]|$[i]|$[n]|$[b]|$[v.x]|$[v.y]"), RenderSource.Text("<main>@content</main>"));
         AssertOk(result, "binding render");
         AssertEq(result.Output, "<main>hello|42|1.5|true|1|z</main>", "binding values");
     }
@@ -177,7 +178,7 @@ internal static class Program
         context.SetString("site", "ctx-site");
         context.SetInt("n", 7);
         context.SetJSON("v", "{\"a\":1}");
-        var result = engine.Render("$[site]|$[n]|$[v.a]", "<main>@content</main>", context);
+        var result = engine.Render(RenderSource.Text("$[site]|$[n]|$[v.a]"), RenderSource.Text("<main>@content</main>"), context);
         AssertOk(result, "context render");
         AssertEq(result.Output, "<main>ctx-site|7|1</main>", "context values");
     }
@@ -188,7 +189,7 @@ internal static class Program
         engine.SetString("site", "engine");
         using var context = new Context();
         context.SetString("site", "context");
-        var result = engine.Render("$[site]", "<main>@content</main>", context);
+        var result = engine.Render(RenderSource.Text("$[site]"), RenderSource.Text("<main>@content</main>"), context);
         AssertOk(result, "precedence render");
         AssertEq(result.Output, "<main>context</main>", "context must win");
     }
@@ -226,7 +227,7 @@ internal static class Program
         using var fixture = new ProjectFixture();
         using var engine = Engine.New();
         engine.SetRoot(fixture.Root);
-        var result = engine.Render("@json(\"content/bad.json\", d)$[d.x]@content", "<main>@content</main>");
+        var result = engine.Render(RenderSource.Text("@json(\"content/bad.json\", d)$[d.x]@content"), RenderSource.Text("<main>@content</main>"));
         Assert(!result.Ok, "malformed JSON must fail");
         Assert(result.ErrorMessage is not null && result.ErrorMessage.StartsWith("json: failed to parse content/bad.json ("),
             $"diagnostic must be in the frozen error family: {result.ErrorMessage}");
@@ -244,11 +245,11 @@ internal static class Program
             }
             return HostResult.NotFound();
         });
-        var result = engine.Render("@input(\"part.html\")", "<main>@content</main>");
+        var result = engine.Render(RenderSource.Text("@input(\"part.html\")"), RenderSource.Text("<main>@content</main>"));
         AssertOk(result, "loader found render");
         AssertEq(result.Output, "<main><p>PART</p></main>", "loader content");
 
-        var missing = engine.Render("@input(\"nope.html\")", "<main>@content</main>");
+        var missing = engine.Render(RenderSource.Text("@input(\"nope.html\")"), RenderSource.Text("<main>@content</main>"));
         Assert(!missing.Ok, "missing input must fail");
         AssertEq(missing.ErrorMessage, "@input path does not exist: nope.html", "missing input diagnostic");
     }
@@ -257,13 +258,13 @@ internal static class Program
     {
         using var engine = Engine.New();
         engine.SetEnvironmentProvider(name => name == "GREETING" ? HostResult.Found("hi") : HostResult.NotFound());
-        var result = engine.Render("@getenv(GREETING)", "<main>@content</main>");
+        var result = engine.Render(RenderSource.Text("@getenv(GREETING)"), RenderSource.Text("<main>@content</main>"));
         AssertOk(result, "env found");
         AssertEq(result.Output, "<main>hi</main>", "env value");
 
         using var failing = Engine.New();
         failing.SetEnvironmentProvider(_ => HostResult.Failure("host exploded"));
-        var failed = failing.Render("@getenv(GREETING)", "<main>@content</main>");
+        var failed = failing.Render(RenderSource.Text("@getenv(GREETING)"), RenderSource.Text("<main>@content</main>"));
         Assert(!failed.Ok, "env error must fail");
         Assert(failed.ErrorMessage is not null && failed.ErrorMessage.Contains("host exploded"),
             $"env error diagnostic must survive inside the render diagnostic: {failed.ErrorMessage}");
@@ -273,7 +274,7 @@ internal static class Program
     {
         using var fixture = new ProjectFixture();
         using var engine = Engine.Open(fixture.Root);
-        var result = engine.RenderPage("blog");
+        var result = engine.Render("blog");
         AssertOk(result, "paginated render");
         AssertEq(result.Pagination.Count, 2, "pagination count");
         AssertEq(result.Pagination[0].Page, 2u, "first pagination page number");
@@ -295,7 +296,7 @@ internal static class Program
             : HostResult.NotFound());
         using var context = new Context();
         context.SetCurrentOutput("public/blog.html");
-        var result = engine.Render("@pathto(\"public/script.js\")@input(\"part.html\")", "<main>@content</main>", context);
+        var result = engine.Render(RenderSource.Text("@pathto(\"public/script.js\")@input(\"part.html\")"), RenderSource.Text("<main>@content</main>"), context);
         AssertOk(result, "dep/req render");
         Assert(result.Requirements.Contains("public/script.js"), "requirement present");
         Assert(result.Dependencies.Contains("part.html"), "dependency present");
@@ -316,7 +317,7 @@ internal static class Program
     {
         using var engine = Engine.New();
         engine.SetEnvironmentProvider(_ => HostResult.Failure("boom"));
-        var result = engine.Render("@getenv(GREETING)", "<main>@content</main>");
+        var result = engine.Render(RenderSource.Text("@getenv(GREETING)"), RenderSource.Text("<main>@content</main>"));
         try
         {
             result.ThrowIfFailed();
@@ -338,7 +339,7 @@ internal static class Program
         {
             using var context = new Context();
             context.SetString("id", Guid.NewGuid().ToString("N"));
-            var result = engine.Render("@input(\"part.html\")", "<main>@content</main>", context);
+            var result = engine.Render(RenderSource.Text("@input(\"part.html\")"), RenderSource.Text("<main>@content</main>"), context);
             if (!result.Ok)
             {
                 throw new Exception($"concurrent render failed: {result.ErrorMessage}");
@@ -354,7 +355,7 @@ internal static class Program
         {
             var engine = Engine.New();
             engine.SetString("s", i.ToString());
-            var result = engine.Render("$[s]", "<main>@content</main>");
+            var result = engine.Render(RenderSource.Text("$[s]"), RenderSource.Text("<main>@content</main>"));
             AssertOk(result, "repeated render");
             engine.Dispose();
         }
@@ -370,7 +371,7 @@ internal static class Program
         GC.Collect();
         GC.WaitForPendingFinalizers();
         GC.Collect();
-        var result = engine.Render("@input(\"p.html\")", "<main>@content</main>");
+        var result = engine.Render(RenderSource.Text("@input(\"p.html\")"), RenderSource.Text("<main>@content</main>"));
         AssertOk(result, "rooted delegate render");
         AssertEq(result.Output, "<main><p>ROOTED</p></main>", "rooted delegate output");
         engine.Dispose();
@@ -399,13 +400,13 @@ internal static class Program
         using var engine = Engine.New();
         engine.SetRoot("/");
         engine.SetLoader(_ => throw new InvalidOperationException("host exploded"));
-        var result = engine.Render("@input(\"p.html\")", "<main>@content</main>");
+        var result = engine.Render(RenderSource.Text("@input(\"p.html\")"), RenderSource.Text("<main>@content</main>"));
         Assert(!result.Ok, "loader throw must fail the render");
         AssertEq(result.ErrorMessage, "host exploded", "exception diagnostic must survive exactly");
 
         using var failing = Engine.New();
         failing.SetEnvironmentProvider(_ => throw new InvalidOperationException("boom"));
-        var failed = failing.Render("@getenv(X)", "<main>@content</main>");
+        var failed = failing.Render(RenderSource.Text("@getenv(X)"), RenderSource.Text("<main>@content</main>"));
         Assert(!failed.Ok, "env throw must fail the render");
         Assert(failed.ErrorMessage is not null && failed.ErrorMessage.Contains("boom"),
             $"env exception diagnostic: {failed.ErrorMessage}");
@@ -428,14 +429,14 @@ internal static class Program
         Exception? renderEx = null;
         var thread = new Thread(() =>
         {
-            try { result = engine.Render("@input(\"p.html\")", "<main>@content</main>"); }
+            try { result = engine.Render(RenderSource.Text("@input(\"p.html\")"), RenderSource.Text("<main>@content</main>")); }
             catch (Exception ex) { renderEx = ex; }
         });
         thread.Start();
         Assert(entered.Wait(TimeSpan.FromSeconds(10)), "render never entered native execution");
         engine.Dispose(); // must defer native destruction
         bool rejected = false;
-        try { engine.Render("x", "y"); }
+        try { engine.Render(RenderSource.Text("x"), RenderSource.Text("y")); }
         catch (ObjectDisposedException) { rejected = true; }
         Assert(rejected, "disposed engine must reject a new render");
         release.Set();
@@ -464,7 +465,7 @@ internal static class Program
         Exception? renderEx = null;
         var thread = new Thread(() =>
         {
-            try { result = engine.Render("@input(\"p.html\")", "<main>@content</main>", ctx); }
+            try { result = engine.Render(RenderSource.Text("@input(\"p.html\")"), RenderSource.Text("<main>@content</main>"), ctx); }
             catch (Exception ex) { renderEx = ex; }
         });
         thread.Start();
@@ -559,6 +560,76 @@ internal static class Program
             Assert(rejected, "disposed context must reject a new setter");
         }
         finally { Nift.Context.NativeOpTestHook = null; }
+    }
+
+
+    private static void TestRenderApi()
+    {
+        // Tracked-page render by name.
+        string root = ScaffoldProject();
+        using var engine = Engine.Open(root);
+        Assert(engine.IsOpen(), "project opens");
+        var byName = engine.Render("about");
+        Assert(byName.Ok && byName.Output == "<main><p>about</p></main>", $"render(name): {byName.ErrorMessage}");
+        var unknown = engine.Render("no-such-page");
+        Assert(!unknown.Ok && unknown.ErrorMessage is not null && unknown.ErrorMessage.Contains("unknown"),
+            $"unknown tracked name must be a controlled unknown-page error: {unknown.ErrorMessage}");
+        using var ctx = new Context();
+        ctx.SetJSON("product", "{\"name\":\"headphones\"}");
+        var withCtx = engine.Render("products/headphones", ctx);
+        Assert(withCtx.Ok && withCtx.Output == "<main><h1>headphones</h1></main>",
+            $"render(name, ctx): {withCtx.ErrorMessage}");
+
+        // render_path: always a filesystem path; missing path is an error.
+        var path = engine.RenderPath(System.IO.Path.Combine(root, "content", "about.html"));
+        Assert(path.Ok && path.Output == "<p>about</p>", $"render_path(existing): {path.ErrorMessage}");
+        var missingPath = engine.RenderPath(System.IO.Path.Combine(root, "nope.html"));
+        Assert(!missingPath.Ok, "render_path(missing) must be a controlled error");
+        Assert(missingPath.Output != "<p>about</p>", "missing path must not be reinterpreted as the file content");
+
+        // render_text: never checks the filesystem.
+        var text = engine.RenderText("<p>literal</p>");
+        Assert(text.Ok && text.Output == "<p>literal</p>", $"render_text: {text.ErrorMessage}");
+        string namesAFile = System.IO.Path.Combine(root, "content", "about.html");
+        var textOfPath = engine.RenderText(namesAFile);
+        Assert(textOfPath.Ok && textOfPath.Output == namesAFile, "render_text must not resolve its argument as a file path");
+
+        // Omitted context == fresh empty context; no request-state reuse.
+        var noCtx = engine.RenderText("$[x]");
+        using var ctx2 = new Context();
+        ctx2.SetString("x", "value");
+        var withCtx2 = engine.RenderText("$[x]", ctx2);
+        Assert(withCtx2.Ok && withCtx2.Output == "value", $"render_text(text, ctx): {withCtx2.ErrorMessage}");
+        Assert(noCtx.Ok && noCtx.Output == "$[x]", "no-context render must not reuse request state");
+
+        // Typed composition path/path, text/text, mixed.
+        string tplPath = System.IO.Path.Combine(root, "templates", "template.html");
+        var pp = engine.Render(RenderSource.Path(System.IO.Path.Combine(root, "content", "about.html")),
+                               RenderSource.Path(tplPath));
+        Assert(pp.Ok && pp.Output == "<main><p>about</p></main>", $"path/path: {pp.ErrorMessage}");
+        var tt = engine.Render(RenderSource.Text("<p>hi</p>"), RenderSource.Text("<main>@content</main>"));
+        Assert(tt.Ok && tt.Output == "<main><p>hi</p></main>", $"text/text: {tt.ErrorMessage}");
+        var mixed = engine.Render(RenderSource.Text("<p>mixed</p>"), RenderSource.Path(tplPath));
+        Assert(mixed.Ok && mixed.Output == "<main><p>mixed</p></main>", $"mixed: {mixed.ErrorMessage}");
+
+        System.IO.Directory.Delete(root, true);
+    }
+
+    private static string ScaffoldProject()
+    {
+        string root = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "nift-cp19-cs-" + Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(System.IO.Path.Combine(root, ".nift"));
+        System.IO.Directory.CreateDirectory(System.IO.Path.Combine(root, "content", "products"));
+        System.IO.Directory.CreateDirectory(System.IO.Path.Combine(root, "templates"));
+        System.IO.File.WriteAllText(System.IO.Path.Combine(root, ".nift", "config.json"),
+            "{\"config\":{\"content-dir\":\"content/\",\"content-ext\":\".html\",\"output-dir\":\"public/\",\"output-ext\":\".html\",\"default-template\":\"templates/template.html\",\"incremental-mode\":\"modified\"}}");
+        System.IO.File.WriteAllText(System.IO.Path.Combine(root, ".nift", "tracked.json"),
+            "{\"tracked\":[{\"name\":\"/\",\"title\":\"Home\",\"template\":\"templates/template.html\"},{\"name\":\"about\",\"title\":\"About\",\"template\":\"templates/template.html\"},{\"name\":\"products/headphones\",\"title\":\"Headphones\",\"template\":\"templates/template.html\"}]}");
+        System.IO.File.WriteAllText(System.IO.Path.Combine(root, "templates", "template.html"), "<main>@content</main>");
+        System.IO.File.WriteAllText(System.IO.Path.Combine(root, "content", "index.html"), "<p>home</p>");
+        System.IO.File.WriteAllText(System.IO.Path.Combine(root, "content", "about.html"), "<p>about</p>");
+        System.IO.File.WriteAllText(System.IO.Path.Combine(root, "content", "products", "headphones.html"), "<h1>$[product.name]</h1>");
+        return root;
     }
 
 }

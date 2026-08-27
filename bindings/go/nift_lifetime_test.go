@@ -24,14 +24,14 @@ func TestCloseEngineDuringRenderIsDeferred(t *testing.T) {
 	errCh := make(chan error, 1)
 	done := make(chan Result, 1)
 	go func() {
-		r, err := e.Render(`@input("p.html")`, "<main>@content</main>", nil)
+		r, err := e.RenderSources(RenderSource{Text: `@input("p.html")`}, RenderSource{Text: "<main>@content</main>"}, nil)
 		errCh <- err
 		done <- r
 	}()
 
 	<-entered // render provably in native execution
 	e.Close() // must defer native destruction
-	if _, err := e.Render("x", "y", nil); err == nil {
+	if _, err := e.RenderSources(RenderSource{Text: "x"}, RenderSource{Text: "y"}, nil); err == nil {
 		t.Fatal("expected a closed engine to reject a new render")
 	}
 	close(release)
@@ -63,7 +63,7 @@ func TestCloseContextDuringRenderIsDeferred(t *testing.T) {
 	errCh := make(chan error, 1)
 	done := make(chan Result, 1)
 	go func() {
-		r, err := e.Render(`@input("p.html")`, "<main>@content</main>", c)
+		r, err := e.RenderSources(RenderSource{Text: `@input("p.html")`}, RenderSource{Text: "<main>@content</main>"}, c)
 		errCh <- err
 		done <- r
 	}()
@@ -103,7 +103,7 @@ func TestBufferReclaimDoesNotRaceNewRenderAdmission(t *testing.T) {
 	// Engine lifecycle mutex (renderCount already zero).
 	aErr := make(chan error, 1)
 	go func() {
-		_, err := e.Render(`@input("p.html")`, "<main>@content</main>", nil)
+		_, err := e.RenderSources(RenderSource{Text: `@input("p.html")`}, RenderSource{Text: "<main>@content</main>"}, nil)
 		aErr <- err
 	}()
 	<-enteredReclaim
@@ -113,7 +113,7 @@ func TestBufferReclaimDoesNotRaceNewRenderAdmission(t *testing.T) {
 	bErr := make(chan error, 1)
 	bOK := make(chan bool, 1)
 	go func() {
-		r, err := e.Render(`@input("p.html")`, "<main>@content</main>", nil)
+		r, err := e.RenderSources(RenderSource{Text: `@input("p.html")`}, RenderSource{Text: "<main>@content</main>"}, nil)
 		bErr <- err
 		bOK <- r.OK
 	}()

@@ -9,12 +9,12 @@ const { performance } = require("perf_hooks");
   const tpl = "<main>@content</main>";
   const n = 50000;
   const rounds = 3;
-  await e.render(page, tpl); // warm-up (unreported)
+  await e.renderSources(page, tpl); // warm-up (unreported)
   const rawSamples = [], reqSamples = [];
   for (let r = 0; r < rounds; r++) {
     let start = performance.now();
     for (let i = 0; i < n; i++) { // raw: no request Context, engine-default binding
-      const res = await e.render(page, tpl);
+      const res = await e.renderSources(page, tpl);
       if (!res.ok) throw new Error(res.error);
     }
     rawSamples.push((performance.now() - start) * 1e6 / n);
@@ -22,7 +22,7 @@ const { performance } = require("perf_hooks");
     for (let i = 0; i < 1000; i++) { // request-loop: fresh Context per request
       const c = new Context();
       c.setString("who", "w");
-      const res = await e.render(page, tpl, c);
+      const res = await e.renderSources(page, tpl, c);
       if (!res.ok) throw new Error(res.error);
       c.close();
     }

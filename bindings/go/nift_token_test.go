@@ -12,7 +12,7 @@ func TestTokenLifetimeCreateInstallClose(t *testing.T) {
 			return HostResult{Status: HostFound, Value: "v"}
 		})
 		ctx := NewContext()
-		r, err := e.Render("@getenv(X)", "<main>@content</main>", ctx)
+		r, err := e.RenderSources(RenderSource{Text: "@getenv(X)"}, RenderSource{Text: "<main>@content</main>"}, ctx)
 		if err != nil || !r.OK || r.Output != "<main>v</main>" {
 			t.Fatalf("iter %d: err=%v ok=%v out=%q", i, err, r.OK, r.Output)
 		}
@@ -31,14 +31,14 @@ func TestProviderReplacement(t *testing.T) {
 	})
 	ctx := NewContext()
 	defer ctx.Close()
-	r, err := e.Render("@getenv(X)", "<main>@content</main>", ctx)
+	r, err := e.RenderSources(RenderSource{Text: "@getenv(X)"}, RenderSource{Text: "<main>@content</main>"}, ctx)
 	if err != nil || !r.OK || r.Output != "<main>one</main>" {
 		t.Fatalf("before: err=%v ok=%v out=%q", err, r.OK, r.Output)
 	}
 	e.SetEnvironmentProvider(func(string) HostResult {
 		return HostResult{Status: HostFound, Value: "two"}
 	})
-	r2, err := e.Render("@getenv(X)", "<main>@content</main>", ctx)
+	r2, err := e.RenderSources(RenderSource{Text: "@getenv(X)"}, RenderSource{Text: "<main>@content</main>"}, ctx)
 	if err != nil || !r2.OK || r2.Output != "<main>two</main>" {
 		t.Fatalf("after: err=%v ok=%v out=%q", err, r2.OK, r2.Output)
 	}

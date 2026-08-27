@@ -46,7 +46,7 @@ public static class Program
     {
         using Context ctx = new();
         ctx.SetString("who", "world"); // Context binding, request-specific
-        RenderResult result = engine.RenderPage("home", ctx);
+        RenderResult result = engine.Render("home", ctx);
         if (!result.Ok)
         {
             return Results.Text($"render failed: {result.ErrorMessage}", statusCode: 500);
@@ -57,7 +57,7 @@ public static class Program
     private static IResult RenderBlog(Engine engine)
     {
         using Context ctx = new();
-        RenderResult result = engine.RenderPage("blog", ctx);
+        RenderResult result = engine.Render("blog", ctx);
         if (!result.Ok)
         {
             return Results.Text($"render failed: {result.ErrorMessage}", statusCode: 500);
@@ -81,7 +81,7 @@ public static class Program
         partialEngine.SetLoader(path =>
             path.EndsWith("/greeting.html") ? HostResult.Found("<p>from loader</p>\n")
             : HostResult.NotFound());
-        RenderResult result = partialEngine.Render("@input(\"greeting.html\")", "<main>@content</main>");
+        RenderResult result = partialEngine.Render(RenderSource.Text("@input(\"greeting.html\")"), RenderSource.Text("<main>@content</main>"));
         if (!result.Ok)
         {
             return Results.Text($"render failed: {result.ErrorMessage}", statusCode: 500);
@@ -97,7 +97,7 @@ public static class Program
         {
             using Context ctx = new();
             ctx.SetString("who", $"c{i}");
-            RenderResult result = engine.RenderPage("home", ctx);
+            RenderResult result = engine.Render("home", ctx);
             if (!result.Ok)
             {
                 Interlocked.Increment(ref failures);
@@ -111,7 +111,7 @@ public static class Program
         // Host Error(diagnostic): the environment callback returns a failure and
         // the render reports the diagnostic verbatim.
         using Context ctx = new();
-        RenderResult result = engine.Render("@getenv(FORCE_ERROR)", "<main>@content</main>", ctx);
+        RenderResult result = engine.Render(RenderSource.Text("@getenv(FORCE_ERROR)"), RenderSource.Text("<main>@content</main>"), ctx);
         if (result.Ok)
         {
             return Results.Text("unexpected: render succeeded", statusCode: 500);
@@ -124,7 +124,7 @@ public static class Program
         // Malformed JSON failure family: controlled failure, parser wording is
         // an implementation detail.
         using Context ctx = new();
-        RenderResult result = engine.Render("@json(\"content/bad.json\", d)$[d.x]", "<main>@content</main>", ctx);
+        RenderResult result = engine.Render(RenderSource.Text("@json(\"content/bad.json\", d)$[d.x]"), RenderSource.Text("<main>@content</main>"), ctx);
         if (result.Ok)
         {
             return Results.Text("unexpected: render succeeded", statusCode: 500);

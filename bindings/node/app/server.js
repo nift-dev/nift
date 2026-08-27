@@ -30,14 +30,14 @@ async function renderHome() {
   const ctx = new Context();
   ctx.setString("who", "world");
   try {
-    return await engine.renderPage("home", ctx);
+    return await engine.render("home", ctx);
   } finally {
     ctx.close();
   }
 }
 
 async function renderPosts() {
-  return engine.renderPage("blog");
+  return engine.render("blog");
 }
 
 async function renderPartial() {
@@ -47,7 +47,7 @@ async function renderPartial() {
     p.endsWith("/greeting.html") ? "<p>from loader</p>\n" : null
   );
   try {
-    return await partialEngine.render('@input("greeting.html")', "<main>@content</main>");
+    return await partialEngine.renderSources('@input("greeting.html")', "<main>@content</main>");
   } finally {
     partialEngine.close();
   }
@@ -58,7 +58,7 @@ async function renderConcurrency() {
   for (let i = 0; i < 32; i++) {
     const ctx = new Context();
     ctx.setString("who", "c" + i);
-    const r = await engine.renderPage("home", ctx);
+    const r = await engine.render("home", ctx);
     ctx.close();
     if (!r.ok) failures++;
   }
@@ -68,7 +68,7 @@ async function renderConcurrency() {
 async function renderError() {
   const ctx = new Context();
   try {
-    return await engine.render("@getenv(FORCE_ERROR)", "<main>@content</main>", ctx);
+    return await engine.renderSources("@getenv(FORCE_ERROR)", "<main>@content</main>", ctx);
   } finally {
     ctx.close();
   }
@@ -77,7 +77,7 @@ async function renderError() {
 async function renderMalformed() {
   const ctx = new Context();
   try {
-    return await engine.render('@json("content/bad.json", d)$[d.x]', "<main>@content</main>", ctx);
+    return await engine.renderSources('@json("content/bad.json", d)$[d.x]', "<main>@content</main>", ctx);
   } finally {
     ctx.close();
   }

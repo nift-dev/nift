@@ -155,6 +155,41 @@ Node (async bridge); request-loop totals sub-20 ms/1000 everywhere.
 Benchmark-only fixes (stale CLI grammar in two suite scripts); no optimization
 changed observable semantics.
 
+
+## CP19 — rendering API direction (render / render_path / render_text) — COMPLETE 2026-08-27
+
+Stable, non-ambiguous rendering surface across the canonical C++ API, C ABI and
+every production binding (Go, C#, Node/JS, Python) plus the Rust conformance
+implementation:
+
+- `render(name)` / `render(name, context)`  -> ALWAYS a tracked project page
+  name (never a filesystem path or literal source; unknown names are
+  controlled unknown-page errors).
+- `render_path(path)` / `(path, context)`    -> ALWAYS a filesystem path
+  (missing path is a controlled missing-path error, never reinterpreted as
+  text).
+- `render_text(text)` / `(text, context)`    -> ALWAYS in-memory template
+  source (never checked against the filesystem).
+- `render(Source, Source)` / `(..., context)`-> typed full composition
+  (path/path, text/text, mixed; no string guessing). `render_string`/
+  `RenderString`/`renderString` terminology removed.
+- Omitted context == fresh empty context; request state never leaks between
+  no-context renders.
+
+Binding specifics: Go uses `Render`/`RenderWithContext`/`RenderPath`/
+`RenderPathWithContext`/`RenderText`/`RenderTextWithContext` (no arity
+overloading); C# `Render`/`RenderPath`/`RenderText`; JS `render`/`renderPath`/
+`renderText` (composition via `renderSources`); Python `render`/`render_path`/
+`render_text` (composition via `render_sources`). The C ABI adds
+`nift_engine_render_path` / `nift_engine_render_text` alongside the existing
+tracked-page, composed and partial entry points; `nift_source` remains the
+ownership-explicit low-level composition primitive.
+
+Required API tests added for every surface (tracked/unknown, path existing/
+missing, text-literal, with/without context, no-state-reuse, typed
+composition); cross-binding corpus and C ABI remain green. See
+docs/handover/CP19-RENDER-API.md.
+
 ## CP19 — merge decision and canonicalization
 
 - `nift-embed` → canonical main Nift repository.

@@ -13,7 +13,7 @@ func BenchmarkRender(b *testing.B) {
 	defer ctx.Close()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		r, err := e.Render("site=$[site] $[user.name]", "<main>@content</main>", ctx)
+		r, err := e.RenderSources(RenderSource{Text: "site=$[site] $[user.name]"}, RenderSource{Text: "<main>@content</main>"}, ctx)
 		if err != nil || !r.OK {
 			b.Fatalf("err=%v ok=%v", err, r.OK)
 		}

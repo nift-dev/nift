@@ -146,13 +146,40 @@ class Engine:
         _nift.engine_set_environment_provider(self._handle, fn if fn is not None else None)
         return self
 
-    def render_page(self, page_name, ctx=None):
+    def render(self, page_name, ctx=None):
+        """Render a tracked project page by name. The name is ALWAYS a tracked
+        page name - never a filesystem path or literal template source; an
+        unknown tracked name is a controlled unknown-page error. ctx omitted is
+        a fresh empty context."""
         self._check()
         return RenderResult(
             _nift.engine_render_page(self._handle, str(page_name), ctx._handle if ctx else None)
         )
 
-    def render(self, page, template, ctx=None):
+    def render_path(self, path, ctx=None):
+        """Render a standalone filesystem source (the file at path) as a
+        partial. The path is ALWAYS a filesystem path: a missing path is a
+        controlled missing-path error and is never reinterpreted as literal
+        template text."""
+        self._check()
+        return RenderResult(
+            _nift.engine_render_path(self._handle, str(path), ctx._handle if ctx else None)
+        )
+
+    def render_text(self, text, ctx=None):
+        """Render the supplied bytes as a standalone in-memory source
+        (partial). The text is ALWAYS template source: it is never checked
+        against the filesystem, so it cannot be misinterpreted as a page or
+        path name."""
+        self._check()
+        return RenderResult(
+            _nift.engine_render_text(self._handle, str(text), ctx._handle if ctx else None)
+        )
+
+    def render_sources(self, page, template, ctx=None):
+        """Full page + template composition with explicit, typed sources
+        (strings or (kind, data) tuples, never inferred from the filesystem).
+        The template must contain exactly one @content."""
         self._check()
         return RenderResult(
             _nift.engine_render(
@@ -161,13 +188,6 @@ class Engine:
                 _source(template, "template"),
                 ctx._handle if ctx else None,
             )
-        )
-
-    def render_partial(self, partial, ctx=None):
-        self._check()
-        return RenderResult(
-            _nift.engine_render_partial(self._handle, _source(partial, "partial"),
-                                        ctx._handle if ctx else None)
         )
 
 

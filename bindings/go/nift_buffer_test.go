@@ -25,7 +25,7 @@ func TestCallbackBufferReclaimedAfterEachRender(t *testing.T) {
 	e, set := newLoaderEngine(t)
 	defer e.Close()
 	for i := 0; i < 200; i++ {
-		res, err := e.Render(`@input("p.html")`, "<main>@content</main>", nil)
+		res, err := e.RenderSources(RenderSource{Text: `@input("p.html")`}, RenderSource{Text: "<main>@content</main>"}, nil)
 		if err != nil || !res.OK {
 			t.Fatalf("render %d failed: err=%v ok=%v errmsg=%v", i, err, res.OK, res.Error)
 		}
@@ -47,7 +47,7 @@ func TestCallbackBufferReclaimedAfterConcurrentRenders(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < 100; j++ {
-				res, err := e.Render(`@input("p.html")`, "<main>@content</main>", nil)
+				res, err := e.RenderSources(RenderSource{Text: `@input("p.html")`}, RenderSource{Text: "<main>@content</main>"}, nil)
 				if err != nil || !res.OK {
 					t.Errorf("render failed: err=%v ok=%v errmsg=%v", err, res.OK, res.Error)
 					return

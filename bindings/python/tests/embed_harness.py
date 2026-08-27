@@ -96,13 +96,13 @@ def main():
             context.set_current_output(req["current_output"])
 
         if mode == "page":
-            result = engine.render_page(req["page_name"], context)
+            result = engine.render(req["page_name"], context)
         elif mode == "partial":
-            result = engine.render_partial(req.get("page") or "", context)
+            result = engine.render_text(req.get("page") or "", context)
         else:
             page = {"path": req["page_path"]} if req.get("page_path") else {"text": req.get("page") or ""}
             tpl = {"path": req["template_path"]} if req.get("template_path") else {"text": req.get("template") or ""}
-            result = engine.render(page, tpl, context)
+            result = engine.render_sources(page, tpl, context)
 
         if not result.ok:
             emit({"ok": False, "error": result.error or ""})

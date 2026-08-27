@@ -198,8 +198,17 @@ public sealed class Engine : IDisposable
 
     public void SetJSON(string name, string json) => SetStringValue(Native.nift_engine_set_json, name, json);
 
-    /// <summary>Project-aware tracked-page render with complete pagination.</summary>
-    public RenderResult RenderPage(string pageName, Context? ctx = null)
+    /// <summary>Renders a tracked project page by name with a fresh empty
+    /// context. The name is ALWAYS a tracked page name - it is never
+    /// interpreted as a filesystem path or literal template source, and an
+    /// unknown tracked name is a controlled unknown-page error.</summary>
+    public RenderResult Render(string pageName) => Render(pageName, null);
+
+    /// <summary>Renders a tracked project page by name with request-scoped
+    /// context. The name is ALWAYS a tracked page name (never a path or
+    /// literal source); an unknown tracked name is a controlled unknown-page
+    /// error.</summary>
+    public RenderResult Render(string pageName, Context? ctx)
     {
         bool ctxEntered = false;
         bool entered = false;
@@ -250,12 +259,16 @@ public sealed class Engine : IDisposable
         }
     }
 
-    /// <summary>Convenience: render in-memory page and template text.</summary>
-    public RenderResult Render(string page, string template, Context? ctx = null)
-        => Render(RenderSource.Text(page), RenderSource.Text(template), ctx);
+    /// <summary>Renders a standalone filesystem source (the file at path) as a
+    /// partial with a fresh empty context. The path is ALWAYS a filesystem
+    /// path: a missing path is a controlled missing-path error and is never
+    /// reinterpreted as literal template text.</summary>
+    public RenderResult RenderPath(string path) => RenderPath(path, null);
 
-    /// <summary>Standalone partial/fragment render (a partial containing @content is an error).</summary>
-    public RenderResult RenderPartial(RenderSource partial, Context? ctx = null)
+    /// <summary>Renders a standalone filesystem source (the file at path) as a
+    /// partial with request-scoped context. The path is ALWAYS a filesystem
+    /// path; a missing path is a controlled missing-path error.</summary>
+    public RenderResult RenderPath(string path, Context? ctx)
     {
         bool ctxEntered = false;
         bool entered = false;
@@ -268,9 +281,9 @@ public sealed class Engine : IDisposable
             }
             EnterRender();
             entered = true;
+            using VarString vars = new(path);
             IntPtr contextHandle = ctx is null ? IntPtr.Zero : ctx.Handle.DangerousGetHandle();
-            using var sources = new NativeSources(partial);
-            int rc = Native.nift_engine_render_partial(_handle.DangerousGetHandle(), in sources.Partial, contextHandle, out IntPtr resultPtr);
+            int rc = Native.nift_engine_render_path(_handle.DangerousGetHandle(), contextHandle, vars.Name, vars.NameLen, out IntPtr resultPtr);
             return ConsumeResult(rc, resultPtr);
         }
         finally
@@ -280,8 +293,39 @@ public sealed class Engine : IDisposable
         }
     }
 
-    public RenderResult RenderPartial(string partial, Context? ctx = null)
-        => RenderPartial(RenderSource.Text(partial), ctx);
+    /// <summary>Renders the supplied bytes as a standalone in-memory source
+    /// (partial) with a fresh empty context. The text is ALWAYS template
+    /// source: it is never checked against the filesystem, so it cannot be
+    /// misinterpreted as a page or path name.</summary>
+    public RenderResult RenderText(string text) => RenderText(text, null);
+
+    /// <summary>Renders the supplied bytes as a standalone in-memory source
+    /// (partial) with request-scoped context. The text is ALWAYS template
+    /// source and is never checked against the filesystem.</summary>
+    public RenderResult RenderText(string text, Context? ctx)
+    {
+        bool ctxEntered = false;
+        bool entered = false;
+        try
+        {
+            if (ctx != null)
+            {
+                ctx.EnterRender();
+                ctxEntered = true;
+            }
+            EnterRender();
+            entered = true;
+            using VarString vars = new(text);
+            IntPtr contextHandle = ctx is null ? IntPtr.Zero : ctx.Handle.DangerousGetHandle();
+            int rc = Native.nift_engine_render_text(_handle.DangerousGetHandle(), contextHandle, vars.Name, vars.NameLen, out IntPtr resultPtr);
+            return ConsumeResult(rc, resultPtr);
+        }
+        finally
+        {
+            if (entered) ExitRender();
+            if (ctxEntered) ctx.ExitRender();
+        }
+    }
 
     private RenderResult ConsumeResult(int rc, IntPtr resultPtr)
     {

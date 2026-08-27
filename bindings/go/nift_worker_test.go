@@ -43,7 +43,7 @@ func TestPaginationWorkerEnvCallback(t *testing.T) {
 
 	// blog hits the failing env on a C++ worker thread -> render fails with the
 	// host failure diagnostic.
-	r, err := e.RenderPage("blog", nil)
+	r, err := e.Render("blog")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +55,7 @@ func TestPaginationWorkerEnvCallback(t *testing.T) {
 	}
 
 	// other hits the succeeding env on the worker thread -> renders.
-	o, err := e.RenderPage("other", nil)
+	o, err := e.Render("other")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,12 +94,12 @@ func TestPaginationWorkerConcurrent(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for i := 0; i < 50; i++ {
-				fail, err := e.RenderPage("blog", nil)
+				fail, err := e.Render("blog")
 				if err != nil || fail.OK {
 					t.Errorf("blog must fail: err=%v ok=%v", err, fail.OK)
 					return
 				}
-				ok, err := e.RenderPage("other", nil)
+				ok, err := e.Render("other")
 				if err != nil || !ok.OK || !strings.Contains(ok.Output, "ok") {
 					t.Errorf("other must succeed: err=%v ok=%v", err, ok.OK)
 					return

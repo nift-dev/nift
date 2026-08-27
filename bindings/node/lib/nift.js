@@ -122,27 +122,30 @@ class Engine {
     return this;
   }
 
-  renderPage(pageName, ctx) {
+  render(pageName, ctx) {
     this._check();
     checkArg(pageName, "string", "pageName");
     return native.engineRenderPage.call(this._handle, pageName, ctx ? ctx._handle : null);
   }
 
-  render(page, template, ctx) {
+  renderPath(path, ctx) {
+    this._check();
+    checkArg(path, "string", "path");
+    return native.engineRenderPath.call(this._handle, path, ctx ? ctx._handle : null);
+  }
+
+  renderText(text, ctx) {
+    this._check();
+    checkArg(text, "string", "text");
+    return native.engineRenderText.call(this._handle, text, ctx ? ctx._handle : null);
+  }
+
+  renderSources(pageSource, templateSource, ctx) {
     this._check();
     return native.engineRender.call(
       this._handle,
-      checkSource(page, "page"),
-      checkSource(template, "template"),
-      ctx ? ctx._handle : null
-    );
-  }
-
-  renderPartial(partial, ctx) {
-    this._check();
-    return native.engineRenderPartial.call(
-      this._handle,
-      checkSource(partial, "partial"),
+      checkSource(pageSource, "page"),
+      checkSource(templateSource, "template"),
       ctx ? ctx._handle : null
     );
   }

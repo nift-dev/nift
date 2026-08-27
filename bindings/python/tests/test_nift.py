@@ -51,7 +51,7 @@ class TestBindings(unittest.TestCase):
         e.set_number("n", 1.5)
         e.set_bool("b", True)
         e.set_json("v", '{"x":1,"y":"z"}')
-        r = e.render("$[s]|$[i]|$[n]|$[b]|$[v.x]|$[v.y]", "<main>@content</main>")
+        r = e.render_sources("$[s]|$[i]|$[n]|$[b]|$[v.x]|$[v.y]", "<main>@content</main>")
         self.assertTrue(r.ok)
         self.assertEqual(r.output, "<main>hello|42|1.5|true|1|z</main>")
         e.close()
@@ -61,7 +61,7 @@ class TestBindings(unittest.TestCase):
         e.set_string("site", "engine")
         c = Context()
         c.set_string("site", "context")
-        r = e.render("$[site]", "<main>@content</main>", c)
+        r = e.render_sources("$[site]", "<main>@content</main>", c)
         self.assertEqual(r.output, "<main>context</main>")
         c.close()
         e.close()
@@ -81,7 +81,7 @@ class TestBindings(unittest.TestCase):
         root = make_project()
         e = Engine.new()
         e.set_root(root)
-        r = e.render('@json("content/bad.json", d)$[d.x]@content', "<main>@content</main>")
+        r = e.render_sources('@json("content/bad.json", d)$[d.x]@content', "<main>@content</main>")
         self.assertFalse(r.ok)
         self.assertTrue(
             r.error.startswith("json: failed to parse content/bad.json ("),
@@ -95,14 +95,14 @@ class TestBindings(unittest.TestCase):
         e = Engine.new()
         e.set_root("/")
         e.set_loader(lambda p: "<p>PART</p>" if p.endswith("/p.html") else None)
-        r = e.render('@input("p.html")', "<main>@content</main>")
+        r = e.render_sources('@input("p.html")', "<main>@content</main>")
         self.assertEqual(r.output, "<main><p>PART</p></main>")
         e.close()
 
         e2 = Engine.new()
         e2.set_root("/")
         e2.set_loader(lambda p: "<p>Q</p>" if p.endswith("/q.html") else None)
-        r = e2.render('@input("missing.html")', "<main>@content</main>")
+        r = e2.render_sources('@input("missing.html")', "<main>@content</main>")
         self.assertFalse(r.ok)
         self.assertEqual(r.error, "@input path does not exist: missing.html")
         e2.close()
@@ -114,7 +114,7 @@ class TestBindings(unittest.TestCase):
             raise RuntimeError("host exploded")
 
         e3.set_loader(boom)
-        r = e3.render('@input("p.html")', "<main>@content</main>")
+        r = e3.render_sources('@input("p.html")', "<main>@content</main>")
         self.assertFalse(r.ok)
         self.assertEqual(r.error, "host exploded")
         e3.close()
@@ -122,7 +122,7 @@ class TestBindings(unittest.TestCase):
     def test_environment_found_notfound_error(self):
         e = Engine.new()
         e.set_environment_provider(lambda n: "hi" if n == "GREETING" else None)
-        r = e.render("@getenv(GREETING)", "<main>@content</main>")
+        r = e.render_sources("@getenv(GREETING)", "<main>@content</main>")
         self.assertEqual(r.output, "<main>hi</main>")
         e.close()
 
@@ -132,7 +132,7 @@ class TestBindings(unittest.TestCase):
             raise RuntimeError("boom")
 
         e2.set_environment_provider(boom)
-        r = e2.render("@getenv(X)", "<main>@content</main>")
+        r = e2.render_sources("@getenv(X)", "<main>@content</main>")
         self.assertFalse(r.ok)
         self.assertEqual(r.error, "getenv: boom")
         e2.close()
@@ -141,7 +141,7 @@ class TestBindings(unittest.TestCase):
         root = make_project()
         e = Engine.open(root)
         self.assertTrue(e.is_open())
-        r = e.render_page("blog")
+        r = e.render("blog")
         self.assertTrue(r.ok)
         self.assertIn("page 1/3", r.output)
         self.assertEqual(len(r.pagination), 2)
@@ -154,7 +154,7 @@ class TestBindings(unittest.TestCase):
 
     def test_partial(self):
         e = Engine.new()
-        r = e.render_partial("<p>frag</p>")
+        r = e.render_text("<p>frag</p>")
         self.assertEqual(r.output, "<p>frag</p>")
         e.close()
 
@@ -162,7 +162,7 @@ class TestBindings(unittest.TestCase):
         root = make_project()
         e = Engine.new()
         e.set_root(root)
-        r = e.render({"path": "content/home.html"}, {"path": "templates/template.html"})
+        r = e.render_sources({"path": "content/home.html"}, {"path": "templates/template.html"})
         self.assertTrue(r.ok)
         self.assertIn("<p>home</p>", r.output)
         e.close()
@@ -182,7 +182,7 @@ class TestConcurrency(unittest.TestCase):
             try:
                 c = Context()
                 c.set_int("n", i)
-                r = e.render('@input("p.html")', "<main>$[n]</main>@content", c)
+                r = e.render_sources('@input("p.html")', "<main>$[n]</main>@content", c)
                 c.close()
                 results[i] = r
             except Exception as ex:  # pragma: no cover
@@ -212,7 +212,7 @@ class TestConcurrency(unittest.TestCase):
             return "worker" if name == "TAG" else None
 
         e.set_environment_provider(env)
-        r = e.render_page("blog")
+        r = e.render("blog")
         self.assertTrue(r.ok)
         self.assertGreaterEqual(len(r.pagination), 1)
         self.assertGreater(len(calls), 0)
@@ -241,7 +241,7 @@ class TestLifetime(unittest.TestCase):
         result = {}
 
         def worker():
-            result["r"] = e.render('@input("p.html")', "<main>@content</main>")
+            result["r"] = e.render_sources('@input("p.html")', "<main>@content</main>")
 
         t = threading.Thread(target=worker)
         t.start()
@@ -253,7 +253,7 @@ class TestLifetime(unittest.TestCase):
         self.assertTrue(r.ok)
         self.assertEqual(r.output, "<main><p>PART</p></main>")
         with self.assertRaises(RuntimeError):
-            e.render("x", "y")
+            e.render_sources("x", "y")
 
     def test_close_context_during_render_on_other_thread(self):
         e = Engine.new()
@@ -272,7 +272,7 @@ class TestLifetime(unittest.TestCase):
         result = {}
 
         def worker():
-            result["r"] = e.render('@input("p.html")', "<main>@content</main>", c)
+            result["r"] = e.render_sources('@input("p.html")', "<main>@content</main>", c)
 
         t = threading.Thread(target=worker)
         t.start()
@@ -312,7 +312,7 @@ class TestLifetime(unittest.TestCase):
         result = {}
 
         def worker():
-            result["r"] = e.render('@input("e.html")', "<main>@content</main>")
+            result["r"] = e.render_sources('@input("e.html")', "<main>@content</main>")
 
         t = threading.Thread(target=worker)
         t.start()
@@ -353,7 +353,7 @@ class TestLifetime(unittest.TestCase):
             try:
                 c = Context()
                 c.set_int("n", i)
-                r = e.render('@input("p.html")', "<main>$[n]</main>@content", c)
+                r = e.render_sources('@input("p.html")', "<main>$[n]</main>@content", c)
                 c.close()
                 results.append(r.ok)
             except Exception as ex:  # pragma: no cover
@@ -400,7 +400,7 @@ class TestLifetime(unittest.TestCase):
             result = {}
 
             def worker():
-                result["r"] = e.render('@input("p.html")', "<main>$[n]</main>@content", c)
+                result["r"] = e.render_sources('@input("p.html")', "<main>$[n]</main>@content", c)
 
             t = threading.Thread(target=worker)
             t.start()
@@ -430,7 +430,7 @@ class TestLifetimeLong(unittest.TestCase):
         for i in range(200):
             e = Engine.new()
             e.set_string("s", str(i))
-            r = e.render("$[s]", "<main>@content</main>")
+            r = e.render_sources("$[s]", "<main>@content</main>")
             self.assertEqual(r.output, f"<main>{i}</main>")
             e.close()
 
@@ -438,7 +438,7 @@ class TestLifetimeLong(unittest.TestCase):
         e = Engine.new()
         e.set_string("site", "persist")
         for i in range(200):
-            r = e.render("$[site]", "<main>@content</main>")
+            r = e.render_sources("$[site]", "<main>@content</main>")
             self.assertEqual(r.output, "<main>persist</main>")
         e.close()
 
@@ -450,9 +450,58 @@ class TestLifetimeLong(unittest.TestCase):
             raise RuntimeError("contained")
 
         e.set_loader(boom)
-        r = e.render('@input("x.html")', "<main>@content</main>")
+        r = e.render_sources('@input("x.html")', "<main>@content</main>")
         self.assertFalse(r.ok)
         self.assertEqual(r.error, "contained")
+        e.close()
+
+
+
+    def test_cp19_render_api(self):
+        root = make_project()
+        e = Engine.open(root)
+        self.assertTrue(e.is_open)
+
+        r = e.render("home")
+        self.assertTrue(r.ok)
+        self.assertIn("<p>home</p>", r.output)
+
+        unknown = e.render("no-such-page")
+        self.assertFalse(unknown.ok)
+        self.assertIn("unknown", unknown.error.lower())
+
+        page_path = os.path.join(root, "content", "home.html")
+        r = e.render_path(page_path)
+        self.assertTrue(r.ok)
+        self.assertEqual(r.output, "<p>home</p>\n")
+
+        missing = e.render_path(os.path.join(root, "nope.html"))
+        self.assertFalse(missing.ok)
+        self.assertNotEqual(missing.output, "<p>home</p>")
+
+        r = e.render_text("<p>literal</p>")
+        self.assertTrue(r.ok)
+        self.assertEqual(r.output, "<p>literal</p>")
+
+        text_naming_file = e.render_text(page_path)
+        self.assertTrue(text_naming_file.ok)
+        self.assertEqual(text_naming_file.output, page_path)
+
+        no_ctx = e.render_text("$[x]")
+        c = Context()
+        c.set_string("x", "value")
+        with_ctx = e.render_text("$[x]", c)
+        self.assertTrue(with_ctx.ok)
+        self.assertEqual(with_ctx.output, "value")
+        self.assertEqual(no_ctx.output, "$[x]")
+
+        tpl_path = os.path.join(root, "templates", "template.html")
+        pp = e.render_sources({"path": page_path}, {"path": tpl_path})
+        self.assertTrue(pp.ok)
+        self.assertIn("<p>home</p>", pp.output)
+        tt = e.render_sources("<p>hi</p>", "<main>@content</main>")
+        self.assertTrue(tt.ok)
+        self.assertEqual(tt.output, "<main><p>hi</p></main>")
         e.close()
 
 

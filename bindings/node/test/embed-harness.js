@@ -98,15 +98,15 @@ async function main() {
 
     let result;
     if (mode === "page") {
-      result = await engine.renderPage(req.page_name, context);
+      result = await engine.render(req.page_name, context);
     } else if (mode === "partial") {
-      result = await engine.renderPartial(req.page || "", context);
+      result = await engine.renderText(req.page || "", context);
     } else {
       const page = req.page_path ? { path: req.page_path } : { text: req.page || "" };
       const tpl = req.template_path
         ? { path: req.template_path }
         : { text: req.template || "" };
-      result = await engine.render(page, tpl, context);
+      result = await engine.renderSources(page, tpl, context);
     }
 
     if (!result.ok) {

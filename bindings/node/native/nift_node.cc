@@ -54,6 +54,8 @@ namespace {
 constexpr int kModePage = 0;
 constexpr int kModeComposed = 1;
 constexpr int kModePartial = 2;
+constexpr int kModePath = 3;
+constexpr int kModeText = 4;
 
 // ---------------------------------------------------------------------------
 // N-API helpers
@@ -384,6 +386,16 @@ void RenderExecute(napi_env env, void* data) {
       req->rc = nift_engine_render_partial(engine, &partial, ctx, &req->result);
       break;
     }
+    case kModePath:
+      req->rc = nift_engine_render_path(engine, ctx,
+                                        req->page_name.data(), req->page_name.size(),
+                                        &req->result);
+      break;
+    case kModeText:
+      req->rc = nift_engine_render_text(engine, ctx,
+                                        req->page_name.data(), req->page_name.size(),
+                                        &req->result);
+      break;
     default: {
       nift_source page, tpl;
       BuildSource(req->page, req->page_is_path, &page);
@@ -820,7 +832,7 @@ napi_value BeginRender(napi_env env, napi_callback_info info, int mode) {
   e->render_count++;
 
   napi_value ctx_value = nullptr;
-  if (mode == kModePage) {
+  if (mode == kModePage || mode == kModePath || mode == kModeText) {
     if (argc >= 1) req->page_name = GetString(env, args[0]);
     if (argc >= 2) ctx_value = args[1];
   } else if (mode == kModeComposed) {
@@ -884,6 +896,12 @@ napi_value Render(napi_env env, napi_callback_info info) {
 }
 napi_value RenderPartial(napi_env env, napi_callback_info info) {
   return BeginRender(env, info, kModePartial);
+}
+napi_value RenderPath(napi_env env, napi_callback_info info) {
+  return BeginRender(env, info, kModePath);
+}
+napi_value RenderText(napi_env env, napi_callback_info info) {
+  return BeginRender(env, info, kModeText);
 }
 
 // ---------------------------------------------------------------------------
@@ -1019,6 +1037,8 @@ napi_value Init(napi_env env, napi_value exports) {
       {"engineRenderPage", nullptr, RenderPage, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"engineRender", nullptr, Render, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"engineRenderPartial", nullptr, RenderPartial, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"engineRenderPath", nullptr, RenderPath, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"engineRenderText", nullptr, RenderText, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"newContext", nullptr, ContextNew, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"disposeContext", nullptr, ContextDispose, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"contextSetPageName", nullptr, ContextSetPageName, nullptr, nullptr, nullptr, napi_default, nullptr},

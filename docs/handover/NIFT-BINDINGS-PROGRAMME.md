@@ -197,7 +197,7 @@ binding should map a call like:
 
 ```python
 engine = nift.Engine.project(".")
-result = engine.render_page("users/show", {"user": user})
+result = engine.render("users/show", {"user": user})
 print(result.output)
 ```
 

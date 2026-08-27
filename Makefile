@@ -106,6 +106,14 @@ $(ENGINE_BINDINGS_TEST): tests/engine_bindings.cpp $(ENGINE_CORE_OBJECTS)
 test-engine-bindings: $(ENGINE_BINDINGS_TEST)
 	$(ENGINE_BINDINGS_TEST)
 
+ENGINE_RENDER_API_TEST := $(TEST_DIR)/engine-render-api$(EXEEXT)
+$(ENGINE_RENDER_API_TEST): tests/engine_render_api.cpp $(ENGINE_CORE_OBJECTS)
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/engine_render_api.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
+
+test-engine-render-api: $(ENGINE_RENDER_API_TEST)
+	$(ENGINE_RENDER_API_TEST)
+
 # Public-header consumer probe: compiled with ONLY the public include path, so
 # it proves <nift/nift.h> is self-contained (no -Isrc, no Jsonic++ visibility).
 PUBLIC_HEADER_PROBE := $(TEST_DIR)/public-header-probe$(EXEEXT)

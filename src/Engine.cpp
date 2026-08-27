@@ -399,4 +399,20 @@ RenderResult Engine::render(const Source& partial) {
     return render(partial, Context{});
 }
 
+RenderResult Engine::render_path(const std::filesystem::path& path) {
+    return render(Source::path(path));
+}
+
+RenderResult Engine::render_path(const std::filesystem::path& path, const Context& context) {
+    return render(Source::path(path), context);
+}
+
+RenderResult Engine::render_text(std::string_view text) {
+    return render(Source::text(std::string(text)));
+}
+
+RenderResult Engine::render_text(std::string_view text, const Context& context) {
+    return render(Source::text(std::string(text)), context);
+}
+
 } // namespace nift

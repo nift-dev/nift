@@ -140,9 +140,9 @@ func main() {
 	var err error
 	switch mode {
 	case "page":
-		result, err = engine.RenderPage(pageName, context)
+		result, err = engine.RenderWithContext(pageName, context)
 	case "partial":
-		result, err = engine.RenderPartial(pageText, context)
+		result, err = engine.RenderTextWithContext(pageText, context)
 	default: // composed
 		page := nift.RenderSource{}
 		if pagePath != "" {

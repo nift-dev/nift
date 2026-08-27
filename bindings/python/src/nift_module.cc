@@ -536,7 +536,7 @@ PyObject* DoRender(PyObject* args, int mode) {
   PyObject* ctx_obj = Py_None;
   PyObject* a0 = nullptr;
   PyObject* a1 = nullptr;
-  if (mode == 0) {  // page
+  if (mode == 0 || mode == 3 || mode == 4) {  // page / path / text
     if (!PyArg_ParseTuple(args, "O" "O" "|O", &engine_obj, &a0, &ctx_obj))
       return nullptr;
   } else if (mode == 1) {  // composed
@@ -574,7 +574,7 @@ PyObject* DoRender(PyObject* args, int mode) {
   int page_kind = NIFT_SOURCE_TEXT;
   int tpl_kind = NIFT_SOURCE_TEXT;
 
-  if (mode == 0) {
+  if (mode == 0 || mode == 3 || mode == 4) {
     Py_ssize_t nlen = 0;
     const char* n = PyUnicode_AsUTF8AndSize(a0, &nlen);
     if (n == nullptr) return nullptr;
@@ -620,6 +620,12 @@ PyObject* DoRender(PyObject* args, int mode) {
     nift_source tpl{static_cast<nift_source_kind>(tpl_kind), tpl_data.data(),
                     tpl_data.size(), nullptr, 0};
     rc = nift_engine_render(engine, &page, &tpl, nctx, &result);
+  } else if (mode == 3) {
+    rc = nift_engine_render_path(engine, nctx, page_name.data(), page_name.size(),
+                                 &result);
+  } else if (mode == 4) {
+    rc = nift_engine_render_text(engine, nctx, page_name.data(), page_name.size(),
+                                 &result);
   } else {
     nift_source partial{static_cast<nift_source_kind>(page_kind), page_data.data(),
                         page_data.size(), nullptr, 0};
@@ -734,6 +740,8 @@ PyObject* DoRender(PyObject* args, int mode) {
 PyObject* EngineRenderPage(PyObject*, PyObject* args) { return DoRender(args, 0); }
 PyObject* EngineRender(PyObject*, PyObject* args) { return DoRender(args, 1); }
 PyObject* EngineRenderPartial(PyObject*, PyObject* args) { return DoRender(args, 2); }
+PyObject* EngineRenderPath(PyObject*, PyObject* args) { return DoRender(args, 3); }
+PyObject* EngineRenderText(PyObject*, PyObject* args) { return DoRender(args, 4); }
 
 // ---------------------------------------------------------------------------
 // Context type
@@ -933,6 +941,8 @@ PyMethodDef kMethods[] = {
     {"engine_render_page", EngineRenderPage, METH_VARARGS, "Render a tracked page."},
     {"engine_render", EngineRender, METH_VARARGS, "Composed render."},
     {"engine_render_partial", EngineRenderPartial, METH_VARARGS, "Partial render."},
+    {"engine_render_path", EngineRenderPath, METH_VARARGS, "Standalone filesystem-source render."},
+    {"engine_render_text", EngineRenderText, METH_VARARGS, "Standalone in-memory-source render."},
     {"new_context", ContextNew, METH_NOARGS, "Create a context."},
     {"context_close", ContextDispose, METH_VARARGS, "Dispose a context."},
     {"context_set_page_name", ContextSetPageName, METH_VARARGS, "Set page name."},

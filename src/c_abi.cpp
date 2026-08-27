@@ -477,6 +477,44 @@ nift_status nift_engine_render_partial(nift_engine* engine,
     }
 }
 
+nift_status nift_engine_render_path(nift_engine* engine,
+                                    const nift_context* context,
+                                    const char* path, size_t path_len,
+                                    nift_render_result** out_result) {
+    if (engine == nullptr || out_result == nullptr) return NIFT_ERROR_INVALID_ARGUMENT;
+    if (path == nullptr || !valid_input(path, path_len)) return NIFT_ERROR_INVALID_ARGUMENT;
+    *out_result = nullptr;
+    try {
+        nift::Source source = nift::Source::path(std::string(path, path_len));
+        if (context != nullptr) {
+            return wrap_render(engine, engine->engine.render_path(source.path(), context->context),
+                               out_result);
+        }
+        return wrap_render(engine, engine->engine.render_path(source.path()), out_result);
+    } catch (...) {
+        return NIFT_ERROR_INTERNAL;
+    }
+}
+
+nift_status nift_engine_render_text(nift_engine* engine,
+                                    const nift_context* context,
+                                    const char* text, size_t text_len,
+                                    nift_render_result** out_result) {
+    if (engine == nullptr || out_result == nullptr) return NIFT_ERROR_INVALID_ARGUMENT;
+    if (text == nullptr || !valid_input(text, text_len)) return NIFT_ERROR_INVALID_ARGUMENT;
+    *out_result = nullptr;
+    try {
+        std::string_view text_view(text, text_len);
+        if (context != nullptr) {
+            return wrap_render(engine, engine->engine.render_text(text_view, context->context),
+                               out_result);
+        }
+        return wrap_render(engine, engine->engine.render_text(text_view), out_result);
+    } catch (...) {
+        return NIFT_ERROR_INTERNAL;
+    }
+}
+
 void nift_render_result_free(nift_render_result* result) { delete result; }
 
 int nift_render_result_ok(const nift_render_result* result) {

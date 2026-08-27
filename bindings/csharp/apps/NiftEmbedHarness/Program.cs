@@ -113,10 +113,10 @@ internal static class Program
         switch (mode)
         {
             case "page":
-                result = engine.RenderPage(pageName, context);
+                result = engine.Render(pageName, context);
                 break;
             case "partial":
-                result = engine.RenderPartial(Text(root, "page"), context);
+                result = engine.RenderText(Text(root, "page"), context);
                 break;
             default:
             {

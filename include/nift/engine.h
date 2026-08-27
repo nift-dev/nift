@@ -86,6 +86,12 @@ public:
     // A failed project open or an unknown page name is a controlled error in
     // the returned RenderResult, never a throw or process termination.
     //
+    // render(name) is ALWAYS a tracked project page name. It is never
+    // interpreted as a filesystem path or as literal template source, and it
+    // does not fall back to either when the name is unknown: a missing tracked
+    // page is an unknown-page error. For filesystem or in-memory sources use
+    // render_path / render_text (or the typed Source composition below).
+    //
     // Pagination contract (decided at PA5): for a paginated tracked page this
     // renders the page's PRIMARY output, matching the CLI's primary file
     // (render("blog/") == public/blog/index.html). Explicit arbitrary
@@ -93,6 +99,22 @@ public:
     // add it. No Context key controls pagination.
     RenderResult render(std::string_view page_name);
     RenderResult render(std::string_view page_name, const Context& context);
+
+    // Standalone filesystem-source render: render_path(path) renders the file
+    // at `path` as a standalone partial (no @content slot; @content is an
+    // error). The argument is ALWAYS a filesystem path: a missing path is a
+    // missing-path error and is never reinterpreted as literal template text.
+    // Omitted context behaves exactly like a fresh empty context.
+    RenderResult render_path(const std::filesystem::path& path);
+    RenderResult render_path(const std::filesystem::path& path, const Context& context);
+
+    // Standalone in-memory-source render: render_text(text) renders the
+    // supplied bytes as a standalone partial (no @content slot; @content is an
+    // error). The argument is ALWAYS template source: it is never checked
+    // against the filesystem, so it cannot be misinterpreted as a page or
+    // path name. Omitted context behaves exactly like a fresh empty context.
+    RenderResult render_text(std::string_view text);
+    RenderResult render_text(std::string_view text, const Context& context);
 
     // Base directory used to resolve relative path sources and relative @input
     // paths. Without a root, a relative @input path is an error rather than
@@ -131,7 +153,10 @@ public:
     bool set_json(std::string name, std::string_view json_text);
 
     // Full page + template composition (template contains @content; exactly one
-    // @content is required). The page and template may each be text or path.
+    // @content is required). The page and template may each be text or path
+    // (typed Source::path / Source::text - the source kind is explicit and is
+    // never inferred from filesystem state). The single-Source forms below are
+    // standalone partials.
     //
     // @pathto requires a path context: set Context::set_current_output (and
     // Context::set_page_name for the 404 rule). Without it, @pathto errors
@@ -141,7 +166,8 @@ public:
 
     // Standalone partial/fragment rendering. There is no content slot: a
     // partial that contains @content is an error. Use render(page, template)
-    // when you want @content.
+    // when you want @content. Prefer the dedicated render_path / render_text
+    // entry points for single standalone sources.
     RenderResult render(const Source& partial);
     RenderResult render(const Source& partial, const Context& context);
 

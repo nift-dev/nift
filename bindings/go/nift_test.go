@@ -36,7 +36,7 @@ func TestBasicRender(t *testing.T) {
 	}
 	ctx := NewContext()
 	defer ctx.Close()
-	r, err := e.Render("site=$[site] $[user.name]", "<main>@content</main>", ctx)
+	r, err := e.RenderSources(RenderSource{Text: "site=$[site] $[user.name]"}, RenderSource{Text: "<main>@content</main>"}, ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func TestRenderErrors(t *testing.T) {
 	}
 	ctx := NewContext()
 	defer ctx.Close()
-	r, err := e.Render("@content", "<main>@content</main>", ctx)
+	r, err := e.RenderSources(RenderSource{Text: "@content"}, RenderSource{Text: "<main>@content</main>"}, ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +79,7 @@ func TestIntegerWidth(t *testing.T) {
 	if err := e.SetNumber("dbl", 3.5); err != nil {
 		t.Fatal(err)
 	}
-	r, err := e.Render("$[imin]|$[imax]|$[dbl]", "<main>@content</main>", ctx)
+	r, err := e.RenderSources(RenderSource{Text: "$[imin]|$[imax]|$[dbl]"}, RenderSource{Text: "<main>@content</main>"}, ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestEmptyVsMissingEnv(t *testing.T) {
 	})
 	ctx := NewContext()
 	defer ctx.Close()
-	r, err := e.Render("@getenv(EMPTY)|@getenv(MISSING)", "<main>@content</main>", ctx)
+	r, err := e.RenderSources(RenderSource{Text: "@getenv(EMPTY)|@getenv(MISSING)"}, RenderSource{Text: "<main>@content</main>"}, ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +116,7 @@ func TestHostErrorFailsRender(t *testing.T) {
 	})
 	ctx := NewContext()
 	defer ctx.Close()
-	r, err := e.Render("@getenv(X)", "<main>@content</main>", ctx)
+	r, err := e.RenderSources(RenderSource{Text: "@getenv(X)"}, RenderSource{Text: "<main>@content</main>"}, ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -142,7 +142,7 @@ func TestLoaderProvider(t *testing.T) {
 	})
 	ctx := NewContext()
 	defer ctx.Close()
-	r, err := e.RenderPath("content/blog.html", "templates/template.html", ctx)
+	r, err := e.RenderSources(RenderSource{IsPath: true, Path: "content/blog.html"}, RenderSource{IsPath: true, Path: "templates/template.html"}, ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +162,7 @@ func TestPanicContainedInCallback(t *testing.T) {
 	})
 	ctx := NewContext()
 	defer ctx.Close()
-	r, err := e.Render("@getenv(X)", "<main>@content</main>", ctx)
+	r, err := e.RenderSources(RenderSource{Text: "@getenv(X)"}, RenderSource{Text: "<main>@content</main>"}, ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,14 +179,14 @@ func TestResultOwnershipAcrossLifecycle(t *testing.T) {
 	defer e.Close()
 	ctx := NewContext()
 	defer ctx.Close()
-	r, err := e.Render("hello", "<main>@content</main>", ctx)
+	r, err := e.RenderSources(RenderSource{Text: "hello"}, RenderSource{Text: "<main>@content</main>"}, ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !r.OK || r.Output != "<main>hello</main>" {
 		t.Fatal("unexpected result")
 	}
-	if _, err := e.Render("world", "<main>@content</main>", ctx); err != nil {
+	if _, err := e.RenderSources(RenderSource{Text: "world"}, RenderSource{Text: "<main>@content</main>"}, ctx); err != nil {
 		t.Fatal(err)
 	}
 	if r.Output != "<main>hello</main>" {
@@ -197,7 +197,7 @@ func TestResultOwnershipAcrossLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	ctx2 := NewContext()
-	rr, err := engine2.Render("$[x]", "<main>@content</main>", ctx2)
+	rr, err := engine2.RenderSources(RenderSource{Text: "$[x]"}, RenderSource{Text: "<main>@content</main>"}, ctx2)
 	ctx2.Close()
 	engine2.Close()
 	if err != nil || !rr.OK || rr.Output != "<main>1</main>" {
@@ -212,7 +212,7 @@ func TestRepeatedCreateDestroy(t *testing.T) {
 	for i := 0; i < 200; i++ {
 		e := NewEngine()
 		ctx := NewContext()
-		r, err := e.Render("x", "<main>@content</main>", ctx)
+		r, err := e.RenderSources(RenderSource{Text: "x"}, RenderSource{Text: "<main>@content</main>"}, ctx)
 		if err != nil || !r.OK {
 			t.Fatalf("iteration %d: %v ok=%v", i, err, r.OK)
 		}
@@ -232,7 +232,7 @@ func TestConcurrentRenders(t *testing.T) {
 			ctx := NewContext()
 			defer ctx.Close()
 			for i := 0; i < 200; i++ {
-				r, err := e.Render("<h2>P</h2>", "<main>@content</main>", ctx)
+				r, err := e.RenderSources(RenderSource{Text: "<h2>P</h2>"}, RenderSource{Text: "<main>@content</main>"}, ctx)
 				if err != nil || !r.OK || r.Output != "<main><h2>P</h2></main>" {
 					t.Errorf("concurrent render: err=%v ok=%v out=%q", err, r.OK, r.Output)
 					return
@@ -256,7 +256,7 @@ func TestProjectPagination(t *testing.T) {
 	if !e.IsOpen() {
 		t.Fatalf("not open: %s", e.OpenError())
 	}
-	r, err := e.RenderPage("blog", nil)
+	r, err := e.Render("blog")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -291,7 +291,7 @@ func TestReload(t *testing.T) {
 	writeProjectFile(t, root, "content/blog.html", "<p>x</p>\n")
 	e := OpenEngine(root)
 	defer e.Close()
-	r, err := e.RenderPage("blog", nil)
+	r, err := e.Render("blog")
 	if err != nil || !r.OK || !strings.Contains(r.Output, "GEN-A") {
 		t.Fatalf("err=%v ok=%v out=%q", err, r.OK, r.Output)
 	}
@@ -299,7 +299,7 @@ func TestReload(t *testing.T) {
 	if err := e.Reload(); err != nil {
 		t.Fatal(err)
 	}
-	r2, err := e.RenderPage("blog", nil)
+	r2, err := e.Render("blog")
 	if err != nil || !r2.OK || !strings.Contains(r2.Output, "GEN-B") {
 		t.Fatalf("err=%v ok=%v out=%q", err, r2.OK, r2.Output)
 	}

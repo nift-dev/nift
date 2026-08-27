@@ -35,13 +35,13 @@ def render_home():
     ctx = Context()
     ctx.set_string("who", "world")
     try:
-        return engine.render_page("home", ctx)
+        return engine.render("home", ctx)
     finally:
         ctx.close()
 
 
 def render_posts():
-    return engine.render_page("blog")
+    return engine.render("blog")
 
 
 def render_partial():
@@ -49,7 +49,7 @@ def render_partial():
     pe.set_root("/")
     pe.set_loader(lambda p: "<p>from loader</p>\n" if p.endswith("/greeting.html") else None)
     try:
-        return pe.render('@input("greeting.html")', "<main>@content</main>")
+        return pe.render_sources('@input("greeting.html")', "<main>@content</main>")
     finally:
         pe.close()
 
@@ -62,7 +62,7 @@ def render_concurrency():
         ctx = Context()
         ctx.set_string("who", "c%d" % i)
         try:
-            r = engine.render_page("home", ctx)
+            r = engine.render("home", ctx)
             if not r.ok:
                 failures += 1  # noqa: B023
         finally:
