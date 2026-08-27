@@ -313,7 +313,7 @@ embed-prefix: libnift_c.a libnift_c.so
 	# version). 0.0.0-dev avoids running the CLI binary inside make (fragile on
 	# Windows); ABI compatibility is governed by the C ABI version.
 	sed -e "s/__VERSION__/0.0.0-dev/" \
-	    -e "s|__LIBS__|-L\$${libdir} -Wl,-Bstatic -lnift_c -Wl,-Bdynamic -lstdc++ -lm -pthread|" \
+	    -e "s|__LIBS__|$(EMBED_PC_LIBS)|" \
 	    packaging/nift.pc.in > dist/embed-prefix/lib/pkgconfig/nift.pc
 
 go-binding: embed
