@@ -20,7 +20,7 @@ import (
 	"sort"
 	"strings"
 
-	"nift.dev/embed"
+	"nift.dev/embed/v4"
 )
 
 func main() {

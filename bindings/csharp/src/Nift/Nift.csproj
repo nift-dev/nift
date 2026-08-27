@@ -9,6 +9,22 @@
     <RootNamespace>Nift</RootNamespace>
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
   </PropertyGroup>
+  <PropertyGroup>
+    <PackageId>Nift</PackageId>
+    <Version>4.0.7</Version>
+    <Description>Nift Embed .NET binding: Nift template rendering for .NET applications over the frozen Nift C ABI. Exposes the Embedded Nift API from Nift 4.0.7.</Description>
+    <Authors>antimatroid</Authors>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Native runtime assets in the standard .NET RID layout. The linux-x64
+         asset is staged from the repo-root library; the CI release matrix
+         stages the other RIDs (linux-arm64, osx-x64, osx-arm64, win-x64). -->
+    <None Include="$(MSBuildProjectDirectory)/../../../../libnift_c.so"
+          Pack="true" PackagePath="runtimes/linux-x64/native/libnift_c.so" Visible="false"
+          Condition="Exists('$(MSBuildProjectDirectory)/../../../../libnift_c.so')" />
+  </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Nift.Tests" />
   </ItemGroup>

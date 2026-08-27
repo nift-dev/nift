@@ -16,8 +16,8 @@
 package nift
 
 /*
-#cgo CFLAGS: -I../../include
-#cgo LDFLAGS: -L../.. -Wl,-Bstatic -lnift_c -Wl,-Bdynamic -lstdc++ -lm -pthread
+#cgo CFLAGS: -I${SRCDIR}/cabi/include
+#cgo pkg-config: nift
 #include <stdlib.h>
 #include <string.h>
 #include "nift/c_abi.h"

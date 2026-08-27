@@ -7,7 +7,7 @@ import (
 	"sort"
 	"time"
 
-	"nift.dev/embed"
+	"nift.dev/embed/v4"
 )
 
 func main() {

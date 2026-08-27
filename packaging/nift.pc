@@ -1,0 +1,14 @@
+# Relocatable nift.pc: prefix resolves from the .pc location, so it works both
+# from a source checkout (packaging/nift.pc -> repo root) and when installed at
+# <prefix>/lib/pkgconfig/nift.pc (-> <prefix>).
+prefix=${pcfiledir}/../..
+exec_prefix=${prefix}
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: nift
+Description: Nift Embedded rendering library (frozen C ABI; Nift 4.0.7)
+Version: 4.0.7
+Libs: -L${libdir} -lnift_c
+Libs.private: -lstdc++ -lm -pthread
+Cflags: -I${includedir}

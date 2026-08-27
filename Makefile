@@ -298,11 +298,20 @@ test-c-abi-c-smoke: $(C_ABI_C_SMOKE)
 # (which builds only the reduced ordinary CLI).
 # ---------------------------------------------------------------------------
 
-# Native embedded-Nift library (headers live in include/nift/).
-embed: libnift_c.a libnift_c.so
+# Native embedded-Nift library (headers live in include/nift/). Also stages the
+# installed-prefix layout (dist/embed-prefix) so the Go binding can link via
+# pkg-config against a self-contained prefix.
+embed: libnift_c.a libnift_c.so embed-prefix
 
-go-binding: libnift_c.a
-	cd bindings/go && go build -o embed-harness ./cmd/embed-harness
+embed-prefix:
+	rm -rf dist/embed-prefix
+	mkdir -p dist/embed-prefix/include/nift dist/embed-prefix/lib/pkgconfig
+	cp include/nift/*.h dist/embed-prefix/include/nift/
+	cp libnift_c.a libnift_c.so dist/embed-prefix/lib/
+	cp packaging/nift.pc dist/embed-prefix/lib/pkgconfig/
+
+go-binding: embed
+	cd bindings/go && PKG_CONFIG_PATH="$(CURDIR)/dist/embed-prefix/lib/pkgconfig" LD_LIBRARY_PATH="$(CURDIR)/dist/embed-prefix/lib" go build -o embed-harness ./cmd/embed-harness
 
 csharp-binding: libnift_c.so
 	cd bindings/csharp/apps/NiftEmbedHarness && dotnet build -v q --nologo
@@ -332,7 +341,7 @@ test-embed: test-c-abi test-c-abi-c-smoke test-engine test-engine-bindings \
 	test-engine-render-api test-conformance
 
 test-go-binding: go-binding
-	cd bindings/go && go test -race ./...
+	cd bindings/go && PKG_CONFIG_PATH="$(CURDIR)/dist/embed-prefix/lib/pkgconfig" LD_LIBRARY_PATH="$(CURDIR)/dist/embed-prefix/lib" go test -race ./...
 
 test-csharp-binding: csharp-binding
 	cd bindings/csharp/tests/Nift.Tests && dotnet run -v q --nologo
