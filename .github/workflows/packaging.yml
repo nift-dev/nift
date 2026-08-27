@@ -46,9 +46,13 @@ jobs:
           make embed
           NIFT_BIN=./nift; [ -f ./nift.exe ] && NIFT_BIN=./nift.exe
           VERSION="$("$NIFT_BIN" --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
-          OUT="$(bash packaging/matrix-build.sh "${{ matrix.target }}" "$VERSION" --require-smoke)"
-          echo "$OUT"
-          echo "$OUT" | grep -q 'SMOKE_EXECUTED=1' || { echo "FAIL: SMOKE_EXECUTED marker missing" >&2; exit 1; }
+          set +e
+          bash packaging/matrix-build.sh "${{ matrix.target }}" "$VERSION" --require-smoke > /tmp/matrix.out 2>&1
+          rc=$?
+          set -e
+          cat /tmp/matrix.out
+          [ $rc -eq 0 ] || exit $rc
+          grep -q 'SMOKE_EXECUTED=1' /tmp/matrix.out || { echo "FAIL: SMOKE_EXECUTED marker missing" >&2; exit 1; }
       - name: Upload packaged artifacts
         uses: actions/upload-artifact@v4
         with:
