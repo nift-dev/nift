@@ -68,7 +68,7 @@ jobs:
           import ("fmt"; "os"; nift "nift.dev/embed/v4")
           func main() { if err := nift.ABICompat(); err != nil { os.Exit(1) }; e := nift.NewEngine(); defer e.Close(); e.SetString("site","nift"); r, err := e.RenderText("<p>$[site]</p>"); if err != nil || !r.OK || r.Output != "<p>nift</p>" { os.Exit(1) }; fmt.Println("go render OK:", r.Output) }
           GO
-          go mod tidy >/dev/null 2>&1 && go build -o consumer . >/dev/null 2>&1
+          go mod tidy && go build -o consumer .
           (command -v otool >/dev/null 2>&1 && otool -L consumer 2>/dev/null | grep -qi nift && { echo "FAIL: go consumer links shared nift" >&2; exit 1; } || true)
           (command -v objdump >/dev/null 2>&1 && objdump -p consumer 2>/dev/null | grep -qiE 'nift.*dll' && { echo "FAIL: go consumer links shared nift" >&2; exit 1; } || true)
           ./consumer
