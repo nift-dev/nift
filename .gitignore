@@ -23,5 +23,5 @@ __pycache__/
 bindings/go/embed-harness
 libnift_c.a
 libnift_c.so
-nift
+/nift
 bindings/python/nift/_nift*.so

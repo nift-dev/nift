@@ -277,12 +277,20 @@ jobs:
   publish-nuget:        # environment: release
     needs: [validate]
     permissions: { contents: read, id-token: write }
-    - obtain a SHORT-LIVED API key via NuGet OIDC Trusted Publishing (exchange
-      the GitHub OIDC token - actions/oidc-token@v1 - for a temporary key per
-      NuGet's documented OIDC flow; the exchange step is pinned at workflow
-      implementation time to NuGet's official endpoint/action)
-    - dotnet nuget push Nift.<v>.nupkg --api-key <temporary-key>
-      (NO stored NUGET_API_KEY; org policy restricts to exact ID `Nift`)
+    - name: NuGet login
+      id: nuget-login
+      uses: NuGet/login@v1        # pin to a reviewed full commit SHA during
+                                  # workflow implementation; NOT actions/oidc-token@v1
+      with:
+        user: antimatroid         # NuGet profile name, not an email address
+    - name: Publish NuGet package
+      run: >
+        dotnet nuget push artifacts/Nift.${VERSION}.nupkg
+        --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}"
+        --source https://api.nuget.org/v3/index.json
+      (NuGet/login@v1 exchanges the GitHub OIDC identity for a temporary API
+      key; NO stored NUGET_API_KEY; org policy restricts to the exact ID
+      `Nift`)
   publish-npm:          # environment: release
     needs: [validate]
     permissions: { contents: read, id-token: write }
@@ -327,3 +335,14 @@ Rules:
 This plan has not modified canonical, merged histories, restructured source,
 created tags/releases, published packages, altered the homepage/install pages,
 or archived repositories. It is awaiting final integration authorization.
+## 14. Packaging status (honest record, 2026-08-27)
+
+| Item | Status |
+|---|---|
+| Product/integration validation (CLI, engine, C ABI, corpus, bindings, sanitizers) | **PASS** |
+| Release packaging implementation | **INCOMPLETE** - commands execute but native-asset inclusion, clean-consumer install, loading, version reporting and no-local-build-dir dependency are unproven |
+| Python native wheel | **FAIL / not implemented correctly** - observed `nift-0.1.0-py3-none-any.whl` is a pure-Python/platform-independent tag; the binding has a native extension, so a valid wheel must be an `abi3` platform wheel (stable ABI) or a CPython/platform-specific wheel |
+| Repository-generated pkg-config artifact | **NOT TESTED / not implemented** - the earlier check used a hand-written temporary `.pc`; the repository does not yet generate/stage/install `nift.pc` |
+| Publication readiness | **HOLD** - nothing published; synchronized version derivation (binding packages derive from the canonical release tag, verified against the CLI version; no hard-coded `0.1.0`) is a packaging-checkpoint task |
+
+These items are outside P7 and are resolved in the packaging checkpoint.

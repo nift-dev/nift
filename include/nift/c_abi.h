@@ -28,8 +28,16 @@ extern "C" {
 
 #define NIFT_ABI_VERSION "1.0"
 
-/* Returns NIFT_ABI_VERSION ("1.0"). Additive ABI extensions keep the version;
- * incompatible changes bump the minor/major. Symbol names are nift_*. */
+/* ABI version policy:
+ *   - additive, backward-compatible ABI changes  -> bump the ABI MINOR;
+ *   - breaking ABI changes (removed/changed symbol signature, struct layout
+ *     change, changed call contract)            -> bump the ABI MAJOR and
+ *                                                   receive Nift major-version
+ *                                                   treatment;
+ *   - patch-level implementation changes that do not alter the ABI surface
+ *                                                -> no ABI-version change.
+ * Within an ABI major, exported symbol NAMES and SIGNATURES are retained.
+ * Symbol names are nift_*. */
 const char* nift_abi_version(void);
 unsigned int nift_abi_version_major(void);
 unsigned int nift_abi_version_minor(void);
