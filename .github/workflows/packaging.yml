@@ -94,7 +94,6 @@ jobs:
           pfx="$(sed -n 's/^prefix=//p' "$pc" | sed 's|\${pcfiledir}|'"$pc_dir"'|g')"
           inc="$(sed -n 's/^includedir=//p' "$pc" | sed 's|\${prefix}|'"$pfx"'|g')"
           lib="$(sed -n 's/^libdir=//p' "$pc" | sed 's|\${prefix}|'"$pfx"'|g')"
-          libs="$(sed -n 's/^Libs: *//p' "$pc" | sed 's|\${libdir}|'"$lib"'|g')"
           # mingw ld/gcc need native Windows paths, not msys /tmp/... paths.
           if command -v cygpath >/dev/null 2>&1; then
             # -m (mixed) gives C:/... forward slashes: cgo's splitQuoted treats
@@ -102,6 +101,7 @@ jobs:
             inc="$(cygpath -m "$inc")"
             lib="$(cygpath -m "$lib")"
           fi
+          libs="$(sed -n 's/^Libs: *//p' "$pc" | sed 's|\${libdir}|'"$lib"'|g')"
           for a in "$@"; do
             case "$a" in
               --cflags) echo "-I$inc" ;;
