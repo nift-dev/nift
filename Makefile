@@ -303,12 +303,13 @@ test-c-abi-c-smoke: $(C_ABI_C_SMOKE)
 # pkg-config against a self-contained prefix.
 embed: libnift_c.a libnift_c.so embed-prefix
 
+NIFT_CLI := $(if $(wildcard nift.exe),nift.exe,nift)
 embed-prefix: libnift_c.a libnift_c.so
 	rm -rf dist/embed-prefix
 	mkdir -p dist/embed-prefix/include/nift dist/embed-prefix/lib/pkgconfig
 	cp include/nift/*.h dist/embed-prefix/include/nift/
 	cp libnift_c.a libnift_c.so dist/embed-prefix/lib/
-	sed -e "s/__VERSION__/$(./nift --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)/" \
+	sed -e "s/__VERSION__/$$($(NIFT_CLI) --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)/" \
 	    -e "s|__LIBS__|-L\$${libdir} -Wl,-Bstatic -lnift_c -Wl,-Bdynamic -lstdc++ -lm -pthread|" \
 	    packaging/nift.pc.in > dist/embed-prefix/lib/pkgconfig/nift.pc
 

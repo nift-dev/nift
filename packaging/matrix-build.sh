@@ -31,6 +31,8 @@ esac
 # CLI binary (the runner already built it for this OS/arch; stage it).
 if [ -x "$ROOT/nift" ]; then
   cp "$ROOT/nift" "$OUT/nift-$OS-$ARCH"
+elif [ -x "$ROOT/nift.exe" ]; then
+  cp "$ROOT/nift.exe" "$OUT/nift-$OS-$ARCH"
 fi
 
 # Native bundle with target-correct .pc.
