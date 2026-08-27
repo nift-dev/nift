@@ -120,6 +120,14 @@ jobs:
         run: |
           bash bindings/python/build.sh
           cd bindings/python && python3 -m unittest tests.test_nift
+      - name: Clean + public aggregate target (make test-bindings)
+        run: |
+          make clean
+          make test-bindings
+      - name: Clean + parallel aggregate target (make -j2 test-all)
+        run: |
+          make clean
+          make -j2 test-all
 
   aggregate-evidence:
     name: Aggregate evidence (${{ matrix.os }})

@@ -4,21 +4,34 @@
 #   - src/embed/* (Engine, Context, c_abi implementation);
 #   - libnift_c.a / libnift_c.so;
 #   - any language binding.
+#
+# NON-DESTRUCTIVE: all work happens in a temporary CLEAN source tree exported
+# from the committed HEAD via `git archive`. The caller's working tree is never
+# modified (no `make clean`, no artifact removal, no embed rebuild). A sentinel
+# is planted in the caller's tree before the run and verified unchanged after,
+# proving the caller checkout is untouched.
+#
 # This test fails if a future source glob or target accidentally pulls
-# embedding implementation into the CLI, so the boundary is enforced by CI
-# rather than by the current object list.
+# embedding implementation into the CLI.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-make clean >/dev/null 2>&1
-# Prove `make nift` does not CREATE these, independent of what `make clean`
-# removes (e.g. a prior `make embed`).
-rm -f libnift_c.a libnift_c.so bindings/go/embed-harness
-rm -rf bindings/node/build bindings/python/build
-rm -f bindings/python/nift/_nift*.so
-make nift >/dev/null 2>&1
+[ -e .git ] || { echo "FAIL: must run inside a Nift git checkout"; exit 1; }
 
+# Sentinel proving the caller's tree is untouched.
+mkdir -p "$ROOT/.build"
+SENTINEL="$ROOT/.build/boundary-sentinel"
+printf 'boundary-sentinel' > "$SENTINEL"
+
+TMP="$(mktemp -d /tmp/nift-boundary-XXXXXX)"
+trap 'rm -rf "$TMP"' EXIT
+
+# Export a CLEAN source tree (no ignored build artifacts) from committed HEAD.
+git archive HEAD | tar -x -C "$TMP"
+cd "$TMP"
+
+make nift >/dev/null 2>&1 || { echo "FAIL: make nift did not succeed in the clean tree"; exit 1; }
 [ -x nift ] || { echo "FAIL: make nift did not produce the CLI binary"; exit 1; }
 
 # 1. No src/embed/ object files compiled.
@@ -43,9 +56,14 @@ fi
 # 5. The CLI still runs and reports a version.
 ./nift --version >/dev/null 2>&1 || { echo "FAIL: reduced CLI does not run"; exit 1; }
 
-echo "PASS: plain make builds only the reduced CLI (no src/embed objects, no libnift_c, no bindings)"
+cd "$ROOT"
+rm -rf "$TMP"
+trap - EXIT
 
-# Restore the native embedding library removed above so a later target (e.g.
-# the C# binding tests in `make test-all`) is not left without it. The gate's
-# assertion was already proven; this leaves the tree in a usable state.
-make embed >/dev/null 2>&1 || { echo "WARN: could not restore make embed after boundary check"; }
+# 6. Prove the caller's checkout is untouched.
+if [ ! -f "$SENTINEL" ] || [ "$(cat "$SENTINEL")" != "boundary-sentinel" ]; then
+  echo "FAIL: build-boundary gate modified the caller's checkout"; exit 1
+fi
+rm -f "$SENTINEL"
+
+echo "PASS: plain make builds only the reduced CLI (no src/embed objects, no libnift_c, no bindings); caller checkout untouched"

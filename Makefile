@@ -325,23 +325,23 @@ test-build-boundary:
 test-embed: test-c-abi test-c-abi-c-smoke test-engine test-engine-bindings \
 	test-engine-render-api test-conformance
 
-test-go-binding:
+test-go-binding: go-binding
 	cd bindings/go && go test -race ./...
 
-test-csharp-binding:
+test-csharp-binding: csharp-binding
 	cd bindings/csharp/tests/Nift.Tests && dotnet run -v q --nologo
 
-test-node-binding:
+test-node-binding: node-binding
 	cd bindings/node && node --test test/nift.test.js
 
-test-python-binding:
+test-python-binding: python-binding
 	cd bindings/python && python3 -m pytest tests/ -q
 
 test-bindings: test-go-binding test-csharp-binding test-node-binding test-python-binding
 
-# The build-boundary gate is last: it performs a clean rebuild to prove plain
-# `make` produces only the reduced CLI, so it intentionally leaves the native
-# embedding library rebuilt and binding artifacts cleaned.
+# The build-boundary gate is NON-DESTRUCTIVE (it runs in a temporary clean
+# source tree, never in the caller's checkout), so it is safe under parallel
+# Make; prerequisite order carries no sequencing meaning.
 test-all: test test-embed test-bindings test-build-boundary
 
 # Plain `make test` = the ordinary Nift/CLI regression surface (C++ toolchain
