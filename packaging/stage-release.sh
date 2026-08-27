@@ -48,7 +48,7 @@ make embed >/dev/null 2>&1
 if [ "$OS" = "linux" ]; then
   PC_LIBS='-L${libdir} -Wl,-Bstatic -lnift_c -Wl,-Bdynamic -lstdc++ -lm -pthread'
 elif [ "$OS" = "macos" ]; then
-  PC_LIBS='-L${libdir} -lnift_c -lc++ -lm'
+  PC_LIBS='-L${libdir} -Wl,-force_load,${libdir}/libnift_c.a -lc++ -lm'
 else
   PC_LIBS='-L${libdir} -lnift_c'
 fi

@@ -34,7 +34,7 @@ case "$OS" in
 esac
 case "$OS:$ARCH" in
   linux:*)  PC_LIBS='-L${libdir} -Wl,-Bstatic -lnift_c -Wl,-Bdynamic -lstdc++ -lm -pthread' ;;
-  macos:*)  PC_LIBS='-L${libdir} -lnift_c -lc++ -lm' ;;
+  macos:*)  PC_LIBS='-L${libdir} -Wl,-force_load,${libdir}/libnift_c.a -lc++ -lm' ;;
   windows:*) PC_LIBS='-L${libdir} -lnift_c' ;;
   *) echo "unsupported target: $TARGET" >&2; exit 2 ;;
 esac

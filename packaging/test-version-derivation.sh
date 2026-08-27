@@ -21,6 +21,8 @@ sed -e "s/__VERSION__/$TV/" -e 's|__LIBS__|-L${libdir} -Wl,-Bstatic -lnift_c -Wl
 grep -q "^Version: $TV\$" "$WORK/nift.pc" || fail "nift.pc Version != $TV"
 
 # 2. npm tarball: stamp package.json, pack, and inspect filename + metadata.
+# The addon is built in canonical (the temp copy lacks native sources).
+make node-binding >/dev/null 2>&1
 NPMTMP="$WORK/npm"
 cp -r bindings/node "$NPMTMP"
 python3 - "$NPMTMP/package.json" "$TV" <<'PY' || fail "npm stamp"
