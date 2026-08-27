@@ -303,7 +303,7 @@ test-c-abi-c-smoke: $(C_ABI_C_SMOKE)
 # pkg-config against a self-contained prefix.
 embed: libnift_c.a libnift_c.so embed-prefix
 
-embed-prefix:
+embed-prefix: libnift_c.a libnift_c.so
 	rm -rf dist/embed-prefix
 	mkdir -p dist/embed-prefix/include/nift dist/embed-prefix/lib/pkgconfig
 	cp include/nift/*.h dist/embed-prefix/include/nift/
