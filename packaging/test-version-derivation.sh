@@ -32,7 +32,7 @@ p["version"] = sys.argv[2]
 p["files"] = ["lib/", "build/nift_node.node", "README.md"]
 json.dump(p, open(sys.argv[1], "w"), indent=2)
 PY
-( cd "$NPMTMP" && bash build.sh >/dev/null 2>&1 && npm pack --pack-destination "$WORK" >/dev/null 2>&1 )
+( cd "$NPMTMP" && npm pack --pack-destination "$WORK" >/dev/null 2>&1 )
 [ -f "$WORK/nift-$TV.tgz" ] || fail "npm tarball filename lacks $TV"
 python3 - "$WORK/nift-$TV.tgz" "$TV" <<'PY' || fail "npm version"
 import sys, tarfile, json
