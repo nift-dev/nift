@@ -4,8 +4,15 @@ CPPFLAGS ?= -Isrc -Iinclude -Iminifypp/include -Iminifypp/src
 LDFLAGS ?=
 LDLIBS ?=
 
-SOURCES := src/nift.cpp src/ProjectOwnership.cpp src/CLI.cpp src/Engine.cpp src/Context.cpp src/Value.cpp src/FileSystem.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp src/Parser.cpp src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp src/WatchList.cpp src/BuildProgress.cpp src/c_abi.cpp
+# Shared core + CLI implementation (the ordinary Nift CLI needs only these).
+CORE_SOURCES := src/nift.cpp src/ProjectOwnership.cpp src/CLI.cpp src/Value.cpp src/FileSystem.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp src/Parser.cpp src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp src/WatchList.cpp src/BuildProgress.cpp
+# Embedding-exclusive implementation (Engine, Context, C ABI). The reduced CLI
+# never compiles or links these; they are built by the embed library and the
+# engine/C ABI test targets.
+EMBED_SOURCES := src/embed/Engine.cpp src/embed/Context.cpp src/embed/c_abi.cpp
+SOURCES := $(CORE_SOURCES) $(EMBED_SOURCES)
 OBJECTS := $(SOURCES:.cpp=.o)
+CLI_OBJECTS := $(CORE_SOURCES:.cpp=.o)
 DEPFILES := $(OBJECTS:.o=.d)
 
 ifeq ($(OS),Windows_NT)

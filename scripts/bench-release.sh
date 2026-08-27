@@ -15,8 +15,8 @@ CXX="${CXX:-g++}"
 CXXFLAGS="-std=c++17 -O2 -pthread"
 CPPFLAGS="-Isrc -Iinclude -Iminifypp/include -Iminifypp/src"
 SOURCES="
-  src/Engine.cpp
-  src/Context.cpp
+  src/embed/Engine.cpp
+  src/embed/Context.cpp
   src/Value.cpp
   src/FileSystem.cpp
   src/JsonFile.cpp

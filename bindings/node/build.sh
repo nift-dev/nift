@@ -31,10 +31,10 @@ trap 'rm -rf "$TMP"' EXIT
 OBJ="$TMP/cabi-pic"
 mkdir -p "$OBJ" build
 
-CABI_SOURCES="src/ProjectOwnership.cpp src/Engine.cpp src/Context.cpp src/Value.cpp \
+CABI_SOURCES="src/ProjectOwnership.cpp src/embed/Engine.cpp src/embed/Context.cpp src/Value.cpp \
   src/FileSystem.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp \
   src/Parser.cpp src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp \
-  src/WatchList.cpp src/BuildProgress.cpp src/c_abi.cpp"
+  src/WatchList.cpp src/BuildProgress.cpp src/embed/c_abi.cpp"
 PIC_OBJECTS=""
 for src in $CABI_SOURCES; do
   obj="$OBJ/$(echo "$src" | tr '/' '_' | sed 's/\.cpp$/.o/')"
