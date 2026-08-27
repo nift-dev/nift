@@ -10,6 +10,7 @@ on:
       - 'bindings/**'
       - 'packaging/**'
       - 'Makefile'
+      - '.github/workflows/packaging.yml'
   workflow_dispatch:
 
 # Build-only: NO environment is attached, so no publishing job can run.
@@ -111,6 +112,8 @@ jobs:
           subprocess.run(["npm","pack","--pack-destination","/tmp/npmdist"], cwd=tmp + "/node", check=True, capture_output=True)
           PY
           ls /tmp/nugetdist /tmp/npmdist
+      - name: Durable synchronized-version derivation regression
+        run: bash packaging/test-version-derivation.sh
       - name: Go external consumer (static, no libnift_c.so)
         shell: bash
         run: |

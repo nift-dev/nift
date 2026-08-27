@@ -41,12 +41,24 @@ curl -fsSL "$url" -o "$tmp/$tarball"
 curl -fsSL "$BUNDLE_BASE/SHA256SUMS" -o "$tmp/SHA256SUMS"
 expected="$(awk -v f="$tarball" '$2==f {print $1}' "$tmp/SHA256SUMS")"
 [ -n "$expected" ] || { echo "no checksum for $tarball in SHA256SUMS" >&2; exit 2; }
-actual="$(sha256sum "$tmp/$tarball" | cut -d' ' -f1)"
+if command -v sha256sum >/dev/null 2>&1; then
+  actual="$(sha256sum "$tmp/$tarball" | cut -d' ' -f1)"
+else
+  actual="$(shasum -a 256 "$tmp/$tarball" | cut -d' ' -f1)"
+fi
 [ "$actual" = "$expected" ] || { echo "checksum mismatch for $tarball" >&2; exit 2; }
 tar xzf "$tmp/$tarball" -C "$tmp"
 mkdir -p "$PREFIX/include/nift" "$PREFIX/lib/pkgconfig"
 cp -r "$tmp/include/nift/." "$PREFIX/include/nift/"
-cp "$tmp/lib/libnift_c.a" "$tmp/lib/libnift_c.so" "$PREFIX/lib/"
+# Target-correct native library files: static archive always; shared library is
+# .so on Linux, .dylib on macOS, .dll on Windows (the bundle ships what the
+# target produced).
+cp "$tmp/lib/libnift_c.a" "$PREFIX/lib/" 2>/dev/null || true
+case "$os" in
+  linux)   cp "$tmp/lib/libnift_c.so" "$PREFIX/lib/" 2>/dev/null || true ;;
+  macos)   cp "$tmp/lib/libnift_c.dylib" "$PREFIX/lib/" 2>/dev/null || cp "$tmp/lib/libnift_c.so" "$PREFIX/lib/" 2>/dev/null || true ;;
+  windows) cp "$tmp/lib/nift_c.dll" "$PREFIX/lib/" 2>/dev/null || cp "$tmp/lib/libnift_c.dll" "$PREFIX/lib/" 2>/dev/null || true ;;
+esac
 cp "$tmp/lib/pkgconfig/nift.pc" "$PREFIX/lib/pkgconfig/nift.pc"
 echo "installed Nift Embed native library to $PREFIX"
 echo "if needed, export PKG_CONFIG_PATH=\"\$PKG_CONFIG_PATH:$PREFIX/lib/pkgconfig\""

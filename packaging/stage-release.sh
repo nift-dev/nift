@@ -20,10 +20,15 @@ cd "$ROOT"
 VERSION="${1:?usage: stage-release.sh <version>}"
 OUT="$ROOT/dist/$VERSION"
 [ ! -e "$OUT" ] || { echo "FAIL: destination already exists and is non-empty: $OUT" >&2; exit 1; }
-STAGE_OUT="$(mktemp -d /tmp/nift-stage.XXXXXX)"
-BUNDLE_STAGE=""; WHEEL_TMP=""; NPM_TMP=""
-trap 'rm -rf "$STAGE_OUT" "$BUNDLE_STAGE" "$WHEEL_TMP" "$NPM_TMP"' EXIT
+# Single cleanup function for the whole script; every temp dir is registered in
+# CLEANUP as it is created, so no failed run leaves residue behind.
+CLEANUP=""
+cleanup() { for d in $CLEANUP; do rm -rf "$d"; done; }
+trap cleanup EXIT
+# Stage INSIDE dist/ so the final rename into $OUT is same-filesystem/atomic.
+STAGE_OUT="$ROOT/dist/.stage-$VERSION.$$"
 mkdir -p "$STAGE_OUT"
+CLEANUP="$CLEANUP $STAGE_OUT"
 
 CLI_VER="$(./nift --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
 [ "$VERSION" = "$CLI_VER" ] || { echo "VERSION=$VERSION != canonical CLI=$CLI_VER" >&2; exit 1; }
@@ -48,7 +53,7 @@ else
   PC_LIBS='-L${libdir} -lnift_c'
 fi
 BUNDLE_STAGE="$(mktemp -d /tmp/nift-bundle.XXXXXX)"
-trap 'rm -rf "$BUNDLE_STAGE"' EXIT
+CLEANUP="$CLEANUP $BUNDLE_STAGE"
 mkdir -p "$BUNDLE_STAGE/include/nift" "$BUNDLE_STAGE/lib/pkgconfig" "$BUNDLE_STAGE/tools"
 cp -r include/nift/. "$BUNDLE_STAGE/include/nift/"
 cp libnift_c.a libnift_c.so "$BUNDLE_STAGE/lib/"
@@ -69,7 +74,7 @@ SDIST="$(ls "$STAGE_OUT"/nift-$VERSION.tar.gz 2>/dev/null | head -1)"
 [ -n "$SDIST" ] || { echo "sdist build failed" >&2; exit 1; }
 # Build the wheel FROM the sdist in a clean temp dir (never the checkout).
 WHEEL_TMP="$(mktemp -d /tmp/nift-wheelsrc.XXXXXX)"
-trap 'rm -rf "$BUNDLE_STAGE" "$WHEEL_TMP"' EXIT
+CLEANUP="$CLEANUP $WHEEL_TMP"
 tar xzf "$SDIST" -C "$WHEEL_TMP"
 ( cd "$WHEEL_TMP"/nift-$VERSION && NIFT_VERSION="$VERSION" python3 -m pip wheel --no-deps --no-build-isolation -w "$STAGE_OUT" . >/dev/null 2>&1 )
 echo "built sdist + wheel: $(ls "$OUT" | grep -E 'nift-.*\.(whl|tar.gz)$' | tr '\n' ' ')"
@@ -78,7 +83,7 @@ echo "built sdist + wheel: $(ls "$OUT" | grep -E 'nift-.*\.(whl|tar.gz)$' | tr '
 #    (the temp tree lacks the native sources), then the whole binding incl. the
 #    built addon is copied and the version stamped.
 NPM_TMP="$(mktemp -d /tmp/nift-npm.XXXXXX)"
-trap 'rm -rf "$BUNDLE_STAGE" "$WHEEL_TMP" "$NPM_TMP"' EXIT
+CLEANUP="$CLEANUP $NPM_TMP"
 make node-binding >/dev/null 2>&1
 cp -r bindings/node/. "$NPM_TMP/"
 python3 - "$NPM_TMP/package.json" "$VERSION" <<'PY'
@@ -97,11 +102,28 @@ echo "built nuget: $(ls "$OUT"/*.nupkg 2>/dev/null | tr '\n' ' ')"
 
 # 6. SHA256SUMS over the final immutable artifact bytes
 ( cd "$STAGE_OUT" && for f in *; do [ -f "$f" ] && [ "$f" != "SHA256SUMS" ] && chk "$f"; done | sort > SHA256SUMS )
-# Validate the exact expected file set.
-EXPECTED="nift-$OS-$ARCH nift-embed-$OS-$ARCH.tar.gz nift-$VERSION.tar.gz nift-$VERSION-cp*-*.whl nift-$VERSION.tgz Nift.$VERSION.nupkg"
-for pat in $EXPECTED; do
-  compgen -G "$STAGE_OUT/$pat" >/dev/null || { echo "FAIL: expected artifact missing: $pat" >&2; exit 1; }
-done
+# Exact expected file set: precisely these entries, nothing else.
+nift_cli="nift-$OS-$ARCH"
+bundle="nift-embed-$OS-$ARCH.tar.gz"
+sdist="nift-$VERSION.tar.gz"
+wheels="$(ls "$STAGE_OUT"/nift-$VERSION-cp*-cp*-*.whl 2>/dev/null || true)"
+[ "$(echo "$wheels" | grep -c . )" = "1" ] || { echo "FAIL: expected exactly one platform wheel; got: $wheels" >&2; exit 1; }
+npm_tgz="nift-$VERSION.tgz"
+nupkg="Nift.$VERSION.nupkg"
+EXPECTED_SET="$nift_cli
+$bundle
+$sdist
+$(basename "$wheels")
+$npm_tgz
+$nupkg"
+ACTUAL_SET="$(cd "$STAGE_OUT" && for f in *; do [ -f "$f" ] && echo "$f"; done | sort)"
+EXPECTED_SORTED="$(printf '%s\n' "$EXPECTED_SET" | sort)"
+[ "$ACTUAL_SET" = "$EXPECTED_SORTED" ] || {
+  echo "FAIL: staged file set mismatch" >&2
+  echo "  expected:" >&2; printf '%s\n' "$EXPECTED_SORTED" | sed 's/^/    /' >&2
+  echo "  actual:" >&2; echo "$ACTUAL_SET" | sed 's/^/    /' >&2
+  exit 1
+}
 mkdir -p "$ROOT/dist"
 mv "$STAGE_OUT" "$OUT"
 echo "--- $OUT SHA256SUMS ---"
