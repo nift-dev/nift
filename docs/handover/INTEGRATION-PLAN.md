@@ -31,18 +31,18 @@ matrix** (section 8), which must pass before integration.
 
 ## 2. Immutable integration target + preflight
 
-The integration target is an **exact reviewed commit SHA**, not a moving branch.
-The proposed SHA is the HEAD of `nift-embed` at the time of review:
+The integration target is an **exact reviewed commit SHA**, never a moving
+branch. A document cannot reliably contain its own SHA, so the plan uses an
+explicit placeholder that the reviewer's authorization message fills in:
 
 ```
-proposed integration SHA: da8e52a37eba90b904b5f97237aebb32b65263e4
+proposed integration SHA: <APPROVED_INTEGRATION_SHA>
 ```
 
-This is the substantive pre-integration revision commit. The reviewer
-authorizes an EXACT commit; the SHA line is re-verified at integration time
-(phase 1) and must be a strict descendant of `8a818f2`. (The plan text itself
-is finalized in the commit immediately following this one, which only fixes
-this SHA line.)
+The reviewer reports the exact final `nift-embed` HEAD SHA externally; the
+authorization names that exact SHA; the integration command fetches it directly
+and verifies it. Any subsequent commit invalidates the authorization and
+requires a newly reported SHA.
 
 Immediately before integration, confirm ALL of:
 - canonical `main` still equals `8a818f2b1b55c5e88da0479b71302e8f4cd83d90`;
@@ -232,13 +232,22 @@ be updated at integration time):
 | Package | Identity | Notes / manual prerequisites |
 |---|---|---|
 | PyPI | project `nift` | Trusted publisher (OIDC) from workflow `release.yml`, environment `release`; first successful publish secures the name. |
-| NuGet | package ID `Nift`, owner `antimatroid`, repo `nift-dev/nift`, env `release`, scope push new packages+versions, package restriction exact ID `Nift`, unlist/relist disabled | API key secret in the `release` environment; org policy prevents any other package ID. |
-| npm | package `nift` (unscoped) | First publish claims the name; npm owner/2FA prerequisite; publish only after validation; not in this plan's first publish set unless authorized. |
+| NuGet | package ID `Nift`, owner `antimatroid`, repo `nift-dev/nift`, env `release`, scope push new packages+versions, package restriction exact ID `Nift`, unlist/relist disabled | **OIDC Trusted Publishing** (temporary-key exchange, see section 12); NO stored `NUGET_API_KEY`. Org policy restricts to the exact ID `Nift`. |
+| npm | package `nift` (unscoped) | **Part of the initial production-binding release.** npm Trusted Publishing/OIDC if supported by the final workflow configuration, otherwise the minimum secure config (2FA + scoped publish token owned by the package, least privilege, environment-gated). |
 | crates.io | NOT in the production package set | Rust (`nift-rs`) is the independent experimental/conformance implementation; its crates stay separate. No production crate proposed. |
-| Go module | `nift.dev/embed` (existing module path) | Lives at `bindings/go/` in canonical; **submodule tag form** `bindings/go/v4.x.y`; requires the `nift.dev/embed` go-import meta tag to point at the canonical repo. |
+| Go module | `module nift.dev/embed/v4` (v4 major suffix is required for major >= 2) | Submodule at `bindings/go/` in canonical; release tag `bindings/go/v4.0.7` for Nift v4.0.7; consumers `go get nift.dev/embed/v4@v4.0.7`. The `nift.dev/embed/v4?go-get=1` discovery response must point to `https://github.com/nift-dev/nift` and the relevant repository root. Do NOT retain `module nift.dev/embed` while assigning v4 versions. |
 | Native C/C++ | GitHub Release assets `nift-embed-{target}.tar.gz/.zip` + `SHA256SUMS` + `install-embed.sh` | Checksum-verified curl/PowerShell installer is the initial C/C++ path; pkg-config `nift.pc`. No Conan/vcpkg in the initial release (no concrete reason). |
 
-## 12. `release.yml` job graph (PyPI + NuGet; exact environments and permissions)
+**Synchronized package-version derivation.** Binding package versions are
+derived from the canonical release tag, never hard-coded (no `0.1.0`): each
+publishing job reads the release tag (e.g. `v4.0.7`), verifies it against the
+CLI version (`nift --version`), and stamps the package with that exact version
+(`4.0.7`). Dry-run artifacts are prepared for the exact candidate version
+before publication; nothing is published in this plan. The initial complete
+release accounts for: npm `nift`, PyPI `nift`, NuGet `Nift`, Go
+`nift.dev/embed/v4`, and native C/C++ release bundles.
+
+## 12. `release.yml` job graph (all production binding registries)
 
 Filename exactly `.github/workflows/release.yml`. The `release` GitHub Actions
 environment is applied **only** to external-publishing jobs. `id-token: write`
@@ -257,32 +266,61 @@ jobs:
     permissions: { contents: read }
     - full matrix on the exact release commit (bindings, conformance,
       sanitizers, package smoke) - no publication
-  release-github:       # no environment (GitHub Release is not external to GH)
+  release-github-draft: # no environment (GitHub Release is not external to GH)
     needs: [validate]
     permissions: { contents: write }
-    - create draft Release; attach CLI binaries + SHA256SUMS + embed bundles
+    - create DRAFT Release; attach CLI binaries + SHA256SUMS + embed bundles
   publish-pypi:         # environment: release
-    needs: [validate, release-github]
+    needs: [validate]
     permissions: { contents: read, id-token: write }
     - pypa/gh-action-pypi-publish (trusted publishing, project `nift`)
   publish-nuget:        # environment: release
-    needs: [validate, release-github]
+    needs: [validate]
     permissions: { contents: read, id-token: write }
-    - dotnet nuget push Nift.<v>.nupkg --api-key ${{ secrets.NUGET_API_KEY }}
-      (org policy restricts to exact package ID `Nift`; the job cannot publish
-      any other ID)
-  release-status:       # no environment
-    needs: [release-github, publish-pypi, publish-nuget]
+    - obtain a SHORT-LIVED API key via NuGet OIDC Trusted Publishing (exchange
+      the GitHub OIDC token - actions/oidc-token@v1 - for a temporary key per
+      NuGet's documented OIDC flow; the exchange step is pinned at workflow
+      implementation time to NuGet's official endpoint/action)
+    - dotnet nuget push Nift.<v>.nupkg --api-key <temporary-key>
+      (NO stored NUGET_API_KEY; org policy restricts to exact ID `Nift`)
+  publish-npm:          # environment: release
+    needs: [validate]
+    permissions: { contents: read, id-token: write }
+    - npm package smoke (contents/digest verified, dry-run)
+    - npm publish (OIDC/Trusted Publishing if the final workflow supports it,
+      otherwise the minimum secure config: environment-gated token owned by the
+      package with 2FA, least privilege)
+  verify-go-module:     # no environment
+    needs: [validate]
     permissions: { contents: read }
-    - record "CLI released" vs "all required packages published"; fail until
-      every required job succeeds
+    - verify nift.dev/embed/v4?go-get=1 discovery response points at
+      https://github.com/nift-dev/nift and the repo root
+    - clean external `go get nift.dev/embed/v4@<tag>` smoke test from a fresh
+      module cache (after the Go module tag exists)
+  release-status:       # no environment
+    needs: [release-github-draft, publish-pypi, publish-nuget, publish-npm,
+            verify-go-module]
+    if: always()
+    permissions: { contents: read }
+    - report each required component's outcome distinctly:
+      validation failure | GitHub draft created | per-registry publication
+      result | version collision | complete publication
+    - fail until every required component is accounted for
 ```
 
-Rules: every publishing job is **idempotent** (a package with the intended
-version that already exists is success ONLY if its contents/digest/provenance
-match the expected artifact; a differing existing package is a **fatal
-version-collision error**, never overwritten or silently accepted). Retry only
-the failed job. Release candidates always run the complete matrix.
+Rules:
+- Language publishing jobs run independently after the common `validate` gate.
+- `release-status` runs even when a publishing dependency fails (`if:
+  always()`) and distinguishes each registry's result from validation failure,
+  from the GitHub draft state, and from a version collision.
+- A pre-existing version is NOT treated as matching merely because its version
+  string exists. Where a registry provides a reliable content hash/digest
+  comparison, idempotent success requires the existing package to match the
+  expected artifact (version + contents + digest + provenance). Where a
+  registry does NOT provide a reliable content hash comparison, a pre-existing
+  version is a **collision requiring manual review** - never claimed as
+  idempotent success.
+- Retry only the failed job. Release candidates always run the complete matrix.
 
 ## 13. Stop boundary
 

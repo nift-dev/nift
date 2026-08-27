@@ -571,3 +571,35 @@ Revision to sections 1 and 12 per review:
 
 Full detail in docs/handover/INTEGRATION-PLAN.md (revised). Canonical `nift`
 remains untouched at 8a818f2; nothing published, merged, moved or archived.
+
+## 14. Pre-integration revision 2 (2026-08-27, final)
+
+- **Go v4 module identity corrected**: `module nift.dev/embed/v4` (major suffix
+  is required for major >= 2); tag `bindings/go/v4.0.7` for Nift v4.0.7;
+  consumers `go get nift.dev/embed/v4@v4.0.7`; the `nift.dev/embed/v4?go-get=1`
+  discovery response must point at `https://github.com/nift-dev/nift` and the
+  repo root; discovery-response verification + clean external `go get` smoke
+  are release-gate steps. `module nift.dev/embed` is NOT retained with v4.
+- **NuGet Trusted Publishing corrected**: OIDC temporary-key exchange
+  (actions/oidc-token + NuGet's OIDC flow) immediately before push; NO stored
+  `NUGET_API_KEY`; job keeps `environment: release` and job-level
+  `permissions: {contents: read, id-token: write}`.
+- **npm is in the initial production-binding release** (npm `nift`), with an
+  independently retryable `publish-npm` job after validation + npm package
+  smoke (OIDC if supported, else documented minimum secure config).
+- **Synchronized versions**: binding package versions derive from the release
+  tag and are verified against the CLI version (no hard-coded 0.1.0); dry-run
+  artifacts for the exact candidate version only.
+- **Simplified immutable-SHA handling**: the plan uses `<APPROVED_INTEGRATION_SHA>`;
+  the final HEAD SHA is reported externally, the authorization names it, the
+  integration fetches and verifies it; any further commit invalidates the
+  authorization.
+- **Tightened release graph**: validate -> release-github-draft,
+  publish-pypi, publish-nuget, publish-npm, verify-go-module -> release-status
+  (`if: always()`), which distinguishes validation failure / draft / per-registry
+  result / version collision / complete publication. A pre-existing version is
+  a collision requiring manual review where no reliable content-hash comparison
+  exists, never claimed as idempotent success.
+
+Full detail in docs/handover/INTEGRATION-PLAN.md (revised). Canonical `nift`
+remains untouched at 8a818f2; nothing published, merged, moved or archived.
