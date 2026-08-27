@@ -5,24 +5,18 @@
 #   - libnift_c.a / libnift_c.so;
 #   - any language binding.
 #
-# NON-DESTRUCTIVE: all work happens in a temporary CLEAN source tree exported
-# from the committed HEAD via `git archive`. The caller's working tree is never
-# modified (no `make clean`, no artifact removal, no embed rebuild). A sentinel
-# is planted in the caller's tree before the run and verified unchanged after,
-# proving the caller checkout is untouched.
-#
-# This test fails if a future source glob or target accidentally pulls
-# embedding implementation into the CLI.
+# This script performs NO writes in the caller's checkout: it exports a CLEAN
+# source tree from committed HEAD via `git archive` into a temporary directory,
+# runs the reduced-CLI build and every assertion inside that temporary tree, and
+# removes it via a trap. Non-destructiveness is verified separately by
+# tests/build_boundary_nondestructive.sh (a before/after caller-state
+# comparison). Safe under parallel Make; prerequisite order carries no
+# sequencing meaning.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 [ -e .git ] || { echo "FAIL: must run inside a Nift git checkout"; exit 1; }
-
-# Sentinel proving the caller's tree is untouched.
-mkdir -p "$ROOT/.build"
-SENTINEL="$ROOT/.build/boundary-sentinel"
-printf 'boundary-sentinel' > "$SENTINEL"
 
 TMP="$(mktemp -d /tmp/nift-boundary-XXXXXX)"
 trap 'rm -rf "$TMP"' EXIT
@@ -56,14 +50,4 @@ fi
 # 5. The CLI still runs and reports a version.
 ./nift --version >/dev/null 2>&1 || { echo "FAIL: reduced CLI does not run"; exit 1; }
 
-cd "$ROOT"
-rm -rf "$TMP"
-trap - EXIT
-
-# 6. Prove the caller's checkout is untouched.
-if [ ! -f "$SENTINEL" ] || [ "$(cat "$SENTINEL")" != "boundary-sentinel" ]; then
-  echo "FAIL: build-boundary gate modified the caller's checkout"; exit 1
-fi
-rm -f "$SENTINEL"
-
-echo "PASS: plain make builds only the reduced CLI (no src/embed objects, no libnift_c, no bindings); caller checkout untouched"
+echo "PASS: plain make builds only the reduced CLI (no src/embed objects, no libnift_c, no bindings); no writes to the caller checkout"

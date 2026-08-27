@@ -317,9 +317,15 @@ bindings: go-binding csharp-binding node-binding python-binding
 
 # Durable build-boundary gate: plain `make`/`make nift` must build ONLY the
 # reduced CLI (no src/embed/* objects, no libnift_c, no bindings). Fails if a
-# future source glob pulls embedding implementation into the CLI.
+# future source glob pulls embedding implementation into the CLI. The gate runs
+# in a temporary clean source tree and never writes to the caller's checkout.
 test-build-boundary:
 	bash tests/build_boundary.sh
+
+# External proof that the boundary gate performs no writes in the caller's
+# checkout (before/after filesystem-state comparison).
+test-build-boundary-nondestructive:
+	bash tests/build_boundary_nondestructive.sh
 
 # Focused embed/binding test targets (mirror the build separation).
 test-embed: test-c-abi test-c-abi-c-smoke test-engine test-engine-bindings \

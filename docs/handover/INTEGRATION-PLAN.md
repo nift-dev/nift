@@ -128,7 +128,7 @@ test-embed      : C ABI adversarial, C-consumer smoke, engine tests, conformance
 test-go-binding : go test -race + go conformance
 test-csharp-binding : csharp tests + conformance
 test-node-binding   : node tests + conformance
-test-python-binding : python pytest + conformance
+test-python-binding : python unittest (standard library) + conformance
 test-bindings   : all binding test targets
 test-all        : test + test-embed + test-bindings
 install         : CLI only (ordinary Nift install)
@@ -202,7 +202,7 @@ be updated at integration time):
 2. Embed / C ABI: `make test-embed` (adversarial, C-consumer smoke, engine +
    bindings + render-api, conformance 9/9).
 3. Shared conformance corpus: all adapters (36/36 x 7).
-4. Bindings: Go `test -race`; C#; Node; Python pytest + package smoke; all
+4. Bindings: Go `test -race`; C#; Node; Python unittest (standard library) + package smoke; all
    binding conformance.
 5. Sanitizer/fuzz/lifetime: ASan/UBSan/TSan; ownership/lifetime suite.
 6. CI full matrix on canonical at <SHA> (P6) and after the restructure commit
