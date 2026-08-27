@@ -576,6 +576,9 @@ func bindingNameError(status C.nift_status) error {
 func (e *Engine) SetString(name, value string) error {
 	n, nl := goString(name)
 	v, vl := goString(value)
+	var _pin runtime.Pinner
+	pinStrings(&_pin, name, value)
+	defer _pin.Unpin()
 	e.lifecycle.Lock()
 	defer e.lifecycle.Unlock()
 	if e.closed.Load() {
@@ -590,6 +593,9 @@ func (e *Engine) SetString(name, value string) error {
 // SetInt sets a long-lived default int32 binding.
 func (e *Engine) SetInt(name string, value int32) error {
 	n, nl := goString(name)
+	var _pin runtime.Pinner
+	pinStrings(&_pin, name)
+	defer _pin.Unpin()
 	e.lifecycle.Lock()
 	defer e.lifecycle.Unlock()
 	if e.closed.Load() {
@@ -604,6 +610,9 @@ func (e *Engine) SetInt(name string, value int32) error {
 // SetNumber sets a long-lived default double binding.
 func (e *Engine) SetNumber(name string, value float64) error {
 	n, nl := goString(name)
+	var _pin runtime.Pinner
+	pinStrings(&_pin, name)
+	defer _pin.Unpin()
 	e.lifecycle.Lock()
 	defer e.lifecycle.Unlock()
 	if e.closed.Load() {
@@ -618,6 +627,9 @@ func (e *Engine) SetNumber(name string, value float64) error {
 // SetBool sets a long-lived default boolean binding.
 func (e *Engine) SetBool(name string, value bool) error {
 	n, nl := goString(name)
+	var _pin runtime.Pinner
+	pinStrings(&_pin, name)
+	defer _pin.Unpin()
 	v := C.int(0)
 	if value {
 		v = 1
@@ -637,6 +649,9 @@ func (e *Engine) SetBool(name string, value bool) error {
 func (e *Engine) SetJSON(name, json string) error {
 	n, nl := goString(name)
 	j, jl := goString(json)
+	var _pin runtime.Pinner
+	pinStrings(&_pin, name, json)
+	defer _pin.Unpin()
 	e.lifecycle.Lock()
 	defer e.lifecycle.Unlock()
 	if e.closed.Load() {
@@ -858,6 +873,9 @@ func (c *Context) ptr() *C.nift_context {
 // SetPageName sets the page identity.
 func (c *Context) SetPageName(name string) {
 	n, nl := goString(name)
+	var _pin runtime.Pinner
+	pinStrings(&_pin, name)
+	defer _pin.Unpin()
 	c.lifecycle.Lock()
 	defer c.lifecycle.Unlock()
 	if c.closed.Load() {
@@ -872,6 +890,9 @@ func (c *Context) SetPageName(name string) {
 // SetCurrentOutput sets the generated output location used by @pathto.
 func (c *Context) SetCurrentOutput(path string) {
 	p, pl := goString(path)
+	var _pin runtime.Pinner
+	pinStrings(&_pin, path)
+	defer _pin.Unpin()
 	c.lifecycle.Lock()
 	defer c.lifecycle.Unlock()
 	if c.closed.Load() {
@@ -886,6 +907,9 @@ func (c *Context) SetCurrentOutput(path string) {
 // SetTitle sets the per-render title.
 func (c *Context) SetTitle(title string) {
 	t, tl := goString(title)
+	var _pin runtime.Pinner
+	pinStrings(&_pin, title)
+	defer _pin.Unpin()
 	c.lifecycle.Lock()
 	defer c.lifecycle.Unlock()
 	if c.closed.Load() {
@@ -901,6 +925,9 @@ func (c *Context) SetTitle(title string) {
 func (c *Context) SetString(name, value string) error {
 	n, nl := goString(name)
 	v, vl := goString(value)
+	var _pin runtime.Pinner
+	pinStrings(&_pin, name, value)
+	defer _pin.Unpin()
 	c.lifecycle.Lock()
 	defer c.lifecycle.Unlock()
 	if c.closed.Load() {
@@ -915,6 +942,9 @@ func (c *Context) SetString(name, value string) error {
 // SetInt sets a request-scoped int32 binding.
 func (c *Context) SetInt(name string, value int32) error {
 	n, nl := goString(name)
+	var _pin runtime.Pinner
+	pinStrings(&_pin, name)
+	defer _pin.Unpin()
 	c.lifecycle.Lock()
 	defer c.lifecycle.Unlock()
 	if c.closed.Load() {
@@ -929,6 +959,9 @@ func (c *Context) SetInt(name string, value int32) error {
 // SetNumber sets a request-scoped double binding.
 func (c *Context) SetNumber(name string, value float64) error {
 	n, nl := goString(name)
+	var _pin runtime.Pinner
+	pinStrings(&_pin, name)
+	defer _pin.Unpin()
 	c.lifecycle.Lock()
 	defer c.lifecycle.Unlock()
 	if c.closed.Load() {
@@ -943,6 +976,9 @@ func (c *Context) SetNumber(name string, value float64) error {
 // SetBool sets a request-scoped boolean binding.
 func (c *Context) SetBool(name string, value bool) error {
 	n, nl := goString(name)
+	var _pin runtime.Pinner
+	pinStrings(&_pin, name)
+	defer _pin.Unpin()
 	v := C.int(0)
 	if value {
 		v = 1
@@ -962,6 +998,9 @@ func (c *Context) SetBool(name string, value bool) error {
 func (c *Context) SetJSON(name, json string) error {
 	n, nl := goString(name)
 	j, jl := goString(json)
+	var _pin runtime.Pinner
+	pinStrings(&_pin, name, json)
+	defer _pin.Unpin()
 	c.lifecycle.Lock()
 	defer c.lifecycle.Unlock()
 	if c.closed.Load() {
