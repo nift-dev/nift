@@ -53,11 +53,17 @@ cp -r "$tmp/include/nift/." "$PREFIX/include/nift/"
 # Target-correct native library files: static archive always; shared library is
 # .so on Linux, .dylib on macOS, .dll on Windows (the bundle ships what the
 # target produced).
-cp "$tmp/lib/libnift_c.a" "$PREFIX/lib/" 2>/dev/null || true
+# Fail-fast: every required native file for the selected platform must install.
+[ -f "$tmp/lib/libnift_c.a" ] || { echo "install: bundle missing libnift_c.a" >&2; exit 1; }
+cp "$tmp/lib/libnift_c.a" "$PREFIX/lib/"
 case "$os" in
-  linux)   cp "$tmp/lib/libnift_c.so" "$PREFIX/lib/" 2>/dev/null || true ;;
-  macos)   cp "$tmp/lib/libnift_c.dylib" "$PREFIX/lib/" 2>/dev/null || cp "$tmp/lib/libnift_c.so" "$PREFIX/lib/" 2>/dev/null || true ;;
-  windows) cp "$tmp/lib/nift_c.dll" "$PREFIX/lib/" 2>/dev/null || cp "$tmp/lib/libnift_c.dll" "$PREFIX/lib/" 2>/dev/null || true ;;
+  linux)
+    [ -f "$tmp/lib/libnift_c.so" ] || { echo "install: bundle missing libnift_c.so" >&2; exit 1; }
+    cp "$tmp/lib/libnift_c.so" "$PREFIX/lib/" ;;
+  macos)
+    if [ -f "$tmp/lib/libnift_c.dylib" ]; then cp "$tmp/lib/libnift_c.dylib" "$PREFIX/lib/"
+    elif [ -f "$tmp/lib/libnift_c.so" ]; then cp "$tmp/lib/libnift_c.so" "$PREFIX/lib/"
+    else echo "install: bundle missing a macOS shared library (.dylib or .so)" >&2; exit 1; fi ;;
 esac
 cp "$tmp/lib/pkgconfig/nift.pc" "$PREFIX/lib/pkgconfig/nift.pc"
 echo "installed Nift Embed native library to $PREFIX"

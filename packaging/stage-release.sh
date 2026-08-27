@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Single-input release staging: ONE required version input; every artifact's
-# metadata is DERIVED from it (no independent hard-coded versions). Validated
-# against the canonical CLI version unless NIFT_SKIP_CLI_CHECK=1 (used by the
-# non-current-version regression).
+# metadata is DERIVED from it (no independent hard-coded versions). ALWAYS
+# validated against the canonical CLI version. The durable non-current-version
+# regression lives in packaging/test-version-derivation.sh (a separate path; no
+# production bypass).
 #
 # Builds (nothing published):
 #   dist/nift-linux-<arch>                      CLI binary
@@ -13,7 +14,6 @@
 #   dist/Nift.<v>.nupkg                         NuGet package (-p:Version)
 #
 # Usage: packaging/stage-release.sh <version>
-#   NIFT_SKIP_CLI_CHECK=1 packaging/stage-release.sh 9.8.7   # derivation regression
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
@@ -41,7 +41,7 @@ chk() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$@"; else shasu
 # 1. CLI binary
 make -j2 nift >/dev/null 2>&1
 cp nift "$STAGE_OUT/nift-$OS-$ARCH"
-echo "built CLI: $OUT/nift-$OS-$ARCH"
+echo "built CLI: $STAGE_OUT/nift-$OS-$ARCH"
 
 # 2. Native embed bundle (per-target .pc stamped) + SHA256SUMS
 make embed >/dev/null 2>&1
@@ -56,11 +56,19 @@ BUNDLE_STAGE="$(mktemp -d /tmp/nift-bundle.XXXXXX)"
 CLEANUP="$CLEANUP $BUNDLE_STAGE"
 mkdir -p "$BUNDLE_STAGE/include/nift" "$BUNDLE_STAGE/lib/pkgconfig" "$BUNDLE_STAGE/tools"
 cp -r include/nift/. "$BUNDLE_STAGE/include/nift/"
-cp libnift_c.a libnift_c.so "$BUNDLE_STAGE/lib/"
+case "$OS" in
+  linux)   BUNDLE_LIBS="libnift_c.a libnift_c.so" ;;
+  macos)   BUNDLE_LIBS="libnift_c.a libnift_c.so" ;;  # Makefile emits .so names; .dylib rename is a release-layout item
+  *)       BUNDLE_LIBS="libnift_c.a libnift_c.so" ;;
+esac
+for _f in $BUNDLE_LIBS; do
+  [ -f "$_f" ] || { echo "FAIL: required native file missing: $_f" >&2; exit 1; }
+  cp "$_f" "$BUNDLE_STAGE/lib/"
+done
 sed -e "s/__VERSION__/$VERSION/" -e "s|__LIBS__|$PC_LIBS|" packaging/nift.pc.in > "$BUNDLE_STAGE/lib/pkgconfig/nift.pc"
 cp packaging/install-embed.sh "$BUNDLE_STAGE/install-embed.sh"
 tar czf "$STAGE_OUT/nift-embed-$OS-$ARCH.tar.gz" -C "$BUNDLE_STAGE" include lib install-embed.sh
-echo "built native bundle: $OUT/nift-embed-$OS-$ARCH.tar.gz"
+echo "built native bundle: $STAGE_OUT/nift-embed-$OS-$ARCH.tar.gz"
 
 # 3. Python: self-contained sdist + wheel built from that sdist in a clean dir
 rm -rf bindings/python/native bindings/python/build bindings/python/nift.egg-info
@@ -77,7 +85,7 @@ WHEEL_TMP="$(mktemp -d /tmp/nift-wheelsrc.XXXXXX)"
 CLEANUP="$CLEANUP $WHEEL_TMP"
 tar xzf "$SDIST" -C "$WHEEL_TMP"
 ( cd "$WHEEL_TMP"/nift-$VERSION && NIFT_VERSION="$VERSION" python3 -m pip wheel --no-deps --no-build-isolation -w "$STAGE_OUT" . >/dev/null 2>&1 )
-echo "built sdist + wheel: $(ls "$OUT" | grep -E 'nift-.*\.(whl|tar.gz)$' | tr '\n' ' ')"
+echo "built sdist + wheel: $(ls "$STAGE_OUT" | grep -E 'nift-.*\.(whl|tar.gz)$' | tr '\n' ' ')"
 
 # 4. npm (stamped package.json in a temp tree). The addon is built in canonical
 #    (the temp tree lacks the native sources), then the whole binding incl. the
@@ -94,11 +102,11 @@ p["files"] = ["lib/", "build/nift_node.node", "README.md"]
 json.dump(p, open(sys.argv[1], "w"), indent=2)
 PY
 ( cd "$NPM_TMP" && npm pack --pack-destination "$STAGE_OUT" >/dev/null 2>&1 )
-echo "built npm: $(ls "$OUT"/*.tgz 2>/dev/null | tr '\n' ' ')"
+echo "built npm: $(ls "$STAGE_OUT"/*.tgz 2>/dev/null | tr '\n' ' ')"
 
 # 5. NuGet (version via -p:Version)
 ( cd bindings/csharp/src/Nift && dotnet pack -v q --nologo -p:Version="$VERSION" -o "$STAGE_OUT" >/dev/null 2>&1 )
-echo "built nuget: $(ls "$OUT"/*.nupkg 2>/dev/null | tr '\n' ' ')"
+echo "built nuget: $(ls "$STAGE_OUT"/*.nupkg 2>/dev/null | tr '\n' ' ')"
 
 # 6. SHA256SUMS over the final immutable artifact bytes
 ( cd "$STAGE_OUT" && for f in *; do [ -f "$f" ] && [ "$f" != "SHA256SUMS" ] && chk "$f"; done | sort > SHA256SUMS )

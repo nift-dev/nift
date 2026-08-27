@@ -51,20 +51,27 @@ jobs:
           NIFT_BIN=./nift; [ -f ./nift.exe ] && NIFT_BIN=./nift.exe
           VERSION="$("$NIFT_BIN" --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
           set +e
-          bash packaging/matrix-build.sh "${{ matrix.target }}" "$VERSION" --require-smoke > /tmp/matrix.out 2>&1
+          bash -x packaging/matrix-build.sh "${{ matrix.target }}" "$VERSION" --require-smoke > /tmp/matrix.out 2>&1
           rc=$?
           set -e
           cat /tmp/matrix.out
           [ $rc -eq 0 ] || exit $rc
           grep -q 'SMOKE_EXECUTED=1' /tmp/matrix.out || { echo "FAIL: SMOKE_EXECUTED marker missing" >&2; exit 1; }
-      - name: Go consumer on macOS/Windows (dynamic .pc; reports dependency)
+      - name: Go static consumer on macOS/Windows (archive-only dir; no force_load)
         if: ${{ matrix.target == 'macos-arm64' || matrix.target == 'macos-x86_64' || matrix.target == 'windows-x86_64' }}
         shell: bash
         run: |
-          # Go's cgo flag security rejects -Wl,-force_load,<path> (go.dev/s/invalidflag),
-          # so the macOS/Windows Go consumer currently links the shared library. Build a
-          # dynamic dev .pc, build + run the consumer, and report the actual dependency.
-          sed -e "s/__VERSION__/0.0.0-dev/" -e "s|__LIBS__|-L\${libdir} -lnift_c -lc++ -lm|"             packaging/nift.pc.in > /tmp/nift-dyn.pc
+          # Static Go without force_load: when the -L directory contains ONLY the
+          # static archive, plain -lnift_c links it statically (cgo-compatible; the
+          # single rejected -Wl,-force_load flag is not the only path). Verify with
+          # otool -L / objdump that no Nift shared library is required.
+          make embed
+          rm -rf /tmp/nift-static-prefix && mkdir -p /tmp/nift-static-prefix/lib/pkgconfig /tmp/nift-static-prefix/include
+          cp include/nift/*.h /tmp/nift-static-prefix/include/
+          cp libnift_c.a /tmp/nift-static-prefix/lib/          # static archive ONLY (no .so/.dylib)
+          sed -e "s/__VERSION__/0.0.0-dev/" \
+            -e "s|__LIBS__|-L\${libdir} -lnift_c -lc++ -lm|" \
+            packaging/nift.pc.in > /tmp/nift-static-prefix/lib/pkgconfig/nift.pc
           rm -rf /tmp/gomod /tmp/gocons && mkdir -p /tmp/gomod /tmp/gocons
           tar -cf - bindings/go | ( cd /tmp/gomod && tar -xf - --strip-components=2 )
           cd /tmp/gocons
@@ -74,11 +81,18 @@ jobs:
           import ("fmt"; "os"; nift "nift.dev/embed/v4")
           func main() { if err := nift.ABICompat(); err != nil { os.Exit(1) }; e := nift.NewEngine(); defer e.Close(); e.SetString("site","nift"); r, err := e.RenderText("<p>$[site]</p>"); if err != nil || !r.OK || r.Output != "<p>nift</p>" { os.Exit(1) }; fmt.Println("go render OK:", r.Output) }
           GO
+          export PKG_CONFIG_PATH=/tmp/nift-static-prefix/lib/pkgconfig
           go mod tidy && go build -o consumer .
           ./consumer
           echo "GO_DEPENDENCY (otool/objdump):"
-          (command -v otool >/dev/null 2>&1 && otool -L consumer 2>/dev/null | grep -i nift || true) || true
-          (command -v objdump >/dev/null 2>&1 && objdump -p consumer 2>/dev/null | grep -iE 'nift.*dll' || true) || true
+          if command -v otool >/dev/null 2>&1; then
+            otool -L consumer 2>/dev/null || true
+            otool -L consumer 2>/dev/null | grep -qi nift && { echo "FAIL: macOS go consumer links shared nift" >&2; exit 1; } || true
+          fi
+          if command -v objdump >/dev/null 2>&1; then
+            objdump -p consumer 2>/dev/null | grep -iE 'nift.*dll' && { echo "FAIL: windows go consumer links shared nift" >&2; exit 1; } || true
+          fi
+          echo "GO_STATIC_OK: no Nift shared-library dependency"
       - name: Upload packaged artifacts
         uses: actions/upload-artifact@v4
         with:
