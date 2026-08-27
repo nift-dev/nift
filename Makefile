@@ -339,7 +339,10 @@ test-python-binding:
 
 test-bindings: test-go-binding test-csharp-binding test-node-binding test-python-binding
 
-test-all: test test-embed test-build-boundary test-bindings
+# The build-boundary gate is last: it performs a clean rebuild to prove plain
+# `make` produces only the reduced CLI, so it intentionally leaves the native
+# embedding library rebuilt and binding artifacts cleaned.
+test-all: test test-embed test-bindings test-build-boundary
 
 # Plain `make test` = the ordinary Nift/CLI regression surface (C++ toolchain
 # only). Embedding and binding suites are run through the focused targets.
