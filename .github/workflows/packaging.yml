@@ -86,7 +86,7 @@ jobs:
           REPLACE_DIR="$(command -v cygpath >/dev/null 2>&1 && cygpath -w /tmp/gomod || echo /tmp/gomod)"
           if [ "${{ matrix.target }}" = "windows-x86_64" ]; then
             mkdir -p /tmp/pcwrapper
-            cat > /tmp/pcwrapper/pkg-config <<'PC'
+            cat > /tmp/pcwrapper/pkg-config.sh <<'PC'
           #!/usr/bin/env bash
           set -euo pipefail
           pc=/tmp/nift-static-prefix/lib/pkgconfig/nift.pc
@@ -100,7 +100,10 @@ jobs:
             esac
           done
           PC
-            chmod +x /tmp/pcwrapper/pkg-config
+            printf '@echo off\r\nbash /tmp/pcwrapper/pkg-config.sh %%*\r\n' > /tmp/pcwrapper/pkg-config.bat
+            # Windows exec resolves pkg-config via PATHEXT (.bat wins) and cgo
+            # honors the PKG_CONFIG variable, so bypass Strawberry's broken one.
+            export PKG_CONFIG=/tmp/pcwrapper/pkg-config.bat
             export PATH="/tmp/pcwrapper:$PATH"
           fi
           printf 'module example.com/consumer\n\ngo 1.26\n\nrequire nift.dev/embed/v4 v4.0.7\n\nreplace nift.dev/embed/v4 => %s\n' "$REPLACE_DIR" > go.mod
