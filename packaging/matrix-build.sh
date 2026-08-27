@@ -124,24 +124,26 @@ C
   echo "libs: $NIFT_LIBS"
   echo "--- compile+link consumer ---"
   ( cd "$CONSUMER" && ${CC:-gcc} -v consumer.c -o consumer $NIFT_CFLAGS $NIFT_LIBS 2>&1 )
-  "$CONSUMER/consumer"
+CONSUMER_BIN="$CONSUMER/consumer"
+  [ -f "$CONSUMER/consumer.exe" ] && CONSUMER_BIN="$CONSUMER/consumer.exe"
+  "$CONSUMER_BIN"
   # Dependency inspection: report what the consumer links. Static (no Nift
   # shared dependency) is the enforced default on Linux (the static .pc); on
   # macOS/Windows the native bundle's shared library is the platform convention,
   # so the render above proves it loads and the dependency is reported.
   echo "--- dependency inspection ---"
   if command -v readelf >/dev/null 2>&1; then
-    echo "NEEDED entries:"; readelf -d "$CONSUMER/consumer" 2>/dev/null | grep -i "NEEDED" || echo "(none)"
-    DEP="$(readelf -d "$CONSUMER/consumer" 2>/dev/null | grep -iE 'NEEDED.*nift' || true)"
+    echo "NEEDED entries:"; readelf -d "$CONSUMER_BIN" 2>/dev/null | grep -i "NEEDED" || echo "(none)"
+    DEP="$(readelf -d "$CONSUMER_BIN" 2>/dev/null | grep -iE 'NEEDED.*nift' || true)"
   elif command -v ldd >/dev/null 2>&1; then
-    ldd "$CONSUMER/consumer" 2>/dev/null || true
-    DEP="$(ldd "$CONSUMER/consumer" 2>/dev/null | grep -i nift || true)"
+    ldd "$CONSUMER_BIN" 2>/dev/null || true
+    DEP="$(ldd "$CONSUMER_BIN" 2>/dev/null | grep -i nift || true)"
   elif command -v otool >/dev/null 2>&1; then
-    otool -L "$CONSUMER/consumer" 2>/dev/null || true
-    DEP="$(otool -L "$CONSUMER/consumer" 2>/dev/null | grep -i nift || true)"
+    otool -L "$CONSUMER_BIN" 2>/dev/null || true
+    DEP="$(otool -L "$CONSUMER_BIN" 2>/dev/null | grep -i nift || true)"
   else
-    objdump -p "$CONSUMER/consumer" 2>/dev/null | grep -iE 'dll|nift' || true
-    DEP="$(objdump -p "$CONSUMER/consumer" 2>/dev/null | grep -i nift || true)"
+    objdump -p "$CONSUMER_BIN" 2>/dev/null | grep -iE 'dll|nift' || true
+    DEP="$(objdump -p "$CONSUMER_BIN" 2>/dev/null | grep -i nift || true)"
   fi
   if [ "$OS" = "linux" ] && [ -n "$DEP" ]; then
     echo "FAIL: Linux consumer links a Nift shared library (static is the default)" >&2
