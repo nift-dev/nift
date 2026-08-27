@@ -115,7 +115,8 @@ $bundle
 $sdist
 $(basename "$wheels")
 $npm_tgz
-$nupkg"
+$nupkg
+SHA256SUMS"
 ACTUAL_SET="$(cd "$STAGE_OUT" && for f in *; do [ -f "$f" ] && echo "$f"; done | sort)"
 EXPECTED_SORTED="$(printf '%s\n' "$EXPECTED_SET" | sort)"
 [ "$ACTUAL_SET" = "$EXPECTED_SORTED" ] || {

@@ -54,6 +54,24 @@ jobs:
           cat /tmp/matrix.out
           [ $rc -eq 0 ] || exit $rc
           grep -q 'SMOKE_EXECUTED=1' /tmp/matrix.out || { echo "FAIL: SMOKE_EXECUTED marker missing" >&2; exit 1; }
+      - name: Go static consumer (this target; otool -L / objdump proof)
+        if: ${{ matrix.target == 'macos-arm64' || matrix.target == 'macos-x86_64' || matrix.target == 'windows-x86_64' }}
+        shell: bash
+        run: |
+          export PKG_CONFIG_PATH="$PWD/dist/embed-prefix/lib/pkgconfig"
+          rm -rf /tmp/gomod /tmp/gocons && mkdir -p /tmp/gomod /tmp/gocons
+          tar -cf - bindings/go | ( cd /tmp/gomod && tar -xf - --strip-components=2 )
+          cd /tmp/gocons
+          printf 'module example.com/consumer\n\ngo 1.26\n\nrequire nift.dev/embed/v4 v4.0.7\n\nreplace nift.dev/embed/v4 => /tmp/gomod\n' > go.mod
+          cat > main.go <<'GO'
+          package main
+          import ("fmt"; "os"; nift "nift.dev/embed/v4")
+          func main() { if err := nift.ABICompat(); err != nil { os.Exit(1) }; e := nift.NewEngine(); defer e.Close(); e.SetString("site","nift"); r, err := e.RenderText("<p>$[site]</p>"); if err != nil || !r.OK || r.Output != "<p>nift</p>" { os.Exit(1) }; fmt.Println("go render OK:", r.Output) }
+          GO
+          go mod tidy >/dev/null 2>&1 && go build -o consumer . >/dev/null 2>&1
+          (command -v otool >/dev/null 2>&1 && otool -L consumer 2>/dev/null | grep -qi nift && { echo "FAIL: go consumer links shared nift" >&2; exit 1; } || true)
+          (command -v objdump >/dev/null 2>&1 && objdump -p consumer 2>/dev/null | grep -qiE 'nift.*dll' && { echo "FAIL: go consumer links shared nift" >&2; exit 1; } || true)
+          ./consumer
       - name: Upload packaged artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -114,6 +132,36 @@ jobs:
           ls /tmp/nugetdist /tmp/npmdist
       - name: Durable synchronized-version derivation regression
         run: bash packaging/test-version-derivation.sh
+      - name: Clean-consumer Python install/load/render
+        run: |
+          WHEEL="$(ls /tmp/pydist/nift-*.whl | head -1)"
+          python3 -m venv /tmp/pyvenv
+          /tmp/pyvenv/bin/pip install --no-index "$WHEEL"
+          cd /tmp && /tmp/pyvenv/bin/python -c "import nift, importlib.metadata; assert importlib.metadata.version('nift').startswith('$(./nift --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')'); e=nift.Engine.new(); r=e.render_text('<p>hi</p>'); assert r.ok and r.output=='<p>hi</p>'; print('python clean-consumer render OK')"
+      - name: Clean-consumer npm install/load/render
+        run: |
+          TGZ="$(ls /tmp/npmdist/nift-*.tgz | head -1)"
+          rm -rf /tmp/npmconsumer && mkdir -p /tmp/npmconsumer/node_modules
+          tar xzf "$TGZ" -C /tmp/npmconsumer/node_modules && mv /tmp/npmconsumer/node_modules/package /tmp/npmconsumer/node_modules/nift
+          node -e "const n=require('/tmp/npmconsumer/node_modules/nift'); (async()=>{const e=n.Engine.new(); const r=await e.renderText('<p>hi</p>'); if(!r.ok||r.output!=='<p>hi</p>'){process.exit(1)} console.log('npm clean-consumer render OK'); e.close();})()"
+      - name: Clean-consumer NuGet install/load/render
+        run: |
+          NUPKG="$(ls /tmp/nugetdist/Nift.*.nupkg | head -1)"
+          rm -rf /tmp/csconsumer && mkdir -p /tmp/csconsumer
+          cd /tmp/csconsumer
+          printf '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>' > consumer.csproj
+          cat > Program.cs <<'CS'
+          using System; using Nift;
+          class P { static int Main() {
+            var e = Engine.New(); e.SetString("site","nift");
+            var r = e.RenderText("<p>$[site]</p>");
+            if (!r.Ok || r.Output != "<p>nift</p>") return 1;
+            Console.WriteLine("nuget clean-consumer render OK"); return 0;
+          } }
+          CS
+          mkdir -p /tmp/nusrc && cp "$NUPKG" /tmp/nusrc/
+          dotnet add package Nift --version "$(basename "$NUPKG" .nupkg | sed 's/Nift.//')" --source /tmp/nusrc >/dev/null 2>&1
+          dotnet run
       - name: Go external consumer (static, no libnift_c.so)
         shell: bash
         run: |
