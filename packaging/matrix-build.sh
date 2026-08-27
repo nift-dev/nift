@@ -35,7 +35,7 @@ esac
 case "$OS:$ARCH" in
   linux:*)  PC_LIBS='-L${libdir} -Wl,-Bstatic -lnift_c -Wl,-Bdynamic -lstdc++ -lm -pthread' ;;
   macos:*)  PC_LIBS='-L${libdir} -Wl,-force_load,${libdir}/libnift_c.a -lc++ -lm' ;;
-  windows:*) PC_LIBS='-L${libdir} -lnift_c -lstdc++ -static-libgcc -static-libstdc++' ;;
+  windows:*) PC_LIBS='-L${libdir} -lnift_c -lstdc++ -static' ;;
   *) echo "unsupported target: $TARGET" >&2; exit 2 ;;
 esac
 
@@ -126,6 +126,8 @@ C
   ( cd "$CONSUMER" && ${CC:-gcc} -v consumer.c -o consumer $NIFT_CFLAGS $NIFT_LIBS 2>&1 )
 CONSUMER_BIN="$CONSUMER/consumer"
   [ -f "$CONSUMER/consumer.exe" ] && CONSUMER_BIN="$CONSUMER/consumer.exe"
+  echo "--- consumer DLL imports (windows) ---"
+  objdump -p "$CONSUMER_BIN" 2>/dev/null | grep -iE 'DLL Name' || true
   "$CONSUMER_BIN"
   # Dependency inspection: report what the consumer links. Static (no Nift
   # shared dependency) is the enforced default on Linux (the static .pc); on
