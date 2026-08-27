@@ -1,0 +1,400 @@
+# Merge decision: Embedded Nift and canonical Nift
+
+Status: **analysis, measurement and recommendation only** (CP20). Canonical Nift
+was not modified. The outcome is open; this document does not prejudge it.
+
+Evidence sources: the three repositories at their current heads
+(`nift-embed fb8597f`, regression suite `fdf35e7`, `nift-rs 37db797`), the
+completed CP10-CP19 engineering record, the 500-pass warm-baseline campaign, the
+event-faithful anomaly investigation, and fresh before/after measurements taken
+for this report (section 4).
+
+---
+
+## 1. Product identity and user understanding
+
+**Does Embedded Nift belong to Nift's identity, or is it a related product
+built from Nift technology?**
+
+The evidence points to a *related product built from Nift technology* rather
+than a natural extension of the CLI's identity:
+
+- Nift's canonical identity is "a fast static-site templating and build tool":
+  content directories, templates, `@`-directives, pagination, incremental
+  builds, deterministic output, a single fast binary.
+- Embedded Nift is *the same parser/evaluator exposed as a request-time
+  library*. It is genuinely "Nift semantics at request time", but the consumer,
+  the failure model, the lifetime model (Context, engine/context lifecycle,
+  concurrency, deferred destruction) and the packaging surface (a C ABI plus
+  five language bindings) are library concerns the CLI never had.
+- They share the language (template/directive semantics) but differ in the
+  *product* (build tool vs rendering library).
+
+**Would merging strengthen "Nift is a fast templating and build tool"?**
+
+It strengthens *"Nift is one templating semantics everywhere"*, which is a
+coherent message, but it risks blurring the primary message: the CLI's own
+marketing ("fast build tool") is diluted if the first thing a visitor sees is
+also a server-rendering library. The message must remain "one semantics; two
+delivery modes; the library is optional."
+
+**Could it confuse users into believing applications with backends need
+Embedded Nift?**
+
+Yes, if the merged repository presents Embed as a headline feature. The
+established positioning boundary is:
+
+> Embedded Nift is optional request-time rendering infrastructure. Applications
+> that need a backend can continue using ordinary Nift-generated assets with
+> JSON APIs, WebSockets or any backend framework. A backend does not require
+> Embedded Nift.
+
+This is only sufficient if the merged *structure* matches the message: Embed
+must be visibly an optional component (separate install/package/headers), not
+something pulled in by the CLI. A merged repo that builds the library and
+bindings from a separate optional tree satisfies this; a merged repo that
+splices binding build steps into the CLI `all` target contradicts it.
+
+**Can the documentation clearly establish three equally legitimate
+architectures?**
+
+Yes - and this is the decisive documentation requirement regardless of
+repository outcome:
+
+1. Nift builds static assets; a backend supplies JSON/WebSocket APIs consumed
+   by frontend JavaScript.
+2. A backend uses Embedded Nift to render HTML at request time.
+3. A mixed application uses static Nift pages, JSON-driven interactivity, and
+   Embedded Nift only for selected routes.
+
+---
+
+## 2. Real-world architectural value (SSR vs JSON + frontend rendering)
+
+### Where request-time server rendering (Embedded Nift) wins
+
+| Application | Why SSR wins |
+|---|---|
+| Marketing/content sites, landing pages, docs | Initial-page completeness; link previews/OG tags require server-rendered HTML; SEO; no-JS operation. |
+| Public listing/catalogue pages with light interaction | Fast first useful content; HTML cached at CDN/edge (no client JS needed to see content). |
+| Articles, blogs, long-form content | Accessibility and readability without a client bundle; predictable time-to-content. |
+| Personalized landing pages (a/b, geo, cohort) | Server can personalize first paint; client gets the personalized HTML immediately rather than after data round-trips. |
+| Email-unsubscribe / confirmation / tokenized pages | One server render, no SPA plumbing, no duplicated client logic. |
+| Low-bandwidth / low-end devices | Small or no client bundle; rendered HTML is the payload. |
+| Offline-tolerant server-generated content | Caching the rendered HTML (full-page/ESI-style) reduces origin load. |
+
+Benefits concentrate on: initial-page completeness, SEO/link previews,
+accessibility, client bundle size (near zero), caching of final HTML, time to
+first useful content, personalization at first paint, and reduced duplicated
+rendering logic (one templating language instead of template + client-side
+re-implementation).
+
+### Where JSON + frontend rendering wins
+
+| Application | Why client-side wins |
+|---|---|
+| Highly interactive authenticated dashboards | Dense interaction (filters, drag, live tables); re-rendering a page per click is worse than diffing state. |
+| Realtime/chat/kanban/editor tools | Server-push updates; client owns the DOM/state model. |
+| Client-heavy apps (SPAs, mobile-web hybrid) | Shared model with mobile clients; persistent session without page reloads. |
+| High server-cost-sensitive, low-CPU apps | Offloading rendering to the client saves server CPU at scale (the server's JSON is cheaper than per-request HTML). |
+
+Benefits concentrate on: interaction density, realtime responsiveness, server
+CPU cost at very high interaction rates, and offline-first client behavior.
+
+### Where a hybrid wins
+
+Static Nift pages for public/marketing routes + JSON API for authenticated
+interactive areas + Embedded Nift only for personalized/SEO-sensitive routes
+(unsubscribe, previews, per-user landing). This is the strongest message: each
+architecture is legitimate and the boundary is chosen per route, not forced by
+the tooling.
+
+**Conclusion: SSR is not universally better.** The correct framing is "one
+templating semantics; choose the delivery mode per route." Embedded Nift is
+valuable precisely for the routes where server-rendered HTML is the right
+choice; it is not a replacement for client-rendered interactive apps.
+
+---
+
+## 3. Merge value versus separate-project value
+
+**Benefits of merging:**
+- One repository for all Nift semantics: CLI, embedding core, bindings,
+  tests, docs. Contributors find everything in one place.
+- Prevents *silent* semantic drift between the CLI and the embed library: a
+  single source tree, single parser, single conformance corpus makes drift a
+  build-time/CI failure rather than a subtle behavioral gap.
+- One version number can describe the shared templating semantics.
+- The regression suite becomes the canonical, shared gate for both.
+
+**Costs/risks of merging:**
+- Repository surface expands: 78 Makefile test targets, five bindings, a C ABI.
+- Release coordination gets heavier: a CLI patch release is coupled to binding
+  changes unless the packaging model isolates them.
+- CI duration and complexity grow; a binding failure can look like a Nift
+  failure unless gates are separated.
+- Contributor onboarding: a "fix the CLI" contributor is confronted with the
+  whole embedding stack.
+- Ownership boundary blurs: who owns bindings vs the core?
+
+**Can the same semantic consistency be achieved without merging?**
+
+Yes - if a *separate* embedding repository consumes a **versioned canonical
+core** and the shared conformance corpus is run against both. The conformance
+suite already runs a 36-case corpus across seven adapters; that is the
+semantic-enforcement mechanism. Versioning a canonical core (the parser
+semantics contract) and pinning the embed repo to it provides drift protection
+without a single repository. This is weaker than single-tree sharing (a change
+to the core can temporarily break the embed repo until its pin bumps) but it is
+achievable and is exactly the model the independent Rust conformance
+implementation already uses.
+
+**Is Embedded Nift valuable as a feature of Nift, or primarily as a separately
+packaged library using Nift semantics?**
+
+Primarily as a *separately packaged library using Nift semantics*. Its users
+are backend developers choosing request-time rendering; they install a
+language package (C++/Go/C#/Node/Python), not the CLI. The value is the
+semantics, delivered through a library. The CLI and the library share
+semantics; they do not share consumers.
+
+**Would separate versioning let each product evolve more safely?**
+
+Yes: the CLI can move on its own cadence (CLI-only fixes, packaging) without
+binding releases, and the embed library can evolve its ABI/API with its own
+major version. Shared-semantics compatibility is enforced by the conformance
+gate, not by a shared release train.
+
+**Which arrangement creates the clearest ownership and contribution
+boundary?**
+
+Separate repositories (or a merged repo with strictly separated ownership
+areas) create the clearest boundary. A merged repo with clear per-area
+ownership (core/CLI owners vs bindings owners) is a close second and has the
+drift-prevention advantage.
+
+---
+
+## 4. Cost to ordinary Nift users (measured)
+
+Fresh measurements on this machine (linux/amd64, g++ 14, `-O2`):
+
+| Metric | CLI-only link | Full CLI (includes embedded engine) | Delta |
+|---|---|---|---|
+| Binary size | 1,256,712 B | 1,380,240 B | **+123,528 B (~9%)** |
+| Startup (`--version`) | ~3 ms | ~3 ms | negligible |
+| Build time (`make -j2`) | ~17 s | ~17 s + ~16 s for `libnift_c.a`/`.so` link | link-only |
+
+Observations:
+- The embedded engine (Engine/Context/C ABI) is already linked into the CLI
+  binary because the CLI and the engine share the parser and project semantics.
+  The marginal cost to an ordinary CLI user is **~120 KB of binary**, a ~3 ms
+  startup (identical), and no additional runtime dependencies (`ldd nift` is
+  libstdc++/libm/libgcc/libc only - the same set as a CLI-only build).
+- Embedding adds **no** runtime or build dependencies to the CLI beyond g++.
+  The Go/.NET/Node/Python toolchains are only needed when building a binding;
+  they are not needed to build the CLI or the C ABI.
+- **Isolation requirement:** in any merged layout, the CLI target must link
+  only the core objects it needs and must NOT require the bindings or the C ABI
+  to build. The 120 KB is a semantic-sharing cost that already exists and is
+  not increased by a merge if targets stay separated.
+
+**Conclusion:** ordinary CLI users pay a small, already-incurred, measurable
+cost (~120 KB, no deps). A merge does not increase it provided the CLI remains
+an independently buildable target.
+
+---
+
+## 5. Build and packaging boundaries
+
+The merged repository must be able to guarantee:
+- the CLI is independently buildable (`make nift`, g++ only);
+- the native embedding library (`libnift_c.a`/`.so`) is optional;
+- language bindings are optional (Go/.NET/Node/Python toolchains only needed
+  for the binding being built);
+- distributors can package the CLI without any binding toolchain;
+- failure in one binding does not block an unrelated CLI package (separate CI
+  gates per binding);
+- users can install the CLI without embedding headers/libraries (separate
+  install rules for `include/nift/`, `libnift_c.*`);
+- users can install one binding without receiving irrelevant bindings
+  (per-binding packages: `nift-cpp`, `nift-go`, `nift-csharp`, `nift-node`,
+  `nift-python`);
+- release artifacts and versions remain comprehensible (one core version; each
+  package is a thin wrapper with its own semver).
+
+### Four options compared
+
+| Option | CLI build | Embed lib | Bindings | Install isolation | Drift risk | CI |
+|---|---|---|---|---|---|---|
+| 1. One repo, one always-built product | coupled | always | coupled | poor | low | one gate |
+| 2. One repo, optional independently packaged targets | isolated (`make nift`) | optional target | per-binding optional targets | strong | low (shared tree) | per-target gates |
+| 3. Separate repos sharing a versioned canonical core | isolated | separate repo | separate | strongest | medium (pin bumps) | per-repo gates |
+| 4. Canonical Nift contains the native core; bindings separately packaged/maintained | isolated | in canonical (optional) | separate repos/packages | strong | low for core, medium for bindings | per-area gates |
+
+Option 2 (one repo, optional independent targets) delivers the isolation
+benefits of separation while retaining single-tree semantic sharing. Options 3
+and 4 trade some drift protection for cleaner ownership. Option 1 is not
+acceptable for the CLI user base.
+
+---
+
+## 6. Maintenance and reliability
+
+| Concern | Merge (single tree) | Separate (versioned core) |
+|---|---|---|
+| Release cadence | one core version; per-package wrappers | independent per product |
+| Version compatibility | semantic core pinned together | core version pinned by embed repo |
+| API/ABI evolution | single C ABI versioning in-tree | embed repo owns its ABI major |
+| Regression-suite ownership | canonical shared suite in one repo | suite runs against both checkouts |
+| CI duration/complexity | grows (bindings + C++ in one workflow) unless gated | per-repo CI, smaller jobs |
+| Contributor onboarding | heavier surface | focused surfaces |
+| Platform support | one matrix | each repo its own matrix |
+| Vulnerability response | one tree to patch | two trees (semantics core + wrapper) |
+| Semantic conformance | enforced by shared suite in-tree | enforced by suite run against both |
+| Risk of weakening CLI while changing embed | present; mitigated by separate CLI targets/gates | low (embed changes cannot touch CLI tree) |
+| Risk of standalone vs embedded drift | low (shared parser) | medium unless conformance gate is strict |
+
+Merging *concentrates* reliability evidence (one tree, one suite, one shared
+parser) but it creates a larger coupled repository whose CI must be carefully
+gated so a binding failure cannot masquerade as a CLI failure. The reliability
+benefit is real but conditional on target separation.
+
+---
+
+## 7. Lessons from the Rust experiment
+
+The independent Rust implementation (jsonic-rs/minify-rs/nift-rs) was built
+from the behavioural contract, not the C++ source, and exposed the following:
+
+| Lesson | Learned | Classification |
+|---|---|---|
+| Accidental C++ assumptions (e.g., `std::filesystem` behaviors, exception use) | Semantics must be specified behaviourally, not by implementation | Already incorporated into canonical C++ (conformance corpus); **evidence for conformance gate, not necessarily merge** |
+| Portable semantics (separator handling, JSON edge cases) | Two implementations forced the corpus to be byte-exact | Already incorporated (corpus); **evidence for keeping implementation boundaries separate** |
+| Ownership/lifetime (render result vs engine lifetime) | A library result must own its data independently of the engine | Already incorporated into C++/bindings (CP13/CP17 lifetime work) |
+| API shape (explicit page/path/text) | Ambiguity must be designed out, not resolved by dispatch | Already incorporated into canonical API (CP19 `render`/`render_path`/`render_text`) |
+| Error families (unknown page vs missing path vs render error) | Errors must identify the logical source | Already incorporated into canonical (CP10 error model); reinforced by CP19 |
+| Concurrency (concurrent renders, deferred destruction) | Lifecycle must be explicit and testable | Already incorporated into canonical (CP7a/CP17) |
+| Project-aware rendering (tracked snapshot) | Project state must be immutable/snapshot-scoped | Already incorporated (PA3/PA4) |
+| Source/path/text distinctions | Never infer source kind from the filesystem | Incorporated (CP19); **should be enforced by the conformance gate for any future surface** |
+| Conformance testing itself | Two implementations + one neutral corpus catches real drift | Incorporated as the suite; **evidence for the shared regression suite as the semantic anchor regardless of repo outcome** |
+
+Classification summary:
+- Incorporated into canonical C++: most lessons (portable semantics, lifetime,
+  API shape, error families, concurrency, project-aware rendering).
+- Should be incorporated before any merge: none outstanding (CP19 API shape is
+  the last required one).
+- Relevant only to bindings/conformance: source/path/text conformance
+  enforcement, per-binding gates.
+- Evidence in favour of merging: single shared parser prevents drift; the
+  conformance suite already proves single-tree sharing works.
+- Evidence in favour of keeping implementation boundaries separate: two
+  independent implementations (C++ canonical + Rust conformance) produced a
+  stronger corpus and caught C++-specific assumptions; a second production
+  engine is explicitly out of scope, and the Rust experiment's value came from
+  *independence*, not co-location.
+
+Established direction retained: Rust is an experimental independent conformance
+implementation, not a second production engine.
+
+---
+
+## 8. Required comparisons (evidence-backed)
+
+| Comparison | Required conclusion |
+|---|---|
+| Canonical Nift before vs proposed merged state | +~120 KB binary for the CLI, ~3 ms startup unchanged, no new deps, link-only build-time delta. A merge with separated targets does not change these numbers. |
+| Merged vs separate repository | Merged: lowest drift risk, heavier onboarding/CI. Separate: cleaner ownership, per-product versioning, drift guarded by the shared conformance corpus. |
+| Static Nift + JSON frontend vs Embedded SSR | Each wins for distinct route classes (sections 2); neither is universally better; hybrid is legitimate. |
+| Optional vs always-linked component | CLI-only binary is 1,256,712 B; with engine 1,380,240 B. The engine is already in the binary; keep it an optional *target*, not an optional *link decision* that forks semantics. |
+| Bindings together vs independently packaged | Per-binding packages (option 2/4) are required so a user installing `nift-python` does not receive Go/.NET tooling and a CLI package never requires bindings. |
+| Public positioning before vs after merge | The "optional request-time infrastructure" boundary must be matched by structural isolation (optional targets/packages), or users will read the merged repo as "Nift needs a backend." |
+| Canonical C++ vs experimental Rust | Rust lessons are largely incorporated; the strongest remaining signal is that independent implementation + shared corpus is the drift-proofing mechanism - an argument for the conformance model, not for merging Rust into canonical. |
+
+---
+
+## 9. Recommendation
+
+**Recommended outcome: Option 2 - one repository with optional, independently
+packaged targets** (equivalently described as "merge as a shared repository
+with strict target/package isolation"), OR the conservative variant: **defer the
+final packaging decision until the packaging/website checkpoint**, keeping the
+codebases as they are (already single-tree) while codifying the isolation
+guarantees.
+
+The concrete, defensible position: the code already lives in one repository
+and shares one parser; the semantic-drift benefit is already realized. What
+must be decided is *packaging/ownership*, and the evidence says that is best
+served by per-product packages (CLI; C++/C-ABI library; each binding) with the
+shared conformance corpus as the semantic anchor, whether in one repository or
+across separate ones.
+
+The single most important structural requirement in every outcome: **the CLI is
+an independently buildable, independently packaged target; embedding and every
+binding are optional; and the shared regression suite is the drift gate.**
+
+If the decision must be binary between "merge the complete implementation now"
+and "keep separate": the evidence favors **keeping the embedding product
+separately packaged while sharing the canonical semantics core** (option 2 or
+4), because the primary consumers differ and separate versioning serves both
+better, with drift controlled by the conformance gate rather than by a shared
+release train.
+
+1. **Recommended outcome:** one repository, optional independently packaged
+   targets (CLI, native library, each binding); conformance suite is the
+   shared drift gate. ("Merge" means *source integration into one tree with
+   isolated build targets and per-package release ownership* - it does NOT mean
+   one always-built product or every binding building from the CLI target.)
+2. **Strongest argument for:** single shared parser prevents semantic drift
+   between the CLI and request-time rendering, and the conformance corpus
+   already proves the shared-semantics model works at 36/36 x 7 adapters.
+3. **Strongest argument against:** the consumer surfaces genuinely differ
+   (build-tool users vs backend-library users); a merged tree couples releases,
+   CI, and onboarding unless isolation is rigorously enforced.
+4. **Evidence that would change the recommendation:** a demonstrated failure to
+   keep CLI packages independent in a merged tree (binding toolchain leaking
+   into CLI builds), or evidence that separate repos cause drift the conformance
+   gate cannot catch (a case where the neutral corpus passes but behaviors
+   diverge).
+5. **Remaining uncertainties:** exact packaging/website final shape (deferred);
+   whether per-binding CI gate isolation can be maintained long-term in one
+   repo; distributor behavior for optional native libraries.
+6. **Effect on ordinary CLI users:** ~120 KB binary (already incurred), no
+   new dependencies, no startup cost; unchanged or improved clarity if the CLI
+   package never requires embedding headers.
+7. **Effect on embedding users:** per-binding packages with their own semver;
+   the native library optional and versioned; a stable C ABI as the
+   ownership-explicit boundary.
+8. **Proposed repository/package layout (option 2):**
+   - `src/`, `include/` - shared core (parser, project semantics).
+   - `cli/` (or existing `nift` target) - CLI, g++ only, independent target.
+   - `embed/` (native library + C ABI) - optional target `libnift_c.a/.so`.
+   - `bindings/go|csharp|node|python/` - per-binding optional targets/packages.
+   - `tests/` - CLI tests; `tests/conformance` + suite - shared corpus.
+   - Packages: `nift-cli` (g++ only), `nift-cpp`/`nift-cabi` (headers+lib),
+     `nift-go`, `nift-csharp`, `nift-node`, `nift-python` (per-binding).
+9. **Versioning and release model:** one core semantics version (the shared
+   corpus + C ABI major); each binding a thin wrapper with its own semver; CLI
+   independent; per-package CI gates so one binding cannot block the CLI.
+10. **Documentation/positioning model:** "one templating semantics, two
+    delivery modes, library optional"; the three legitimate architectures
+    (static + JSON frontend; backend SSR; hybrid) documented up front.
+11. **Migration and rollback plan:** this checkpoint changes no code; a future
+    packaging step is additive (new package targets), the CLI behavior and
+    corpus are unchanged, and the current single-tree layout is the rollback
+    state.
+12. **Confidence level:** Medium-high for the packaging/isolation model (it is
+    directly supported by the measured 120 KB/deps-free result and the existing
+    conformance gate). Medium for the "merge vs separate" binary because the
+    strongest differentiators are organizational (release/CI/ownership
+    discipline) rather than technical, and the current single-tree reality
+    already captures the main technical benefit.
+
+---
+
+## 10. Stop boundary
+
+This checkpoint produced analysis, measurements and a recommendation only.
+No canonical Nift modification, history merge, repository move, package
+publication, or website/release work was performed. The next decision point is
+the packaging/website checkpoint, gated on this report.

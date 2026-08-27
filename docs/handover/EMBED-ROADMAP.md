@@ -18,7 +18,8 @@ CP15  Python + real Python web-app dogfood
 CP16  full historical + expanded regression campaign
 CP17  sanitizer / memory / platform campaign
 CP18  final performance campaign
-CP19  merge decision + canonicalization
+CP19  rendering API direction (COMPLETE 2026-08-27)
+CP20  merge DECISION + canonicalization
         ↓
 packages + website + release
 ```
@@ -190,15 +191,32 @@ missing, text-literal, with/without context, no-state-reuse, typed
 composition); cross-binding corpus and C ABI remain green. See
 docs/handover/CP19-RENDER-API.md.
 
-## CP19 — merge decision and canonicalization
+## CP20 — merge decision and canonicalization (OUTCOME OPEN - DO NOT PREJUDGE)
 
-- `nift-embed` → canonical main Nift repository.
-- `nift-embed-regression-suite` → canonical Nift regression infrastructure.
-- Preserve the original pre-Embed repository/suite history as the comparison
-  reference point.
-- The Rust implementation (jsonic-rs / minify-rs / nift-rs) remains the
-  independent experimental/conformance implementation, not a second canonical
-  Nift.
+This checkpoint DECIDES the relationship between Embedded Nift and canonical
+Nift. The outcome is a CANDIDATE, not a predetermined result. All of the
+following remain legitimate conclusions:
+
+1. Merge the complete implementation now.
+2. Merge only after structural or packaging changes.
+3. Keep Embedded Nift as a separate repository/library.
+4. Upstream selected core abstractions and lessons without merging the
+   complete product.
+5. Defer the decision because material evidence is still missing.
+
+Analysis, measurement and recommendation only. Canonical Nift is NOT modified
+during this checkpoint. The evidence and recommendation are in
+docs/handover/MERGE-DECISION-REPORT.md. Candidate ownership model for EACH
+outcome, pending the decision:
+
+- Merge: the merged repository must keep the CLI independently buildable, the
+  embedding library and every language binding optional and independently
+  packaged, and preserve the pre-Embed history as the comparison reference.
+- Separate: semantic conformance and shared-core versioning must remain
+  enforceable (bindings/embed consume a versioned canonical core).
+- Rust (jsonic-rs / minify-rs / nift-rs) remains the independent experimental
+  conformance implementation in every outcome, not a second production
+  engine.
 
 ## After CP19 — packaging, website, release
 
