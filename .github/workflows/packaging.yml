@@ -90,7 +90,8 @@ jobs:
           #!/usr/bin/env bash
           set -euo pipefail
           pc=/tmp/nift-static-prefix/lib/pkgconfig/nift.pc
-          pfx="$(sed -n 's/^prefix=//p' "$pc")"
+          pc_dir="$(cd "$(dirname "$pc")" && pwd)"
+          pfx="$(sed -n 's/^prefix=//p' "$pc" | sed 's|\${pcfiledir}|'"$pc_dir"'|g')"
           inc="$(sed -n 's/^includedir=//p' "$pc" | sed 's|\${prefix}|'"$pfx"'|g')"
           lib="$(sed -n 's/^libdir=//p' "$pc" | sed 's|\${prefix}|'"$pfx"'|g')"
           libs="$(sed -n 's/^Libs: *//p' "$pc" | sed 's|\${libdir}|'"$lib"'|g')"
