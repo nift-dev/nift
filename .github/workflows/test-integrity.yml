@@ -92,14 +92,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Build native libraries
-        run: make -j2 libnift_c.a libnift_c.so
+      - name: Build native libraries + staged prefix
+        run: make embed
       - uses: actions/setup-go@v5
         with:
           go-version-file: bindings/go/go.mod
       - name: Go binding tests
         run: |
           cd bindings/go
+          export PKG_CONFIG_PATH="$(pwd)/../../dist/embed-prefix/lib/pkgconfig"
+          export LD_LIBRARY_PATH="$(pwd)/../../dist/embed-prefix/lib"
           go test ./...
           go test -race ./...
       - uses: actions/setup-dotnet@v4
