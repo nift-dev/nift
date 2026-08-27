@@ -128,14 +128,15 @@ jobs:
           bash /tmp/pcwrapper/pkg-config.sh --cflags nift || true
           bash /tmp/pcwrapper/pkg-config.sh --libs nift || true
           go mod tidy && go build -o consumer .
-          ./consumer
+          [ -f consumer.exe ] && CONSUMER=consumer.exe || CONSUMER=consumer
+          "./$CONSUMER"
           echo "GO_DEPENDENCY (otool/objdump):"
           if command -v otool >/dev/null 2>&1; then
-            otool -L consumer 2>/dev/null || true
-            otool -L consumer 2>/dev/null | grep -qi nift && { echo "FAIL: macOS go consumer links shared nift" >&2; exit 1; } || true
+            otool -L "$CONSUMER" 2>/dev/null || true
+            otool -L "$CONSUMER" 2>/dev/null | grep -qi nift && { echo "FAIL: macOS go consumer links shared nift" >&2; exit 1; } || true
           fi
           if command -v objdump >/dev/null 2>&1; then
-            objdump -p consumer 2>/dev/null | grep -iE 'nift.*dll' && { echo "FAIL: windows go consumer links shared nift" >&2; exit 1; } || true
+            objdump -p "$CONSUMER" 2>/dev/null | grep -iE 'nift.*dll' && { echo "FAIL: windows go consumer links shared nift" >&2; exit 1; } || true
           fi
           echo "GO_STATIC_OK: no Nift shared-library dependency"
       - name: Upload packaged artifacts
