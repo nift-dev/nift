@@ -1,64 +1,93 @@
 #!/usr/bin/env bash
 # Non-publishing target-matrix build + smoke for ONE supported target.
-# Usage: packaging/matrix-build.sh <os>-<arch> <version>
+# Usage: packaging/matrix-build.sh <os>-<arch> <version> [--require-smoke]
 #   e.g. linux-x86_64, linux-arm64, macos-arm64, macos-x86_64, windows-x86_64
 #
 # Builds (nothing published):
 #   dist/<version>/<target>/nift-<os>-<arch>            CLI binary
 #   dist/<version>/<target>/nift-embed-<os>-<arch>.tar.gz  native bundle
 #   dist/<version>/<target>/SHA256SUMS
-# Then smoke-tests the native bundle from a clean consumer: extract to a temp
-# prefix, compile a C consumer via the packaged nift.pc, link and run a render,
-# and verify the consumer has no Nift shared-library runtime dependency using
-# the platform dependency tool (ldd / otool -L / objdump).
+#
+# The clean-consumer smoke MUST execute when the configured target matches the
+# runner's normalized platform (the matrix maps target == runner). It compiles a
+# C consumer via the packaged nift.pc, links, renders, and verifies there is no
+# Nift shared-library runtime dependency (ldd / otool -L / objdump). On success
+# it prints SMOKE_EXECUTED=1; the workflow fails if that marker is absent.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-TARGET="${1:?usage: matrix-build.sh <os>-<arch> <version>}"
-VERSION="${2:?usage: matrix-build.sh <os>-<arch> <version>}"
+TARGET="${1:?usage: matrix-build.sh <os>-<arch> <version> [--require-smoke]}"
+VERSION="${2:?usage: matrix-build.sh <os>-<arch> <version> [--require-smoke]}"
+REQUIRE_SMOKE=0
+[ "${3:-}" = "--require-smoke" ] && REQUIRE_SMOKE=1
 OS="${TARGET%%-*}"
 ARCH="${TARGET#*-}"
 OUT="$ROOT/dist/$VERSION/$TARGET"
 mkdir -p "$OUT"
 
+# Per-target native library filenames (exact; failure if any is missing).
+case "$OS" in
+  linux)   NATIVE_FILES="libnift_c.a libnift_c.so" ;;
+  macos)   NATIVE_FILES="libnift_c.a libnift_c.so" ;;  # Makefile emits .so names; .dylib naming is a release-layout item
+  windows) NATIVE_FILES="libnift_c.a libnift_c.so" ;;  # Makefile emits .so names on mingw; DLL/import-lib layout is a release-layout item
+  *) echo "unsupported target OS: $OS" >&2; exit 2 ;;
+esac
 case "$OS:$ARCH" in
-  linux:*) PC_LIBS='-L${libdir} -Wl,-Bstatic -lnift_c -Wl,-Bdynamic -lstdc++ -lm -pthread' ;;
-  macos:*) PC_LIBS='-L${libdir} -lnift_c -lc++ -lm' ;;
+  linux:*)  PC_LIBS='-L${libdir} -Wl,-Bstatic -lnift_c -Wl,-Bdynamic -lstdc++ -lm -pthread' ;;
+  macos:*)  PC_LIBS='-L${libdir} -lnift_c -lc++ -lm' ;;
   windows:*) PC_LIBS='-L${libdir} -lnift_c' ;;
   *) echo "unsupported target: $TARGET" >&2; exit 2 ;;
 esac
 
-# CLI binary (the runner already built it for this OS/arch; stage it).
-if [ -x "$ROOT/nift" ]; then
-  cp "$ROOT/nift" "$OUT/nift-$OS-$ARCH"
-elif [ -x "$ROOT/nift.exe" ]; then
-  cp "$ROOT/nift.exe" "$OUT/nift-$OS-$ARCH"
-fi
+# CLI binary (nift or nift.exe).
+if [ -x "$ROOT/nift" ]; then cp "$ROOT/nift" "$OUT/nift-$OS-$ARCH"
+elif [ -x "$ROOT/nift.exe" ]; then cp "$ROOT/nift.exe" "$OUT/nift-$OS-$ARCH"
+else echo "FAIL: no CLI binary (nift / nift.exe)" >&2; exit 1; fi
 
-# Native bundle with target-correct .pc.
+# Native bundle with target-correct .pc; FAIL if any required native file is absent.
 make embed >/dev/null 2>&1
 STAGE="$(mktemp -d /tmp/nift-matrix.XXXXXX)"
 trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$STAGE/include/nift" "$STAGE/lib/pkgconfig"
 cp -r include/nift/. "$STAGE/include/nift/"
-cp libnift_c.* "$STAGE/lib/" 2>/dev/null || true
+for f in $NATIVE_FILES; do
+  [ -f "$ROOT/$f" ] || { echo "FAIL: required native file missing: $ROOT/$f" >&2; exit 1; }
+  cp "$ROOT/$f" "$STAGE/lib/"
+done
 sed -e "s/__VERSION__/$VERSION/" -e "s|__LIBS__|$PC_LIBS|" packaging/nift.pc.in > "$STAGE/lib/pkgconfig/nift.pc"
 cp packaging/install-embed.sh "$STAGE/install-embed.sh"
 tar czf "$OUT/nift-embed-$OS-$ARCH.tar.gz" -C "$STAGE" include lib install-embed.sh
 
-( cd "$OUT" && for f in *; do [ -f "$f" ] && [ "$f" != "SHA256SUMS" ] && sha256sum "$f"; done | sort > SHA256SUMS )
+# Portable checksum helper (sha256sum on Linux, shasum -a 256 on macOS).
+chk() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$@"; else shasum -a 256 "$@"; fi; }
+( cd "$OUT" && for f in *; do [ -f "$f" ] && [ "$f" != "SHA256SUMS" ] && chk "$f"; done | sort > SHA256SUMS )
 
-# --- Clean-consumer smoke of the native bundle (this runner's platform) ---
-# (Only runs when the bundle matches the running platform; cross-target bundles
-# are verified by their own runner in the CI matrix.)
-if [ "$OS-$ARCH" = "$(uname -s)-$(uname -m)" ] || \
-   { [ "$OS" = "linux" ] && [ "$ARCH" = "x86_64" ] && [ "$(uname -m)" = "x86_64" ]; }; then
+# --- Normalized platform detection ---
+detect_os() {
+  case "$(uname -s)" in
+    Linux) echo linux ;; Darwin) echo macos ;;
+    MINGW*|MSYS*|CYGWIN*) echo windows ;;
+    *) echo "$(uname -s)" ;;
+  esac
+}
+detect_arch() {
+  case "$(uname -m)" in
+    x86_64|amd64) echo x86_64 ;; aarch64|arm64) echo arm64 ;;
+    *) echo "$(uname -m)" ;;
+  esac
+}
+
+RUNNER="$TARGET"
+if [ "$OS-$ARCH" = "$(detect_os)-$(detect_arch)" ]; then
   CONSUMER="$(mktemp -d /tmp/nift-matrix-consumer.XXXXXX)"
   trap 'rm -rf "$STAGE" "$CONSUMER"' EXIT
   tar xzf "$OUT/nift-embed-$OS-$ARCH.tar.gz" -C "$CONSUMER"
   mkdir -p "$CONSUMER/prefix/include/nift" "$CONSUMER/prefix/lib/pkgconfig"
   cp -r "$CONSUMER/include/nift/." "$CONSUMER/prefix/include/nift/"
-  cp "$CONSUMER"/lib/libnift_c.* "$CONSUMER/prefix/lib/" 2>/dev/null || true
+  for f in $NATIVE_FILES; do
+    [ -f "$CONSUMER/lib/$f" ] || { echo "FAIL: bundle missing $f" >&2; exit 1; }
+    cp "$CONSUMER/lib/$f" "$CONSUMER/prefix/lib/"
+  done
   cp "$CONSUMER/lib/pkgconfig/nift.pc" "$CONSUMER/prefix/lib/pkgconfig/"
   sed "s|^prefix=.*|prefix=$CONSUMER/prefix|" "$CONSUMER/prefix/lib/pkgconfig/nift.pc" > "$CONSUMER/prefix/lib/pkgconfig/nift.pc.tmp" \
     && mv "$CONSUMER/prefix/lib/pkgconfig/nift.pc.tmp" "$CONSUMER/prefix/lib/pkgconfig/nift.pc"
@@ -79,12 +108,24 @@ int main(void) {
     return 0;
 }
 C
-  ( cd "$CONSUMER" && gcc consumer.c -o consumer $(PKG_CONFIG_PATH="$CONSUMER/prefix/lib/pkgconfig" pkg-config --cflags --libs nift) )
+  ( cd "$CONSUMER" && ${CC:-gcc} consumer.c -o consumer $(PKG_CONFIG_PATH="$CONSUMER/prefix/lib/pkgconfig" pkg-config --cflags --libs nift) )
   "$CONSUMER/consumer"
-  # verify no Nift shared-library runtime dependency
-  if command -v ldd >/dev/null 2>&1; then ldd "$CONSUMER/consumer" | grep -i nift && { echo "FAIL: consumer links libnift_c shared" >&2; exit 1; } || true; fi
-  if command -v otool >/dev/null 2>&1; then otool -L "$CONSUMER/consumer" | grep -i nift && { echo "FAIL: consumer links libnift_c shared" >&2; exit 1; } || true; fi
+  # Dependency inspection for a Nift shared-library dependency.
+  if command -v ldd >/dev/null 2>&1; then
+    if ldd "$CONSUMER/consumer" 2>/dev/null | grep -qi nift; then echo "FAIL: consumer links Nift shared library" >&2; exit 1; fi
+  elif command -v otool >/dev/null 2>&1; then
+    if otool -L "$CONSUMER/consumer" 2>/dev/null | grep -qi nift; then echo "FAIL: consumer links Nift shared library" >&2; exit 1; fi
+  elif command -v objdump >/dev/null 2>&1; then
+    if objdump -p "$CONSUMER/consumer" 2>/dev/null | grep -qi nift; then echo "FAIL: consumer links Nift shared library" >&2; exit 1; fi
+  fi
+  echo "SMOKE_EXECUTED=1"
   echo "SMOKE PASS: $TARGET native bundle renders from a clean consumer with no Nift shared-library dependency"
+else
+  if [ "$REQUIRE_SMOKE" = "1" ]; then
+    echo "FAIL: smoke not executed (configured $TARGET != runner $(detect_os)-$(detect_arch))" >&2
+    exit 1
+  fi
+  echo "SMOKE_SKIPPED (cross-target staging; not a matrix smoke job)"
 fi
 
 echo "matrix build complete: $OUT"

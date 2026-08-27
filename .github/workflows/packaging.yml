@@ -17,8 +17,8 @@ permissions:
   contents: read
 
 jobs:
-  matrix:
-    name: package ${{ matrix.target }} (build + clean-consumer smoke)
+  native-matrix:
+    name: native ${{ matrix.target }} (build + enforced clean-consumer smoke)
     strategy:
       fail-fast: false
       matrix:
@@ -27,9 +27,8 @@ jobs:
             os: ubuntu-latest
           - target: linux-arm64
             os: ubuntu-24.04-arm
-          # macOS x86-64 intentionally omitted: GitHub Actions Intel macOS
-          # (macos-13) runners are not being provisioned (retired); verified
-          # once an Intel macOS runner is available.
+          - target: macos-x86_64
+            os: macos-15-intel
           - target: macos-arm64
             os: macos-latest
           - target: windows-x86_64
@@ -37,7 +36,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
-      - name: Install g++ (ubuntu)
+      - name: Install g++/pkg-config (ubuntu)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y g++ pkg-config
       - name: Build + smoke package target
@@ -45,11 +44,97 @@ jobs:
         run: |
           make -j2
           make embed
-          NIFT_BIN=./nift; [ -f ./nift.exe ] && NIFT_BIN=./nift.exe; VERSION="$("$NIFT_BIN" --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
-          bash packaging/matrix-build.sh "${{ matrix.target }}" "$VERSION"
+          NIFT_BIN=./nift; [ -f ./nift.exe ] && NIFT_BIN=./nift.exe
+          VERSION="$("$NIFT_BIN" --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+          OUT="$(bash packaging/matrix-build.sh "${{ matrix.target }}" "$VERSION" --require-smoke)"
+          echo "$OUT"
+          echo "$OUT" | grep -q 'SMOKE_EXECUTED=1' || { echo "FAIL: SMOKE_EXECUTED marker missing" >&2; exit 1; }
       - name: Upload packaged artifacts
         uses: actions/upload-artifact@v4
         with:
           name: nift-package-${{ matrix.target }}
           path: dist/*/${{ matrix.target }}/
+          if-no-files-found: error
+
+  language-packages:
+    name: language packages (build-only, non-publishing)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: bindings/go/go.mod
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install python dev + build deps
+        run: |
+          sudo apt-get update && sudo apt-get install -y g++ pkg-config python3-dev
+          python3 -m pip install setuptools wheel
+      - name: Python wheel + self-contained sdist
+        run: |
+          make -j2
+          VERSION="$(./nift --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+          rm -rf bindings/python/native
+          mkdir -p bindings/python/native
+          cp -r src bindings/python/native/src
+          cp -r include bindings/python/native/include
+          cp -r minifypp bindings/python/native/minifypp
+          cp -r jsonic bindings/python/native/jsonic
+          ( cd bindings/python && NIFT_VERSION="$VERSION" python3 setup.py sdist --dist-dir /tmp/pydist )
+          SDIST="$(ls /tmp/pydist/nift-$VERSION.tar.gz | head -1)"
+          mkdir -p /tmp/pysrc && tar xzf "$SDIST" -C /tmp/pysrc
+          ( cd /tmp/pysrc/nift-$VERSION && NIFT_VERSION="$VERSION" python3 -m pip wheel --no-deps --no-build-isolation -w /tmp/pydist . )
+          ls /tmp/pydist
+      - name: NuGet (RID asset) + npm (addon) + Go (static consumer) builds
+        run: |
+          make embed
+          make node-binding
+          VERSION="$(./nift --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+          ( cd bindings/csharp/src/Nift && dotnet pack -v q --nologo -p:Version="$VERSION" -o /tmp/nugetdist )
+          python3 - "$VERSION" <<'PY'
+          import json, sys
+          import shutil, subprocess, os
+          v = sys.argv[1]
+          os.makedirs("/tmp/npmdist", exist_ok=True)
+          import tempfile
+          tmp = tempfile.mkdtemp()
+          shutil.copytree("bindings/node", tmp + "/node", dirs_exist_ok=True)
+          p = json.load(open(tmp + "/node/package.json")); p["version"] = v; json.dump(p, open(tmp + "/node/package.json","w"), indent=2)
+          subprocess.run(["npm","pack","--pack-destination","/tmp/npmdist"], cwd=tmp + "/node", check=True, capture_output=True)
+          PY
+          ls /tmp/nugetdist /tmp/npmdist
+      - name: Go external consumer (static, no libnift_c.so)
+        shell: bash
+        run: |
+          make embed
+          export PKG_CONFIG_PATH="$PWD/dist/embed-prefix/lib/pkgconfig"
+          rm -rf /tmp/gomod /tmp/goconsumer
+          mkdir -p /tmp/gomod /tmp/goconsumer
+          tar -cf - bindings/go | ( cd /tmp/gomod && tar -xf - --strip-components=2 )
+          cd /tmp/goconsumer
+          printf 'module example.com/consumer\n\ngo 1.26\n\nrequire nift.dev/embed/v4 v4.0.7\n\nreplace nift.dev/embed/v4 => /tmp/gomod\n' > go.mod
+          cat > main.go <<'GO'
+          package main
+          import ("fmt"; "os"; nift "nift.dev/embed/v4")
+          func main() {
+            if err := nift.ABICompat(); err != nil { fmt.Fprintln(os.Stderr, err); os.Exit(1) }
+            e := nift.NewEngine(); defer e.Close()
+            e.SetString("site","nift")
+            r, err := e.RenderText("<p>$[site]</p>")
+            if err != nil || !r.OK || r.Output != "<p>nift</p>" { os.Exit(1) }
+            fmt.Println("go render OK:", r.Output)
+          }
+          GO
+          go mod tidy >/dev/null 2>&1 && go build -o consumer . >/dev/null 2>&1
+          ldd consumer 2>/dev/null | grep -qi nift && { echo "FAIL: go consumer links shared nift" >&2; exit 1; } || true
+          ./consumer
+      - name: Upload language package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nift-language-packages
+          path: /tmp/pydist /tmp/nugetdist /tmp/npmdist
           if-no-files-found: error
