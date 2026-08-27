@@ -527,3 +527,47 @@ fast-forward; embed `src/` is a strict superset of canonical `src/` (no
 canonical-only CLI behaviour discarded). C ABI policy, Makefile/directory
 layout, reduced-CLI target, conformance ownership, validation matrix and
 rollback plan are specified there. NOT EXECUTED - awaiting authorization.
+
+## 13. Pre-integration plan revision (2026-08-27)
+
+Revision to sections 1 and 12 per review:
+- **Narrowed ancestry claim**: shared ancestry + file presence prove no
+  canonical file disappears and zero canonical-only commits prove canonical
+  holds no own changes; behavioural preservation is established by the complete
+  reduced-CLI regression/equivalence matrix (not asserted from ancestry alone).
+- **Reconciled C ABI policy**: additive backward-compatible -> ABI minor bump;
+  breaking -> ABI major + Nift major; patch-level no-ABI changes -> no ABI
+  version change; bindings require matching ABI major + feature availability,
+  not exact patch equality. Symbol rule corrected to "retain existing exported
+  symbol names and signatures within an ABI major" (no source-ordering
+  significance). Public structs are finalized before first publication; later
+  `size`-field insertion is NOT described as automatically backward compatible.
+- **Rollback revised**: pre-integration backup ref (`pre-embed-merge-v4`) at
+  the old head; validate-before-push and fix-forward-after-push are the primary
+  strategy; force-push is an explicit emergency action requiring separate
+  authorization, never routine/pre-authorized. `nift-embed` unarchived until
+  post-push validation completes.
+- **Immutable integration target**: exact reviewed commit SHA
+  `7d5482ef960076adeb34e3fabd77219009c95de7` (re-verified at integration time);
+  preflight re-checks canonical == 8a818f2, reviewed descendant, merge base,
+  zero canonical-only commits, clean trees.
+- **Publishing design**: `release.yml`, environment `release` only on
+  external-publishing jobs, job-level `permissions: {contents: read,
+  id-token: write}` only there; separate dependency-gated idempotent jobs for
+  PyPI `nift` and NuGet `Nift` (NuGet incapable of other package IDs) after
+  full validation + package smoke; "version already exists" success only on
+  exact content/digest/provenance match, else fatal collision.
+- **Phased sequence**: freeze/verify SHAs; backup ref; fast-forward in a
+  disposable canonical clone; full validation matrix; push only if green;
+  rerun canonical CI; structural isolation commit only after the fast-forward
+  state independently passes; build + install smoke without publishing; return
+  for publication authorization; archive nift-embed only after separately
+  authorized completion.
+- **Package identities** proposed: PyPI `nift`; NuGet `Nift` (owner
+  antimatroid, restriction to exact ID); npm `nift` (first publish claims);
+  crates.io NOT in the production set (Rust = conformance); Go `nift.dev/embed`
+  via `bindings/go/v4.x.y` submodule tags; native C/C++ via GitHub Release
+  bundles + checksum-verified installer.
+
+Full detail in docs/handover/INTEGRATION-PLAN.md (revised). Canonical `nift`
+remains untouched at 8a818f2; nothing published, merged, moved or archived.
