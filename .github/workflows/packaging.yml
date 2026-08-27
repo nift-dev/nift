@@ -71,7 +71,7 @@ jobs:
           cp include/nift/*.h /tmp/nift-static-prefix/include/
           cp libnift_c.a /tmp/nift-static-prefix/lib/          # static archive ONLY (no .so/.dylib)
           if [ "${{ matrix.target }}" = "windows-x86_64" ]; then
-            GO_PC_LIBS='-L\${libdir} -lnift_c -lstdc++'
+            GO_PC_LIBS='-L\${libdir} -lnift_c -lstdc++ -static'
           else
             GO_PC_LIBS='-L\${libdir} -lnift_c -lc++ -lm'
           fi
