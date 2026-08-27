@@ -91,12 +91,13 @@ jobs:
           set -euo pipefail
           pc=/tmp/nift-static-prefix/lib/pkgconfig/nift.pc
           pfx="$(sed -n 's/^prefix=//p' "$pc")"
-          inc="$(sed -n 's/^includedir=//p' "$pc" | sed "s|\${prefix}|$pfx|g")"
-          lib="$(sed -n 's/^libdir=//p' "$pc" | sed "s|\${prefix}|$pfx|g")"
+          inc="$(sed -n 's/^includedir=//p' "$pc" | sed 's|\${prefix}|'"$pfx"'|g')"
+          lib="$(sed -n 's/^libdir=//p' "$pc" | sed 's|\${prefix}|'"$pfx"'|g')"
+          libs="$(sed -n 's/^Libs: *//p' "$pc" | sed 's|\${libdir}|'"$lib"'|g')"
           for a in "$@"; do
             case "$a" in
               --cflags) echo "-I$inc" ;;
-              --libs)   echo "$(sed -n 's/^Libs: *//p' "$pc" | sed "s|\${libdir}|$lib|g")" ;;
+              --libs)   echo "$libs" ;;
             esac
           done
           PC
