@@ -346,3 +346,18 @@ or archived repositories. It is awaiting final integration authorization.
 | Publication readiness | **HOLD** - nothing published; synchronized version derivation (binding packages derive from the canonical release tag, verified against the CLI version; no hard-coded `0.1.0`) is a packaging-checkpoint task |
 
 These items are outside P7 and are resolved in the packaging checkpoint.
+
+## 15. P7 status (structural isolation, 2026-08-27)
+
+P7 implemented: src/embed/ relocation (Engine/Context/c_abi) with CORE_SOURCES /
+EMBED_SOURCES split; plain `make`/`make nift` build only the reduced ordinary
+CLI (verified: 1,256,712 B, no src/embed objects, no libnift_c, no bindings);
+explicit targets embed / go-binding / csharp-binding / node-binding /
+python-binding / bindings and test targets test-embed / test-<lang>-binding /
+test-bindings / test-all / test-build-boundary (durable boundary gate); plain
+`make test` = the ordinary CLI regression surface. CI runs the build-boundary
+gate. Conformance adapters no longer hardcode any home-directory path and
+require explicit configuration; a portability test proves the corpus runs from
+unrelated temporary paths. Documentation corrections (NuGet/login@v1, ABI
+version policy, honest packaging status) applied. Not yet authorized: release
+packaging implementation, publication, releases, archiving nift-embed.

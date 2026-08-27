@@ -133,5 +133,7 @@ jobs:
       - uses: actions/checkout@v5
       - name: Build Nift
         run: make -j2
+      - name: Build-boundary gate (plain make = reduced CLI only)
+        run: make test-build-boundary
       - name: Run documented aggregate evidence gate
         run: make bh2-test-integrity
