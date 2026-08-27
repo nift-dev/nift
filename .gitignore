@@ -25,3 +25,7 @@ libnift_c.a
 libnift_c.so
 /nift
 bindings/python/nift/_nift*.so
+
+dist/
+*.egg-info/
+bindings/python/build/
