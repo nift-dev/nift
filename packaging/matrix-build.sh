@@ -39,7 +39,7 @@ STAGE="$(mktemp -d /tmp/nift-matrix.XXXXXX)"
 trap 'rm -rf "$STAGE"' EXIT
 mkdir -p "$STAGE/include/nift" "$STAGE/lib/pkgconfig"
 cp -r include/nift/. "$STAGE/include/nift/"
-cp libnift_c.a libnift_c.so "$STAGE/lib/"
+cp libnift_c.* "$STAGE/lib/" 2>/dev/null || true
 sed -e "s/__VERSION__/$VERSION/" -e "s|__LIBS__|$PC_LIBS|" packaging/nift.pc.in > "$STAGE/lib/pkgconfig/nift.pc"
 cp packaging/install-embed.sh "$STAGE/install-embed.sh"
 tar czf "$OUT/nift-embed-$OS-$ARCH.tar.gz" -C "$STAGE" include lib install-embed.sh
@@ -56,7 +56,7 @@ if [ "$OS-$ARCH" = "$(uname -s)-$(uname -m)" ] || \
   tar xzf "$OUT/nift-embed-$OS-$ARCH.tar.gz" -C "$CONSUMER"
   mkdir -p "$CONSUMER/prefix/include/nift" "$CONSUMER/prefix/lib/pkgconfig"
   cp -r "$CONSUMER/include/nift/." "$CONSUMER/prefix/include/nift/"
-  cp "$CONSUMER/lib/libnift_c.a" "$CONSUMER/lib/libnift_c.so" "$CONSUMER/prefix/lib/"
+  cp "$CONSUMER"/lib/libnift_c.* "$CONSUMER/prefix/lib/" 2>/dev/null || true
   cp "$CONSUMER/lib/pkgconfig/nift.pc" "$CONSUMER/prefix/lib/pkgconfig/"
   sed "s|^prefix=.*|prefix=$CONSUMER/prefix|" "$CONSUMER/prefix/lib/pkgconfig/nift.pc" > "$CONSUMER/prefix/lib/pkgconfig/nift.pc.tmp" \
     && mv "$CONSUMER/prefix/lib/pkgconfig/nift.pc.tmp" "$CONSUMER/prefix/lib/pkgconfig/nift.pc"
