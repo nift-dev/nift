@@ -5,10 +5,13 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+echo "gen-dev-pc: uname_s=$(uname -s) uname_m=$(uname -m)" >&2
 case "$(uname -s)" in
   Darwin)   PC_LIBS='-L${libdir} -Wl,-force_load,${libdir}/libnift_c.a -lc++ -lm' ;;
   MINGW*|MSYS*|CYGWIN*) PC_LIBS='-L${libdir} -lnift_c' ;;
   *)        PC_LIBS='-L${libdir} -Wl,-Bstatic -lnift_c -Wl,-Bdynamic -lstdc++ -lm -pthread' ;;
 esac
+mkdir -p dist/embed-prefix/lib/pkgconfig
 sed -e "s/__VERSION__/0.0.0-dev/" -e "s|__LIBS__|$PC_LIBS|" packaging/nift.pc.in \
-  > dist/embed-prefix/lib/pkgconfig/nift.pc
+  > dist/embed-prefix/lib/pkgconfig/nift.pc || { echo "gen-dev-pc: sed failed" >&2; exit 1; }
+echo "gen-dev-pc: wrote dist/embed-prefix/lib/pkgconfig/nift.pc with PC_LIBS=$PC_LIBS" >&2
