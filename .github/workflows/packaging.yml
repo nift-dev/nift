@@ -70,8 +70,13 @@ jobs:
           rm -rf /tmp/nift-static-prefix && mkdir -p /tmp/nift-static-prefix/lib/pkgconfig /tmp/nift-static-prefix/include
           cp include/nift/*.h /tmp/nift-static-prefix/include/
           cp libnift_c.a /tmp/nift-static-prefix/lib/          # static archive ONLY (no .so/.dylib)
+          if [ "${{ matrix.target }}" = "windows-x86_64" ]; then
+            GO_PC_LIBS='-L\${libdir} -lnift_c'
+          else
+            GO_PC_LIBS='-L\${libdir} -lnift_c -lc++ -lm'
+          fi
           sed -e "s/__VERSION__/0.0.0-dev/" \
-            -e "s|__LIBS__|-L\${libdir} -lnift_c -lc++ -lm|" \
+            -e "s|__LIBS__|$GO_PC_LIBS|" \
             packaging/nift.pc.in > /tmp/nift-static-prefix/lib/pkgconfig/nift.pc
           rm -rf /tmp/gomod /tmp/gocons && mkdir -p /tmp/gomod /tmp/gocons
           tar -cf - bindings/go | ( cd /tmp/gomod && tar -xf - --strip-components=2 )

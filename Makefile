@@ -19,6 +19,10 @@ ifeq ($(OS),Windows_NT)
 	EXEEXT := .exe
 	PREFIX ?= $(LOCALAPPDATA)/Programs/Nift
 	INSTALL_PROGRAM = cp
+	# Self-contained Windows binaries: the mingw runtime DLLs (libstdc++-6,
+	# libgcc_s_seh-1, libwinpthread-1) are not guaranteed to be on consumer
+	# PATH, so the CLI and every embedded consumer link the runtimes statically.
+	LDFLAGS += -static -static-libgcc -static-libstdc++
 else
 	EXEEXT :=
 	PREFIX ?= /usr/local
