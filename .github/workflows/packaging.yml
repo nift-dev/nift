@@ -122,6 +122,11 @@ jobs:
           func main() { if err := nift.ABICompat(); err != nil { os.Exit(1) }; e := nift.NewEngine(); defer e.Close(); e.SetString("site","nift"); r, err := e.RenderText("<p>$[site]</p>"); if err != nil || !r.OK || r.Output != "<p>nift</p>" { os.Exit(1) }; fmt.Println("go render OK:", r.Output) }
           GO
           export PKG_CONFIG_PATH=/tmp/nift-static-prefix/lib/pkgconfig
+          echo "=== debug: static prefix lib ==="
+          ls -la /tmp/nift-static-prefix/lib/ || true
+          echo "=== debug: wrapper output ==="
+          bash /tmp/pcwrapper/pkg-config.sh --cflags nift || true
+          bash /tmp/pcwrapper/pkg-config.sh --libs nift || true
           go mod tidy && go build -o consumer .
           ./consumer
           echo "GO_DEPENDENCY (otool/objdump):"
