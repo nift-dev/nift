@@ -44,3 +44,8 @@ fi
 ./nift --version >/dev/null 2>&1 || { echo "FAIL: reduced CLI does not run"; exit 1; }
 
 echo "PASS: plain make builds only the reduced CLI (no src/embed objects, no libnift_c, no bindings)"
+
+# Restore the native embedding library removed above so a later target (e.g.
+# the C# binding tests in `make test-all`) is not left without it. The gate's
+# assertion was already proven; this leaves the tree in a usable state.
+make embed >/dev/null 2>&1 || { echo "WARN: could not restore make embed after boundary check"; }
