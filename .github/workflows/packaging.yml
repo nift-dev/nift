@@ -132,9 +132,16 @@ jobs:
           go mod tidy >/dev/null 2>&1 && go build -o consumer . >/dev/null 2>&1
           ldd consumer 2>/dev/null | grep -qi nift && { echo "FAIL: go consumer links shared nift" >&2; exit 1; } || true
           ./consumer
+      - name: Collect language packages into the workspace
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/pkg-artifacts"
+          cp -r /tmp/pydist/* "$GITHUB_WORKSPACE/pkg-artifacts/" 2>/dev/null || true
+          cp -r /tmp/nugetdist/* "$GITHUB_WORKSPACE/pkg-artifacts/" 2>/dev/null || true
+          cp -r /tmp/npmdist/* "$GITHUB_WORKSPACE/pkg-artifacts/" 2>/dev/null || true
+          ls -la "$GITHUB_WORKSPACE/pkg-artifacts"
       - name: Upload language package artifacts
         uses: actions/upload-artifact@v4
         with:
           name: nift-language-packages
-          path: /tmp/pydist /tmp/nugetdist /tmp/npmdist
+          path: pkg-artifacts/
           if-no-files-found: error
