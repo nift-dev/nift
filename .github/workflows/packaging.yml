@@ -40,6 +40,9 @@ jobs:
       - name: Install g++/pkg-config (ubuntu)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y g++ pkg-config
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: bindings/go/go.mod
       - name: Build + smoke package target
         shell: bash
         run: |
