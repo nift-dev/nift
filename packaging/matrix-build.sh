@@ -110,10 +110,20 @@ int main(void) {
 C
   echo "--- bundle nift.pc ---"
   cat "$CONSUMER/prefix/lib/pkgconfig/nift.pc"
-  echo "--- pkg-config flags ---"
-  PKG_CONFIG_PATH="$CONSUMER/prefix/lib/pkgconfig" pkg-config --cflags --libs nift
+  echo "--- compile+link flags ---"
+  # pkg-config is broken on the Windows runners (Strawberry Perl's pkg-config
+  # fails on a missing Pod/Usage.pm), so derive the relocatable flags directly
+  # from the installed nift.pc and fall back to pkg-config only when it works.
+  pc_file="$CONSUMER/prefix/lib/pkgconfig/nift.pc"
+  pc_prefix="$(sed -n 's/^prefix=//p' "$pc_file")"
+  pc_libdir="$(sed -n 's/^libdir=//p' "$pc_file")"; pc_libdir="${pc_libdir//\${prefix}/$pc_prefix}"
+  pc_incdir="$(sed -n 's/^includedir=//p' "$pc_file")"; pc_incdir="${pc_incdir//\${prefix}/$pc_prefix}"
+  NIFT_CFLAGS="-I$pc_incdir"
+  NIFT_LIBS="$(sed -n 's/^Libs: *//p' "$pc_file")"; NIFT_LIBS="${NIFT_LIBS//\${libdir}/$pc_libdir}"
+  echo "cflags: $NIFT_CFLAGS"
+  echo "libs: $NIFT_LIBS"
   echo "--- compile+link consumer ---"
-  ( cd "$CONSUMER" && PKG_CONFIG_PATH="$CONSUMER/prefix/lib/pkgconfig" ${CC:-gcc} -v consumer.c -o consumer $(PKG_CONFIG_PATH="$CONSUMER/prefix/lib/pkgconfig" pkg-config --cflags --libs nift) 2>&1 )
+  ( cd "$CONSUMER" && ${CC:-gcc} -v consumer.c -o consumer $NIFT_CFLAGS $NIFT_LIBS 2>&1 )
   "$CONSUMER/consumer"
   # Dependency inspection: report what the consumer links. Static (no Nift
   # shared dependency) is the enforced default on Linux (the static .pc); on
