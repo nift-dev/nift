@@ -31,7 +31,7 @@
 namespace fs = std::filesystem;
 
 namespace {
-constexpr const char* version_text = "Nift v4.0.7";
+constexpr const char* version_text = "Nift v4.0.8";
 constexpr auto build_auto_poll_interval = std::chrono::milliseconds(200);
 constexpr const char* build_auto_log_path = ".nift/build-auto.log";
 

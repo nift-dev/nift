@@ -1,8 +1,34 @@
 # Nift — Release Notes
 
-## v4.0.7 (development)
+## v4.0.8 (development)
 
-Development version following the public v4.0.6 release.
+Development version following the public v4.0.7 release.
+
+## v4.0.7
+
+Nift 4.0.7 is a CLI-only release that unifies the build and inspection command
+grammar and adds an explicit repair path for interrupted builds.
+
+- **Unified `build` grammar.** `nift build [names...]` performs an incremental
+  build, or builds the named pages explicitly; `nift build --all` builds every
+  tracked page; `nift build --auto` runs the continuous watch build; and
+  `nift build --repair` reconstructs derived build state. The historical verbs
+  `build-all`, `build-updated`, `build-names` and `build-auto` are removed;
+  invoking them now reports an error with the replacement spelling.
+- **Unified `info` grammar.** `nift info [names...]`, `nift info --all`,
+  `nift info --names`, `nift info --tracking` and `nift info --watching` replace
+  the removed `info-all`, `info-names`, `info-tracking` and `info-watching`
+  verbs.
+- **`-n`/`-s` removed.** The historical display flags on `build` and `status`
+  are rejected as unknown options; `-p` remains for full per-page detail.
+- **Interrupted-build repair protocol.** A build that does not complete
+  successfully leaves an `.unfinished` marker; the next build refuses with a
+  clear diagnostic, and `nift build --repair` reconstructs the derived build
+  state.
+
+The embedded engine, its language bindings, the shared corpus and the
+experimental Rust implementation remain in-tree but are not released,
+documented or promoted by this release.
 
 ## v4.0.6
 
