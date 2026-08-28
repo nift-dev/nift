@@ -12,7 +12,7 @@ remain deferred pending explicit authorization.
 | canonical `nift` (behavioral/documentation base) | `c4faede` | binary behaviour identical to the accepted P8 head `71db053`; +HANDOVER identity fix |
 | canonical `nift` (evidence v1) | `ba96321` | go/no-go packet v1 + release-notes draft |
 | canonical `nift` (CLI-RC04R workflow repair) | `0a009c0` | release-workflow repair (permissions, rehearsal mode, notes-file, fail-closed publish, action pinning) |
-| canonical `nift` (proposed `v4.0.7` tag target) | `TBD` | = the final CLI-RC04R commit recording this revised packet (named precisely after it is committed) |
+| canonical `nift` (proposed `v4.0.7` tag target) | `TBD` | = the final CLI-RC04R2 commit recording this revised packet (named precisely after it is committed) |
 | website source (`nift-dev.github.io` `stage`) | `c50d4bc` | docs audit |
 | website generated (`public/main`) | `02ceb29` | rebuilt public site |
 | CLI contract suite (`nift-regression-suite`) | `eaae07a` | reconciled to the unified CLI grammar (on `6bcf539`) |
@@ -103,11 +103,12 @@ No linux-arm64 archive (established decision; Snap provides Linux ARM64).
   be published is the reviewed file `docs/evidence/release-4.0.7/
   release-notes-4.0.7.md` (contents in §8). The publish job fails if the notes
   file is absent from the tagged commit.
-- **Fail-closed existing release**: if a release for the tag already exists, the
-  publish job verifies (a) the exact four-asset set + `SHA256SUMS` are present,
-  (b) each asset's SHA-256 equals the freshly built artifact, and (c) the
-  release body equals the reviewed notes file; any mismatch fails the job.
-  An arbitrary or stale release is never silently accepted.
+- **Fail-closed existing release**: before publishing, the job validates the
+  freshly built asset set is exactly the four expected archives (no extra or
+  missing assets). If a GitHub release already exists for the tag, the job
+  **fails and stops for explicit recovery review** — it never silently accepts,
+  verifies-with-idempotency, or overwrites an existing release. This is the
+  agreed partial-release policy for the first 4.0.7 publication.
 
 ## 5. Installer / upgrade / checksum evidence
 - `make test-installer` (preflight): PASS (in CI and locally).

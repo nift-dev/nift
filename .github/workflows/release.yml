@@ -99,15 +99,27 @@ jobs:
       - name: Rehearse extracted archive (native runner)
         shell: bash
         run: |
+          set -euo pipefail
           version="${{ steps.version.outputs.version }}"
           rm -rf archive-check && mkdir archive-check
           powershell.exe -NoProfile -Command "Expand-Archive -Path 'nift-$version-windows-x86_64.zip' -DestinationPath 'archive-check'"
-          ( cd "archive-check/nift-$version-windows-x86_64" && \
-            test "$(./nift.exe version | sed -E 's/^Nift v([^ ]+).*/\1/')" = "$version" && \
-            objdump -p nift.exe | sed -n 's/.*DLL Name: //p' | grep -Eiq '^(libgcc|libstdc\+\+|libwinpthread)' && { echo "extracted exe has MinGW runtime DLL" >&2; exit 1; } || true && \
-            rm -rf "$RUNNER_TEMP/nift-arch-smoke" && mkdir -p "$RUNNER_TEMP/nift-arch-smoke" && cd "$RUNNER_TEMP/nift-arch-smoke" && \
-            "$OLDPWD/nift.exe" init >/dev/null && printf 'x\n' > index.html && \
-            "$OLDPWD/nift.exe" build --all >/dev/null && "$OLDPWD/nift.exe" status >/dev/null ) || { echo "extracted-archive smoke FAILED" >&2; exit 1; }
+          cd "archive-check/nift-$version-windows-x86_64"
+          EXE="$PWD/nift.exe"
+          actual_version="$("$EXE" version | sed -E 's/^Nift v([^ ]+).*/\1/')"
+          test "$actual_version" = "$version" || {
+            echo "FAIL: extracted Windows archive reports $actual_version, expected $version" >&2
+            exit 1
+          }
+          if objdump -p "$EXE" | sed -n 's/.*DLL Name: //p' | grep -Eiq '^(libgcc|libstdc\+\+|libwinpthread)'; then
+            echo "FAIL: extracted executable depends on a MinGW runtime DLL" >&2
+            exit 1
+          fi
+          rm -rf "$RUNNER_TEMP/nift-arch-smoke" && mkdir -p "$RUNNER_TEMP/nift-arch-smoke"
+          cd "$RUNNER_TEMP/nift-arch-smoke"
+          "$EXE" init >/dev/null
+          printf 'x\n' > index.html
+          "$EXE" build --all >/dev/null
+          "$EXE" status >/dev/null
           echo "archive smoke PASS: windows-x86_64"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -140,7 +152,7 @@ jobs:
       - name: Create checksums
         working-directory: dist
         run: sha256sum nift-* > SHA256SUMS
-      - name: Publish GitHub release (reviewed notes; fail-closed on existing release)
+      - name: Publish GitHub release (reviewed notes; fail-closed)
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -150,26 +162,20 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           NOTES="docs/evidence/release-$version/release-notes-$version.md"
           [ -f "$NOTES" ] || { echo "FAIL: release-notes file missing at $NOTES (reviewed body must be committed in the tag)" >&2; exit 1; }
-          # Exact-set validation: exactly the four expected archives + SHA256SUMS.
+          # Exact-set validation of the freshly built artifacts before publishing.
           cd dist
           expected="nift-$version-linux-x86_64.tar.gz nift-$version-macos-arm64.tar.gz nift-$version-macos-x86_64.tar.gz nift-$version-windows-x86_64.zip"
           for a in $expected; do [ -f "$a" ] || { echo "FAIL: missing expected asset $a" >&2; exit 1; }; done
           actual="$(ls nift-* | sort | tr '\n' ' ')"
           [ "$actual" = "$(printf '%s\n' $expected | tr '\n' ' ')" ] || { echo "FAIL: unexpected assets: $actual" >&2; exit 1; }
           cd ..
+          # Fail closed: a pre-existing release is never silently accepted or
+          # overwritten. Stop for explicit recovery review.
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            echo "release exists; verifying assets + body before treating as success"
-            gh release download "$GITHUB_REF_NAME" --dir /tmp/rel-existing --clobber 2>/dev/null || { echo "FAIL: cannot download existing release assets" >&2; exit 1; }
-            ( cd /tmp/rel-existing && for a in $expected SHA256SUMS; do [ -f "$a" ] || { echo "FAIL: existing release missing $a" >&2; exit 1; }; done )
-            for a in $expected; do
-              [ "$(sha256sum "dist/$a" | cut -d' ' -f1)" = "$(sha256sum "/tmp/rel-existing/$a" | cut -d' ' -f1)" ] || { echo "FAIL: existing release asset $a differs from the built artifact" >&2; exit 1; }
-            done
-            body="$(gh release view "$GITHUB_REF_NAME" --json body --jq .body)"
-            [ "$body" = "$(cat "$NOTES")" ] || { echo "FAIL: existing release body differs from the reviewed notes" >&2; exit 1; }
-            echo "existing release verified identical (assets + checksums + body)"
-          else
-            gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --notes-file "$NOTES"
+            echo "FAIL: GitHub release $GITHUB_REF_NAME already exists; stop for explicit recovery review" >&2
+            exit 1
           fi
+          gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --notes-file "$NOTES"
 
   rehearse:
     if: github.event_name == 'workflow_dispatch'
