@@ -135,13 +135,17 @@ jobs:
           sh -n packaging/install.sh
           make test-installer
 
-  # Pre-tag deployment gate: if packaging/install.sh changed since the previous
-  # public release, the exact reviewed version MUST already be live at
-  # https://nift.dev/install before the release is tagged/published. This job is
-  # a dependency of both the rehearsal aggregate and the publish job, so a stale
-  # public installer fails the release fail-closed. Post-publication installer
-  # smokes are retained separately (equality alone does not prove the script can
-  # install the newly released artifacts).
+  # Public-installer gate. Three protections keep the public installer aligned
+  # with the released script:
+  #   - Pre-tag process gate: the non-publishing rehearsal's aggregate depends on
+  #     this job, and the go/no-go review refuses tag authorization unless the
+  #     rehearsal passes.
+  #   - Publication gate: this job is a dependency of `publish`, so the
+  #     tag-triggered workflow rechecks equality and refuses to publish if a
+  #     stale installer slipped in between rehearsal and tagging.
+  #   - Post-publication gate: the retained installer-public-smoke jobs prove the
+  #     live script actually installs the published artifacts (equality alone
+  #     does not prove that).
   public-installer-preflight:
     runs-on: ubuntu-latest
     steps:

@@ -26,10 +26,6 @@ grammar and adds an explicit repair path for interrupted builds.
   clear diagnostic, and `nift build --repair` reconstructs the derived build
   state.
 
-The embedded engine, its language bindings, the shared corpus and the
-experimental Rust implementation remain in-tree but are not released,
-documented or promoted by this release.
-
 ## v4.0.6
 
 Nift 4.0.6 is the first release with intentional user-facing changes since

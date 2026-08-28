@@ -7,10 +7,11 @@ is packaged and published.
 
 ## Authority and current state
 
-The development executable currently reports `Nift v4.0.5`, following the public v4.0.4 release.
-identity remains documented in project history and release notes, but it is not
-part of the public product version. Exact tag, artifact, and public release
-conventions must follow `PACKAGING.md` and actual Git/release evidence.
+The development executable currently reports `Nift v4.0.8`, following the
+public v4.0.7 release. The exact executable identity remains documented in
+project history and release notes, but it is not part of the public product
+version. Exact tag, artifact, and public release conventions must follow
+`PACKAGING.md` and actual Git/release evidence.
 
 A website content checkpoint, regression-suite checkpoint, and executable version
 are distinct identities. Do not synchronize version numbers mechanically.
@@ -75,17 +76,26 @@ Proportionately include:
     → public installer tested against released artifacts
     ```
 
-    Two gates apply when the installer changed: (a) the **pre-tag deployment
-    gate** — the website is already serving the exact candidate installer, and
-    (b) the **post-release installation gate** — that same public installer
-    successfully installs the newly published artifacts. Both are required. The
-    pre-tag gate is enforced fail-closed by `release.yml`'s
-    `public-installer-preflight` job, which is a dependency of both the
-    non-publishing rehearsal aggregate and the `publish` job (byte-compares
-    `https://nift.dev/install` with `packaging/install.sh`, records both SHA-256
-    values, and runs `sh -n`). The post-release gate is the retained
-    `installer-public-smoke` jobs (equality alone does not prove the script can
-    install the newly released artifacts).
+    Three gates protect the installer path when it has changed. They are
+    distinct and all required:
+
+    - **Pre-tag process gate.** The mandatory non-publishing rehearsal must
+      pass before tag authorization: the rehearsal aggregate depends on
+      `release.yml`'s `public-installer-preflight` job (which byte-compares
+      `https://nift.dev/install` with `packaging/install.sh`, records both
+      SHA-256 values, and runs `sh -n`), and the go/no-go review refuses to
+      authorize tagging unless that rehearsal passes. The tag-triggered
+      workflow runs only after the tag is pushed, so it cannot by itself
+      prevent tag creation.
+    - **Publication gate.** The tag-triggered `release.yml` rechecks equality:
+      `public-installer-preflight` is a dependency of the `publish` job, so a
+      stale public installer fails the workflow fail-closed and publication
+      does not proceed, even if the invariant was violated between rehearsal
+      and tagging.
+    - **Post-publication gate.** The retained `installer-public-smoke` jobs
+      prove the same live public installer actually installs the newly
+      published artifacts (equality alone does not prove the script can install
+      them).
 
 Repository tests passing does not prove a release archive is usable. After the
 release is public, the separate distribution-verification workflow tests the
@@ -513,9 +523,13 @@ first, so `https://nift.dev/install` still served the previous installer. The
 a stale public installer only in the post-publication smoke is too late, so this
 release established a permanent invariant (item 13 in the release-candidate
 validation checklist): the exact reviewed installer must be deployed and
-byte-verified before the release tag is created, enforced by
-`public-installer-preflight` in `release.yml` as a dependency of both the
-rehearsal and `publish`.
+byte-verified before the release tag is created, protected by the three gates
+described there — the pre-tag process gate (mandatory non-publishing rehearsal
+whose aggregate depends on `public-installer-preflight`, with the go/no-go
+review refusing tag authorization unless it passes), the publication gate (the
+tag-triggered workflow rechecks equality via `public-installer-preflight` as a
+dependency of `publish` and refuses to publish if it differs), and the
+post-publication gate (the retained `installer-public-smoke` jobs).
 
 Recovery (no release assets, tag or published checksums were changed):
 - Website deployment (`main`) commit `a0573ec` and website source (`stage`)

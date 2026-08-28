@@ -2,22 +2,22 @@
 
 ## Current status
 
-Nift has completed the planned Checkpoints 0–10 deliberate hardening campaign and reached the intended **hardening plateau**. The current development executable identifies as `Nift v4.0.5`, following the public v4.0.4 release. Production readiness is now a maintained state rather than a milestone still waiting to be earned through another synthetic checkpoint.
+Nift has completed the planned Checkpoints 0–10 deliberate hardening campaign and reached the intended **hardening plateau**. The current development executable identifies as `Nift v4.0.8`, following the public v4.0.7 release. Production readiness is now a maintained state rather than a milestone still waiting to be earned through another synthetic checkpoint.
 
 The completed campaign established and retained evidence around component memory/resource safety, Nift lifecycle/endurance behavior, cross-component ownership, incremental-vs-clean equivalence, filesystem/transaction integrity, parser fuzz/resource boundaries, and scoped Linux/macOS/Windows behavioral equivalence. Checkpoint 10 also found and fixed a real Windows read-only artifact deletion defect before the final portable corpus converged with zero mismatches.
 
 Do **not** invent Checkpoint 11 merely to continue the sequence. New hardening campaigns need a concrete trigger: a field defect, an unsupported platform claim worth establishing, a newly introduced semantic contract, or another clearly justified guarantee.
 
-## Current phase: v4.0.5 development
+## Current phase: v4.0.8 development
 
-v4.0.4 has been released. The development executable now identifies as Nift v4.0.5.
+v4.0.7 has been released. The development executable now identifies as Nift v4.0.8.
 
 The current sequence is now:
 
-1. Maintain the v4.0.3 public language/configuration documentation and retain the focused/independent regressions established for the new contracts.
+1. Maintain the current public language/configuration documentation and retain the focused/independent regressions established for the new contracts.
 2. Treat the 18 pagination incremental-vs-clean comparisons plus compact sanitizer/TSan pagination gates as scoped evidence for the exercised states, not universal proof.
 3. Continue dogfooding real sites and platform targets; turn concrete field failures into focused regressions instead of opening synthetic checkpoint sequences without a trigger.
-4. Monitor downstream distribution propagation (Homebrew auto-bump, Flathub) for v4.0.3.
+4. Monitor downstream distribution propagation (Homebrew auto-bump, Flathub) for v4.0.7.
 
 ## Distribution validation direction
 
