@@ -63,8 +63,8 @@ jobs:
             executable: nift.exe
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.13'
       - name: Download and extract public release archive
@@ -109,7 +109,7 @@ jobs:
             --expected-version '${{ inputs.version }}' \
             --evidence '.build/distribution/evidence/github-release-${{ matrix.platform }}.json' \
             --command "$NIFT_EXE"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: distribution-github-release-${{ matrix.platform }}
@@ -129,8 +129,8 @@ jobs:
             platform: linux-x86_64
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.13'
       - name: Set up Homebrew
@@ -156,7 +156,7 @@ jobs:
         if: always()
         shell: bash
         run: brew uninstall --force nift >/dev/null 2>&1 || true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: distribution-homebrew-${{ matrix.platform }}
@@ -168,8 +168,8 @@ jobs:
     name: Chocolatey / windows-x86_64
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.13'
       - name: Fresh install from Chocolatey Community Repository
@@ -189,7 +189,7 @@ jobs:
         if: always()
         shell: pwsh
         run: choco uninstall nift -y --no-progress 2>$null | Out-Null
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: distribution-chocolatey-windows-x86_64
@@ -201,8 +201,8 @@ jobs:
     name: Snap Store / linux-x86_64
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.13'
       - name: Fresh install from Snap stable
@@ -222,7 +222,7 @@ jobs:
         if: always()
         shell: bash
         run: sudo snap remove nift >/dev/null 2>&1 || true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: distribution-snap-linux-x86_64
@@ -234,8 +234,8 @@ jobs:
     name: Flathub / linux-x86_64
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: '3.13'
       - name: Install Flatpak tooling
@@ -263,7 +263,7 @@ jobs:
         if: always()
         shell: bash
         run: flatpak uninstall --user -y cc.nift.nsm >/dev/null 2>&1 || true
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: distribution-flathub-linux-x86_64
@@ -311,7 +311,7 @@ jobs:
               handle.write("\n")
           print(json.dumps(data, indent=2, sort_keys=True))
           PY
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: distribution-summary
           path: .build/distribution/summary.json

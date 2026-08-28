@@ -31,7 +31,7 @@ jobs:
             platform: linux-x86_64
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Set up Homebrew
         uses: Homebrew/actions/setup-homebrew@df4b09108a1de9d6f995fe68f302b3f68bd6d2ef # 2026.07.20.1
         with:
@@ -66,7 +66,7 @@ jobs:
           cp .build/homebrew/nift.rb "$tap_dir/Formula/nift.rb"
           brew install --build-from-source nift-dev/nift-ci/nift
           brew test nift-dev/nift-ci/nift
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: nift-homebrew-${{ matrix.platform }}
           path: .build/homebrew/nift.rb

@@ -29,28 +29,28 @@ jobs:
     env:
       SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Require package and tag versions to agree
         if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
         run: |
           package_version="$(sed -nE "s/^version: '([^']+)'/\1/p" snap/snapcraft.yaml)"
           test "$package_version" = "${GITHUB_REF_NAME#v}"
-      - uses: snapcore/action-build@v1
+      - uses: snapcore/action-build@b391f430cb2650fd359ed4d2cfe88b2c481800e0
         id: snapcraft
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: nift-snap-${{ matrix.platform }}
           path: ${{ steps.snapcraft.outputs.snap }}
       - name: Publish edge Snap for confinement testing
         if: github.event_name == 'workflow_dispatch' && inputs.publish_edge && env.SNAPCRAFT_STORE_CREDENTIALS != ''
-        uses: snapcore/action-publish@v1
+        uses: snapcore/action-publish@9334eecb267cfd97a0ce3c8654215d095927252f
         with:
           snap: ${{ steps.snapcraft.outputs.snap }}
           release: edge
       - name: Publish stable Snap
         if: startsWith(github.ref, 'refs/tags/v') && env.SNAPCRAFT_STORE_CREDENTIALS != ''
-        uses: snapcore/action-publish@v1
+        uses: snapcore/action-publish@9334eecb267cfd97a0ce3c8654215d095927252f
         with:
           snap: ${{ steps.snapcraft.outputs.snap }}
           release: stable

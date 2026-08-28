@@ -4,9 +4,19 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to rehearse (e.g. 4.0.7). Builds + stages the four
+          archives and runs per-target extracted-archive smokes without
+          publishing anything.'
+        required: true
+        type: string
 
+# Least privilege: read-only at workflow scope; only the publish job is granted
+# write access to repository contents.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   unix:
@@ -21,7 +31,13 @@ jobs:
             platform: macos-x86_64
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then v="${GITHUB_REF_NAME#v}"; else v="${{ inputs.version }}"; fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
       - name: Build and smoke test
         run: |
           make -j2
@@ -29,13 +45,24 @@ jobs:
       - name: Stage archive
         shell: bash
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          version="${{ steps.version.outputs.version }}"
           test "$(./nift version | sed -E 's/^Nift v([^ ]+).*/\1/')" = "$version"
           root="nift-$version-${{ matrix.platform }}"
           mkdir "$root"
           cp nift README.md LICENSE "$root/"
           tar -czf "$root.tar.gz" "$root"
-      - uses: actions/upload-artifact@v4
+      - name: Rehearse extracted archive (native runner)
+        shell: bash
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          rm -rf archive-check && mkdir archive-check && tar xzf nift-*-"${{ matrix.platform }}".tar.gz -C archive-check
+          ( cd archive-check/nift-"$version"-"${{ matrix.platform }}" && \
+            test "$(./nift version | sed -E 's/^Nift v([^ ]+).*/\1/')" = "$version" && \
+            rm -rf /tmp/nift-arch-smoke && mkdir -p /tmp/nift-arch-smoke && cd /tmp/nift-arch-smoke && \
+            "$OLDPWD/nift" init >/dev/null && printf 'x\n' > index.html && \
+            "$OLDPWD/nift" build --all >/dev/null && "$OLDPWD/nift" status >/dev/null ) || { echo "extracted-archive smoke FAILED" >&2; exit 1; }
+          echo "archive smoke PASS: ${{ matrix.platform }}"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: ${{ matrix.platform }}
           path: nift-*.tar.gz
@@ -43,12 +70,18 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: msys2/setup-msys2@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884
         with:
           msystem: UCRT64
           update: true
           install: make mingw-w64-ucrt-x86_64-gcc
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then v="${GITHUB_REF_NAME#v}"; else v="${{ inputs.version }}"; fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
       - name: Build and stage archive
         shell: msys2 {0}
         run: |
@@ -57,13 +90,26 @@ jobs:
             echo "Windows release executable still depends on a MinGW runtime DLL" >&2
             exit 1
           fi
-          version="${GITHUB_REF_NAME#v}"
+          version="${{ steps.version.outputs.version }}"
           test "$(./nift.exe version | sed -E 's/^Nift v([^ ]+).*/\1/')" = "$version"
           root="nift-$version-windows-x86_64"
           mkdir "$root"
           cp nift.exe README.md LICENSE "$root/"
           powershell.exe -NoProfile -Command "Compress-Archive -Path '$root' -DestinationPath '$root.zip'"
-      - uses: actions/upload-artifact@v4
+      - name: Rehearse extracted archive (native runner)
+        shell: bash
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          rm -rf archive-check && mkdir archive-check
+          powershell.exe -NoProfile -Command "Expand-Archive -Path 'nift-$version-windows-x86_64.zip' -DestinationPath 'archive-check'"
+          ( cd "archive-check/nift-$version-windows-x86_64" && \
+            test "$(./nift.exe version | sed -E 's/^Nift v([^ ]+).*/\1/')" = "$version" && \
+            objdump -p nift.exe | sed -n 's/.*DLL Name: //p' | grep -Eiq '^(libgcc|libstdc\+\+|libwinpthread)' && { echo "extracted exe has MinGW runtime DLL" >&2; exit 1; } || true && \
+            rm -rf "$RUNNER_TEMP/nift-arch-smoke" && mkdir -p "$RUNNER_TEMP/nift-arch-smoke" && cd "$RUNNER_TEMP/nift-arch-smoke" && \
+            "$OLDPWD/nift.exe" init >/dev/null && printf 'x\n' > index.html && \
+            "$OLDPWD/nift.exe" build --all >/dev/null && "$OLDPWD/nift.exe" status >/dev/null ) || { echo "extracted-archive smoke FAILED" >&2; exit 1; }
+          echo "archive smoke PASS: windows-x86_64"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: windows-x86_64
           path: nift-*.zip
@@ -71,7 +117,7 @@ jobs:
   installer-preflight:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Validate installer
         run: |
           sh -n packaging/install.sh
@@ -81,24 +127,77 @@ jobs:
     if: github.event_name == 'push'
     needs: [unix, windows, installer-preflight]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           path: dist
           merge-multiple: true
       - name: Create checksums
         working-directory: dist
         run: sha256sum nift-* > SHA256SUMS
-      - name: Publish GitHub release
+      - name: Publish GitHub release (reviewed notes; fail-closed on existing release)
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+        shell: bash
         run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          NOTES="docs/evidence/release-$version/release-notes-$version.md"
+          [ -f "$NOTES" ] || { echo "FAIL: release-notes file missing at $NOTES (reviewed body must be committed in the tag)" >&2; exit 1; }
+          # Exact-set validation: exactly the four expected archives + SHA256SUMS.
+          cd dist
+          expected="nift-$version-linux-x86_64.tar.gz nift-$version-macos-arm64.tar.gz nift-$version-macos-x86_64.tar.gz nift-$version-windows-x86_64.zip"
+          for a in $expected; do [ -f "$a" ] || { echo "FAIL: missing expected asset $a" >&2; exit 1; }; done
+          actual="$(ls nift-* | sort | tr '\n' ' ')"
+          [ "$actual" = "$(printf '%s\n' $expected | tr '\n' ' ')" ] || { echo "FAIL: unexpected assets: $actual" >&2; exit 1; }
+          cd ..
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            echo "GitHub release $GITHUB_REF_NAME already exists; leaving its published assets unchanged"
+            echo "release exists; verifying assets + body before treating as success"
+            gh release download "$GITHUB_REF_NAME" --dir /tmp/rel-existing --clobber 2>/dev/null || { echo "FAIL: cannot download existing release assets" >&2; exit 1; }
+            ( cd /tmp/rel-existing && for a in $expected SHA256SUMS; do [ -f "$a" ] || { echo "FAIL: existing release missing $a" >&2; exit 1; }; done )
+            for a in $expected; do
+              [ "$(sha256sum "dist/$a" | cut -d' ' -f1)" = "$(sha256sum "/tmp/rel-existing/$a" | cut -d' ' -f1)" ] || { echo "FAIL: existing release asset $a differs from the built artifact" >&2; exit 1; }
+            done
+            body="$(gh release view "$GITHUB_REF_NAME" --json body --jq .body)"
+            [ "$body" = "$(cat "$NOTES")" ] || { echo "FAIL: existing release body differs from the reviewed notes" >&2; exit 1; }
+            echo "existing release verified identical (assets + checksums + body)"
           else
-            gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --generate-notes
+            gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --notes-file "$NOTES"
           fi
+
+  rehearse:
+    if: github.event_name == 'workflow_dispatch'
+    needs: [unix, windows, installer-preflight]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Build rehearsal checksum manifest and validate exact asset set
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ inputs.version }}"
+          expected="nift-$version-linux-x86_64.tar.gz nift-$version-macos-arm64.tar.gz nift-$version-macos-x86_64.tar.gz nift-$version-windows-x86_64.zip"
+          for a in $expected; do [ -f "dist/$a" ] || { echo "FAIL: missing $a" >&2; exit 1; }; done
+          actual="$(ls dist/nift-* | sed 's#dist/##' | sort | tr '\n' ' ')"
+          [ "$actual" = "$(printf '%s\n' $expected | tr '\n' ' ')" ] || { echo "FAIL: unexpected artifacts: $actual" >&2; exit 1; }
+          ( cd dist && sha256sum nift-* | sort > SHA256SUMS )
+          echo "REHEARSAL_EXACT_SET=1"
+          echo "assets: $(ls dist/nift-* | sed 's#dist/##' | tr '\n' ' ')"
+          cat dist/SHA256SUMS
+      - name: Upload rehearsal bundle
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rehearsal-${{ inputs.version }}
+          path: dist/*
 
   installer-public-smoke:
     needs: publish
@@ -113,7 +212,7 @@ jobs:
             platform: macos-x86_64
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Fetch and verify public installer
         shell: bash
         run: |
