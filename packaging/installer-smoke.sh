@@ -70,9 +70,10 @@ int main(void) {
 }
 C
 PC="$PREFIX/lib/pkgconfig/nift.pc"
-pc_prefix="$(sed -n 's/^prefix=//p' "$PC")"
-pc_libdir="$(sed -n 's/^libdir=//p' "$PC" | sed "s|\${prefix}|$pc_prefix|g")"
-pc_incdir="$(sed -n 's/^includedir=//p' "$PC" | sed "s|\${prefix}|$pc_prefix|g")"
+pc_dir="$(dirname "$PC")"
+pc_prefix="$(sed -n 's/^prefix=//p' "$PC" | sed "s|\${pcfiledir}|$pc_dir|g")"
+pc_libdir="$(sed -n 's/^libdir=//p' "$PC" | sed "s|\${pcfiledir}|$pc_dir|g" | sed "s|\${prefix}|$pc_prefix|g")"
+pc_incdir="$(sed -n 's/^includedir=//p' "$PC" | sed "s|\${pcfiledir}|$pc_dir|g" | sed "s|\${prefix}|$pc_prefix|g")"
 NIFT_CFLAGS="-I$pc_incdir"
 NIFT_LIBS="$(sed -n 's/^Libs: *//p' "$PC" | sed "s|\${libdir}|$pc_libdir|g")"
 echo "--- compile from installed prefix (flags derived from installed nift.pc) ---"
