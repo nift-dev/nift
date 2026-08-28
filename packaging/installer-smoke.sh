@@ -38,7 +38,17 @@ for i in $(seq 1 50); do curl -fsS "http://127.0.0.1:$PORT/SHA256SUMS" >/dev/nul
 BASE="http://127.0.0.1:$PORT"
 
 echo "=== installer smoke: positive (fresh prefix; real download + checksum) ==="
-INSTALL_OUT="$(NIFT_EMBED_BASE="$BASE" PREFIX="$PREFIX" bash packaging/install-embed.sh)"
+# On macOS, demonstrate the shasum -a 256 fallback by hiding sha256sum from
+# PATH: install-embed.sh must take its else branch and still verify the bundle.
+INSTALL_PATH="$PATH"
+if [ "$OS" = "macos" ] && [ "$HAS_SHA256SUM" -eq 1 ]; then
+  SHATOOL_DIR="$(dirname "$(command -v sha256sum)")"
+  INSTALL_PATH="$(printf '%s' "$PATH" | tr ':' '\n' | grep -vx "$SHATOOL_DIR" | paste -sd: -)"
+  echo "macOS installer run: sha256sum hidden (dropped ${SHATOOL_DIR}) -> shasum -a 256 fallback exercised"
+else
+  [ "$OS" = "macos" ] && echo "macOS installer run: sha256sum absent -> shasum -a 256 used"
+fi
+INSTALL_OUT="$(NIFT_EMBED_BASE="$BASE" PREFIX="$PREFIX" PATH="$INSTALL_PATH" bash packaging/install-embed.sh)"
 echo "$INSTALL_OUT"
 for f in include/nift/c_abi.h lib/libnift_c.a lib/pkgconfig/nift.pc; do
   [ -f "$PREFIX/$f" ] || { echo "FAIL: installer did not install $PREFIX/$f" >&2; exit 1; }
@@ -48,9 +58,6 @@ case "$OS" in
   macos) [ -f "$PREFIX/lib/libnift_c.dylib" ] || { echo "FAIL: installer missing libnift_c.dylib" >&2; exit 1; } ;;
   *) echo "FAIL: installer smoke unsupported OS $OS" >&2; exit 2 ;;
 esac
-if [ "$OS" = "macos" ]; then
-  [ "$HAS_SHA256SUM" -eq 0 ] && echo "checksum path on macOS: shasum -a 256 (sha256sum absent)" || echo "checksum path: sha256sum"
-fi
 
 cat > "$CONSUMER/consumer.c" <<'C'
 #include <stdio.h>
