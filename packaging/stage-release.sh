@@ -58,7 +58,7 @@ mkdir -p "$BUNDLE_STAGE/include/nift" "$BUNDLE_STAGE/lib/pkgconfig" "$BUNDLE_STA
 cp -r include/nift/. "$BUNDLE_STAGE/include/nift/"
 case "$OS" in
   linux)   BUNDLE_LIBS="libnift_c.a libnift_c.so" ;;
-  macos)   BUNDLE_LIBS="libnift_c.a libnift_c.so" ;;  # Makefile emits .so names; .dylib rename is a release-layout item
+  macos)   BUNDLE_LIBS="libnift_c.a libnift_c.dylib" ;;
   *)       BUNDLE_LIBS="libnift_c.a libnift_c.so" ;;
 esac
 for _f in $BUNDLE_LIBS; do

@@ -58,6 +58,9 @@ jobs:
           cat /tmp/matrix.out
           [ $rc -eq 0 ] || exit $rc
           grep -q 'SMOKE_EXECUTED=1' /tmp/matrix.out || { echo "FAIL: SMOKE_EXECUTED marker missing" >&2; exit 1; }
+          if [[ "${{ matrix.target }}" == linux-* || "${{ matrix.target }}" == macos-* ]]; then
+            grep -q 'INSTALLER_SMOKE_EXECUTED=1' /tmp/matrix.out || { echo "FAIL: INSTALLER_SMOKE_EXECUTED marker missing" >&2; exit 1; }
+          fi
       - name: Go static consumer on macOS/Windows (archive-only dir; no force_load)
         if: ${{ matrix.target == 'macos-arm64' || matrix.target == 'macos-x86_64' || matrix.target == 'windows-x86_64' }}
         shell: bash
@@ -204,7 +207,9 @@ jobs:
           WHEEL="$(ls /tmp/pydist/nift-*.whl | head -1)"
           python3 -m venv /tmp/pyvenv
           /tmp/pyvenv/bin/pip install --no-index "$WHEEL"
-          cd /tmp && /tmp/pyvenv/bin/python -c "import nift, importlib.metadata; assert importlib.metadata.version('nift').startswith('$(./nift --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')'); e=nift.Engine.new(); r=e.render_text('<p>hi</p>'); assert r.ok and r.output=='<p>hi</p>'; print('python clean-consumer render OK')"
+          VERSION="$(./nift --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
+          cd /tmp
+          /tmp/pyvenv/bin/python -c "import nift, importlib.metadata; assert importlib.metadata.version('nift') == '$VERSION'; e=nift.Engine.new(); r=e.render_text('<p>hi</p>'); assert r.ok and r.output=='<p>hi</p>'; print('python clean-consumer version+render OK (', importlib.metadata.version('nift'), ')')"
       - name: Clean-consumer npm install/load/render
         run: |
           TGZ="$(ls /tmp/npmdist/nift-*.tgz | head -1)"

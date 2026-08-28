@@ -28,7 +28,7 @@ mkdir -p "$OUT"
 # Per-target native library filenames (exact; failure if any is missing).
 case "$OS" in
   linux)   NATIVE_FILES="libnift_c.a libnift_c.so" ;;
-  macos)   NATIVE_FILES="libnift_c.a libnift_c.so" ;;  # Makefile emits .so names; .dylib naming is a release-layout item
+  macos)   NATIVE_FILES="libnift_c.a libnift_c.dylib" ;;
   windows) NATIVE_FILES="libnift_c.a libnift_c.so" ;;  # Makefile emits .so names on mingw; DLL/import-lib layout is a release-layout item
   *) echo "unsupported target OS: $OS" >&2; exit 2 ;;
 esac
@@ -141,8 +141,10 @@ CONSUMER_BIN="$CONSUMER/consumer"
     ldd "$CONSUMER_BIN" 2>/dev/null || true
     DEP="$(ldd "$CONSUMER_BIN" 2>/dev/null | grep -i nift || true)"
   elif command -v otool >/dev/null 2>&1; then
-    otool -L "$CONSUMER_BIN" 2>/dev/null || true
-    DEP="$(otool -L "$CONSUMER_BIN" 2>/dev/null | grep -i nift || true)"
+    # The first otool -L line is the executable's own header (a path that can
+    # contain "nift"); only an actual library dependency counts. tail -n +2.
+    otool -L "$CONSUMER_BIN" 2>/dev/null | tail -n +2 || true
+    DEP="$(otool -L "$CONSUMER_BIN" 2>/dev/null | tail -n +2 | grep -i libnift_c || true)"
   else
     objdump -p "$CONSUMER_BIN" 2>/dev/null | grep -iE 'dll|nift' || true
     DEP="$(objdump -p "$CONSUMER_BIN" 2>/dev/null | grep -i nift || true)"
@@ -153,8 +155,18 @@ CONSUMER_BIN="$CONSUMER/consumer"
   fi
   [ -z "$DEP" ] && DEP="none (statically linked)"
   echo "NIFT_DEPENDENCY=$DEP"
+  if [ "$OS" = "macos" ]; then
+    echo "--- macOS dynamic library install name (must be relocatable) ---"
+    otool -D "$ROOT/libnift_c.dylib" 2>/dev/null | tail -n +2 || echo "(install name unavailable)"
+  fi
   echo "SMOKE_EXECUTED=1"
   echo "SMOKE PASS: $TARGET native bundle installs, links and renders from a clean consumer; Nift dependency: $DEP"
+  case "$OS" in
+    linux|macos)
+      echo "=== installer smoke (build-only; local HTTP server) ==="
+      bash "$ROOT/packaging/installer-smoke.sh" "$TARGET" "$OUT/nift-embed-$OS-$ARCH.tar.gz"
+      ;;
+  esac
 else
   if [ "$REQUIRE_SMOKE" = "1" ]; then
     echo "FAIL: smoke not executed (configured $TARGET != runner $(detect_os)-$(detect_arch))" >&2
