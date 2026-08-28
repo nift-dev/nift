@@ -55,6 +55,37 @@ Proportionately include:
     help-like invocations produce the intended diagnostic and direct users to
     `nift commands`; a separate `nift help` command is not part of the contract.
 12. Inspect repository state for generated/debug residue.
+13. **Pre-tag public-installer deployment gate.** If `packaging/install.sh` (or
+    any public update script Nift may later gain) has changed since the previous
+    public release, the exact reviewed script must already be deployed at
+    `https://nift.dev/install` and byte-verified *before* the release tag is
+    created. The required sequence is:
+
+    ```text
+    installer change detected
+    → website source updated
+    → generated website rebuilt
+    → public website deployed
+    → public installer downloaded
+    → bytes/checksum verified
+    → public installer candidate smoke passes
+    → release go/no-go
+    → tag created
+    → release published
+    → public installer tested against released artifacts
+    ```
+
+    Two gates apply when the installer changed: (a) the **pre-tag deployment
+    gate** — the website is already serving the exact candidate installer, and
+    (b) the **post-release installation gate** — that same public installer
+    successfully installs the newly published artifacts. Both are required. The
+    pre-tag gate is enforced fail-closed by `release.yml`'s
+    `public-installer-preflight` job, which is a dependency of both the
+    non-publishing rehearsal aggregate and the `publish` job (byte-compares
+    `https://nift.dev/install` with `packaging/install.sh`, records both SHA-256
+    values, and runs `sh -n`). The post-release gate is the retained
+    `installer-public-smoke` jobs (equality alone does not prove the script can
+    install the newly released artifacts).
 
 Repository tests passing does not prove a release archive is usable. After the
 release is public, the separate distribution-verification workflow tests the
@@ -451,5 +482,106 @@ page named `404`, and loud rejection of unknown `.nift/config.json` keys.
 
 - Homebrew auto-bump merge + fresh install; Chocolatey moderation/approval and
   fresh install; Flathub external PR; Snap non-x86 architectures.
+- Run `distribution-verification.yml` against the exact public version once
+  stores propagate.
+
+## v4.0.7 release report (2026-08-28)
+
+### Scope
+
+v4.0.7 is a CLI-only release. It unifies the build and inspection command
+grammar and adds an explicit repair path for interrupted builds. The embedded
+engine, its language bindings, the shared corpus and the experimental Rust
+implementation remain in-tree but are not released, documented or promoted.
+
+### Source and workflow
+
+- Tag: `v4.0.7` (annotated) at `756aa61`; pushed to `origin`.
+- GitHub Actions run: `33146385355` — publication succeeded; the run initially
+  reported failure due to a release-ordering defect (below) and completed
+  success after the public installer was deployed and the failed/skipped
+  verification jobs were re-run.
+- GitHub release: https://github.com/nift-dev/nift/releases/tag/v4.0.7
+
+### Release-ordering defect and recovery (public installer deployment)
+
+`packaging/install.sh` changed since v4.0.6 (a `custom_install_dir` refactor and
+an automatic macOS PATH-profile update), but the website was not redeployed
+first, so `https://nift.dev/install` still served the previous installer. The
+`installer-public-smoke` gate correctly caught this post-publication
+(`packaging/install.sh /tmp/nift-install.sh differ: byte 68, line 5`). Detecting
+a stale public installer only in the post-publication smoke is too late, so this
+release established a permanent invariant (item 13 in the release-candidate
+validation checklist): the exact reviewed installer must be deployed and
+byte-verified before the release tag is created, enforced by
+`public-installer-preflight` in `release.yml` as a dependency of both the
+rehearsal and `publish`.
+
+Recovery (no release assets, tag or published checksums were changed):
+- Website deployment (`main`) commit `a0573ec` and website source (`stage`)
+  commit `2369090` deployed the reviewed installer to `https://nift.dev/install`.
+- Public installer SHA-256 after deployment: `a98bdf72…` == canonical
+  `packaging/install.sh` SHA-256 `a98bdf72…`; independent `cmp` PASS; `sh -n`
+  PASS.
+- The public script was exercised against the published 4.0.7 release in a
+  temporary install directory: installed binary reports `Nift v4.0.7`; clean
+  `init`/`build --all`/`status`/`info` smoke PASS.
+- Failed/skipped verification jobs re-run: `installer-public-smoke` PASS on
+  linux-x86_64, macos-x86_64 and macos-arm64; the run then completed success.
+- User-visible broken-installation window: none. The stale installer resolved
+  `releases/latest` (= v4.0.7) and honoured `NIFT_VERSION`, so it still installed
+  the correct 4.0.7 binary; it only lacked the newer macOS PATH-profile
+  convenience, not correctness.
+
+### Release-candidate validation (performed at `756aa61`, clean build)
+
+- Full implementation-local suite, external contract suite (22/22 modules +
+  historical/ruthless), ASan/UBSan, performance/scaling and memory guards, and
+  the reduced-CLI isolation gate all PASS (the external suite was reconciled to
+  the unified grammar and the `.unfinished`/`--repair` semantics first).
+- Four-platform non-publishing native-runner rehearsal (run `33144427317`)
+  PASS: linux-x86_64, macos-arm64, macos-x86_64, windows-x86_64, installer
+  preflight, aggregate rehearsal; publish and public smokes skipped.
+- Website built with the candidate binary (75/75 pages); homepage unchanged; no
+  Embedded Nift promotion anywhere in the public site.
+
+### Archives and checksums (definitive, from the published release)
+
+- `nift-4.0.7-linux-x86_64.tar.gz` (489 353 bytes) — `b76b23c81d4dd8b3b1b972487b1b3228fd5a584dd187b88e871cc6c2d2458716`
+- `nift-4.0.7-macos-arm64.tar.gz` (372 544 bytes) — `6960314754394c3684a1e563a092b27ec23e63cf932b0da7946ede44506a207f`
+- `nift-4.0.7-macos-x86_64.tar.gz` (396 520 bytes) — `c915e9849d1794e77edc99a595d8c807fb0f38020a27e75a94ad32859253ad9f`
+- `nift-4.0.7-windows-x86_64.zip` (1 388 264 bytes) — `9db779cb264d3936b7be71aad8df1abc2bd70bba6194cc77f7bcb8f22bf80aad`
+- `SHA256SUMS` (386 bytes) — independently downloaded; all four entries verified
+  (`sha256sum -c` OK).
+- Release body equals the reviewed CLI-only notes; no Embedded Nift mention.
+
+### Package publication
+
+- **Snap stable**: PUBLISHED on amd64 (revision 678) and arm64 (revision 677)
+  via `snapcraft upload … --release stable`.
+- **Chocolatey Community**: `nift.4.0.7.nupkg` pushed successfully to
+  `push.chocolatey.org` — submitted, awaiting moderation; not yet independently
+  verified from the public channel.
+- **Homebrew**: formula built and tested on Linux x86-64 and macOS arm64;
+  propagation is left to Homebrew's automatic bump service (no manual PR);
+  fresh install is external verification.
+- **Flathub**: external `flathub/cc.nift.nsm` manifest update required —
+  pending external PR.
+- **Distribution verification**: run `distribution-verification.yml` against the
+  exact public version once channels have had the required propagation time.
+
+### Post-release
+
+- Development identity advanced to `Nift v4.0.8` in `src/CLI.cpp`,
+  `snap/snapcraft.yaml`, release notes, and the guarantee registry baseline
+  (released_version 4.0.7, release_commit 756aa61, development_version 4.0.8).
+- Regression-suite version assertions advanced to v4.0.8.
+- Both `nift-dev/nift` and `nift-dev/nift-regression-suite` pushed to `main`.
+
+### Remaining downstream tracking
+
+- Homebrew auto-bump merge + fresh install; Chocolatey moderation/approval and
+  fresh install; Flathub external PR; Snap non-x86 architectures; public
+  installer verified against 4.0.7 in CI (completed).
 - Run `distribution-verification.yml` against the exact public version once
   stores propagate.

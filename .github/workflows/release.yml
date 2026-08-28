@@ -135,9 +135,37 @@ jobs:
           sh -n packaging/install.sh
           make test-installer
 
+  # Pre-tag deployment gate: if packaging/install.sh changed since the previous
+  # public release, the exact reviewed version MUST already be live at
+  # https://nift.dev/install before the release is tagged/published. This job is
+  # a dependency of both the rehearsal aggregate and the publish job, so a stale
+  # public installer fails the release fail-closed. Post-publication installer
+  # smokes are retained separately (equality alone does not prove the script can
+  # install the newly released artifacts).
+  public-installer-preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Verify the public installer matches the reviewed canonical script
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --retry 5 --retry-all-errors --retry-delay 2 -fsSL https://nift.dev/install -o /tmp/public-install.sh
+          canonical_sha="$(sha256sum packaging/install.sh | cut -d' ' -f1)"
+          public_sha="$(sha256sum /tmp/public-install.sh | cut -d' ' -f1)"
+          echo "canonical packaging/install.sh SHA-256: $canonical_sha"
+          echo "public https://nift.dev/install SHA-256:  $public_sha"
+          cmp packaging/install.sh /tmp/public-install.sh || {
+            echo "FAIL: the public website serves a stale installer (differs from the reviewed canonical packaging/install.sh)." >&2
+            echo "Per the release invariant, the exact reviewed installer must be deployed at https://nift.dev/install and byte-verified before the release tag is created." >&2
+            exit 1
+          }
+          sh -n /tmp/public-install.sh
+          echo "PUBLIC_INSTALLER_MATCH=1"
+
   publish:
     if: github.event_name == 'push'
-    needs: [unix, windows, installer-preflight]
+    needs: [unix, windows, installer-preflight, public-installer-preflight]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -179,7 +207,7 @@ jobs:
 
   rehearse:
     if: github.event_name == 'workflow_dispatch'
-    needs: [unix, windows, installer-preflight]
+    needs: [unix, windows, installer-preflight, public-installer-preflight]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
