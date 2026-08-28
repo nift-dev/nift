@@ -61,9 +61,9 @@ case "$os" in
     [ -f "$tmp/lib/libnift_c.so" ] || { echo "install: bundle missing libnift_c.so" >&2; exit 1; }
     cp "$tmp/lib/libnift_c.so" "$PREFIX/lib/" ;;
   macos)
-    if [ -f "$tmp/lib/libnift_c.dylib" ]; then cp "$tmp/lib/libnift_c.dylib" "$PREFIX/lib/"
-    elif [ -f "$tmp/lib/libnift_c.so" ]; then cp "$tmp/lib/libnift_c.so" "$PREFIX/lib/"
-    else echo "install: bundle missing a macOS shared library (.dylib or .so)" >&2; exit 1; fi ;;
+    # Target-correct macOS layout: only a Mach-O .dylib is accepted.
+    [ -f "$tmp/lib/libnift_c.dylib" ] || { echo "install: bundle missing libnift_c.dylib" >&2; exit 1; }
+    cp "$tmp/lib/libnift_c.dylib" "$PREFIX/lib/" ;;
 esac
 cp "$tmp/lib/pkgconfig/nift.pc" "$PREFIX/lib/pkgconfig/nift.pc"
 echo "installed Nift Embed native library to $PREFIX"

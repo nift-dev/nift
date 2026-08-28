@@ -23,9 +23,12 @@ HAS_SHA256SUM=0; command -v sha256sum >/dev/null 2>&1 && HAS_SHA256SUM=1
 SERVE="$(mktemp -d /tmp/nift-serve.XXXXXX)"
 PREFIX="$(mktemp -d /tmp/nift-prefix.XXXXXX)"
 CONSUMER="$(mktemp -d /tmp/nift-instcons.XXXXXX)"
+BADPREFIX=
+LAYOUT_DIR=
+LAYOUTPREFIX=
 PORT="$(( 22000 + (RANDOM % 10000) ))"
 SERVER_PID=
-cleanup() { [ -n "$SERVER_PID" ] && kill "$SERVER_PID" 2>/dev/null || true; rm -rf "$SERVE" "$PREFIX" "$CONSUMER"; }
+cleanup() { [ -n "$SERVER_PID" ] && kill "$SERVER_PID" 2>/dev/null || true; rm -rf "$SERVE" "$PREFIX" "$CONSUMER" "$BADPREFIX" "$LAYOUT_DIR" "$LAYOUTPREFIX"; }
 trap cleanup EXIT
 
 tarball="nift-embed-$OS-$ARCH.tar.gz"
@@ -99,4 +102,27 @@ if [ -f "$BADPREFIX/lib/libnift_c.a" ] || [ -f "$BADPREFIX/include/nift/c_abi.h"
   echo "FAIL: negative checksum test installed files into $BADPREFIX" >&2; exit 1
 fi
 echo "installer smoke PASS: negative checksum rejected, nothing installed"
+
+if [ "$OS" = "macos" ]; then
+  echo "=== installer smoke: negative macOS layout (checksum-valid bundle, .so instead of .dylib) ==="
+  # Serve a checksum-VALID bundle whose shared library is named libnift_c.so.
+  # The installer must reject it (target-correct .dylib required) and must not
+  # install any shared library.
+  LAYOUT_DIR="$(mktemp -d /tmp/nift-badlayout.XXXXXX)"
+  LAYOUTPREFIX="$(mktemp -d /tmp/nift-badlayout-prefix.XXXXXX)"
+  rm -rf "$SERVE/$tarball"
+  tar xzf "$BUNDLE" -C "$LAYOUT_DIR"
+  [ -f "$LAYOUT_DIR/lib/libnift_c.dylib" ] || { echo "FAIL: source bundle lacks libnift_c.dylib" >&2; exit 1; }
+  mv "$LAYOUT_DIR/lib/libnift_c.dylib" "$LAYOUT_DIR/lib/libnift_c.so"
+  ( cd "$LAYOUT_DIR" && tar czf "$SERVE/$tarball" include lib install-embed.sh )
+  ( cd "$SERVE" && chk "$tarball" > SHA256SUMS )
+  if NIFT_EMBED_BASE="$BASE" PREFIX="$LAYOUTPREFIX" bash packaging/install-embed.sh >/dev/null 2>&1; then
+    echo "FAIL: installer accepted a macOS bundle with libnift_c.so instead of libnift_c.dylib" >&2; exit 1
+  fi
+  for f in lib/libnift_c.dylib lib/libnift_c.so; do
+    [ -e "$LAYOUTPREFIX/$f" ] && { echo "FAIL: macOS layout test installed $f" >&2; exit 1; }
+  done
+  echo "installer smoke PASS: macOS .so-layout bundle rejected, no shared library installed"
+fi
+
 echo "INSTALLER_SMOKE_EXECUTED=1"
