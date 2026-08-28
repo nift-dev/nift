@@ -48,6 +48,22 @@ smoke; the Windows job also asserts the extracted executable has no MinGW
 runtime DLL dependency. The rehearsal and the real release share the same
 `release.yml` build/staging logic — there is no second packaging implementation.
 
+### 2.1 RC04R2 re-rehearsal (after the workflow repair)
+
+Run **`33144427317`** (workflow_dispatch, `version=4.0.7`, commit `74f3a09`) —
+**completed/success**. unix (linux-x86_64 / macos-arm64 / macos-x86_64),
+windows, installer-preflight and rehearse all succeeded; **publish and
+installer-public-smoke were skipped** (non-publishing). The Windows extracted
+archive smoke ran its explicit sequential version + forbidden-DLL checks and
+reported `archive smoke PASS: windows-x86_64` with no executed FAIL.
+
+The four archives' extracted binaries and bundled README/LICENSE are
+**byte-identical** to run `33142977130`; the archive SHA-256 values differ only
+because `tar -czf` embeds the gzip timestamp (expected nondeterminism). The
+definitive per-release hashes are recorded by the tag-triggered `release.yml`
+run at CLI-RC05; the rehearsal hashes below are evidence of the artifact set
+and content.
+
 ### 2.1 Artifacts (rehearsal bundle `rehearsal-4.0.7`, all SHA-256 verified)
 
 | Artifact | Size (bytes) | SHA-256 |
