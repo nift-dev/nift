@@ -18,6 +18,8 @@
 #if defined(_WIN32)
 #define popen _popen
 #define pclose _pclose
+#else
+#include <sys/wait.h>
 #endif
 
 // Portable, deterministic regression coverage for the BuildProgress renderer.
@@ -213,29 +215,86 @@ std::string shell_quote(const std::string& value) {
 #if defined(_WIN32)
     return "\"" + value + "\"";
 #else
-    return "'" + value + "'";
+    // Single-quote for POSIX sh, escaping embedded single quotes as '\'' so
+    // paths containing spaces or quotes re-exec correctly.
+    std::string out = "'";
+    for (char c : value) {
+        if (c == '\'') out += "'\\''";
+        else out += c;
+    }
+    out += "'";
+    return out;
+#endif
+}
+
+// Decodes the popen()/pclose() child status. Returns false if the child did not
+// exit normally; on success sets *exit_code. POSIX wait status is decoded with
+// the wait macros; Windows _pclose returns the exit code directly.
+bool decode_child_status(int status, int& exit_code) {
+#if defined(_WIN32)
+    if (status == -1) return false;
+    exit_code = status;
+    return true;
+#else
+    if (!WIFEXITED(status)) return false;
+    exit_code = WEXITSTATUS(status);
+    return true;
 #endif
 }
 
 // Runs the production Visibility::Detect path with genuinely redirected stdout:
 // the child's stdout is a pipe (popen), so the renderer must not start and no
 // progress bytes (\r or \033) may appear. Deterministic regardless of whether
-// this test executable itself was launched from a terminal.
+// this test executable itself was launched from a terminal. Also proves the
+// child actually executed and exited successfully (pclose status), so an
+// empty capture cannot masquerade as success.
 void test_detect_noninteractive_child() {
     const std::string command = shell_quote(program_path_) + " --progress-detect-child";
     FILE* pipe = popen(command.c_str(), "r");
     check(pipe != nullptr, "popen starts the detect child");
     std::string captured;
+    int status = -1;
     if (pipe != nullptr) {
         char buffer[256];
         std::size_t n = 0;
         while ((n = std::fread(buffer, 1, sizeof(buffer), pipe)) > 0)
             captured.append(buffer, n);
-        pclose(pipe);
+        status = pclose(pipe);
     }
+    int child_exit = -1;
+    const bool exited = decode_child_status(status, child_exit);
+    check(exited && child_exit == 0, "detect child executed and exited successfully");
     check(captured.empty(), "detect child with redirected stdout emits no progress bytes");
     check(captured.find('\r') == std::string::npos, "redirected output contains no carriage returns");
     check(captured.find('\033') == std::string::npos, "redirected output contains no escape sequences");
+}
+
+// Counter-probe for the above: a deliberately non-executable child must be
+// reported as a failed launch, never as an empty-output success.
+void test_detect_child_launch_failure_detected() {
+    const std::string command =
+        shell_quote("/nonexistent/nift-progress-test-missing") + " --progress-detect-child"
+#if defined(_WIN32)
+        + " 2>nul"
+#else
+        + " 2>/dev/null"
+#endif
+        ;
+    FILE* pipe = popen(command.c_str(), "r");
+    check(pipe != nullptr, "popen starts the bogus child");
+    std::string captured;
+    int status = -1;
+    if (pipe != nullptr) {
+        char buffer[256];
+        std::size_t n = 0;
+        while ((n = std::fread(buffer, 1, sizeof(buffer), pipe)) > 0)
+            captured.append(buffer, n);
+        status = pclose(pipe);
+    }
+    int child_exit = -1;
+    const bool exited = decode_child_status(status, child_exit);
+    check(!(exited && child_exit == 0),
+          "non-executable child is reported as a failure, not an empty success");
 }
 
 void test_frame_tiers() {
@@ -484,6 +543,7 @@ int main(int argc, char** argv) {
     test_disabled_emits_nothing();
     test_zero_total_emits_nothing();
     test_detect_noninteractive_child();
+    test_detect_child_launch_failure_detected();
     test_deterministic_fixed_ordering();
     test_deterministic_buggy_ordering_detected();
     test_wide_to_medium_no_stale_suffix();

@@ -48,31 +48,38 @@ EOF
 
 # Invoke the build under a PTY. $1 = transcript file, $2... = build arguments.
 # The inner command is assembled with printf '%q' so project or binary paths
-# containing spaces cannot change what is executed.
+# containing spaces or single quotes cannot change what is executed. The Nift
+# command runs inside a wrapper that always prints an explicit status marker
+# (__NIFT_PROGRESS_EXIT__=N) into the transcript, so the reported exit status
+# never depends on which `script` implementation wrote the footer.
 pty_invoke() {
   local transcript="$1"; shift
   local platform="${PTY_PLATFORM:-$(uname -s)}"
-  local inner_cmd
-  inner_cmd="cd $(printf '%q' "$P") && $(printf '%q' "$NIFT_BIN")"
+  local wrapper
+  wrapper="{ cd $(printf '%q' "$P") && $(printf '%q' "$NIFT_BIN")"
   local arg
-  for arg in "$@"; do inner_cmd+=" $(printf '%q' "$arg")"; done
+  for arg in "$@"; do wrapper+=" $(printf '%q' "$arg")"; done
+  wrapper+=" ; } ; __status=\$? ; printf '\\n__NIFT_PROGRESS_EXIT__=%s\\n' \"\$__status\" ; exit \"\$__status\""
   case "$platform" in
     Darwin)
-      script -q "$transcript" /bin/sh -c "$inner_cmd" >"$TMP/pty.out" 2>&1 || true
+      script -q "$transcript" /bin/sh -c "$wrapper" >"$TMP/pty.out" 2>&1 || true
       ;;
     *)
-      script -qec "$inner_cmd" "$transcript" >"$TMP/pty.out" 2>&1 || true
+      script -qec "$wrapper" "$transcript" >"$TMP/pty.out" 2>&1 || true
       ;;
   esac
 }
 
 # Reconstruct the terminal screen from a transcript and write the visible lines
-# plus the parsed child exit code to "$TMP/screen.txt". $1 = transcript file.
+# plus the child exit code (from the explicit marker) to "$TMP/screen.txt".
+# $1 = transcript file.
 pty_reconstruct() {
   python3 - "$1" "$TMP/screen.txt" <<'EOF'
 import re, sys
 transcript, out = sys.argv[1], sys.argv[2]
 data = open(transcript, "rb").read().decode("utf-8", "replace")
+marker = re.search(r"__NIFT_PROGRESS_EXIT__=([0-9]+)", data)
+exit_code = marker.group(1) if marker else "unknown"
 lines = [""]
 cur = 0
 i = 0
@@ -107,12 +114,10 @@ while i < n:
         lines[-1] = line
         cur += 1
         i += 1
-exit_code = "unknown"
-footer = re.search(r"COMMAND_EXIT_CODE[^0-9]*([0-9]+)", data)
-if footer:
-    exit_code = footer.group(1)
 with open(out, "w") as f:
     for line in lines:
+        if line.startswith("__NIFT_PROGRESS_EXIT__="):
+            continue
         f.write(line + "\n")
     f.write("EXIT_CODE=" + exit_code + "\n")
 EOF
@@ -132,7 +137,8 @@ exit_code() {
 
 # Structural verification of the macOS/BSD `script` branch without a macOS
 # runner: a fake `script` on PATH records the argv it receives, proving the
-# Darwin invocation passes transcript first, then /bin/sh -c <command>.
+# Darwin invocation passes transcript first, then /bin/sh -c <command>, and that
+# the supplied command carries the explicit exit-marker contract.
 check_darwin_invocation() {
   local fake="$TMP/fakebin/script"
   mkdir -p "$TMP/fakebin"
@@ -144,11 +150,12 @@ FAKE
   chmod +x "$fake"
   FAKE_ARGV="$TMP/darwin-argv.txt" PTY_PLATFORM=Darwin PATH="$TMP/fakebin:$PATH" \
     pty_invoke "$TMP/darwin.transcript" build --all
-  local argc arg2 arg3 arg4
+  local argc arg2 arg3 arg4 arg5
   argc="$(sed -n '1p' "$TMP/darwin-argv.txt")"
   arg2="$(sed -n '3p' "$TMP/darwin-argv.txt")"
   arg3="$(sed -n '4p' "$TMP/darwin-argv.txt")"
   arg4="$(sed -n '5p' "$TMP/darwin-argv.txt")"
+  arg5="$(sed -n '6p' "$TMP/darwin-argv.txt")"
   test "$argc" = "5" || { echo "FAIL: Darwin script argv count (got $argc, want 5)"; exit 1; }
   test "$arg2" = "$TMP/darwin.transcript" \
     || { echo "FAIL: Darwin script transcript not first positional argument (got: $arg2)"; exit 1; }
@@ -156,10 +163,41 @@ FAKE
     || { echo "FAIL: Darwin script command not /bin/sh (got: $arg3)"; exit 1; }
   test "$arg4" = "-c" \
     || { echo "FAIL: Darwin script missing -c (got: $arg4)"; exit 1; }
-  echo "Darwin script invocation structurally verified (script -q FILE /bin/sh -c CMD)"
+  case "$arg5" in
+    *__NIFT_PROGRESS_EXIT__=*) : ;;
+    *) echo "FAIL: Darwin -c command lacks the exit-marker contract (got: $arg5)"; exit 1 ;;
+  esac
+  echo "Darwin script invocation structurally verified (script -q FILE /bin/sh -c CMD + exit marker)"
+}
+
+# Parser fixture: a BSD/macOS-style transcript has no util-linux COMMAND_EXIT_CODE
+# footer. The explicit __NIFT_PROGRESS_EXIT__ marker must be the only source of
+# status, must be parsed for both success and failure, and must never leak into
+# the reconstructed user-facing screen.
+check_marker_parsing() {
+  local fixture
+  fixture="$TMP/fixture-ok.transcript"
+  printf 'Script started on 2026-01-01\r\noutput line\r\n__NIFT_PROGRESS_EXIT__=0\r\nScript done on 2026-01-01\r\n' > "$fixture"
+  pty_reconstruct "$fixture"
+  test "$(exit_code)" = "0" || { echo "FAIL: marker status 0 not parsed (got $(exit_code))"; exit 1; }
+  screen_line | grep -q '__NIFT_PROGRESS_EXIT__' \
+    && { echo "FAIL: exit marker leaked into reconstructed screen"; exit 1; }
+
+  fixture="$TMP/fixture-fail.transcript"
+  printf 'Script started on 2026-01-01\r\noutput line\r\n__NIFT_PROGRESS_EXIT__=1\r\nScript done on 2026-01-01\r\n' > "$fixture"
+  pty_reconstruct "$fixture"
+  test "$(exit_code)" = "1" || { echo "FAIL: marker status 1 not parsed (got $(exit_code))"; exit 1; }
+
+  fixture="$TMP/fixture-none.transcript"
+  printf 'Script started on 2026-01-01\r\noutput line\r\nScript done on 2026-01-01\r\n' > "$fixture"
+  pty_reconstruct "$fixture"
+  test "$(exit_code)" = "unknown" || { echo "FAIL: absent marker should yield unknown (got $(exit_code))"; exit 1; }
+
+  echo "exit marker parsing verified (footer-free BSD-style transcripts)"
 }
 
 check_darwin_invocation
+check_marker_parsing
 
 # --- Success path -----------------------------------------------------------
 run_pty "$TMP/ok.transcript" build
