@@ -5,22 +5,23 @@
 # line: no stale "building ..." prefix survives before the summary, on either the
 # success or the failure path, and NO_COLOR keeps SGR colour sequences out of an
 # interactive session. Skipped gracefully when `script` or `python3` is absent.
+#
+# Linux and macOS use different `script` CLIs:
+#   Linux  (util-linux):  script -qec "CMD" FILE
+#   macOS  (BSD/FreeBSD): script -q FILE /bin/sh -c "CMD"
+# PTY_PLATFORM may override `uname -s`; the fake-`script` structural check below
+# uses that to verify the Darwin argument order without a macOS runner.
 set -euo pipefail
 NIFT_BIN="${NIFT_BIN:?NIFT_BIN must point to the nift binary}"
 
 if ! command -v script >/dev/null 2>&1; then
-  echo "SKIP: 'script' (util-linux) is unavailable"
+  echo "SKIP: 'script' is unavailable"
   exit 0
 fi
 if ! command -v python3 >/dev/null 2>&1; then
   echo "SKIP: 'python3' is unavailable"
   exit 0
 fi
-
-case "$(uname -s)" in
-  Darwin) SCRIPT_OPTS="-q" ;;
-  *)      SCRIPT_OPTS="-qec" ;;
-esac
 
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/nift-progress-pty.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
@@ -45,13 +46,30 @@ for i in range(1, 1001):
         f.write("---\ntitle: P %d\ntemplate: templates/template.html\n---\n<p>%d</p>\n" % (i, i))
 EOF
 
-# Run the build under a PTY and reconstruct the screen. $1 = transcript file,
-# $2... = build arguments. Writes the reconstructed lines and the exit code to
-# a second file.
-run_pty() {
+# Invoke the build under a PTY. $1 = transcript file, $2... = build arguments.
+# The inner command is assembled with printf '%q' so project or binary paths
+# containing spaces cannot change what is executed.
+pty_invoke() {
   local transcript="$1"; shift
-  script $SCRIPT_OPTS "cd $P && $NIFT_BIN $*" "$transcript" >"$TMP/pty.out" 2>&1 || true
-  python3 - "$transcript" "$TMP/screen.txt" <<'EOF'
+  local platform="${PTY_PLATFORM:-$(uname -s)}"
+  local inner_cmd
+  inner_cmd="cd $(printf '%q' "$P") && $(printf '%q' "$NIFT_BIN")"
+  local arg
+  for arg in "$@"; do inner_cmd+=" $(printf '%q' "$arg")"; done
+  case "$platform" in
+    Darwin)
+      script -q "$transcript" /bin/sh -c "$inner_cmd" >"$TMP/pty.out" 2>&1 || true
+      ;;
+    *)
+      script -qec "$inner_cmd" "$transcript" >"$TMP/pty.out" 2>&1 || true
+      ;;
+  esac
+}
+
+# Reconstruct the terminal screen from a transcript and write the visible lines
+# plus the parsed child exit code to "$TMP/screen.txt". $1 = transcript file.
+pty_reconstruct() {
+  python3 - "$1" "$TMP/screen.txt" <<'EOF'
 import re, sys
 transcript, out = sys.argv[1], sys.argv[2]
 data = open(transcript, "rb").read().decode("utf-8", "replace")
@@ -90,7 +108,7 @@ while i < n:
         cur += 1
         i += 1
 exit_code = "unknown"
-footer = re.search(r"COMMAND_EXIT_CODE=\"([^\"]*)\"", data)
+footer = re.search(r"COMMAND_EXIT_CODE[^0-9]*([0-9]+)", data)
 if footer:
     exit_code = footer.group(1)
 with open(out, "w") as f:
@@ -100,12 +118,48 @@ with open(out, "w") as f:
 EOF
 }
 
+run_pty() {
+  pty_invoke "$@"
+  pty_reconstruct "$1"
+}
+
 screen_line() {
   grep -v '^EXIT_CODE=' "$TMP/screen.txt"
 }
 exit_code() {
   sed -n 's/^EXIT_CODE=//p' "$TMP/screen.txt"
 }
+
+# Structural verification of the macOS/BSD `script` branch without a macOS
+# runner: a fake `script` on PATH records the argv it receives, proving the
+# Darwin invocation passes transcript first, then /bin/sh -c <command>.
+check_darwin_invocation() {
+  local fake="$TMP/fakebin/script"
+  mkdir -p "$TMP/fakebin"
+  cat > "$fake" <<'FAKE'
+#!/usr/bin/env bash
+printf '%s\n' "$#" >> "$FAKE_ARGV"
+printf '%s\n' "$@" >> "$FAKE_ARGV"
+FAKE
+  chmod +x "$fake"
+  FAKE_ARGV="$TMP/darwin-argv.txt" PTY_PLATFORM=Darwin PATH="$TMP/fakebin:$PATH" \
+    pty_invoke "$TMP/darwin.transcript" build --all
+  local argc arg2 arg3 arg4
+  argc="$(sed -n '1p' "$TMP/darwin-argv.txt")"
+  arg2="$(sed -n '3p' "$TMP/darwin-argv.txt")"
+  arg3="$(sed -n '4p' "$TMP/darwin-argv.txt")"
+  arg4="$(sed -n '5p' "$TMP/darwin-argv.txt")"
+  test "$argc" = "5" || { echo "FAIL: Darwin script argv count (got $argc, want 5)"; exit 1; }
+  test "$arg2" = "$TMP/darwin.transcript" \
+    || { echo "FAIL: Darwin script transcript not first positional argument (got: $arg2)"; exit 1; }
+  test "$arg3" = "/bin/sh" \
+    || { echo "FAIL: Darwin script command not /bin/sh (got: $arg3)"; exit 1; }
+  test "$arg4" = "-c" \
+    || { echo "FAIL: Darwin script missing -c (got: $arg4)"; exit 1; }
+  echo "Darwin script invocation structurally verified (script -q FILE /bin/sh -c CMD)"
+}
+
+check_darwin_invocation
 
 # --- Success path -----------------------------------------------------------
 run_pty "$TMP/ok.transcript" build
@@ -152,7 +206,7 @@ json.dump(t, open(root + "/.nift/tracked.json", "w"))
 EOF
 rm -rf "$P/public" "$P/.nift/public"
 rm -f "$P/.nift/.unfinished"
-NO_COLOR=1 script $SCRIPT_OPTS "cd $P && $NIFT_BIN build --all" "$TMP/nocolor.transcript" >"$TMP/nocolor.out" 2>&1 || true
+NO_COLOR=1 run_pty "$TMP/nocolor.transcript" build --all
 NO_COLOR_RESULT="$(python3 - "$TMP/nocolor.transcript" <<'EOF'
 import re, sys
 data = open(sys.argv[1], "rb").read().decode("utf-8", "replace")

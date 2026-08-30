@@ -4,6 +4,7 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstdio>
 #include <cstdlib>
 #include <functional>
 #include <iostream>
@@ -13,6 +14,11 @@
 #include <string>
 #include <thread>
 #include <vector>
+
+#if defined(_WIN32)
+#define popen _popen
+#define pclose _pclose
+#endif
 
 // Portable, deterministic regression coverage for the BuildProgress renderer.
 // No PTY is required: interactivity is controlled through BuildProgress's
@@ -199,6 +205,39 @@ std::string strip_erase(const std::string& frame) {
     return frame.compare(0, erase_len, erase) == 0 ? frame.substr(erase_len) : frame;
 }
 
+// Path to this test executable, captured from argv[0] so the Detect subprocess
+// test can re-exec itself.
+std::string program_path_;
+
+std::string shell_quote(const std::string& value) {
+#if defined(_WIN32)
+    return "\"" + value + "\"";
+#else
+    return "'" + value + "'";
+#endif
+}
+
+// Runs the production Visibility::Detect path with genuinely redirected stdout:
+// the child's stdout is a pipe (popen), so the renderer must not start and no
+// progress bytes (\r or \033) may appear. Deterministic regardless of whether
+// this test executable itself was launched from a terminal.
+void test_detect_noninteractive_child() {
+    const std::string command = shell_quote(program_path_) + " --progress-detect-child";
+    FILE* pipe = popen(command.c_str(), "r");
+    check(pipe != nullptr, "popen starts the detect child");
+    std::string captured;
+    if (pipe != nullptr) {
+        char buffer[256];
+        std::size_t n = 0;
+        while ((n = std::fread(buffer, 1, sizeof(buffer), pipe)) > 0)
+            captured.append(buffer, n);
+        pclose(pipe);
+    }
+    check(captured.empty(), "detect child with redirected stdout emits no progress bytes");
+    check(captured.find('\r') == std::string::npos, "redirected output contains no carriage returns");
+    check(captured.find('\033') == std::string::npos, "redirected output contains no escape sequences");
+}
+
 void test_frame_tiers() {
     const std::string wide = strip_erase(BuildProgress::compose_frame(15003, 16253, 0, 80, false));
     check_eq(wide, "  building 15003/16253  92%  [" + BuildProgress::compose_bar(0, 12, false) + "]",
@@ -280,23 +319,6 @@ void test_zero_total_emits_nothing() {
         progress.finish();
         check(!progress.running(), "zero-total renderer never starts a thread");
         check(buffer.data_unlocked().empty(), "zero-total renderer emits no bytes at all");
-    }
-}
-
-void test_detect_noninteractive_is_safe() {
-    NotificationBuffer buffer;
-    std::ostream sink(&buffer);
-    std::atomic<std::size_t> completed{0};
-    {
-        // Real stdout of the test binary is not a TTY here, so Detect must not
-        // start a renderer even though a sink is injected.
-        BuildProgress::Options options;
-        options.sink = &sink;
-        BuildProgress progress(1000, completed, options);
-        std::this_thread::sleep_for(std::chrono::milliseconds(30));
-        progress.finish();
-        check(!progress.running(), "Detect against non-interactive stdout starts nothing");
-        check(buffer.data_unlocked().empty(), "Detect against non-interactive stdout emits no bytes");
     }
 }
 
@@ -437,13 +459,31 @@ void test_stress_repeat_no_timing_race() {
 
 } // namespace
 
-int main() {
+int main(int argc, char** argv) {
+    if (argc >= 2 && std::string(argv[1]) == "--progress-detect-child") {
+        // Child mode of the redirected-output Detect test: real stdout is the
+        // pipe popen set up, so Visibility::Detect must not start a renderer.
+        // Emits nothing on stdout.
+        std::atomic<std::size_t> completed{0};
+        BuildProgress::Options options;
+        options.display_delay = std::chrono::milliseconds(1);
+        options.interval = std::chrono::milliseconds(1);
+        {
+            BuildProgress progress(1000, completed, options);
+            completed.store(500);
+            std::this_thread::sleep_for(std::chrono::milliseconds(40));
+            progress.finish();
+        }
+        return 0;
+    }
+
+    program_path_ = argv[0];
     test_frame_tiers();
     test_bar_plain();
     test_no_color_detection();
     test_disabled_emits_nothing();
     test_zero_total_emits_nothing();
-    test_detect_noninteractive_is_safe();
+    test_detect_noninteractive_child();
     test_deterministic_fixed_ordering();
     test_deterministic_buggy_ordering_detected();
     test_wide_to_medium_no_stale_suffix();
