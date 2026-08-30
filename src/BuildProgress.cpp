@@ -7,16 +7,24 @@
 
 namespace {
 
-// Fixed-width activity bar: a smooth highlight that breathes back and forth.
-// The two glyphs are both single-column so display width stays deterministic.
+// Fixed-width activity bar: a soft green gradient pulse that breathes while it
+// travels. All glyphs are single-column so display width stays deterministic.
 constexpr std::size_t bar_cells = 12;
 constexpr double two_pi = 6.283185307179586476925286766559;
-// Full back-and-forth cycle in ticks (2.8 s at the 100 ms animation interval).
-constexpr std::size_t animation_period_ticks = 28;
-// U+00B7 (middle dot) and U+2593 (dark shade), written as UTF-8 bytes so the
-// source stays an ordinary narrow execution charset.
-constexpr const char* dot_glyph = "\xc2\xb7";
-constexpr const char* block_glyph = "\xe2\x96\x93";
+// Travel (left-right) and breathing (width/brightness) run on distinct periods
+// in ticks at the 100 ms animation interval: 3.0 s and 2.0 s, so the combined
+// pattern repeats every lcm(30, 20) = 60 ticks (6 s) and maximum brightness is
+// never pinned to one particular end.
+constexpr std::size_t travel_period_ticks = 30;
+constexpr std::size_t breathe_period_ticks = 20;
+// U+00B7 (middle dot) and the shade block series U+2591..U+2593, U+2588,
+// written as UTF-8 bytes so the source stays an ordinary narrow execution
+// charset. Inactive cells use the dot; the pulse climbs through the shades.
+constexpr const char* glyph_dot = "\xc2\xb7";
+constexpr const char* glyph_shade1 = "\xe2\x96\x91";
+constexpr const char* glyph_shade2 = "\xe2\x96\x92";
+constexpr const char* glyph_shade3 = "\xe2\x96\x93";
+constexpr const char* glyph_block = "\xe2\x96\x88";
 
 } // namespace
 
@@ -111,23 +119,48 @@ void BuildProgress::finish() noexcept {
 
 std::string BuildProgress::compose_bar(std::size_t phase, std::size_t width, bool colour) {
     if (width == 0) return {};
-    const double t = two_pi * static_cast<double>(phase % animation_period_ticks) /
-                     static_cast<double>(animation_period_ticks);
-    // The centre travels between 1.5 and width - 1.5 so the 3-cell highlight
-    // never clips at either edge and reverses smoothly (the sine derivative is
-    // zero at the extremes, so the direction change does not jump).
-    const double centre = 1.5 + (static_cast<double>(width) - 3.0) * (0.5 + 0.5 * std::sin(t));
+    const double travel = two_pi * static_cast<double>(phase % travel_period_ticks) /
+                          static_cast<double>(travel_period_ticks);
+    const double breathe = two_pi * static_cast<double>(phase % breathe_period_ticks) /
+                           static_cast<double>(breathe_period_ticks);
+    // The pulse centre travels with sine easing (zero derivative at both ends,
+    // so direction reverses without a jump). Breathing modulates the pulse
+    // width and peak brightness on a distinct, faster period, so the light
+    // visibly expands/contracts while it moves rather than merely sliding.
+    const double margin = std::min(3.0, static_cast<double>(width) * 0.25);
+    const double span = static_cast<double>(width) - 2.0 * margin;
+    const double centre = margin + span * (0.5 + 0.5 * std::sin(travel));
+    const double br = 0.5 + 0.5 * std::sin(breathe);
+    const double peak = 0.55 + 0.45 * br;   // dim exhale .. bright inhale
+    const double radius = 1.7 + 0.9 * br;   // narrow .. wide pulse
+
     std::string bar;
-    bar.reserve(width * (colour ? 11u : 1u));
+    bar.reserve(width * (colour ? 16u : 3u));
     for (std::size_t i = 0; i < width; ++i) {
-        const double distance = std::fabs(static_cast<double>(i) + 0.5 - centre);
-        if (colour) {
-            if (distance <= 0.5) bar += "\033[1;36m" "\xe2\x96\x93" "\033[0m";      // bright peak
-            else if (distance <= 1.0) bar += "\033[36m" "\xe2\x96\x93" "\033[0m";   // shoulders
-            else bar += dot_glyph;
+        const double d = std::fabs(static_cast<double>(i) + 0.5 - centre);
+        const double g = peak * std::exp(-(d * d) / (radius * radius));
+        int level = 0;
+        if (g >= 0.84) level = 4;
+        else if (g >= 0.62) level = 3;
+        else if (g >= 0.38) level = 2;
+        else if (g >= 0.18) level = 1;
+
+        if (level == 0) {
+            bar += glyph_dot;
+        } else if (colour) {
+            switch (level) {
+                case 1: bar += "\033[2;32m"; bar += glyph_shade1; bar += "\033[0m"; break;
+                case 2: bar += "\033[32m";   bar += glyph_shade2; bar += "\033[0m"; break;
+                case 3: bar += "\033[1;32m"; bar += glyph_shade3; bar += "\033[0m"; break;
+                default: bar += "\033[1;32m"; bar += glyph_block; bar += "\033[0m"; break;
+            }
         } else {
-            if (distance <= 1.0) bar += block_glyph;
-            else bar += dot_glyph;
+            switch (level) {
+                case 1: bar += glyph_shade1; break;
+                case 2: bar += glyph_shade2; break;
+                case 3: bar += glyph_shade3; break;
+                default: bar += glyph_block; break;
+            }
         }
     }
     return bar;
