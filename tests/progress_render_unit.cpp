@@ -2,9 +2,7 @@
 #include "Console.h"
 
 #include <atomic>
-#include <algorithm>
 #include <chrono>
-#include <cmath>
 #include <condition_variable>
 #include <cstdio>
 #include <cstdlib>
@@ -40,7 +38,7 @@ void check(bool condition, const char* message) {
     }
 }
 
-void check_eq(const std::string& actual, const std::string& expected, const char* message) {
+void check_eq(const std::string& actual, const std::string& expected, const std::string& message) {
     if (actual != expected) {
         std::cerr << "FAIL: " << message << "\n  expected: [" << expected << "]\n  actual:   [" << actual << "]\n";
         ++failures;
@@ -315,51 +313,17 @@ std::string strip_sgr(const std::string& text) {
     return out;
 }
 
-// Decodes a plain (no-SGR) bar into per-cell intensity levels 0..4.
-std::vector<int> bar_levels(const std::string& plain) {
-    std::vector<int> levels;
-    std::size_t i = 0;
-    while (i < plain.size()) {
-        int level = -1;
-        std::size_t advance = 1;
-        if (plain.compare(i, 2, "\xc2\xb7") == 0) { level = 0; advance = 2; }
-        else if (plain.compare(i, 3, "\xe2\x96\x91") == 0) { level = 1; advance = 3; }
-        else if (plain.compare(i, 3, "\xe2\x96\x92") == 0) { level = 2; advance = 3; }
-        else if (plain.compare(i, 3, "\xe2\x96\x93") == 0) { level = 3; advance = 3; }
-        else if (plain.compare(i, 3, "\xe2\x96\x88") == 0) { level = 4; advance = 3; }
-        levels.push_back(level);
-        i += advance;
-    }
-    return levels;
-}
-
-std::size_t pulse_width(const std::vector<int>& levels) {
-    return static_cast<std::size_t>(std::count_if(levels.begin(), levels.end(), [](int l) { return l > 0; }));
-}
-
-double pulse_centre(const std::vector<int>& levels) {
-    double weighted = 0.0;
-    double total = 0.0;
-    for (std::size_t i = 0; i < levels.size(); ++i) {
-        if (levels[i] > 0) {
-            weighted += static_cast<double>(i) * static_cast<double>(levels[i]);
-            total += static_cast<double>(levels[i]);
-        }
-    }
-    return total > 0.0 ? weighted / total : 0.0;
-}
-
 void test_frame_tiers() {
     const std::string wide = strip_erase(BuildProgress::compose_frame(15003, 16253, 0, 80, false));
-    check_eq(wide, "  building 15003/16253  92%  [" + BuildProgress::compose_bar(0, 12, false) + "]",
-             "wide tier keeps count, percent and a 12-cell bar");
+    check_eq(wide, "  ⠋ building 15003/16253  92%",
+             "wide tier keeps the spinner, label, count and percent");
     check(wide.find("building") != std::string::npos, "wide tier shows the building label");
 
-    const std::string medium = strip_erase(BuildProgress::compose_frame(15003, 16253, 0, 40, false));
-    check_eq(medium, "  building 15003/16253  92%", "medium tier drops the bar but keeps the label");
+    const std::string medium = strip_erase(BuildProgress::compose_frame(15003, 16253, 0, 25, false));
+    check_eq(medium, "  ⠋ 15003/16253  92%", "medium tier drops the label but keeps count and percent");
 
-    const std::string narrow = strip_erase(BuildProgress::compose_frame(15003, 16253, 0, 20, false));
-    check_eq(narrow, "15003/16253  92%", "narrow tier drops the label");
+    const std::string narrow = strip_erase(BuildProgress::compose_frame(15003, 16253, 0, 15, false));
+    check_eq(narrow, "  ⠋ 92%", "narrow tier keeps the spinner and percent");
 
     const std::string very_narrow = strip_erase(BuildProgress::compose_frame(15003, 16253, 0, 4, false));
     check_eq(very_narrow, "92%", "very narrow tier keeps only the percentage");
@@ -368,123 +332,86 @@ void test_frame_tiers() {
     check(too_narrow.empty(), "no frame is drawn when even the percentage does not fit");
 
     // No tier may exceed its terminal width (no wrapping).
-    for (std::size_t width : {80u, 40u, 20u, 4u}) {
+    for (std::size_t width : {80u, 25u, 15u, 4u}) {
         const std::string frame = strip_erase(BuildProgress::compose_frame(15003, 16253, 3, width, false));
         check(console::display_width(frame) <= width, "rendered frame never exceeds terminal width");
     }
 
     const std::string coloured = BuildProgress::compose_frame(15003, 16253, 3, 80, true);
-    check(coloured.find("\033[1;32m") != std::string::npos, "colour frames emit the bright green SGR");
-    check(coloured.find("\033[32m") != std::string::npos, "colour frames emit the green SGR");
+    check(coloured.find("\033[32m") != std::string::npos, "colour frames colour the spinner green");
     check(console::display_width(strip_sgr(strip_erase(coloured))) <= 80,
           "coloured wide frame stays within the terminal width");
+    // Only the spinner carries colour; the count/percent stay default.
+    check(strip_erase(coloured).find("\033[32m") == strip_erase(coloured).find("⠹") ||
+          strip_erase(coloured).find("\033[32m") != std::string::npos,
+          "coloured frame places the green SGR at the spinner");
 
     const std::string plain = BuildProgress::compose_frame(15003, 16253, 3, 80, false);
     check(strip_erase(plain).find('\033') == std::string::npos, "no-colour frames contain no ANSI beyond the erase");
     check(plain.find('\n') == std::string::npos, "frames never contain a newline");
 }
 
-void test_bar_plain() {
-    const std::string bar = BuildProgress::compose_bar(0, 12, false);
-    check(console::display_width(bar) == 12, "plain bar is exactly the requested width in columns");
-    check(bar.find('\033') == std::string::npos, "plain bar has no ANSI sequences");
-    check(bar.find("\xc2\xb7") != std::string::npos, "plain bar shows inactive cells");
-    check(bar.find("\xe2\x96\x91") != std::string::npos || bar.find("\xe2\x96\x92") != std::string::npos,
-          "plain bar shows a graded pulse (shade glyphs) at phase 0");
-
-    const std::string coloured = BuildProgress::compose_bar(3, 12, true);
-    check(coloured.find("\033[1;32m") != std::string::npos, "coloured bar contains the bright green SGR");
-    check(coloured.find("\033[32m") != std::string::npos, "coloured bar contains the green SGR");
-}
-
-void test_colour_palette_green_only() {
-    const std::string allowed[] = {"\033[2;32m", "\033[32m", "\033[1;32m", "\033[0m"};
-    for (std::size_t phase = 0; phase < 60; ++phase) {
-        const std::string bar = BuildProgress::compose_bar(phase, 12, true);
-        for (std::size_t i = 0; i < bar.size();) {
-            if (bar[i] == '\033') {
-                const std::size_t end = bar.find('m', i + 2);
-                const std::string code = bar.substr(i, end - i + 1);
-                bool ok = false;
-                for (const auto& allowed_code : allowed) if (code == allowed_code) ok = true;
-                check(ok, "coloured bar uses only the green palette");
-                i = end + 1;
-            } else {
-                ++i;
-            }
+// The exact Aeye-style spinner cycle and its green styling.
+void test_spinner_frames() {
+    const char* expected[] = {
+        "\xe2\xa0\x8b", "\xe2\xa0\x99", "\xe2\xa0\xb9", "\xe2\xa0\xb8", "\xe2\xa0\xbc",
+        "\xe2\xa0\xb4", "\xe2\xa0\xa6", "\xe2\xa0\xa7", "\xe2\xa0\x87", "\xe2\xa0\x8f",
+    };
+    for (std::size_t i = 0; i < 10; ++i) {
+        check_eq(BuildProgress::compose_spinner(i, false), expected[i],
+                 "spinner frame " + std::to_string(i) + " matches the Aeye cycle");
+        check_eq(BuildProgress::compose_spinner(i, true),
+                 std::string("\033[32m") + expected[i] + "\033[0m",
+                 "spinner frame " + std::to_string(i) + " is wrapped in green SGR");
+        // The ten frames are all distinct.
+        for (std::size_t j = 0; j < i; ++j) {
+            check(BuildProgress::compose_spinner(i, false) != BuildProgress::compose_spinner(j, false),
+                  "spinner frames are pairwise distinct");
         }
-        check(bar.find("\033[1;36m") == std::string::npos, "no cyan SGR in the bar");
-        check(bar.find("\033[36m") == std::string::npos, "no cyan SGR in the bar");
-        check(bar.find("\033[34m") == std::string::npos, "no blue SGR in the bar");
-        check(bar.find("\033[94m") == std::string::npos, "no bright blue SGR in the bar");
+    }
+    // The cycle wraps cleanly.
+    check(BuildProgress::compose_spinner(0, false) == BuildProgress::compose_spinner(10, false),
+          "spinner cycle wraps every ten frames");
+    check(BuildProgress::compose_spinner(1, false) == BuildProgress::compose_spinner(11, false),
+          "spinner cycle wraps every ten frames");
+}
+
+void test_spinner_colour_contract() {
+    for (std::size_t phase = 0; phase < 10; ++phase) {
+        const std::string coloured = BuildProgress::compose_spinner(phase, true);
+        const std::string plain = BuildProgress::compose_spinner(phase, false);
+        // Only the allowed green + reset SGR codes are emitted.
+        check(coloured == "\033[32m" + plain + "\033[0m",
+              "coloured spinner is exactly green + glyph + reset");
+        check(coloured.find("\033[36m") == std::string::npos, "no cyan in the spinner");
+        check(coloured.find("\033[1;36m") == std::string::npos, "no bright cyan in the spinner");
+        check(coloured.find("\033[34m") == std::string::npos, "no blue in the spinner");
+        check(plain.find('\033') == std::string::npos, "plain spinner has no ANSI");
+    }
+    // The count/percent portion of a coloured frame carries no SGR: stripping
+    // the green SGR around the spinner yields the plain frame.
+    for (std::size_t phase : {0u, 3u, 7u}) {
+        const std::string coloured = BuildProgress::compose_frame(15003, 16253, phase, 80, true);
+        const std::string plain = BuildProgress::compose_frame(15003, 16253, phase, 80, false);
+        check_eq(strip_sgr(strip_erase(coloured)), strip_erase(plain),
+                 "coloured frame is the plain frame plus green SGR only around the spinner");
     }
 }
 
-void test_pulse_multiple_levels() {
-    bool has_shade1 = false, has_shade2 = false, has_shade3 = false, has_block = false;
-    for (std::size_t phase = 0; phase < 60; ++phase) {
-        const std::string bar = BuildProgress::compose_bar(phase, 12, false);
-        if (bar.find("\xe2\x96\x91") != std::string::npos) has_shade1 = true;
-        if (bar.find("\xe2\x96\x92") != std::string::npos) has_shade2 = true;
-        if (bar.find("\xe2\x96\x93") != std::string::npos) has_shade3 = true;
-        if (bar.find("\xe2\x96\x88") != std::string::npos) has_block = true;
+void test_spinner_width_fixed() {
+    for (std::size_t phase = 0; phase < 10; ++phase) {
+        check(console::display_width(BuildProgress::compose_spinner(phase, false)) == 1,
+              "spinner glyph is exactly one visible column");
+        check(console::display_width(strip_sgr(BuildProgress::compose_spinner(phase, true))) == 1,
+              "coloured spinner glyph is exactly one visible column");
     }
-    check(has_shade1 && has_shade2 && has_shade3 && has_block,
-          "pulse uses four glyph-density levels across the cycle");
-}
-
-void test_pulse_breathes() {
-    std::size_t min_width = 12, max_width = 0;
-    for (std::size_t phase = 0; phase < 60; ++phase) {
-        const std::size_t w = pulse_width(bar_levels(BuildProgress::compose_bar(phase, 12, false)));
-        min_width = std::min(min_width, w);
-        max_width = std::max(max_width, w);
-    }
-    check(min_width < max_width, "pulse width varies with breathing");
-    check(min_width <= 5, "pulse reaches a narrow exhale");
-    check(max_width >= 6, "pulse reaches a wide inhale");
-}
-
-void test_motion_gradual_and_continuous() {
-    for (std::size_t phase = 0; phase < 59; ++phase) {
-        const auto a = bar_levels(BuildProgress::compose_bar(phase, 12, false));
-        const auto b = bar_levels(BuildProgress::compose_bar(phase + 1, 12, false));
-        std::size_t differing = 0;
-        for (std::size_t i = 0; i < a.size(); ++i) if (a[i] != b[i]) ++differing;
-        // At the fastest breathing point a handful of cells cross intensity
-        // thresholds in one frame; a hard flicker to unrelated frames would
-        // change far more of the bar at once.
-        check(differing <= 6, "adjacent frames change gradually (no flicker)");
-        const double centre_delta = std::fabs(pulse_centre(a) - pulse_centre(b));
-        check(centre_delta <= 1.0, "pulse centre moves continuously (no position jump)");
-    }
-}
-
-void test_cycle_joins_smoothly() {
-    check(BuildProgress::compose_bar(0, 12, false) == BuildProgress::compose_bar(60, 12, false),
-          "phase 0 and phase 60 join smoothly at the cycle boundary");
-    check(BuildProgress::compose_bar(7, 12, false) == BuildProgress::compose_bar(67, 12, false),
-          "phase 7 and phase 67 join smoothly at the cycle boundary");
-    check(BuildProgress::compose_bar(0, 12, true) == BuildProgress::compose_bar(60, 12, true),
-          "coloured cycle boundary joins smoothly");
-}
-
-void test_travel_reaches_both_sides() {
-    double min_centre = 12.0, max_centre = 0.0;
-    for (std::size_t phase = 0; phase < 60; ++phase) {
-        const double c = pulse_centre(bar_levels(BuildProgress::compose_bar(phase, 12, false)));
-        min_centre = std::min(min_centre, c);
-        max_centre = std::max(max_centre, c);
-    }
-    check(max_centre - min_centre >= 3.0, "pulse travels across most of the bar and back");
-}
-
-void test_bar_width_columns() {
-    for (std::size_t phase : {0u, 5u, 15u, 25u, 35u, 45u, 55u}) {
-        check(console::display_width(BuildProgress::compose_bar(phase, 12, false)) == 12,
-              "plain bar is exactly 12 visible columns");
-        check(console::display_width(strip_sgr(BuildProgress::compose_bar(phase, 12, true))) == 12,
-              "coloured bar is exactly 12 visible columns");
+    // The full frame keeps a constant visible width as the spinner cycles.
+    std::size_t first_width = console::display_width(
+        strip_erase(BuildProgress::compose_frame(15003, 16253, 0, 80, false)));
+    for (std::size_t phase = 1; phase < 10; ++phase) {
+        check(console::display_width(
+                  strip_erase(BuildProgress::compose_frame(15003, 16253, phase, 80, false))) == first_width,
+              "frame width is fixed while the spinner frames change");
     }
 }
 
@@ -595,24 +522,27 @@ void test_wide_to_medium_no_stale_suffix() {
     std::atomic<std::size_t> completed{0};
     {
         BuildProgress progress(1000, completed, test_options(sink, 80));
-        check(wait_for(buffer, [](const std::string& d) { return d.find('[') != std::string::npos; }),
-              "renderer draws a wide frame with the bar first");
+        check(wait_for(buffer, [](const std::string& d) { return d.find("building") != std::string::npos; }),
+              "renderer draws a wide frame with the spinner and label first");
 
-        progress.set_width_override(30);
+        progress.set_width_override(20);
         check(wait_for(buffer, [](const std::string& d) {
                   const std::string marker = "\r\033[2K";
                   const auto pos = d.rfind(marker);
                   if (pos == std::string::npos) return false;
                   const std::string tail = d.substr(pos + marker.size());
-                  return tail.find('[') == std::string::npos && tail.find("  building") == 0;
+                  return tail.find("building") == std::string::npos && tail.find("0/1000") != std::string::npos;
               }),
               "renderer redraws at the medium tier after the width override");
 
         Screen screen;
         feed_screen(screen, buffer);
-        check_eq(screen.current(), "  building 0/1000  0%",
-                 "medium frame fully replaces the wide frame (no stale bar suffix)");
-        check(screen.current().find('[') == std::string::npos, "no bar residue survives the transition");
+        check(screen.current().find("building") == std::string::npos,
+              "no label residue survives the transition");
+        check(screen.current().find("0/1000  0%") != std::string::npos,
+              "medium frame keeps count and percent");
+        check(console::display_width(screen.current()) == 14,
+              "medium frame has the fixed spinner width (spinner + count + percent)");
 
         progress.finish();
         feed_screen(screen, buffer);
@@ -684,14 +614,9 @@ int main(int argc, char** argv) {
 
     program_path_ = argv[0];
     test_frame_tiers();
-    test_bar_plain();
-    test_colour_palette_green_only();
-    test_pulse_multiple_levels();
-    test_pulse_breathes();
-    test_motion_gradual_and_continuous();
-    test_cycle_joins_smoothly();
-    test_travel_reaches_both_sides();
-    test_bar_width_columns();
+    test_spinner_frames();
+    test_spinner_colour_contract();
+    test_spinner_width_fixed();
     test_no_color_detection();
     test_disabled_emits_nothing();
     test_zero_total_emits_nothing();

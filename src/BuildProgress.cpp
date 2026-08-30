@@ -1,30 +1,28 @@
 #include "BuildProgress.h"
 #include "Console.h"
 
-#include <cmath>
 #include <iostream>
 #include <utility>
 
 namespace {
 
-// Fixed-width activity bar: a soft green gradient pulse that breathes while it
-// travels. All glyphs are single-column so display width stays deterministic.
-constexpr std::size_t bar_cells = 12;
-constexpr double two_pi = 6.283185307179586476925286766559;
-// Travel (left-right) and breathing (width/brightness) run on distinct periods
-// in ticks at the 100 ms animation interval: 3.0 s and 2.0 s, so the combined
-// pattern repeats every lcm(30, 20) = 60 ticks (6 s) and maximum brightness is
-// never pinned to one particular end.
-constexpr std::size_t travel_period_ticks = 30;
-constexpr std::size_t breathe_period_ticks = 20;
-// U+00B7 (middle dot) and the shade block series U+2591..U+2593, U+2588,
-// written as UTF-8 bytes so the source stays an ordinary narrow execution
-// charset. Inactive cells use the dot; the pulse climbs through the shades.
-constexpr const char* glyph_dot = "\xc2\xb7";
-constexpr const char* glyph_shade1 = "\xe2\x96\x91";
-constexpr const char* glyph_shade2 = "\xe2\x96\x92";
-constexpr const char* glyph_shade3 = "\xe2\x96\x93";
-constexpr const char* glyph_block = "\xe2\x96\x88";
+// Minimal Aeye-style Braille spinner. The ten glyphs are all single-column, so
+// the animated prefix keeps a fixed position and width while the frames change.
+// The cycle advances one frame per animation tick.
+constexpr const char* spinner_frames[] = {
+    "\xe2\xa0\x8b", // ⠋
+    "\xe2\xa0\x99", // ⠙
+    "\xe2\xa0\xb9", // ⠹
+    "\xe2\xa0\xb8", // ⠸
+    "\xe2\xa0\xbc", // ⠼
+    "\xe2\xa0\xb4", // ⠴
+    "\xe2\xa0\xa6", // ⠦
+    "\xe2\xa0\xa7", // ⠧
+    "\xe2\xa0\x87", // ⠇
+    "\xe2\xa0\x8f", // ⠏
+};
+constexpr std::size_t spinner_frame_count =
+    sizeof(spinner_frames) / sizeof(spinner_frames[0]);
 
 } // namespace
 
@@ -117,53 +115,9 @@ void BuildProgress::finish() noexcept {
     });
 }
 
-std::string BuildProgress::compose_bar(std::size_t phase, std::size_t width, bool colour) {
-    if (width == 0) return {};
-    const double travel = two_pi * static_cast<double>(phase % travel_period_ticks) /
-                          static_cast<double>(travel_period_ticks);
-    const double breathe = two_pi * static_cast<double>(phase % breathe_period_ticks) /
-                           static_cast<double>(breathe_period_ticks);
-    // The pulse centre travels with sine easing (zero derivative at both ends,
-    // so direction reverses without a jump). Breathing modulates the pulse
-    // width and peak brightness on a distinct, faster period, so the light
-    // visibly expands/contracts while it moves rather than merely sliding.
-    const double margin = std::min(3.0, static_cast<double>(width) * 0.25);
-    const double span = static_cast<double>(width) - 2.0 * margin;
-    const double centre = margin + span * (0.5 + 0.5 * std::sin(travel));
-    const double br = 0.5 + 0.5 * std::sin(breathe);
-    const double peak = 0.55 + 0.45 * br;   // dim exhale .. bright inhale
-    const double radius = 1.7 + 0.9 * br;   // narrow .. wide pulse
-
-    std::string bar;
-    bar.reserve(width * (colour ? 16u : 3u));
-    for (std::size_t i = 0; i < width; ++i) {
-        const double d = std::fabs(static_cast<double>(i) + 0.5 - centre);
-        const double g = peak * std::exp(-(d * d) / (radius * radius));
-        int level = 0;
-        if (g >= 0.84) level = 4;
-        else if (g >= 0.62) level = 3;
-        else if (g >= 0.38) level = 2;
-        else if (g >= 0.18) level = 1;
-
-        if (level == 0) {
-            bar += glyph_dot;
-        } else if (colour) {
-            switch (level) {
-                case 1: bar += "\033[2;32m"; bar += glyph_shade1; bar += "\033[0m"; break;
-                case 2: bar += "\033[32m";   bar += glyph_shade2; bar += "\033[0m"; break;
-                case 3: bar += "\033[1;32m"; bar += glyph_shade3; bar += "\033[0m"; break;
-                default: bar += "\033[1;32m"; bar += glyph_block; bar += "\033[0m"; break;
-            }
-        } else {
-            switch (level) {
-                case 1: bar += glyph_shade1; break;
-                case 2: bar += glyph_shade2; break;
-                case 3: bar += glyph_shade3; break;
-                default: bar += glyph_block; break;
-            }
-        }
-    }
-    return bar;
+std::string BuildProgress::compose_spinner(std::size_t phase, bool colour) {
+    const std::string glyph = spinner_frames[phase % spinner_frame_count];
+    return colour ? "\033[32m" + glyph + "\033[0m" : glyph;
 }
 
 std::string BuildProgress::compose_frame(std::size_t done, std::size_t total, std::size_t phase,
@@ -171,20 +125,23 @@ std::string BuildProgress::compose_frame(std::size_t done, std::size_t total, st
     const std::size_t percent = total ? (100 * done) / total : 0;
     const std::string count = std::to_string(done) + "/" + std::to_string(total);
     const std::string pct = std::to_string(percent) + "%";
+    const std::string spinner = compose_spinner(phase, colour);
 
     // Layout tiers, measured in visible columns and recomputed for every frame.
-    // A frame that fits its tier can never wrap.
-    const std::string wide_prefix = "  building " + count + "  " + pct + "  [";
-    const std::size_t wide_needed = console::display_width(wide_prefix) + bar_cells + 1;
-    const std::string medium_line = "  building " + count + "  " + pct;
+    // The spinner is always one column wide, so the animated prefix keeps a
+    // fixed position and width; only the trailing text is dropped as the
+    // terminal narrows. A frame that fits its tier can never wrap.
+    const std::string full_line = "  " + spinner + " building " + count + "  " + pct;
+    const std::string medium_line = "  " + spinner + " " + count + "  " + pct;
+    const std::string narrow_line = "  " + spinner + " " + pct;
+    const std::size_t full_needed = console::display_width(full_line);
     const std::size_t medium_needed = console::display_width(medium_line);
-    const std::string narrow_line = count + "  " + pct;
     const std::size_t narrow_needed = console::display_width(narrow_line);
     const std::size_t very_needed = console::display_width(pct);
 
     std::string text;
-    if (term_width >= wide_needed) {
-        text = wide_prefix + compose_bar(phase, bar_cells, colour) + "]";
+    if (term_width >= full_needed) {
+        text = full_line;
     } else if (term_width >= medium_needed) {
         text = medium_line;
     } else if (term_width >= narrow_needed) {

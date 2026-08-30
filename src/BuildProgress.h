@@ -57,7 +57,7 @@ public:
     // Pure frame composition, exposed for deterministic unit coverage. The
     // returned string is exactly what render() writes, including the leading
     // full-line clear so every frame erases the previous, longer or shorter.
-    static std::string compose_bar(std::size_t phase, std::size_t width, bool colour);
+    static std::string compose_spinner(std::size_t phase, bool colour);
     static std::string compose_frame(std::size_t done, std::size_t total, std::size_t phase,
                                      std::size_t term_width, bool colour);
 
