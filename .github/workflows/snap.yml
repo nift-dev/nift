@@ -17,6 +17,11 @@ on:
         default: false
 
 jobs:
+  # Non-publishing validation builds for amd64 and arm64. These catch build
+  # regressions on pull requests and tag runs but never upload to the Snap
+  # Store: the connected Snapcraft/Launchpad build service is the sole producer
+  # of published revisions (it builds every platform declared in
+  # snap/snapcraft.yaml). No Store credential is present in this job.
   build:
     strategy:
       matrix:
@@ -26,8 +31,6 @@ jobs:
           - runner: ubuntu-24.04-arm
             platform: arm64
     runs-on: ${{ matrix.runner }}
-    env:
-      SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Require package and tag versions to agree
@@ -42,15 +45,63 @@ jobs:
         with:
           name: nift-snap-${{ matrix.platform }}
           path: ${{ steps.snapcraft.outputs.snap }}
-      - name: Publish edge Snap for confinement testing
-        if: github.event_name == 'workflow_dispatch' && inputs.publish_edge && env.SNAPCRAFT_STORE_CREDENTIALS != ''
-        uses: snapcore/action-publish@9334eecb267cfd97a0ce3c8654215d095927252f
+
+  # Manual edge publication for isolated confinement testing only. Gated on a
+  # workflow_dispatch flag; uploads the freshly built amd64/arm64 snaps to edge.
+  # Edge is never used as a promote source, so this can never feed candidate or
+  # stable promotion. Store credentials are scoped to this job alone.
+  publish-edge:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_edge
+    needs: [build]
+    runs-on: ubuntu-latest
+    env:
+      SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+    steps:
+      - name: Install pinned snapcraft
+        shell: bash
+        run: |
+          sudo snap install snapcraft --classic --channel="${SNAPCRAFT_CHANNEL:-latest/stable}"
+          snapcraft version
+      - uses: actions/download-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          snap: ${{ steps.snapcraft.outputs.snap }}
-          release: edge
-      - name: Publish stable Snap
-        if: startsWith(github.ref, 'refs/tags/v') && env.SNAPCRAFT_STORE_CREDENTIALS != ''
-        uses: snapcore/action-publish@9334eecb267cfd97a0ce3c8654215d095927252f
-        with:
-          snap: ${{ steps.snapcraft.outputs.snap }}
-          release: stable
+          path: snaps
+          merge-multiple: true
+      - name: Publish built snaps to edge
+        if: env.SNAPCRAFT_STORE_CREDENTIALS != ''
+        shell: bash
+        run: |
+          set -euo pipefail
+          for snap_file in snaps/*.snap; do
+            echo "publishing $snap_file to edge"
+            snapcraft upload "$snap_file" --release=edge
+          done
+
+  # Release coordinator: waits for the Snapcraft build-service revisions of the
+  # tagged version, releases exactly those six revisions to candidate, verifies
+  # the complete build set, promotes candidate -> stable, and verifies stable.
+  # Serialized by a concurrency group so two release tags can never share
+  # candidate or stable state. Fails closed on any missing/ambiguous/mismatched
+  # revision; stable is untouched by every failure before the promote step.
+  release-coordination:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build]
+    runs-on: ubuntu-latest
+    concurrency:
+      group: nift-snap-release-transaction
+      cancel-in-progress: false
+    env:
+      SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Install pinned snapcraft
+        shell: bash
+        run: |
+          sudo snap install snapcraft --classic --channel="${SNAPCRAFT_CHANNEL:-latest/stable}"
+          snapcraft version
+      - name: Coordinate candidate staging and stable promotion
+        shell: bash
+        run: python3 packaging/snap_release.py
+        env:
+          NIFT_SNAP_VERSION: ${GITHUB_REF_NAME#v}
+          NIFT_SNAP_START: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+          NIFT_SNAP_WAIT: "5400"

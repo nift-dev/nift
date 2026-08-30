@@ -97,6 +97,12 @@ $(PROGRESS_RENDER_TEST): tests/progress_render_unit.cpp src/BuildProgress.cpp sr
 test-progress-render: $(PROGRESS_RENDER_TEST)
 	"$(PROGRESS_RENDER_TEST)"
 
+# Offline contract tests for the Snap publication coordinator: architecture set,
+# candidate staging, complete-set verification, promotion, rollback and
+# fail-closed behaviour. No network access and no Store operations.
+test-snap-contract:
+	python3 tests/snap_release_contract.py
+
 # POSIX PTY end-to-end progress coverage uses `script`; skipped gracefully when
 # unavailable. Not part of the Windows matrix, where the portable
 # test-progress-render unit test covers the same renderer lifecycle.
@@ -404,7 +410,7 @@ test: test-content test-commands test-comments test-contracts test-json \
 	test-template-optional test-requirements test-path-safety test-metadata-safety \
 	test-init-targets test-control-flow test-cross-feature test-config-validation \
 	test-zero-mutation test-repair-campaign test-ownership-concurrency \
-	test-progress-render $(PROGRESS_PTY_TARGET)
+	test-progress-render $(PROGRESS_PTY_TARGET) test-snap-contract
 
 # CP10.2: Embed host-seam failure contract (C++ Engine level).
 HOST_SEAM_TEST := $(TEST_DIR)/host-seam$(EXEEXT)
@@ -593,7 +599,7 @@ clean:
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
-.PHONY: embed go-binding csharp-binding node-binding python-binding bindings test-build-boundary test-embed test-go-binding test-csharp-binding test-node-binding test-python-binding test-bindings test-all test benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-progress-render test-progress-pty test-diagnostics test-minify test-json-schema-integration test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke test-host-seam benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
+.PHONY: embed go-binding csharp-binding node-binding python-binding bindings test-build-boundary test-embed test-go-binding test-csharp-binding test-node-binding test-python-binding test-bindings test-all test benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-progress-render test-progress-pty test-snap-contract test-diagnostics test-minify test-json-schema-integration test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke test-host-seam benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
 
 
 test-cross-feature: $(TARGET)
