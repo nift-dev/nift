@@ -6,14 +6,20 @@
 #include <string>
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 #include <string_view>
 
 #if defined(_WIN32)
     #include <io.h>
+    #define NOMINMAX
+    #define WIN32_LEAN_AND_MEAN
+    #include <windows.h>
     #define NIFT_ISATTY _isatty
     #define NIFT_FILENO _fileno
 #else
     #include <unistd.h>
+    #include <sys/ioctl.h>
+    #include <termios.h>
     #define NIFT_ISATTY isatty
     #define NIFT_FILENO fileno
 #endif
@@ -28,6 +34,67 @@ inline bool stdout_is_tty() {
 
 inline bool stderr_is_tty() {
     return !plain_output.load(std::memory_order_relaxed) && NIFT_ISATTY(NIFT_FILENO(stderr)) != 0;
+}
+
+// Interactivity and colour are deliberately separate capabilities. A terminal
+// may be interactive while colour is disabled, and NO_COLOR must never make an
+// interactive terminal appear non-interactive.
+inline bool stdout_is_interactive() { return stdout_is_tty(); }
+inline bool stderr_is_interactive() { return stderr_is_tty(); }
+
+// NO_COLOR convention: a non-empty value disables colour. Evaluated on demand
+// (never cached) so behaviour cannot depend on which helper ran first.
+inline bool no_color_requested() {
+    const char* value = std::getenv("NO_COLOR");
+    return value != nullptr && *value != '\0';
+}
+
+#if defined(_WIN32)
+inline bool enable_virtual_terminal(HANDLE handle) {
+    DWORD mode = 0;
+    if (!GetConsoleMode(handle, &mode)) return false;
+    if ((mode & ENABLE_VIRTUAL_TERMINAL_PROCESSING) != 0) return true;
+    return SetConsoleMode(handle, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING) != 0;
+}
+#endif
+
+// stdout and stderr are probed independently: one may be an ANSI-capable
+// console while the other is redirected.
+inline bool stdout_ansi_supported() {
+    if (!stdout_is_interactive()) return false;
+#if defined(_WIN32)
+    static const bool supported = enable_virtual_terminal(GetStdHandle(STD_OUTPUT_HANDLE));
+    return supported;
+#else
+    return true;
+#endif
+}
+
+inline bool stderr_ansi_supported() {
+    if (!stderr_is_interactive()) return false;
+#if defined(_WIN32)
+    static const bool supported = enable_virtual_terminal(GetStdHandle(STD_ERROR_HANDLE));
+    return supported;
+#else
+    return true;
+#endif
+}
+
+inline bool stdout_colour_enabled() { return stdout_ansi_supported() && !no_color_requested(); }
+inline bool stderr_colour_enabled() { return stderr_ansi_supported() && !no_color_requested(); }
+
+inline std::size_t terminal_width() {
+#if defined(_WIN32)
+    CONSOLE_SCREEN_BUFFER_INFO info;
+    if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info))
+        return static_cast<std::size_t>(info.srWindow.Right - info.srWindow.Left + 1);
+    return 80;
+#else
+    struct winsize ws;
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == 0 && ws.ws_col > 0)
+        return static_cast<std::size_t>(ws.ws_col);
+    return 80;
+#endif
 }
 
 class ScopedPlainOutput {
@@ -51,14 +118,14 @@ inline std::string paint(const std::string& text, const char* code, bool enabled
 }
 
 inline std::string path(const std::string& text, bool stderr_stream = false) {
-    return paint(text, "36", stderr_stream ? stderr_is_tty() : stdout_is_tty());
+    return paint(text, "36", stderr_stream ? stderr_colour_enabled() : stdout_colour_enabled());
 }
 
-inline std::string diagnostic_directive(const std::string& text, bool enabled = stderr_is_tty()) {
+inline std::string diagnostic_directive(const std::string& text, bool enabled = stderr_colour_enabled()) {
     return paint(text, "1;35", enabled);
 }
 
-inline std::string diagnostic_offender(const std::string& text, bool enabled = stderr_is_tty()) {
+inline std::string diagnostic_offender(const std::string& text, bool enabled = stderr_colour_enabled()) {
     return paint(text, "1;31", enabled);
 }
 
@@ -129,16 +196,16 @@ inline std::size_t nift_function_token_end(std::string_view text, std::size_t at
     return known_nift_function(name) ? end : at;
 }
 
-inline std::string diagnostic_value(const std::string& text, bool enabled = stderr_is_tty()) {
+inline std::string diagnostic_value(const std::string& text, bool enabled = stderr_colour_enabled()) {
     return paint(text, "32", enabled);
 }
 
-inline std::string diagnostic_value_expr(const std::string& text, bool enabled = stderr_is_tty()) {
+inline std::string diagnostic_value_expr(const std::string& text, bool enabled = stderr_colour_enabled()) {
     return paint(text, "1;36", enabled);
 }
 
 
-inline std::string highlight_diagnostic_message(const std::string& message, bool enabled = stderr_is_tty()) {
+inline std::string highlight_diagnostic_message(const std::string& message, bool enabled = stderr_colour_enabled()) {
     if (!enabled) return message;
     std::string out;
     out.reserve(message.size() + 64);
@@ -162,7 +229,7 @@ inline std::string highlight_diagnostic_message(const std::string& message, bool
 inline std::string highlight_nift_source(const std::string& line,
                                          std::size_t error_byte_start,
                                          std::size_t error_byte_length,
-                                         bool enabled = stderr_is_tty()) {
+                                         bool enabled = stderr_colour_enabled()) {
     if (!enabled) return line;
     const std::size_t error_end = std::min(line.size(), error_byte_start + error_byte_length);
     std::string out;
@@ -277,15 +344,15 @@ inline std::string highlight_nift_source(const std::string& line,
     }
     return out;
 }
-inline std::string good(const std::string& text) { return paint(text, "32", stdout_is_tty()); }
-inline std::string dim(const std::string& text) { return paint(text, "2", stdout_is_tty()); }
-inline std::string heading(const std::string& text) { return paint(text, "1;35", stdout_is_tty()); }
-inline std::string json_key(const std::string& text) { return paint(text, "1;34", stdout_is_tty()); }
-inline std::string json_string(const std::string& text) { return paint(text, "32", stdout_is_tty()); }
-inline std::string json_number(const std::string& text) { return paint(text, "36", stdout_is_tty()); }
-inline std::string json_literal(const std::string& text) { return paint(text, "35", stdout_is_tty()); }
-inline std::string error_label() { return paint("error:", "1;31", stderr_is_tty()); }
-inline std::string warning_label() { return paint("warning:", "1;33", stderr_is_tty()); }
+inline std::string good(const std::string& text) { return paint(text, "32", stdout_colour_enabled()); }
+inline std::string dim(const std::string& text) { return paint(text, "2", stdout_colour_enabled()); }
+inline std::string heading(const std::string& text) { return paint(text, "1;35", stdout_colour_enabled()); }
+inline std::string json_key(const std::string& text) { return paint(text, "1;34", stdout_colour_enabled()); }
+inline std::string json_string(const std::string& text) { return paint(text, "32", stdout_colour_enabled()); }
+inline std::string json_number(const std::string& text) { return paint(text, "36", stdout_colour_enabled()); }
+inline std::string json_literal(const std::string& text) { return paint(text, "35", stdout_colour_enabled()); }
+inline std::string error_label() { return paint("error:", "1;31", stderr_colour_enabled()); }
+inline std::string warning_label() { return paint("warning:", "1;33", stderr_colour_enabled()); }
 
 inline void error(const std::string& message) {
     std::lock_guard<std::mutex> lock(output_mutex);

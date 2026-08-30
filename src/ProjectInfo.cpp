@@ -547,6 +547,14 @@ void ProjectInfo::print_build_error(const BuildError& error) const {
     }
 }
 
+void ProjectInfo::report_build_error(const BuildError& error, std::optional<BuildError>* out_error) const {
+    if (out_error) {
+        *out_error = error;
+        return;
+    }
+    print_build_error(error);
+}
+
 bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::string>& dependencies, const std::set<std::string>& reqs, std::size_t pagination_pages) const {
     const std::string content_name = relative(content_path(info));
     const std::string output_name = relative(output_path(info));
@@ -631,7 +639,7 @@ bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::s
     return filesystem::write_direct_file(info_path(info), output);
 }
 
-bool ProjectInfo::build_one(TrackedInfo& info) {
+bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_error) {
     // The previous pagination page count is historical state required for
     // stale-output cleanup: when pagination is removed or its page count
     // decreases, page-2..N outputs from the previous build must be removed.
@@ -653,15 +661,15 @@ bool ProjectInfo::build_one(TrackedInfo& info) {
     }
     const fs::path content = content_path(info);
     if (!filesystem::path_exists(content)) {
-        print_build_error({info.name, content, 0, "content file does not exist"});
+        report_build_error({info.name, content, 0, "content file does not exist"}, out_error);
         return false;
     }
 
     ProjectInfoHost host(*this);
     Parser parser(host, info);
     RenderResult result = parser.render();
-    if (!result.ok) { print_build_error(result.error); return false; }
-    if (!load_user_dependencies(info, result.dependencies, &result.error)) { print_build_error(result.error); return false; }
+    if (!result.ok) { report_build_error(result.error, out_error); return false; }
+    if (!load_user_dependencies(info, result.dependencies, &result.error)) { report_build_error(result.error, out_error); return false; }
 
     const fs::path output = output_path(info);
     const std::string extension = info.output_ext.empty() ? config.output_ext : info.output_ext;
@@ -674,14 +682,14 @@ bool ProjectInfo::build_one(TrackedInfo& info) {
     if (should_minify) {
         minify::Format format;
         if (!minify::format_for_extension(extension, format)) {
-            print_build_error({info.name, output, 0, "no minifier is available for output extension " + extension});
+            report_build_error({info.name, output, 0, "no minifier is available for output extension " + extension}, out_error);
             return false;
         }
         auto minify_output = [&](std::string& page_output) {
             std::string minified, minify_error;
             if (!minify::run(format, page_output, minified, minify_error)) {
-                print_build_error({info.name, output, 0, "minification failed" +
-                                   (minify_error.empty() ? std::string() : ": " + minify_error)});
+                report_build_error({info.name, output, 0, "minification failed" +
+                                    (minify_error.empty() ? std::string() : ": " + minify_error)}, out_error);
                 return false;
             }
             page_output = std::move(minified);
@@ -711,11 +719,11 @@ bool ProjectInfo::build_one(TrackedInfo& info) {
         for (std::size_t page = 1; page <= result.pagination_outputs.size(); ++page)
             page_files.emplace_back(pagination_output_path(info, page), result.pagination_outputs[page - 1]);
         if (!filesystem::write_direct_files(page_files, output_mode)) {
-            print_build_error({info.name, output, 0, "failed to commit generated pagination outputs"});
+            report_build_error({info.name, output, 0, "failed to commit generated pagination outputs"}, out_error);
             return false;
         }
     } else if (!filesystem::write_direct_file(output, result.output, output_mode)) {
-        print_build_error({info.name, output, 0, "failed to write generated output"});
+        report_build_error({info.name, output, 0, "failed to write generated output"}, out_error);
         return false;
     }
 
@@ -731,13 +739,13 @@ bool ProjectInfo::build_one(TrackedInfo& info) {
     for (std::size_t page = keep_pages + 1; page <= previous_pagination_pages; ++page) {
         const fs::path stale = pagination_output_path(info, page);
         if (!filesystem::remove_owned_file(stale)) {
-            print_build_error({info.name, stale, 0, "failed to remove stale pagination output"});
+            report_build_error({info.name, stale, 0, "failed to remove stale pagination output"}, out_error);
             return false;
         }
     }
 
     if (!write_page_info(info, result.dependencies, result.reqs, new_pagination_pages)) {
-        print_build_error({info.name, info_path(info), 0, "failed to write page build metadata"});
+        report_build_error({info.name, info_path(info), 0, "failed to write page build metadata"}, out_error);
         return false;
     }
 
@@ -760,13 +768,18 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& jobs, bool targeted, bo
     std::atomic<std::size_t> next{0};
     std::atomic<std::size_t> completed{0};
     std::vector<unsigned char> succeeded(jobs.size(), 0);
+    std::vector<std::optional<BuildError>> errors(jobs.size());
     BuildProgress progress(jobs.size(), completed);
 
     auto worker = [&] {
         while (true) {
             const std::size_t index = next.fetch_add(1);
             if (index >= jobs.size()) break;
-            succeeded[index] = build_one(*jobs[index].info) ? 1 : 0;
+            // Worker-generated build errors are buffered per job index (each
+            // worker owns its slots, so no shared buffer needs locking). They
+            // are emitted only after progress has stopped, so no diagnostic
+            // can ever be written into an active progress line.
+            succeeded[index] = build_one(*jobs[index].info, &errors[index]) ? 1 : 0;
             ++completed;
         }
     };
@@ -775,6 +788,13 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& jobs, bool targeted, bo
     workers.reserve(thread_count);
     for (std::size_t i = 0; i < thread_count; ++i) workers.emplace_back(worker);
     for (auto& worker_thread : workers) worker_thread.join();
+
+    // Deterministic shutdown: stop the renderer, join it, erase the transient
+    // line and flush — only then may diagnostics and the summary be written.
+    progress.finish();
+
+    for (std::size_t i = 0; i < jobs.size(); ++i)
+        if (errors[i].has_value()) print_build_error(*errors[i]);
 
     std::size_t successful_count = 0;
     for (unsigned char success : succeeded) if (success) ++successful_count;

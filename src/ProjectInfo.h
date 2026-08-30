@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <mutex>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 #include <unordered_map>
@@ -42,7 +43,7 @@ public:
 
     std::vector<std::string> build_reasons(const TrackedInfo& info) const;
     bool needs_build(const TrackedInfo& info, std::string* reason = nullptr) const;
-    bool build_one(TrackedInfo& info);
+    bool build_one(TrackedInfo& info, std::optional<BuildError>* out_error = nullptr);
     int build_all(bool force, bool explain = false, bool repair = false);
     int build_names(const std::vector<std::string>& names, bool force, bool explain = false);
 
@@ -108,5 +109,6 @@ private:
     void refresh_hash_once(const std::filesystem::path& dependency);
     bool write_page_info(const TrackedInfo& info, const std::set<std::string>& dependencies, const std::set<std::string>& reqs, std::size_t pagination_pages = 0) const;
     void print_build_error(const BuildError& error) const;
+    void report_build_error(const BuildError& error, std::optional<BuildError>* out_error) const;
     int build_many(const std::vector<BuildJob>& jobs, bool targeted, bool full_detail, std::size_t requested_count);
 };
