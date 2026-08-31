@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
-"""Offline failure-mode checks for the repaired full-build scaling benchmark.
+"""Offline failure-mode and invocation checks for the repaired full-build
+scaling benchmark.
 
 Proves the benchmark fails closed when a timed build does not rewrite all
 expected outputs, when the expected output count is incomplete, and when a
-timed build returns non-zero. Deterministic and offline; no timing evidence is
-collected here.
+timed build returns non-zero - exercising the complete Fixture.timed_build()
+path (with a mocked successful no-op subprocess for the rewrite/count cases)
+rather than calling the checker directly. Also proves every documented
+invocation invariant is enforced with a controlled early diagnostic.
+Deterministic and offline; no timing evidence is collected here.
 """
 import argparse
 import importlib.util
@@ -17,9 +21,10 @@ ap = argparse.ArgumentParser()
 ap.add_argument("--nift", required=True)
 args = ap.parse_args()
 
+BENCH = pathlib.Path(__file__).resolve().parent / "full_build_scaling_benchmark.py"
+
 spec = importlib.util.spec_from_file_location(
-    "full_build_scaling_benchmark",
-    pathlib.Path(__file__).resolve().parent / "full_build_scaling_benchmark.py")
+    "full_build_scaling_benchmark", BENCH)
 bm = importlib.util.module_from_spec(spec)
 sys.argv = ["full_build_scaling_benchmark.py", "--nift", args.nift]
 spec.loader.exec_module(bm)
@@ -36,6 +41,23 @@ def check(label, fn):
         print(f"  [PASS] {label}")
 
 
+def check_cond(label, cond):
+    if not cond:
+        fails.append(label)
+        print(f"  [FAIL] {label}")
+    else:
+        print(f"  [PASS] {label}")
+
+
+class FakeSuccess:
+    returncode = 0
+    stderr = b""
+
+
+def mock_build_success():
+    bm.subprocess.run = lambda *a, **k: FakeSuccess()
+
+
 with tempfile.TemporaryDirectory(prefix="nift-failmode-") as td:
     root = pathlib.Path(td)
     bm.fixture(root, 4)
@@ -44,28 +66,43 @@ with tempfile.TemporaryDirectory(prefix="nift-failmode-") as td:
     subprocess.run([args.nift, "build", "--all"], cwd=td,
                    stdout=subprocess.DEVNULL, check=True)
 
-    def not_rewritten():
-        # Corrupt one output so it lacks the current variant marker.
-        (root / "public" / "p0.html").write_text("<main class='z'><p>0</p></main>\n")
-        fx.verify_rewrite()
-    check("timed build not rewriting all expected outputs fails closed", not_rewritten)
+    saved_run = bm.subprocess.run
 
-    def incomplete():
-        (root / "public" / "p1.html").unlink()
-        fx.verify_rewrite()
-    check("incomplete expected output count fails closed", incomplete)
+    # 1. A timed build that does not rewrite every output fails closed. The
+    #    build itself is mocked to succeed; the real verify_rewrite inside
+    #    timed_build must still reject the stale outputs.
+    mock_build_success()
+    for f in (root / "public").glob("*.html"):
+        f.write_text("<main class='z'><p>x</p></main>\n")
+    check("timed build not rewriting all expected outputs fails closed",
+          lambda: fx.timed_build())
+    bm.subprocess.run = saved_run
 
-    # Restore a complete, correctly rewritten set, then force a failing build.
-    fx.toggle()
-    subprocess.run([args.nift, "build", "--all"], cwd=td,
-                   stdout=subprocess.DEVNULL, check=True)
+    # 2. Incomplete expected output count fails closed (via timed_build).
+    mock_build_success()
+    (root / "public" / "p1.html").unlink()
+    check("incomplete expected output count fails closed",
+          lambda: fx.timed_build())
+    bm.subprocess.run = saved_run
+
+    # 3. A timed build returning non-zero fails closed (real failing build).
     saved = bm.args.nift
     bm.args.nift = "/bin/false"
-
-    def nonzero():
-        fx.timed_build()
-    check("timed build returning non-zero fails closed", nonzero)
+    check("timed build returning non-zero fails closed", lambda: fx.timed_build())
     bm.args.nift = saved
+
+    # 4. Invocation invariants are enforced with a controlled early diagnostic.
+    for argv, needle in [
+        (["--small", "0"], "small"),
+        (["--small", "2000", "--large", "6000"], "large"),
+        (["--rounds", "3"], "rounds"),
+        (["--confirm-rounds", "3"], "confirm-rounds"),
+        (["--max-ratio", "0"], "max-ratio"),
+    ]:
+        p = subprocess.run([sys.executable, str(BENCH), "--nift", args.nift, *argv],
+                           capture_output=True, text=True)
+        label = "invalid invocation %s fails with a controlled diagnostic" % " ".join(argv)
+        check_cond(label, p.returncode != 0 and needle in (p.stdout + p.stderr))
 
 if fails:
     print(f"\nFAILED: {len(fails)}: {fails}")

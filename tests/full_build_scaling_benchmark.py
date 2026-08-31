@@ -141,7 +141,23 @@ def report(title, smalls, larges):
     return statistics.median(ratios)
 
 
+def validate_args():
+    """Controlled fail-fast on an accidental weakening of the guard."""
+    if args.small <= 0:
+        raise SystemExit("FAIL: --small must be > 0 (got %d)" % args.small)
+    if args.large != 4 * args.small:
+        raise SystemExit("FAIL: --large must equal 4 * --small (got large=%d, 4*small=%d)"
+                         % (args.large, 4 * args.small))
+    if args.rounds < 7:
+        raise SystemExit("FAIL: --rounds must be >= 7 (got %d)" % args.rounds)
+    if args.confirm_rounds < 7:
+        raise SystemExit("FAIL: --confirm-rounds must be >= 7 (got %d)" % args.confirm_rounds)
+    if args.max_ratio <= 0:
+        raise SystemExit("FAIL: --max-ratio must be > 0 (got %s)" % args.max_ratio)
+
+
 def main():
+    validate_args()
     with tempfile.TemporaryDirectory(prefix="nift-full-scale-small-") as td_s, \
          tempfile.TemporaryDirectory(prefix="nift-full-scale-large-") as td_l:
         fixture(pathlib.Path(td_s), args.small)
