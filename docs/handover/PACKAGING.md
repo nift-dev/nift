@@ -44,7 +44,7 @@ packaging/chocolatey/                       Chocolatey source templates
 packaging/flatpak/                          upstream Flathub migration aid
 packaging/homebrew/                         upstream homebrew-core formula template
 .github/workflows/release.yml               portable GitHub release archives
-.github/workflows/snap.yml                  Snap build and optional publication
+.github/workflows/snap.yml                  Non-publishing Snap validation + release coordinator
 .github/workflows/chocolatey.yml            Chocolatey pack and optional push
 .github/workflows/homebrew.yml               Homebrew formula generation/testing
 ```
@@ -648,9 +648,11 @@ Publication evidence:
 
 ## Strict Snap validation for v4.0.3
 
-The Snap recipe uses `confinement: strict` with the `home` interface.
-`.github/workflows/snap.yml` can be manually dispatched with `publish_edge=true`
-to publish the exact built artifact to the `edge` channel before stable release.
+The Snap recipe uses `confinement: strict` with the `home` interface. At that
+time `snap.yml` could be manually dispatched with `publish_edge=true` to publish
+the exact built artifact to the `edge` channel before stable release. That
+workflow input no longer exists: the connected build service is now the sole
+producer of published revisions, so there is no manual edge publisher to invoke.
 
 The decisive empirical gate has been completed: a real Store-built strict `edge`
 revision was installed on a representative host and successfully exercised an

@@ -76,7 +76,10 @@ jobs:
           test -n "$SNAPCRAFT_SNAP_REVISION" || { echo "SNAPCRAFT_SNAP_REVISION is not set" >&2; exit 1; }
           test -n "$SNAPCRAFT_EXPECTED_VERSION" || { echo "SNAPCRAFT_EXPECTED_VERSION is not set" >&2; exit 1; }
           sudo snap install snapcraft --classic --revision="$SNAPCRAFT_SNAP_REVISION"
-          installed_version="$(snapcraft version)"
+          # `snapcraft version` commonly prints "snapcraft 9.0.1"; extract the
+          # version token and compare that, never the raw whole-output string.
+          installed_version="$(snapcraft version | grep -oE '[0-9]+(\.[0-9]+){1,2}' | head -1)"
+          test -n "$installed_version" || { echo "could not parse snapcraft version" >&2; exit 1; }
           installed_revision="$(snap list snapcraft | sed -n '2p' | awk '{print $3}')"
           [ "$installed_version" = "$SNAPCRAFT_EXPECTED_VERSION" ] || { echo "snapcraft version ${installed_version} != ${SNAPCRAFT_EXPECTED_VERSION}" >&2; exit 1; }
           [ "$installed_revision" = "$SNAPCRAFT_SNAP_REVISION" ] || { echo "snapcraft revision ${installed_revision} != ${SNAPCRAFT_SNAP_REVISION}" >&2; exit 1; }

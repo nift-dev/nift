@@ -290,13 +290,36 @@ class CandidateStrict(unittest.TestCase):
 
 class RollbackCompleteness(unittest.TestCase):
     def test_complete_snapshot_passes(self):
-        snap = sr.snapshot_stable(stable_map(revision_numbers(), "4.0.8")["channel-map"], sr.EXPECTED_ARCHS)
-        self.assertEqual(sr.missing_rollback_archs(snap, sr.EXPECTED_ARCHS), [])
+        entries = stable_map(revision_numbers(), "4.0.8")["channel-map"]
+        self.assertEqual(sr.stable_snapshot_problems(entries, sr.EXPECTED_ARCHS), [])
 
     def test_missing_rollback_architecture_reported(self):
         entries = [channel_entry(arch, 1, "4.0.8", risk="stable") for arch in ARCHS if arch != "s390x"]
+        problems = sr.stable_snapshot_problems(entries, sr.EXPECTED_ARCHS)
+        self.assertTrue(any("missing" in p and "s390x" in p for p in problems))
+
+    def test_malformed_previous_stable_reported(self):
+        entries = stable_map(revision_numbers(), "4.0.8")["channel-map"]
+        for entry in entries:
+            if entry["channel"]["architecture"] == "amd64":
+                del entry["revision"]
+        problems = sr.stable_snapshot_problems(entries, sr.EXPECTED_ARCHS)
+        self.assertTrue(any("malformed" in p and "amd64" in p for p in problems))
+
+    def test_duplicate_previous_stable_reported(self):
+        entries = stable_map(revision_numbers(), "4.0.8")["channel-map"] + [
+            channel_entry("amd64", 777, "4.0.8", risk="stable")]
+        problems = sr.stable_snapshot_problems(entries, sr.EXPECTED_ARCHS)
+        self.assertTrue(any("duplicate" in p and "amd64" in p for p in problems))
+
+    def test_legacy_stable_i386_is_ignored_and_never_in_rollback(self):
+        entries = stable_map(revision_numbers(), "4.0.8")["channel-map"] + [
+            channel_entry("i386", 11, "3.0.3", risk="stable")]
+        self.assertEqual(sr.stable_snapshot_problems(entries, sr.EXPECTED_ARCHS), [])
         snap = sr.snapshot_stable(entries, sr.EXPECTED_ARCHS)
-        self.assertEqual(sr.missing_rollback_archs(snap, sr.EXPECTED_ARCHS), ["s390x"])
+        cmds = sr.build_rollback_commands(snap)
+        self.assertEqual(len(cmds), len(ARCHS))
+        self.assertFalse(any("i386" in cmd for cmd in cmds))
 
 
 class SnapshotAndRollback(unittest.TestCase):
@@ -422,7 +445,49 @@ class CoordinatorDryRun(unittest.TestCase):
             fetch,
         )
         self.assertEqual(code, 1)
-        self.assertIn("no previous stable revision", out)
+        self.assertIn("invalid previous stable snapshot", out)
+        self.assertNotIn("DRY-RUN: snapcraft release", out)
+        self.assertNotIn("DRY-RUN: snapcraft promote", out)
+
+    def test_malformed_previous_stable_prevents_candidate_mutation(self):
+        revs = revision_numbers()
+        prev = revision_numbers(offset=500)
+        prev_stable = stable_map(prev, "4.0.8")
+        for entry in prev_stable["channel-map"]:
+            if entry["channel"]["architecture"] == "amd64":
+                del entry["revision"]
+        entries = edge_map_at(VERSION, revs)["channel-map"] + prev_stable["channel-map"]
+
+        def fetch():
+            return entries
+
+        code, out = self.run_main(
+            {"NIFT_SNAP_VERSION": VERSION, "NIFT_SNAP_WAIT": "1", "NIFT_SNAP_POLL": "0", "SNAPCRAFT_STORE_CREDENTIALS": "secret"},
+            fetch,
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("malformed", out)
+        self.assertNotIn("DRY-RUN: snapcraft release", out)
+        self.assertNotIn("DRY-RUN: snapcraft promote", out)
+
+    def test_duplicate_previous_stable_prevents_candidate_mutation(self):
+        revs = revision_numbers()
+        prev = revision_numbers(offset=500)
+        prev_stable = stable_map(prev, "4.0.8")
+        prev_stable["channel-map"] = prev_stable["channel-map"] + [
+            channel_entry("amd64", 777, "4.0.8", risk="stable")]
+        entries = edge_map_at(VERSION, revs)["channel-map"] + prev_stable["channel-map"]
+
+        def fetch():
+            return entries
+
+        code, out = self.run_main(
+            {"NIFT_SNAP_VERSION": VERSION, "NIFT_SNAP_WAIT": "1", "NIFT_SNAP_POLL": "0", "SNAPCRAFT_STORE_CREDENTIALS": "secret"},
+            fetch,
+        )
+        self.assertEqual(code, 1)
+        self.assertIn("duplicate", out)
+        self.assertNotIn("DRY-RUN: snapcraft release", out)
         self.assertNotIn("DRY-RUN: snapcraft promote", out)
 
     def test_missing_credentials_fail_closed_before_network(self):
@@ -489,6 +554,127 @@ class CoordinatorDryRun(unittest.TestCase):
         )
         self.assertEqual(code, 1)
         self.assertIn("malformed latest/edge entries", out)
+
+    @staticmethod
+    def stateful_fetch(states):
+        index = {"n": 0}
+
+        def fetch():
+            state = states[min(index["n"], len(states) - 1)]
+            index["n"] += 1
+            return state
+
+        return fetch
+
+    def env(self, **extra):
+        env = {"NIFT_SNAP_VERSION": VERSION, "NIFT_SNAP_WAIT": "1", "NIFT_SNAP_POLL": "0", "SNAPCRAFT_STORE_CREDENTIALS": "secret"}
+        env.update(extra)
+        return env
+
+    def base_states(self, candidate_incomplete=False, stable_incomplete=False):
+        revs = revision_numbers()
+        prev = revision_numbers(offset=500)
+        prev_stable = stable_map(prev, "4.0.8")
+        edge_waiting = edge_map_at(VERSION, revs)
+        for entry in edge_waiting["channel-map"]:
+            if entry["channel"]["architecture"] == "s390x":
+                entry["version"] = "4.0.8"
+        edge_complete = edge_map_at(VERSION, revs)
+        candidate = candidate_map(revs)
+        if candidate_incomplete:
+            for entry in candidate["channel-map"]:
+                if entry["channel"]["architecture"] == "s390x":
+                    entry["version"] = "4.0.8"
+        stable = stable_map(revs, VERSION)
+        if stable_incomplete:
+            for entry in stable["channel-map"]:
+                if entry["channel"]["architecture"] == "s390x":
+                    entry["version"] = "4.0.8"
+        return prev_stable, edge_waiting, edge_complete, candidate, stable
+
+    def test_delayed_candidate_converges(self):
+        prev_stable, edge_waiting, edge_complete, candidate, stable = self.base_states()
+        candidate_lag = dict(candidate)
+        candidate_lag["channel-map"] = [e for e in candidate["channel-map"] if e["channel"]["architecture"] != "s390x"]
+
+        def combine(*maps):
+            entries = []
+            for m in maps:
+                entries.extend(m["channel-map"])
+            return entries
+
+        states = [
+            combine(edge_waiting, prev_stable),
+            combine(edge_waiting, prev_stable),
+            combine(edge_complete, prev_stable),
+            combine(candidate_lag, prev_stable),  # candidate not yet visible for s390x
+            combine(candidate, prev_stable),      # candidate converges
+            combine(candidate, stable),
+        ]
+        code, out = self.run_main(self.env(NIFT_SNAP_CANDIDATE_WAIT="2"), self.stateful_fetch(states))
+        self.assertEqual(code, 0, out)
+        self.assertIn("DRY-RUN: snapcraft promote", out)
+        self.assertIn("Stable verified", out)
+
+    def test_candidate_timeout_prevents_smoke_and_promotion(self):
+        revs = revision_numbers()
+        prev = revision_numbers(offset=500)
+        prev_stable = stable_map(prev, "4.0.8")
+        edge_complete = edge_map_at(VERSION, revs)
+        candidate = candidate_map(revs)
+        for entry in candidate["channel-map"]:
+            if entry["channel"]["architecture"] == "s390x":
+                entry["version"] = "4.0.8"  # never converges
+        entries = edge_complete["channel-map"] + prev_stable["channel-map"] + candidate["channel-map"]
+
+        def steady():
+            return entries
+
+        code, out = self.run_main(self.env(NIFT_SNAP_CANDIDATE_WAIT="1"), steady)
+        self.assertEqual(code, 1)
+        self.assertIn("candidate did not converge", out)
+        self.assertNotIn("DRY-RUN: bash packaging/snap-candidate-smoke.sh", out)
+        self.assertNotIn("DRY-RUN: snapcraft promote", out)
+
+    def test_delayed_stable_converges(self):
+        prev_stable, edge_waiting, edge_complete, candidate, stable = self.base_states()
+        stable_lag = dict(stable)
+        stable_lag["channel-map"] = [e for e in stable["channel-map"] if e["channel"]["architecture"] != "s390x"]
+
+        def combine(*maps):
+            entries = []
+            for m in maps:
+                entries.extend(m["channel-map"])
+            return entries
+
+        states = [
+            combine(edge_waiting, prev_stable),
+            combine(edge_waiting, prev_stable),
+            combine(edge_complete, prev_stable),
+            combine(candidate, prev_stable),
+            combine(candidate, stable_lag),  # stable not yet visible for s390x
+            combine(candidate, stable),      # stable converges
+        ]
+        code, out = self.run_main(self.env(NIFT_SNAP_STABLE_WAIT="2"), self.stateful_fetch(states))
+        self.assertEqual(code, 0, out)
+        self.assertIn("Stable verified", out)
+
+    def test_stable_timeout_prints_rollback(self):
+        revs = revision_numbers()
+        prev = revision_numbers(offset=500)
+        prev_stable = stable_map(prev, "4.0.8")  # stable never advances past 4.0.8
+        candidate = candidate_map(revs)
+        entries = candidate["channel-map"] + prev_stable["channel-map"]
+
+        def steady():
+            return entries
+
+        code, out = self.run_main(self.env(NIFT_SNAP_STABLE_WAIT="1"), steady)
+        self.assertEqual(code, 1)
+        self.assertIn("stable did not converge", out)
+        self.assertIn("Rollback commands", out)
+        self.assertIn("snapcraft release nift 600 latest/stable", out)  # previous amd64 revision
+        self.assertNotIn("Stable verified", out)
 
 
 class WorkflowStructure(unittest.TestCase):
@@ -591,6 +777,20 @@ class WorkflowStructure(unittest.TestCase):
         smoke = self.load("packaging/snap-candidate-smoke.sh")
         self.assertIn("sudo snap install nift", smoke)
         self.assertIn("sudo snap remove nift", smoke)
+
+    def test_smoke_installs_exact_nift_revision(self):
+        smoke = self.load("packaging/snap-candidate-smoke.sh")
+        self.assertIn('sudo snap install nift --revision="$REVISION"', smoke)
+        self.assertNotIn("--channel=latest/candidate", smoke)
+
+    def test_snapcraft_version_assertion_parses_robustly(self):
+        text = self.load(".github/workflows/snap.yml")
+        # `snapcraft version` commonly prints "snapcraft 9.0.1"; the version
+        # token must be extracted, never compared as the raw whole-output string.
+        self.assertIn("grep -oE '[0-9]+(\\.[0-9]+){1,2}'", text)
+        self.assertNotIn('[ "$(snapcraft version)" = "$SNAPCRAFT_EXPECTED_VERSION" ]', text)
+        self.assertIn('[ "$installed_version" = "$SNAPCRAFT_EXPECTED_VERSION" ]', text)
+        self.assertIn('[ "$installed_revision" = "$SNAPCRAFT_SNAP_REVISION" ]', text)
 
     def test_release_workflow_calls_snap_via_workflow_call(self):
         self.assertIn("uses: ./.github/workflows/snap.yml", self.load(".github/workflows/release.yml"))

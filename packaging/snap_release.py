@@ -254,6 +254,59 @@ def verify_candidate_strict(channel_map, expected, supported):
     return (not problems, problems)
 
 
+def candidate_convergence(channel_map, expected, archs):
+    """State of the latest/candidate stage.
+
+    Returns (ok, retryable, problems). Unsupported, malformed or duplicate
+    candidate entries are fatal (never retried): `snapcraft promote` moves the
+    whole build set. Missing or stale expected revisions are retryable while the
+    Store channel map converges."""
+    ok, problems = verify_candidate_strict(channel_map, expected, archs)
+    if ok:
+        return True, False, []
+    fatal = [p for p in problems if any(k in p for k in ("unsupported", "malformed", "duplicate"))]
+    if fatal:
+        return False, False, fatal
+    return False, True, problems
+
+
+def stable_convergence(channel_map, expected, archs):
+    """State of the latest/stable verification.
+
+    Returns (ok, retryable, problems). Malformed or duplicate supported stable
+    entries are fatal; missing or stale expected revisions are retryable while
+    the Store channel map converges. Legacy entries are ignored."""
+    ok, problems = verify_channel(channel_map, "stable", expected)
+    if ok:
+        return True, False, []
+    fatal = [p for p in problems if any(k in p for k in ("malformed", "duplicate"))]
+    if fatal:
+        return False, False, fatal
+    return False, True, problems
+
+
+def poll_convergence(fetch, classify, expected, archs, wait_seconds, poll_seconds, what):
+    """Poll until `classify` reports convergence. Returns (channel_map, ok, problems).
+
+    Fatal problems return immediately; missing/stale entries are retried until
+    the bounded deadline. A Store query failure fails closed."""
+    deadline = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=wait_seconds)
+    while True:
+        try:
+            channel_map = fetch()
+        except (OSError, RuntimeError) as exc:
+            return None, False, ["Store query failed: {}".format(exc)]
+        ok, retryable, problems = classify(channel_map, expected, archs)
+        if ok:
+            return channel_map, True, None
+        if not retryable:
+            return channel_map, False, problems
+        if datetime.datetime.now(datetime.timezone.utc) >= deadline:
+            return channel_map, False, problems
+        print("waiting for {} to converge: {}".format(what, "; ".join(problems)))
+        time.sleep(poll_seconds)
+
+
 def missing_rollback_archs(previous_stable, archs):
     """Architectures lacking a previous stable revision (rollback snapshot)."""
     return sorted(arch for arch in archs if arch not in previous_stable)
@@ -274,12 +327,46 @@ def report_legacy(channel_map, risk, supported, track="latest"):
 
 
 def snapshot_stable(channel_map, supported, track="latest"):
-    """{arch: {"revision", "version"}} for unbranched latest/stable (rollback base)."""
+    """{arch: {"revision", "version"}} for unbranched latest/stable (rollback base).
+
+    Malformed supported entries are skipped; use stable_snapshot_problems to
+    refuse promotion before this map is relied upon."""
     out = {}
-    for arch, rev, ver in channel_entries(channel_map, track, "stable"):
-        if arch in supported and arch not in out:
-            out[arch] = {"revision": rev, "version": ver}
+    for entry in channel_map:
+        ch = entry.get("channel") or {}
+        arch = ch.get("architecture")
+        if ch.get("track") == track and ch.get("risk") == "stable" and ch.get("branch") in (None, "") and arch in supported:
+            if entry_problem(entry) is None and arch not in out:
+                out[arch] = {"revision": entry.get("revision"), "version": entry.get("version")}
     return out
+
+
+def stable_snapshot_problems(channel_map, archs, track="latest"):
+    """Problems that make the previous latest/stable snapshot unusable.
+
+    Every supported architecture must have exactly one valid unbranched
+    latest/stable entry (positive integer revision, non-empty version, valid
+    architecture/track/risk). Malformed or duplicate supported entries and any
+    missing architecture are all non-retryable problems. Legacy entries outside
+    the declared set are ignored."""
+    problems = []
+    by_arch = {}
+    for entry in channel_map:
+        ch = entry.get("channel") or {}
+        arch = ch.get("architecture")
+        if ch.get("track") == track and ch.get("risk") == "stable" and ch.get("branch") in (None, "") and arch in archs:
+            problem = entry_problem(entry)
+            if problem:
+                problems.append("previous stable {} malformed: {}".format(arch, problem))
+                continue
+            by_arch.setdefault(arch, []).append((entry.get("revision"), entry.get("version")))
+    for arch in sorted(archs):
+        got = by_arch.get(arch, [])
+        if not got:
+            problems.append("previous stable entry missing for {}".format(arch))
+        elif len(got) > 1:
+            problems.append("previous stable duplicate entries for {}: {}".format(arch, got))
+    return problems
 
 
 def candidate_at_version(channel_map, archs, version):
@@ -345,6 +432,8 @@ def main(argv=None):
         print("FAIL: SNAPCRAFT_STORE_CREDENTIALS is required for release/promote", file=sys.stderr)
         return 2
     wait_seconds = int(os.environ.get("NIFT_SNAP_WAIT", "7200"))
+    candidate_wait = int(os.environ.get("NIFT_SNAP_CANDIDATE_WAIT", "300"))
+    stable_wait = int(os.environ.get("NIFT_SNAP_STABLE_WAIT", "300"))
     poll_seconds = int(os.environ.get("NIFT_SNAP_POLL", "30"))
 
     archs = load_platforms()
@@ -357,16 +446,17 @@ def main(argv=None):
     except (OSError, RuntimeError) as exc:
         print("FAIL: could not query the Snap Store: {}".format(exc), file=sys.stderr)
         return 1
-    previous_stable = snapshot_stable(channel_map, archs)
 
-    # A complete rollback snapshot is required: every supported architecture
-    # must already have a previous stable revision or promotion is refused.
-    missing_rollback = missing_rollback_archs(previous_stable, archs)
-    if missing_rollback:
-        print("FAIL: no previous stable revision for archs: {}; refusing promotion "
-              "(no approved first-release exception in place)".format(", ".join(missing_rollback)),
-              file=sys.stderr)
+    # A usable rollback snapshot is required before any candidate mutation:
+    # every supported architecture must have exactly one valid unbranched
+    # latest/stable entry. Malformed or duplicate supported entries refuse the
+    # run so candidate is never touched on an unsafe rollback base.
+    snapshot_problems = stable_snapshot_problems(channel_map, archs)
+    if snapshot_problems:
+        print("FAIL: invalid previous stable snapshot:\n  " + "\n  ".join(snapshot_problems), file=sys.stderr)
+        print("Refusing any candidate mutation (no approved first-release exception in place).", file=sys.stderr)
         return 1
+    previous_stable = snapshot_stable(channel_map, archs)
 
     selected = candidate_at_version(channel_map, archs, version)
     if selected is None:
@@ -404,19 +494,17 @@ def main(argv=None):
                 print("FAIL: release revision {} to candidate".format(expected[arch]["revision"]), file=sys.stderr)
                 return 1
 
-    channel_map = fetch_channel_map()
-    report_legacy(channel_map, "candidate", archs)
-    # Strict candidate verification: exactly the six declared architectures, no
-    # unsupported entries, exact selected revisions, exact version, unbranched
-    # latest/candidate. Legacy entries in candidate must fail closed before
-    # promotion; they are never auto-removed.
-    ok, problems = verify_candidate_strict(channel_map, expected, archs)
+    # Poll candidate until it converges on the exact strict six-revision set.
+    # Unsupported/malformed/duplicate candidate entries fail immediately;
+    # missing/stale expected revisions are retried to a bounded deadline.
+    channel_map, ok, problems = poll_convergence(
+        fetch_channel_map, candidate_convergence, expected, archs, candidate_wait, poll_seconds, "candidate")
     if not ok:
-        print("FAIL: candidate verification (promotion refused):\n  " + "\n  ".join(problems), file=sys.stderr)
-        print("Manual inspection required: review and remove any unsupported candidate "
-              "entries in the Snap Store, then rerun. The coordinator does not modify them.",
-              file=sys.stderr)
+        print("FAIL: candidate did not converge:\n  " + "\n  ".join(problems or []), file=sys.stderr)
+        print("Manual inspection required: review candidate entries in the Snap Store; the "
+              "coordinator never modifies unsupported candidate entries.", file=sys.stderr)
         return 1
+    report_legacy(channel_map, "candidate", archs)
 
     if run_snapcraft(smoke_command(version, expected["amd64"]["revision"]), dry_run) != 0:
         print("FAIL: candidate confinement smoke failed; stable not promoted", file=sys.stderr)
@@ -426,15 +514,18 @@ def main(argv=None):
         print("FAIL: promote candidate -> stable", file=sys.stderr)
         return 1
 
-    channel_map = fetch_channel_map()
-    report_legacy(channel_map, "stable", archs)
-    ok, problems = verify_channel(channel_map, "stable", expected)
+    # Poll stable until it converges on the exact six-revision set. Malformed or
+    # duplicate supported entries fail immediately; missing/stale revisions are
+    # retried to a bounded deadline.
+    channel_map, ok, problems = poll_convergence(
+        fetch_channel_map, stable_convergence, expected, archs, stable_wait, poll_seconds, "stable")
     if not ok:
-        print("FAIL: stable verification:\n  " + "\n  ".join(problems), file=sys.stderr)
+        print("FAIL: stable did not converge:\n  " + "\n  ".join(problems or []), file=sys.stderr)
         print("Rollback commands (manual, per-arch, non-atomic):")
         for command in build_rollback_commands(previous_stable):
             print("  " + command)
         return 1
+    report_legacy(channel_map, "stable", archs)
 
     print("Stable verified: all six architectures at version {}".format(version))
     print("Rollback commands (previous stable, per-arch):")
