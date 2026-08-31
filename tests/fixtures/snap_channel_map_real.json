@@ -1,0 +1,88 @@
+{
+  "channel-map": [
+    {
+      "channel": {"architecture": "amd64", "name": "edge", "risk": "edge", "track": "latest", "branch": null},
+      "created-at": "2026-08-28T10:00:00Z",
+      "revision": 684,
+      "version": "4.0.9"
+    },
+    {
+      "channel": {"architecture": "arm64", "name": "edge", "risk": "edge", "track": "latest", "branch": null},
+      "created-at": "2026-08-28T10:01:00Z",
+      "revision": 685,
+      "version": "4.0.9"
+    },
+    {
+      "channel": {"architecture": "armhf", "name": "edge", "risk": "edge", "track": "latest", "branch": null},
+      "created-at": "2026-08-28T10:02:00Z",
+      "revision": 686,
+      "version": "4.0.9"
+    },
+    {
+      "channel": {"architecture": "ppc64el", "name": "edge", "risk": "edge", "track": "latest", "branch": null},
+      "created-at": "2026-08-28T10:03:00Z",
+      "revision": 687,
+      "version": "4.0.9"
+    },
+    {
+      "channel": {"architecture": "riscv64", "name": "edge", "risk": "edge", "track": "latest", "branch": null},
+      "created-at": "2026-08-28T10:04:00Z",
+      "revision": 688,
+      "version": "4.0.9"
+    },
+    {
+      "channel": {"architecture": "s390x", "name": "edge", "risk": "edge", "track": "latest", "branch": null},
+      "created-at": "2026-08-28T10:05:00Z",
+      "revision": 683,
+      "version": "4.0.8"
+    },
+    {
+      "channel": {"architecture": "i386", "name": "edge", "risk": "edge", "track": "latest", "branch": null},
+      "created-at": "2023-01-01T00:00:00Z",
+      "revision": 12,
+      "version": "3.0.3"
+    },
+    {
+      "channel": {"architecture": "amd64", "name": "stable", "risk": "stable", "track": "latest", "branch": null},
+      "created-at": "2026-08-20T10:00:00Z",
+      "revision": 679,
+      "version": "4.0.8"
+    },
+    {
+      "channel": {"architecture": "arm64", "name": "stable", "risk": "stable", "track": "latest", "branch": null},
+      "created-at": "2026-08-20T10:01:00Z",
+      "revision": 680,
+      "version": "4.0.8"
+    },
+    {
+      "channel": {"architecture": "armhf", "name": "stable", "risk": "stable", "track": "latest", "branch": null},
+      "created-at": "2026-08-20T10:02:00Z",
+      "revision": 681,
+      "version": "4.0.8"
+    },
+    {
+      "channel": {"architecture": "ppc64el", "name": "stable", "risk": "stable", "track": "latest", "branch": null},
+      "created-at": "2026-08-20T10:03:00Z",
+      "revision": 682,
+      "version": "4.0.8"
+    },
+    {
+      "channel": {"architecture": "riscv64", "name": "stable", "risk": "stable", "track": "latest", "branch": null},
+      "created-at": "2026-08-20T10:04:00Z",
+      "revision": 683,
+      "version": "4.0.8"
+    },
+    {
+      "channel": {"architecture": "s390x", "name": "stable", "risk": "stable", "track": "latest", "branch": null},
+      "created-at": "2026-08-20T10:05:00Z",
+      "revision": 684,
+      "version": "4.0.8"
+    },
+    {
+      "channel": {"architecture": "i386", "name": "stable", "risk": "stable", "track": "latest", "branch": null},
+      "created-at": "2023-01-01T00:00:00Z",
+      "revision": 11,
+      "version": "3.0.3"
+    }
+  ]
+}

@@ -9,12 +9,6 @@ on:
       - 'src/**'
       - '.github/workflows/snap.yml'
   workflow_dispatch:
-    inputs:
-      publish_edge:
-        description: Publish the built snap to edge for strict-confinement testing
-        required: false
-        type: boolean
-        default: false
 
 jobs:
   # Non-publishing validation builds for amd64 and arm64. These catch build
@@ -46,42 +40,14 @@ jobs:
           name: nift-snap-${{ matrix.platform }}
           path: ${{ steps.snapcraft.outputs.snap }}
 
-  # Manual edge publication for isolated confinement testing only. Gated on a
-  # workflow_dispatch flag; uploads the freshly built amd64/arm64 snaps to edge.
-  # Edge is never used as a promote source, so this can never feed candidate or
-  # stable promotion. Store credentials are scoped to this job alone.
-  publish-edge:
-    if: github.event_name == 'workflow_dispatch' && inputs.publish_edge
-    needs: [build]
-    runs-on: ubuntu-latest
-    env:
-      SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
-    steps:
-      - name: Install pinned snapcraft
-        shell: bash
-        run: |
-          sudo snap install snapcraft --classic --channel="${SNAPCRAFT_CHANNEL:-latest/stable}"
-          snapcraft version
-      - uses: actions/download-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          path: snaps
-          merge-multiple: true
-      - name: Publish built snaps to edge
-        if: env.SNAPCRAFT_STORE_CREDENTIALS != ''
-        shell: bash
-        run: |
-          set -euo pipefail
-          for snap_file in snaps/*.snap; do
-            echo "publishing $snap_file to edge"
-            snapcraft upload "$snap_file" --release=edge
-          done
-
-  # Release coordinator: waits for the Snapcraft build-service revisions of the
-  # tagged version, releases exactly those six revisions to candidate, verifies
-  # the complete build set, promotes candidate -> stable, and verifies stable.
-  # Serialized by a concurrency group so two release tags can never share
-  # candidate or stable state. Fails closed on any missing/ambiguous/mismatched
-  # revision; stable is untouched by every failure before the promote step.
+  # Release coordinator. The connected build service publishes each platform to
+  # latest/edge; this job waits until all six declared architectures reach the
+  # tagged version on edge, releases exactly those revisions to candidate,
+  # verifies the complete candidate set, runs the amd64 candidate confinement
+  # smoke, promotes candidate -> stable, and verifies stable. Serialized by a
+  # concurrency group so two release tags can never share candidate or stable
+  # state. Fails closed on any missing/ambiguous/mismatched revision; stable is
+  # untouched by every failure before the promote step.
   release-coordination:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [build]
@@ -90,18 +56,26 @@ jobs:
       group: nift-snap-release-transaction
       cancel-in-progress: false
     env:
+      # Exact tested Snapcraft snap revision. This is a genuine immutable pin:
+      # the tag release fails closed until a validated revision number is
+      # recorded here. The contract test rejects any fallback to a floating
+      # channel.
+      SNAPCRAFT_SNAP_REVISION: ""
       SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Resolve release inputs
+        shell: bash
+        run: |
+          echo "NIFT_SNAP_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          echo "NIFT_SNAP_WAIT=7200" >> "$GITHUB_ENV"
       - name: Install pinned snapcraft
         shell: bash
         run: |
-          sudo snap install snapcraft --classic --channel="${SNAPCRAFT_CHANNEL:-latest/stable}"
+          test -n "$SNAPCRAFT_SNAP_REVISION" || { echo "SNAPCRAFT_SNAP_REVISION is not set to a tested revision" >&2; exit 1; }
+          sudo snap install snapcraft --classic --revision="$SNAPCRAFT_SNAP_REVISION"
           snapcraft version
+          snap list snapcraft
       - name: Coordinate candidate staging and stable promotion
         shell: bash
         run: python3 packaging/snap_release.py
-        env:
-          NIFT_SNAP_VERSION: ${GITHUB_REF_NAME#v}
-          NIFT_SNAP_START: $(date -u +%Y-%m-%dT%H:%M:%SZ)
-          NIFT_SNAP_WAIT: "5400"

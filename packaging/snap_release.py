@@ -2,12 +2,16 @@
 """Snap release coordinator for the nift snap.
 
 The Snapcraft/Launchpad build service connected to the GitHub repository reads
-snap/snapcraft.yaml and produces a Store revision for every declared platform on
-each tag push. This coordinator is the sole publisher: it waits for the
-build-service revisions of the tagged version, releases exactly those revisions
-to latest/candidate, verifies the complete six-architecture build set, promotes
-the set to latest/stable, and verifies stable. GitHub-built snaps are never
-uploaded to the Store during ordinary tag releases.
+snap/snapcraft.yaml and publishes one build per declared platform into
+latest/edge on each tag push. This coordinator is the sole publisher: it waits
+for every supported architecture to reach the tagged version on latest/edge,
+releases exactly those edge revisions to latest/candidate, verifies the complete
+six-architecture candidate set, runs the candidate confinement smoke on amd64,
+promotes the set to latest/stable, and verifies stable. GitHub-built snaps are
+never uploaded to the Store during ordinary tag releases.
+
+Legacy channel entries outside the declared platform set (e.g. i386 at an old
+version) are ignored and reported, never promoted, replaced or closed.
 
 The decision logic is pure and importable for offline tests; running this module
 executes the real Store transaction (unless --dry-run is given).
@@ -15,9 +19,8 @@ executes the real Store transaction (unless --dry-run is given).
 Environment:
   SNAP_NAME                   snap name (default: nift)
   NIFT_SNAP_VERSION           tag version to release (no leading 'v')
-  NIFT_SNAP_START             ISO-8601 UTC workflow start time (correlation base)
-  NIFT_SNAP_WAIT              seconds to wait for build-service revisions (default 5400)
-  NIFT_SNAP_TOLERANCE         seconds accepted before NIFT_SNAP_START (default 600)
+  NIFT_SNAP_WAIT              seconds to wait for edge builds to reach the
+                              version (default 7200)
   SNAPCRAFT_STORE_CREDENTIALS required for any release/promote operation
 """
 
@@ -36,12 +39,6 @@ STORE_API = "https://api.snapcraft.io/v2/snaps/info"
 # authoritative source is snap/snapcraft.yaml (platforms:); this constant is the
 # documented invariant the offline contract test pins the file to.
 EXPECTED_ARCHS = {"amd64", "arm64", "armhf", "ppc64el", "riscv64", "s390x"}
-
-
-class ReleaseSelectionError(Exception):
-    def __init__(self, message, competing=None):
-        super().__init__(message)
-        self.competing = competing  # dict arch -> [revision numbers]
 
 
 def parse_platforms(yaml_text):
@@ -70,105 +67,87 @@ def load_platforms(path="snap/snapcraft.yaml"):
         return set()
 
 
-def fetch_info(snap_name=SNAP_NAME, fields="channel-map,revisions"):
-    url = "{}/{}?fields={}".format(STORE_API, snap_name, fields)
+def parse_channel_map_response(payload):
+    """Validate a raw API payload and return its channel-map list. Raises on an
+    API error-list so callers fail closed instead of silently selecting nothing."""
+    if isinstance(payload, dict) and "error-list" in payload:
+        raise RuntimeError("Snap Store API error: " + json.dumps(payload["error-list"]))
+    return payload.get("channel-map", []) if isinstance(payload, dict) else []
+
+
+def fetch_channel_map(snap_name=SNAP_NAME):
+    url = "{}/{}?fields=channel-map".format(STORE_API, snap_name)
     # The v2 info endpoint requires the Snap-Device-Series header.
     req = urllib.request.Request(
         url, headers={"Snap-Device-Series": "16", "User-Agent": "nift-release-coordinator/1"}
     )
     with urllib.request.urlopen(req, timeout=30) as resp:
-        return json.load(resp)
-
-
-def parse_iso(value):
-    text = str(value).strip()
-    if text.endswith("Z"):
-        text = text[:-1] + "+00:00"
-    return datetime.datetime.fromisoformat(text).astimezone(datetime.timezone.utc)
-
-
-def revision_created(revision):
-    created = revision.get("created_at")
-    if not created:
-        return None
-    try:
-        return parse_iso(created)
-    except (ValueError, TypeError):
-        return None
-
-
-def revision_on_channel(revision, channel):
-    return channel in revision.get("channels", [])
-
-
-def revision_archs(revision):
-    return set(revision.get("architectures", []))
-
-
-def select_revisions(revisions, version, archs, start, now, tolerance=600, exclude_stable=True):
-    """Return {arch: revision_number} for the current build-service run.
-
-    Only revisions of the exact version, built for an expected architecture,
-    created within [start - tolerance, now], and not already on latest/stable
-    are eligible. Exactly one eligible revision per architecture is required;
-    ambiguity or a missing architecture raises ReleaseSelectionError so the
-    caller fails closed with stable untouched.
-    """
-    start_dt = parse_iso(start)
-    candidates = {}
-    for rev in revisions:
-        if rev.get("version") != version:
-            continue
-        rarchs = revision_archs(rev)
-        if not (rarchs & archs):
-            continue
-        if exclude_stable and revision_on_channel(rev, "latest/stable"):
-            continue
-        created = revision_created(rev)
-        if created is None:
-            continue
-        if created < start_dt - datetime.timedelta(seconds=tolerance) or created > now:
-            continue
-        for arch in rarchs & archs:
-            candidates.setdefault(arch, []).append(rev["revision"])
-
-    competing = {}
-    for arch in sorted(archs):
-        bucket = candidates.get(arch, [])
-        if len(bucket) > 1:
-            competing[arch] = sorted(bucket)
-    if competing:
-        raise ReleaseSelectionError(
-            "ambiguous eligible revisions for version {}: {}".format(
-                version, "; ".join("{}={}".format(a, b) for a, b in competing.items())
-            ),
-            competing=competing,
-        )
-    missing = sorted(a for a in archs if a not in candidates)
-    if missing:
-        raise ReleaseSelectionError("no eligible revision for archs: {}".format(", ".join(missing)))
-    return {arch: candidates[arch][0] for arch in archs}
+        payload = json.load(resp)
+    return parse_channel_map_response(payload)
 
 
 def channel_entries(channel_map, track, risk):
-    """(architecture, revision, version) for unbranched track/risk entries."""
+    """(architecture, revision, version) for unbranched track/risk entries.
+
+    Matches the real v2 channel-map schema: architecture lives inside `channel`,
+    and revision/version are top-level. A missing or null branch means the
+    channel is unbranched.
+    """
     out = []
     for entry in channel_map:
         ch = entry.get("channel") or {}
-        if ch.get("track") == track and ch.get("risk") == risk and ch.get("branch") is None:
-            out.append((entry.get("architecture"), entry.get("revision"), entry.get("version")))
+        branch = ch.get("branch")
+        if ch.get("track") == track and ch.get("risk") == risk and branch in (None, ""):
+            out.append((ch.get("architecture"), entry.get("revision"), entry.get("version")))
     return out
 
 
+def select_edge_revisions(channel_map, version, archs):
+    """State of the unbranched latest/edge build set.
+
+    Returns (selected, waiting, duplicates, legacy):
+      selected    {arch: revision} for archs already at `version`
+      waiting     archs still missing from edge or on an older version
+      duplicates  archs with more than one edge entry (fail-closed condition)
+      legacy      (arch, revision, version) entries outside the declared set
+    """
+    by_arch = {}
+    legacy = []
+    for arch, rev, ver in channel_entries(channel_map, "latest", "edge"):
+        if arch in archs:
+            by_arch.setdefault(arch, []).append((rev, ver))
+        else:
+            legacy.append((arch, rev, ver))
+    selected = {}
+    waiting = []
+    duplicates = []
+    for arch in sorted(archs):
+        got = by_arch.get(arch, [])
+        if not got:
+            waiting.append(arch)
+        elif len(got) > 1:
+            duplicates.append(arch)
+        else:
+            rev, ver = got[0]
+            if ver == version:
+                selected[arch] = rev
+            else:
+                waiting.append(arch)
+    return selected, waiting, duplicates, legacy
+
+
 def verify_channel(channel_map, risk, expected, track="latest"):
-    """expected: {arch: {"revision": int, "version": str}}. Returns (ok, problems)."""
+    """Verify an expected {arch: {"revision", "version"}} set in a channel.
+
+    Entries for architectures outside `expected` are ignored (use
+    legacy_entries to report them) and never fail verification. Returns
+    (ok, problems).
+    """
     problems = []
     by_arch = {}
     for arch, rev, ver in channel_entries(channel_map, track, risk):
-        by_arch.setdefault(arch, []).append((rev, ver))
-    unexpected = sorted(set(by_arch) - set(expected))
-    if unexpected:
-        problems.append("unexpected {} entries for archs: {}".format(risk, ", ".join(unexpected)))
+        if arch in expected:
+            by_arch.setdefault(arch, []).append((rev, ver))
     for arch, want in sorted(expected.items()):
         got = by_arch.get(arch, [])
         if not got:
@@ -184,21 +163,37 @@ def verify_channel(channel_map, risk, expected, track="latest"):
     return (not problems, problems)
 
 
-def snapshot_stable(channel_map, track="latest"):
+def legacy_entries(channel_map, risk, supported, track="latest"):
+    return [
+        (arch, rev, ver)
+        for arch, rev, ver in channel_entries(channel_map, track, risk)
+        if arch not in supported
+    ]
+
+
+def report_legacy(channel_map, risk, supported, track="latest"):
+    for arch, rev, ver in legacy_entries(channel_map, risk, supported, track):
+        print("ignoring legacy {} entry: {} revision {} version {} (not declared)".format(
+            risk, arch, rev, ver))
+
+
+def snapshot_stable(channel_map, supported, track="latest"):
     """{arch: {"revision", "version"}} for unbranched latest/stable (rollback base)."""
     out = {}
     for arch, rev, ver in channel_entries(channel_map, track, "stable"):
-        if arch not in out:
+        if arch in supported and arch not in out:
             out[arch] = {"revision": rev, "version": ver}
     return out
 
 
-def candidate_at_version(info, archs, version):
+def candidate_at_version(channel_map, archs, version):
     """{arch: revision} if latest/candidate already holds exactly the expected
-    set at this version (e.g. a prior stage of this coordinator); else None."""
+    set at this version (e.g. a prior stage of this coordinator); else None.
+    Legacy entries outside the declared set are ignored."""
     by_arch = {}
-    for arch, rev, ver in channel_entries(info.get("channel-map", []), "latest", "candidate"):
-        by_arch.setdefault(arch, []).append((rev, ver))
+    for arch, rev, ver in channel_entries(channel_map, "latest", "candidate"):
+        if arch in archs:
+            by_arch.setdefault(arch, []).append((rev, ver))
     if set(by_arch) != archs:
         return None
     result = {}
@@ -228,6 +223,10 @@ def promote_command(snap_name=SNAP_NAME):
     return ["snapcraft", "promote", snap_name, "--from-channel=latest/candidate", "--to-channel=latest/stable", "--yes"]
 
 
+def smoke_command(version, amd64_revision):
+    return ["bash", "packaging/snap-candidate-smoke.sh", str(version), str(amd64_revision)]
+
+
 def credentials_present():
     return bool(os.environ.get("SNAPCRAFT_STORE_CREDENTIALS"))
 
@@ -243,18 +242,14 @@ def run_snapcraft(argv, dry_run):
 def main(argv=None):
     dry_run = "--dry-run" in (argv if argv is not None else sys.argv[1:])
     version = os.environ.get("NIFT_SNAP_VERSION")
-    start = os.environ.get("NIFT_SNAP_START")
     if not version:
         print("FAIL: NIFT_SNAP_VERSION is required", file=sys.stderr)
-        return 2
-    if not start:
-        print("FAIL: NIFT_SNAP_START is required", file=sys.stderr)
         return 2
     if not dry_run and not credentials_present():
         print("FAIL: SNAPCRAFT_STORE_CREDENTIALS is required for release/promote", file=sys.stderr)
         return 2
-    wait_seconds = int(os.environ.get("NIFT_SNAP_WAIT", "5400"))
-    tolerance = int(os.environ.get("NIFT_SNAP_TOLERANCE", "600"))
+    wait_seconds = int(os.environ.get("NIFT_SNAP_WAIT", "7200"))
+    poll_seconds = int(os.environ.get("NIFT_SNAP_POLL", "30"))
 
     archs = load_platforms()
     if not archs:
@@ -262,50 +257,61 @@ def main(argv=None):
         return 2
 
     try:
-        info = fetch_info()
-    except OSError as exc:
+        channel_map = fetch_channel_map()
+    except (OSError, RuntimeError) as exc:
         print("FAIL: could not query the Snap Store: {}".format(exc), file=sys.stderr)
         return 1
-    previous_stable = snapshot_stable(info.get("channel-map", []))
+    previous_stable = snapshot_stable(channel_map, archs)
 
-    selected = candidate_at_version(info, archs, version)
+    selected = candidate_at_version(channel_map, archs, version)
     if selected is None:
-        deadline = parse_iso(start) + datetime.timedelta(seconds=wait_seconds)
+        deadline = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=wait_seconds)
         while True:
             try:
-                info = fetch_info()
-                selected = select_revisions(
-                    info.get("revisions", []), version, archs, start,
-                    datetime.datetime.now(datetime.timezone.utc), tolerance,
-                )
-                break
-            except ReleaseSelectionError as exc:
-                if "no eligible revision" in str(exc) and datetime.datetime.now(datetime.timezone.utc) < deadline:
-                    time.sleep(30)
-                    continue
-                print("FAIL: {}".format(exc), file=sys.stderr)
+                channel_map = fetch_channel_map()
+            except (OSError, RuntimeError) as exc:
+                print("FAIL: could not query the Snap Store: {}".format(exc), file=sys.stderr)
                 return 1
+            report_legacy(channel_map, "edge", archs)
+            sel, waiting, duplicates, legacy = select_edge_revisions(channel_map, version, archs)
+            if duplicates:
+                print("FAIL: duplicate latest/edge entries for archs: {}".format(", ".join(duplicates)), file=sys.stderr)
+                return 1
+            if not waiting:
+                selected = sel
+                break
+            if datetime.datetime.now(datetime.timezone.utc) >= deadline:
+                print("FAIL: timed out waiting for latest/edge to reach version {}; still waiting: {}".format(
+                    version, ", ".join(waiting)), file=sys.stderr)
+                return 1
+            time.sleep(poll_seconds)
 
     expected = {arch: {"revision": rev, "version": version} for arch, rev in selected.items()}
 
-    if candidate_at_version(info, archs, version) is None:
+    if candidate_at_version(channel_map, archs, version) is None:
         for arch in sorted(expected):
             if run_snapcraft(release_command(expected[arch]["revision"]), dry_run) != 0:
                 print("FAIL: release revision {} to candidate".format(expected[arch]["revision"]), file=sys.stderr)
                 return 1
 
-    info = fetch_info()
-    ok, problems = verify_channel(info.get("channel-map", []), "candidate", expected)
+    channel_map = fetch_channel_map()
+    report_legacy(channel_map, "candidate", archs)
+    ok, problems = verify_channel(channel_map, "candidate", expected)
     if not ok:
         print("FAIL: candidate verification:\n  " + "\n  ".join(problems), file=sys.stderr)
+        return 1
+
+    if run_snapcraft(smoke_command(version, expected["amd64"]["revision"]), dry_run) != 0:
+        print("FAIL: candidate confinement smoke failed; stable not promoted", file=sys.stderr)
         return 1
 
     if run_snapcraft(promote_command(), dry_run) != 0:
         print("FAIL: promote candidate -> stable", file=sys.stderr)
         return 1
 
-    info = fetch_info()
-    ok, problems = verify_channel(info.get("channel-map", []), "stable", expected)
+    channel_map = fetch_channel_map()
+    report_legacy(channel_map, "stable", archs)
+    ok, problems = verify_channel(channel_map, "stable", expected)
     if not ok:
         print("FAIL: stable verification:\n  " + "\n  ".join(problems), file=sys.stderr)
         print("Rollback commands (manual, per-arch, non-atomic):")
