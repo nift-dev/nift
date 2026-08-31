@@ -539,7 +539,12 @@ bool write_target_files(const InitOptions& options) {
 }
 
 bool initialise_project(const InitOptions& options) {
-    if (fs::exists(".nift")) {
+    // Refuse to initialize over an existing Nift project. A project root is
+    // identified by its project configuration; a partial .nift directory that
+    // is not yet a project (for example one left behind by a failed earlier
+    // init, or carrying only a .lock) may be completed safely, which is what
+    // makes the existing-`.lock` cases below reachable through `nift init`.
+    if (fs::exists(".nift/config.json") || fs::exists(".nift/tracked.json")) {
         console::error("cannot initialise project");
         std::cerr << "  this directory is already a Nift project\n";
         return false;
@@ -551,11 +556,11 @@ bool initialise_project(const InitOptions& options) {
 
     fs::create_directories(".nift");
     // The persistent project-local serialization lock is part of a valid
-    // project: establish it (creating or repairing an empty file, never
+    // project: establish it (creating, or repairing an empty file, while never
     // replacing a non-empty one) before any project configuration is written,
     // so a failed init leaves no misleading successful project state and a
-    // fresh project is never missing its .lock. This does not create
-    // .unfinished.
+    // fresh or partial project is never missing its .lock. This does not
+    // create .unfinished.
     std::string lock_error;
     if (!ProjectOwnership::ensure_lock_file(".nift", &lock_error)) {
         console::error("cannot initialise project: " + lock_error);

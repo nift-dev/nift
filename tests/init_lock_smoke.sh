@@ -57,5 +57,52 @@ printf '<p>0</p>\n' > "$P/content/p0.html"
 ( cd "$P" && "$NIFT_BIN" build --all >/dev/null 2>&1 )
 [ "$(cat "$P/.nift/.lock")" = "$LOCK_TEXT" ] && check PASS "older project acquires .lock on first build" || check FAIL "older project acquires .lock on first build"
 
+# 5. `nift init` over an existing initialized project (config.json present)
+#    still refuses; the "do not initialize over a project" protection holds.
+P="$TMP/already"; mkdir -p "$P/.nift"; printf '{}' > "$P/.nift/config.json"
+set +e; ( cd "$P" && "$NIFT_BIN" init >/dev/null 2>&1 ); rc=$?; set -e
+[ "$rc" -ne 0 ] && check PASS "init refuses over an already initialized project" || check FAIL "init refuses over an already initialized project"
+
+# 6. Partial-init cases reach ensure_lock_file through `nift init`:
+#    an existing non-empty .lock is preserved (identity + contents) and a
+#    project completes; an existing empty .lock is repaired.
+P="$TMP/partial-nonempty"; mkdir -p "$P/.nift"
+printf 'custom persistent content\n' > "$P/.nift/.lock"
+INODE_BEFORE="$(stat -c %i "$P/.nift/.lock" 2>/dev/null || true)"
+( cd "$P" && "$NIFT_BIN" init >/dev/null 2>&1 )
+[ "$(cat "$P/.nift/.lock")" = "custom persistent content" ] \
+  && check PASS "partial-init preserves an existing non-empty .lock" \
+  || check FAIL "partial-init preserves an existing non-empty .lock"
+if [ -n "$INODE_BEFORE" ]; then
+  INODE_AFTER="$(stat -c %i "$P/.nift/.lock" 2>/dev/null || true)"
+  [ "$INODE_BEFORE" = "$INODE_AFTER" ] && check PASS "partial-init keeps the same .lock inode" || check FAIL "partial-init keeps the same .lock inode"
+fi
+test -f "$P/.nift/config.json" && check PASS "partial-init completes the project" || check FAIL "partial-init completes the project"
+
+P="$TMP/partial-empty"; mkdir -p "$P/.nift"; : > "$P/.nift/.lock"
+( cd "$P" && "$NIFT_BIN" init >/dev/null 2>&1 )
+[ "$(cat "$P/.nift/.lock")" = "$LOCK_TEXT" ] && check PASS "partial-init repairs an existing empty .lock" || check FAIL "partial-init repairs an existing empty .lock"
+
+# 7. A directory or symlink at .nift/.lock makes `nift init` refuse.
+P="$TMP/dir-lock"; mkdir -p "$P/.nift/.lock"
+set +e; ( cd "$P" && "$NIFT_BIN" init >/dev/null 2>&1 ); rc=$?; set -e
+[ "$rc" -ne 0 ] && check PASS "init refuses a directory at .nift/.lock" || check FAIL "init refuses a directory at .nift/.lock"
+test -f "$P/.nift/config.json" && check FAIL "directory-.lock refusal leaves no config.json" || check PASS "directory-.lock refusal leaves no config.json"
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*) ;;
+  *)
+    P="$TMP/symlink-lock"; mkdir -p "$P/.nift"; ln -s somewhere "$P/.nift/.lock"
+    set +e; ( cd "$P" && "$NIFT_BIN" init >/dev/null 2>&1 ); rc=$?; set -e
+    [ "$rc" -ne 0 ] && check PASS "init refuses a symlink at .nift/.lock" || check FAIL "init refuses a symlink at .nift/.lock"
+    test -f "$P/.nift/config.json" && check FAIL "symlink-.lock refusal leaves no config.json" || check PASS "symlink-.lock refusal leaves no config.json"
+    ;;
+esac
+
+# 8. Injected parent-directory-sync failure makes init fail before config.json.
+P="$TMP/parent-sync"; mkdir -p "$P"
+set +e; ( cd "$P" && NIFT_TEST_PARENT_SYNC_FAIL=1 "$NIFT_BIN" init >/dev/null 2>&1 ); rc=$?; set -e
+[ "$rc" -ne 0 ] && check PASS "init fails on injected parent-sync failure" || check FAIL "init fails on injected parent-sync failure"
+test -f "$P/.nift/config.json" && check FAIL "parent-sync failure leaves no config.json" || check PASS "parent-sync failure leaves no config.json"
+
 if [ "$fails" -ne 0 ]; then echo "FAILED"; exit 1; fi
 echo "ALL INIT LOCK SMOKE TESTS PASSED"

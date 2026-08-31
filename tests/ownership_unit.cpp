@@ -5,11 +5,20 @@
 #include "ProjectOwnership.h"
 
 #include <chrono>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <string>
+
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#else
+#include <sys/stat.h>
+#include <sys/types.h>
+#endif
 
 namespace fs = std::filesystem;
 
@@ -42,6 +51,27 @@ static void clear_test_env(const char* name) {
     _putenv_s(name, "");
 #else
     ::unsetenv(name);
+#endif
+}
+
+// Stable file identity for the identity-preservation assertion: POSIX uses
+// device+inode; Windows uses volume serial + file index.
+static std::uint64_t file_identity(const fs::path& p) {
+#ifdef _WIN32
+    HANDLE h = CreateFileW(p.wstring().c_str(), FILE_READ_ATTRIBUTES,
+                           FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                           nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (h == INVALID_HANDLE_VALUE) return 0;
+    BY_HANDLE_FILE_INFORMATION info{};
+    const BOOL ok = GetFileInformationByHandle(h, &info);
+    CloseHandle(h);
+    if (!ok) return 0;
+    return (static_cast<std::uint64_t>(info.dwVolumeSerialNumber) << 32) ^
+           (static_cast<std::uint64_t>(info.nFileIndexHigh) << 32) ^ info.nFileIndexLow;
+#else
+    struct stat st {};
+    if (::stat(p.c_str(), &st) != 0) return 0;
+    return (static_cast<std::uint64_t>(st.st_dev) << 32) ^ static_cast<std::uint64_t>(st.st_ino);
 #endif
 }
 
@@ -218,6 +248,19 @@ int main() {
             }
             CHECK("truncated non-empty .lock is retained after partial-write failure",
                   !partial.empty() && partial.size() < std::strlen(lock_text));
+
+        // Injected parent-directory-sync failure: acquire refuses before any
+        // .unfinished mutation.
+        {
+            std::FILE* f = std::fopen(lock.string().c_str(), "w");
+            std::fclose(f); // empty file
+            set_test_env("NIFT_TEST_PARENT_SYNC_FAIL", "1");
+            ProjectOwnership o(marker);
+            CHECK("parent-sync failure refuses (Failed)",
+                  o.acquire() == ProjectOwnership::State::Failed);
+            clear_test_env("NIFT_TEST_PARENT_SYNC_FAIL");
+            CHECK("no .unfinished after parent-sync failure", !fs::exists(marker));
+        }
         }
 
         // Injected legacy-removal failure: acquire refuses, .unfinished is
@@ -263,8 +306,9 @@ int main() {
         std::FILE* wf = std::fopen((idir / ".lock").string().c_str(), "w");
         std::fprintf(wf, "custom persistent content\n");
         std::fclose(wf);
+        const std::uint64_t nonempty_id = file_identity(idir / ".lock");
         CHECK("ensure_lock_file succeeds with an existing non-empty .lock",
-              ProjectOwnership::ensure_lock_file(idir, &err));
+              ProjectOwnership::ensure_lock_file(idir, &err) && file_identity(idir / ".lock") != 0);
         std::FILE* rf = std::fopen((idir / ".lock").string().c_str(), "r");
         std::string before;
         if (rf) {
@@ -275,12 +319,16 @@ int main() {
         }
         CHECK("ensure_lock_file leaves a non-empty .lock untouched",
               before == "custom persistent content\n");
+        CHECK("non-empty .lock retains its file identity across ensure_lock_file",
+              nonempty_id != 0 && file_identity(idir / ".lock") == nonempty_id);
 
-        // Existing empty .lock: repaired with the canonical sentence.
+        // Existing empty .lock: repaired with the canonical sentence while
+        // retaining its file identity.
         std::FILE* ef = std::fopen((idir / ".lock").string().c_str(), "w");
         std::fclose(ef);
+        const std::uint64_t empty_id = file_identity(idir / ".lock");
         CHECK("ensure_lock_file repairs an existing empty .lock",
-              ProjectOwnership::ensure_lock_file(idir, &err));
+              ProjectOwnership::ensure_lock_file(idir, &err) && file_identity(idir / ".lock") != 0);
         std::FILE* rf2 = std::fopen((idir / ".lock").string().c_str(), "r");
         std::string repaired;
         if (rf2) {
@@ -291,6 +339,8 @@ int main() {
         }
         CHECK("empty .lock is repopulated with the canonical sentence",
               repaired == "Nift project lock. This persistent file is normal and does not indicate an active or failed build.\n");
+        CHECK("empty .lock retains its file identity while being populated",
+              empty_id != 0 && file_identity(idir / ".lock") == empty_id);
 
         // A directory at .lock is refused.
         const fs::path ddir = dir / "ensure-lock-dir";

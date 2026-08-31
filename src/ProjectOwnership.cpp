@@ -92,23 +92,24 @@ bool durable_sync(void* file) {
 // inode but NOT the parent-directory entry that links the name to the inode.
 // A power loss can persist the file without the directory entry (or vice
 // versa). Flushing the parent directory closes that window so the stated
-// guarantee ("marker durable before any derived mutation") holds. This is one
-// extra fsync per build, not per output.
-void durable_sync_parent(const std::filesystem::path& path) {
+// guarantee ("marker durable before any derived mutation") holds. Returns
+// false if the parent cannot be opened or fsynced so the caller can fail
+// closed before any .unfinished mutation. On Windows, NTFS journals metadata
+// so the creation is durably visible; a directory handle is not opened or
+// flushed here, and the function returns true (the documented narrower
+// Windows power-loss guarantee).
+bool durable_sync_parent(const std::filesystem::path& path) {
 #ifdef _WIN32
-    // NTFS journals metadata so the creation is durably visible; a directory
-    // handle is not opened/flushed here. The documented Windows power-loss
-    // guarantee is therefore "file data + metadata flushed via
-    // FlushFileBuffers; creation is journaled by NTFS" - narrower than the
-    // POSIX parent-directory fsync, and stated precisely (see CP2.1 report).
     (void)path;
+    return true;
 #else
     const std::filesystem::path parent = path.parent_path();
-    if (parent.empty()) return;
+    if (parent.empty()) return true;
     const int dfd = ::open(parent.c_str(), O_RDONLY | O_DIRECTORY);
-    if (dfd < 0) return;
-    ::fsync(dfd);
+    if (dfd < 0) return false;
+    const bool ok = ::fsync(dfd) == 0;
     ::close(dfd);
+    return ok;
 #endif
 }
 
@@ -158,19 +159,35 @@ std::filesystem::path lock_path(const std::filesystem::path& marker) {
 }
 
 // Opens (creating if needed) .lock without truncation, preserving a stable
-// filesystem identity. Returns true on success.
+// filesystem identity. The final component is opened without following a
+// symlink/reparse point, and the opened object is validated as a regular file,
+// so a path swapped to a symlink between inspection and open is refused rather
+// than followed. Returns true on success.
 bool open_create_lock(const std::filesystem::path& path, void*& file) {
 #ifdef _WIN32
     const std::wstring wide = path.wstring();
     HANDLE h = CreateFileW(wide.c_str(), GENERIC_READ | GENERIC_WRITE,
                            FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                           nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+                           nullptr, OPEN_ALWAYS,
+                           FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT,
+                           nullptr);
     if (h == INVALID_HANDLE_VALUE) return false;
+    BY_HANDLE_FILE_INFORMATION info{};
+    if (!GetFileInformationByHandle(h, &info) ||
+        (info.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0) {
+        CloseHandle(h);
+        return false;
+    }
     file = static_cast<void*>(h);
     return true;
 #else
-    const int fd = ::open(path.c_str(), O_CREAT | O_RDWR, 0644);
+    const int fd = ::open(path.c_str(), O_CREAT | O_RDWR | O_NOFOLLOW, 0644);
     if (fd < 0) return false;
+    struct stat st;
+    if (::fstat(fd, &st) != 0 || !S_ISREG(st.st_mode)) {
+        ::close(fd);
+        return false;
+    }
     file = reinterpret_cast<void*>(static_cast<std::intptr_t>(fd));
     return true;
 #endif
@@ -249,6 +266,8 @@ bool populate_lock_if_empty(void* file, const std::filesystem::path& path) {
     if (seam_size) return false;    // simulated final-size-verification failure
     if (!GetFileSizeEx(static_cast<HANDLE>(file), &size) ||
         size.QuadPart != static_cast<LONGLONG>(len)) return false;
+    if (std::getenv("NIFT_TEST_PARENT_SYNC_FAIL")) return false; // simulated parent-sync failure
+    if (!durable_sync_parent(path)) return false;
     return true;
 #else
     const int fd = static_cast<int>(reinterpret_cast<std::intptr_t>(file));
@@ -279,7 +298,8 @@ bool populate_lock_if_empty(void* file, const std::filesystem::path& path) {
     if (::fsync(fd) != 0) return false;
     if (seam_size) return false;    // simulated final-size-verification failure
     if (::fstat(fd, &st) != 0 || st.st_size != static_cast<off_t>(len)) return false;
-    durable_sync_parent(path);
+    if (std::getenv("NIFT_TEST_PARENT_SYNC_FAIL")) return false; // simulated parent-sync failure
+    if (!durable_sync_parent(path)) return false;
     return true;
 #endif
 }
@@ -413,7 +433,7 @@ ProjectOwnership::State ProjectOwnership::acquire() {
         file_ = created_file;
         if (try_lock(file_)) {
             durable_sync(file_);
-            durable_sync_parent(marker_);
+            (void)durable_sync_parent(marker_);
             owned_ = true;
             result = State::Clean;
         } else {
@@ -429,7 +449,7 @@ ProjectOwnership::State ProjectOwnership::acquire() {
         if (open_existing(marker_, file_)) {
             if (try_lock(file_)) {
                 durable_sync(file_);
-                durable_sync_parent(marker_);
+                (void)durable_sync_parent(marker_);
                 owned_ = true;
                 result = State::Stale;
             } else {
