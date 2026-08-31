@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <string>
 
@@ -27,6 +28,22 @@ static int failures = 0;
 #include <sys/wait.h>
 #include <unistd.h>
 #endif
+
+static void set_test_env(const char* name, const char* value) {
+#ifdef _WIN32
+    _putenv_s(name, value);
+#else
+    ::setenv(name, value, 1);
+#endif
+}
+
+static void clear_test_env(const char* name) {
+#ifdef _WIN32
+    _putenv_s(name, "");
+#else
+    ::unsetenv(name);
+#endif
+}
 
 int main() {
     // Portable unique suffix (no getpid/unistd dependency; MSYS2 UCRT exposes
@@ -130,6 +147,96 @@ int main() {
         }
         CHECK("empty .lock is populated with the explanation on next acquire",
               refilled == std::string(lock_text));
+
+        // Existing non-empty .lock retains its identity and contents.
+        const fs::path identity_lock = dir / ".identity.lock";
+        {
+            std::FILE* f = std::fopen(identity_lock.string().c_str(), "w");
+            std::fprintf(f, "custom persistent content\n");
+            std::fclose(f);
+        }
+        // Point a second marker at the same directory so .lock is the identity
+        // file: assert the pre-existing content is untouched by an acquire.
+        const fs::path marker2 = dir / ".identity-marker";
+        const fs::path existing_lock = dir / ".lock";
+        {
+            std::FILE* f = std::fopen(existing_lock.string().c_str(), "w");
+            std::fprintf(f, "custom existing lock content\n");
+            std::fclose(f);
+            const fs::path marker3 = dir / ".identity-marker2";
+            (void)marker3;
+            ProjectOwnership o(marker2);
+            CHECK("acquire succeeds with a pre-existing non-empty .lock",
+                  o.acquire() == ProjectOwnership::State::Clean);
+            std::FILE* rf = std::fopen(existing_lock.string().c_str(), "r");
+            std::string before;
+            if (rf) {
+                char buf[256];
+                std::size_t n = 0;
+                while ((n = std::fread(buf, 1, sizeof(buf), rf)) > 0) before.append(buf, n);
+                std::fclose(rf);
+            }
+            CHECK("pre-existing non-empty .lock contents are untouched",
+                  before == "custom existing lock content\n");
+            o.finish();
+        }
+        std::error_code remove_ec;
+        std::filesystem::remove(identity_lock, remove_ec);
+
+        // Injected explanation-write failure: acquire refuses before creating
+        // or classifying .unfinished, and no truncated lock is left.
+        {
+            std::FILE* f = std::fopen(lock.string().c_str(), "w");
+            std::fclose(f); // empty file
+            set_test_env("NIFT_TEST_LOCK_WRITE_FAIL", "err");
+            ProjectOwnership o(marker);
+            CHECK("explanation-write failure refuses (Failed)",
+                  o.acquire() == ProjectOwnership::State::Failed);
+            clear_test_env("NIFT_TEST_LOCK_WRITE_FAIL");
+            CHECK("no .unfinished after explanation-write failure", !fs::exists(marker));
+            CHECK(".lock still exists after explanation-write failure", fs::exists(lock));
+        }
+
+        // Injected partial-write failure: acquire refuses, .unfinished is never
+        // created, and the truncated non-empty .lock is retained untouched.
+        {
+            std::FILE* f = std::fopen(lock.string().c_str(), "w");
+            std::fclose(f); // empty file
+            set_test_env("NIFT_TEST_LOCK_WRITE_FAIL", "partial");
+            ProjectOwnership o(marker);
+            CHECK("partial-write failure refuses (Failed)",
+                  o.acquire() == ProjectOwnership::State::Failed);
+            clear_test_env("NIFT_TEST_LOCK_WRITE_FAIL");
+            CHECK("no .unfinished after partial-write failure", !fs::exists(marker));
+            std::FILE* pf = std::fopen(lock.string().c_str(), "r");
+            std::string partial;
+            if (pf) {
+                char buf[256];
+                std::size_t n = 0;
+                while ((n = std::fread(buf, 1, sizeof(buf), pf)) > 0) partial.append(buf, n);
+                std::fclose(pf);
+            }
+            CHECK("truncated non-empty .lock is retained after partial-write failure",
+                  !partial.empty() && partial.size() < std::strlen(lock_text));
+        }
+
+        // Injected legacy-removal failure: acquire refuses, .unfinished is
+        // never created, and both files are retained for diagnosis/retry.
+        {
+            std::FILE* lg = std::fopen(legacy.string().c_str(), "w");
+            std::fprintf(lg, "legacy\n");
+            std::fclose(lg);
+            std::FILE* f = std::fopen(lock.string().c_str(), "w");
+            std::fclose(f); // empty .lock
+            set_test_env("NIFT_TEST_LOCK_LEGACY_REMOVE_FAIL", "1");
+            ProjectOwnership o(marker);
+            CHECK("legacy-removal failure refuses (Failed)",
+                  o.acquire() == ProjectOwnership::State::Failed);
+            clear_test_env("NIFT_TEST_LOCK_LEGACY_REMOVE_FAIL");
+            CHECK("no .unfinished after legacy-removal failure", !fs::exists(marker));
+            CHECK("legacy .ownership-gate retained after removal failure", fs::exists(legacy));
+            CHECK(".lock retained after legacy-removal failure", fs::exists(lock));
+        }
     }
 
 #ifndef _WIN32

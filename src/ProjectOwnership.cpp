@@ -1,5 +1,6 @@
 #include "ProjectOwnership.h"
 
+#include <cerrno>
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
@@ -199,32 +200,77 @@ bool open_lock(const std::filesystem::path& marker, void*& file, void*& legacy_f
 }
 
 // Removes the (already verified idle) legacy serialization file now that .lock
-// is established and locked, then releases the legacy handle.
-void remove_legacy_serialization(const std::filesystem::path& marker, void*& legacy_file) {
-    if (!legacy_file) return;
-    std::error_code ignored;
-    std::filesystem::remove(marker.parent_path() / ".ownership-gate", ignored);
+// is established and locked. Returns false if the removal fails so the caller
+// refuses before any .unfinished mutation while both files remain; the legacy
+// file is then retained for diagnosis/retry. Never removes a locked legacy file
+// (that decision is made by open_lock before the .lock is established).
+bool remove_legacy_serialization(const std::filesystem::path& marker, void*& legacy_file) {
+    if (!legacy_file) return true;
+    if (std::getenv("NIFT_TEST_LOCK_LEGACY_REMOVE_FAIL")) {
+        close_file(legacy_file);
+        return false; // simulated removal failure: both files retained
+    }
+    std::error_code ec;
+    const std::filesystem::path legacy_path = marker.parent_path() / ".ownership-gate";
+    std::filesystem::remove(legacy_path, ec);
+    const bool gone = !std::filesystem::exists(legacy_path, ec);
     close_file(legacy_file);
+    return gone;
 }
 
 // Writes the explanatory sentence into a freshly created (empty) .lock while
-// the caller holds the serialization lock. Never truncates or rewrites a
-// non-empty file; an interrupted creation is repaired on the next acquisition
-// because the file is then empty. Locking does not depend on the contents.
-void populate_lock_if_empty(void* file) {
+// the caller holds the serialization lock. Writes the complete sentence at
+// offset zero with a write-all loop (retrying EINTR on POSIX), verifies the
+// final size, durably flushes the file and, where supported, the parent
+// directory. Returns false on any failure so the caller refuses before
+// creating or classifying .unfinished. Never truncates or rewrites a non-empty
+// file; locking does not depend on the contents.
+bool populate_lock_if_empty(void* file, const std::filesystem::path& path) {
 #ifdef _WIN32
     LARGE_INTEGER size{};
-    if (!GetFileSizeEx(static_cast<HANDLE>(file), &size) || size.QuadPart != 0) return;
+    if (!GetFileSizeEx(static_cast<HANDLE>(file), &size) || size.QuadPart != 0) return true;
+    const char* seam = std::getenv("NIFT_TEST_LOCK_WRITE_FAIL");
+    const bool seam_error = seam && *seam && std::strcmp(seam, "partial") != 0;
+    const bool seam_partial = seam && std::strcmp(seam, "partial") == 0;
+    if (seam_error) return false;
+    const std::size_t len = std::strlen(lock_explanation);
+    DWORD total = static_cast<DWORD>(seam_partial ? len / 2 : len);
+    OVERLAPPED overlapped{};
     DWORD written = 0;
-    WriteFile(static_cast<HANDLE>(file), lock_explanation,
-              static_cast<DWORD>(std::strlen(lock_explanation)), &written, nullptr);
+    if (!WriteFile(static_cast<HANDLE>(file), lock_explanation, total, &written, &overlapped))
+        return false;
+    if (written != total) return false;
+    if (seam_partial) return false; // simulated partial write, then failure
+    if (!FlushFileBuffers(static_cast<HANDLE>(file))) return false;
+    if (!GetFileSizeEx(static_cast<HANDLE>(file), &size) ||
+        size.QuadPart != static_cast<LONGLONG>(len)) return false;
+    return true;
 #else
     const int fd = static_cast<int>(reinterpret_cast<std::intptr_t>(file));
     struct stat st;
-    if (::fstat(fd, &st) != 0 || st.st_size != 0) return;
-    (void)::lseek(fd, 0, SEEK_SET);
-    const ssize_t ignored = ::write(fd, lock_explanation, std::strlen(lock_explanation));
-    (void)ignored;
+    if (::fstat(fd, &st) != 0 || st.st_size != 0) return true;
+    const char* seam = std::getenv("NIFT_TEST_LOCK_WRITE_FAIL");
+    const bool seam_error = seam && *seam && std::strcmp(seam, "partial") != 0;
+    const bool seam_partial = seam && std::strcmp(seam, "partial") == 0;
+    if (seam_error) return false;
+    const std::size_t len = std::strlen(lock_explanation);
+    if (::lseek(fd, 0, SEEK_SET) < 0) return false;
+    const char* p = lock_explanation;
+    std::size_t remaining = seam_partial ? len / 2 : len;
+    while (remaining > 0) {
+        const ssize_t n = ::write(fd, p, remaining);
+        if (n < 0) {
+            if (errno == EINTR) continue;
+            return false;
+        }
+        p += n;
+        remaining -= static_cast<std::size_t>(n);
+    }
+    if (seam_partial) return false; // simulated partial write, then failure
+    if (::fsync(fd) != 0) return false;
+    if (::fstat(fd, &st) != 0 || st.st_size != static_cast<off_t>(len)) return false;
+    durable_sync_parent(path);
+    return true;
 #endif
 }
 
@@ -287,9 +333,22 @@ ProjectOwnership::State ProjectOwnership::acquire() {
         return State::Failed;
     }
     // While holding .lock, populate a freshly created (empty) lock with its
-    // explanatory sentence and remove the already-verified-idle legacy file.
-    populate_lock_if_empty(gate);
-    remove_legacy_serialization(marker_, legacy_file_);
+    // explanatory sentence (refusing before any .unfinished mutation if the
+    // write cannot be completed) and remove the already-verified-idle legacy
+    // file (refusing if the removal fails so both names are never silently
+    // present during .unfinished mutation).
+    if (!populate_lock_if_empty(gate, lock_path(marker_))) {
+        unlock_serial(gate);
+        close_file(gate);
+        if (legacy_file_) close_file(legacy_file_);
+        return State::Failed;
+    }
+    if (!remove_legacy_serialization(marker_, legacy_file_)) {
+        unlock_serial(gate);
+        close_file(gate);
+        if (legacy_file_) close_file(legacy_file_);
+        return State::Failed;
+    }
 
     void* created_file = nullptr;
     const bool created = exclusive_create(marker_, created_file);
