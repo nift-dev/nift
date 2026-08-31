@@ -13,6 +13,15 @@
 // and answers "did the last build finish?" A live build holds both; a crashed
 // build leaves the marker with no lock holder.
 //
+// A project-local serialization file .nift/.lock serializes the short marker
+// create/classify/lock critical section across processes so a freshly created
+// marker is never observable unlocked (no timing heuristics). .nift/.lock is
+// normal persistent concurrency infrastructure: its presence does not mean a
+// command is running and does not require repair, which is deliberately
+// distinct from .nift/.unfinished. A legacy .ownership-gate is migrated to
+// .lock on first use when it is idle; a live legacy-version process is refused
+// (concurrent different-version migration is unsupported).
+//
 // Acquisition contract (encoded centrally here):
 //   Clean  -> the caller created the marker (no prior unfinished state); a
 //             normal build may proceed and is the owner.
@@ -53,5 +62,6 @@ public:
 private:
     std::filesystem::path marker_;
     void* file_ = nullptr; // HANDLE (Windows) or an fd stored as intptr (POSIX)
+    void* legacy_file_ = nullptr; // idle legacy .ownership-gate handle awaiting migration
     bool owned_ = false;
 };

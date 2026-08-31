@@ -97,8 +97,9 @@ tag-triggered run.
 - Website built with the exact candidate binary: **75/75 pages**, exit 0; the
   generated `public/` tree is byte-identical (no diff), so the homepage is
   unchanged. A stale 0-byte `.nift/.ownership-gate` marker that predated the
-  build was removed; both website source `stage` and generated `public/` trees
-  are clean.
+  build was removed and, after the `.lock` rename, the project's persistent
+  serialization file is `.nift/.lock` (a normal artifact that residue checks
+  allow); both website source `stage` and generated `public/` trees are clean.
 - Website source/generated commits for the release: **pending** (no website
   content changes are required; none were made).
 

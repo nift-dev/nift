@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <system_error>
 #include <thread>
@@ -12,6 +13,7 @@
 #else
 #include <fcntl.h>
 #include <sys/file.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #endif
 
@@ -110,26 +112,53 @@ void durable_sync_parent(const std::filesystem::path& path) {
 }
 
 // ---------------------------------------------------------------------------
-// Ownership gate (CP15 fix): the marker is created with O_CREAT|O_EXCL and
-// then flock-locked in a separate syscall. Without serialization, a concurrent
-// process can open and lock the freshly-created-but-not-yet-locked marker,
-// classify it Stale and refuse, while the creator then fails to lock and
-// refuses too (both refuse; the marker remains). To close that window
-// deterministically (no timing heuristics), every acquire() first takes a
-// blocking advisory lock on a project-local gate file
-// (.nift/.ownership-gate), holds it across the marker create+lock critical
-// section, then releases it. A fresh marker is therefore never observable
-// unlocked by another process: the creator locks it before releasing the gate.
-// The gate hold time is microseconds; the build's long-lived ownership is
-// still the non-blocking marker flock, unchanged.
+// Ownership serialization lock (CP15 fix): the marker is created with
+// O_CREAT|O_EXCL and then flock-locked in a separate syscall. Without
+// serialization, a concurrent process can open and lock the
+// freshly-created-but-not-yet-locked marker, classify it Stale and refuse,
+// while the creator then fails to lock and refuses too (both refuse; the
+// marker remains). To close that window deterministically (no timing
+// heuristics), every acquire() first takes a blocking advisory lock on a
+// project-local serialization file (.nift/.lock), holds it across the marker
+// create+lock critical section, then releases it. A fresh marker is therefore
+// never observable unlocked by another process: the creator locks it before
+// releasing the serialization lock. The serialization lock is held only across
+// the short marker create/classify/lock critical section; the build's
+// long-lived ownership is still the non-blocking marker flock, unchanged.
+//
+// .nift/.lock is normal persistent concurrency infrastructure. Its presence
+// does not mean a command is running and does not require repair. That is
+// deliberately distinct from .nift/.unfinished, which is evidence that a
+// derived-state mutation was not proven to finish and requires
+// `nift build --repair`. Newly created .lock files carry that explanation;
+// existing files keep their filesystem identity and are never truncated, and
+// locking does not depend on the explanatory contents.
 // ---------------------------------------------------------------------------
 
-std::filesystem::path gate_path(const std::filesystem::path& marker) {
-    return marker.parent_path() / ".ownership-gate";
+void close_file(void*& file) {
+#ifdef _WIN32
+    if (file) {
+        CloseHandle(static_cast<HANDLE>(file));
+        file = nullptr;
+    }
+#else
+    if (file) {
+        ::close(static_cast<int>(reinterpret_cast<std::intptr_t>(file)));
+        file = nullptr;
+    }
+#endif
 }
 
-// Opens (creating if needed) the gate file. Returns true on success.
-bool open_gate(const std::filesystem::path& path, void*& file) {
+constexpr const char* lock_explanation =
+    "Nift project lock. This persistent file is normal and does not indicate an active or failed build.\n";
+
+std::filesystem::path lock_path(const std::filesystem::path& marker) {
+    return marker.parent_path() / ".lock";
+}
+
+// Opens (creating if needed) .lock without truncation, preserving a stable
+// filesystem identity. Returns true on success.
+bool open_create_lock(const std::filesystem::path& path, void*& file) {
 #ifdef _WIN32
     const std::wstring wide = path.wstring();
     HANDLE h = CreateFileW(wide.c_str(), GENERIC_READ | GENERIC_WRITE,
@@ -146,8 +175,61 @@ bool open_gate(const std::filesystem::path& path, void*& file) {
 #endif
 }
 
-// Blocking exclusive lock on the gate (waits for the critical section holder).
-bool lock_gate(void* file) {
+// Legacy migration: the pre-4.0.8 serialization file was .nift/.ownership-gate.
+// When it exists, refuse unless no live process holds its advisory lock (an
+// idle legacy project may be migrated; a live legacy-version process cannot -
+// concurrently running different Nift versions during migration is
+// unsupported). On success the idle legacy handle is recorded so the file is
+// removed only after .lock is established and locked.
+bool open_lock(const std::filesystem::path& marker, void*& file, void*& legacy_file) {
+    const std::filesystem::path legacy_path = marker.parent_path() / ".ownership-gate";
+    std::error_code ec;
+    if (std::filesystem::exists(legacy_path, ec)) {
+        if (!open_existing(legacy_path, legacy_file)) return false; // cannot establish state safely
+        if (!try_lock(legacy_file)) { // a live process holds the legacy lock
+            close_file(legacy_file);
+            return false;
+        }
+    }
+    if (!open_create_lock(lock_path(marker), file)) {
+        if (legacy_file) close_file(legacy_file);
+        return false;
+    }
+    return true;
+}
+
+// Removes the (already verified idle) legacy serialization file now that .lock
+// is established and locked, then releases the legacy handle.
+void remove_legacy_serialization(const std::filesystem::path& marker, void*& legacy_file) {
+    if (!legacy_file) return;
+    std::error_code ignored;
+    std::filesystem::remove(marker.parent_path() / ".ownership-gate", ignored);
+    close_file(legacy_file);
+}
+
+// Writes the explanatory sentence into a freshly created (empty) .lock while
+// the caller holds the serialization lock. Never truncates or rewrites a
+// non-empty file; an interrupted creation is repaired on the next acquisition
+// because the file is then empty. Locking does not depend on the contents.
+void populate_lock_if_empty(void* file) {
+#ifdef _WIN32
+    LARGE_INTEGER size{};
+    if (!GetFileSizeEx(static_cast<HANDLE>(file), &size) || size.QuadPart != 0) return;
+    DWORD written = 0;
+    WriteFile(static_cast<HANDLE>(file), lock_explanation,
+              static_cast<DWORD>(std::strlen(lock_explanation)), &written, nullptr);
+#else
+    const int fd = static_cast<int>(reinterpret_cast<std::intptr_t>(file));
+    struct stat st;
+    if (::fstat(fd, &st) != 0 || st.st_size != 0) return;
+    (void)::lseek(fd, 0, SEEK_SET);
+    const ssize_t ignored = ::write(fd, lock_explanation, std::strlen(lock_explanation));
+    (void)ignored;
+#endif
+}
+
+// Blocking exclusive lock on .lock (waits for the critical section holder).
+bool lock_serial(void* file) {
 #ifdef _WIN32
     OVERLAPPED overlapped{};
     return LockFileEx(static_cast<HANDLE>(file), LOCKFILE_EXCLUSIVE_LOCK, 0, 1,
@@ -158,7 +240,7 @@ bool lock_gate(void* file) {
 #endif
 }
 
-void unlock_gate(void* file) {
+void unlock_serial(void* file) {
 #ifdef _WIN32
     OVERLAPPED overlapped{};
     UnlockFileEx(static_cast<HANDLE>(file), 0, 1, 0, &overlapped);
@@ -184,20 +266,6 @@ static void test_hold_after_acquire() {
     std::filesystem::remove(dir / "acquired", ignored);
 }
 
-void close_file(void*& file) {
-#ifdef _WIN32
-    if (file) {
-        CloseHandle(static_cast<HANDLE>(file));
-        file = nullptr;
-    }
-#else
-    if (file) {
-        ::close(static_cast<int>(reinterpret_cast<std::intptr_t>(file)));
-        file = nullptr;
-    }
-#endif
-}
-
 } // namespace
 
 ProjectOwnership::ProjectOwnership(std::filesystem::path marker)
@@ -208,24 +276,32 @@ ProjectOwnership::State ProjectOwnership::acquire() {
 
     // Serialize the marker create+lock critical section across processes so a
     // freshly created marker is never observable unlocked (closes the
-    // O_CREAT|O_EXCL / flock race deterministically - see the gate comment).
+    // O_CREAT|O_EXCL / flock race deterministically - see the serialization
+    // comment). A legacy .ownership-gate is migrated safely to .lock, or the
+    // acquire refuses if a live legacy-version process still holds it.
     void* gate = nullptr;
-    if (!open_gate(gate_path(marker_), gate)) return State::Failed;
-    if (!lock_gate(gate)) {
+    if (!open_lock(marker_, gate, legacy_file_)) return State::Failed;
+    if (!lock_serial(gate)) {
         close_file(gate);
+        if (legacy_file_) close_file(legacy_file_);
         return State::Failed;
     }
+    // While holding .lock, populate a freshly created (empty) lock with its
+    // explanatory sentence and remove the already-verified-idle legacy file.
+    populate_lock_if_empty(gate);
+    remove_legacy_serialization(marker_, legacy_file_);
 
     void* created_file = nullptr;
     const bool created = exclusive_create(marker_, created_file);
 
     State result = State::Live;
     if (created) {
-        // Brand-new marker: no prior unfinished state. While we hold the gate,
-        // no other process can observe this marker, so the non-blocking lock
-        // below can only fail if a long-lived build holds a marker that we
-        // could not have created (impossible: the file did not exist). Take
-        // the lock and make the marker durable before any derived mutation.
+        // Brand-new marker: no prior unfinished state. While we hold the
+        // serialization lock, no other process can observe this marker, so the
+        // non-blocking lock below can only fail if a long-lived build holds a
+        // marker that we could not have created (impossible: the file did not
+        // exist). Take the lock and make the marker durable before any derived
+        // mutation.
         file_ = created_file;
         if (try_lock(file_)) {
             durable_sync(file_);
@@ -239,9 +315,9 @@ ProjectOwnership::State ProjectOwnership::acquire() {
         }
     } else {
         // The marker already exists (either stale, or held by a live build).
-        // We hold the gate, so its classification is stable: if the flock is
-        // free it is genuinely stale (the previous owner crashed or finished);
-        // if it is held, a live build owns it.
+        // We hold the serialization lock, so its classification is stable: if
+        // the flock is free it is genuinely stale (the previous owner crashed
+        // or finished); if it is held, a live build owns it.
         if (open_existing(marker_, file_)) {
             if (try_lock(file_)) {
                 durable_sync(file_);
@@ -258,12 +334,13 @@ ProjectOwnership::State ProjectOwnership::acquire() {
         }
     }
 
-    unlock_gate(gate);
+    unlock_serial(gate);
     close_file(gate);
 
-    // The hold hook blocks until released; it must not run while the gate is
-    // held, or a concurrently starting command would block on the gate instead
-    // of observing a Live refusal (the NIFT_TEST_OWNERSHIP_HOLD contract).
+    // The hold hook blocks until released; it must not run while the
+    // serialization lock is held, or a concurrently starting command would
+    // block on it instead of observing a Live refusal (the
+    // NIFT_TEST_OWNERSHIP_HOLD contract).
     if (result == State::Clean || result == State::Stale) {
         test_hold_after_acquire();
     }

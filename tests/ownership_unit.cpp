@@ -72,8 +72,68 @@ int main() {
     // 4. live_owner_exists with no marker at all.
     CHECK("live_owner_exists is false with no marker", !ProjectOwnership::live_owner_exists(marker));
 
+    // 5. .nift/.lock is persistent, contains the explanatory sentence, and is
+    //    never removed by finish(). An idle legacy .ownership-gate migrates.
+    {
+        const fs::path lock = dir / ".lock";
+        const fs::path legacy = dir / ".ownership-gate";
+        const char* lock_text =
+            "Nift project lock. This persistent file is normal and does not indicate an active or failed build.\n";
+        {
+            ProjectOwnership o(marker);
+            CHECK("acquire creates .nift/.lock", o.acquire() == ProjectOwnership::State::Clean && fs::exists(lock));
+            std::FILE* f = std::fopen(lock.string().c_str(), "r");
+            CHECK(".lock exists after acquire", f != nullptr);
+            std::string contents;
+            if (f) {
+                char buf[256];
+                std::size_t n = 0;
+                while ((n = std::fread(buf, 1, sizeof(buf), f)) > 0) contents.append(buf, n);
+                std::fclose(f);
+            }
+            CHECK(".lock contains the exact explanatory sentence", contents == std::string(lock_text));
+            o.finish();
+        }
+        CHECK(".lock persists after finish()", fs::exists(lock));
+
+        // Legacy migration: an idle .ownership-gate is removed only after the
+        // new .lock is established; a build epoch still works.
+        std::FILE* lg = std::fopen(legacy.string().c_str(), "w");
+        std::fprintf(lg, "legacy\n");
+        std::fclose(lg);
+        {
+            ProjectOwnership o(marker);
+            CHECK("acquire succeeds while migrating an idle legacy gate",
+                  o.acquire() == ProjectOwnership::State::Clean);
+            CHECK("legacy .ownership-gate removed after migration", !fs::exists(legacy));
+            CHECK("new .lock established", fs::exists(lock));
+            o.finish();
+        }
+
+        // An empty .lock from an interrupted creation is populated while the
+        // lock is held (the file content is repaired on the next acquisition).
+        std::FILE* ef = std::fopen(lock.string().c_str(), "w");
+        std::fclose(ef); // empty file, existing identity
+        {
+            ProjectOwnership o(marker);
+            CHECK("acquire succeeds on an existing empty .lock",
+                  o.acquire() == ProjectOwnership::State::Clean);
+            o.finish();
+        }
+        std::FILE* rf = std::fopen(lock.string().c_str(), "r");
+        std::string refilled;
+        if (rf) {
+            char buf[256];
+            std::size_t n = 0;
+            while ((n = std::fread(buf, 1, sizeof(buf), rf)) > 0) refilled.append(buf, n);
+            std::fclose(rf);
+        }
+        CHECK("empty .lock is populated with the explanation on next acquire",
+              refilled == std::string(lock_text));
+    }
+
 #ifndef _WIN32
-    // 5. Process death releases the lock; the marker survives.
+    // 6. Process death releases the lock; the marker survives.
     {
         const pid_t child = ::fork();
         if (child == 0) {

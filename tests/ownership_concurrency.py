@@ -26,6 +26,8 @@ import time
 
 NIFT = os.environ.get("NIFT_BIN", str(pathlib.Path(__file__).resolve().parent.parent / "nift"))
 
+LOCK_TEXT = "Nift project lock. This persistent file is normal and does not indicate an active or failed build.\n"
+
 
 def scaffold(root: pathlib.Path, pages: int = 8):
     for d in (".nift", "content", "templates", "public"):
@@ -76,6 +78,11 @@ def main():
         rc, _ = run(root, "build", "--all")
         check("1 clean build succeeds", rc == 0)
         check("1 marker absent after successful build", not (root / ".nift/.unfinished").exists())
+        check("1 .nift/.lock left by a successful build", (root / ".nift/.lock").exists())
+        check("1 .nift/.lock contains the explanatory sentence",
+              (root / ".nift/.lock").read_text() == LOCK_TEXT)
+        check("1 no legacy .ownership-gate created in a fresh project",
+              not (root / ".nift/.ownership-gate").exists())
 
         # 2. Pre-mutation validation failure leaves no marker.
         (root / ".nift/tracked.json").write_text("{{{ not json")
@@ -90,6 +97,7 @@ def main():
         rc, _ = run(root, "build", "--all")
         check("3 failing build returns nonzero", rc != 0)
         check("3 marker remains after failed post-mutation build", (root / ".nift/.unfinished").exists())
+        check("3 .nift/.lock retained after a failed build", (root / ".nift/.lock").exists())
         (root / "content" / "p0.html").write_text("<p>ok</p>\n")
 
         # 4. Stale marker + ordinary build refuses; --repair recovers.
@@ -103,6 +111,7 @@ def main():
         rc, _ = run(root, "build", "--repair")
         check("4 build --repair succeeds on stale marker", rc == 0)
         check("4 marker removed after successful repair", not (root / ".nift/.unfinished").exists())
+        check("4 .nift/.lock retained after repair", (root / ".nift/.lock").exists())
 
         # 5. Live lock (Python holds flock) -> every mutator refuses; info/status read.
         fd = hold_lock(root / ".nift/.unfinished", create=True)
@@ -225,6 +234,45 @@ def main():
         after = {f.name: f.read_bytes() for f in (big / "public").glob("*.html")}
         check("8 concurrent builds leave byte-identical outputs", after == reference)
         check("8 no marker left after all concurrent builds completed", not (big / ".nift/.unfinished").exists())
+
+        # 9. .nift/.lock identity, legacy .ownership-gate migration, and the
+        #    create-before-flock serialization window.
+        (root / "content" / "p0.html").write_text("<p>ok</p>\n")
+        rc, _ = run(root, "build", "--all")
+        check("9 repeated command leaves .lock", rc == 0 and (root / ".nift/.lock").exists())
+        if os.name != "nt":
+            lock_inode = (root / ".nift/.lock").stat().st_ino
+            rc, _ = run(root, "build")
+            check("9 repeated command reuses the same .lock inode",
+                  rc == 0 and (root / ".nift/.lock").stat().st_ino == lock_inode)
+        check("9 .lock contents unchanged after repeated commands",
+              (root / ".nift/.lock").read_text() == LOCK_TEXT)
+
+        # 9a. Idle legacy .ownership-gate migrates to .lock and is removed.
+        (root / ".nift/.lock").unlink(missing_ok=True)
+        (root / ".nift/.ownership-gate").write_text("legacy\n")
+        rc, _ = run(root, "build", "--all")
+        check("9a idle legacy .ownership-gate migrates (build succeeds)", rc == 0)
+        check("9a .lock established with the explanation",
+              (root / ".nift/.lock").exists() and (root / ".nift/.lock").read_text() == LOCK_TEXT)
+        check("9a unlocked legacy .ownership-gate removed", not (root / ".nift/.ownership-gate").exists())
+
+        # 9b. A locked legacy .ownership-gate is never removed; the command
+        #     refuses (concurrent different-version migration unsupported).
+        (root / ".nift/.lock").unlink(missing_ok=True)
+        (root / ".nift/.ownership-gate").write_text("legacy\n")
+        gate_fd = hold_lock(root / ".nift/.ownership-gate")
+        rc, err = run(root, "build", "--all")
+        check("9b locked legacy .ownership-gate refuses the build", rc == 1 and "could not acquire the build lock" in err)
+        check("9b locked legacy .ownership-gate is never removed",
+              (root / ".nift/.ownership-gate").exists())
+        check("9b no .lock created while the legacy gate is locked",
+              not (root / ".nift/.lock").exists())
+        fcntl.flock(gate_fd, fcntl.LOCK_UN)
+        os.close(gate_fd)
+        (root / ".nift/.ownership-gate").unlink(missing_ok=True)
+        rc, _ = run(root, "build", "--repair")
+        check("9b recovery after releasing the legacy lock", rc == 0)
 
     if fails:
         print(f"\nFAILED: {len(fails)}: {fails}")
