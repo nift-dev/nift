@@ -644,6 +644,7 @@ test-tracking-scaling: $(TARGET)
 
 
 test-full-build-scaling: $(TARGET)
+	python3 tests/full_build_scaling_failmodes.py --nift "$(CURDIR)/$(TARGET)"
 	python3 tests/full_build_scaling_benchmark.py --nift "$(CURDIR)/$(TARGET)"
 
 

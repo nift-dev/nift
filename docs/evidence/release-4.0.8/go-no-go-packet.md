@@ -43,8 +43,46 @@ tag-triggered run.
   incremental builds, the parser/value adversarial battery (15 cases) and the
   init functional-truth battery with no findings.
 - Performance/scaling guards: `benchmark-10k` full-build median 0.100 s,
-  no-op 0.073 s; tracking-scaling 4.30x ratio PASS; full-build-scaling 3.23x
-  ratio PASS; recovery-epoch scan-bound PASS.
+  no-op 0.073 s; tracking-scaling 4.30x ratio PASS; recovery-epoch scan-bound
+  PASS; memory peaks ≤ 13 560 KiB (guard 16 384) PASS.
+
+### 3.1 Full-build scaling guard — repaired methodology
+
+- **Original hosted guard failure:** during both v4.0.7 and v4.0.8 release
+  preparation the unchanged benchmark failed intermittently on the shared
+  runner (a v4.0.8 hosted run reported **8.15x**); independent good-candidate
+  measurements were around **3.23x** and **3.62x**. The old sequential
+  sub-second methodology (1,000/4,000 pages, all small runs before all large
+  runs, three samples, medians only) was found to be flaky and was repaired
+  before release; the original failure is not concealed.
+- **Repaired methodology:** 2,000/8,000-page fixtures (4:1), both warmed with
+  an untimed full rewrite before timing; seven balanced interleaved rounds
+  (order alternates per round to cancel shared-runner load drift); every timed
+  build toggles the shared template so all outputs traverse the real
+  transactional write path; complete raw samples are printed (all small/large
+  durations, every paired ratio, median/min/max per size, fixture sizes, run
+  count, threshold); the **median paired ratio** is the primary decision value
+  (threshold unchanged at 7.00x). If the primary median exceeds the threshold,
+  one predeclared confirmation phase runs with the starting order reversed; the
+  run fails only if the confirmation median also exceeds it (this is not
+  retry-until-green).
+- **Good-build evidence (local, candidate binary):** five consecutive repaired
+  runs all PASS with median paired ratios 3.74–3.87x (3.71x in the first run).
+- **Quadratic red-demonstration:** a temporary (uncommitted) worktree
+  recreating the historical once-per-output recovery-scan defect produced
+  median ratios 17.92x (primary) and 17.85x (confirmation) → **FAIL: repeated
+  scaling violation**, so the guard detects the historical O(N²) defect and the
+  confirmation protocol distinguishes a single noisy phase from a repeatable
+  violation.
+- **Failure-mode checks:** the benchmark fails closed when a timed build does
+  not rewrite all expected outputs, when the expected output count is
+  incomplete, and when a timed build returns non-zero (offline
+  `full_build_scaling_failmodes.py` PASS).
+- **Structural guards preserved:** the recovery-epoch scan-bound guard and the
+  BH8 complexity invariants remain required and are unchanged; wall-clock
+  timing does not replace structural complexity evidence.
+- **Repaired hosted workflow result: PENDING** (requires a GitHub run at the
+  new exact commit).
 - Memory guard: `memory_10k_benchmark.py` all peaks ≤ 13 560 KiB (guard
   ≤ 16 384 KiB) PASS.
 - Embedded synchronization: Jsonic++ sync PASS (20 files); Minify++
