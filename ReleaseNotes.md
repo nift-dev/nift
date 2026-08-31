@@ -1,5 +1,9 @@
 # Nift — Release Notes
 
+## v4.0.9
+
+Development in progress following the public v4.0.8 release.
+
 ## v4.0.8
 
 Nift 4.0.8 fixes the build-progress output ordering so final summaries are

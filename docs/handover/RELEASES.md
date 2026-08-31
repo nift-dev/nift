@@ -7,8 +7,8 @@ is packaged and published.
 
 ## Authority and current state
 
-The development executable currently reports `Nift v4.0.8`, following the
-public v4.0.7 release. The exact executable identity remains documented in
+The development executable currently reports `Nift v4.0.9`, following the
+public v4.0.8 release. The exact executable identity remains documented in
 project history and release notes, but it is not part of the public product
 version. Exact tag, artifact, and public release conventions must follow
 `PACKAGING.md` and actual Git/release evidence.
@@ -597,5 +597,123 @@ Recovery (no release assets, tag or published checksums were changed):
 - Homebrew auto-bump merge + fresh install; Chocolatey moderation/approval and
   fresh install; Flathub external PR; Snap non-x86 architectures; public
   installer verified against 4.0.7 in CI (completed).
+- Run `distribution-verification.yml` against the exact public version once
+  stores propagate.
+
+## v4.0.8 release report (2026-08-31)
+
+### Scope
+
+v4.0.8 fixes the build-progress output ordering so final summaries are never
+interleaved with an active progress line, replaces the progress presentation
+with a restrained green Braille spinner, hardens the `.nift/.lock`
+serialization file (parent-sync fail-closed, write failure seams, no-follow
+open, init-established lock), and adds automated all-architecture Snap release
+coordination. The embedded engine, its language bindings, the shared corpus and
+the experimental Rust implementation remain in-tree but are not released,
+documented or promoted.
+
+### Source and workflow
+
+- Tag: `v4.0.8` (annotated) at `89eb46e`; pushed to `origin`.
+- GitHub release: https://github.com/nift-dev/nift/releases/tag/v4.0.8 —
+  published 2026-08-31T10:00:29Z, non-draft, non-prerelease.
+- Pre-tag rehearsals: Snap rehearsal `33375601302` (toolchain-preflight ran,
+  amd64/arm64 builds passed, release-coordination skipped with no Store
+  mutation) and release-artifacts rehearsal `33375627058` (all four archives +
+  installer + public-installer gates + rehearsal aggregate, publish skipped)
+  PASSED.
+- Push-triggered runs at the tagged commit passed: Init targets, Checkpoint 10,
+  Test integrity guards, packaging matrix, Performance regression guards.
+
+### Snap coordination and i386 promotion defect
+
+The connected Snap Store/Launchpad build service published the six declared
+platforms to `latest/edge`; the release-coordination job staged exactly those
+edge revisions to `latest/candidate`, and the amd64 candidate confinement smoke
+passed (revision 698). The subsequent whole-channel `snapcraft promote` failed
+(run `33380252640`): its completeness policy requires the entire set of
+ever-released store architectures, which includes the historical i386 entry
+(409, 3.0.3) that Nift no longer declares or builds. The failure was
+fail-closed — no candidate or stable mutation occurred.
+
+Fix `53a3e66` replaced whole-channel promote with guarded per-revision
+releases: after candidate revalidation, the coordinator runs
+`snapcraft release nift <revision> latest/stable` for exactly the six selected
+revisions, then verifies stable. Per-revision releases are idempotent, so a
+rerun preserves already-correct stable assignments. Snapcraft offers no
+supported atomic multi-architecture release API that can exclude a legacy
+architecture.
+
+Recovery: the six already-screened candidate revisions were released to
+`latest/stable` manually; amd64/arm64 were initially released from newer edge
+rebuilds (704/703) instead of the screened revisions, then corrected to the
+exact screened candidate revisions. Final verified `latest/stable` state:
+
+- amd64 revision `698` · arm64 revision `702` · armhf revision `699` ·
+  ppc64el revision `700` · riscv64 revision `687` · s390x revision `701` — all
+  at version `4.0.8`.
+- Legacy `i386` (`409`, `3.0.3`) untouched in stable/edge; never released,
+  promoted or closed.
+- amd64 revision `698` is the exact revision that passed the candidate
+  confinement smoke.
+
+### Release-candidate validation (performed at `89eb46e`, clean build)
+
+- Full implementation-local suite, external contract suite, ASan/UBSan,
+  performance/scaling and memory guards PASS; the repaired full-build scaling
+  benchmark (2000/8000 pages, 7 interleaved rounds, median paired ratio vs a
+  7.00x threshold plus confirmation phase) with invocation-invariant guards.
+- `.nift/.lock` lifecycle coverage: init establishes the persistent lock file,
+  `.gitignore` records `.nift/.lock`, interrupted builds leave no
+  `.unfinished`, and write/parent-sync/legacy-removal failure seams fail
+  closed.
+- Four-platform non-publishing rehearsal PASS (linux-x86_64, macos-arm64,
+  macos-x86_64, windows-x86_64) with installer preflight and aggregate
+  rehearsal; publish and public smokes skipped.
+- Fresh Linux archive smoke: `Nift v4.0.8`; `init` creates `.nift/.lock` with
+  the canonical sentence; `build`/`status` PASS; no `.unfinished`.
+
+### Archives and checksums (definitive, from the published release)
+
+- `nift-4.0.8-linux-x86_64.tar.gz` (499 258 bytes) — `d63cc323c7f9c4a624ddcab131c1f52db440bf0c07c3c791ce5658fa5cabb2c8`
+- `nift-4.0.8-macos-arm64.tar.gz` (380 589 bytes) — `3b0bb6db6ba7dc514cf504d6fd8608b75ebe54fc7aeaf9d8c8cdf09bd1adb6d7`
+- `nift-4.0.8-macos-x86_64.tar.gz` (404 052 bytes) — `76f253369a41a25e6f246f7ddd88a53f16ae475b87386d73af75b2b9c0b114c4`
+- `nift-4.0.8-windows-x86_64.zip` (1 400 751 bytes) — `3c04f48c37d88ec44a8b0c74a667f78d8731c2b0744dd5226df033fbe9fc580d`
+- `SHA256SUMS` (386 bytes) — independently downloaded; all four entries verified
+  (`sha256sum -c` OK).
+
+### Package publication
+
+- **Snap stable**: PUBLISHED on all six declared architectures at v4.0.8 with
+  the exact screened revisions (amd64 698, arm64 702, armhf 699, ppc64el 700,
+  riscv64 687, s390x 701); legacy i386 untouched. Recovery required the
+  coordinator fix `53a3e66` (see above) plus a manual release of the screened
+  candidate revisions.
+- **Chocolatey Community**: `nift.4.0.8.nupkg` pushed — submitted, awaiting
+  moderation; not yet independently verified from the public channel.
+- **Homebrew**: formula built and tested on Linux x86-64 and macOS arm64;
+  propagation is left to Homebrew's automatic bump service (no manual PR);
+  fresh install is external verification.
+- **Flathub**: external `flathub/cc.nift.nsm` manifest update required —
+  pending external PR.
+- **Distribution verification**: run `distribution-verification.yml` against the
+  exact public version once channels have had the required propagation time.
+
+### Post-release
+
+- Development identity advanced to `Nift v4.0.9` in `src/CLI.cpp`,
+  `snap/snapcraft.yaml`, release notes, and the guarantee registry baseline
+  (released_version 4.0.8, release_commit 89eb46e, development_version 4.0.9).
+- Regression-suite version assertions advanced to v4.0.9; the full-build
+  scaling benchmark invocation invariants synced byte-identical.
+- Both `nift-dev/nift` and `nift-dev/nift-regression-suite` pushed to `main`.
+
+### Remaining downstream tracking
+
+- Homebrew auto-bump merge + fresh install; Chocolatey moderation/approval and
+  fresh install; Flathub external PR; Snap non-x86 rebuilds on edge (amd64 704,
+  arm64 703, armhf 705) do not affect stable and are selected only by a future
+  coordinator run.
 - Run `distribution-verification.yml` against the exact public version once
   stores propagate.
