@@ -10,6 +10,14 @@ on:
       - '.github/workflows/snap.yml'
   workflow_dispatch:
 
+env:
+  # Exact tested Snapcraft snap revision and version, shared by the manual
+  # toolchain preflight and the tag release coordinator. `snap install
+  # --revision` installs a specific immutable Store revision; both the version
+  # and the revision are asserted after install.
+  SNAPCRAFT_SNAP_REVISION: "18514"
+  SNAPCRAFT_EXPECTED_VERSION: "9.0.1"
+
 jobs:
   # Non-publishing validation builds for amd64 and arm64. These catch build
   # regressions on pull requests and tag runs but never upload to the Snap
@@ -40,6 +48,20 @@ jobs:
           name: nift-snap-${{ matrix.platform }}
           path: ${{ steps.snapcraft.outputs.snap }}
 
+  # Non-publishing toolchain preflight: installs the pinned Snapcraft snap
+  # revision and asserts both its version and revision, using no Store
+  # credentials and performing no channel release, promotion or Store mutation.
+  # A manual workflow_dispatch therefore exercises the exact toolchain the tag
+  # release will use before any Nift publication, so a bad pin is caught early.
+  # The tag release coordinator depends on this job's success.
+  toolchain-preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Install and verify pinned snapcraft
+        shell: bash
+        run: bash packaging/snapcraft-pin.sh
+
   # Release coordinator. The connected build service publishes each platform to
   # latest/edge; this job waits until all six declared architectures reach the
   # tagged version on edge, releases exactly those revisions to candidate,
@@ -50,18 +72,12 @@ jobs:
   # untouched by every failure before the promote step.
   release-coordination:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build]
+    needs: [build, toolchain-preflight]
     runs-on: ubuntu-latest
     concurrency:
       group: nift-snap-release-transaction
       cancel-in-progress: false
     env:
-      # Exact tested Snapcraft snap revision and version. `snap install
-      # --revision` installs a specific immutable Store revision; the tag
-      # release verifies both the version and the revision after install. The
-      # contract test requires both values to be non-empty.
-      SNAPCRAFT_SNAP_REVISION: "18514"
-      SNAPCRAFT_EXPECTED_VERSION: "9.0.1"
       SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -72,18 +88,7 @@ jobs:
           echo "NIFT_SNAP_WAIT=7200" >> "$GITHUB_ENV"
       - name: Install and verify pinned snapcraft
         shell: bash
-        run: |
-          test -n "$SNAPCRAFT_SNAP_REVISION" || { echo "SNAPCRAFT_SNAP_REVISION is not set" >&2; exit 1; }
-          test -n "$SNAPCRAFT_EXPECTED_VERSION" || { echo "SNAPCRAFT_EXPECTED_VERSION is not set" >&2; exit 1; }
-          sudo snap install snapcraft --classic --revision="$SNAPCRAFT_SNAP_REVISION"
-          # `snapcraft version` commonly prints "snapcraft 9.0.1"; extract the
-          # version token and compare that, never the raw whole-output string.
-          installed_version="$(snapcraft version | grep -oE '[0-9]+(\.[0-9]+){1,2}' | head -1)"
-          test -n "$installed_version" || { echo "could not parse snapcraft version" >&2; exit 1; }
-          installed_revision="$(snap list snapcraft | sed -n '2p' | awk '{print $3}')"
-          [ "$installed_version" = "$SNAPCRAFT_EXPECTED_VERSION" ] || { echo "snapcraft version ${installed_version} != ${SNAPCRAFT_EXPECTED_VERSION}" >&2; exit 1; }
-          [ "$installed_revision" = "$SNAPCRAFT_SNAP_REVISION" ] || { echo "snapcraft revision ${installed_revision} != ${SNAPCRAFT_SNAP_REVISION}" >&2; exit 1; }
-          echo "snapcraft ${installed_version} revision ${installed_revision} verified"
+        run: bash packaging/snapcraft-pin.sh
       - name: Coordinate candidate staging and stable promotion
         shell: bash
         run: python3 packaging/snap_release.py

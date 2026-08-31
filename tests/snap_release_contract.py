@@ -748,9 +748,27 @@ class WorkflowStructure(unittest.TestCase):
         text = self.load(".github/workflows/snap.yml")
         self.assertIn('SNAPCRAFT_SNAP_REVISION: "18514"', text)
         self.assertIn('SNAPCRAFT_EXPECTED_VERSION: "9.0.1"', text)
-        self.assertIn('--revision="$SNAPCRAFT_SNAP_REVISION"', text)
-        self.assertIn('[ "$installed_version" = "$SNAPCRAFT_EXPECTED_VERSION" ]', text)
-        self.assertIn('[ "$installed_revision" = "$SNAPCRAFT_SNAP_REVISION" ]', text)
+        # Both the manual preflight and the release coordinator call the shared
+        # pin script, which holds the immutable-revision install and assertions.
+        self.assertEqual(text.count("packaging/snapcraft-pin.sh"), 2)
+        script = self.load("packaging/snapcraft-pin.sh")
+        self.assertIn('--revision="$REVISION"', script)
+        self.assertIn('[ "$installed_version" = "$EXPECTED" ]', script)
+        self.assertIn('[ "$installed_revision" = "$REVISION" ]', script)
+
+    def test_manual_preflight_verifies_pin_without_credentials_or_publication(self):
+        text = self.load(".github/workflows/snap.yml")
+        self.assertIn("toolchain-preflight", text)
+        preflight = text.split("release-coordination")[0]
+        self.assertIn("packaging/snapcraft-pin.sh", preflight)
+        # No Store credential, no release/promote/upload publication in preflight.
+        self.assertNotIn("SNAPCRAFT_STORE_CREDENTIALS", preflight)
+        self.assertNotIn("snapcraft release", preflight)
+        self.assertNotIn("snapcraft promote", preflight)
+        self.assertNotIn("snapcraft upload", preflight)
+
+    def test_release_coordination_depends_on_toolchain_preflight(self):
+        self.assertIn("needs: [build, toolchain-preflight]", self.load(".github/workflows/snap.yml"))
 
     def test_candidate_smoke_ordered_before_promotion(self):
         script = self.load("packaging/snap_release.py")
@@ -784,13 +802,13 @@ class WorkflowStructure(unittest.TestCase):
         self.assertNotIn("--channel=latest/candidate", smoke)
 
     def test_snapcraft_version_assertion_parses_robustly(self):
-        text = self.load(".github/workflows/snap.yml")
+        script = self.load("packaging/snapcraft-pin.sh")
         # `snapcraft version` commonly prints "snapcraft 9.0.1"; the version
         # token must be extracted, never compared as the raw whole-output string.
-        self.assertIn("grep -oE '[0-9]+(\\.[0-9]+){1,2}'", text)
-        self.assertNotIn('[ "$(snapcraft version)" = "$SNAPCRAFT_EXPECTED_VERSION" ]', text)
-        self.assertIn('[ "$installed_version" = "$SNAPCRAFT_EXPECTED_VERSION" ]', text)
-        self.assertIn('[ "$installed_revision" = "$SNAPCRAFT_SNAP_REVISION" ]', text)
+        self.assertIn("grep -oE '[0-9]+(\\.[0-9]+){1,2}'", script)
+        self.assertNotIn('[ "$(snapcraft version)" = "$EXPECTED" ]', script)
+        self.assertIn('[ "$installed_version" = "$EXPECTED" ]', script)
+        self.assertIn('[ "$installed_revision" = "$REVISION" ]', script)
 
     def test_release_workflow_calls_snap_via_workflow_call(self):
         self.assertIn("uses: ./.github/workflows/snap.yml", self.load(".github/workflows/release.yml"))
