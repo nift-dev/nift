@@ -815,6 +815,15 @@ class CoordinatorDryRun(unittest.TestCase):
         code, out = self.run_main(self.env(NIFT_SNAP_VERSION="4.0.8", NIFT_SNAP_STABLE_WAIT="1"), steady)
         self.assertEqual(code, 1)
         self.assertIn("not recoverable from the channel map for: amd64, arm64", out)
+        # The diagnostic must not describe every target-version assignment as
+        # already correct: amd64@704 is the wrong revision of the target version.
+        self.assertNotIn("already-correct", out)
+        # It must say publication resumes toward the exact selected revisions...
+        self.assertIn("resumes publication toward the exact selected revisions", out)
+        # ...and that a different target-version revision (704 vs selected 698)
+        # may be corrected while the exact match (arm64@702) stays unchanged.
+        self.assertIn("Assignments already at their selected revision remain unchanged", out)
+        self.assertIn("other revisions of the target version may be corrected", out)
         self.assertIn("DRY-RUN: snapcraft release nift 698 latest/stable", out)  # resume toward screened revision
         rollback_section = out[out.index("Rollback commands"):]
         self.assertIn("snapcraft release nift 675 latest/stable", rollback_section)

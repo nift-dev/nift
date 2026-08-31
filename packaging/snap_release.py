@@ -563,8 +563,10 @@ def main(argv=None):
     if already_target:
         print("NOTE: previous stable already exposes the target release version for "
               "{}; those original pre-release revisions are not recoverable from the "
-              "channel map. This run resumes publication and preserves those "
-              "already-correct assignments.".format(", ".join(already_target)))
+              "channel map. This run resumes publication toward the exact selected "
+              "revisions. Assignments already at their selected revision remain "
+              "unchanged; other revisions of the target version may be corrected."
+              .format(", ".join(already_target)))
 
     if candidate_at_version(channel_map, archs, version) is None:
         for arch in sorted(expected):
