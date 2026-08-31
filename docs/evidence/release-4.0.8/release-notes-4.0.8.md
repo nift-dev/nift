@@ -35,6 +35,18 @@ all-architecture Snap release coordination.
   the Snapcraft toolchain is pinned to an immutable revision with a
   non-publishing preflight, and the coordinator supports `--dry-run` rehearsal.
 
+## Persistent project lock
+
+- Every project now has a persistent `.nift/.lock` file. It is Nift's normal
+  concurrency infrastructure: it exists so simultaneous Nift commands serialize
+  safely and it stays after every build. Its presence does **not** mean a build
+  is active or failed, and it never requires repair.
+- New projects create it during `nift init`; older projects, including legacy
+  `.ownership-gate` projects, acquire it automatically on their next build.
+- `.nift/.lock` is ignored by Git. `.nift/.unfinished` remains the separate
+  indicator that a mutating operation failed, was interrupted, or otherwise was
+  not proven to finish and requires `nift build --repair`.
+
 ## Archives
 
 - `nift-4.0.8-linux-x86_64.tar.gz`

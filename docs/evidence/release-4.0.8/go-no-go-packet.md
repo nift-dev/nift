@@ -7,13 +7,19 @@ are marked **pending** — they have not run and are not claimed.
 
 ## 1. Candidate heads and tag target
 
+The v4.0.8 candidate is the lock/scaling series on `main`, ending at the
+amended lock-correction head. The final release-preparation commit (release
+notes + this packet) is added next and is recorded externally, since this
+document cannot embed its own hash.
+
 | Repository | Head | Role |
 |---|---|---|
-| canonical `nift` (code base) | `1d908c1` | build-progress repair, Braille spinner, Snap release automation, toolchain preflight |
-| canonical `nift` (release-preparation commit) | `TBD` | release notes + this evidence packet (added after local validation) |
-| canonical `nift` (proposed `v4.0.8` tag target) | `TBD` | = the final release-preparation commit, named after it is committed |
+| canonical `nift` (candidate series) | `951659b` (amended lock-correction head) | the six-commit candidate series below |
+| candidate series | `2250a34` `.lock` rename · `d60a013` scaling methodology · `df6fb0f` lock write hardening · `f0b6f7a` scaling invocation guards · `f3e60b0` init establishes `.lock` · `951659b` lock init contract correction | build-progress repair, Braille spinner, Snap release automation, toolchain preflight, persistent `.lock`, repaired scaling guard |
+| canonical `nift` (release-preparation commit) | `TBD` (reported externally after commit) | release notes + this evidence packet |
+| canonical `nift` (proposed `v4.0.8` tag target) | `TBD` | = the final release-preparation commit |
 | website source (`nift-dev.github.io` `stage`) | `ade73ca` | rebuilt 75/75 with the candidate; no generated diff |
-| CLI contract suite (`nift-regression-suite`) | `00b6d54` | 22/22 modules + historical/ruthless PASS against the candidate |
+| CLI contract suite (`nift-regression-suite`) | `00b6d54` (scaling benchmark synced) | 22/22 modules + historical/ruthless PASS against the candidate |
 | `nift-embed` | `a63e6e5` | unchanged, outside the release |
 | `nift-embed-regression-suite` | `be6c28b` | unchanged |
 
@@ -23,15 +29,14 @@ Post-release dev identity: **4.0.9**.
 ## 2. Four-platform release rehearsal
 
 **PENDING.** Requires dispatching the non-publishing `release.yml` rehearsal
-(`version=4.0.8`) on GitHub; the local environment has no authenticated GitHub
-API, so this could not be run here. Required verification once dispatched:
-unix (linux-x86_64 / macos-arm64 / macos-x86_64) and windows jobs each build and
-extract-smoke their archive; installer-preflight; `rehearse` validates the exact
-four-asset set and builds `SHA256SUMS`; `publish` and `installer-public-smoke`
-are skipped. The definitive per-release archive hashes are recorded by the
-tag-triggered run.
+(`version=4.0.8`) on GitHub (manually, via the Actions web UI). Required
+verification once dispatched: unix (linux-x86_64 / macos-arm64 / macos-x86_64)
+and windows jobs each build and extract-smoke their archive;
+installer-preflight; `rehearse` validates the exact four-asset set and builds
+`SHA256SUMS`; `publish` and `installer-public-smoke` are skipped. The definitive
+per-release archive hashes are recorded by the tag-triggered run.
 
-## 3. Local test evidence (Linux, candidate `1d908c1` binary)
+## 3. Local test evidence (Linux, candidate series head `951659b` binary)
 
 - Clean release build (g++ C++17 `-O2 -pthread`): PASS, `nift version` →
   `Nift v4.0.8`.
@@ -75,14 +80,17 @@ tag-triggered run.
   confirmation protocol distinguishes a single noisy phase from a repeatable
   violation.
 - **Failure-mode checks:** the benchmark fails closed when a timed build does
-  not rewrite all expected outputs, when the expected output count is
-  incomplete, and when a timed build returns non-zero (offline
-  `full_build_scaling_failmodes.py` PASS).
+  not rewrite all expected outputs (exercised through `Fixture.timed_build()`
+  with a mocked successful no-op subprocess), when the expected output count is
+  incomplete, when a timed build returns non-zero, and for every documented
+  invocation invariant (`--small > 0`, `--large == 4 * --small`,
+  `--rounds >= 7`, `--confirm-rounds >= 7`, `--max-ratio > 0`) — offline
+  `full_build_scaling_failmodes.py` PASS.
 - **Structural guards preserved:** the recovery-epoch scan-bound guard and the
   BH8 complexity invariants remain required and are unchanged; wall-clock
   timing does not replace structural complexity evidence.
 - **Repaired hosted workflow result: PENDING** (requires a GitHub run at the
-  new exact commit).
+  new exact head).
 - Memory guard: `memory_10k_benchmark.py` all peaks ≤ 13 560 KiB (guard
   ≤ 16 384 KiB) PASS.
 - Embedded synchronization: Jsonic++ sync PASS (20 files); Minify++
@@ -96,6 +104,23 @@ tag-triggered run.
 - `packaging/install.sh` is unchanged since the v4.0.7 baseline, so no new
   pre-tag public-installer deployment is required; the rehearsal's
   byte-comparison `public-installer-preflight` gate still applies.
+
+### 3.2 Persistent `.lock` initialization and migration coverage
+
+- `nift init` establishes a populated `.nift/.lock` (exact canonical sentence)
+  with a scoped `.gitignore` rule and never creates `.unfinished`.
+- Partial-init is reachable through the CLI: an existing non-empty `.lock` is
+  preserved (contents + file identity), an existing empty `.lock` is repaired,
+  a directory/symlink at `.nift/.lock` is refused, and injected
+  write/flush/size/parent-sync failures fail init before `config.json`.
+- Runtime acquisition creates/repairs `.lock` for older, copied,
+  hand-assembled, partially initialized and legacy `.ownership-gate` projects,
+  and fails closed before `.unfinished` on population, parent-sync, or
+  legacy-removal failure. Legacy `.ownership-gate` is never removed while a
+  live legacy-version process holds it.
+- Cross-platform ownership unit tests and the POSIX ownership/concurrency and
+  crash-recovery suites all PASS (the Windows unit path is covered by the
+  cross-platform unit target).
 
 ## 4. Snap coordinator evidence
 
@@ -143,27 +168,33 @@ tag-triggered run.
 
 ## 7. Proposed tag and release notes
 
-- Tag: `v4.0.8` (annotated) at the final release-preparation commit (TBD after
-  this packet is committed).
+- Tag: `v4.0.8` (annotated) at the final release-preparation commit (TBD,
+  reported externally after this packet is committed).
 - Release body = the reviewed notes file
-  `docs/evidence/release-4.0.8/release-notes-4.0.8.md`, published verbatim by
+  `docs/evidence/release-4.0.8/release-notes-4.0.8.md` (now including the
+  persistent `.lock` section), published verbatim by
   `release.yml` (`--notes-file`). No Embedded Nift mention.
 
 ## 8. Outstanding items before tag authorization
 
-- [ ] Manual non-publishing `Snap` dispatch on `main`: preflight + amd64/arm64
-  builds pass, no Store mutation.
+- [ ] Hosted CI on the new exact head: cross-platform build/test, performance
+  regression guards (the repaired full-build scaling guard must pass), packaging
+  and integrity checks, init-target checks, Snap build validation.
+- [ ] Manual non-publishing `Snap` dispatch on `main`: preflight (Snapcraft
+  9.0.1, revision 18514) + amd64/arm64 validation builds pass,
+  `release-coordination` skipped, no Store channel mutated.
 - [ ] Non-publishing `Release artifacts` rehearsal (`version=4.0.8`): exact
   four-asset set, extracted-archive smokes, installer gates, checksums.
-- [ ] Confirmation of the exact release-preparation commit and its push to
-  `main`.
+- [ ] Confirmation that local `main == origin/main` and that `v4.0.8` does not
+  already exist locally, remotely, or as a GitHub release.
 - [ ] Explicit tag authorization naming that one immutable commit.
 
 ## 9. Repository cleanliness
 
 - canonical `nift`: clean after the release-preparation commit (0 porcelain
   residue; the local archive workspace lives under `/tmp`).
-- website `stage`: clean; `public/` clean.
+- website `stage`: clean; `public/` clean. `docs/handover/PENDING-WEBSITE.md`
+  reviewed: **"Open items: None currently."**
 - `nift-regression-suite`: clean; `nift-embed`, `nift-embed-regression-suite`:
   clean and unchanged.
 

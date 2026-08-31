@@ -38,6 +38,15 @@ all-architecture Snap release coordination.
   non-publishing preflight, and `--dry-run` rehearses the whole transaction.
   The Snap automation is implemented and covered by offline contract tests; it
   is exercised in rehearsal before any public publication.
+- **Persistent project lock.** Every project now has a persistent `.nift/.lock`
+  file, Nift's normal concurrency infrastructure: it exists so simultaneous
+  Nift commands serialize safely and it stays after every build. Its presence
+  does not mean a build is active or failed and never requires repair. New
+  projects create it during `nift init`; older projects, including legacy
+  `.ownership-gate` projects, acquire it automatically. It is ignored by Git.
+  `.nift/.unfinished` remains the separate indicator that a mutating operation
+  failed, was interrupted, or otherwise was not proven to finish and requires
+  `nift build --repair`.
 
 ## v4.0.7
 
