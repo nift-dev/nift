@@ -15,12 +15,12 @@ set -euo pipefail
 NIFT_BIN="${NIFT_BIN:?NIFT_BIN must point to the nift binary}"
 
 if ! command -v script >/dev/null 2>&1; then
-  echo "SKIP: 'script' is unavailable"
-  exit 0
+  echo "progress PTY smoke test SKIPPED ('script' unavailable): the PTY ordering guarantee is NOT verified" >&2
+  exit 77
 fi
 if ! command -v python3 >/dev/null 2>&1; then
-  echo "SKIP: 'python3' is unavailable"
-  exit 0
+  echo "progress PTY smoke test SKIPPED ('python3' unavailable): the PTY ordering guarantee is NOT verified" >&2
+  exit 77
 fi
 
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/nift-progress-pty.XXXXXX")"

@@ -1,8 +1,43 @@
 # Nift — Release Notes
 
-## v4.0.8 (development)
+## v4.0.8
 
-Development version following the public v4.0.7 release.
+Nift 4.0.8 fixes the build-progress output ordering so final summaries are
+never interleaved with an active progress line, replaces the progress
+presentation with a restrained green Braille spinner, and adds automated
+all-architecture Snap release coordination.
+
+- **Deterministic progress shutdown.** A long build can no longer print its
+  final "pages built successfully" line on top of a half-drawn progress frame.
+  The renderer now stops, joins, erases the complete transient line and flushes
+  before any permanent output. Per-page build errors are buffered and emitted
+  only after progress has stopped, so diagnostics and summaries always land on
+  clean lines. Full-line ANSI erasure clears every transition, including a
+  resized terminal or a shorter frame following a longer one.
+- **Green Braille spinner.** Interactive progress now shows a restrained green
+  Aeye-style spinner (`⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏`) in front of the stable
+  `building N/M  P%` text. Only the spinner is coloured; the counts and
+  percentage keep the terminal default colour, the text stays at a fixed
+  position and width, and `NO_COLOR`/redirected output stays free of animation
+  sequences.
+- **Short builds stay quiet.** The existing 200 ms display delay is retained, so
+  builds that finish almost instantly show no animation at all.
+- **Lifecycle/race regression coverage.** Deterministic tests prove the renderer
+  is fully stopped before the summary, no stale prefix survives, no frame is
+  written after shutdown, wide-to-narrow transitions clear fully, and success,
+  failure, interruption and `NO_COLOR` paths all behave cleanly.
+- **Snap release automation.** Publication is coordinated for all six declared
+  Snap architectures (amd64, arm64, armhf, ppc64el, riscv64, s390x) from the
+  connected build service's `latest/edge` revisions: wait for the complete
+  exact-version set, release exactly those revisions to `latest/candidate`,
+  verify candidate strictly, run the amd64 candidate confinement smoke, promote
+  to `latest/stable`, and verify stable. Legacy `i386` entries are ignored and
+  reported in edge/stable and block candidate promotion rather than being
+  promoted. A validated previous-stable rollback snapshot is required before
+  promotion, the Snapcraft toolchain is pinned to an immutable revision with a
+  non-publishing preflight, and `--dry-run` rehearses the whole transaction.
+  The Snap automation is implemented and covered by offline contract tests; it
+  is exercised in rehearsal before any public publication.
 
 ## v4.0.7
 

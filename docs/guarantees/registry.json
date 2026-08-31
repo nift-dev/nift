@@ -1445,7 +1445,7 @@
         {
           "repo": "website",
           "path": "content/docs/production-readiness.html",
-          "needle": "all 16 modern standalone black-box modules in that validation group"
+          "needle": "22-module external contract"
         },
         {
           "repo": "regression",
@@ -1491,19 +1491,19 @@
     {
       "repo": "website",
       "path": "content/docs/battle-tested.html",
-      "sha256": "d20e7aa3e2d0b1205eab6468f370f3e5daa377726c41f57ab6e78b9b1b69f7d6",
+      "sha256": "a35237c320ae0f36c52dcb0896d2b0374fe0b810ba0f66866d59298541311c5a",
       "mapping_scope": "BH1 manual audit of significant quantitative/reliability claims; source hash invalidates the audit if this page changes."
     },
     {
       "repo": "website",
       "path": "content/docs/memory-safety.html",
-      "sha256": "30c848c65b221d235756d0b176e93122a199b6bd0b3fdcf4ab404cdb313741de",
+      "sha256": "0b515e6c75bb5eb4d7afb69402978b1cdee600208d1c5c5b676766c6681ad4af",
       "mapping_scope": "BH1 manual audit of significant quantitative/reliability claims; source hash invalidates the audit if this page changes."
     },
     {
       "repo": "website",
       "path": "content/docs/production-readiness.html",
-      "sha256": "d078d5b7d6a209d40b898ded818f56e725c42876d6c3c20ebc68321a43586c98",
+      "sha256": "410e84de3e134ab9ab9bcbf65abb8af73b185cdc63a52f369128b07303e0ac80",
       "mapping_scope": "BH1 manual audit of significant quantitative/reliability claims; source hash invalidates the audit if this page changes."
     },
     {

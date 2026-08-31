@@ -16,7 +16,7 @@ BENCH_ITERATIONS ?= 20
 all: $(TARGET)
 
 $(TARGET): cli/main.cpp $(LIBSRC) include/minify/Minify.h src/Json.h
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) cli/main.cpp $(LIBSRC) -o $@
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) cli/main.cpp $(LIBSRC) $(LDFLAGS) -o $@
 
 test: test-smoke test-node test-generated test-jsx test-css-semantics test-formats test-cross-format test-cli test-fuzz
 

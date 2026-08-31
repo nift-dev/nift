@@ -1,0 +1,135 @@
+# Nift 4.0.8 release candidate — go/no-go packet (draft)
+
+This packet records the local release-candidate evidence for Nift 4.0.8. No tag
+was created and nothing was released, published, promoted or deployed. GitHub
+workflow dispatch, the Snap real rehearsal and all downstream publication checks
+are marked **pending** — they have not run and are not claimed.
+
+## 1. Candidate heads and tag target
+
+| Repository | Head | Role |
+|---|---|---|
+| canonical `nift` (code base) | `1d908c1` | build-progress repair, Braille spinner, Snap release automation, toolchain preflight |
+| canonical `nift` (release-preparation commit) | `TBD` | release notes + this evidence packet (added after local validation) |
+| canonical `nift` (proposed `v4.0.8` tag target) | `TBD` | = the final release-preparation commit, named after it is committed |
+| website source (`nift-dev.github.io` `stage`) | `ade73ca` | rebuilt 75/75 with the candidate; no generated diff |
+| CLI contract suite (`nift-regression-suite`) | `00b6d54` | 22/22 modules + historical/ruthless PASS against the candidate |
+| `nift-embed` | `a63e6e5` | unchanged, outside the release |
+| `nift-embed-regression-suite` | `be6c28b` | unchanged |
+
+Version: **Nift 4.0.8** (`src/CLI.cpp:34`, `snap/snapcraft.yaml`, release notes).
+Post-release dev identity: **4.0.9**.
+
+## 2. Four-platform release rehearsal
+
+**PENDING.** Requires dispatching the non-publishing `release.yml` rehearsal
+(`version=4.0.8`) on GitHub; the local environment has no authenticated GitHub
+API, so this could not be run here. Required verification once dispatched:
+unix (linux-x86_64 / macos-arm64 / macos-x86_64) and windows jobs each build and
+extract-smoke their archive; installer-preflight; `rehearse` validates the exact
+four-asset set and builds `SHA256SUMS`; `publish` and `installer-public-smoke`
+are skipped. The definitive per-release archive hashes are recorded by the
+tag-triggered run.
+
+## 3. Local test evidence (Linux, candidate `1d908c1` binary)
+
+- Clean release build (g++ C++17 `-O2 -pthread`): PASS, `nift version` →
+  `Nift v4.0.8`.
+- Full implementation-local suite: `make test` **exit 0** (all targets incl.
+  progress-render 69/69 snap-contract, PTY, zero-mutation, repair, ownership).
+- External contract suite: `run-contract.sh` against the candidate binary —
+  **22/22 modules + historical + ruthless PASS**.
+- ASan/UBSan build: clean; sanitized binary passed `--version`, init, full and
+  incremental builds, the parser/value adversarial battery (15 cases) and the
+  init functional-truth battery with no findings.
+- Performance/scaling guards: `benchmark-10k` full-build median 0.100 s,
+  no-op 0.073 s; tracking-scaling 4.30x ratio PASS; full-build-scaling 3.23x
+  ratio PASS; recovery-epoch scan-bound PASS.
+- Memory guard: `memory_10k_benchmark.py` all peaks ≤ 13 560 KiB (guard
+  ≤ 16 384 KiB) PASS.
+- Embedded synchronization: Jsonic++ sync PASS (20 files); Minify++
+  synchronization reconciled (Makefile + `tests/cli_smoke.sh` adopted from the
+  standalone checkout) and the sync check now PASSES (24 files). Minify++
+  standalone gates PASS: CLI smoke, format idempotence (115 documents), generated
+  JS semantic corpus (15 459 programs), JSX (180 programs), Node semantics.
+- CLI behavior: `version`, `about`, `commands` correct; unknown command exits 1
+  and directs to `nift commands`; `--help`/`-h` exit 0; bare `help` word is an
+  unknown command (per contract).
+- `packaging/install.sh` is unchanged since the v4.0.7 baseline, so no new
+  pre-tag public-installer deployment is required; the rehearsal's
+  byte-comparison `public-installer-preflight` gate still applies.
+
+## 4. Snap coordinator evidence
+
+- Offline contract suite: `tests/snap_release_contract.py` — **69/69 PASS**
+  (six-architecture set; edge revision selection; strict candidate
+  verification; legacy i386 protection; rollback snapshot validation; exact
+  revision smoke; immutable Snapcraft pin `18514`/`9.0.1`; non-publishing
+  toolchain preflight; convergence polling; fail-closed paths).
+- Live read-only probe of `https://api.snapcraft.io/v2/snaps/info/nift?fields=
+  channel-map,revision,version` parsed the current public channel map (14
+  entries, none malformed; declared edge at 4.0.8 = amd64/arm64/armhf/ppc64el/
+  riscv64, s390x lagging at 4.0.7; legacy i386 reported). No Store mutation.
+- Real Snap rehearsal run: **PENDING** — requires a manual non-publishing
+  `Snap` dispatch on GitHub to verify toolchain-preflight (Snapcraft 9.0.1
+  revision 18514), amd64/arm64 validation builds, `release-coordination`
+  skipped, and no Store mutation.
+- **The Snap automation has not yet run against the real Store; it must not be
+  described as succeeded publicly until the rehearsal and the tag run complete.**
+
+## 5. Installer / upgrade / checksum evidence
+
+- `make test-installer` PASS (in `make test`).
+- Pre-tag public-installer gate: `packaging/install.sh` unchanged since v4.0.7;
+  the rehearsal byte-comparison gate is **pending** (requires workflow dispatch).
+- Local Linux archive layout validation (this environment): built
+  `nift-4.0.8-linux-x86_64.tar.gz` (nift, README.md, LICENSE); fresh extract
+  reports `Nift v4.0.8`, `about`/`commands` correct, unknown command exit 1,
+  `--help` exit 0, LICENSE present, exec bit set, fresh-project
+  `init`/`build`/`status` smoke PASS. Local archive SHA-256 (validation only;
+  the definitive release hashes come from the tag-triggered run):
+  `cdefb1bf5e17d1e2eb9e7ea0141c33d1aae55ef0723ecb799a759ee2ed1645a6`.
+
+## 6. Website / documentation
+
+- `docs/handover/PENDING-WEBSITE.md` reviewed: **"Open items: None currently."**
+  recorded as a completed review of an empty queue.
+- Website built with the exact candidate binary: **75/75 pages**, exit 0; the
+  generated `public/` tree is byte-identical (no diff), so the homepage is
+  unchanged. A stale 0-byte `.nift/.ownership-gate` marker that predated the
+  build was removed; both website source `stage` and generated `public/` trees
+  are clean.
+- Website source/generated commits for the release: **pending** (no website
+  content changes are required; none were made).
+
+## 7. Proposed tag and release notes
+
+- Tag: `v4.0.8` (annotated) at the final release-preparation commit (TBD after
+  this packet is committed).
+- Release body = the reviewed notes file
+  `docs/evidence/release-4.0.8/release-notes-4.0.8.md`, published verbatim by
+  `release.yml` (`--notes-file`). No Embedded Nift mention.
+
+## 8. Outstanding items before tag authorization
+
+- [ ] Manual non-publishing `Snap` dispatch on `main`: preflight + amd64/arm64
+  builds pass, no Store mutation.
+- [ ] Non-publishing `Release artifacts` rehearsal (`version=4.0.8`): exact
+  four-asset set, extracted-archive smokes, installer gates, checksums.
+- [ ] Confirmation of the exact release-preparation commit and its push to
+  `main`.
+- [ ] Explicit tag authorization naming that one immutable commit.
+
+## 9. Repository cleanliness
+
+- canonical `nift`: clean after the release-preparation commit (0 porcelain
+  residue; the local archive workspace lives under `/tmp`).
+- website `stage`: clean; `public/` clean.
+- `nift-regression-suite`: clean; `nift-embed`, `nift-embed-regression-suite`:
+  clean and unchanged.
+
+## 10. Known limitations
+
+Binaries unsigned; release is CLI-only; embedded engine/bindings/corpus/Rust
+remain in-tree but unpublished and unpromoted. Snap and package-channel
+publication is exercised by the real runs, not claimed from offline evidence.

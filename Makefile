@@ -103,12 +103,16 @@ test-progress-render: $(PROGRESS_RENDER_TEST)
 test-snap-contract:
 	python3 tests/snap_release_contract.py
 
-# POSIX PTY end-to-end progress coverage uses `script`; skipped gracefully when
-# unavailable. Not part of the Windows matrix, where the portable
-# test-progress-render unit test covers the same renderer lifecycle.
+# POSIX PTY end-to-end progress coverage uses `script`; skipped (exit 77) when
+# unavailable, matching the pagination-ordering skip convention. Not part of the
+# Windows matrix, where the portable test-progress-render unit test covers the
+# same renderer lifecycle.
 ifneq ($(OS),Windows_NT)
 test-progress-pty: $(TARGET)
-	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/progress_pty_smoke.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/progress_pty_smoke.sh; \
+	  status=$$?; \
+	  if [ $$status -eq 77 ]; then echo "test-progress-pty: skipped (PTY tooling unavailable)"; \
+	  else exit $$status; fi
 PROGRESS_PTY_TARGET := test-progress-pty
 endif
 
