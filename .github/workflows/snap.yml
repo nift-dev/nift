@@ -50,7 +50,7 @@ jobs:
 
   # Non-publishing toolchain preflight: installs the pinned Snapcraft snap
   # revision and asserts both its version and revision, using no Store
-  # credentials and performing no channel release, promotion or Store mutation.
+  # credentials and performing no channel release or Store mutation.
   # A manual workflow_dispatch therefore exercises the exact toolchain the tag
   # release will use before any Nift publication, so a bad pin is caught early.
   # The tag release coordinator depends on this job's success.
@@ -66,10 +66,12 @@ jobs:
   # latest/edge; this job waits until all six declared architectures reach the
   # tagged version on edge, releases exactly those revisions to candidate,
   # verifies the complete candidate set, runs the amd64 candidate confinement
-  # smoke, promotes candidate -> stable, and verifies stable. Serialized by a
-  # concurrency group so two release tags can never share candidate or stable
-  # state. Fails closed on any missing/ambiguous/mismatched revision; stable is
-  # untouched by every failure before the promote step.
+  # smoke, then revalidates candidate and releases each selected revision
+  # explicitly to latest/stable (never whole-channel promote), and verifies
+  # stable. Serialized by a concurrency group so two release tags can never
+  # share candidate or stable state. Fails closed on any
+  # missing/ambiguous/mismatched revision; stable is untouched by every failure
+  # before the stable-release step.
   release-coordination:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [build, toolchain-preflight]
@@ -89,6 +91,6 @@ jobs:
       - name: Install and verify pinned snapcraft
         shell: bash
         run: bash packaging/snapcraft-pin.sh
-      - name: Coordinate candidate staging and stable promotion
+      - name: Coordinate candidate staging and explicit stable release
         shell: bash
         run: python3 packaging/snap_release.py

@@ -634,8 +634,13 @@ edge revisions to `latest/candidate`, and the amd64 candidate confinement smoke
 passed (revision 698). The subsequent whole-channel `snapcraft promote` failed
 (run `33380252640`): its completeness policy requires the entire set of
 ever-released store architectures, which includes the historical i386 entry
-(409, 3.0.3) that Nift no longer declares or builds. The failure was
-fail-closed — no candidate or stable mutation occurred.
+(409, 3.0.3) that Nift no longer declares or builds.
+
+The promotion attempt itself was fail-closed with respect to stable: it made no
+stable mutation. By the time it failed, candidate staging had already completed
+(all six selected revisions were in `latest/candidate`), the amd64 candidate
+smoke had passed, and `latest/candidate` remained populated with the screened
+set. Only `latest/stable` was untouched by the failure.
 
 Fix `53a3e66` replaced whole-channel promote with guarded per-revision
 releases: after candidate revalidation, the coordinator runs

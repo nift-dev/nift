@@ -157,11 +157,11 @@ The coordinator installs a specific immutable Snapcraft snap revision
 revision before proceeding. `packaging/snap_release.py` is the single
 publication entry point and can be rehearsed with `--dry-run`.
 
-Before the candidate set is promoted to stable, `packaging/snap-candidate-smoke.sh`
+Before any stable release, `packaging/snap-candidate-smoke.sh`
 installs the exact amd64 candidate revision from `latest/candidate` on the clean
 Ubuntu host and exercises version/help, project creation, a real build,
 dependency-driven rebuilding, filesystem behavior under strict confinement, and
-project-local `.nift/` state. Any failure aborts before stable promotion.
+project-local `.nift/` state. Any failure aborts before any stable release.
 
 ## Chocolatey
 
@@ -384,20 +384,21 @@ evidence for the release report.
    supported architecture to reach the exact release version on unbranched
    `latest/edge`, releases exactly those revisions to `latest/candidate`,
    verifies the complete candidate set (no unsupported entries), runs the amd64
-   candidate confinement smoke, promotes candidate to stable, and verifies
-   stable. A complete previous-stable rollback snapshot for all six
-   architectures is required before promotion. Legacy i386 is not a supported
-   core24/Launchpad target: it is ignored and reported in edge and stable, and
-   aborts candidate promotion for manual inspection rather than being promoted,
-   replaced or closed.
+   candidate confinement smoke, then revalidates candidate and releases each
+   selected revision explicitly to `latest/stable` (never whole-channel
+   promote), and verifies stable. A complete previous-stable rollback snapshot
+   for all six architectures is required before any candidate mutation. Legacy
+   i386 is not a supported core24/Launchpad target: it is ignored and reported
+   in edge and stable, and aborts candidate publication for manual inspection
+   rather than being released, replaced or closed.
 3. `riscv64` may take substantially longer than the other builders; the
    coordinator waits (default 2 h) and fails closed on timeout rather than
-   promoting a partial set.
+   releasing a partial set.
 4. Ensure `SNAPCRAFT_STORE_CREDENTIALS` is configured; a tag release fails
    closed without it. `SNAPCRAFT_SNAP_REVISION`/`SNAPCRAFT_EXPECTED_VERSION` in
    `snap.yml` pin a specific immutable Snapcraft snap revision, and the job
    asserts the installed version and revision.
-5. Promotion is explicit and approved only after the candidate smoke passes.
+5. Publication is explicit and approved only after the candidate smoke passes.
    Confirm `snap info nift` reports `X.Y.Z` on `latest/stable` for every
    supported architecture and perform a fresh store install.
 

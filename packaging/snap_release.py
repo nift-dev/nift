@@ -339,7 +339,7 @@ def snapshot_stable(channel_map, supported, track="latest"):
     """{arch: {"revision", "version"}} for unbranched latest/stable (rollback base).
 
     Malformed supported entries are skipped; use stable_snapshot_problems to
-    refuse promotion before this map is relied upon."""
+    refuse publication before this map is relied upon."""
     out = {}
     for entry in channel_map:
         ch = entry.get("channel") or {}
@@ -398,13 +398,56 @@ def candidate_at_version(channel_map, archs, version):
 
 
 def build_rollback_commands(previous_stable, snap_name=SNAP_NAME):
-    """Positional `snapcraft release` commands restoring the pre-promotion
+    """Positional `snapcraft release` commands restoring the pre-release
     latest/stable map. Per-architecture and therefore not atomic; the workflow
     prints these and never executes them automatically."""
     commands = []
     for arch in sorted(previous_stable):
         commands.append("snapcraft release {} {} latest/stable".format(snap_name, previous_stable[arch]["revision"]))
     return commands
+
+
+def rollback_availability(previous_stable, expected):
+    """Split the pre-release snapshot into (known, unknown) rollback archs.
+
+    An architecture whose previous stable revision equals the expected target
+    revision was already advanced to the target by a prior partial publication;
+    the original pre-release revision cannot be reconstructed from the channel
+    map. Only the genuinely-known archs may be presented as an authoritative
+    rollback plan. Returns (known, unknown) where known is {arch: {"revision",
+    "version"}} and unknown is a sorted list of architecture names."""
+    known = {}
+    unknown = []
+    for arch in sorted(previous_stable):
+        want = expected.get(arch, {})
+        if previous_stable[arch]["revision"] == want.get("revision"):
+            unknown.append(arch)
+        else:
+            known[arch] = previous_stable[arch]
+    return known, unknown
+
+
+def print_rollback(previous_stable, expected, snap_name=SNAP_NAME):
+    """Honest rollback reporting for the previous-stable snapshot.
+
+    On a pristine run every previous-stable revision differs from the target and
+    the full rollback set is authoritative. On a partial rerun, architectures
+    already at the target revision have an unknown original pre-release revision
+    and are reported explicitly rather than as a misleading complete rollback
+    plan. Never labels a mixed snapshot as an authoritative full rollback."""
+    known, unknown = rollback_availability(previous_stable, expected)
+    if unknown:
+        print("Original pre-release stable revision is not recoverable from the channel map for: "
+              "{} (already at the target revision from a prior partial publication).".format(
+                  ", ".join(unknown)))
+    if known:
+        print("Rollback commands (per-arch; only architectures whose original pre-release "
+              "revision is known):")
+        for command in build_rollback_commands(known, snap_name):
+            print("  " + command)
+    elif unknown:
+        print("No rollback commands are available: no supported architecture exposes a "
+              "known original pre-release revision. Resume publication instead of rolling back.")
 
 
 def release_command(revision, snap_name=SNAP_NAME):
@@ -445,7 +488,7 @@ def main(argv=None):
         print("FAIL: NIFT_SNAP_VERSION is required", file=sys.stderr)
         return 2
     if not dry_run and not credentials_present():
-        print("FAIL: SNAPCRAFT_STORE_CREDENTIALS is required for release/promote", file=sys.stderr)
+        print("FAIL: SNAPCRAFT_STORE_CREDENTIALS is required for release", file=sys.stderr)
         return 2
     wait_seconds = int(os.environ.get("NIFT_SNAP_WAIT", "7200"))
     candidate_wait = int(os.environ.get("NIFT_SNAP_CANDIDATE_WAIT", "300"))
@@ -504,6 +547,17 @@ def main(argv=None):
 
     expected = {arch: {"revision": rev, "version": version} for arch, rev in selected.items()}
 
+    # Distinguish a pristine previous-stable snapshot from an already-partial
+    # target state before any mutation: architectures whose previous stable
+    # revision is already the target were advanced by a prior partial
+    # publication, so their original pre-release revision is not recoverable.
+    _, already_advanced = rollback_availability(previous_stable, expected)
+    if already_advanced:
+        print("NOTE: previous stable already holds the target revision for "
+              "{}; those original pre-release revisions are not recoverable from the "
+              "channel map. This run resumes publication and preserves those "
+              "already-correct assignments.".format(", ".join(already_advanced)))
+
     if candidate_at_version(channel_map, archs, version) is None:
         for arch in sorted(expected):
             if run_snapcraft(release_command(expected[arch]["revision"]), dry_run) != 0:
@@ -555,9 +609,7 @@ def main(argv=None):
                     done_arch, expected[done_arch]["revision"]), file=sys.stderr)
             print("  Pending (safe to rerun; per-revision releases are idempotent): "
                   "{}".format(", ".join(a for a in sorted(expected) if a not in released)), file=sys.stderr)
-            print("Rollback commands (manual, per-arch, non-atomic):")
-            for command in build_rollback_commands(previous_stable):
-                print("  " + command)
+            print_rollback(previous_stable, expected)
             return 1
         released.append(arch)
 
@@ -568,16 +620,12 @@ def main(argv=None):
         fetch_channel_map, stable_convergence, expected, archs, stable_wait, poll_seconds, "stable")
     if not ok:
         print("FAIL: stable did not converge:\n  " + "\n  ".join(problems or []), file=sys.stderr)
-        print("Rollback commands (manual, per-arch, non-atomic):")
-        for command in build_rollback_commands(previous_stable):
-            print("  " + command)
+        print_rollback(previous_stable, expected)
         return 1
     report_legacy(channel_map, "stable", archs)
 
     print("Stable verified: all six architectures at version {}".format(version))
-    print("Rollback commands (previous stable, per-arch):")
-    for command in build_rollback_commands(previous_stable):
-        print("  " + command)
+    print_rollback(previous_stable, expected)
     return 0
 
 

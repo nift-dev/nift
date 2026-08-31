@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Candidate confinement smoke for the nift snap, run on a clean Ubuntu amd64
-# host between candidate verification and stable promotion.
+# host between candidate verification and explicit per-revision stable release.
 #
 # Installs the exact amd64 revision that was selected for candidate (the same
 # revision number verified in the candidate channel map), then verifies the
 # installed version and revision, exercises the strict-confinement surface
 # (version/help, project creation, a real build, dependency-driven rebuilding,
 # filesystem access under the home plug, and project-local .nift/ state), then
-# removes the snap. Fails closed on any error so stable promotion never
+# removes the snap. Fails closed on any error so stable release never
 # proceeds from an unvalidated candidate.
 set -euo pipefail
 VERSION="${1:?usage: snap-candidate-smoke.sh <version> <amd64-revision>}"

@@ -334,6 +334,30 @@ class SnapshotAndRollback(unittest.TestCase):
         self.assertTrue(all(cmd.startswith("snapcraft release nift ") for cmd in cmds))
         self.assertTrue(all(cmd.endswith(" latest/stable") for cmd in cmds))
 
+    def test_rollback_availability_splits_already_advanced_archs(self):
+        expected = {arch: {"revision": rev, "version": "4.0.9"} for arch, rev in revision_numbers().items()}
+        previous = {
+            "amd64": {"revision": 100, "version": "4.0.9"},   # already advanced to target
+            "arm64": {"revision": 101, "version": "4.0.9"},   # already advanced to target
+            "armhf": {"revision": 602, "version": "4.0.8"},
+            "ppc64el": {"revision": 603, "version": "4.0.8"},
+            "riscv64": {"revision": 604, "version": "4.0.8"},
+            "s390x": {"revision": 605, "version": "4.0.8"},
+        }
+        known, unknown = sr.rollback_availability(previous, expected)
+        self.assertEqual(unknown, ["amd64", "arm64"])
+        self.assertEqual(set(known), {"armhf", "ppc64el", "riscv64", "s390x"})
+        for arch in unknown:
+            self.assertNotIn(arch, known)
+
+    def test_rollback_availability_full_pristine_snapshot(self):
+        prev = revision_numbers(offset=500)
+        expected = {arch: {"revision": rev, "version": "4.0.9"} for arch, rev in revision_numbers().items()}
+        previous = {arch: {"revision": prev[arch], "version": "4.0.8"} for arch in ARCHS}
+        known, unknown = sr.rollback_availability(previous, expected)
+        self.assertEqual(unknown, [])
+        self.assertEqual(set(known), set(ARCHS))
+
 
 class Commands(unittest.TestCase):
     def test_release_command_is_positional(self):
@@ -715,6 +739,38 @@ class CoordinatorDryRun(unittest.TestCase):
         self.assertIn("snapcraft release nift 600 latest/stable", out)  # previous amd64 revision
         self.assertNotIn("Stable verified", out)
 
+    def test_partial_rerun_rollback_is_not_authoritative(self):
+        revs = revision_numbers()
+        prev = revision_numbers(offset=500)
+        # Stable already partially advanced by a prior publication: amd64 and
+        # arm64 are at the target revisions; the other four are pre-release.
+        partial = dict(stable_map(prev, "4.0.8"))
+        partial["channel-map"] = [
+            channel_entry("amd64", revs["amd64"], VERSION, risk="stable"),
+            channel_entry("arm64", revs["arm64"], VERSION, risk="stable"),
+        ] + [e for e in partial["channel-map"]
+             if e["channel"]["architecture"] in ("armhf", "ppc64el", "riscv64", "s390x")]
+        candidate = candidate_map(revs)
+        entries = candidate["channel-map"] + partial["channel-map"]
+
+        def steady():
+            return entries
+
+        code, out = self.run_main(self.env(NIFT_SNAP_STABLE_WAIT="1"), steady)
+        self.assertEqual(code, 1)
+        self.assertIn("stable did not converge", out)
+        self.assertIn("not recoverable from the channel map for: amd64, arm64", out)
+        # The rollback section is explicitly partial and never labels itself
+        # an authoritative complete rollback plan.
+        self.assertNotIn("previous stable, per-arch", out)
+        self.assertNotIn("(manual, per-arch, non-atomic)", out)
+        self.assertIn("Rollback commands (per-arch; only architectures whose original pre-release", out)
+        rollback_section = out[out.index("Rollback commands"):]
+        self.assertIn("snapcraft release nift 602 latest/stable", rollback_section)
+        self.assertIn("snapcraft release nift 605 latest/stable", rollback_section)
+        self.assertNotIn("snapcraft release nift 100 latest/stable", rollback_section)
+        self.assertNotIn("snapcraft release nift 101 latest/stable", rollback_section)
+
 
 class WorkflowStructure(unittest.TestCase):
     def load(self, path):
@@ -821,6 +877,28 @@ class WorkflowStructure(unittest.TestCase):
         self.assertNotIn("promote_command", script)
         self.assertIn("snapcraft\", \"release\"", script)
         self.assertIn("latest/stable", script)
+
+    def test_no_stale_whole_channel_promotion_wording_in_active_docs(self):
+        stale_phrases = [
+            "promotes candidate -> stable",
+            "before the promote step",
+            "candidate set is promoted",
+            "stable promotion",
+            "release/promote",
+            "before promotion",
+            "promotion is refused",
+        ]
+        active_docs = (
+            ".github/workflows/snap.yml",
+            "docs/handover/PACKAGING.md",
+            "packaging/snap-candidate-smoke.sh",
+            "packaging/snap_release.py",
+        )
+        for path in active_docs:
+            text = self.load(path)
+            for phrase in stale_phrases:
+                self.assertNotIn(phrase, text,
+                                 "stale whole-channel promotion wording '{}' in {}".format(phrase, path))
 
     def test_no_timestamp_window_selection(self):
         script = self.load("packaging/snap_release.py")
