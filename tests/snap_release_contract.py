@@ -358,6 +358,25 @@ class SnapshotAndRollback(unittest.TestCase):
         self.assertEqual(unknown, [])
         self.assertEqual(set(known), set(ARCHS))
 
+    def test_any_target_version_revision_is_not_recoverable(self):
+        # v4.0.8 recovery: stable amd64 held revision 704 at 4.0.8 while the
+        # screened target was revision 698 at 4.0.8. Revision 704 is another
+        # v4.0.8 publication, not the original pre-v4.0.8 state, so it must be
+        # classified unknown even though it differs from the selected revision.
+        expected = {"amd64": {"revision": 698, "version": "4.0.8"}}
+        previous = {"amd64": {"revision": 704, "version": "4.0.8"}}
+        known, unknown = sr.rollback_availability(previous, expected)
+        self.assertEqual(unknown, ["amd64"])
+        self.assertEqual(known, {})
+        self.assertNotIn("704", " ".join(sr.build_rollback_commands(known)))
+
+    def test_older_version_is_known_pre_release_base(self):
+        expected = {"amd64": {"revision": 698, "version": "4.0.8"}}
+        previous = {"amd64": {"revision": 678, "version": "4.0.7"}}
+        known, unknown = sr.rollback_availability(previous, expected)
+        self.assertEqual(unknown, [])
+        self.assertEqual(known["amd64"], {"revision": 678, "version": "4.0.7"})
+
 
 class Commands(unittest.TestCase):
     def test_release_command_is_positional(self):
@@ -770,6 +789,40 @@ class CoordinatorDryRun(unittest.TestCase):
         self.assertIn("snapcraft release nift 605 latest/stable", rollback_section)
         self.assertNotIn("snapcraft release nift 100 latest/stable", rollback_section)
         self.assertNotIn("snapcraft release nift 101 latest/stable", rollback_section)
+
+    def test_target_version_any_revision_resumes_toward_screened_revision(self):
+        # The v4.0.8 recovery case: stable amd64 already exposes the target
+        # version at revision 704 while the screened target is revision 698.
+        # 704 is another v4.0.8 publication, so it must be classified
+        # non-recoverable, never printed as a rollback command, and the run
+        # must still resume publication toward 698.
+        target = "4.0.8"
+        revs = {"amd64": 698, "arm64": 702, "armhf": 699, "ppc64el": 700, "riscv64": 687, "s390x": 701}
+        candidate = {"channel-map": [channel_entry(arch, rev, target, risk="candidate") for arch, rev in revs.items()]}
+        partial = [
+            channel_entry("amd64", 704, target, risk="stable"),      # wrong target-version revision
+            channel_entry("arm64", 702, target, risk="stable"),      # exact screened revision
+            channel_entry("armhf", 675, "4.0.7", risk="stable"),
+            channel_entry("ppc64el", 679, "4.0.7", risk="stable"),
+            channel_entry("riscv64", 594, "4.0.7", risk="stable"),
+            channel_entry("s390x", 668, "4.0.7", risk="stable"),     # never advances
+        ]
+        entries = candidate["channel-map"] + partial
+
+        def steady():
+            return entries
+
+        code, out = self.run_main(self.env(NIFT_SNAP_VERSION="4.0.8", NIFT_SNAP_STABLE_WAIT="1"), steady)
+        self.assertEqual(code, 1)
+        self.assertIn("not recoverable from the channel map for: amd64, arm64", out)
+        self.assertIn("DRY-RUN: snapcraft release nift 698 latest/stable", out)  # resume toward screened revision
+        rollback_section = out[out.index("Rollback commands"):]
+        self.assertIn("snapcraft release nift 675 latest/stable", rollback_section)
+        self.assertIn("snapcraft release nift 668 latest/stable", rollback_section)
+        self.assertNotIn("704 latest/stable", rollback_section)
+        self.assertNotIn("698 latest/stable", rollback_section)
+        self.assertNotIn("previous stable, per-arch", out)
+        self.assertNotIn("(manual, per-arch, non-atomic)", out)
 
 
 class WorkflowStructure(unittest.TestCase):

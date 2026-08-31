@@ -410,35 +410,41 @@ def build_rollback_commands(previous_stable, snap_name=SNAP_NAME):
 def rollback_availability(previous_stable, expected):
     """Split the pre-release snapshot into (known, unknown) rollback archs.
 
-    An architecture whose previous stable revision equals the expected target
-    revision was already advanced to the target by a prior partial publication;
-    the original pre-release revision cannot be reconstructed from the channel
-    map. Only the genuinely-known archs may be presented as an authoritative
-    rollback plan. Returns (known, unknown) where known is {arch: {"revision",
+    An architecture whose stable entry already carries the target release
+    version is not a known pre-release rollback base, whether that entry is the
+    exact selected revision or any other revision of the target version. It may
+    have been advanced by a prior partial publication of this coordinator or
+    changed manually/by another publisher; the original pre-release revision
+    cannot be reconstructed from the channel map. Only a stable entry from a
+    version different from the target version is a known pre-release rollback
+    revision. Returns (known, unknown) where known is {arch: {"revision",
     "version"}} and unknown is a sorted list of architecture names."""
     known = {}
     unknown = []
     for arch in sorted(previous_stable):
         want = expected.get(arch, {})
-        if previous_stable[arch]["revision"] == want.get("revision"):
+        prev = previous_stable[arch]
+        already_target_version = prev.get("version") == want.get("version")
+        if prev["revision"] == want.get("revision") or already_target_version:
             unknown.append(arch)
         else:
-            known[arch] = previous_stable[arch]
+            known[arch] = prev
     return known, unknown
 
 
 def print_rollback(previous_stable, expected, snap_name=SNAP_NAME):
     """Honest rollback reporting for the previous-stable snapshot.
 
-    On a pristine run every previous-stable revision differs from the target and
-    the full rollback set is authoritative. On a partial rerun, architectures
-    already at the target revision have an unknown original pre-release revision
-    and are reported explicitly rather than as a misleading complete rollback
-    plan. Never labels a mixed snapshot as an authoritative full rollback."""
+    On a pristine run no supported architecture exposes the target release
+    version yet and the full rollback set is authoritative. On a partial rerun,
+    architectures whose stable already exposes the target release version have
+    an unknown original pre-release revision and are reported explicitly rather
+    than as a misleading complete rollback plan. Never labels a mixed snapshot
+    as an authoritative full rollback."""
     known, unknown = rollback_availability(previous_stable, expected)
     if unknown:
         print("Original pre-release stable revision is not recoverable from the channel map for: "
-              "{} (already at the target revision from a prior partial publication).".format(
+              "{} (stable already exposes the target release version).".format(
                   ", ".join(unknown)))
     if known:
         print("Rollback commands (per-arch; only architectures whose original pre-release "
@@ -548,15 +554,17 @@ def main(argv=None):
     expected = {arch: {"revision": rev, "version": version} for arch, rev in selected.items()}
 
     # Distinguish a pristine previous-stable snapshot from an already-partial
-    # target state before any mutation: architectures whose previous stable
-    # revision is already the target were advanced by a prior partial
-    # publication, so their original pre-release revision is not recoverable.
-    _, already_advanced = rollback_availability(previous_stable, expected)
-    if already_advanced:
-        print("NOTE: previous stable already holds the target revision for "
+    # target state before any mutation: an architecture whose previous stable
+    # already exposes the target release version (any revision of it) has an
+    # original pre-release revision that is not recoverable from the channel
+    # map, whether it was advanced by a prior partial publication or changed
+    # manually/by another publisher.
+    _, already_target = rollback_availability(previous_stable, expected)
+    if already_target:
+        print("NOTE: previous stable already exposes the target release version for "
               "{}; those original pre-release revisions are not recoverable from the "
               "channel map. This run resumes publication and preserves those "
-              "already-correct assignments.".format(", ".join(already_advanced)))
+              "already-correct assignments.".format(", ".join(already_target)))
 
     if candidate_at_version(channel_map, archs, version) is None:
         for arch in sorted(expected):
