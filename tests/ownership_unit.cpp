@@ -239,6 +239,88 @@ int main() {
         }
     }
 
+    // 6. ensure_lock_file (shared by nift init and runtime acquisition).
+    {
+        const fs::path idir = dir / "ensure-lock";
+        fs::create_directories(idir);
+        std::string err;
+
+        // Fresh directory: creates a populated .lock.
+        CHECK("ensure_lock_file creates a populated .lock on a fresh dir",
+              ProjectOwnership::ensure_lock_file(idir, &err));
+        std::FILE* f = std::fopen((idir / ".lock").string().c_str(), "r");
+        std::string contents;
+        if (f) {
+            char buf[256];
+            std::size_t n = 0;
+            while ((n = std::fread(buf, 1, sizeof(buf), f)) > 0) contents.append(buf, n);
+            std::fclose(f);
+        }
+        CHECK("ensure_lock_file writes the exact canonical sentence",
+              contents == "Nift project lock. This persistent file is normal and does not indicate an active or failed build.\n");
+
+        // Existing non-empty .lock: preserved (identity and contents).
+        std::FILE* wf = std::fopen((idir / ".lock").string().c_str(), "w");
+        std::fprintf(wf, "custom persistent content\n");
+        std::fclose(wf);
+        CHECK("ensure_lock_file succeeds with an existing non-empty .lock",
+              ProjectOwnership::ensure_lock_file(idir, &err));
+        std::FILE* rf = std::fopen((idir / ".lock").string().c_str(), "r");
+        std::string before;
+        if (rf) {
+            char buf[256];
+            std::size_t n = 0;
+            while ((n = std::fread(buf, 1, sizeof(buf), rf)) > 0) before.append(buf, n);
+            std::fclose(rf);
+        }
+        CHECK("ensure_lock_file leaves a non-empty .lock untouched",
+              before == "custom persistent content\n");
+
+        // Existing empty .lock: repaired with the canonical sentence.
+        std::FILE* ef = std::fopen((idir / ".lock").string().c_str(), "w");
+        std::fclose(ef);
+        CHECK("ensure_lock_file repairs an existing empty .lock",
+              ProjectOwnership::ensure_lock_file(idir, &err));
+        std::FILE* rf2 = std::fopen((idir / ".lock").string().c_str(), "r");
+        std::string repaired;
+        if (rf2) {
+            char buf[256];
+            std::size_t n = 0;
+            while ((n = std::fread(buf, 1, sizeof(buf), rf2)) > 0) repaired.append(buf, n);
+            std::fclose(rf2);
+        }
+        CHECK("empty .lock is repopulated with the canonical sentence",
+              repaired == "Nift project lock. This persistent file is normal and does not indicate an active or failed build.\n");
+
+        // A directory at .lock is refused.
+        const fs::path ddir = dir / "ensure-lock-dir";
+        fs::create_directories(ddir);
+        fs::create_directories(ddir / ".lock");
+        CHECK("ensure_lock_file refuses a directory at .lock",
+              !ProjectOwnership::ensure_lock_file(ddir, &err) && !err.empty());
+
+#ifndef _WIN32
+        // A symlink at .lock is refused.
+        const fs::path sdir = dir / "ensure-lock-symlink";
+        fs::create_directories(sdir);
+        std::error_code se;
+        fs::create_symlink(idir / ".lock", sdir / ".lock", se);
+        CHECK("ensure_lock_file refuses a symlink at .lock",
+              !ProjectOwnership::ensure_lock_file(sdir, &err) && !err.empty());
+#endif
+
+        // Injected population failures refuse cleanly.
+        for (const char* seam : {"err", "partial", "flush", "size"}) {
+            const fs::path sdir2 = dir / ("ensure-lock-seam-" + std::string(seam));
+            fs::create_directories(sdir2);
+            set_test_env("NIFT_TEST_LOCK_WRITE_FAIL", seam);
+            bool refused = !ProjectOwnership::ensure_lock_file(sdir2, &err);
+            clear_test_env("NIFT_TEST_LOCK_WRITE_FAIL");
+            CHECK((std::string("ensure_lock_file refuses on injected ") + seam + " failure").c_str(),
+                  refused);
+        }
+    }
+
 #ifndef _WIN32
     // 6. Process death releases the lock; the marker survives.
     {

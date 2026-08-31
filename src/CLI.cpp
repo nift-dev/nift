@@ -550,6 +550,17 @@ bool initialise_project(const InitOptions& options) {
     const bool html_family = html_family_extension(options.extension);
 
     fs::create_directories(".nift");
+    // The persistent project-local serialization lock is part of a valid
+    // project: establish it (creating or repairing an empty file, never
+    // replacing a non-empty one) before any project configuration is written,
+    // so a failed init leaves no misleading successful project state and a
+    // fresh project is never missing its .lock. This does not create
+    // .unfinished.
+    std::string lock_error;
+    if (!ProjectOwnership::ensure_lock_file(".nift", &lock_error)) {
+        console::error("cannot initialise project: " + lock_error);
+        return false;
+    }
     fs::create_directories("content");
     fs::create_directories("templates");
     fs::create_directories(output_dir);
@@ -598,6 +609,12 @@ bool initialise_project(const InitOptions& options) {
     }
 
     if (!write_target_files(options)) return false;
+
+    // New projects ignore the runtime serialization lock through Git. The rule
+    // is scoped to .nift/.lock (never a bare *.lock or .lock), because the
+    // lock is a runtime coordination artifact, not portable project
+    // configuration.
+    if (!append_line_if_missing(".gitignore", ".nift/.lock")) return false;
 
     // The handover is part of project creation: it is written alongside the
     // other scaffold files and before the initial build, so a project created

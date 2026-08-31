@@ -55,6 +55,15 @@ public:
     // may not be present). Never creates the marker.
     static bool live_owner_exists(const std::filesystem::path& marker);
 
+    // Ensures the project-local .nift/.lock serialization file exists and, if
+    // it is empty, carries the canonical explanatory sentence. Shared by
+    // `nift init` and the runtime acquisition path so initialization and
+    // locking use one implementation. A non-empty existing .lock is left
+    // untouched (stable filesystem identity); a directory or symlink at that
+    // path is refused. On failure returns false with *error set (when
+    // non-null) and never creates .unfinished.
+    static bool ensure_lock_file(const std::filesystem::path& project_dir, std::string* error);
+
     ~ProjectOwnership();
 
     bool owned() const { return owned_; }

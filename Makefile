@@ -412,7 +412,7 @@ test: test-content test-commands test-comments test-contracts test-json \
 	test-json-schema test-console test-diagnostics test-minify \
 	test-json-schema-integration test-pagination test-pagination-ordering \
 	test-template-optional test-requirements test-path-safety test-metadata-safety \
-	test-init-targets test-control-flow test-cross-feature test-config-validation \
+	test-init-targets test-init-lock test-control-flow test-cross-feature test-config-validation \
 	test-zero-mutation test-repair-campaign test-ownership-concurrency \
 	test-progress-render $(PROGRESS_PTY_TARGET) test-snap-contract
 
@@ -552,6 +552,9 @@ test-contracts: $(TARGET)
 test-init-targets: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/init_targets_smoke.sh
 
+test-init-lock: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/init_lock_smoke.sh
+
 
 test-guarantee-registry:
 	python3 scripts/check_guarantee_registry.py
@@ -603,7 +606,7 @@ clean:
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
-.PHONY: embed go-binding csharp-binding node-binding python-binding bindings test-build-boundary test-embed test-go-binding test-csharp-binding test-node-binding test-python-binding test-bindings test-all test benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-progress-render test-progress-pty test-snap-contract test-diagnostics test-minify test-json-schema-integration test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke test-host-seam benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets install uninstall
+.PHONY: embed go-binding csharp-binding node-binding python-binding bindings test-build-boundary test-embed test-go-binding test-csharp-binding test-node-binding test-python-binding test-bindings test-all test benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-progress-render test-progress-pty test-snap-contract test-diagnostics test-minify test-json-schema-integration test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke test-host-seam benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets test-init-lock install uninstall
 
 
 test-cross-feature: $(TARGET)

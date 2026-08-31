@@ -230,8 +230,11 @@ bool populate_lock_if_empty(void* file, const std::filesystem::path& path) {
     LARGE_INTEGER size{};
     if (!GetFileSizeEx(static_cast<HANDLE>(file), &size) || size.QuadPart != 0) return true;
     const char* seam = std::getenv("NIFT_TEST_LOCK_WRITE_FAIL");
-    const bool seam_error = seam && *seam && std::strcmp(seam, "partial") != 0;
+    const bool seam_error = seam && *seam && std::strcmp(seam, "partial") != 0 &&
+                            std::strcmp(seam, "flush") != 0 && std::strcmp(seam, "size") != 0;
     const bool seam_partial = seam && std::strcmp(seam, "partial") == 0;
+    const bool seam_flush = seam && std::strcmp(seam, "flush") == 0;
+    const bool seam_size = seam && std::strcmp(seam, "size") == 0;
     if (seam_error) return false;
     const std::size_t len = std::strlen(lock_explanation);
     DWORD total = static_cast<DWORD>(seam_partial ? len / 2 : len);
@@ -241,7 +244,9 @@ bool populate_lock_if_empty(void* file, const std::filesystem::path& path) {
         return false;
     if (written != total) return false;
     if (seam_partial) return false; // simulated partial write, then failure
+    if (seam_flush) return false;   // simulated flush failure
     if (!FlushFileBuffers(static_cast<HANDLE>(file))) return false;
+    if (seam_size) return false;    // simulated final-size-verification failure
     if (!GetFileSizeEx(static_cast<HANDLE>(file), &size) ||
         size.QuadPart != static_cast<LONGLONG>(len)) return false;
     return true;
@@ -250,8 +255,11 @@ bool populate_lock_if_empty(void* file, const std::filesystem::path& path) {
     struct stat st;
     if (::fstat(fd, &st) != 0 || st.st_size != 0) return true;
     const char* seam = std::getenv("NIFT_TEST_LOCK_WRITE_FAIL");
-    const bool seam_error = seam && *seam && std::strcmp(seam, "partial") != 0;
+    const bool seam_error = seam && *seam && std::strcmp(seam, "partial") != 0 &&
+                            std::strcmp(seam, "flush") != 0 && std::strcmp(seam, "size") != 0;
     const bool seam_partial = seam && std::strcmp(seam, "partial") == 0;
+    const bool seam_flush = seam && std::strcmp(seam, "flush") == 0;
+    const bool seam_size = seam && std::strcmp(seam, "size") == 0;
     if (seam_error) return false;
     const std::size_t len = std::strlen(lock_explanation);
     if (::lseek(fd, 0, SEEK_SET) < 0) return false;
@@ -267,7 +275,9 @@ bool populate_lock_if_empty(void* file, const std::filesystem::path& path) {
         remaining -= static_cast<std::size_t>(n);
     }
     if (seam_partial) return false; // simulated partial write, then failure
+    if (seam_flush) return false;   // simulated flush failure
     if (::fsync(fd) != 0) return false;
+    if (seam_size) return false;    // simulated final-size-verification failure
     if (::fstat(fd, &st) != 0 || st.st_size != static_cast<off_t>(len)) return false;
     durable_sync_parent(path);
     return true;
@@ -313,6 +323,45 @@ static void test_hold_after_acquire() {
 }
 
 } // namespace
+
+bool ProjectOwnership::ensure_lock_file(const std::filesystem::path& project_dir, std::string* error) {
+    std::error_code ec;
+    const std::filesystem::path lock = project_dir / ".lock";
+    const bool exists = std::filesystem::exists(lock, ec);
+    if (ec) {
+        if (error) *error = "cannot inspect .nift/.lock: " + ec.message();
+        return false;
+    }
+    if (exists) {
+        const bool symlink = std::filesystem::is_symlink(lock, ec);
+        if (ec) {
+            if (error) *error = "cannot inspect .nift/.lock: " + ec.message();
+            return false;
+        }
+        const bool regular = std::filesystem::is_regular_file(lock, ec);
+        if (ec) {
+            if (error) *error = "cannot inspect .nift/.lock: " + ec.message();
+            return false;
+        }
+        if (symlink || !regular) {
+            if (error) *error =
+                ".nift/.lock exists but is not a regular file (a symlink or directory); refusing to initialise";
+            return false;
+        }
+    }
+    void* file = nullptr;
+    if (!open_create_lock(lock, file)) {
+        if (error) *error = "cannot open .nift/.lock for writing";
+        return false;
+    }
+    const bool ok = populate_lock_if_empty(file, lock);
+    close_file(file);
+    if (!ok) {
+        if (error) *error = "cannot write .nift/.lock";
+        return false;
+    }
+    return true;
+}
 
 ProjectOwnership::ProjectOwnership(std::filesystem::path marker)
     : marker_(std::move(marker)) {}
