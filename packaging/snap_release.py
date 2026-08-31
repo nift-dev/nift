@@ -7,15 +7,24 @@ platforms to latest/edge. This coordinator is the sole publisher: it waits for
 every supported architecture to reach the tagged version on latest/edge,
 releases exactly those edge revisions to latest/candidate, verifies the complete
 six-architecture candidate set with no unsupported entries, runs the amd64
-candidate confinement smoke, promotes the set to latest/stable, and verifies
-stable. GitHub-built snaps are never uploaded to the Store during ordinary
-release runs.
+candidate confinement smoke, then revalidates candidate and releases each
+selected revision explicitly to latest/stable (never whole-channel `snapcraft
+promote`), and verifies stable. GitHub-built snaps are never uploaded to the
+Store during ordinary release runs.
+
+Whole-channel `snapcraft promote` is deliberately not used: its completeness
+policy requires the entire set of ever-released store architectures, which
+includes the historical i386 entry that Nift no longer declares or builds.
+Snapcraft offers no supported atomic multi-architecture release API that can
+exclude a legacy architecture, so the coordinator releases each selected
+candidate revision to latest/stable directly. Per-revision releases are
+idempotent: a rerun preserves already-correct stable assignments and resumes a
+partial publication safely.
 
 Legacy channel entries outside the declared platform set (e.g. i386 at an old
-version) are ignored and reported in edge and stable, and never promoted,
-replaced or closed. In candidate they are a fail-closed condition: `snapcraft
-promote` moves the whole candidate build set, so an unsupported candidate entry
-would be promoted alongside the supported six.
+version) are ignored and reported in edge and stable, and never released,
+promoted, replaced or closed. In candidate they are a fail-closed condition,
+because the strict candidate set is the exact source for the stable releases.
 
 The decision logic is pure and importable for offline tests; running this module
 executes the real Store transaction (unless --dry-run is given).
@@ -25,7 +34,7 @@ Environment:
   NIFT_SNAP_VERSION           release version to coordinate (no leading 'v')
   NIFT_SNAP_WAIT              seconds to wait for edge builds to reach the
                               version (default 7200)
-  SNAPCRAFT_STORE_CREDENTIALS required for any release/promote operation
+  SNAPCRAFT_STORE_CREDENTIALS required for any release operation
 """
 
 import datetime
@@ -215,13 +224,13 @@ def verify_channel(channel_map, risk, expected, track="latest"):
 
 
 def verify_candidate_strict(channel_map, expected, supported):
-    """Strict latest/candidate verification for the promote source.
+    """Strict latest/candidate verification for the stable-release source.
 
-    Unlike edge/stable, legacy entries cannot be tolerated here: `snapcraft
-    promote` moves the entire candidate build set, so an unsupported entry in
-    candidate would be promoted alongside the supported six. Returns
-    (ok, problems); the coordinator fails closed and never auto-removes legacy
-    candidate entries.
+    Unlike edge/stable, legacy entries cannot be tolerated here: the strict
+    candidate set is the exact source the coordinator releases to stable, so an
+    unsupported candidate entry means the source set is not the expected one.
+    Returns (ok, problems); the coordinator fails closed and never auto-removes
+    legacy candidate entries.
     """
     problems = []
     seen = {}
@@ -258,9 +267,9 @@ def candidate_convergence(channel_map, expected, archs):
     """State of the latest/candidate stage.
 
     Returns (ok, retryable, problems). Unsupported, malformed or duplicate
-    candidate entries are fatal (never retried): `snapcraft promote` moves the
-    whole build set. Missing or stale expected revisions are retryable while the
-    Store channel map converges."""
+    candidate entries are fatal (never retried): the strict candidate set is the
+    exact source for the explicit per-revision stable releases. Missing or stale
+    expected revisions are retryable while the Store channel map converges."""
     ok, problems = verify_candidate_strict(channel_map, expected, archs)
     if ok:
         return True, False, []
@@ -402,8 +411,15 @@ def release_command(revision, snap_name=SNAP_NAME):
     return ["snapcraft", "release", snap_name, str(revision), "latest/candidate"]
 
 
-def promote_command(snap_name=SNAP_NAME):
-    return ["snapcraft", "promote", snap_name, "--from-channel=latest/candidate", "--to-channel=latest/stable", "--yes"]
+def stable_release_command(revision, snap_name=SNAP_NAME):
+    """Explicit per-revision stable release (idempotent, never whole-channel promote).
+
+    `snapcraft promote` applies a completeness policy over the entire set of
+    ever-released store architectures, which includes the historical i386 entry
+    Nift no longer declares. Releasing each selected candidate revision directly
+    to latest/stable is the supported way to promote exactly the six declared
+    architectures while leaving i386 untouched."""
+    return ["snapcraft", "release", snap_name, str(revision), "latest/stable"]
 
 
 def smoke_command(version, amd64_revision):
@@ -507,12 +523,43 @@ def main(argv=None):
     report_legacy(channel_map, "candidate", archs)
 
     if run_snapcraft(smoke_command(version, expected["amd64"]["revision"]), dry_run) != 0:
-        print("FAIL: candidate confinement smoke failed; stable not promoted", file=sys.stderr)
+        print("FAIL: candidate confinement smoke failed; stable not released", file=sys.stderr)
         return 1
 
-    if run_snapcraft(promote_command(), dry_run) != 0:
-        print("FAIL: promote candidate -> stable", file=sys.stderr)
+    # Revalidate candidate immediately before any stable mutation. The candidate
+    # smoke above is the release gate; this strict revalidation confirms the
+    # exact selected revisions are still the candidate set at release time.
+    try:
+        channel_map = fetch_channel_map()
+    except (OSError, RuntimeError) as exc:
+        print("FAIL: could not query the Snap Store before stable release: {}".format(exc), file=sys.stderr)
         return 1
+    ok, problems = verify_candidate_strict(channel_map, expected, archs)
+    if not ok:
+        print("FAIL: candidate revalidation before stable release:\n  " + "\n  ".join(problems), file=sys.stderr)
+        print("No stable mutation performed.", file=sys.stderr)
+        return 1
+
+    # Release each selected revision explicitly to latest/stable. Whole-channel
+    # `snapcraft promote` is not used: its completeness policy requires the
+    # historical i386 store entry that Nift no longer declares. Per-revision
+    # releases are idempotent, so a rerun preserves already-correct stable
+    # assignments and resumes a partial publication safely.
+    released = []
+    for arch in sorted(expected):
+        if run_snapcraft(stable_release_command(expected[arch]["revision"]), dry_run) != 0:
+            print("FAIL: stable publication is PARTIAL after {}/{} architectures:".format(
+                len(released), len(expected)), file=sys.stderr)
+            for done_arch in sorted(released):
+                print("  {} -> revision {} at latest/stable (correct, preserved on rerun)".format(
+                    done_arch, expected[done_arch]["revision"]), file=sys.stderr)
+            print("  Pending (safe to rerun; per-revision releases are idempotent): "
+                  "{}".format(", ".join(a for a in sorted(expected) if a not in released)), file=sys.stderr)
+            print("Rollback commands (manual, per-arch, non-atomic):")
+            for command in build_rollback_commands(previous_stable):
+                print("  " + command)
+            return 1
+        released.append(arch)
 
     # Poll stable until it converges on the exact six-revision set. Malformed or
     # duplicate supported entries fail immediately; missing/stale revisions are

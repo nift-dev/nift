@@ -119,21 +119,31 @@ The release-coordination job then:
    on unbranched `latest/edge`;
 2. releases those exact edge revisions to `latest/candidate`;
 3. verifies candidate contains exactly those six revisions at the release
-   version with no unsupported entries (legacy entries in candidate fail closed
-   before promotion because `snapcraft promote` moves the whole build set);
+   version with no unsupported entries (legacy entries in candidate fail
+   closed);
 4. runs the amd64 candidate confinement smoke (see below);
-5. promotes the verified candidate build set to `latest/stable`;
+5. revalidates candidate, then releases each selected revision explicitly to
+   `latest/stable` with `snapcraft release nift <revision> latest/stable`;
 6. verifies stable contains those six exact revisions.
+
+Whole-channel `snapcraft promote` is deliberately not used: its completeness
+policy requires the entire set of ever-released store architectures, which
+includes the historical `i386` entry that Nift no longer declares or builds.
+There is no supported atomic multi-architecture release API that can exclude a
+legacy architecture, so the coordinator uses per-revision releases instead.
+Per-revision releases are idempotent: a rerun preserves already-correct stable
+assignments and safely resumes a partial publication. A failed release reports
+exactly which architectures advanced to stable and which are pending.
 
 Before any candidate work, the coordinator requires a complete rollback
 snapshot: every supported architecture must already have a previous
-`latest/stable` revision, or promotion is refused.
+`latest/stable` revision, or publication is refused.
 
 Legacy `i386` is not declared because the current core24/Launchpad
 supported-architecture list no longer includes it. Legacy i386 channel entries
-in edge and stable are ignored and reported; in candidate they abort promotion
-for manual inspection. They are never promoted, replaced or closed by this
-workflow.
+in edge and stable are ignored and reported; in candidate they abort
+publication for manual inspection. They are never released, promoted, replaced
+or closed by this workflow.
 
 Configure the GitHub Actions secret `SNAPCRAFT_STORE_CREDENTIALS` with a scoped
 Snap Store login/export credential. A tag release fails closed if the credential

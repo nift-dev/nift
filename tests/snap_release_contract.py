@@ -7,11 +7,12 @@ channel-map schema (architecture inside channel, released-at spelling, branch
 omitted when unbranched); the required fields=channel-map,revision,version
 request; rejection of an API error-list and of entries lacking revision/version;
 entry validation; polling while an edge architecture lags; legacy i386 ignored
-and reported in edge/stable but fail-closed in candidate; exact edge revision
-numbers carried through candidate and stable; a complete rollback snapshot
-before promotion; candidate staging and confinement smoke ordered before
-promotion; the exact promote --yes invocation; positional rollback syntax; no
-duplicate publisher targeting unbranched edge; literal YAML shell expressions
+    and reported in edge/stable but fail-closed in candidate; exact edge revision
+    numbers carried through candidate and stable; a complete rollback snapshot
+    before any candidate mutation; candidate staging and confinement smoke ordered
+    before any stable mutation; the exact per-revision stable release invocation
+    (whole-channel promote never used); positional rollback syntax; no
+    duplicate publisher targeting unbranched edge; literal YAML shell expressions
 rejected; the actual immutable Snapcraft pin with post-install assertions; sudo
 candidate install/cleanup; and missing publishing credentials failing rather
 than skipping. No network access and no Store operations are performed.
@@ -338,10 +339,10 @@ class Commands(unittest.TestCase):
     def test_release_command_is_positional(self):
         self.assertEqual(sr.release_command(42), ["snapcraft", "release", "nift", "42", "latest/candidate"])
 
-    def test_promote_command_uses_yes(self):
+    def test_stable_release_command_is_per_revision(self):
         self.assertEqual(
-            sr.promote_command(),
-            ["snapcraft", "promote", "nift", "--from-channel=latest/candidate", "--to-channel=latest/stable", "--yes"],
+            sr.stable_release_command(42),
+            ["snapcraft", "release", "nift", "42", "latest/stable"],
         )
 
     def test_smoke_command(self):
@@ -416,7 +417,10 @@ class CoordinatorDryRun(unittest.TestCase):
         self.assertEqual(code, 0, out)
         self.assertIn("DRY-RUN: snapcraft release nift 100 latest/candidate", out)
         self.assertIn("DRY-RUN: bash packaging/snap-candidate-smoke.sh", out)
-        self.assertIn("DRY-RUN: snapcraft promote nift --from-channel=latest/candidate --to-channel=latest/stable --yes", out)
+        self.assertNotIn("DRY-RUN: snapcraft promote", out)
+        revs = revision_numbers()
+        for arch in ARCHS:
+            self.assertIn("DRY-RUN: snapcraft release nift {} latest/stable".format(revs[arch]), out)
         self.assertIn("Stable verified", out)
 
     def test_legacy_candidate_never_promoted(self):
@@ -428,6 +432,39 @@ class CoordinatorDryRun(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("unsupported candidate entry i386", out)
         self.assertNotIn("DRY-RUN: snapcraft promote", out)
+        self.assertNotIn("latest/stable", out)
+
+    def test_legacy_i386_ignored_while_six_reach_stable(self):
+        revs = revision_numbers()
+        prev = revision_numbers(offset=500)
+        prev_stable = stable_map(prev, "4.0.8")
+        prev_stable["channel-map"].append(channel_entry("i386", 11, "3.0.3", risk="stable"))
+        edge_complete = edge_map_at(VERSION, revs)
+        edge_complete["channel-map"].append(channel_entry("i386", 11, "3.0.3", risk="edge"))
+        candidate = candidate_map(revs)
+        stable_new = stable_map(revs, VERSION)
+        stable_new["channel-map"].append(channel_entry("i386", 11, "3.0.3", risk="stable"))
+
+        def combine(*maps):
+            entries = []
+            for m in maps:
+                entries.extend(m["channel-map"])
+            return entries
+
+        states = [
+            combine(edge_complete, prev_stable),
+            combine(edge_complete, prev_stable),
+            combine(candidate, prev_stable),
+            combine(candidate, stable_new),
+        ]
+        code, out = self.run_main(self.env(), self.stateful_fetch(states))
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("DRY-RUN: snapcraft promote", out)
+        for arch in ARCHS:
+            self.assertIn("DRY-RUN: snapcraft release nift {} latest/stable".format(revs[arch]), out)
+        self.assertNotIn("DRY-RUN: snapcraft release nift 11 latest/stable", out)
+        self.assertIn("i386", out)  # reported as legacy, never released
+        self.assertIn("Stable verified", out)
 
     def test_incomplete_rollback_snapshot_refuses_promotion(self):
         revs = revision_numbers()
@@ -613,7 +650,8 @@ class CoordinatorDryRun(unittest.TestCase):
         ]
         code, out = self.run_main(self.env(NIFT_SNAP_CANDIDATE_WAIT="2"), self.stateful_fetch(states))
         self.assertEqual(code, 0, out)
-        self.assertIn("DRY-RUN: snapcraft promote", out)
+        self.assertIn("DRY-RUN: snapcraft release nift 100 latest/stable", out)
+        self.assertNotIn("DRY-RUN: snapcraft promote", out)
         self.assertIn("Stable verified", out)
 
     def test_candidate_timeout_prevents_smoke_and_promotion(self):
@@ -635,6 +673,7 @@ class CoordinatorDryRun(unittest.TestCase):
         self.assertIn("candidate did not converge", out)
         self.assertNotIn("DRY-RUN: bash packaging/snap-candidate-smoke.sh", out)
         self.assertNotIn("DRY-RUN: snapcraft promote", out)
+        self.assertNotIn("latest/stable", out)
 
     def test_delayed_stable_converges(self):
         prev_stable, edge_waiting, edge_complete, candidate, stable = self.base_states()
@@ -770,11 +809,18 @@ class WorkflowStructure(unittest.TestCase):
     def test_release_coordination_depends_on_toolchain_preflight(self):
         self.assertIn("needs: [build, toolchain-preflight]", self.load(".github/workflows/snap.yml"))
 
-    def test_candidate_smoke_ordered_before_promotion(self):
+    def test_candidate_smoke_ordered_before_stable_release(self):
         script = self.load("packaging/snap_release.py")
         smoke = script.index("snap-candidate-smoke.sh")
-        promote = script.index("promote_command()")
-        self.assertLess(smoke, promote)
+        release = script.index("stable_release_command(expected")
+        self.assertLess(smoke, release)
+
+    def test_no_whole_channel_promote(self):
+        script = self.load("packaging/snap_release.py")
+        self.assertNotIn("snapcraft\", \"promote\"", script)
+        self.assertNotIn("promote_command", script)
+        self.assertIn("snapcraft\", \"release\"", script)
+        self.assertIn("latest/stable", script)
 
     def test_no_timestamp_window_selection(self):
         script = self.load("packaging/snap_release.py")
