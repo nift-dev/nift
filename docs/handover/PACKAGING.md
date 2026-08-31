@@ -111,23 +111,29 @@ claim pre-emptively.
 the GitHub release succeeds; on that release path it requires the recipe version
 to match the tag. GitHub-hosted runners build amd64 and arm64 strictly as
 non-publishing validation. The connected Snap Store/Launchpad build service is
-the sole producer of published revisions: it reads the `platforms:` build plan
-and publishes one revision per supported architecture into `latest/edge` on each
-tag push. The release-coordination job then:
+the sole producer of published revisions: it publishes repository builds for the
+six declared platforms (`snap/snapcraft.yaml` `platforms:`) to `latest/edge`.
+The release-coordination job then:
 
 1. waits for all six declared architectures to reach the exact release version
    on unbranched `latest/edge`;
 2. releases those exact edge revisions to `latest/candidate`;
 3. verifies candidate contains exactly those six revisions at the release
-   version;
+   version with no unsupported entries (legacy entries in candidate fail closed
+   before promotion because `snapcraft promote` moves the whole build set);
 4. runs the amd64 candidate confinement smoke (see below);
 5. promotes the verified candidate build set to `latest/stable`;
 6. verifies stable contains those six exact revisions.
 
+Before any candidate work, the coordinator requires a complete rollback
+snapshot: every supported architecture must already have a previous
+`latest/stable` revision, or promotion is refused.
+
 Legacy `i386` is not declared because the current core24/Launchpad
-supported-architecture list no longer includes it; any legacy i386 channel
-entries are ignored and reported, and are never promoted, replaced or closed by
-this workflow.
+supported-architecture list no longer includes it. Legacy i386 channel entries
+in edge and stable are ignored and reported; in candidate they abort promotion
+for manual inspection. They are never promoted, replaced or closed by this
+workflow.
 
 Configure the GitHub Actions secret `SNAPCRAFT_STORE_CREDENTIALS` with a scoped
 Snap Store login/export credential. A tag release fails closed if the credential
@@ -135,9 +141,10 @@ is absent; it never skips publication and reports success. Treat credential
 rotation, store ownership and channel promotion as external state that must be
 checked in the Snap Store.
 
-The coordinator installs a pinned Snapcraft snap revision (`SNAPCRAFT_SNAP_REVISION`
-in `snap.yml`), not a floating channel, and reports the installed Snapcraft
-version and revision in the job log. `packaging/snap_release.py` is the single
+The coordinator installs a specific immutable Snapcraft snap revision
+(`SNAPCRAFT_SNAP_REVISION` and `SNAPCRAFT_EXPECTED_VERSION` in `snap.yml`) via
+`snap install --revision`, then asserts both the installed Snapcraft version and
+revision before proceeding. `packaging/snap_release.py` is the single
 publication entry point and can be rehearsed with `--dry-run`.
 
 Before the candidate set is promoted to stable, `packaging/snap-candidate-smoke.sh`
@@ -359,23 +366,27 @@ evidence for the release report.
 ### 3. Publish and verify Snap
 
 1. The connected Snap Store/Launchpad build service is the sole producer of
-   published Snap revisions; it points at `nift-dev/nift` and builds every
-   declared platform (amd64, arm64, armhf, ppc64el, riscv64, s390x) into
-   `latest/edge` on the release tag. GitHub-hosted amd64/arm64 builds are
-   non-publishing validation only.
+   published Snap revisions; it points at `nift-dev/nift` and publishes builds
+   for every declared platform (amd64, arm64, armhf, ppc64el, riscv64, s390x)
+   to `latest/edge`. GitHub-hosted amd64/arm64 builds are non-publishing
+   validation only.
 2. The tag-triggered `release-coordination` job in `snap.yml` waits for every
    supported architecture to reach the exact release version on unbranched
    `latest/edge`, releases exactly those revisions to `latest/candidate`,
-   verifies the complete candidate set, runs the amd64 candidate confinement
-   smoke, promotes candidate to stable, and verifies stable. Legacy i386 is not
-   a supported core24/Launchpad target; it is ignored and reported, never
-   promoted, replaced or closed.
+   verifies the complete candidate set (no unsupported entries), runs the amd64
+   candidate confinement smoke, promotes candidate to stable, and verifies
+   stable. A complete previous-stable rollback snapshot for all six
+   architectures is required before promotion. Legacy i386 is not a supported
+   core24/Launchpad target: it is ignored and reported in edge and stable, and
+   aborts candidate promotion for manual inspection rather than being promoted,
+   replaced or closed.
 3. `riscv64` may take substantially longer than the other builders; the
    coordinator waits (default 2 h) and fails closed on timeout rather than
    promoting a partial set.
 4. Ensure `SNAPCRAFT_STORE_CREDENTIALS` is configured; a tag release fails
-   closed without it. The pinned `SNAPCRAFT_SNAP_REVISION` in `snap.yml` must be
-   a validated, immutable Snapcraft snap revision.
+   closed without it. `SNAPCRAFT_SNAP_REVISION`/`SNAPCRAFT_EXPECTED_VERSION` in
+   `snap.yml` pin a specific immutable Snapcraft snap revision, and the job
+   asserts the installed version and revision.
 5. Promotion is explicit and approved only after the candidate smoke passes.
    Confirm `snap info nift` reports `X.Y.Z` on `latest/stable` for every
    supported architecture and perform a fresh store install.

@@ -2,23 +2,27 @@
 """Snap release coordinator for the nift snap.
 
 The Snapcraft/Launchpad build service connected to the GitHub repository reads
-snap/snapcraft.yaml and publishes one build per declared platform into
-latest/edge on each tag push. This coordinator is the sole publisher: it waits
-for every supported architecture to reach the tagged version on latest/edge,
+snap/snapcraft.yaml and publishes repository builds for the six declared
+platforms to latest/edge. This coordinator is the sole publisher: it waits for
+every supported architecture to reach the tagged version on latest/edge,
 releases exactly those edge revisions to latest/candidate, verifies the complete
-six-architecture candidate set, runs the candidate confinement smoke on amd64,
-promotes the set to latest/stable, and verifies stable. GitHub-built snaps are
-never uploaded to the Store during ordinary tag releases.
+six-architecture candidate set with no unsupported entries, runs the amd64
+candidate confinement smoke, promotes the set to latest/stable, and verifies
+stable. GitHub-built snaps are never uploaded to the Store during ordinary
+release runs.
 
 Legacy channel entries outside the declared platform set (e.g. i386 at an old
-version) are ignored and reported, never promoted, replaced or closed.
+version) are ignored and reported in edge and stable, and never promoted,
+replaced or closed. In candidate they are a fail-closed condition: `snapcraft
+promote` moves the whole candidate build set, so an unsupported candidate entry
+would be promoted alongside the supported six.
 
 The decision logic is pure and importable for offline tests; running this module
 executes the real Store transaction (unless --dry-run is given).
 
 Environment:
   SNAP_NAME                   snap name (default: nift)
-  NIFT_SNAP_VERSION           tag version to release (no leading 'v')
+  NIFT_SNAP_VERSION           release version to coordinate (no leading 'v')
   NIFT_SNAP_WAIT              seconds to wait for edge builds to reach the
                               version (default 7200)
   SNAPCRAFT_STORE_CREDENTIALS required for any release/promote operation
@@ -76,7 +80,9 @@ def parse_channel_map_response(payload):
 
 
 def fetch_channel_map(snap_name=SNAP_NAME):
-    url = "{}/{}?fields=channel-map".format(STORE_API, snap_name)
+    # The parser needs the top-level revision and version, so both fields must
+    # be requested explicitly; fields=channel-map alone omits them.
+    url = "{}/{}?fields=channel-map,revision,version".format(STORE_API, snap_name)
     # The v2 info endpoint requires the Snap-Device-Series header.
     req = urllib.request.Request(
         url, headers={"Snap-Device-Series": "16", "User-Agent": "nift-release-coordinator/1"}
@@ -86,12 +92,36 @@ def fetch_channel_map(snap_name=SNAP_NAME):
     return parse_channel_map_response(payload)
 
 
+def entry_problem(entry):
+    """Validate one channel-map entry. Returns a problem string or None.
+
+    Every selected entry must carry a non-empty architecture, channel
+    track/risk, a positive integer revision and a non-empty version. Entries
+    returned by fields=channel-map alone lack revision/version and are
+    therefore malformed rather than "still building".
+    """
+    ch = entry.get("channel") or {}
+    arch = ch.get("architecture")
+    if not isinstance(arch, str) or not arch:
+        return "entry missing a non-empty channel architecture"
+    if not isinstance(ch.get("track"), str) or not ch.get("track"):
+        return "entry for {} missing channel track".format(arch)
+    if not isinstance(ch.get("risk"), str) or not ch.get("risk"):
+        return "entry for {} missing channel risk".format(arch)
+    revision = entry.get("revision")
+    if not isinstance(revision, int) or revision <= 0:
+        return "entry for {} revision is not a positive integer: {!r}".format(arch, revision)
+    version = entry.get("version")
+    if not isinstance(version, str) or not version:
+        return "entry for {} version is not a non-empty string: {!r}".format(arch, version)
+    return None
+
+
 def channel_entries(channel_map, track, risk):
     """(architecture, revision, version) for unbranched track/risk entries.
 
     Matches the real v2 channel-map schema: architecture lives inside `channel`,
-    and revision/version are top-level. A missing or null branch means the
-    channel is unbranched.
+    revision/version are top-level, and unbranched responses omit `branch`.
     """
     out = []
     for entry in channel_map:
@@ -105,23 +135,38 @@ def channel_entries(channel_map, track, risk):
 def select_edge_revisions(channel_map, version, archs):
     """State of the unbranched latest/edge build set.
 
-    Returns (selected, waiting, duplicates, legacy):
+    Returns (selected, waiting, duplicates, legacy, malformed):
       selected    {arch: revision} for archs already at `version`
       waiting     archs still missing from edge or on an older version
       duplicates  archs with more than one edge entry (fail-closed condition)
       legacy      (arch, revision, version) entries outside the declared set
+      malformed   (arch, problem) entries for supported archs that fail
+                  validation (fail-closed condition, never "waiting")
     """
     by_arch = {}
     legacy = []
-    for arch, rev, ver in channel_entries(channel_map, "latest", "edge"):
+    malformed = []
+    malformed_archs = set()
+    for entry in channel_map:
+        ch = entry.get("channel") or {}
+        arch = ch.get("architecture")
+        if ch.get("track") != "latest" or ch.get("risk") != "edge" or ch.get("branch") not in (None, ""):
+            continue
         if arch in archs:
-            by_arch.setdefault(arch, []).append((rev, ver))
+            problem = entry_problem(entry)
+            if problem:
+                malformed.append((arch, problem))
+                malformed_archs.add(arch)
+                continue
+            by_arch.setdefault(arch, []).append((entry.get("revision"), entry.get("version")))
         else:
-            legacy.append((arch, rev, ver))
+            legacy.append((arch, entry.get("revision"), entry.get("version")))
     selected = {}
     waiting = []
     duplicates = []
     for arch in sorted(archs):
+        if arch in malformed_archs:
+            continue  # reported as malformed; never treated as still building
         got = by_arch.get(arch, [])
         if not got:
             waiting.append(arch)
@@ -133,7 +178,7 @@ def select_edge_revisions(channel_map, version, archs):
                 selected[arch] = rev
             else:
                 waiting.append(arch)
-    return selected, waiting, duplicates, legacy
+    return selected, waiting, duplicates, legacy, malformed
 
 
 def verify_channel(channel_map, risk, expected, track="latest"):
@@ -145,9 +190,15 @@ def verify_channel(channel_map, risk, expected, track="latest"):
     """
     problems = []
     by_arch = {}
-    for arch, rev, ver in channel_entries(channel_map, track, risk):
-        if arch in expected:
-            by_arch.setdefault(arch, []).append((rev, ver))
+    for entry in channel_map:
+        ch = entry.get("channel") or {}
+        arch = ch.get("architecture")
+        if ch.get("track") == track and ch.get("risk") == risk and ch.get("branch") in (None, "") and arch in expected:
+            problem = entry_problem(entry)
+            if problem:
+                problems.append("{} {} malformed: {}".format(arch, risk, problem))
+                continue
+            by_arch.setdefault(arch, []).append((entry.get("revision"), entry.get("version")))
     for arch, want in sorted(expected.items()):
         got = by_arch.get(arch, [])
         if not got:
@@ -161,6 +212,51 @@ def verify_channel(channel_map, risk, expected, track="latest"):
             if ver != want["version"]:
                 problems.append("{} {} version {} != expected {}".format(arch, risk, ver, want["version"]))
     return (not problems, problems)
+
+
+def verify_candidate_strict(channel_map, expected, supported):
+    """Strict latest/candidate verification for the promote source.
+
+    Unlike edge/stable, legacy entries cannot be tolerated here: `snapcraft
+    promote` moves the entire candidate build set, so an unsupported entry in
+    candidate would be promoted alongside the supported six. Returns
+    (ok, problems); the coordinator fails closed and never auto-removes legacy
+    candidate entries.
+    """
+    problems = []
+    seen = {}
+    for entry in channel_map:
+        ch = entry.get("channel") or {}
+        arch = ch.get("architecture")
+        if ch.get("track") != "latest" or ch.get("risk") != "candidate" or ch.get("branch") not in (None, ""):
+            continue
+        if arch not in supported:
+            problems.append("unsupported candidate entry {} revision {} version {}".format(
+                arch, entry.get("revision"), entry.get("version")))
+            continue
+        problem = entry_problem(entry)
+        if problem:
+            problems.append("candidate {} malformed: {}".format(arch, problem))
+            continue
+        seen.setdefault(arch, []).append((entry.get("revision"), entry.get("version")))
+    for arch, want in sorted(expected.items()):
+        got = seen.get(arch, [])
+        if not got:
+            problems.append("missing candidate entry for {}".format(arch))
+        elif len(got) > 1:
+            problems.append("duplicate candidate entries for {}".format(arch))
+        else:
+            rev, ver = got[0]
+            if rev != want["revision"]:
+                problems.append("candidate {} revision {} != expected {}".format(arch, rev, want["revision"]))
+            if ver != want["version"]:
+                problems.append("candidate {} version {} != expected {}".format(arch, ver, want["version"]))
+    return (not problems, problems)
+
+
+def missing_rollback_archs(previous_stable, archs):
+    """Architectures lacking a previous stable revision (rollback snapshot)."""
+    return sorted(arch for arch in archs if arch not in previous_stable)
 
 
 def legacy_entries(channel_map, risk, supported, track="latest"):
@@ -263,6 +359,15 @@ def main(argv=None):
         return 1
     previous_stable = snapshot_stable(channel_map, archs)
 
+    # A complete rollback snapshot is required: every supported architecture
+    # must already have a previous stable revision or promotion is refused.
+    missing_rollback = missing_rollback_archs(previous_stable, archs)
+    if missing_rollback:
+        print("FAIL: no previous stable revision for archs: {}; refusing promotion "
+              "(no approved first-release exception in place)".format(", ".join(missing_rollback)),
+              file=sys.stderr)
+        return 1
+
     selected = candidate_at_version(channel_map, archs, version)
     if selected is None:
         deadline = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=wait_seconds)
@@ -273,9 +378,14 @@ def main(argv=None):
                 print("FAIL: could not query the Snap Store: {}".format(exc), file=sys.stderr)
                 return 1
             report_legacy(channel_map, "edge", archs)
-            sel, waiting, duplicates, legacy = select_edge_revisions(channel_map, version, archs)
+            sel, waiting, duplicates, legacy, malformed = select_edge_revisions(channel_map, version, archs)
             if duplicates:
                 print("FAIL: duplicate latest/edge entries for archs: {}".format(", ".join(duplicates)), file=sys.stderr)
+                return 1
+            if malformed:
+                print("FAIL: malformed latest/edge entries for supported archs:", file=sys.stderr)
+                for arch, problem in malformed:
+                    print("  {}: {}".format(arch, problem), file=sys.stderr)
                 return 1
             if not waiting:
                 selected = sel
@@ -296,9 +406,16 @@ def main(argv=None):
 
     channel_map = fetch_channel_map()
     report_legacy(channel_map, "candidate", archs)
-    ok, problems = verify_channel(channel_map, "candidate", expected)
+    # Strict candidate verification: exactly the six declared architectures, no
+    # unsupported entries, exact selected revisions, exact version, unbranched
+    # latest/candidate. Legacy entries in candidate must fail closed before
+    # promotion; they are never auto-removed.
+    ok, problems = verify_candidate_strict(channel_map, expected, archs)
     if not ok:
-        print("FAIL: candidate verification:\n  " + "\n  ".join(problems), file=sys.stderr)
+        print("FAIL: candidate verification (promotion refused):\n  " + "\n  ".join(problems), file=sys.stderr)
+        print("Manual inspection required: review and remove any unsupported candidate "
+              "entries in the Snap Store, then rerun. The coordinator does not modify them.",
+              file=sys.stderr)
         return 1
 
     if run_snapcraft(smoke_command(version, expected["amd64"]["revision"]), dry_run) != 0:

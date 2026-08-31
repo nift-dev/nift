@@ -12,8 +12,8 @@ set -euo pipefail
 VERSION="${1:?usage: snap-candidate-smoke.sh <version> <amd64-revision>}"
 REVISION="${2:?}"
 
-snap remove nift >/dev/null 2>&1 || true
-snap install nift --channel=latest/candidate
+sudo snap remove nift >/dev/null 2>&1 || true
+sudo snap install nift --channel=latest/candidate
 
 line="$(snap list nift | sed -n '2p')"
 installed_version="$(printf '%s\n' "$line" | awk '{print $2}')"
@@ -29,7 +29,7 @@ nift commands >/dev/null || { echo "FAIL: 'nift commands' failed" >&2; exit 1; }
 # Disposable project under $HOME: strict confinement grants the home plug, so a
 # project outside $HOME would not be representative of supported filesystem use.
 proj="$(mktemp -d "$HOME/nift-candidate-smoke.XXXXXX")"
-trap 'rm -rf "$proj"; snap remove nift >/dev/null 2>&1 || true' EXIT
+trap 'rm -rf "$proj"; sudo snap remove nift >/dev/null 2>&1 || true' EXIT
 cd "$proj"
 
 nift init

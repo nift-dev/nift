@@ -56,11 +56,12 @@ jobs:
       group: nift-snap-release-transaction
       cancel-in-progress: false
     env:
-      # Exact tested Snapcraft snap revision. This is a genuine immutable pin:
-      # the tag release fails closed until a validated revision number is
-      # recorded here. The contract test rejects any fallback to a floating
-      # channel.
-      SNAPCRAFT_SNAP_REVISION: ""
+      # Exact tested Snapcraft snap revision and version. `snap install
+      # --revision` installs a specific immutable Store revision; the tag
+      # release verifies both the version and the revision after install. The
+      # contract test requires both values to be non-empty.
+      SNAPCRAFT_SNAP_REVISION: "18514"
+      SNAPCRAFT_EXPECTED_VERSION: "9.0.1"
       SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -69,13 +70,17 @@ jobs:
         run: |
           echo "NIFT_SNAP_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
           echo "NIFT_SNAP_WAIT=7200" >> "$GITHUB_ENV"
-      - name: Install pinned snapcraft
+      - name: Install and verify pinned snapcraft
         shell: bash
         run: |
-          test -n "$SNAPCRAFT_SNAP_REVISION" || { echo "SNAPCRAFT_SNAP_REVISION is not set to a tested revision" >&2; exit 1; }
+          test -n "$SNAPCRAFT_SNAP_REVISION" || { echo "SNAPCRAFT_SNAP_REVISION is not set" >&2; exit 1; }
+          test -n "$SNAPCRAFT_EXPECTED_VERSION" || { echo "SNAPCRAFT_EXPECTED_VERSION is not set" >&2; exit 1; }
           sudo snap install snapcraft --classic --revision="$SNAPCRAFT_SNAP_REVISION"
-          snapcraft version
-          snap list snapcraft
+          installed_version="$(snapcraft version)"
+          installed_revision="$(snap list snapcraft | sed -n '2p' | awk '{print $3}')"
+          [ "$installed_version" = "$SNAPCRAFT_EXPECTED_VERSION" ] || { echo "snapcraft version ${installed_version} != ${SNAPCRAFT_EXPECTED_VERSION}" >&2; exit 1; }
+          [ "$installed_revision" = "$SNAPCRAFT_SNAP_REVISION" ] || { echo "snapcraft revision ${installed_revision} != ${SNAPCRAFT_SNAP_REVISION}" >&2; exit 1; }
+          echo "snapcraft ${installed_version} revision ${installed_revision} verified"
       - name: Coordinate candidate staging and stable promotion
         shell: bash
         run: python3 packaging/snap_release.py
