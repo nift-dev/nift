@@ -195,7 +195,13 @@ const std::string* ProjectInfo::read_shared_source(const fs::path& path) const {
         if (it != shared_source_cache_.end()) return it->second.get();
     }
 
-    auto contents = std::make_unique<const std::string>(filesystem::read_file(path));
+    // The read is the authority: nullptr for missing/unreadable/non-regular
+    // (only successful reads are cached; the error path re-probes per render).
+    // Do not convert a failed read into an empty file: that would silently
+    // render unreadable content as empty instead of reporting it.
+    const auto read = filesystem::read_file_checked(path);
+    if (!read.has_value()) return nullptr;
+    auto contents = std::make_unique<const std::string>(*read);
     const std::string* result = contents.get();
     {
         std::lock_guard<std::mutex> lock(source_cache_mutex_);

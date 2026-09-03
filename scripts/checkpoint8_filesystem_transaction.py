@@ -74,6 +74,20 @@ with tempfile.TemporaryDirectory(prefix="nift-cp8-") as td:
         return {}
     case("unreadable-template-preserves-last-good",unreadable_template)
 
+    def unreadable_input():
+        root=td/"unread-input"; root.mkdir(); scaffold(root); prior=preserve_pair(root)
+        p=root/"templates/head.html"; p.write_text('<meta charset="utf-8">\n')
+        (root/"templates/template.html").write_text('<head>@input("templates/head.html")</head><main>@content</main>\n')
+        run(root,"build", "--all"); prior=preserve_pair(root)
+        p.write_text('<link>new</link>\n'); os.chmod(p,0)
+        try:
+            r=run(root,"build", "--all",ok=False)
+            if "not readable" not in (r.stdout+r.stderr): raise RuntimeError("missing input-readable diagnostic")
+            assert_pair(root,prior,"unreadable input")
+        finally: chmod_restore(p)
+        return {"diagnostic":"input file is not readable"}
+    case("unreadable-input-preserves-last-good",unreadable_input)
+
     def unreadable_json():
         root=td/"unread-json"; root.mkdir(); scaffold(root)
         (root/"data").mkdir(); j=root/"data/site.json"; j.write_text('{"name":"ok"}\n')
@@ -147,7 +161,12 @@ with tempfile.TemporaryDirectory(prefix="nift-cp8-") as td:
         # With metadata absent, status must say rebuild rather than silently clean.
         s=run(root,"status")
         if "needs rebuilding" not in s.stdout: raise RuntimeError("missing metadata did not leave page stale")
-        run(root,"build")
+        # The failed build left a durable .unfinished marker (v4.0.7+): a plain
+        # build refuses and repair is the only mode that reconstructs the
+        # incomplete derived state.
+        run(root,"build", "--repair")
+        if b"NEW-META" not in (root/"public/index.html").read_bytes():
+            raise RuntimeError("repair did not rebuild the page after metadata obstruction")
         return {}
     case("metadata-write-failure-remains-stale-and-repairs",metadata_write_failure)
 
@@ -198,30 +217,41 @@ with tempfile.TemporaryDirectory(prefix="nift-cp8-") as td:
     case("readonly-state-directory-preserves-tracking",readonly_project_state_directory)
 
 
-    def partial_write_limit_preserves_last_good():
+    def partial_direct_write_marks_unfinished_and_repairs():
         if resource is None:
             return {"skipped":"RLIMIT_FSIZE unavailable"}
         root=td/"write-limit"; root.mkdir(); scaffold(root)
-        # Establish a multi-megabyte last-good output first.
+        # Establish a complete multi-megabyte output first (direct write).
         content=root/"content/index.html"; content.write_text("B"*(4*1024*1024))
         (root/"templates/template.html").write_text("@content")
-        run(root,"build", "--all",timeout=20); prior=preserve_pair(root)
+        run(root,"build", "--all",timeout=20)
         # Force a different multi-megabyte result so identical-output elision
-        # cannot bypass the write-pressure path under test.
+        # cannot bypass the write-pressure path under test. CP3 direct writes
+        # are in-place truncate (no temp, no atomic replace): a failed write may
+        # leave a truncated output, and the durable marker + --repair are the
+        # documented recovery contract.
         content.write_text("C"*(4*1024*1024))
         def limit_file_size():
             resource.setrlimit(resource.RLIMIT_FSIZE,(1024*1024,1024*1024))
             signal.signal(signal.SIGXFSZ,signal.SIG_IGN)
         p=subprocess.run([NIFT,"build", "--all"],cwd=root,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
                          preexec_fn=limit_file_size,timeout=20)
-        if p.returncode==0: raise RuntimeError("file-size-limited build unexpectedly succeeded")
-        assert_pair(root,prior,"partial/write-limit failure")
-        # Failed temporary writes are cleaned by the writer itself or the next build.
+        if p.returncode==0: raise RuntimeError("file-size-limited build unexpectedly claimed success")
+        marker=root/".nift/.unfinished"
+        if not marker.exists(): raise RuntimeError("direct-write failure did not leave .unfinished marker")
+        r=run(root,"build", "--all",ok=False)
+        if "unfinished build detected" not in (r.stdout+r.stderr):
+            raise RuntimeError("plain build did not refuse while the marker remains")
         run(root,"build", "--repair",timeout=20)
-        if list((root/"public").glob("index.html.nift-tmp-*")):
-            raise RuntimeError("temporary survived recovery after limited write")
+        if (root/"public/index.html").stat().st_size != (4*1024*1024):
+            raise RuntimeError("repair did not reconstruct the complete output")
+        if (root/"public/index.html").read_bytes() != b"C"*(4*1024*1024):
+            raise RuntimeError("repaired output content is wrong")
+        if marker.exists(): raise RuntimeError("repair did not clear .unfinished marker")
+        s=run(root,"status")
+        if "up to date" not in s.stdout: raise RuntimeError("status not clean after repair")
         return {"exit":p.returncode,"limit_bytes":1024*1024}
-    case("partial-write-limit-preserves-last-good",partial_write_limit_preserves_last_good)
+    case("partial-direct-write-marks-unfinished-and-repairs",partial_direct_write_marks_unfinished_and_repairs)
 
     def stale_temp_recovery_is_bounded_and_concurrency_safe():
         root=td/"stale-temp-recovery"; root.mkdir(); scaffold(root)
@@ -310,34 +340,44 @@ with tempfile.TemporaryDirectory(prefix="nift-cp8-") as td:
         return {"rendered_bytes_unchanged":True,"status_clean":True}
     case("identical-output-rebuild-refreshes-current-state",identical_output_rebuild_refreshes_current_state)
 
-    def killed_output_write():
+    def sigkill_during_direct_write_marks_unfinished_and_repairs():
         root=td/"kill-write"; root.mkdir(); scaffold(root)
-        # Replace tiny content with a large page and establish it as last-good.
         size=48*1024*1024
         content=root/"content/index.html"; content.write_text("A"*size)
         (root/"templates/template.html").write_text("@content")
         run(root,"build", "--all",timeout=30)
-        prior=preserve_pair(root)
         # Force a different result so identical-output elision cannot bypass the
-        # transactional rewrite being interrupted.
+        # direct-write rewrite being interrupted.
         content.write_text("B"*size)
-        # Kill once the same-dir temporary output appears, before atomic rename.
+        # CP3 direct-write: no output temp file exists. Kill while the durable
+        # marker is present and the in-place output has started growing (the
+        # multi-MB write is then mid-flight).
         p=subprocess.Popen([NIFT,"build", "--all"],cwd=root,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-        deadline=time.monotonic()+10; seen=None
+        deadline=time.monotonic()+10; seen=False
         while time.monotonic()<deadline and p.poll() is None:
-            matches=list((root/"public").glob("index.html.nift-tmp-*"))
-            if matches:
-                seen=matches[0]; break
+            if (root/".nift/.unfinished").exists() and (root/"public/index.html").exists():
+                sz=(root/"public/index.html").stat().st_size
+                if 0 < sz < size:
+                    seen=True; break
             time.sleep(.001)
-        if seen is None:
-            p.kill(); p.wait(); raise RuntimeError("did not observe output temp file")
+        if not seen:
+            p.kill(); p.wait(); raise RuntimeError("did not observe mid-flight direct write")
         os.kill(p.pid,signal.SIGKILL); p.wait(timeout=5)
-        assert_pair(root,prior,"killed atomic output rewrite")
-        leftovers=list((root/"public").glob("index.html.nift-tmp-*"))
-        run(root,"build", "--all",timeout=30)
-        if list((root/"public").glob("index.html.nift-tmp-*")): raise RuntimeError("stale temp not cleaned by next build")
-        return {"kill_exit":p.returncode,"stale_temp_observed":bool(leftovers),"bytes":size}
-    case("sigkill-during-output-write-preserves-last-good",killed_output_write)
+        marker=root/".nift/.unfinished"
+        if not marker.exists(): raise RuntimeError("killed direct write did not leave .unfinished marker")
+        r=run(root,"build", "--all",ok=False)
+        if "unfinished build detected" not in (r.stdout+r.stderr):
+            raise RuntimeError("plain build did not refuse while the marker remains")
+        run(root,"build", "--repair",timeout=30)
+        if (root/"public/index.html").stat().st_size != size:
+            raise RuntimeError("repair did not reconstruct the complete output")
+        if (root/"public/index.html").read_bytes() != b"B"*size:
+            raise RuntimeError("repaired output content is wrong")
+        if marker.exists(): raise RuntimeError("repair did not clear .unfinished marker")
+        s=run(root,"status")
+        if "up to date" not in s.stdout: raise RuntimeError("status not clean after repair")
+        return {"kill_exit":p.returncode,"bytes":size}
+    case("sigkill-during-direct-write-marks-unfinished-and-repairs",sigkill_during_direct_write_marks_unfinished_and_repairs)
 
 out=pathlib.Path(a.output); out.parent.mkdir(parents=True,exist_ok=True)
 data={"schema_version":1,"checkpoint":"8-filesystem-transaction","commit":commit(),"platform":platform.platform(),

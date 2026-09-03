@@ -414,7 +414,7 @@ test: test-content test-commands test-comments test-contracts test-json \
 	test-template-optional test-requirements test-path-safety test-metadata-safety \
 	test-init-targets test-init-lock test-control-flow test-cross-feature test-config-validation \
 	test-zero-mutation test-repair-campaign test-ownership-concurrency \
-	test-progress-render $(PROGRESS_PTY_TARGET) test-snap-contract
+	test-progress-render $(PROGRESS_PTY_TARGET) test-snap-contract test-unreadable-source
 
 # CP10.2: Embed host-seam failure contract (C++ Engine level).
 HOST_SEAM_TEST := $(TEST_DIR)/host-seam$(EXEEXT)
@@ -517,6 +517,13 @@ test-pathto-404: $(TARGET)
 test-output-permissions: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/output_permissions_smoke.sh
 
+# Unreadable content/@input/template sources must fail the build with a clear
+# "not readable" diagnostic and preserve the previously successful output; an
+# empty-but-readable source remains a distinct, valid state. Protects the
+# ProjectInfo host read path from regressing a failed read into an empty file.
+test-unreadable-source: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/unreadable_source_smoke.sh
+
 # `nift init --handover` writes a project-root HANDOVER.md byte-for-byte
 # identical to the canonical copy (tests/fixtures/HANDOVER.md). Plain init
 # must not create it, and it must never land under the output directory.
@@ -606,7 +613,7 @@ clean:
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
-.PHONY: embed go-binding csharp-binding node-binding python-binding bindings test-build-boundary test-embed test-go-binding test-csharp-binding test-node-binding test-python-binding test-bindings test-all test benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-progress-render test-progress-pty test-snap-contract test-diagnostics test-minify test-json-schema-integration test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke test-host-seam benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets test-init-lock install uninstall
+.PHONY: embed go-binding csharp-binding node-binding python-binding bindings test-build-boundary test-embed test-go-binding test-csharp-binding test-node-binding test-python-binding test-bindings test-all test benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-progress-render test-progress-pty test-snap-contract test-diagnostics test-minify test-json-schema-integration test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke test-host-seam benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets test-init-lock test-unreadable-source install uninstall
 
 
 test-cross-feature: $(TARGET)

@@ -380,6 +380,67 @@ void test_zero_writes() {
     CHECK(!any_info_json(after));
 }
 
+void test_read_parity() {
+    // ProjectState and ProjectInfo must agree that a failed read is a nullptr,
+    // never an empty file: an empty-but-readable source is a successful read
+    // (non-null, empty), a missing source fails with nullptr, and a POSIX
+    // unreadable source fails with nullptr. Failed reads are never cached, so
+    // restoring permissions must make the same path readable again. This pins
+    // the semantic difference that the CLI @content/@input/template read path
+    // must not silently render an unreadable source as empty content.
+    const fs::path root = make_fixture("read-parity");
+    write_file(root / ".nift/config.json", kConfig);
+    write_file(root / ".nift/tracked.json", kTracked);
+    write_file(root / "content/empty.html", "");
+    const fs::path missing_path = root / "content/missing.html";
+    write_file(missing_path, "");
+    fs::remove(missing_path);
+
+    ProjectInfo project;
+    project.root = root;
+    CHECK(project.load_config());
+    CHECK(project.load_tracking());
+
+    ProjectState state;
+    std::string error;
+    CHECK(state.open(root, error));
+
+    // Empty readable: successful read, non-null, empty contents, from both.
+    const fs::path empty_path = root / "content/empty.html";
+    const std::string* pi_empty = project.read_shared_source(empty_path);
+    const std::string* ps_empty = state.read_shared_source(empty_path);
+    CHECK(pi_empty != nullptr);
+    CHECK(pi_empty != nullptr && pi_empty->empty());
+    CHECK(ps_empty != nullptr);
+    CHECK(ps_empty != nullptr && ps_empty->empty());
+
+    // Missing: nullptr from both (no successful read, never cached).
+    CHECK(project.read_shared_source(missing_path) == nullptr);
+    CHECK(state.read_shared_source(missing_path) == nullptr);
+
+#if !defined(_WIN32)
+    // Unreadable (POSIX chmod 000): nullptr from both, and never cached, so
+    // the same path becomes readable again once permissions are restored.
+    // The path is deliberately not read successfully before being made
+    // unreadable: a successful read is cached for the rest of the process.
+    const fs::path unreadable_path = root / "content/unreadable.html";
+    write_file(unreadable_path, "<p>secret</p>");
+    std::error_code perm_error;
+    fs::permissions(unreadable_path, fs::perms::none, perm_error);
+    CHECK(!perm_error);
+    CHECK(project.read_shared_source(unreadable_path) == nullptr);
+    CHECK(state.read_shared_source(unreadable_path) == nullptr);
+    fs::permissions(unreadable_path, fs::perms::owner_read, perm_error);
+    CHECK(!perm_error);
+    const std::string* recovered = project.read_shared_source(unreadable_path);
+    CHECK(recovered != nullptr);
+    CHECK(recovered != nullptr && *recovered == "<p>secret</p>");
+    const std::string* recovered_state = state.read_shared_source(unreadable_path);
+    CHECK(recovered_state != nullptr);
+    CHECK(recovered_state != nullptr && *recovered_state == "<p>secret</p>");
+#endif
+}
+
 } // namespace
 
 int main() {
@@ -387,6 +448,7 @@ int main() {
     test_invalid_parity();
     test_open_sequences();
     test_zero_writes();
+    test_read_parity();
 
     if (failures == 0) {
         std::printf("project-state parity test passed\n");
