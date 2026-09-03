@@ -12,7 +12,7 @@ presentation with a restrained green Braille spinner, and adds automated
 all-architecture Snap release coordination.
 
 - **Deterministic progress shutdown.** A long build can no longer print its
-  final "pages built successfully" line on top of a half-drawn progress frame.
+  final "files built successfully" line on top of a half-drawn progress frame.
   The renderer now stops, joins, erases the complete transient line and flushes
   before any permanent output. Per-page build errors are buffered and emitted
   only after progress has stopped, so diagnostics and summaries always land on

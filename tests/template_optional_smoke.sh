@@ -64,17 +64,19 @@ PY
 (cd "$P" && "$NIFT_BIN" status >empty.log)
 ! grep -Fq 'needs rebuilding' "$P/empty.log"
 
-# New CSS and JavaScript entries no longer use identity templates.
+# The default scaffold keeps ordinary CSS and JavaScript outside tracking.
 S="$TMP/scaffold"
 mkdir "$S"
 (cd "$S" && "$NIFT_BIN" init >/dev/null)
 python3 -S - "$S/.nift/tracked.json" <<'PY'
 import json, sys
 d = json.load(open(sys.argv[1]))
-assets = {item["name"]: item for item in d["tracked"] if item["name"].startswith("assets/")}
-assert "template" not in assets["assets/css/style"], assets
-assert "template" not in assets["assets/js/script"], assets
+assets = [item for item in d["tracked"] if item["name"].startswith("assets/")]
+assert assets == [], assets
 PY
+test ! -e "$S/content/assets"
+test -f "$S/public/assets/css/style.css"
+test -f "$S/public/assets/js/script.js"
 test ! -e "$S/templates/template.css"
 test ! -e "$S/templates/template.js"
 

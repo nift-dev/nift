@@ -277,7 +277,7 @@ void print_commands() {
 
     std::cout << console::dim("Build") << '\n';
     row("build", "[names...] [options]", "Incremental build, or explicitly build the named pages");
-    row("build --all", "", "Build all tracked pages");
+    row("build --all", "", "Build all tracked files");
     row("build --auto", "", "Automatic/watch build");
     row("build --repair", "", "Repair/reconstruct derived build state");
 
@@ -570,8 +570,8 @@ bool initialise_project(const InitOptions& options) {
     fs::create_directories("templates");
     fs::create_directories(output_dir);
     if (html_family) {
-        fs::create_directories("content/assets/css");
-        fs::create_directories("content/assets/js");
+        fs::create_directories(fs::path(output_dir) / "assets/css");
+        fs::create_directories(fs::path(output_dir) / "assets/js");
     }
 
     json::Document config = json::Document::make_object();
@@ -597,18 +597,14 @@ bool initialise_project(const InitOptions& options) {
         tracked["tracked"].push_back(value);
     };
     add("/", "index", html_family ? "templates/template.html" : "");
-    if (html_family) {
-        add("assets/css/style", "style", "", ".css", ".css");
-        add("assets/js/script", "script", "", ".js", ".js");
-    }
     if (options.target == "azure")
         add("staticwebapp.config", "Azure Static Web Apps config", "", ".json", ".json");
     if (!save_json_file(".nift/tracked.json", tracked)) return false;
 
     if (!filesystem::write_file("content/index" + options.extension, "")) return false;
     if (html_family) {
-        if (!filesystem::write_file("content/assets/css/style.css", "")) return false;
-        if (!filesystem::write_file("content/assets/js/script.js", "")) return false;
+        if (!filesystem::write_file(fs::path(output_dir) / "assets/css/style.css", "")) return false;
+        if (!filesystem::write_file(fs::path(output_dir) / "assets/js/script.js", "")) return false;
         if (!filesystem::write_file("templates/head.html", "<meta charset=\"utf-8\">\n<title>$[title]</title>\n")) return false;
         if (!filesystem::write_file("templates/template.html", "<!doctype html>\n<html lang=\"en\">\n\t<head>\n\t\t@input(\"templates/head.html\")\n\t</head>\n\t<body>\n\t\t@content\n\t</body>\n</html>\n")) return false;
     }
@@ -1051,7 +1047,7 @@ int run_cli(int argc, char** argv) {
             if (pending.empty()) {
                 std::cout << console::heading("Nift status") << '\n';
                 std::cout << console::good("✓") << " all " << project.tracked.size() << " tracked "
-                          << (project.tracked.size() == 1 ? "page is" : "pages are") << " up to date\n";
+                          << (project.tracked.size() == 1 ? "file is" : "files are") << " up to date\n";
                 return 0;
             }
 
@@ -1061,7 +1057,7 @@ int run_cli(int argc, char** argv) {
 
             std::cout << console::heading("Nift status") << '\n';
             std::cout << pending.size() << " of " << project.tracked.size() << " tracked "
-                      << (project.tracked.size() == 1 ? "page needs" : "pages need") << " rebuilding\n\n";
+                      << (project.tracked.size() == 1 ? "file needs" : "files need") << " rebuilding\n\n";
 
             if (full_detail || pending.size() <= detailed_status_limit) {
                 for (const auto& entry : pending) {
@@ -1077,9 +1073,9 @@ int run_cli(int argc, char** argv) {
                 std::cout << console::dim("rebuild causes:") << '\n';
                 for (const auto& [reason, count] : reason_counts)
                     std::cout << "  " << console::dim("↳ " + reason + " → " + std::to_string(count) +
-                               (count == 1 ? " page" : " pages")) << '\n';
+                               (count == 1 ? " file" : " files")) << '\n';
 
-                std::cout << '\n' << console::dim("affected pages: ");
+                std::cout << '\n' << console::dim("affected files: ");
                 const std::size_t shown = std::min(status_sample_limit, pending.size());
                 for (std::size_t i = 0; i < shown; ++i) {
                     if (i) std::cout << console::dim(", ");
@@ -1091,7 +1087,7 @@ int run_cli(int argc, char** argv) {
             }
 
             std::cout << "\nrun " << console::good("nift build") << " to rebuild "
-                      << (pending.size() == 1 ? "this page" : "these pages") << '\n';
+                      << (pending.size() == 1 ? "this file" : "these files") << '\n';
             return 0;
         }
 

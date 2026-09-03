@@ -65,7 +65,7 @@ representative attack goes RED:
   parent-reference name controlled.
 - **BH3** pagination oracle now verifies rendered item content matches the
   source items (corrupting rendered content in both builds is RED).
-- **BH6** asserts the full init scaffold including the starter CSS/JS assets
+- **BH6** asserts the full init scaffold including directly maintained starter CSS/JS assets
   and their tracked entries/outputs (a scaffold missing them is RED).
 
 Registry `test_of_test` reconciled: the six BH4–BH9 guards are promoted to

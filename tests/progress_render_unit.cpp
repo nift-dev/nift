@@ -481,10 +481,10 @@ void test_deterministic_fixed_ordering() {
         // Summary is emitted only after the erase, under the same output lock.
         {
             std::lock_guard<std::mutex> lock(console::output_mutex);
-            sink << "📦 3 pages built successfully\n" << std::flush;
+            sink << "📦 3 files built successfully\n" << std::flush;
         }
         feed_screen(screen, buffer);
-        check_eq(screen.last(), "📦 3 pages built successfully",
+        check_eq(screen.last(), "📦 3 files built successfully",
                  "summary lands on a clean line with no stale progress prefix");
     }
 }
@@ -503,7 +503,7 @@ void test_deterministic_buggy_ordering_detected() {
 
         {
             std::lock_guard<std::mutex> lock(console::output_mutex);
-            sink << "📦 3 pages built successfully\n" << std::flush;
+            sink << "📦 3 files built successfully\n" << std::flush;
         }
         Screen screen;
         feed_screen(screen, buffer);

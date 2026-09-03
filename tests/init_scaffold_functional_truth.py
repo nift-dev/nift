@@ -37,22 +37,24 @@ def main() -> int:
     nift = str(Path(args.nift).resolve())
     with tempfile.TemporaryDirectory(prefix='nift-bh6.') as td:
         root = Path(td)
-        run(nift, root, 'init')
+        init_result = run(nift, root, 'init')
+        if '1 file built successfully' not in init_result.stdout:
+            raise RuntimeError(f"init build summary does not use file terminology:\n{init_result.stdout}")
 
-        # scaffold present (including the starter CSS/JS assets and their
-        # tracked entries and outputs; deleting them is a broken scaffold)
+        # Pages are tracked, while starter CSS/JS are ordinary files maintained
+        # directly in the public tree.
         for rel in ('.nift/config.json', '.nift/tracked.json',
                     'templates/template.html', 'templates/head.html',
                     'content/index.html', 'public/index.html',
-                    'content/assets/css/style.css', 'content/assets/js/script.js',
                     'public/assets/css/style.css', 'public/assets/js/script.js'):
             if not (root / rel).is_file():
                 raise RuntimeError(f"init scaffold missing {rel!r}")
         tracked = json.loads((root / '.nift' / 'tracked.json').read_text())['tracked']
         tracked_names = {e['name'] for e in tracked}
-        for expect_name in ('assets/css/style', 'assets/js/script'):
-            if expect_name not in tracked_names:
-                raise RuntimeError(f"init scaffold missing tracked entry {expect_name!r}")
+        if tracked_names.intersection({'assets/css/style', 'assets/js/script'}):
+            raise RuntimeError(f"init scaffold unexpectedly tracks static assets: {tracked_names!r}")
+        if (root / 'content' / 'assets').exists():
+            raise RuntimeError("init scaffold unexpectedly created content/assets")
 
         # template references resolve
         tpl = (root / 'templates' / 'template.html').read_text()
@@ -81,8 +83,8 @@ def main() -> int:
         if not init_pub:
             raise RuntimeError("init produced no public output")
 
-        # a clean rebuild must reproduce the init'd output exactly
-        shutil.rmtree(root / 'public')
+        # A clean page rebuild must leave directly maintained assets untouched.
+        (root / 'public' / 'index.html').unlink()
         shutil.rmtree(root / '.nift' / 'public')
         run(nift, root, 'build', '--all')
         if tree_hash(root / 'public') != init_pub:
@@ -91,9 +93,15 @@ def main() -> int:
             raise RuntimeError("clean rebuild does not reproduce init'd page metadata")
 
         # builds must be idempotent
-        run(nift, root, 'build')
+        up_to_date_build = run(nift, root, 'build')
         if tree_hash(root / 'public') != init_pub:
             raise RuntimeError("incremental build is not idempotent")
+        if '1 tracked file is up to date' not in up_to_date_build.stdout:
+            raise RuntimeError(f"up-to-date build summary does not use tracked-file terminology:\n{up_to_date_build.stdout}")
+
+        status = run(nift, root, 'status')
+        if 'all 1 tracked file is up to date' not in status.stdout:
+            raise RuntimeError(f"status summary does not use tracked-file terminology:\n{status.stdout}")
 
     print('BH6 init/starter functional truth: PASS')
     return 0

@@ -757,7 +757,7 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& jobs, bool targeted, bo
         std::lock_guard<std::mutex> lock(console::output_mutex);
         if (targeted) return 1;
         std::cout << console::good("✓") << ' ' << requested_count << " tracked "
-                  << (requested_count == 1 ? "page is" : "pages are") << " up to date\n";
+                  << (requested_count == 1 ? "file is" : "files are") << " up to date\n";
         return 0;
     }
 
@@ -826,10 +826,10 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& jobs, bool targeted, bo
         if (!reason_counts.empty()) {
             std::cout << console::dim("rebuild causes:") << '\n';
             for (const auto& [reason, count] : reason_counts)
-                std::cout << "  " << console::dim("↳ " + reason + " → " + std::to_string(count) + (count == 1 ? " page" : " pages")) << '\n';
+                std::cout << "  " << console::dim("↳ " + reason + " → " + std::to_string(count) + (count == 1 ? " file" : " files")) << '\n';
         }
 
-        std::cout << console::dim("affected pages: ");
+        std::cout << console::dim("affected files: ");
         std::size_t shown = 0;
         for (std::size_t i = 0; i < jobs.size() && shown < summary_path_sample_limit; ++i) {
             if (!succeeded[i]) continue;
@@ -848,10 +848,10 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& jobs, bool targeted, bo
     } else if (failed_count == 0) {
         const bool incremental = !jobs.empty() && !jobs.front().reasons.empty();
         std::cout << console::good("📦") << ' ' << successful_count << ' '
-                  << (successful_count == 1 ? "page " : "pages ")
+                  << (successful_count == 1 ? "file " : "files ")
                   << (incremental ? "rebuilt" : "built") << " successfully\n";
     } else {
-        std::cout << successful_count << " of " << jobs.size() << " pages built successfully\n";
+        std::cout << successful_count << " of " << jobs.size() << " files built successfully\n";
     }
 
     return failed_count == 0 ? 0 : 1;

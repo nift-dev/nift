@@ -79,7 +79,11 @@ def check(nift: Path) -> None:
         assert (php / "content/index.php").is_file()
         assert (php / "public/index.php").is_file()
         assert "<title>index</title>" in (php / "public/index.php").read_text(encoding="utf-8")
-        assert (php / "content/assets/css/style.css").is_file()
+        assert not (php / "content/assets").exists()
+        assert (php / "public/assets/css/style.css").is_file()
+        assert (php / "public/assets/js/script.js").is_file()
+        php_names = {entry["name"] for entry in load_json(php / ".nift/tracked.json")["tracked"]}
+        assert php_names.isdisjoint({"assets/css/style", "assets/js/script"})
 
         text = init(nift, root, "text", "--ext=.txt")
         cfg = load_json(text / ".nift/config.json")["config"]
@@ -92,6 +96,12 @@ def check(nift: Path) -> None:
         for target in TARGETS:
             project = init(nift, root, target, f"--target={target}")
             run(nift, project, "build")
+            output_dir = load_json(project / ".nift/config.json")["config"]["output-dir"]
+            assert not (project / "content/assets").exists()
+            assert (project / output_dir / "assets/css/style.css").is_file()
+            assert (project / output_dir / "assets/js/script.js").is_file()
+            names = {entry["name"] for entry in load_json(project / ".nift/tracked.json")["tracked"]}
+            assert names.isdisjoint({"assets/css/style", "assets/js/script"})
             projects[target] = project
 
         vercel = projects["vercel"]

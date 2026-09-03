@@ -27,7 +27,15 @@ run_init php --ext=.php
 test -f "$TMP/php/content/index.php"
 test -f "$TMP/php/public/index.php"
 grep -q '<title>index</title>' "$TMP/php/public/index.php"
-test -f "$TMP/php/content/assets/css/style.css"
+test ! -e "$TMP/php/content/assets"
+test -f "$TMP/php/public/assets/css/style.css"
+test -f "$TMP/php/public/assets/js/script.js"
+python3 - "$TMP/php/.nift/tracked.json" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding='utf-8') as f:
+    names = {entry['name'] for entry in json.load(f)['tracked']}
+assert not names.intersection({'assets/css/style', 'assets/js/script'}), names
+PY
 
 run_init text --ext=.txt
 test -f "$TMP/text/content/index.txt"
@@ -46,6 +54,20 @@ for target in vercel netlify amplify azure firebase render cloudflare github-pag
   run_init "$target" --target="$target"
   (cd "$TMP/$target" && "$NIFT_BIN" build >/dev/null)
 done
+
+python3 - "$TMP" vercel netlify amplify azure firebase render cloudflare github-pages supabase <<'PY'
+import json, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+for target in sys.argv[2:]:
+    project = root / target
+    cfg = json.loads((project / '.nift/config.json').read_text())['config']
+    output = project / cfg['output-dir']
+    assert not (project / 'content/assets').exists(), target
+    assert (output / 'assets/css/style.css').is_file(), target
+    assert (output / 'assets/js/script.js').is_file(), target
+    names = {entry['name'] for entry in json.loads((project / '.nift/tracked.json').read_text())['tracked']}
+    assert names.isdisjoint({'assets/css/style', 'assets/js/script'}), (target, names)
+PY
 
 mkdir "$TMP/vercel-existing-ignore"
 printf 'node_modules/\n' > "$TMP/vercel-existing-ignore/.gitignore"

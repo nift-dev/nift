@@ -1,5 +1,5 @@
 # HANDOVER.md
-v0.0.5
+v0.0.6
 
 This is a living handover for working effectively in a Nift project.
 
@@ -193,6 +193,16 @@ Using `@pathto` lets Nift resolve the correct output-relative path and check the
 
 `.nift/tracked.json` describes tracked pages and their metadata, including things such as their content, template, and output relationships.
 
+By default, ordinary CSS, JavaScript, images, fonts and other static assets live
+directly in the configured output tree (normally `public/`) and do not have
+entries in `.nift/tracked.json`. Edit those files in place. This keeps Nift's
+tracked graph focused on content that Nift actually renders and avoids duplicate
+source/output copies for files that need no build-time transformation.
+
+Track an asset only when Nift genuinely needs to generate it from content,
+templates or build-time data. Template-less tracked entries remain available for
+that advanced case; they are not the default asset workflow.
+
 These files are part of the project and should evolve with its structure.
 
 If you add, remove, or reorganise pages, templates, outputs, deployment settings, or other Nift-managed structure, inspect the relevant `.nift` configuration and update it where necessary.
@@ -212,7 +222,9 @@ A normal Nift project may use `public/`, but deployment targets can use a differ
 
 Inspect `.nift/config.json` before making assumptions about output paths.
 
-Edit source files rather than generated output unless the project explicitly documents otherwise.
+Edit Nift-managed page sources rather than their generated output. Edit untracked
+static assets directly in the configured output tree, unless the project
+documents another tool or source directory as their owner.
 
 ## Pagination
 

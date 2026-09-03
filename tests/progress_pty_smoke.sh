@@ -203,6 +203,8 @@ check_marker_parsing
 run_pty "$TMP/ok.transcript" build
 SUCCESS_SUMMARY="$(screen_line | grep -F 'built successfully' | tail -1)"
 test -n "$SUCCESS_SUMMARY" || { echo "FAIL: no success summary in PTY screen"; exit 1; }
+echo "$SUCCESS_SUMMARY" | grep -qE '[0-9]+ files (re)?built successfully$' \
+  || { echo "FAIL: success summary does not describe built files: $SUCCESS_SUMMARY"; exit 1; }
 echo "$SUCCESS_SUMMARY" | grep -q '^📦' \
   || { echo "FAIL: success summary has a stale prefix: $SUCCESS_SUMMARY"; exit 1; }
 echo "$SUCCESS_SUMMARY" | grep -qE 'building|[·▓]' \
@@ -231,6 +233,8 @@ test -n "$FAILURE_SUMMARY" || { echo "FAIL: no partial-success summary in PTY sc
 echo "$FAILURE_SUMMARY" | grep -q 'building' \
   && { echo "FAIL: failure summary has a stale prefix: $FAILURE_SUMMARY"; exit 1; }
 echo "$FAILURE_SUMMARY" | grep -q ' of ' || { echo "FAIL: unexpected failure summary: $FAILURE_SUMMARY"; exit 1; }
+echo "$FAILURE_SUMMARY" | grep -q ' files built successfully$' \
+  || { echo "FAIL: partial-success summary does not describe built files: $FAILURE_SUMMARY"; exit 1; }
 test "$(exit_code)" = "1" || { echo "FAIL: failure build exited $(exit_code), expected 1"; exit 1; }
 
 # --- NO_COLOR interactive behaviour -----------------------------------------

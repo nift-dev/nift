@@ -71,6 +71,14 @@ not to Nift's parser or template language.
 
 ## File ownership
 
+For HTML-family projects, the initializer creates empty starter CSS and
+JavaScript files directly under the configured output directory's
+`assets/css/` and `assets/js/` directories. It does not create
+`content/assets/` and does not add those static files to `.nift/tracked.json`.
+They are ordinary user-owned frontend assets: builds neither copy nor rewrite
+them. Projects can still opt into tracked, generated assets when build-time Nift
+processing is genuinely useful.
+
 The Vercel and Amplify metadata files are source-controlled deployment metadata;
 their static subdirectories are generated output and are ignored by Git.
 
