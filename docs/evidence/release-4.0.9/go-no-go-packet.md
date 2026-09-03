@@ -13,8 +13,9 @@ run and are not claimed.
 |---|---|---|
 | canonical `nift` (previous candidate base) | `d3341dec47ba42dfdb416913ba3e37bbbaaa8feb` | pre-fix `main`; does not contain the fix or reconciled checkpoint |
 | canonical `nift` (implementation/fix commit) | `9aa3c4ba1c15c36bd7150aba6d827bbd1ec5553b` | unreadable-source fix + checkpoint-8 CP3 reconciliation + new tests |
-| canonical `nift` (release-preparation commit) | **PENDING** | release notes + this packet + handover/evidence reconciliation, committed after review |
-| canonical `nift` (proposed `v4.0.9` tag target) | **PENDING** | = the reviewed release-preparation commit, never `d3341de` directly |
+| canonical `nift` (initial release-preparation content commit) | `2bbb290` | release notes + this packet + handover/evidence reconciliation |
+| canonical `nift` (packet-finalization commit) | recorded externally after creation | this finalized packet (documentation/evidence finalization; the packet cannot embed the SHA of the commit containing it) |
+| canonical `nift` (proposed `v4.0.9` tag target) | recorded externally immediately before tag authorization | the final reviewed commit containing this finalized packet; never `d3341de` directly |
 | website source (`nift-dev.github.io` `stage`) | `6aa8421` | pushed; already documents direct asset ownership |
 | website generated (`nift-dev.github.io` `public/main`) | `9738d43` | pushed; live Pages confirmed serving this commit |
 | CLI contract suite (`nift-regression-suite`) | `a6d508c` | 23/23 modules PASS against the candidate binary |
@@ -38,7 +39,8 @@ implementation commit and the release-preparation commit are included.
 | `5ad4a95` Correct resume-note wording: target-version assignments are not all already correct | release automation correction |
 | `d3341de` Simplify asset ownership and use file terminology | included user-facing change (direct CSS/JS ownership in the output tree; "page(s)" → "file(s)" build/status terminology) |
 | `9aa3c4b` Fix unreadable-source handling and reconcile checkpoint 8 with direct writes | correctness fix + release-gate reconciliation (unreadable content/`@input`/template no longer silently render empty; checkpoint-8 write-interruption cases re-asserted against the CP3 direct-write contract) |
-| `<release-preparation>` (pending) | release-preparation commit: release notes, this packet, HANDOVER/ReleaseNotes reconciliation, refreshed checkpoint-8 evidence |
+| `2bbb290` Prepare v4.0.9 release notes and go/no-go packet | initial release-preparation commit: release notes, this packet, HANDOVER/ReleaseNotes reconciliation, refreshed checkpoint-8 evidence |
+| `<this packet-finalization commit>` | documentation/evidence finalization commit carrying the finalized packet; exact SHA recorded externally after creation |
 
 Every commit in the range appears in the release record; none are omitted.
 
@@ -97,9 +99,19 @@ heads.
   recovery-epoch scan-bound PASS); `benchmark-10k` PASS (full 0.109 s / no-op
   0.073 s medians); `benchmark-memory-10k` PASS (peaks ≤ 13 160 KiB);
   `packaging/test-version-derivation.sh` PASS; Minify++ `check-nift-sync.sh`
-  PASS (24 files). The source is identical between `9aa3c4b` and the
-  documentation-only release-preparation commit, so these results also hold at
-  the final head (rerun after the release-preparation commit is recorded).
+  PASS (24 files).
+- **Broader rerun at the initial release-preparation head `2bbb290`**
+  (documentation-only release-prep commit; source identical to `9aa3c4b`):
+  `make test` exit 0; `make
+  test-installer` PASS; `make test-embed` PASS; `make test-bindings` PASS; `make
+  test-build-boundary` PASS; `make test-project-state` PASS; Checkpoints 7, 8,
+  9, 10 all PASS; `test-performance-scaling` PASS; `benchmark-10k` PASS;
+  `benchmark-memory-10k` PASS; `packaging/test-version-derivation.sh` PASS;
+  Minify++ `check-nift-sync.sh` PASS (24 files); `run-contract.sh` at `a6d508c`
+  → 23/23 PASS. The committed checkpoint-8 evidence still records `9aa3c4b` (the
+  code-bearing implementation commit that the gate ran under). The later
+  packet-finalization commit changes documentation only, so the broader tests
+  are not claimed to have run at that later commit.
 - Jsonic++ synchronization: **maintained `make test-jsonic-sync` target
   UNAVAILABLE locally** because the external `jsonic/jsonic` checkout has three
   pre-existing mode-only changes (exec bit stripped from
@@ -117,11 +129,13 @@ heads.
 
 ## 5. Pending items before tag authorization
 
-- [ ] Release-preparation commit reviewed and committed on `nift` `main` (notes,
-      this packet, HANDOVER/ReleaseNotes reconciliation, refreshed checkpoint-8
-      evidence), then pushed.
-- [ ] Broader validation rerun at the final release-preparation head and results
-      recorded in this packet.
+- [x] Initial release-preparation commit `2bbb290` created on `nift` `main`
+      (notes, this packet, HANDOVER/ReleaseNotes reconciliation, refreshed
+      checkpoint-8 evidence). **PENDING: review and push.**
+- [x] Broader validation rerun at the initial release-preparation head `2bbb290`
+      and results recorded in this packet.
+- [x] Final documentation commit carrying this finalized packet (exact SHA
+      recorded externally after creation). **PENDING: review and push.**
 - [ ] Hosted CI at the exact final head: init targets, checkpoint-10 matrix,
       test-integrity guards, packaging matrix, performance-regression guards.
 - [ ] Non-publishing `Release artifacts` rehearsal (`version=4.0.9`): exact
@@ -136,17 +150,15 @@ heads.
 - [ ] Confirmation that local `main == origin/main`, that `v4.0.9` does not
       already exist locally, remotely, or as a GitHub release, and that the
       public installer is still byte-identical at rehearsal time.
-- [ ] Explicit tag authorization naming the final immutable release-preparation
-      commit.
+- [ ] The final reviewed commit containing this finalized packet is resolved and
+      recorded externally, and explicit tag authorization names it.
 
 ## 6. Repository cleanliness
 
-- canonical `nift`: no generated or debug residue; the intended tracked edits
-  (`HANDOVER.md`, `ReleaseNotes.md`, refreshed checkpoint-8 evidence) and the
-  untracked `docs/evidence/release-4.0.9/` release edits are present until the
-  release-preparation commit is made; the tree is verified clean afterward.
-- website `stage`: clean; `public/main`: clean. `PENDING-WEBSITE.md` has no open
-  items.
+- At the committed candidate head, the canonical `nift` tree contains no
+  uncommitted files or generated/debug residue.
+- website `stage` and generated `public/main` trees are clean.
+  `PENDING-WEBSITE.md` has no open items.
 - `nift-regression-suite`: clean at `a6d508c` (version assertions at 4.0.9; the
   23rd contract module is committed).
 - `jsonic/jsonic`: 3 mode-only changes remain as pre-existing environment state
@@ -154,8 +166,9 @@ heads.
 
 ## 7. Proposed tag and release notes
 
-- Tag: `v4.0.9` (annotated) at the reviewed release-preparation commit
-  (**PENDING**, reported after commit).
+- Tag: `v4.0.9` (annotated) at the final reviewed commit containing this
+  finalized packet, resolved and recorded externally immediately before tag
+  authorization (**PENDING**).
 - Release body = the reviewed notes file
   `docs/evidence/release-4.0.9/release-notes-4.0.9.md`, published verbatim by
   `release.yml` (`--notes-file`). No Embedded Nift mention.
