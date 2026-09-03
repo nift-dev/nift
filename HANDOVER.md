@@ -20,12 +20,12 @@ whether it is a regression.
 ## Current identity
 
 - Product: **Nift**, a website generator and dependency-aware website build layer.
-- Current executable identity: `Nift v4.0.8` (development), following the public v4.0.7 release.
+- Current executable identity: `Nift v4.0.9` (development), following the public v4.0.8 release.
 - Language/toolchain: C++17 and Make.
 - Output convention for modern projects: `public/`.
 - Current branch: `main` in this checkout.
-- Current project phase: **post-release** — the public v4.0.7 CLI-only release is
-  published (tag `v4.0.7` at `756aa61`). The embedded engine, its language
+- Current project phase: **post-release** — the public v4.0.8 CLI-only release is
+  published (tag `v4.0.8` at `89eb46e`). The embedded engine, its language
   bindings, the shared corpus and the experimental Rust implementation remain
   in-tree but are not publicly released, documented or promoted; they are
   dogfooding/experimental work. Ordinary `make` builds only the CLI.
@@ -288,14 +288,15 @@ calling the Nift work complete.
 - Evidence is scoped deliberately: the generated/mutated states tested establish equivalence for that corpus; this is not an absolute proof over every possible Nift project.
 - Checkpoint 8 still makes sense unchanged: it attacks safe failure and persistent-state integrity under hostile filesystem/interruption conditions, a property not exercised by successful incremental equivalence.
 
-## Checkpoint 8 complete — filesystem/transaction integrity (2026-08-18)
+## Checkpoint 8 complete — filesystem/transaction integrity (2026-08-18; CP3 direct-write contract, reconciled 2026-09-04)
 
 - Maintained gate: `make checkpoint-8-filesystem-transaction`.
-- Commit under test: `5deb974`; exact evidence is retained at `docs/evidence/checkpoint-8/filesystem-transaction.json`.
-- Sixteen Linux adversarial cases now pass: unreadable content/template/JSON, dangling symlink, symlink loop, file↔directory obstruction classes, read-only output/state directories, metadata-write obstruction/recovery, long Unicode path, `RLIMIT_FSIZE` partial-write pressure, forced `SIGKILL` during a 48 MiB generated-output write, stale-temporary recovery that preserves temporaries owned by a live concurrent process, long-running `build-auto` recovery of a dead-owner temp on the next relevant build pass, and identical-output rebuilds that must still refresh modified-mode current-state metadata.
-- Four bug families have been fixed around this checkpoint: unreadable inputs being conflated with empty files; directory-as-file reads reaching a `std::length_error` abort; truncate-in-place writes that could destroy the last-good artifact on interruption; and a later O(n²) full-build regression caused by scanning an output directory before every transactional write.
-- File/state writes stage to same-directory Nift temporary files and replace only after a complete write. A killed write leaves the prior output+metadata intact. Recovery is epoch-scoped and lazy: each output/state parent is scanned at most once per build pass when that parent next receives a write, and only temporaries whose recorded owner PID is no longer live are removed. Idle `build-auto` polls are not background garbage collection; a later relevant pass gets a fresh recovery opportunity. This preserves bounded full-build scaling, long-running recovery and concurrent writers.
-- Failed output writes do not refresh page metadata. Failed metadata writes leave the page stale so `nift status`/`nift build` can repair it.
+- Exact evidence is retained at `docs/evidence/checkpoint-8/filesystem-transaction.json`. The recorded commit is the head the gate ran under; the evidence and the gate description were refreshed in the v4.0.9 cycle (2026-09-04) to match the CP3 direct-write contract and to add the unreadable `@input` case (case count 16 → 17).
+- The seventeen Linux adversarial cases are: unreadable content, unreadable template, unreadable `@input`, unreadable JSON, dangling symlink, symlink loop, file↔directory obstruction classes, read-only output/state directories, metadata-write obstruction/recovery, long Unicode path, `RLIMIT_FSIZE` partial-write pressure, forced `SIGKILL` during a 48 MiB generated-output write, stale-temporary recovery that preserves temporaries owned by a live concurrent process, long-running `build-auto` recovery of a dead-owner temp on the next relevant build pass, and identical-output rebuilds that must still refresh modified-mode current-state metadata.
+- **Write contract (CP3 direct-write).** Regenerable generated output and `.info.json` page metadata are written **in place** (`write_direct_file`, truncate + write) — not through a temporary and not atomically replaced. The durable `.nift/.unfinished` marker is the interruption protection: a failed or interrupted build never claims success, the marker remains, an ordinary build refuses while it is present, and `build --repair` reconstructs the complete correct output, clears the marker, and leaves `nift status` clean. A failed/killed direct write may therefore leave a truncated output; repair (not an atomic replace) is the recovery path. This deliberately replaced the pre-CP3 temp-and-rename output writes for performance (see `docs/handover/CP3-DIRECT-WRITE-REPORT.md`); the write-interruption checkpoint cases assert the marker-and-repair invariants, not last-good output preservation.
+- **Retained atomic machinery.** Authoritative state files that are not regenerable (`tracked.json`, `config.json`, hashes, and other committed state) remain `write_file` temp-and-rename, atomic on POSIX. Stale-temporary recovery applies to that retained machinery: each output/state parent is scanned at most once per build pass when that parent next receives a write, and only temporaries whose recorded owner PID is no longer live are removed. Idle `build-auto` polls are not background garbage collection; a later relevant pass gets a fresh recovery opportunity. This preserves bounded full-build scaling, long-running recovery and concurrent writers.
+- Failed output writes do not refresh page metadata. Failed metadata writes leave the page stale so `nift status`/`nift build --repair` can repair it.
+- Historical bug families fixed around this checkpoint: unreadable inputs being conflated with empty files; directory-as-file reads reaching a `std::length_error` abort; the later O(n²) full-build regression caused by scanning an output directory before every transactional write. The v4.0.9 cycle additionally fixed the CLI `ProjectInfo::read_shared_source` regression that silently rendered unreadable content/`@input`/template sources as empty (it returned an empty string instead of `nullptr`, masking "not readable" diagnostics).
 - Claim scope is intentionally limited to the tested Linux failure classes. Direct ENOSPC and platform-specific Windows/macOS permission/locking semantics remain outside this checkpoint and belong in later platform evidence.
 - Checkpoint 9 remains appropriate and distinct: fuzz/sanitizer the n++ parser and explicit resource/depth boundaries, without duplicating standalone Jsonic++ or Minify++ parser campaigns.
 

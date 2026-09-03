@@ -1,107 +1,112 @@
 {
   "schema_version": 1,
   "checkpoint": "8-filesystem-transaction",
-  "commit": "5deb974cd626596325fcf66bc594fd4e25eac222",
-  "platform": "Linux-6.18.35-x86_64-with-glibc2.41",
+  "commit": "9aa3c4ba1c15c36bd7150aba6d827bbd1ec5553b",
+  "platform": "Linux-7.0.0-29-generic-x86_64-with-glibc2.43",
   "cases": [
     {
       "case": "unreadable-content-preserves-last-good",
       "pass": true,
-      "elapsed_seconds": 0.014644,
+      "elapsed_seconds": 0.006957,
       "diagnostic": "content file is not readable"
     },
     {
       "case": "unreadable-template-preserves-last-good",
       "pass": true,
-      "elapsed_seconds": 0.008876
+      "elapsed_seconds": 0.006414
+    },
+    {
+      "case": "unreadable-input-preserves-last-good",
+      "pass": true,
+      "elapsed_seconds": 0.008512,
+      "diagnostic": "input file is not readable"
     },
     {
       "case": "unreadable-json-preserves-last-good",
       "pass": true,
-      "elapsed_seconds": 0.012407
+      "elapsed_seconds": 0.008445
     },
     {
       "case": "dangling-symlink-fails-safely",
       "pass": true,
-      "elapsed_seconds": 0.008246
+      "elapsed_seconds": 0.006088
     },
     {
       "case": "symlink-loop-does-not-hang",
       "pass": true,
-      "elapsed_seconds": 0.008654,
+      "elapsed_seconds": 0.005738,
       "exit": 1
     },
     {
       "case": "file-replaced-by-directory-fails-safely",
       "pass": true,
-      "elapsed_seconds": 0.012573,
+      "elapsed_seconds": 0.007757,
       "exit": 1,
       "diagnostic_tail": "  json: failed to parse data/site.json (JSON file is not readable)\n    @json(\"data/site.json\", site)\n    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
     },
     {
       "case": "readonly-output-directory-does-not-claim-success",
       "pass": true,
-      "elapsed_seconds": 0.006875
+      "elapsed_seconds": 0.006253
     },
     {
       "case": "metadata-write-failure-remains-stale-and-repairs",
       "pass": true,
-      "elapsed_seconds": 0.011335
+      "elapsed_seconds": 0.009112
     },
     {
       "case": "unicode-and-long-relative-path",
       "pass": true,
-      "elapsed_seconds": 0.013992,
+      "elapsed_seconds": 0.008069,
       "name_length": 349
     },
     {
       "case": "output-directory-replaced-by-file-fails-safely",
       "pass": true,
-      "elapsed_seconds": 0.011553
+      "elapsed_seconds": 0.009591
     },
     {
       "case": "readonly-state-directory-preserves-tracking",
       "pass": true,
-      "elapsed_seconds": 0.010619
+      "elapsed_seconds": 0.007158
     },
     {
-      "case": "partial-write-limit-preserves-last-good",
+      "case": "partial-direct-write-marks-unfinished-and-repairs",
       "pass": true,
-      "elapsed_seconds": 0.278843,
+      "elapsed_seconds": 0.262002,
       "exit": 1,
       "limit_bytes": 1048576
     },
     {
       "case": "stale-temp-recovery-is-bounded-and-concurrency-safe",
       "pass": true,
-      "elapsed_seconds": 0.008815,
+      "elapsed_seconds": 0.006887,
       "dead_owner_removed": true,
       "live_owner_preserved": true
     },
     {
       "case": "build-auto-recovers-mid-session-stale-temp-on-relevant-activity",
       "pass": true,
-      "elapsed_seconds": 0.458304,
+      "elapsed_seconds": 0.457366,
       "idle_retained": true,
       "next_relevant_pass_removed": true
     },
     {
       "case": "identical-output-rebuild-refreshes-current-state",
       "pass": true,
-      "elapsed_seconds": 0.033103,
+      "elapsed_seconds": 0.033658,
       "rendered_bytes_unchanged": true,
       "status_clean": true
     },
     {
-      "case": "sigkill-during-output-write-preserves-last-good",
+      "case": "sigkill-during-direct-write-marks-unfinished-and-repairs",
       "pass": true,
-      "elapsed_seconds": 3.286714,
+      "elapsed_seconds": 2.975486,
       "kill_exit": -9,
-      "stale_temp_observed": true,
       "bytes": 50331648
     }
   ],
-  "case_count": 16,
-  "elapsed_seconds": 4.21,
+  "case_count": 17,
+  "elapsed_seconds": 3.843,
   "pass": true
 }

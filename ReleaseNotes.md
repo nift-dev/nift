@@ -2,7 +2,31 @@
 
 ## v4.0.9
 
-Development in progress following the public v4.0.8 release.
+Nift 4.0.9 gives ordinary CSS and JavaScript direct ownership in the output
+tree, makes build and status output consistently file-oriented, fixes a CLI
+read-integrity defect that could silently render unreadable sources as empty,
+and hardens Snap publication with honest rollback reporting and guarded
+per-revision stable releases.
+
+- **Direct asset ownership.** `nift init` creates the empty starter `style.css`
+  and `script.js` directly under the output directory's `assets/css/` and
+  `assets/js/` directories, no longer creates a default `content/assets/`
+  directory, and no longer records those static files in `.nift/tracked.json`.
+  They are ordinary user-owned assets (neither copied nor rewritten); explicit
+  tracking remains available for generated or minified assets.
+- **File-oriented terminology.** `nift build` and `nift status` output now
+  consistently speaks about tracked files rather than pages.
+- **Read-integrity fix.** A tracked content file, `@input` source, or template
+  that exists but cannot be read now fails the build with a clear
+  `… is not readable` diagnostic and leaves the previously successful output
+  intact, instead of silently rendering empty content and reporting success.
+  This fixes a latent CLI regression that also affected v4.0.7 and v4.0.8. An
+  empty but readable file remains a valid, distinct state.
+- **Snap publication hardening.** Snap stable publication uses guarded
+  per-revision `latest/stable` releases rather than whole-channel promotion,
+  and rollback reporting classifies any target-version stable entry as
+  non-recoverable so a partial publication is reported honestly and a rerun
+  preserves already-correct assignments.
 
 ## v4.0.8
 
