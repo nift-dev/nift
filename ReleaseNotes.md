@@ -1,5 +1,9 @@
 # Nift — Release Notes
 
+## v4.0.10
+
+Development in progress following the public v4.0.9 release.
+
 ## v4.0.9
 
 Nift 4.0.9 gives ordinary CSS and JavaScript direct ownership in the output

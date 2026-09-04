@@ -20,12 +20,12 @@ whether it is a regression.
 ## Current identity
 
 - Product: **Nift**, a website generator and dependency-aware website build layer.
-- Current executable identity: `Nift v4.0.9` (development), following the public v4.0.8 release.
+- Current executable identity: `Nift v4.0.10` (development), following the public v4.0.9 release.
 - Language/toolchain: C++17 and Make.
 - Output convention for modern projects: `public/`.
 - Current branch: `main` in this checkout.
-- Current project phase: **post-release** — the public v4.0.8 CLI-only release is
-  published (tag `v4.0.8` at `89eb46e`). The embedded engine, its language
+- Current project phase: **post-release** — the public v4.0.9 CLI-only release is
+  published (tag `v4.0.9` at `9c91298`). The embedded engine, its language
   bindings, the shared corpus and the experimental Rust implementation remain
   in-tree but are not publicly released, documented or promoted; they are
   dogfooding/experimental work. Ordinary `make` builds only the CLI.

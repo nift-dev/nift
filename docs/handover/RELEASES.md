@@ -722,3 +722,120 @@ exact screened candidate revisions. Final verified `latest/stable` state:
   coordinator run.
 - Run `distribution-verification.yml` against the exact public version once
   stores propagate.
+
+## v4.0.9 release report (2026-09-04)
+
+### Scope
+
+v4.0.9 gives ordinary CSS and JavaScript direct ownership in the output tree,
+makes build and status output consistently file-oriented, fixes a CLI
+read-integrity defect that could silently render unreadable sources as empty,
+and hardens Snap publication with honest rollback reporting and guarded
+per-revision stable releases. The embedded engine, its language bindings, the
+shared corpus and the experimental Rust implementation remain in-tree but are
+not released, documented or promoted.
+
+### Release blocker and correction
+
+- **Unreadable-source CLI regression (found during preparation).**
+  `ProjectInfo::read_shared_source` returned an empty string instead of
+  `nullptr` for unreadable files, so the CLI silently rendered unreadable
+  content/`@input`/template sources as empty and reported success. It was a
+  latent defect affecting v4.0.7 and v4.0.8, introduced by the CP1 RenderHost
+  seam. Fixed in `9aa3c4b` to mirror `ProjectState` (`read_file_checked`,
+  `nullptr` on failure, failed reads never cached), with CLI smoke coverage,
+  a `ProjectState`/`ProjectInfo` read-parity test, an unreadable-`@input`
+  checkpoint-8 case, and a black-box regression-suite contract.
+- **Checkpoint-8 reconciliation to the CP3 direct-write contract.** The gate's
+  write-interruption cases predated the approved CP3 direct-write design (in-place
+  output/`.info.json` writes backed by the durable `.unfinished` marker and
+  `build --repair`) and had been masked by the unreadable-content failure. They
+  were renamed and re-asserted against that contract:
+  `partial-direct-write-marks-unfinished-and-repairs` and
+  `sigkill-during-direct-write-marks-unfinished-and-repairs`. Case count 16 → 17;
+  `HANDOVER.md` and the checkpoint-8 evidence were refreshed.
+
+### Source and workflow
+
+- Annotated tag object `c0677b37fd3ad2c89016067328dcda05dd93b132`; tag `v4.0.9`
+  peels exactly to `9c91298d9f7fba226fb1ea0b2e1cf78cf1f9bb43`; only the tag was
+  pushed (no branch changes).
+- GitHub Actions run: `33818807348` — every job succeeded (unix linux-x86_64 /
+  macos-arm64 / macos-x86_64, windows, installer-preflight,
+  public-installer-preflight, publish, installer-public-smoke ×3, homebrew ×2,
+  chocolatey, snap toolchain-preflight + build amd64/arm64 +
+  release-coordination; rehearse skipped as dispatch-only).
+- Pre-tag rehearsals: release-artifacts rehearsal `33817292964` and Snap
+  rehearsal `33817296723` (both non-publishing; all publish/coordination jobs
+  skipped). Push-triggered CI at `9c91298`: test-integrity `33816347286`,
+  packaging `33816347291`, checkpoint-10 `33816347309`, performance-regression
+  `33816347382`, init-targets `33816347187` — all success.
+- GitHub release: https://github.com/nift-dev/nift/releases/tag/v4.0.9 — public,
+  non-draft, non-prerelease, latest; body is the reviewed committed notes
+  (`docs/evidence/release-4.0.9/release-notes-4.0.9.md`, verbatim modulo a
+  trailing newline). The release display name is empty by design (published via
+  the tag); it is cosmetic and was not mutated.
+
+### Archives and checksums (definitive, from the published release)
+
+- `nift-4.0.9-linux-x86_64.tar.gz` (499 381 bytes) — `38658a223dabd3360dbbe2cc48df5e8252009bf79f0e488453f73243d3f8f26a`; extracted binary reports `Nift v4.0.9`; archive contains LICENSE, README.md, nift.
+- `nift-4.0.9-macos-arm64.tar.gz` (380 985 bytes) — `c35fb58a8d56773127f3779f7dbec2cb6600d6226b2dc500f13d653f6992a90d`
+- `nift-4.0.9-macos-x86_64.tar.gz` (404 605 bytes) — `510b6ca8bb20ebf9659abbc11630cb772f560b68656c6eb03a83cc1fb0c7d025`
+- `nift-4.0.9-windows-x86_64.zip` (1 288 287 bytes) — `da9bfb6dc579d6f6218bdce0815c6d2d4e92c0e4c5d57cf816cda0c1025e62f5`
+- `SHA256SUMS` (386 bytes) — independently downloaded; all four entries verified (`sha256sum -c` OK).
+- Release body equals the reviewed CLI-only notes; no Embedded Nift mention.
+
+### Installer verification
+
+`installer-public-smoke` PASS on linux-x86_64, macos-x86_64 and macos-arm64: the
+live `https://nift.dev/install` is byte-identical to `packaging/install.sh`
+(SHA-256 `a98bdf72…`), `sh -n` passes, the tagged 4.0.9 is installed through the
+public script with an exact version assertion, and fresh `init`/`build`/`status`
+succeed.
+
+### Snap publication (coordinated, per-revision)
+
+The coordinator staged all six declared architectures at 4.0.9, verified
+candidate, ran the amd64 candidate confinement smoke (revision 722, PASS), and
+released each selected revision individually to `latest/stable`. Legacy i386
+(409, 3.0.3) was ignored and left untouched in edge/stable and absent from
+candidate. Final verified state:
+
+- amd64 revision `722` · arm64 revision `724` · armhf revision `723` ·
+  ppc64el revision `726` · riscv64 revision `727` · s390x revision `725` — all
+  at version `4.0.9` on both `latest/candidate` and `latest/stable`.
+- Rollback commands recorded against the pre-release stable revisions
+  (698/702/699/700/687/701).
+
+### Package publication
+
+- **Chocolatey Community**: `nift.4.0.9.nupkg` pushed successfully to
+  `push.chocolatey.org`; the package page
+  `community.chocolatey.org/packages/nift/4.0.9` returns 200 and shows
+  **Pending automated review** (under moderation). Submitted, not yet approved
+  or independently fresh-install verified. Do not resubmit.
+- **Homebrew**: `homebrew.yml` built and tested the formula against the
+  immutable `v4.0.9` tag on macOS arm64 and Linux x86-64 (validation only;
+  nothing published to homebrew-core). Canonical `Homebrew/homebrew-core`
+  formula still lists 4.0.8; propagation is Homebrew's external automatic bump
+  service (no manual PR).
+- **Flathub**: external `flathub/cc.nift.nsm` manifest tag/checksum update
+  required — explicitly separate downstream work, pending.
+- **Distribution verification**: run `distribution-verification.yml` against
+  the exact public version once channels have had the required propagation time.
+
+### Post-release
+
+- Development identity advanced to `Nift v4.0.10` in `src/CLI.cpp`,
+  `snap/snapcraft.yaml`, release notes, and the guarantee registry baseline
+  (released_version 4.0.9, release_commit 9c91298, development_version 4.0.10).
+- Regression-suite version assertions advanced to v4.0.10.
+- Both `nift-dev/nift` and `nift-dev/nift-regression-suite` pushed to `main`.
+
+### Remaining downstream tracking
+
+- Homebrew auto-bump merge + fresh install; Chocolatey moderation/approval and
+  fresh install; Flathub external PR; Snap fresh install verification on
+  non-x86 architectures.
+- Run `distribution-verification.yml` against the exact public version once
+  stores propagate.

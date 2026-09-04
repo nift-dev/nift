@@ -3,9 +3,9 @@
   "campaign": "battle-hardening-2026-08",
   "purpose": "Map Nift guarantees and the manually audited quantitative/reliability claims on the pinned public surfaces to retained evidence, enforcement, platform scope, limitations, and test-of-test status. Surface hashes force re-audit when those pages change.",
 "baseline": {
-  "released_version": "4.0.8",
-  "development_version": "4.0.9",
-  "release_commit": "89eb46e",
+  "released_version": "4.0.9",
+  "development_version": "4.0.10",
+  "release_commit": "9c91298",
   "note": "BH1 is guarantee-durability infrastructure. Existing evidence remains valid unless falsified; UNPROVEN test-of-test status means guard liveness has not yet been demonstrated during this campaign."
  },
   "repositories": {
@@ -1450,7 +1450,7 @@
         {
           "repo": "regression",
           "path": "HANDOVER.md",
-          "needle": "22 modules total"
+          "needle": "23 modules total"
         }
       ]
     }
