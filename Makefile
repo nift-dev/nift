@@ -629,6 +629,14 @@ clean:
 	rm -f libnift_c.a libnift_c.so libnift_c.dylib bindings/go/embed-harness
 	rm -rf dist/embed-prefix bindings/node/build bindings/python/build
 	rm -f bindings/python/nift/_nift*.so
+	rm -rf bindings/csharp/src/Nift/bin bindings/csharp/src/Nift/obj
+	rm -rf bindings/csharp/apps/NiftEmbedHarness/bin bindings/csharp/apps/NiftEmbedHarness/obj
+	rm -rf bindings/csharp/apps/NiftAspDogfood/bin bindings/csharp/apps/NiftAspDogfood/obj
+	rm -rf bindings/csharp/tests/Nift.Tests/bin bindings/csharp/tests/Nift.Tests/obj
+	rm -rf bindings/csharp/bench/bin bindings/csharp/bench/obj
+	rm -rf bindings/python/__pycache__ bindings/python/nift/__pycache__ \
+		bindings/python/tests/__pycache__ packaging/__pycache__
+	find bindings/python packaging -type f -name '*.pyc' -delete 2>/dev/null || true
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
