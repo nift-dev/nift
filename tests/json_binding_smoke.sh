@@ -207,6 +207,40 @@ printf '%s\n' '@json(data, "../../outside.schema.json", "data/test.json")' >"$D/
 if (cd "$D" && "$NIFT_BIN" build --all >log 2>&1); then echo "schema-traversal unexpectedly succeeded" >&2; exit 1; fi
 grep -F 'json: schema path must stay inside the Nift project' "$D/log" >/dev/null
 
+# Schema position disambiguation: a bare identifier is a schema BINDING NAME and
+# must already exist; a quoted string is a schema path. A missing bare schema
+# name must fail even when a same-named file exists in the project root.
+D="$TMP/schema-name-vs-file"
+make_project "$D"
+printf '%s\n' '{"type":"object","required":["title"]}' >"$D/schema"
+printf '%s\n' '{}' >"$D/data/test.json"
+printf '%s\n' '@json(data, schema, "data/test.json")' >"$D/templates/template.html"
+if (cd "$D" && "$NIFT_BIN" build --all >log 2>&1); then
+    echo "schema-name-vs-file unexpectedly used the same-named file" >&2
+    exit 1
+fi
+grep -F "json: schema name 'schema' is not bound (quote the argument to use a schema path)" "$D/log" >/dev/null
+
+D="$TMP/schema-quoted-path-wins"
+make_project "$D"
+printf '%s\n' '{"type":"object","required":["title"]}' >"$D/schema"
+printf '%s\n' '{"title":"ok"}' >"$D/data/test.json"
+printf '%s\n' '@json(data, "schema", "data/test.json")VAL=$[data.title]@content' >"$D/templates/template.html"
+(cd "$D" && "$NIFT_BIN" build --all >/dev/null) || { echo "schema-quoted-path-wins failed" >&2; exit 1; }
+grep -Fq 'VAL=ok' "$D/public/index.html"
+grep -Fq '"schema"' "$D/.nift/public/index.info.json"
+
+D="$TMP/schema-bare-name-unquoted-path"
+make_project "$D"
+printf '%s\n' '{"type":"object","required":["title"]}' >"$D/data/test.json"
+printf '%s\n' '{"title":"ok"}' >"$D/data/test.json"
+printf '%s\n' '@json(data, data/test.json, "data/test.json")' >"$D/templates/template.html"
+if (cd "$D" && "$NIFT_BIN" build --all >log 2>&1); then
+    echo "unquoted non-identifier schema unexpectedly succeeded" >&2
+    exit 1
+fi
+grep -F "json: schema name 'data/test.json' must be an existing binding name or a quoted schema path" "$D/log" >/dev/null
+
 echo "JSON Schema binding extensions passed"
 
 # More schema integration boundaries through the public @json syntax.

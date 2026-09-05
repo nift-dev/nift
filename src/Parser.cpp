@@ -20,25 +20,29 @@
 namespace fs = std::filesystem;
 
 namespace {
-std::vector<std::string> parse_parameters(const std::string& text, bool& ok) {
-    std::vector<std::string> result; std::string current; bool quoted=false; char quote=0;
+std::vector<std::string> parse_parameters(const std::string& text, bool& ok,
+                                          std::vector<bool>* quoted = nullptr) {
+    std::vector<std::string> result; std::string current; bool in_quotes=false; char quote=0;
+    bool parameter_was_quoted=false;
     int parens=0, brackets=0, braces=0; std::size_t significant_end=0; ok=true;
-    auto append_parameter=[&]{ current.resize(significant_end); result.push_back(current); current.clear(); significant_end=0; };
+    auto append_parameter=[&]{ current.resize(significant_end); result.push_back(current);
+        if (quoted) quoted->push_back(parameter_was_quoted);
+        current.clear(); significant_end=0; parameter_was_quoted=false; };
     for (std::size_t i=0;i<text.size();++i) {
         const char c=text[i];
-        if (quoted) {
+        if (in_quotes) {
             if (c=='\\' && i+1<text.size()) { const char escaped=text[++i]; if (escaped=='$') current+='\\'; current+=escaped; significant_end=current.size(); }
-            else if (c==quote) quoted=false; else { current+=c; significant_end=current.size(); }
+            else if (c==quote) in_quotes=false; else { current+=c; significant_end=current.size(); }
             continue;
         }
-        if (c=='\'' || c=='"') { quoted=true; quote=c; continue; }
+        if (c=='\'' || c=='"') { in_quotes=true; quote=c; parameter_was_quoted=true; continue; }
         if (c=='(') ++parens; else if (c==')') --parens; else if (c=='[') ++brackets; else if (c==']') --brackets; else if (c=='{') ++braces; else if (c=='}') --braces;
         if (parens<0 || brackets<0 || braces<0) { ok=false; return {}; }
         if (c==',' && parens==0 && brackets==0 && braces==0) { append_parameter(); continue; }
         if (std::isspace(static_cast<unsigned char>(c))) { if (!current.empty()) current+=c; }
         else { current+=c; significant_end=current.size(); }
     }
-    if (quoted || parens || brackets || braces) { ok=false; return {}; }
+    if (in_quotes || parens || brackets || braces) { ok=false; return {}; }
     if (!text.empty() || !current.empty()) append_parameter();
     return result;
 }
@@ -377,6 +381,21 @@ bool Parser::find_balanced(const std::string& source,
         if (c == '\'' || c == '"') {
             quoted = true;
             quote = c;
+            continue;
+        }
+
+        // Code spans and fenced blocks (backtick-delimited) are not template
+        // structure: braces inside Markdown code samples or AsciiDoc/RST
+        // literal backtick spans must not terminate a surrounding @markup or
+        // @json block. An unterminated run is treated as literal text.
+        if (c == '`') {
+            std::size_t run = 1;
+            while (i + run < source.size() && source[i + run] == '`') ++run;
+            const std::string delimiter(source, i, run);
+            const auto span_end = source.find(delimiter, i + run);
+            if (span_end != std::string::npos) {
+                i = span_end + run - 1;
+            }
             continue;
         }
 
@@ -2119,6 +2138,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             const std::string function = source.substr(i + 1, name_end - i - 1);
             std::size_t call_start = name_end;
             std::vector<std::string> parameters;
+            std::vector<bool> parameter_quoted;
             bool has_parameters = false;
             bool parameters_ok = true;
             std::size_t end = call_start;
@@ -2127,7 +2147,8 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 has_parameters = true;
                 std::size_t close = 0;
                 if (!find_balanced(source, call_start, '(', ')', close)) { fail(source_path, source, i, function + ": malformed parameters"); break; }
-                parameters = parse_parameters(source.substr(call_start + 1, close - call_start - 1), parameters_ok);
+                parameters = parse_parameters(source.substr(call_start + 1, close - call_start - 1), parameters_ok,
+                                              function == "json" ? &parameter_quoted : nullptr);
                 if (!parameters_ok) { fail(source_path, source, i, function + ": malformed parameters"); break; }
                 end = close + 1;
                 if (end < source.size() && source[end] == ';') ++end;
@@ -2535,8 +2556,14 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                         resolver_error = "markup include is not readable: " + requested;
                         return false;
                     }
+                    if (std::find(input_stack_.begin(), input_stack_.end(), candidate) != input_stack_.end()) {
+                        resolver_error = "markup include would form a cycle through " + candidate.generic_string();
+                        return false;
+                    }
                     result_.dependencies.insert(host_.relative(candidate));
+                    input_stack_.push_back(candidate);
                     const auto templated = parse(*loaded.content, candidate, depth + 1);
+                    input_stack_.pop_back();
                     if (!templated.ok) {
                         resolver_error = result_.error.message;
                         return false;
@@ -2659,16 +2686,34 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 const bool has_schema = inline_json ? parameters.size() == 2 : parameters.size() == 3;
                 if (has_schema) {
                     const std::size_t schema_index = 1;
+                    const bool schema_was_quoted = parameter_quoted.size() > schema_index &&
+                                                   parameter_quoted[schema_index];
                     const std::string schema_reference = trim_copy(parameters[schema_index]);
                     std::shared_ptr<const json::Document> schema;
                     std::string schema_label;
-                    if (valid_binding_identifier(schema_reference)) {
-                        std::string binding_error;
-                        if (resolve_json_value(schema_reference, schema, binding_error)) {
-                            schema_label = schema_reference;
+                    if (!schema_was_quoted) {
+                        // A bare identifier in the schema position is a schema
+                        // binding name and must already exist; it must never
+                        // fall back to a same-named file.
+                        if (!valid_binding_identifier(schema_reference)) {
+                            fail(source_path, source, i,
+                                 "json: schema name '" + schema_reference +
+                                 "' must be an existing binding name or a quoted schema path");
+                            break;
                         }
-                    }
-                    if (!schema) {
+                        std::string binding_error;
+                        if (!resolve_json_value(schema_reference, schema, binding_error)) {
+                            fail(source_path, source, i,
+                                 "json: schema name '" + schema_reference +
+                                 "' is not bound (quote the argument to use a schema path)");
+                            break;
+                        }
+                        if (!binding_error.empty()) {
+                            fail(source_path, source, i, "json: " + binding_error);
+                            break;
+                        }
+                        schema_label = schema_reference;
+                    } else {
                         std::string schema_path_argument;
                         if (!interpolate_parameter(parameters[schema_index], schema_path_argument,
                                                    interpolation_error)) {

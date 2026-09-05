@@ -68,4 +68,36 @@ printf '@markup("unknown") { text }\n' > content/index.html
 if "$NIFT_BIN" build >out 2>err; then exit 1; fi
 grep -F "unknown format 'unknown'" err >/dev/null
 
+# A @markup include cycle that closes through a nested @markup directive is
+# reported cleanly instead of exhausting the parse-depth guard.
+mkdir -p cyc
+printf '@markup("adoc", "cyc/part-a.adoc")\n' > content/index.html
+printf '= A\n\ninclude::part-b.adoc[]\n' > cyc/part-a.adoc
+printf '@markup("adoc", "cyc/part-a.adoc")\n' > cyc/part-b.adoc
+if "$NIFT_BIN" build >out 2>err; then exit 1; fi
+grep -F 'cycle' err >/dev/null
+
+# Braces inside Markdown code spans and fenced blocks must not terminate the
+# @markup block; quoted braces in inline JSON must not corrupt parsing.
+cat > content/index.html <<'EOF'
+@markup("md") {
+  ## Braces
+
+  Inline `code { x }` span.
+
+  ```
+  function f() { return { a: 1 }; }
+  ```
+}
+@json(settings) {
+  {"pattern": "value { with } lone } brace"}
+}
+VALUE=$[settings.pattern]
+EOF
+"$NIFT_BIN" build >/dev/null
+grep -F '<code>code { x }</code>' public/index.html >/dev/null
+grep -F '<span class="hljs-title">' public/index.html >/dev/null 2>&1 || true
+grep -F 'function f() { return { a: 1 }; }' public/index.html >/dev/null
+grep -F 'VALUE=value { with } lone } brace' public/index.html >/dev/null
+
 echo '@json and @markup directive smoke test passed'
