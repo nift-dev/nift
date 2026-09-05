@@ -34,8 +34,8 @@ whether it is a regression.
 - Embedded minifier: `minifypp/`, synchronized with standalone Minify++.
 - Embedded JSON parser: `jsonic/include/json.h`, synchronized with standalone Jsonic++; `src/Json.h` is a compatibility wrapper.
 - Embedded markup converter: `markuppp/`, synchronized byte-for-byte with the current standalone Markup++ candidate (`make test-markuppp-sync`); standalone remains canonical.
-- Line comments use `@//` only. The former `@#` alias was removed after it
-  collided with embedded CSS/WPT source; literal `@#` must pass through unchanged.
+- Source comments are opaque: `@//` for a single line and `@/* ... */` for a
+  multiline block. Comment bodies are skipped without parsing Nift syntax.
 - Snap Store publication is asynchronous relative to GitHub releases: `snap.yml`
   validates only, while `snap-promote.yml` manually promotes completed connected
   edge builds after every declared architecture is available.

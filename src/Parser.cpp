@@ -401,10 +401,10 @@ bool Parser::find_balanced(const std::string& source,
 
         // Comment bodies are not template structure. In particular, a brace in
         // a source/HTML comment must not terminate a surrounding @if/@for block.
-        if (source.compare(i, 4, "<#--") == 0) {
-            const auto comment_end = source.find("--#>", i + 4);
+        if (source.compare(i, 3, "@/*") == 0) {
+            const auto comment_end = source.find("*/", i + 3);
             if (comment_end == std::string::npos) return false;
-            i = comment_end + 3;
+            i = comment_end + 1;
             continue;
         }
         if (source.compare(i, 4, "<!--") == 0) {
@@ -1413,10 +1413,10 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             continue;
         }
 
-        if (source.compare(i, 4, "<#--") == 0) {
-            const auto end = source.find("--#>", i + 4);
-            if (end == std::string::npos) { fail(source_path, source, i, "open comment '<#--' has no close '--#>'"); break; }
-            i = end + 4;
+        if (source.compare(i, 3, "@/*") == 0) {
+            const auto end = source.find("*/", i + 3);
+            if (end == std::string::npos) { fail(source_path, source, i, "open comment '@/*' has no close '*/'"); break; }
+            i = end + 2;
             continue;
         }
         if (source.compare(i, 3, "@//") == 0) {

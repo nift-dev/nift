@@ -4,9 +4,9 @@
 
 Development in progress following the public v4.0.9 release.
 
-- Removed the `@#` single-line comment alias. `@//` remains the Nift
-  line-comment syntax; literal `@#` now passes through unchanged, avoiding
-  accidental comments inside embedded CSS and other foreign source text.
+- Standardized Nift source comments on familiar opaque forms: `@//` for
+  single-line comments and `@/* ... */` for multiline comments. Comment bodies
+  are skipped without parsing or executing Nift syntax.
 - Synchronized the embedded Minify++ CSS recovery fixes found through the new
   WPT conformance harness, including browser-style EOF recovery for strings and
   comments and bad-string newline handling.

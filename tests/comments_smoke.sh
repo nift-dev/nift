@@ -19,10 +19,10 @@ printf '{}\n' > data/ignored.json
 
 cat > content/index.html <<'EOF'
 before
-<#--
+@/*
 @dep('data/ignored.json')
 $[title]
---#>
+*/
 @// ignored line $[title]
 <!-- html comment: $[title] -->
 <pre>@# is ordinary text now</pre>
@@ -39,5 +39,15 @@ grep -F '<!-- html comment: Comments -->' public/index.html >/dev/null
 grep -F '<pre>@# is ordinary text now</pre>' public/index.html >/dev/null
 grep -F '<p>@# inline text remains</p>' public/index.html >/dev/null
 ! grep -F '"data/ignored.json"' .nift/public/index.info.json >/dev/null
+
+cat > content/index.html <<'EOF'
+before
+@/* never closes
+EOF
+if "$NIFT_BIN" build --all >build.out 2>build.err; then
+    echo "expected unclosed multiline comment to fail" >&2
+    exit 1
+fi
+grep -F "open comment '@/*' has no close '*/'" build.err >/dev/null
 
 echo "Comments smoke test passed"

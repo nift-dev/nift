@@ -123,7 +123,7 @@ OBJ=$[key]:$[val.value]
 }
 @if(true){QUOTED_BRACE="}"
 }
-@if(true){<#-- } raw comment brace --#>
+@if(true){@/* } raw comment brace */
 @// } line comment brace
 <!-- } html comment brace -->
 COMMENT_BRACES_OK

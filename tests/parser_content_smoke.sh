@@ -282,7 +282,7 @@ fi
 rm -f .nift/.unfinished
 
 cat > templates/template.html <<'EOF2'
-<#-- @content --#>
+@/* @content */
 @if(false){@content}
 @input('slot.html')
 EOF2
