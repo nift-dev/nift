@@ -33,7 +33,7 @@ whether it is a regression.
 - External contract: the separate `nift-regression-suite` repository.
 - Embedded minifier: `minifypp/`, synchronized with standalone Minify++.
 - Embedded JSON parser: `jsonic/include/json.h`, synchronized with standalone Jsonic++; `src/Json.h` is a compatibility wrapper.
-- Embedded markup converter: `markuppp/`, synchronized with standalone Markup++ at approved commit `ee0ec00`.
+- Embedded markup converter: `markuppp/`, synchronized byte-for-byte with the current standalone Markup++ candidate (`make test-markuppp-sync`); standalone remains canonical.
 
 Do not habitually reduce Nift to “a static site generator.” Nift generates
 website artifacts, but those artifacts may contain client applications, consume
