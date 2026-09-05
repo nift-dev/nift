@@ -47,7 +47,7 @@ def mutate(rng,s):
     return s
 
 BASES=[
-'''@json("data/site.json", site)
+'''@json(site, "data/site.json")
 @if(site.enabled){<b>$[title]</b>}else{<i>$[name]</i>}
 @for(item : site.items){<span>$[item.name]-$[loop.index]</span>}
 @content
@@ -73,7 +73,7 @@ $[title]
 </code></pre>
 @content
 ''',
-'''@json('data/site.json',site)
+'''@json(site, 'data/site.json')
 @if(site.count >= 2){yes}
 @if(site.name == "Nift"){name}
 @for((key,val):site.object){$[key]=$[val]}

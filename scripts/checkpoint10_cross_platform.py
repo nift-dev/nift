@@ -178,7 +178,7 @@ def setup_project(root):
         "properties": {"name": {"type": "string"}, "items": {"type": "array", "maxItems": 8}}
     })
     write(root / "templates/page.html",
-          '@json("data/site.json", site, "schemas/site.schema.json")\n'
+          '@json(site, "schemas/site.schema.json", "data/site.json")\n'
           '@input("parts/shared.html")\n'
           '<nav><a href="$[routes.home]">$[site.name]</a></nav>\n'
           '<a href="@pathto(\'docs/index\')">docs</a>\n'

@@ -91,7 +91,7 @@ with tempfile.TemporaryDirectory(prefix="nift-cp8-") as td:
     def unreadable_json():
         root=td/"unread-json"; root.mkdir(); scaffold(root)
         (root/"data").mkdir(); j=root/"data/site.json"; j.write_text('{"name":"ok"}\n')
-        (root/"templates/template.html").write_text('@json("data/site.json", site)\n<b>$[site.name]</b>@content\n')
+        (root/"templates/template.html").write_text('@json(site, "data/site.json")\n<b>$[site.name]</b>@content\n')
         run(root,"build", "--all"); prior=preserve_pair(root)
         j.write_text('{"name":"new"}\n'); os.chmod(j,0)
         try:
@@ -125,7 +125,7 @@ with tempfile.TemporaryDirectory(prefix="nift-cp8-") as td:
     def json_replaced_by_directory():
         root=td/"json-dir"; root.mkdir(); scaffold(root)
         (root/"data").mkdir(); p=root/"data/site.json"; p.write_text('{"v":1}\n')
-        (root/"templates/template.html").write_text('@json("data/site.json", site)\n$[site.v]@content\n')
+        (root/"templates/template.html").write_text('@json(site, "data/site.json")\n$[site.v]@content\n')
         run(root,"build", "--all"); prior=preserve_pair(root)
         p.unlink(); p.mkdir()
         r=run(root,"build", "--all",ok=False)

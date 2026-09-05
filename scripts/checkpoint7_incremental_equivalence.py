@@ -48,7 +48,7 @@ def setup(root,mode):
     (root/"schemas/site.schema.json").write_text('{"type":"object","required":["name","items"],"properties":{"name":{"type":"string"},"items":{"type":"array"}}}\n')
     (root/"templates/parts/shared.html").write_text("<strong>shared-0</strong>\n")
     (root/"templates/template.html").write_text(
-      '@json("data/site.json", site, "schemas/site.schema.json")\n'
+      '@json(site, "schemas/site.schema.json", "data/site.json")\n'
       '@input("parts/shared.html")\n'
       '<a href="$[routes.home]">$[site.name]</a>\n'
       '@for(item : site.items){<i>$[item.v]</i>}\n@content\n')
@@ -77,7 +77,7 @@ def mutate(root,rng,step):
         p.write_text(f"<p>content-{step}-{rng.randrange(1_000_000)}</p>\n"); touch(p)
     elif op=="template":
         p=root/"templates/template.html"
-        p.write_text('@json("data/site.json", site, "schemas/site.schema.json")\n@input("parts/shared.html")\n'
+        p.write_text('@json(site, "schemas/site.schema.json", "data/site.json")\n@input("parts/shared.html")\n'
                      f'<em>template-{step}</em><a href="$[routes.home]">$[site.name]</a>\n'
                      '@for(item : site.items){<i>$[item.v]</i>}\n@content\n'); touch(p)
     elif op=="json":
