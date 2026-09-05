@@ -147,19 +147,28 @@ bool css(const std::string& input, std::string& output, std::string& error) {
             output.push_back(c);
             ++i;
             bool escaped = false;
-            bool closed = false;
             while (i < input.size()) {
                 const char q = input[i++];
                 output.push_back(q);
-                if (escaped) escaped = false;
-                else if (q == '\\') escaped = true;
-                else if (q == quote) { closed = true; break; }
+                if (escaped) {
+                    escaped = false;
+                    continue;
+                }
+                if (q == '\\') {
+                    escaped = true;
+                    continue;
+                }
+                if (q == quote) break;
+                // CSS Syntax recovers an unescaped newline as a bad-string
+                // token rather than making the whole stylesheet invalid. The
+                // newline itself is significant because it terminates the
+                // token, so preserve it and resume scanning after it.
+                if (q == '\n' || q == '\r' || q == '\f') break;
             }
-            if (!closed) {
-                error = "unterminated CSS string";
-                output.clear();
-                return false;
-            }
+            // EOF also terminates a CSS string token with a parse error but
+            // without rejecting the stylesheet. Preserve the recoverable
+            // source rather than turning browser-accepted CSS into a Minify++
+            // hard error.
             continue;
         }
 
@@ -167,9 +176,18 @@ bool css(const std::string& input, std::string& output, std::string& error) {
             const bool preserve = i + 2 < input.size() && input[i + 2] == '!';
             const auto end = input.find("*/", i + 2);
             if (end == std::string::npos) {
-                error = "unterminated CSS comment";
-                output.clear();
-                return false;
+                // CSS comments are implicitly closed by EOF. Ordinary
+                // comments can therefore be removed to EOF; preserved license
+                // comments remain byte-for-byte intact and are likewise
+                // browser-recoverable without a closing delimiter.
+                if (preserve) {
+                    emit_pending_css_space(output, pending_space, '/');
+                    output.append(input, i, std::string::npos);
+                } else {
+                    pending_space = true;
+                }
+                i = input.size();
+                continue;
             }
             if (preserve) {
                 emit_pending_css_space(output, pending_space, '/');

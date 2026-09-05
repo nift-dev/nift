@@ -1,0 +1,44 @@
+name: Promote completed Snap builds
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version already completed on latest/edge (for example 4.0.10)
+        required: true
+        type: string
+
+env:
+  SNAPCRAFT_SNAP_REVISION: "18514"
+  SNAPCRAFT_EXPECTED_VERSION: "9.0.1"
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: nift-snap-store-promotion
+      cancel-in-progress: false
+    env:
+      SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+      NIFT_SNAP_VERSION: ${{ inputs.version }}
+      # This workflow is deliberately user-triggered only after the connected
+      # builders have completed. Do not hold a GitHub release open waiting for
+      # scarce builders such as riscv64. A short wait only absorbs Store API
+      # propagation after the operator has confirmed edge is complete.
+      NIFT_SNAP_WAIT: "300"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Validate requested version
+        shell: bash
+        run: |
+          case "$NIFT_SNAP_VERSION" in
+            ''|*[!0-9.]*) echo "version must contain only digits and dots" >&2; exit 1 ;;
+          esac
+          package_version="$(sed -nE "s/^version: '([^']+)'/\1/p" snap/snapcraft.yaml)"
+          test "$package_version" = "$NIFT_SNAP_VERSION"
+      - name: Install and verify pinned snapcraft
+        shell: bash
+        run: bash packaging/snapcraft-pin.sh
+      - name: Promote completed edge revisions
+        shell: bash
+        run: python3 packaging/snap_release.py

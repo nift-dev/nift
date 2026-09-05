@@ -413,7 +413,7 @@ bool Parser::find_balanced(const std::string& source,
             i = comment_end + 2;
             continue;
         }
-        if (source.compare(i, 2, "@#") == 0 || source.compare(i, 3, "@//") == 0) {
+        if (source.compare(i, 3, "@//") == 0) {
             const auto line_end = source.find('\n', i);
             if (line_end == std::string::npos) return false;
             i = line_end;
@@ -1419,7 +1419,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             i = end + 4;
             continue;
         }
-        if (source.compare(i, 2, "@#") == 0 || source.compare(i, 3, "@//") == 0) {
+        if (source.compare(i, 3, "@//") == 0) {
             const auto end = source.find('\n', i);
             i = end == std::string::npos ? source.size() : end;
             continue;

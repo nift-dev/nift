@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Added Web Platform Test-driven CSS recovery coverage. CSS EOF comments and
+  strings now follow browser-style recovery semantics instead of becoming
+  Minify++ errors, and bad strings stop at unescaped newlines so subsequent CSS
+  remains visible to the scanner.
+
 - Reopened the production-readiness audit after a real Minify++ website build
   exposed unsafe CSS whitespace removal. CSS token-boundary handling now protects
   leading-decimal value lists, descendant selectors, adjacent quoted values,
@@ -18,8 +23,10 @@
   authored whitespace.
 - Prevented the JSX root finder from interpreting JSX-like text inside JavaScript
   comments as live markup, and made escaped JSX attribute quotes explicit.
-- CSS, HTML, XML, SVG, and JSX now reject affected unterminated quoted constructs
-  instead of accepting partial lexical output.
+- HTML, XML, SVG, and JSX now reject affected unterminated quoted constructs
+  instead of accepting partial lexical output. CSS follows CSS Syntax EOF recovery:
+  unterminated strings and comments are recovered rather than rejected, while an
+  unescaped newline terminates a bad string without swallowing following tokens.
 - Raised the adversarial validation campaign to 7,000,000 deterministic mutations
   across the seven formats under both ordinary and ASan/UBSan builds; all
   successful first-pass outputs remained accepted on the second pass.

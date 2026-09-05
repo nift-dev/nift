@@ -281,7 +281,6 @@ jobs:
   snap:
     needs: publish
     uses: ./.github/workflows/snap.yml
-    secrets: inherit
 
   homebrew:
     needs: publish

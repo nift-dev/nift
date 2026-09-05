@@ -30,6 +30,19 @@ int main() {
     expect(out.find("/ *") != std::string::npos, "CSS whitespace removal created a comment opener");
     expect(out.find("* /") != std::string::npos, "CSS whitespace removal created a comment closer");
 
+    // CSS Syntax treats EOF as recovery for unterminated comments/strings and
+    // an unescaped newline as the end of a bad-string token. Minification must
+    // not reject or retokenize source that browsers intentionally recover.
+    expect(minify::css(".a { color: red; } /* eof", out, err), err);
+    eq(out, ".a{color:red;}", "css eof comment recovery");
+    expect(minify::css("/*!license eof", out, err), err);
+    eq(out, "/*!license eof", "css preserved eof comment recovery");
+    expect(minify::css(".a { content: \"unterminated", out, err), err);
+    eq(out, ".a{content:\"unterminated", "css eof string recovery");
+    expect(minify::css(".a { content: \"bad\n; color: red; }", out, err), err);
+    expect(out.find("\n") != std::string::npos, "CSS bad-string terminating newline removed");
+    expect(out.find("color:red") != std::string::npos, "CSS after bad-string newline was swallowed");
+
     // Authored CSS whitespace can separate tokens even when neither side is an
     // identifier character. These are public semantic contracts, not preferred
     // output spellings: removing the spaces changes or invalidates the CSS.
@@ -202,12 +215,15 @@ int main() {
         eq(twice, once, "adversarial JSX idempotence");
     }
 
-    // Malformed lexical constructs should fail cleanly rather than silently
-    // emitting a half-minified program.
+    // Malformed lexical constructs that are not browser-recoverable should fail
+    // cleanly rather than silently emitting a half-minified program. CSS EOF
+    // recovery is intentionally accepted below because browsers do the same.
     expect(!minify::javascript("const x = 'unterminated", out, err), "unterminated JS string accepted");
     expect(!minify::javascript("const x = `unterminated", out, err), "unterminated JS template accepted");
-    expect(!minify::css("a{/* unterminated", out, err), "unterminated CSS comment accepted");
-    expect(!minify::css("a{content:\"unterminated}", out, err), "unterminated CSS string accepted");
+    expect(minify::css("a{/* unterminated", out, err), err);
+    eq(out, "a{", "CSS EOF comment recovery");
+    expect(minify::css("a{content:\"unterminated}", out, err), err);
+    eq(out, "a{content:\"unterminated}", "CSS EOF string recovery");
     expect(!minify::html("<div data-x=\"unterminated>", out, err),
            "unterminated HTML attribute accepted");
     expect(!minify::xml("<node data-x=\"unterminated>", out, err),
@@ -351,9 +367,11 @@ int main() {
     expect(minify::html("<p>你好   😀   café</p>", out, err), err);
     expect(out.find("你好 😀 café") != std::string::npos, "Unicode HTML text damaged");
 
-    // Malformed inputs fail rather than emitting guessed output.
+    // Non-recoverable malformed inputs fail rather than emitting guessed output.
+    // CSS comments are recoverable at EOF according to CSS Syntax.
     expect(!minify::html("<div", out, err), "unterminated HTML tag accepted");
-    expect(!minify::css("a{/*", out, err), "unterminated CSS comment accepted");
+    expect(minify::css("a{/*", out, err), err);
+    eq(out, "a{", "CSS short EOF comment recovery");
     expect(!minify::javascript("/*", out, err), "unterminated JS comment accepted");
 
     // Idempotence: a second minification pass must be byte-identical.

@@ -4,6 +4,15 @@
 
 Development in progress following the public v4.0.9 release.
 
+- Removed the `@#` single-line comment alias. `@//` remains the Nift
+  line-comment syntax; literal `@#` now passes through unchanged, avoiding
+  accidental comments inside embedded CSS and other foreign source text.
+- Synchronized the embedded Minify++ CSS recovery fixes found through the new
+  WPT conformance harness, including browser-style EOF recovery for strings and
+  comments and bad-string newline handling.
+- Decoupled Snap Store promotion from the GitHub release workflow. Release runs
+  now perform only non-publishing Snap validation; completed connected builds
+  are promoted later through the manual `Promote completed Snap builds` workflow.
 - Embedded the approved Markup++ library and its vendored cmark engine. The new
   `@markup(format){...}` and `@markup(format, path)` directives render Markdown,
   AsciiDoc or reStructuredText after evaluating Nift template syntax, then append

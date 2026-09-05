@@ -39,7 +39,7 @@ def mutate(rng,s):
             s=s[:i]+s[j:]
         elif op==5:
             i=rng.randrange(len(s)+1)
-            token=rng.choice(['@if(true){','@if(false){','}else{','@content','$[title]','@# fuzz\n',
+            token=rng.choice(['@if(true){','@if(false){','}else{','@content','$[title]','@// fuzz\n',
                               '<#-- fuzz } --#>','<!-- fuzz } -->','\\@','\\$','{}','()','[]'])
             s=s[:i]+token+s[i:]
         else:
@@ -53,7 +53,7 @@ BASES=[
 @content
 ''',
 '''<main>
-@# line comment } { @if(
+@// line comment } { @if(
 <#-- raw comment @if(false){ } --#>
 <!-- html comment @for(x:y){ } -->
 @getenv("HOME")
@@ -141,7 +141,7 @@ with tempfile.TemporaryDirectory(prefix='nift-cp9-fuzz-') as td:
       ('literal-8m','x'*(8*1024*1024)+'\n@content\n',15.0),
       ('raw-comment-4m','<#--'+'x'*(4*1024*1024)+'--#>\n@content\n',12.0),
       ('html-comment-4m','<!--'+'}'*(4*1024*1024)+'-->\n@content\n',12.0),
-      ('line-comment-2m','@# '+'x'*(2*1024*1024)+'\n@content\n',10.0),
+      ('line-comment-2m','@// '+'x'*(2*1024*1024)+'\n@content\n',10.0),
       ('parameter-1m','@getenv("'+'A'*(1024*1024)+'")\n@content\n',10.0),
       ('balanced-parens-100k','@if('+'('*50000+'true'+')'*50000+'){ok}\n@content\n',12.0),
       ('interpolation-1m','$['+'a'*(1024*1024)+']\n@content\n',10.0),

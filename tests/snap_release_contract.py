@@ -878,36 +878,37 @@ class WorkflowStructure(unittest.TestCase):
             self.assertNotIn("$(", value)
             if "${" in value and "${{" not in value:
                 self.fail("shell expansion in YAML env value: " + value)
-        self.assertIn('"NIFT_SNAP_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"', text)
+        self.assertIn('test "$package_version" = "${GITHUB_REF_NAME#v}"', text)
 
-    def test_release_coordination_runs_the_coordinator(self):
+    def test_release_validation_does_not_coordinate_store_promotion(self):
         text = self.load(".github/workflows/snap.yml")
-        self.assertIn("release-coordination", text)
+        self.assertNotIn("release-coordination", text)
+        self.assertNotIn("packaging/snap_release.py", text)
+        self.assertNotIn("SNAPCRAFT_STORE_CREDENTIALS", text)
+
+    def test_manual_promotion_runs_the_coordinator(self):
+        text = self.load(".github/workflows/snap-promote.yml")
+        self.assertIn("workflow_dispatch", text)
         self.assertIn("packaging/snap_release.py", text)
-
-    def test_concurrency_group_serializes_release_transaction(self):
-        self.assertIn("nift-snap-release-transaction", self.load(".github/workflows/snap.yml"))
-        self.assertIn("cancel-in-progress: false", self.load(".github/workflows/snap.yml"))
-
-    def test_store_credentials_only_on_publishing_job(self):
-        text = self.load(".github/workflows/snap.yml")
+        self.assertIn("nift-snap-store-promotion", text)
+        self.assertIn("cancel-in-progress: false", text)
         self.assertEqual(text.count("SNAPCRAFT_STORE_CREDENTIALS:"), 1)
-        build_section = text.split("release-coordination")[0]
-        self.assertNotIn("SNAPCRAFT_STORE_CREDENTIALS", build_section)
+        self.assertNotIn("push:", text)
 
     def test_no_duplicate_publisher_to_unbranched_edge(self):
-        text = self.load(".github/workflows/snap.yml")
-        self.assertNotIn("publish-edge", text)
-        self.assertNotIn("release=edge", text)
-        self.assertNotIn("--release=edge", text)
+        for path in (".github/workflows/snap.yml", ".github/workflows/snap-promote.yml"):
+            text = self.load(path)
+            self.assertNotIn("publish-edge", text)
+            self.assertNotIn("release=edge", text)
+            self.assertNotIn("--release=edge", text)
 
     def test_immutable_snapcraft_pin_with_post_install_assertions(self):
-        text = self.load(".github/workflows/snap.yml")
-        self.assertIn('SNAPCRAFT_SNAP_REVISION: "18514"', text)
-        self.assertIn('SNAPCRAFT_EXPECTED_VERSION: "9.0.1"', text)
-        # Both the manual preflight and the release coordinator call the shared
-        # pin script, which holds the immutable-revision install and assertions.
-        self.assertEqual(text.count("packaging/snapcraft-pin.sh"), 2)
+        validation = self.load(".github/workflows/snap.yml")
+        promotion = self.load(".github/workflows/snap-promote.yml")
+        for text in (validation, promotion):
+            self.assertIn('SNAPCRAFT_SNAP_REVISION: "18514"', text)
+            self.assertIn('SNAPCRAFT_EXPECTED_VERSION: "9.0.1"', text)
+            self.assertIn("packaging/snapcraft-pin.sh", text)
         script = self.load("packaging/snapcraft-pin.sh")
         self.assertIn('--revision="$REVISION"', script)
         self.assertIn('[ "$installed_version" = "$EXPECTED" ]', script)
@@ -916,16 +917,11 @@ class WorkflowStructure(unittest.TestCase):
     def test_manual_preflight_verifies_pin_without_credentials_or_publication(self):
         text = self.load(".github/workflows/snap.yml")
         self.assertIn("toolchain-preflight", text)
-        preflight = text.split("release-coordination")[0]
-        self.assertIn("packaging/snapcraft-pin.sh", preflight)
-        # No Store credential, no release/promote/upload publication in preflight.
-        self.assertNotIn("SNAPCRAFT_STORE_CREDENTIALS", preflight)
-        self.assertNotIn("snapcraft release", preflight)
-        self.assertNotIn("snapcraft promote", preflight)
-        self.assertNotIn("snapcraft upload", preflight)
-
-    def test_release_coordination_depends_on_toolchain_preflight(self):
-        self.assertIn("needs: [build, toolchain-preflight]", self.load(".github/workflows/snap.yml"))
+        self.assertIn("packaging/snapcraft-pin.sh", text)
+        self.assertNotIn("SNAPCRAFT_STORE_CREDENTIALS", text)
+        self.assertNotIn("snapcraft release", text)
+        self.assertNotIn("snapcraft promote", text)
+        self.assertNotIn("snapcraft upload", text)
 
     def test_candidate_smoke_ordered_before_stable_release(self):
         script = self.load("packaging/snap_release.py")
@@ -952,6 +948,7 @@ class WorkflowStructure(unittest.TestCase):
         ]
         active_docs = (
             ".github/workflows/snap.yml",
+            ".github/workflows/snap-promote.yml",
             "docs/handover/PACKAGING.md",
             "packaging/snap-candidate-smoke.sh",
             "packaging/snap_release.py",
@@ -974,7 +971,7 @@ class WorkflowStructure(unittest.TestCase):
         self.assertNotIn("?fields=channel-map\"", script)
 
     def test_no_credential_skip_gate_on_publication(self):
-        text = self.load(".github/workflows/snap.yml")
+        text = self.load(".github/workflows/snap-promote.yml")
         self.assertNotIn("SNAPCRAFT_STORE_CREDENTIALS != ''", text)
 
     def test_smoke_uses_sudo_for_install_and_cleanup(self):
@@ -997,7 +994,10 @@ class WorkflowStructure(unittest.TestCase):
         self.assertIn('[ "$installed_revision" = "$REVISION" ]', script)
 
     def test_release_workflow_calls_snap_via_workflow_call(self):
-        self.assertIn("uses: ./.github/workflows/snap.yml", self.load(".github/workflows/release.yml"))
+        text = self.load(".github/workflows/release.yml")
+        self.assertIn("uses: ./.github/workflows/snap.yml", text)
+        snap_job = text.split("  snap:", 1)[1].split("\n  ", 1)[0]
+        self.assertNotIn("secrets: inherit", snap_job)
 
 
 if __name__ == "__main__":

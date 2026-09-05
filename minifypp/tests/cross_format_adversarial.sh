@@ -40,7 +40,7 @@ check_idem .xml '<?pi  a   b?><r><![CDATA[a < b]]><x> a  b </x></r>'
 check_idem .svg '<svg><text>a  b</text><path d="M 0 0 L 10 10"/></svg>'
 
 check_fail .html '<div'
-check_fail .css 'a{/*'
+check_idem .css 'a{/*'
 check_fail .js 'const r=/unterminated'
 check_fail .jsx 'const x=<div>{a+1</div>;'
 check_fail .json '{"a":}'

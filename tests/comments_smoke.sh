@@ -23,10 +23,10 @@ before
 @dep('data/ignored.json')
 $[title]
 --#>
-@# ignored line $[title]
-@// also ignored $[title]
+@// ignored line $[title]
 <!-- html comment: $[title] -->
-@#-- old parsed-comment opener is now just a single-line @# comment
+<pre>@# is ordinary text now</pre>
+<p>@# inline text remains</p>
 after
 EOF
 
@@ -36,8 +36,8 @@ grep -F 'before' public/index.html >/dev/null
 grep -F 'after' public/index.html >/dev/null
 grep -F '<!-- html comment: Comments -->' public/index.html >/dev/null
 ! grep -F 'ignored line' public/index.html >/dev/null
-! grep -F 'also ignored' public/index.html >/dev/null
-! grep -F 'old parsed-comment opener' public/index.html >/dev/null
+grep -F '<pre>@# is ordinary text now</pre>' public/index.html >/dev/null
+grep -F '<p>@# inline text remains</p>' public/index.html >/dev/null
 ! grep -F '"data/ignored.json"' .nift/public/index.info.json >/dev/null
 
 echo "Comments smoke test passed"

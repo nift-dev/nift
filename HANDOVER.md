@@ -34,6 +34,11 @@ whether it is a regression.
 - Embedded minifier: `minifypp/`, synchronized with standalone Minify++.
 - Embedded JSON parser: `jsonic/include/json.h`, synchronized with standalone Jsonic++; `src/Json.h` is a compatibility wrapper.
 - Embedded markup converter: `markuppp/`, synchronized byte-for-byte with the current standalone Markup++ candidate (`make test-markuppp-sync`); standalone remains canonical.
+- Line comments use `@//` only. The former `@#` alias was removed after it
+  collided with embedded CSS/WPT source; literal `@#` must pass through unchanged.
+- Snap Store publication is asynchronous relative to GitHub releases: `snap.yml`
+  validates only, while `snap-promote.yml` manually promotes completed connected
+  edge builds after every declared architecture is available.
 
 Do not habitually reduce Nift to “a static site generator.” Nift generates
 website artifacts, but those artifacts may contain client applications, consume
