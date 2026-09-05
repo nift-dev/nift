@@ -276,7 +276,7 @@ resolve_string_argument(...)
 parse_identifier_argument(...)
 ```
 
-so `@json(path, binding)` can treat its two argument positions differently.
+so `@json(binding, path)` can treat its two argument positions differently.
 
 ---
 
@@ -830,7 +830,7 @@ before any @directive:
 
 because arguments can contain grammar, identifiers and separators.
 
-`@for(...)`, `@if(...)`, `@json(..., binding)` are not simply one string.
+`@for(...)`, `@if(...)`, `@json(binding, ...)` are not simply one string.
 
 Interpolation belongs in **semantically textual argument positions**.
 
@@ -841,19 +841,19 @@ Interpolation belongs in **semantically textual argument positions**.
 Conceptually:
 
 ```text
-@json('data/$[dataset].json', data)
+@json(data, 'data/$[dataset].json')
 ```
 
 contains:
 
 ```text
 argument 1:
-    path string
-    → interpolate
-
-argument 2:
     lexical binding identifier
     → parse as identifier
+
+argument 2:
+    path string
+    → interpolate
 ```
 
 Do not turn:

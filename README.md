@@ -122,7 +122,7 @@ Nift renders the tracked page's content at `@content`, processes inputs and depe
 Structured project data can be loaded directly from JSON:
 
 ```html
-@json("data/site.json", site, "schemas/site.schema.json")
+@json(site, "data/site.json", "schemas/site.schema.json")
 <h1>$[site.title]</h1>
 <p>$[site.sections[3].items[0].label]</p>
 ```

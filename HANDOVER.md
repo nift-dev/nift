@@ -201,7 +201,18 @@ directly. Never re-enter the template parser on conversion output: generated
 `@...` or `$[...]` text is data. Markdown retains Markup++'s raw-HTML default;
 AsciiDoc and RST retain their converter capability policy. Includes are resolved
 by Nift inside the project root and their contents are templated before Markup++
-continues conversion.
+continues conversion. Include resolution participates in the same input-loop
+tracking as `@input` and `@markup` file sources, so a cycle that closes through
+a nested `@markup` directive is reported as a cycle rather than exhausting the
+parse-depth guard.
+
+RST raw directives are fail-closed: `.. raw::` is disabled by Markup++ and Nift
+surfaces the converter diagnostic as a build error. AsciiDoc `pass:[...]` and
+`++++` passthrough and Markdown raw HTML remain available. Inline `@markup` and
+`@json` bodies are delimited with brace counting that already ignores quoted
+strings, comments and backtick code spans/fences; a lone unmatched `}` in plain
+prose still terminates the block, so prefer the file-backed forms for prose that
+must contain unbalanced braces.
 
 `@json` is name-first. Its supported forms are `@json(name, path)`,
 `@json(name, schema-path, path)`, `@json(name, schema-name, path)`, and the
@@ -209,6 +220,10 @@ corresponding inline forms `@json(name){...}`, `@json(name, schema-path){...}`
 and `@json(name, schema-name){...}`. Inline bodies are templated before parsing;
 schema names refer to earlier JSON bindings. Source and schema files remain
 project-bound dependencies.
+
+In the schema position a bare identifier is a schema binding name and must
+already exist; a quoted string is a schema path. A missing bare schema name is a
+build error and never falls back to a same-named file.
 
 ## Maintaining this handover
 

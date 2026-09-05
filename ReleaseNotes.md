@@ -12,7 +12,15 @@ Development in progress following the public v4.0.9 release.
 - Reworked `@json` around name-first file forms and added inline JSON bodies:
   `@json(name, path)`, `@json(name, schema, path)`, `@json(name){...}` and
   `@json(name, schema){...}`. A schema argument may be a project path or an
-  earlier JSON binding, allowing reusable inline named schemas.
+  earlier JSON binding, allowing reusable inline named schemas. In the schema
+  position a bare identifier is a schema binding name that must already exist;
+  a quoted string is a schema path, and a missing bare schema name is an error
+  rather than a fallback to a same-named file.
+- `@markup` include resolution participates in input-loop tracking, so cycles
+  that close through a nested `@markup` directive are reported as cycles.
+  Inline `@markup`/`@json` brace counting ignores quoted strings, comments and
+  backtick code spans/fences; reStructuredText `raw` directives fail the build
+  closed rather than emitting raw HTML.
 - Added a maintained 41-file standalone/embedded Markup++ synchronization gate
   and focused conversion, templating, validation, path-safety and incremental
   dependency coverage.

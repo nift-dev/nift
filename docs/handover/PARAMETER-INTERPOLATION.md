@@ -392,7 +392,7 @@ what is the string value of @dep?
 and:
 
 ```text
-@json(@input('data-path.txt'), data)
+@json(data, @input('data-path.txt'))
 ```
 
 mixes rendering, IO, dependencies and filename resolution in a way Nift has never needed to define.
@@ -1047,7 +1047,7 @@ This is likely one of the most valuable examples.
 Expected:
 
 ```text
-@json('page.json', page)
+@json(page, 'page.json')
 
 @input($[page.partial])
 ```
@@ -1265,7 +1265,7 @@ This is likely one of the more important regression families for the new feature
 A natural use case is conceptually:
 
 ```text
-@json('data/$[page.dataset].json', data)
+@json(data, 'data/$[page.dataset].json')
 ```
 
 If the current grammar supports this after the feature, it should use the same interpolation layer.
@@ -1279,8 +1279,8 @@ The parameter value must already exist in the current lexical scope before it ca
 For example:
 
 ```text
-@json('config.json', config)
-@json('data/$[config.dataset].json', data)
+@json(config, 'config.json')
+@json(data, 'data/$[config.dataset].json')
 ```
 
 may be meaningful.
@@ -1288,7 +1288,7 @@ may be meaningful.
 But:
 
 ```text
-@json('data/$[data.file].json', data)
+@json(data, 'data/$[data.file].json')
 ```
 
 cannot use a binding that does not exist until the outer `@json` operation succeeds.
@@ -1333,7 +1333,7 @@ Do not blindly interpolate every token in a parameter list if some positions are
 For example, conceptually:
 
 ```text
-@json(path, binding)
+@json(binding, path)
 ```
 
 has two semantically different arguments:
@@ -1357,7 +1357,7 @@ This distinction is important.
 Something conceptually like:
 
 ```text
-@json('file.json', $[bindingName])
+@json($[bindingName], 'file.json')
 ```
 
 would turn dynamic value resolution into dynamic symbol creation.
@@ -1789,7 +1789,7 @@ Use current source/tests to distinguish tracked-name and concrete-file cases.
 Suppose:
 
 ```text
-@json('page.json', page)
+@json(page, 'page.json')
 @input('$[page.partial]')
 ```
 

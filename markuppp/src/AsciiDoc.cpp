@@ -6,6 +6,7 @@
 #include <cctype>
 #include <algorithm>
 #include <set>
+#include <stdexcept>
 #include <utility>
 
 namespace markup::asciidoc {
@@ -19,7 +20,8 @@ std::string normalize(const std::string& input);
 std::vector<std::string> split_lines(const std::string& input);
 bool starts_with(const std::string& value, const std::string& prefix);
 
-std::string select_include_content(const std::string& content, const std::string& options) {
+std::string select_include_content(const std::string& content, const std::string& options,
+                                   std::size_t max_bytes) {
     auto lines = split_lines(normalize(content));
     std::vector<std::string> selected = lines;
     const auto lines_at = options.find("lines=");
@@ -53,13 +55,37 @@ std::string select_include_content(const std::string& content, const std::string
     }
     unsigned indent = 0;
     const auto indent_at = options.find("indent=");
-    if (indent_at != std::string::npos)
-        indent = static_cast<unsigned>(std::stoul(options.substr(indent_at + 7)));
+    if (indent_at != std::string::npos) {
+        const std::string token = options.substr(indent_at + 7);
+        const auto token_end = token.find_first_of(" ,]");
+        const std::string indent_text = token.substr(0, token_end);
+        std::size_t parsed = 0;
+        if (indent_text.empty()) throw std::runtime_error("invalid include options");
+        try {
+            parsed = std::stoul(indent_text);
+        } catch (const std::exception&) {
+            throw std::runtime_error("invalid include options");
+        }
+        // Clamp indentation so the selected output cannot exceed the documented
+        // expansion budget even for a hostile indent= value.
+        if (parsed > 1024) parsed = 1024;
+        indent = static_cast<unsigned>(parsed);
+    }
     std::string result;
     for (std::size_t i = 0; i < selected.size(); ++i) {
-        if (indent && !selected[i].empty()) result.append(indent, ' ');
+        if (indent && !selected[i].empty()) {
+            if (selected[i].size() + indent > max_bytes - result.size())
+                throw std::runtime_error("expanded input exceeds 64 MiB");
+            result.append(indent, ' ');
+        }
+        if (selected[i].size() > max_bytes - result.size())
+            throw std::runtime_error("expanded input exceeds 64 MiB");
         result += selected[i];
-        if (i + 1 < selected.size()) result += '\n';
+        if (i + 1 < selected.size()) {
+            if (result.size() >= max_bytes)
+                throw std::runtime_error("expanded input exceeds 64 MiB");
+            result += '\n';
+        }
     }
     return result;
 }
@@ -101,14 +127,14 @@ bool expand_includes(const std::string& input, const std::string& identity,
                 error = identity + ":" + std::to_string(line + 1) + ": include cycle at " + canonical;
                 return false;
             }
-            if (content.size() > max_input_bytes - bytes) {
-                error = identity + ":" + std::to_string(line + 1) + ": expanded input exceeds 64 MiB";
-                return false;
-            }
             try {
-                content = select_include_content(content, include_options);
+                content = select_include_content(content, include_options, max_input_bytes);
             } catch (const std::exception&) {
                 error = identity + ":" + std::to_string(line + 1) + ": invalid include options";
+                return false;
+            }
+            if (content.size() > max_input_bytes - bytes) {
+                error = identity + ":" + std::to_string(line + 1) + ": expanded input exceeds 64 MiB";
                 return false;
             }
             bytes += content.size();
@@ -630,7 +656,7 @@ void parse_blocks(const std::vector<std::string>& lines, std::size_t& line,
         const std::string id = anchor_id(lines[line]);
         if (!id.empty()) { pending_id = id; ++line; continue; }
 
-        if (lines[line].size() > 1 && lines[line].front() == '.' && lines[line][1] != '.') {
+        if (lines[line].size() > 1 && lines[line].front() == '.' && lines[line][1] != '.' && lines[line][1] != ' ') {
             pending_title = substitute_attributes(lines[line++].substr(1), attributes);
             continue;
         }
@@ -947,10 +973,10 @@ std::string render_blocks(const std::vector<Block>& blocks, const Options& optio
 
 void validate_references(const std::vector<Block>& blocks, std::set<std::string>& ids,
                          std::vector<std::pair<std::string, Range>>& references,
-                         std::vector<std::string>& diagnostics) {
+                         std::vector<std::string>& diagnostics, const std::string& source_identity) {
     for (const auto& block : blocks) {
         if (!block.id.empty() && !ids.insert(block.id).second) {
-            diagnostics.push_back("<input>:" + std::to_string(block.source.begin.line) +
+            diagnostics.push_back(source_identity + ":" + std::to_string(block.source.begin.line) +
                                   ": duplicate anchor: " + block.id);
         }
         const auto inspect = [&](const std::vector<Inline>& inlines, const auto& self) -> void {
@@ -963,9 +989,9 @@ void validate_references(const std::vector<Block>& blocks, std::set<std::string>
         inspect(block.inlines, inspect);
         for (const auto& item : block.items) {
             inspect(item.inlines, inspect);
-            validate_references(item.blocks, ids, references, diagnostics);
+            validate_references(item.blocks, ids, references, diagnostics, source_identity);
         }
-        validate_references(block.blocks, ids, references, diagnostics);
+        validate_references(block.blocks, ids, references, diagnostics, source_identity);
     }
 }
 
@@ -1048,7 +1074,8 @@ bool parse(const std::string& input, Document& document, std::string& error,
     std::set<std::string> ids;
     std::vector<std::pair<std::string, Range>> references;
     std::vector<std::string> diagnostics;
-    validate_references(document.blocks, ids, references, diagnostics);
+    validate_references(document.blocks, ids, references, diagnostics,
+                             options.asciidoc_source_identity);
     for (const auto& reference : references) {
         if (reference.first.find('/') == std::string::npos &&
             reference.first.find('.') == std::string::npos &&
