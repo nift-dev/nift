@@ -176,6 +176,7 @@ jobs:
           cp -r src bindings/python/native/src
           cp -r include bindings/python/native/include
           cp -r minifypp bindings/python/native/minifypp
+          cp -r markuppp bindings/python/native/markuppp
           cp -r jsonic bindings/python/native/jsonic
           ( cd bindings/python && NIFT_VERSION="$VERSION" python3 setup.py sdist --dist-dir /tmp/pydist )
           SDIST="$(ls /tmp/pydist/nift-$VERSION.tar.gz | head -1)"

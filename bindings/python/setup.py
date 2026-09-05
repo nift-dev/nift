@@ -30,6 +30,9 @@ CABI_SOURCES = [
     "native/src/JsonFile.cpp",
     "native/src/JsonSchema.cpp",
     "native/minifypp/src/Minify.cpp",
+    "native/markuppp/src/Markup.cpp",
+    "native/markuppp/src/AsciiDoc.cpp",
+    "native/markuppp/src/ReStructuredText.cpp",
     "native/src/Parser.cpp",
     "native/src/ProjectInfo.cpp",
     "native/src/ProjectRead.cpp",
@@ -41,11 +44,23 @@ CABI_SOURCES = [
 sources = [os.path.join(BASE, s) for s in CABI_SOURCES]
 sources.append(os.path.join(BASE, "src", "nift_module.cc"))
 
+MARKUP_C_NAMES = [
+    "blocks", "buffer", "cmark", "cmark_ctype", "houdini_href_e",
+    "houdini_html_e", "houdini_html_u", "html", "inlines", "iterator",
+    "node", "references", "render", "scanners", "utf8",
+]
+sources.extend(
+    os.path.join(BASE, "native", "markuppp", "vendor", "cmark", name + ".c")
+    for name in MARKUP_C_NAMES
+)
+
 include_dirs = [
     os.path.join(NATIVE, "include"),
     os.path.join(NATIVE, "src"),
     os.path.join(NATIVE, "minifypp", "include"),
     os.path.join(NATIVE, "minifypp", "src"),
+    os.path.join(NATIVE, "markuppp", "include"),
+    os.path.join(NATIVE, "markuppp", "vendor", "cmark"),
 ]
 
 setup(

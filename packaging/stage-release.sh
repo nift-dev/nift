@@ -76,6 +76,7 @@ mkdir -p bindings/python/native
 cp -r src bindings/python/native/src
 cp -r include bindings/python/native/include
 cp -r minifypp bindings/python/native/minifypp
+cp -r markuppp bindings/python/native/markuppp
 cp -r jsonic bindings/python/native/jsonic
 ( cd bindings/python && NIFT_VERSION="$VERSION" python3 setup.py sdist --dist-dir "$STAGE_OUT" >/dev/null 2>&1 )
 SDIST="$(ls "$STAGE_OUT"/nift-$VERSION.tar.gz 2>/dev/null | head -1)"

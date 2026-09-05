@@ -1,5 +1,5 @@
 include pyproject.toml
 recursive-include nift *.py
 recursive-include src *.cc *.h
-recursive-include native *.cpp *.h *.cc
+recursive-include native *.cpp *.h *.cc *.c *.inc
 recursive-include native/jsonic *.h *.cpp *.cc

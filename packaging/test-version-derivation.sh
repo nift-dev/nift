@@ -57,7 +57,8 @@ PY
 #    clean dir; inspect sdist filename, wheel filename, and wheel METADATA.
 rm -rf bindings/python/native && mkdir -p bindings/python/native
 cp -r src bindings/python/native/src && cp -r include bindings/python/native/include
-cp -r minifypp bindings/python/native/minifypp && cp -r jsonic bindings/python/native/jsonic
+cp -r minifypp bindings/python/native/minifypp && cp -r markuppp bindings/python/native/markuppp
+cp -r jsonic bindings/python/native/jsonic
 ( cd bindings/python && NIFT_VERSION="$TV" python3 setup.py sdist --dist-dir "$WORK" >/dev/null 2>&1 )
 [ -f "$WORK/nift-$TV.tar.gz" ] || fail "sdist filename lacks $TV"
 SDIST_DIR="$WORK/pysrc" && mkdir -p "$SDIST_DIR" && tar xzf "$WORK/nift-$TV.tar.gz" -C "$SDIST_DIR"
