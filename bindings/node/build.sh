@@ -33,13 +33,35 @@ mkdir -p "$OBJ" build
 
 CABI_SOURCES="src/ProjectOwnership.cpp src/embed/Engine.cpp src/embed/Context.cpp src/Value.cpp \
   src/FileSystem.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp \
+  markuppp/src/Markup.cpp markuppp/src/AsciiDoc.cpp markuppp/src/ReStructuredText.cpp \
   src/Parser.cpp src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp \
   src/WatchList.cpp src/BuildProgress.cpp src/embed/c_abi.cpp"
+MARKUP_C_NAMES="blocks buffer cmark cmark_ctype houdini_href_e houdini_html_e houdini_html_u \
+  html inlines iterator node references render scanners utf8"
 PIC_OBJECTS=""
+compile_object() {
+  local src="$1"
+  local obj="$2"
+  case "$src" in
+    *.c)
+      gcc -std=c99 -O2 -fPIC -I"$EMBED/markuppp/vendor/cmark" -c "$EMBED/$src" -o "$obj"
+      ;;
+    *)
+      g++ -std=c++17 -O2 -fPIC -I"$EMBED/include" -I"$EMBED/src" -I"$EMBED/minifypp/include" \
+          -I"$EMBED/minifypp/src" -I"$EMBED/markuppp/include" -I"$EMBED/markuppp/vendor/cmark" \
+          -c "$EMBED/$src" -o "$obj"
+      ;;
+  esac
+}
 for src in $CABI_SOURCES; do
-  obj="$OBJ/$(echo "$src" | tr '/' '_' | sed 's/\.cpp$/.o/')"
-  g++ -std=c++17 -O2 -fPIC -I"$EMBED/include" -I"$EMBED/src" -I"$EMBED/minifypp/include" \
-      -I"$EMBED/minifypp/src" -c "$EMBED/$src" -o "$obj"
+  obj="$OBJ/$(echo "$src" | tr '/' '_' | sed 's/\.\(cpp\|c\)$/.o/')"
+  compile_object "$src" "$obj"
+  PIC_OBJECTS="$PIC_OBJECTS $obj"
+done
+for name in $MARKUP_C_NAMES; do
+  src="markuppp/vendor/cmark/$name.c"
+  obj="$OBJ/markuppp_vendor_cmark_${name}.o"
+  compile_object "$src" "$obj"
   PIC_OBJECTS="$PIC_OBJECTS $obj"
 done
 

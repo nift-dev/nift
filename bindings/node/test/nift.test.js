@@ -101,7 +101,7 @@ function makeProject() {
     const root = makeProject();
     const e = Engine.new();
     e.setRoot(root);
-    const r = await e.renderSources('@json("content/bad.json", d)$[d.x]@content', "<main>@content</main>");
+    const r = await e.renderSources('@json(d, "content/bad.json")$[d.x]@content', "<main>@content</main>");
     assert.strictEqual(r.ok, false);
     assert.ok(
       r.error.startsWith("json: failed to parse content/bad.json ("),

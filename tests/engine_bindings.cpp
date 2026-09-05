@@ -92,7 +92,7 @@ int main() {
         engine.set_root(tmp);
         engine.set("user", std::string("x"));
         auto r = engine.render(nift::Source::text("<p>p</p>"),
-                               nift::Source::text("@json(\"data.json\", \"user\")@content"));
+                               nift::Source::text("@json(user, \"data.json\")@content"));
         CHECK(!r.ok());
         CHECK(r.error().message.find("already bound") != std::string::npos);
         fs::remove_all(tmp);

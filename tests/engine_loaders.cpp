@@ -56,7 +56,7 @@ int main() {
         nift::Engine engine;
         engine.set_root(root);
         engine.set_loader(memory_loader({{"data.json", R"({"value": 7})"}}));
-        auto r = engine.render(nift::Source::text("@json(\"data.json\", \"data\")$[data.value]"));
+        auto r = engine.render(nift::Source::text("@json(data, \"data.json\")$[data.value]"));
         CHECK(r.ok());
         CHECK(r.output() == "7");
     }

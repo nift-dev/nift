@@ -319,6 +319,10 @@ $(TEST_DIR)/pic/%.o: %.cpp
 	mkdir -p $(dir $@)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -fPIC -c $< -o $@
 
+$(TEST_DIR)/pic/%.o: %.c
+	mkdir -p $(dir $@)
+	$(CC) -Imarkuppp/vendor/cmark $(CFLAGS) -fPIC -c $< -o $@
+
 libnift_c.a: $(C_ABI_CORE)
 	ar rcs $@ $(C_ABI_CORE)
 
@@ -622,8 +626,8 @@ uninstall:
 clean:
 	rm -f $(OBJECTS) $(DEPFILES) "$(TARGET)"
 	rm -rf "$(TEST_DIR)"
-	rm -f libnift_c.a libnift_c.so bindings/go/embed-harness
-	rm -rf bindings/node/build bindings/python/build
+	rm -f libnift_c.a libnift_c.so libnift_c.dylib bindings/go/embed-harness
+	rm -rf dist/embed-prefix bindings/node/build bindings/python/build
 	rm -f bindings/python/nift/_nift*.so
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean

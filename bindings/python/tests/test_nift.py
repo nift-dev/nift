@@ -81,7 +81,7 @@ class TestBindings(unittest.TestCase):
         root = make_project()
         e = Engine.new()
         e.set_root(root)
-        r = e.render_sources('@json("content/bad.json", d)$[d.x]@content', "<main>@content</main>")
+        r = e.render_sources('@json(d, "content/bad.json")$[d.x]@content', "<main>@content</main>")
         self.assertFalse(r.ok)
         self.assertTrue(
             r.error.startswith("json: failed to parse content/bad.json ("),

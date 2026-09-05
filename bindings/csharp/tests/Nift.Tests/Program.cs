@@ -227,7 +227,7 @@ internal static class Program
         using var fixture = new ProjectFixture();
         using var engine = Engine.New();
         engine.SetRoot(fixture.Root);
-        var result = engine.Render(RenderSource.Text("@json(\"content/bad.json\", d)$[d.x]@content"), RenderSource.Text("<main>@content</main>"));
+        var result = engine.Render(RenderSource.Text("@json(d, \"content/bad.json\")$[d.x]@content"), RenderSource.Text("<main>@content</main>"));
         Assert(!result.Ok, "malformed JSON must fail");
         Assert(result.ErrorMessage is not null && result.ErrorMessage.StartsWith("json: failed to parse content/bad.json ("),
             $"diagnostic must be in the frozen error family: {result.ErrorMessage}");
