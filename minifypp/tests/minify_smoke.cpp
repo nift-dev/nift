@@ -77,6 +77,37 @@ int main() {
     expect(out.find("] button") != std::string::npos,
            "CSS attribute descendant type selector merged");
 
+    // WPT-derived regressions: native nesting descendant combinators,
+    // escaped selector whitespace and namespace separator whitespace must
+    // survive when removing it changes the browser's parsed rule tree.
+    expect(minify::css(".a { & .b { color: red; } & span { color: blue; } &::before { content: \"x\"; } }", out, err), err);
+    expect(out.find("& .b") != std::string::npos, "CSS nesting descendant class merged into parent selector");
+    expect(out.find("& span") != std::string::npos, "CSS nesting descendant type merged into parent selector");
+    expect(out.find("&::before") != std::string::npos, "CSS nesting compound pseudo selector unnecessarily separated");
+    expect(minify::css(".a { .ancestor & { color: red; } }", out, err), err);
+    expect(out.find(".ancestor &") != std::string::npos, "CSS nesting right-side descendant parent selector merged");
+    expect(minify::css(R"CSS(::part(\(foo) {} ::part(   bar\    ) {} ::part( -foo  bar    ) {})CSS", out, err), err);
+    expect(out.find("bar\\ ") != std::string::npos, "CSS escaped selector whitespace removed");
+    expect(minify::css("[ |data-test-4] { color: green; } [ | data-test-4] { color: red; }", out, err), err);
+    expect(out.find("[ |data-test-4]") != std::string::npos, "CSS attribute namespace leading whitespace removed");
+    expect(out.find("[ | data-test-4]") != std::string::npos, "CSS invalid attribute namespace whitespace normalized into valid selector");
+
+    // Invalid declaration values must stay invalid after compaction. Browsers
+    // discard these declarations; joining a block with adjacent tokens can
+    // accidentally make the declaration survive.
+    expect(minify::css(".a { color: rgb(2,2,2); color:var(--x) { }; background:red; }", out, err), err);
+    expect(out.find("var(--x) {}") != std::string::npos, "CSS invalid declaration block boundary changed");
+    expect(minify::css(".a { color: rgb(2,2,2); color:{ } var(--x); background:red; }", out, err), err);
+    expect(out.find("{} var(--x)") != std::string::npos, "CSS invalid declaration block/value boundary changed");
+
+    // A bad string ending at the final newline is different from an EOF-ended
+    // string. Preserve the newline so the browser performs the same recovery
+    // and still discards the malformed declaration.
+    expect(minify::css("p { color: green; color: var(--a, \"\n", out, err), err);
+    expect(!out.empty() && out.back() == '\n', "CSS final bad-string newline trimmed");
+    expect(minify::css("p { color: green; color: var(--a, url(\"\n", out, err), err);
+    expect(!out.empty() && out.back() == '\n', "CSS final bad-url string newline trimmed");
+
     expect(minify::html("  <div   class=\"a  b\">  hello   world <!-- gone --> <span> x </span> </div>  ", out, err), err);
     eq(out, "<div class=\"a  b\"> hello world <span> x </span> </div>", "html basic");
     expect(minify::html("<pre>  a\n    b </pre><script> const x = ` a  b `;\n</script>", out, err), err);

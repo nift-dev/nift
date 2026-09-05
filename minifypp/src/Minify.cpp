@@ -41,6 +41,16 @@ bool css_needs_space(char left, char right) {
     if ((word_char(left) && word_char(right)) ||
         (left == '/' && right == '*') || (left == '*' && right == '/')) return true;
 
+    // In CSS nesting, authored whitespace after '&' is the descendant
+    // combinator. Preserve it before a following compound selector.
+    if (left == '&' && (word_char(right) || right == '.' || right == '#' ||
+                        right == '[' || right == '*' || right == ':' || right == '\\')) return true;
+
+    // The nesting selector can also appear on the right side of a descendant
+    // combinator (`.ancestor &`). Joining it to the preceding selector changes
+    // the compound selector just as surely as joining `& .child` does.
+    if (right == '&' && (word_char(left) || left == ')' || left == ']' || left == '*')) return true;
+
     // A leading decimal, class/ID/attribute selector, universal selector or
     // parenthesized construct can begin a distinct CSS token even though it is
     // not word-like. Joining it to the previous token can invalidate a value
@@ -137,6 +147,10 @@ bool css(const std::string& input, std::string& output, std::string& error) {
     output.clear();
     output.reserve(input.size());
     bool pending_space = false;
+    bool preserve_final_bad_string_newline = false;
+    std::size_t bracket_depth = 0;
+    std::vector<bool> brace_is_component_value;
+    bool just_closed_component_value = false;
 
     for (std::size_t i = 0; i < input.size();) {
         const char c = input[i];
@@ -163,12 +177,25 @@ bool css(const std::string& input, std::string& output, std::string& error) {
                 // token rather than making the whole stylesheet invalid. The
                 // newline itself is significant because it terminates the
                 // token, so preserve it and resume scanning after it.
-                if (q == '\n' || q == '\r' || q == '\f') break;
+                if (q == '\n' || q == '\r' || q == '\f') {
+                    preserve_final_bad_string_newline = i == input.size();
+                    break;
+                }
             }
             // EOF also terminates a CSS string token with a parse error but
             // without rejecting the stylesheet. Preserve the recoverable
             // source rather than turning browser-accepted CSS into a Minify++
             // hard error.
+            continue;
+        }
+
+        // A CSS escape consumes the following code point. Copy it as a unit
+        // so escaped whitespace is not mistaken for removable formatting.
+        if (c == '\\' && i + 1 < input.size()) {
+            emit_pending_css_space(output, pending_space, c);
+            output.push_back(c);
+            output.push_back(input[i + 1]);
+            i += 2;
             continue;
         }
 
@@ -215,11 +242,36 @@ bool css(const std::string& input, std::string& output, std::string& error) {
             const bool preserve_before_colon = c == ':' && pending_space &&
                                                css_colon_precedes_rule_block(input, i) &&
                                                !output.empty() && output.back() != ' ';
+            const bool preserve_before_block = c == '{' && pending_space &&
+                                               !output.empty() && output.back() == ')';
             pending_space = false;
             while (!output.empty() && output.back() == ' ') output.pop_back();
-            if (preserve_before_colon) output.push_back(' ');
+            if (preserve_before_colon || preserve_before_block) output.push_back(' ');
+            const bool opens_component_value = c == '{' && !output.empty() && output.back() == ':';
             output.push_back(c);
+            if (c == '{') {
+                brace_is_component_value.push_back(opens_component_value);
+                just_closed_component_value = false;
+            } else if (c == '}') {
+                just_closed_component_value = !brace_is_component_value.empty() && brace_is_component_value.back();
+                if (!brace_is_component_value.empty()) brace_is_component_value.pop_back();
+            } else {
+                just_closed_component_value = false;
+            }
         } else {
+            if (pending_space && just_closed_component_value && !output.empty() && output.back() == '}') {
+                output.push_back(' ');
+                pending_space = false;
+            }
+
+            // Whitespace around an attribute-selector namespace separator can
+            // distinguish a valid selector from an invalid one.
+            if (pending_space && bracket_depth != 0 &&
+                (c == '|' || (!output.empty() && output.back() == '|'))) {
+                if (!output.empty() && output.back() != ' ') output.push_back(' ');
+                pending_space = false;
+            }
+
             // CSS math functions require whitespace around binary + and -.
             // Preserve authored whitespace adjacent to these operators rather
             // than trying to parse the full evolving CSS value grammar.
@@ -232,11 +284,15 @@ bool css(const std::string& input, std::string& output, std::string& error) {
                 emit_pending_css_space(output, pending_space, c);
             pending_space = false;
             output.push_back(c);
+            if (c == '[') ++bracket_depth;
+            else if (c == ']' && bracket_depth != 0) --bracket_depth;
+            just_closed_component_value = false;
         }
         ++i;
     }
 
-    while (!output.empty() && ws(output.back())) output.pop_back();
+    if (!preserve_final_bad_string_newline)
+        while (!output.empty() && ws(output.back())) output.pop_back();
     error.clear();
     return true;
 }
