@@ -45,9 +45,9 @@ fail_build(){
   }
 }
 
-fail_build json-symlink 'path must stay inside the Nift project' '@json("data/link.json", x)'
+fail_build json-symlink 'path must stay inside the Nift project' '@json(x, "data/link.json")'
 printf '{}\n' >"$P/data/local.json"
-fail_build schema-symlink 'schema path must stay inside the Nift project' '@json("data/local.json", x, "schemas/link.json")'
+fail_build schema-symlink 'schema path must stay inside the Nift project' '@json(x, "schemas/link.json", "data/local.json")'
 
 fail_build dep-symlink 'path must stay inside the Nift project' '@dep("data/dep-link.txt")'
 fail_build pathto-symlink 'path must stay inside the Nift project' '@pathto("public/link.txt")'

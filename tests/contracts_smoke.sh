@@ -134,7 +134,7 @@ grep -F '$[routes.users.list]' "$D/public/index.html" >/dev/null
 D="$TMP/local-json"
 make_project "$D"
 printf '{"users":{"list":"/local"}}\n' > "$D/data/routes.json"
-printf '%s\n' '@json("data/routes.json", routes)' 'VALUE=$[routes.users.list]' '@content' > "$D/templates/template.html"
+printf '%s\n' '@json(routes, "data/routes.json")' 'VALUE=$[routes.users.list]' '@content' > "$D/templates/template.html"
 (cd "$D" && "$NIFT_BIN" build --all >/dev/null)
 grep -Fx 'VALUE=/local' "$D/public/index.html" >/dev/null
 
@@ -168,7 +168,7 @@ D="$TMP/json-shadow"
 make_project "$D" '{"routes":".nift/routes.json"}'
 printf '{}\n' > "$D/.nift/routes.json"
 printf '{}\n' > "$D/data/local.json"
-printf '%s\n' '@json("data/local.json", routes)' > "$D/templates/template.html"
+printf '%s\n' '@json(routes, "data/local.json")' > "$D/templates/template.html"
 expect_build_failure "$D" "json: name 'routes' conflicts with configured contract namespace"
 
 D="$TMP/array-loop-shadow"

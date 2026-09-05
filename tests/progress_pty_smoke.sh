@@ -32,7 +32,7 @@ cat > "$P/.nift/config.json" <<'JSON'
 {"config":{"content-dir":"content/","content-ext":".html","output-dir":"public/","output-ext":".html","default-template":"templates/template.html","build-threads":1,"incremental-mode":"modified"}}
 JSON
 
-printf '%s' '<!doctype html><title>$[page.title]</title><body>@json('"'"'data/big.json'"'"', d)@for(x : d.rows){<i>$[x.i]</i>}@content</body>' > "$P/templates/template.html"
+printf '%s' '<!doctype html><title>$[page.title]</title><body>@json(d, '"'"'data/big.json'"'"')@for(x : d.rows){<i>$[x.i]</i>}@content</body>' > "$P/templates/template.html"
 
 python3 - "$P" <<'EOF'
 import json, sys

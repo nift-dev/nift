@@ -33,6 +33,7 @@ whether it is a regression.
 - External contract: the separate `nift-regression-suite` repository.
 - Embedded minifier: `minifypp/`, synchronized with standalone Minify++.
 - Embedded JSON parser: `jsonic/include/json.h`, synchronized with standalone Jsonic++; `src/Json.h` is a compatibility wrapper.
+- Embedded markup converter: `markuppp/`, synchronized with standalone Markup++ at approved commit `ee0ec00`.
 
 Do not habitually reduce Nift to “a static site generator.” Nift generates
 website artifacts, but those artifacts may contain client applications, consume
@@ -71,7 +72,10 @@ themselves. Nift owns the small build-time job it can perform precisely.
 5. Standalone Jsonic++ owns the independent JSON-parser identity. Nift vendors its
    exact `include/json.h` as `jsonic/include/json.h`; parser changes originate in Jsonic++,
    synchronize into Nift, and then pass Nift JSON/schema/parser/incremental contracts.
-6. Green tests are the start of confidence, not permission to stop reasoning.
+6. Standalone Markup++ owns markup conversion. Nift evaluates its own template
+   language first, calls only Markup++'s public API, and never reparses generated
+   HTML. Markup sources and host-resolved includes are dependencies.
+7. Green tests are the start of confidence, not permission to stop reasoning.
    Read relevant implementation, attack assumptions, preserve reproducers, and
    test interactions.
 
@@ -82,6 +86,7 @@ themselves. Nift owns the small build-time job it can perform precisely.
 - `benchmarks/`: reproducible large-project performance fixtures.
 - `minifypp/`: embedded standalone-style Minify++ subtree.
 - `jsonic/`: vendored Jsonic++ public header used by Nift core.
+- `markuppp/`: embedded Markup++ public API, implementation and vendored cmark engine.
 - `ARCHITECTURE_RULES.md`: concise current architectural review checklist.
 - `PERFORMANCE.md`: retained performance rationale and checkpoint evidence.
 - `docs/PLATFORM-TARGETS.md`: current `nift init` extension/hosting-target contract and provider ownership boundaries.
@@ -180,6 +185,30 @@ Nift source. After any Jsonic++ parser change, run standalone Jsonic++ tests and
 binding, contracts and affected full integration gates. Minify++ also vendors the
 same parser privately and must be reconciled separately before the ecosystem
 checkpoint is complete.
+
+## Markup++ synchronization and template boundary
+
+Standalone Markup++ is canonical. Nift mirrors its public header, converter
+sources, licence and vendored cmark files under `markuppp/`; run
+`make test-markuppp-sync MARKUP_DIR=/path/to/markup` after either side changes.
+Nift owns filesystem policy, dependency recording and template evaluation;
+Markup++ remains IO-free and knows nothing about Nift.
+
+`@markup(format){source}` and `@markup(format, path)` accept `md`, `adoc` or
+`rst` (and their long names). Nift resolves and templates the source first,
+records file/include dependencies, converts it once, and appends the HTML
+directly. Never re-enter the template parser on conversion output: generated
+`@...` or `$[...]` text is data. Markdown retains Markup++'s raw-HTML default;
+AsciiDoc and RST retain their converter capability policy. Includes are resolved
+by Nift inside the project root and their contents are templated before Markup++
+continues conversion.
+
+`@json` is name-first. Its supported forms are `@json(name, path)`,
+`@json(name, schema-path, path)`, `@json(name, schema-name, path)`, and the
+corresponding inline forms `@json(name){...}`, `@json(name, schema-path){...}`
+and `@json(name, schema-name){...}`. Inline bodies are templated before parsing;
+schema names refer to earlier JSON bindings. Source and schema files remain
+project-bound dependencies.
 
 ## Maintaining this handover
 

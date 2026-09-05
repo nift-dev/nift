@@ -46,7 +46,7 @@ cat > "$D/data/site.json" <<'JSON'
 JSON
 
 cat > "$D/templates/template.html" <<'EOF'
-@json("data/site.json", site)
+@json(site, "data/site.json")
 NAME=$[site.name]
 VERSION=$[site.version]
 TRUE=$[site.enabled]
@@ -95,29 +95,29 @@ expect_failure() {
 }
 
 expect_failure malformed-json 'json: failed to parse data/test.json' \
-    '@json("data/test.json", data)' '{"broken":'
+    '@json(data, "data/test.json")' '{"broken":'
 expect_failure duplicate-alias "json: name 'data' is already bound" \
-    $'@json("data/test.json", data)\n@json("data/test.json", data)'
+    $'@json(data, "data/test.json")\n@json(data, "data/test.json")'
 expect_failure invalid-alias 'json: name must be an identifier' \
-    '@json("data/test.json", bad-name)'
+    '@json(bad-name, "data/test.json")'
 expect_failure reserved-alias "conflicts with built-in metadata" \
-    '@json("data/test.json", title)' '{}'
+    '@json(title, "data/test.json")' '{}'
 expect_failure missing-member "has no member 'missing'" \
-    $'@json("data/test.json", data)\n$[data.missing]' '{"present":1}'
+    $'@json(data, "data/test.json")\n$[data.missing]' '{"present":1}'
 expect_failure out-of-range 'JSON array index 3 is out of range' \
-    $'@json("data/test.json", data)\n$[data.items[3]]' '{"items":[1]}'
+    $'@json(data, "data/test.json")\n$[data.items[3]]' '{"items":[1]}'
 expect_failure wrong-index-type 'because it is not an array' \
-    $'@json("data/test.json", data)\n$[data.item[0]]' '{"item":{"x":1}}'
+    $'@json(data, "data/test.json")\n$[data.item[0]]' '{"item":{"x":1}}'
 expect_failure wrong-member-type "because the current JSON value is not an object" \
-    $'@json("data/test.json", data)\n$[data.items.foo]' '{"items":[1]}'
+    $'@json(data, "data/test.json")\n$[data.items.foo]' '{"items":[1]}'
 expect_failure render-array 'cannot render JSON array' \
-    $'@json("data/test.json", data)\n$[data.items]' '{"items":[1,2]}'
+    $'@json(data, "data/test.json")\n$[data.items]' '{"items":[1,2]}'
 expect_failure render-object 'cannot render JSON object' \
-    $'@json("data/test.json", data)\n$[data.item]' '{"item":{"x":1}}'
+    $'@json(data, "data/test.json")\n$[data.item]' '{"item":{"x":1}}'
 
 D="$TMP/missing-file"
 make_project "$D"
-printf '%s\n' '@json("data/nope.json", data)' > "$D/templates/template.html"
+printf '%s\n' '@json(data, "data/nope.json")' > "$D/templates/template.html"
 if (cd "$D" && "$NIFT_BIN" build --all >log 2>&1); then
     echo "missing-file unexpectedly succeeded" >&2
     exit 1
@@ -127,7 +127,7 @@ grep -F 'json: file does not exist: data/nope.json' "$D/log" >/dev/null
 D="$TMP/traversal"
 make_project "$D"
 printf '{}\n' > "$TMP/outside.json"
-printf '%s\n' '@json("../../outside.json", data)' > "$D/templates/template.html"
+printf '%s\n' '@json(data, "../../outside.json")' > "$D/templates/template.html"
 if (cd "$D" && "$NIFT_BIN" build --all >log 2>&1); then
     echo "traversal unexpectedly succeeded" >&2
     exit 1
@@ -152,7 +152,7 @@ cat >"$D/data/products.schema.json" <<'JSON_SCHEMA'
 }
 JSON_SCHEMA
 cat >"$D/templates/template.html" <<'TMPL_SCHEMA'
-@json("data/products.json", products, "data/products.schema.json")
+@json(products, "data/products.schema.json", "data/products.json")
 SCHEMA=$[products.products[0].name]:$[products.products[0].price]
 @content
 TMPL_SCHEMA
@@ -167,7 +167,7 @@ schema_failure() {
     make_project "$d"
     printf '%s\n' "$data" >"$d/data/test.json"
     printf '%s\n' "$schema" >"$d/data/test.schema.json"
-    printf '%s\n' '@json("data/test.json", data, "data/test.schema.json")' >"$d/templates/template.html"
+    printf '%s\n' '@json(data, "data/test.schema.json", "data/test.json")' >"$d/templates/template.html"
     if (cd "$d" && "$NIFT_BIN" build --all >log 2>&1); then
         echo "$name unexpectedly succeeded" >&2
         exit 1
@@ -188,14 +188,14 @@ D="$TMP/schema-malformed"
 make_project "$D"
 printf '%s\n' '{}' >"$D/data/test.json"
 printf '%s\n' '{"type":' >"$D/data/test.schema.json"
-printf '%s\n' '@json("data/test.json", data, "data/test.schema.json")' >"$D/templates/template.html"
+printf '%s\n' '@json(data, "data/test.schema.json", "data/test.json")' >"$D/templates/template.html"
 if (cd "$D" && "$NIFT_BIN" build --all >log 2>&1); then echo "schema-malformed unexpectedly succeeded" >&2; exit 1; fi
 grep -F 'json: failed to parse schema data/test.schema.json' "$D/log" >/dev/null
 
 D="$TMP/schema-missing"
 make_project "$D"
 printf '%s\n' '{}' >"$D/data/test.json"
-printf '%s\n' '@json("data/test.json", data, "data/missing.schema.json")' >"$D/templates/template.html"
+printf '%s\n' '@json(data, "data/missing.schema.json", "data/test.json")' >"$D/templates/template.html"
 if (cd "$D" && "$NIFT_BIN" build --all >log 2>&1); then echo "schema-missing unexpectedly succeeded" >&2; exit 1; fi
 grep -F 'json: schema file does not exist: data/missing.schema.json' "$D/log" >/dev/null
 
@@ -203,7 +203,7 @@ D="$TMP/schema-traversal"
 make_project "$D"
 printf '%s\n' '{}' >"$D/data/test.json"
 printf '%s\n' '{}' >"$TMP/outside.schema.json"
-printf '%s\n' '@json("data/test.json", data, "../../outside.schema.json")' >"$D/templates/template.html"
+printf '%s\n' '@json(data, "../../outside.schema.json", "data/test.json")' >"$D/templates/template.html"
 if (cd "$D" && "$NIFT_BIN" build --all >log 2>&1); then echo "schema-traversal unexpectedly succeeded" >&2; exit 1; fi
 grep -F 'json: schema path must stay inside the Nift project' "$D/log" >/dev/null
 
@@ -225,7 +225,7 @@ D="$TMP/schema-pointer-escape"
 make_project "$D"
 printf '%s\n' '3' >"$D/data/test.json"
 printf '%s\n' '{"$defs":{"a/b":{"type":"number"}},"$ref":"#/$defs/a~1b"}' >"$D/data/test.schema.json"
-printf '%s\n' '@json("data/test.json", data, "data/test.schema.json")' '@content' >"$D/templates/template.html"
+printf '%s\n' '@json(data, "data/test.schema.json", "data/test.json")' '@content' >"$D/templates/template.html"
 (cd "$D" && "$NIFT_BIN" build --all >/dev/null)
 
 echo "JSON Schema integration adversarial extensions passed"
@@ -248,7 +248,7 @@ cat > data/join.json <<'JSON'
 {"tags":["C++","Nift","tooling"],"mixed":[1,true,null,"x"],"bad":[{"x":1}]}
 JSON
 cat > content/index.html <<'EOF2'
-@json('data/join.json', d)
+@json(d, 'data/join.json')
 @join(d.tags, ', ')
 @join($[d.mixed], '|')
 EOF2
@@ -256,7 +256,7 @@ EOF2
 grep -F 'C++, Nift, tooling' public/index.html >/dev/null
 grep -F '1|true|null|x' public/index.html >/dev/null
 cat > content/index.html <<'EOF2'
-@json('data/join.json', d)
+@json(d, 'data/join.json')
 @join(d.bad, ',')
 EOF2
 if "$NIFT_BIN" build --all >/dev/null 2>&1; then echo '@join accepted object item' >&2; exit 1; fi
@@ -278,7 +278,7 @@ cat > data/substr.json <<'JSON'
 {"text":"café 😄 tooling"}
 JSON
 cat > content/index.html <<'EOF2'
-@json('data/substr.json', d)
+@json(d, 'data/substr.json')
 @substr($[d.text], 0, 4)|@substr($[d.text], 5, 1)|@substr($[d.text], 7, 99)|@substr($[d.text], 99, 3)|@substr($[d.text], 0, 0)
 EOF2
 "$NIFT_BIN" build --all >/dev/null

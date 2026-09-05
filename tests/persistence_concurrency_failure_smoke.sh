@@ -24,7 +24,7 @@ cp "$P/public/index.html" "$P/old-output"
 cp "$P/.nift/public/index.info.json" "$P/old-info"
 
 cat >"$P/templates/template.html" <<'EOF'
-@json("data/missing.json", broken)
+@json(broken, "data/missing.json")
 @content
 EOF
 if (cd "$P" && "$NIFT_BIN" build >failed.log 2>&1); then
@@ -58,7 +58,7 @@ cp "$P/public/p7.html" "$P/p7-old"
 cp "$P/.nift/public/p7.info.json" "$P/p7-info-old"
 
 # One page gets an invalid @json call via its content; others get valid changes.
-printf '@json("data/missing.json", x)\n' >"$P/content/p7.html"
+printf '@json(x, "data/missing.json")\n' >"$P/content/p7.html"
 for i in $(seq 0 19); do
   if [ "$i" != 7 ]; then printf '<p>NEW-%s</p>\n' "$i" >"$P/content/p$i.html"; fi
 done
@@ -95,7 +95,7 @@ cat >"$P/templates/parts/list.html" <<'EOF'
 @for(item : data.items by item.rank asc){$[item.name]}
 EOF
 cat >"$P/templates/template.html" <<'EOF'
-@json("data/shared.json", data, "schemas/shared.json")
+@json(data, "schemas/shared.json", "data/shared.json")
 <title>$[title]</title>
 @input("templates/parts/list.html")
 @content

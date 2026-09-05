@@ -1,4 +1,4 @@
-@json("data/items.json", data, "schemas/items.schema.json")
+@json(data, "schemas/items.schema.json", "data/items.json")
 @for(item : data.items by item.rank asc){$[loop.index]:$[item.name]
 }
 @content

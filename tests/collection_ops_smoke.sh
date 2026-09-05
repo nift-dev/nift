@@ -15,7 +15,7 @@ cat >"$D/data/data.json" <<'JSON'
 {"nums":[3,1,2,2],"words":["beta","alpha","beta"],"triples":[[1,2,3],[4,5,6]],"products":[{"price":10,"quantity":2},{"price":5,"quantity":3}],"posts":[{"title":"Old","score":5,"published":true},{"title":"Draft","score":99,"published":false},{"title":"Best","score":10,"published":true}]}
 JSON
 cat >"$D/templates/template.html" <<'EOF2'
-@json("data/data.json", d)
+@json(d, "data/data.json")
 SORT=@sort(d.nums)
 SORTDESC=@sort(n : d.nums => n desc)
 FILTER=@filter(p : d.posts => p.published && p.score >= 5)
@@ -91,15 +91,15 @@ PYJSON
 for CASE in badsort badslice badpredicate legacycomma badreduce badsum emptymin badtuple badacc; do
   X="$TMP/$CASE"; cp -a "$D" "$X"; rm -rf "$X/public"; mkdir "$X/public"
   case "$CASE" in
-    badsort) printf '@json("data/data.json", d)\n@sort(p : d.posts => p)\n@content\n' >"$X/templates/template.html" ;;
-    badslice) printf '@json("data/data.json", d)\n@slice(d.nums, -1, 2)\n@content\n' >"$X/templates/template.html" ;;
-    badpredicate) printf '@json("data/data.json", d)\n@filter(p : d.posts => p.missing)\n@content\n' >"$X/templates/template.html" ;;
-    legacycomma) printf '@json("data/data.json", d)\n@map(p : d.posts, p.title)\n@content\n' >"$X/templates/template.html" ;;
-    badreduce) printf '@json("data/data.json", d)\n@reduce(n : d.nums & acc = 0 => acc + missing)\n@content\n' >"$X/templates/template.html" ;;
-    badsum) printf '@json("data/data.json", d)\n@sum(d.words)\n@content\n' >"$X/templates/template.html" ;;
-    emptymin) printf '@json("data/data.json", d)\n@min(@slice(d.nums, 0, 0))\n@content\n' >"$X/templates/template.html" ;;
-    badtuple) printf '@json("data/data.json", d)\n@sum((a,b) : d.triples => a + b)\n@content\n' >"$X/templates/template.html" ;;
-    badacc) printf '@json("data/data.json", d)\n@reduce(n : d.nums & n = 0 => n + 1)\n@content\n' >"$X/templates/template.html" ;;
+    badsort) printf '@json(d, "data/data.json")\n@sort(p : d.posts => p)\n@content\n' >"$X/templates/template.html" ;;
+    badslice) printf '@json(d, "data/data.json")\n@slice(d.nums, -1, 2)\n@content\n' >"$X/templates/template.html" ;;
+    badpredicate) printf '@json(d, "data/data.json")\n@filter(p : d.posts => p.missing)\n@content\n' >"$X/templates/template.html" ;;
+    legacycomma) printf '@json(d, "data/data.json")\n@map(p : d.posts, p.title)\n@content\n' >"$X/templates/template.html" ;;
+    badreduce) printf '@json(d, "data/data.json")\n@reduce(n : d.nums & acc = 0 => acc + missing)\n@content\n' >"$X/templates/template.html" ;;
+    badsum) printf '@json(d, "data/data.json")\n@sum(d.words)\n@content\n' >"$X/templates/template.html" ;;
+    emptymin) printf '@json(d, "data/data.json")\n@min(@slice(d.nums, 0, 0))\n@content\n' >"$X/templates/template.html" ;;
+    badtuple) printf '@json(d, "data/data.json")\n@sum((a,b) : d.triples => a + b)\n@content\n' >"$X/templates/template.html" ;;
+    badacc) printf '@json(d, "data/data.json")\n@reduce(n : d.nums & n = 0 => n + 1)\n@content\n' >"$X/templates/template.html" ;;
 
   esac
   if (cd "$X" && "$NIFT_BIN" build >out 2>err); then echo "$CASE unexpectedly succeeded" >&2; exit 1; fi

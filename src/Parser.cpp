@@ -3,6 +3,7 @@
 #include "Json.h"
 #include "JsonSchema.h"
 #include "RenderHost.h"
+#include <markup/Markup.h>
 
 #include <algorithm>
 #include <chrono>
@@ -2420,43 +2421,183 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 continue;
             }
 
-            if (function == "json") {
-                if (!has_parameters || (parameters.size() != 2 && parameters.size() != 3)) {
-                    fail(source_path, source, i, "json: expected 2 or 3 parameters (path, name[, schema])");
+            if (function == "markup") {
+                std::size_t block_open = end;
+                while (block_open < source.size() &&
+                       std::isspace(static_cast<unsigned char>(source[block_open]))) ++block_open;
+                const bool inline_source = block_open < source.size() && source[block_open] == '{';
+                if (!has_parameters || (inline_source ? parameters.size() != 1 : parameters.size() != 2)) {
+                    fail(source_path, source, i,
+                         inline_source ? "markup: inline syntax is @markup(format){...}"
+                                       : "markup: file syntax is @markup(format, path)");
                     break;
                 }
 
-                std::string resolved_path, interpolation_error;
-                if (!interpolate_parameter(parameters[0], resolved_path, interpolation_error)) {
-                    fail(source_path, source, i, "json: " + interpolation_error); break;
+                std::string format_name, interpolation_error;
+                if (!interpolate_parameter(parameters[0], format_name, interpolation_error)) {
+                    fail(source_path, source, i, "markup: " + interpolation_error);
+                    break;
                 }
-                parameters[0] = std::move(resolved_path);
-                if (parameters.size() == 3) {
-                    std::string resolved_schema;
-                    if (!interpolate_parameter(parameters[2], resolved_schema, interpolation_error)) {
-                        fail(source_path, source, i, "json: " + interpolation_error); break;
-                    }
-                    parameters[2] = std::move(resolved_schema);
+                markup::Format format;
+                const std::string normalized_format = trim_copy(format_name);
+                if (normalized_format == "md" || normalized_format == "markdown") format = markup::Format::Markdown;
+                else if (normalized_format == "adoc" || normalized_format == "asciidoc") format = markup::Format::AsciiDoc;
+                else if (normalized_format == "rst" || normalized_format == "restructuredtext") format = markup::Format::ReStructuredText;
+                else {
+                    fail(source_path, source, i, "markup: unknown format '" + normalized_format +
+                         "' (expected md, adoc or rst)");
+                    break;
                 }
 
-                const std::string& json_path_argument = parameters[0];
-                const std::string& binding_name = parameters[1];
-                const bool valid_name =
-                    !binding_name.empty() &&
-                    (std::isalpha(static_cast<unsigned char>(binding_name[0])) || binding_name[0] == '_') &&
-                    std::all_of(binding_name.begin() + 1, binding_name.end(), [](char c) {
-                        return std::isalnum(static_cast<unsigned char>(c)) || c == '_';
-                    });
-                if (!valid_name) {
-                    fail(source_path, source, i, "json: name must be an identifier using letters, digits and underscores");
+                std::string markup_source;
+                fs::path markup_identity = source_path;
+                std::size_t directive_end = end;
+                if (inline_source) {
+                    std::size_t block_close = 0;
+                    if (!find_balanced(source, block_open, '{', '}', block_close)) {
+                        fail(source_path, source, block_open, "@markup block has no matching '}'");
+                        break;
+                    }
+                    const auto body = normalize_control_block_body(
+                        source.substr(block_open + 1, block_close - block_open - 1));
+                    const auto templated = parse(body.text, source_path, depth + 1);
+                    if (!templated.ok) break;
+                    markup_source = templated.output;
+                    directive_end = block_close + 1;
+                } else {
+                    std::string resolved_path;
+                    if (!interpolate_parameter(parameters[1], resolved_path, interpolation_error)) {
+                        fail(source_path, source, i, "markup: " + interpolation_error);
+                        break;
+                    }
+                    fs::path candidate = resolved_path;
+                    if (candidate.is_relative()) candidate = host_.root() / candidate;
+                    candidate = fs::absolute(candidate).lexically_normal();
+                    if (!filesystem::path_within(host_.root().lexically_normal(), candidate)) {
+                        fail(source_path, source, i,
+                             "markup: path must stay inside the Nift project: " + resolved_path);
+                        break;
+                    }
+                    if (!host_.source_exists(candidate)) {
+                        fail(source_path, source, i, "markup: file does not exist: " + resolved_path);
+                        break;
+                    }
+                    if (std::find(input_stack_.begin(), input_stack_.end(), candidate) != input_stack_.end()) {
+                        fail(source_path, source, i,
+                             "@markup would result in an input loop through " + candidate.generic_string());
+                        break;
+                    }
+                    const auto loaded = host_.read_shared_source(candidate);
+                    if (loaded.status == nift::HostStatus::Error) {
+                        fail(source_path, source, i, "markup: " + loaded.error);
+                        break;
+                    }
+                    if (!loaded.content) {
+                        fail(source_path, source, i, "markup: file is not readable: " + resolved_path);
+                        break;
+                    }
+                    result_.dependencies.insert(host_.relative(candidate));
+                    input_stack_.push_back(candidate);
+                    const auto templated = parse(*loaded.content, candidate, depth + 1);
+                    input_stack_.pop_back();
+                    if (!templated.ok) break;
+                    markup_source = templated.output;
+                    markup_identity = candidate;
+                }
+
+                markup::Options options;
+                options.allow_raw_html = true;
+                options.asciidoc_source_identity = markup_identity.generic_string();
+                options.rst_source_identity = markup_identity.generic_string();
+                auto resolve_resource = [&](const std::string& including,
+                                            const std::string& requested,
+                                            std::string& content,
+                                            std::string& canonical,
+                                            std::string& resolver_error) {
+                    fs::path base = fs::path(including).parent_path();
+                    fs::path candidate = fs::path(requested);
+                    if (candidate.is_relative()) candidate = base / candidate;
+                    candidate = fs::absolute(candidate).lexically_normal();
+                    if (!filesystem::path_within(host_.root().lexically_normal(), candidate)) {
+                        resolver_error = "markup include must stay inside the Nift project: " + requested;
+                        return false;
+                    }
+                    if (!host_.source_exists(candidate)) {
+                        resolver_error = "markup include does not exist: " + requested;
+                        return false;
+                    }
+                    const auto loaded = host_.read_shared_source(candidate);
+                    if (loaded.status == nift::HostStatus::Error) {
+                        resolver_error = loaded.error;
+                        return false;
+                    }
+                    if (!loaded.content) {
+                        resolver_error = "markup include is not readable: " + requested;
+                        return false;
+                    }
+                    result_.dependencies.insert(host_.relative(candidate));
+                    const auto templated = parse(*loaded.content, candidate, depth + 1);
+                    if (!templated.ok) {
+                        resolver_error = result_.error.message;
+                        return false;
+                    }
+                    content = templated.output;
+                    canonical = candidate.generic_string();
+                    return true;
+                };
+                options.asciidoc_include_resolver = resolve_resource;
+                options.rst_resource_resolver = resolve_resource;
+                options.asciidoc_dependency = [&](const std::string& identity) {
+                    result_.dependencies.insert(host_.relative(fs::path(identity)));
+                };
+                options.rst_dependency = options.asciidoc_dependency;
+                std::vector<std::string> diagnostics;
+                options.asciidoc_diagnostic = [&](const std::string& message) { diagnostics.push_back(message); };
+                options.rst_diagnostic = options.asciidoc_diagnostic;
+
+                std::string html, conversion_error;
+                if (!markup::convert(format, markup_source, html, conversion_error, options)) {
+                    fail(source_path, source, i, "markup: " + conversion_error);
+                    break;
+                }
+                if (!diagnostics.empty()) {
+                    fail(source_path, source, i, "markup: " + diagnostics.front());
+                    break;
+                }
+                append_indented(output, html, indent, code_block_depth_);
+                i = directive_end;
+                continue;
+            }
+
+            if (function == "json") {
+                std::size_t block_open = end;
+                while (block_open < source.size() &&
+                       std::isspace(static_cast<unsigned char>(source[block_open]))) ++block_open;
+                const bool inline_json = block_open < source.size() && source[block_open] == '{';
+                const bool arity_ok = inline_json
+                    ? (parameters.size() == 1 || parameters.size() == 2)
+                    : (parameters.size() == 2 || parameters.size() == 3);
+                if (!has_parameters || !arity_ok) {
+                    fail(source_path, source, i,
+                         "json: expected @json(name, path), @json(name, schema, path), "
+                         "@json(name){...} or @json(name, schema){...}");
+                    break;
+                }
+
+                std::string binding_name = trim_copy(parameters[0]);
+                if (!valid_binding_identifier(binding_name)) {
+                    fail(source_path, source, i,
+                         "json: name must be an identifier using letters, digits and underscores");
                     break;
                 }
                 if (reserved_binding_name(binding_name)) {
-                    fail(source_path, source, i, "json: name '" + binding_name + "' conflicts with built-in metadata/reserved bindings");
+                    fail(source_path, source, i, "json: name '" + binding_name +
+                         "' conflicts with built-in metadata/reserved bindings");
                     break;
                 }
                 if (host_.is_contract_name(binding_name)) {
-                    fail(source_path, source, i, "json: name '" + binding_name + "' conflicts with configured contract namespace");
+                    fail(source_path, source, i, "json: name '" + binding_name +
+                         "' conflicts with configured contract namespace");
                     break;
                 }
                 if (host_.binding(binding_name) || json_bindings_.count(binding_name)) {
@@ -2464,58 +2605,109 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     break;
                 }
 
-                const fs::path json_path = (host_.root() / json_path_argument).lexically_normal();
-                const fs::path host_root = host_.root().lexically_normal();
-                if (!filesystem::path_within(host_root, json_path)) {
-                    fail(source_path, source, i, "json: path must stay inside the Nift project: " + json_path_argument);
-                    break;
-                }
-                if (!host_.source_exists(json_path)) {
-                    fail(source_path, source, i, "json: file does not exist: " + json_path_argument);
-                    break;
-                }
-
-                std::string json_error;
-                auto document = host_.read_shared_json(json_path, json_error);
-                if (!document) {
-                    fail(source_path, source, i, "json: failed to parse " + json_path_argument +
-                         (json_error.empty() ? "" : " (" + json_error + ")"));
-                    break;
-                }
-
-                if (parameters.size() == 3) {
-                    const std::string& schema_path_argument = parameters[2];
-                    const fs::path schema_path = (host_.root() / schema_path_argument).lexically_normal();
-                    if (!filesystem::path_within(host_root, schema_path)) {
+                std::shared_ptr<const json::Document> document;
+                std::string instance_label = "inline JSON";
+                std::size_t directive_end = end;
+                std::string interpolation_error;
+                if (inline_json) {
+                    std::size_t block_close = 0;
+                    if (!find_balanced(source, block_open, '{', '}', block_close)) {
+                        fail(source_path, source, block_open, "@json block has no matching '}'");
+                        break;
+                    }
+                    const auto body = normalize_control_block_body(
+                        source.substr(block_open + 1, block_close - block_open - 1));
+                    const auto templated = parse(body.text, source_path, depth + 1);
+                    if (!templated.ok) break;
+                    json::Document parsed;
+                    std::string parse_error;
+                    if (!json::Document::parse(templated.output, parsed, parse_error)) {
+                        fail(source_path, source, i, "json: failed to parse inline JSON (" + parse_error + ")");
+                        break;
+                    }
+                    document = std::make_shared<const json::Document>(std::move(parsed));
+                    directive_end = block_close + 1;
+                } else {
+                    const std::size_t path_index = parameters.size() - 1;
+                    std::string json_path_argument;
+                    if (!interpolate_parameter(parameters[path_index], json_path_argument, interpolation_error)) {
+                        fail(source_path, source, i, "json: " + interpolation_error);
+                        break;
+                    }
+                    const fs::path host_root = host_.root().lexically_normal();
+                    const fs::path json_path = (host_.root() / json_path_argument).lexically_normal();
+                    if (!filesystem::path_within(host_root, json_path)) {
                         fail(source_path, source, i,
-                             "json: schema path must stay inside the Nift project: " + schema_path_argument);
+                             "json: path must stay inside the Nift project: " + json_path_argument);
                         break;
                     }
-                    if (!host_.source_exists(schema_path)) {
-                        fail(source_path, source, i, "json: schema file does not exist: " + schema_path_argument);
+                    if (!host_.source_exists(json_path)) {
+                        fail(source_path, source, i, "json: file does not exist: " + json_path_argument);
                         break;
                     }
-                    std::string schema_parse_error;
-                    auto schema = host_.read_shared_json(schema_path, schema_parse_error);
+                    std::string parse_error;
+                    document = host_.read_shared_json(json_path, parse_error);
+                    if (!document) {
+                        fail(source_path, source, i, "json: failed to parse " + json_path_argument +
+                             (parse_error.empty() ? "" : " (" + parse_error + ")"));
+                        break;
+                    }
+                    instance_label = json_path_argument;
+                    result_.dependencies.insert(host_.relative(json_path));
+                }
+
+                const bool has_schema = inline_json ? parameters.size() == 2 : parameters.size() == 3;
+                if (has_schema) {
+                    const std::size_t schema_index = 1;
+                    const std::string schema_reference = trim_copy(parameters[schema_index]);
+                    std::shared_ptr<const json::Document> schema;
+                    std::string schema_label;
+                    if (valid_binding_identifier(schema_reference)) {
+                        std::string binding_error;
+                        if (resolve_json_value(schema_reference, schema, binding_error)) {
+                            schema_label = schema_reference;
+                        }
+                    }
                     if (!schema) {
-                        fail(source_path, source, i, "json: failed to parse schema " + schema_path_argument +
-                             (schema_parse_error.empty() ? "" : " (" + schema_parse_error + ")"));
+                        std::string schema_path_argument;
+                        if (!interpolate_parameter(parameters[schema_index], schema_path_argument,
+                                                   interpolation_error)) {
+                            fail(source_path, source, i, "json: " + interpolation_error);
+                            break;
+                        }
+                        const fs::path host_root = host_.root().lexically_normal();
+                        const fs::path schema_path = (host_.root() / schema_path_argument).lexically_normal();
+                        if (!filesystem::path_within(host_root, schema_path)) {
+                            fail(source_path, source, i,
+                                 "json: schema path must stay inside the Nift project: " + schema_path_argument);
+                            break;
+                        }
+                        if (!host_.source_exists(schema_path)) {
+                            fail(source_path, source, i,
+                                 "json: schema file does not exist: " + schema_path_argument);
+                            break;
+                        }
+                        std::string schema_parse_error;
+                        schema = host_.read_shared_json(schema_path, schema_parse_error);
+                        if (!schema) {
+                            fail(source_path, source, i, "json: failed to parse schema " + schema_path_argument +
+                                 (schema_parse_error.empty() ? "" : " (" + schema_parse_error + ")"));
+                            break;
+                        }
+                        schema_label = schema_path_argument;
+                        result_.dependencies.insert(host_.relative(schema_path));
+                    }
+                    std::string validation_error;
+                    if (!jsonschema::validate(*document, *schema, validation_error)) {
+                        fail(source_path, source, i, "json: " + instance_label+
+                             " does not satisfy schema " + schema_label + " (" + validation_error + ")");
                         break;
                     }
-                    std::string schema_validation_error;
-                    if (!jsonschema::validate(*document, *schema, schema_validation_error)) {
-                        fail(source_path, source, i,
-                             "json: " + json_path_argument + " does not satisfy schema " +
-                             schema_path_argument + " (" + schema_validation_error + ")");
-                        break;
-                    }
-                    result_.dependencies.insert(host_.relative(schema_path));
                 }
 
                 json_bindings_.emplace(binding_name, std::move(document));
                 if (!json_binding_scopes_.empty()) json_binding_scopes_.back().push_back(binding_name);
-                result_.dependencies.insert(host_.relative(json_path));
-                i = end;
+                i = directive_end;
                 continue;
             }
 

@@ -92,7 +92,7 @@ def main():
         (root / ".nift/tracked.json").write_text(
             '{"tracked":[{"name":"/","title":"Home","template":"templates/template.html"}]}')
         (root / "templates/template.html").write_text(
-            '@json("data/items.json", data, "schemas/items.schema.json")\n@content\n')
+            '@json(data, "schemas/items.schema.json", "data/items.json")\n@content\n')
         (root / "data/items.json").write_text('{"items":[{"name":"oops","rank":"2"}]}')
         (root / "schemas/items.schema.json").write_text(
             '{"type":"object","properties":{"items":{"type":"array","items":{"type":"object",'

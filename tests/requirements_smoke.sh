@@ -21,7 +21,7 @@ P="$TMP/dedupe"; mkproj "$P"
 printf 'x\n' >"$P/public/assets/a.txt"
 printf 'y\n' >"$P/public/assets/skipped.txt"
 cat >"$P/content/index.html" <<'EOF'
-@json("data.json", data)
+@json(data, "data.json")
 <a href="@pathto('public/assets/a.txt')">A</a>
 <a href="@pathto('public/assets/a.txt')">A again</a>
 @if(false){<a href="@pathto('public/assets/skipped.txt')">skip</a>}

@@ -69,7 +69,7 @@ void write_project(const fs::path& root) {
 <p>env=@getenv("PA_ENV_VAR")</p>
 <p>home=@pathto("/")</p>)");
     write_file(root / "content/blog/index.html",
-               R"(@json('data/items.json', d)
+               R"(@json(d, 'data/items.json')
 @for(x : d.items){@item{$[x.name]}}
 @paginate)");
     write_file(root / "content/blog/index.paginate.html",

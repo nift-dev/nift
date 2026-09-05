@@ -4,6 +4,19 @@
 
 Development in progress following the public v4.0.9 release.
 
+- Embedded the approved Markup++ library and its vendored cmark engine. The new
+  `@markup(format){...}` and `@markup(format, path)` directives render Markdown,
+  AsciiDoc or reStructuredText after evaluating Nift template syntax, then append
+  the resulting HTML without reparsing it as a template. File sources and
+  host-resolved AsciiDoc/RST includes are project-bound tracked dependencies.
+- Reworked `@json` around name-first file forms and added inline JSON bodies:
+  `@json(name, path)`, `@json(name, schema, path)`, `@json(name){...}` and
+  `@json(name, schema){...}`. A schema argument may be a project path or an
+  earlier JSON binding, allowing reusable inline named schemas.
+- Added a maintained 41-file standalone/embedded Markup++ synchronization gate
+  and focused conversion, templating, validation, path-safety and incremental
+  dependency coverage.
+
 ## v4.0.9
 
 Nift 4.0.9 gives ordinary CSS and JavaScript direct ownership in the output

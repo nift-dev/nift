@@ -28,7 +28,7 @@ cat >"$P/schemas/site.schema.json" <<'JSON'
 {"type":"object","required":["choice"],"properties":{"choice":{"enum":["a","b"]}}}
 JSON
 cat >"$P/templates/template.html" <<'EOF'
-@json("data/site.json", site, "schemas/site.schema.json")
+@json(site, "schemas/site.schema.json", "data/site.json")
 @if(site.choice == "a"){
 <a href="@pathto('public/assets/a.txt')">A</a>
 }else{
@@ -77,7 +77,7 @@ cat >"$P/schemas/items.json" <<'JSON'
 {"type":"object","properties":{"items":{"type":"array","items":{"type":"object","required":["name","rank"],"properties":{"name":{"type":"string"},"rank":{"type":"integer"}}}}}}
 JSON
 cat >"$P/templates/template.html" <<'EOF'
-@json("data/items.json", data, "schemas/items.json")
+@json(data, "schemas/items.json", "data/items.json")
 @for(item : data.items by item.rank asc){
 @input("templates/parts/item.html")
 }

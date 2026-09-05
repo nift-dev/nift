@@ -13,7 +13,7 @@ Nift has completed its planned Checkpoints 0–10 deliberate hardening campaign.
 ## Features
 
 - Fast, multithreaded builds and incremental rebuilds
-- Simple templating with exactly-one rendered `@content`, `@input(...)`, `@pathto(...)`, `@dep(...)`, `@getenv(...)`, `@ent(...)`, structured JSON via `@json(...)`, project contracts via `$[...]`, bounded `@for` / `@if` control flow, short-circuit logical conditions, lazy ternary rendering, `@join`, UTF-8-safe `@substr`, and opt-in multi-output pagination
+- Simple templating with exactly-one rendered `@content`, `@input(...)`, `@pathto(...)`, `@dep(...)`, `@getenv(...)`, `@ent(...)`, structured inline or file JSON via `@json(...)`, Markdown/AsciiDoc/reStructuredText conversion via `@markup(...)`, project contracts via `$[...]`, bounded `@for` / `@if` control flow, short-circuit logical conditions, lazy ternary rendering, `@join`, UTF-8-safe `@substr`, and opt-in multi-output pagination
 - Modified-time, hash and hybrid incremental build modes
 - File and directory dependency tracking
 - Automatic and explicit dependency support

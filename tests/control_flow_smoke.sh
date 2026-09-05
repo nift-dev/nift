@@ -52,7 +52,7 @@ cat >"$D/data/site.json" <<'JSON'
 JSON
 
 cat >"$D/templates/template.html" <<'EOF'
-@json("data/site.json", site)
+@json(site, "data/site.json")
 @if(site.enabled){IF_TRUE
 }
 @if(!site.disabled){NEG_TRUE
@@ -189,7 +189,7 @@ D2="$TMP/leak"
 make_project "$D2"
 printf '{"items":[1]}\n' >"$D2/data/site.json"
 cat >"$D2/templates/template.html" <<'EOF'
-@json("data/site.json", site)
+@json(site, "data/site.json")
 @for(item : site.items){$[item]}
 AFTER=$[item]
 @content
@@ -204,7 +204,7 @@ cat >"$D3/data/site.json" <<'JSON'
 {"groups":[{"name":"g1","items":[{"name":"a"},{"name":"b"}]},{"name":"g2","items":[{"name":"c"}]}]}
 JSON
 cat >"$D3/templates/template.html" <<'EOF'
-@json("data/site.json", site)
+@json(site, "data/site.json")
 @for(item : site.groups){
 OUTER1=$[item.name]
 @for(item : item.items){INNER=$[item.name]
@@ -230,7 +230,7 @@ mkdir -p "$D4/templates/partials"
 printf '{"enabled":true,"items":[{"name":"one","show":true},{"name":"two","show":false}]}\n' >"$D4/data/site.json"
 printf 'PARTIAL-ONE\nPARTIAL-TWO\n' >"$D4/templates/partials/two-lines.html"
 cat >"$D4/templates/template.html" <<'EOF'
-@json("data/site.json", site)
+@json(site, "data/site.json")
 <div>
     @for(item : site.items) {
         <p>FOR=$[item.name]</p>
@@ -292,17 +292,17 @@ expect_failure(){
 expect_failure if-no-close "@if has no matching ')'" '@if(site.enabled{hello' '{"enabled":true}'
 expect_failure if-no-block "@if(...) must be followed by a '{...}' block" '@if(site.enabled) hello' '{"enabled":true}'
 expect_failure if-unclosed-block "@if block has no matching '}'" '@if(site.enabled){hello' '{"enabled":true}'
-expect_failure if-missing-value "JSON value 'site' has no member 'missing'" $'@json("data/site.json", site)\n@if(site.missing){x}' '{}'
-expect_failure if-object-comparison '@if comparisons are only supported for scalar JSON values' $'@json("data/site.json", site)\n@if(site.obj == site.obj){x}' '{"obj":{"x":1}}'
-expect_failure if-order-mixed '@if ordering comparisons require two numbers or two strings of the same type' $'@json("data/site.json", site)\n@if(site.value < "3"){x}' '{"value":3}'
-expect_failure if-order-bool '@if ordering comparisons require two numbers or two strings of the same type' $'@json("data/site.json", site)\n@if(site.value >= false){x}' '{"value":true}'
-expect_failure for-no-in "@for header must contain ':'" $'@json("data/site.json", site)\n@for(item site.items){x}' '{"items":[]}'
-expect_failure for-array-bad-binding 'array @for syntax is @for(item : array)' $'@json("data/site.json", site)\n@for((a,b) : site.items){x}' '{"items":[]}'
-expect_failure for-object-bad-binding 'object @for syntax is @for((key, val) : object)' $'@json("data/site.json", site)\n@for(item : site.obj){x}' '{"obj":{"a":1}}'
-expect_failure for-scalar '@for can only iterate over JSON arrays or objects' $'@json("data/site.json", site)\n@for(item : site.value){x}' '{"value":1}'
-expect_failure for-unclosed-block "@for block has no matching '}'" $'@json("data/site.json", site)\n@for(item : site.items){x' '{"items":[]}'
-expect_failure for-reserved-binding "conflicts with built-in metadata" $'@json("data/site.json", site)\n@for(title : site.items){x}' '{"items":[1]}'
-expect_failure duplicate-plain-else "plain else must be the final branch" $'@json("data/site.json", site)\n@if(false){a}else{b}else{c}' '{}'
+expect_failure if-missing-value "JSON value 'site' has no member 'missing'" $'@json(site, "data/site.json")\n@if(site.missing){x}' '{}'
+expect_failure if-object-comparison '@if comparisons are only supported for scalar JSON values' $'@json(site, "data/site.json")\n@if(site.obj == site.obj){x}' '{"obj":{"x":1}}'
+expect_failure if-order-mixed '@if ordering comparisons require two numbers or two strings of the same type' $'@json(site, "data/site.json")\n@if(site.value < "3"){x}' '{"value":3}'
+expect_failure if-order-bool '@if ordering comparisons require two numbers or two strings of the same type' $'@json(site, "data/site.json")\n@if(site.value >= false){x}' '{"value":true}'
+expect_failure for-no-in "@for header must contain ':'" $'@json(site, "data/site.json")\n@for(item site.items){x}' '{"items":[]}'
+expect_failure for-array-bad-binding 'array @for syntax is @for(item : array)' $'@json(site, "data/site.json")\n@for((a,b) : site.items){x}' '{"items":[]}'
+expect_failure for-object-bad-binding 'object @for syntax is @for((key, val) : object)' $'@json(site, "data/site.json")\n@for(item : site.obj){x}' '{"obj":{"a":1}}'
+expect_failure for-scalar '@for can only iterate over JSON arrays or objects' $'@json(site, "data/site.json")\n@for(item : site.value){x}' '{"value":1}'
+expect_failure for-unclosed-block "@for block has no matching '}'" $'@json(site, "data/site.json")\n@for(item : site.items){x' '{"items":[]}'
+expect_failure for-reserved-binding "conflicts with built-in metadata" $'@json(site, "data/site.json")\n@for(title : site.items){x}' '{"items":[1]}'
+expect_failure duplicate-plain-else "plain else must be the final branch" $'@json(site, "data/site.json")\n@if(false){a}else{b}else{c}' '{}'
 
 echo "Control-flow smoke test passed"
 
@@ -326,7 +326,7 @@ cat >"$D5/data/site.json" <<'JSON_META'
 }
 JSON_META
 cat >"$D5/templates/template.html" <<'TMPL_META'
-@json("data/site.json", site)
+@json(site, "data/site.json")
 @for(post : site.posts by post.date desc){$[loop.index]/$[loop.length]:$[post.name]:first=$[loop.first]:last=$[loop.last]
 }
 --ASC--
@@ -362,7 +362,7 @@ D6="$TMP/loop-metadata-nested"
 make_project "$D6"
 printf '%s\n' '{"groups":[{"name":"g1","items":["a","b"]},{"name":"g2","items":["c"]}]}' >"$D6/data/site.json"
 cat >"$D6/templates/template.html" <<'TMPL_NEST'
-@json("data/site.json", site)
+@json(site, "data/site.json")
 @for(group : site.groups){OUTER-BEFORE=$[loop.index]/$[loop.length]:$[group.name]
 @for(item : group.items){INNER=$[loop.index]/$[loop.length]:$[item]
 }
@@ -394,21 +394,21 @@ expect_cf_failure() {
 }
 
 expect_cf_failure loop-json-reserved "conflicts with built-in metadata/reserved bindings" \
-    '@json("data/site.json", loop)' '{}'
+    '@json(loop, "data/site.json")' '{}'
 expect_cf_failure loop-array-reserved "conflicts with built-in metadata" \
-    $'@json("data/site.json", site)\n@for(loop : site.items){x}' '{"items":[1]}'
+    $'@json(site, "data/site.json")\n@for(loop : site.items){x}' '{"items":[1]}'
 expect_cf_failure loop-object-reserved "bindings cannot conflict with built-in metadata" \
-    $'@json("data/site.json", site)\n@for((loop,val) : site.object){x}' '{"object":{"a":1}}'
+    $'@json(site, "data/site.json")\n@for((loop,val) : site.object){x}' '{"object":{"a":1}}'
 expect_cf_failure sort-missing-direction "sorting syntax is" \
-    $'@json("data/site.json", site)\n@for(item : site.items by item.name){x}' '{"items":[{"name":"a"}]}'
+    $'@json(site, "data/site.json")\n@for(item : site.items by item.name){x}' '{"items":[{"name":"a"}]}'
 expect_cf_failure sort-wrong-root "sort key must begin with loop binding" \
-    $'@json("data/site.json", site)\n@for(item : site.items by site.name asc){x}' '{"name":"x","items":[{"name":"a"}]}'
+    $'@json(site, "data/site.json")\n@for(item : site.items by site.name asc){x}' '{"name":"x","items":[{"name":"a"}]}'
 expect_cf_failure sort-missing-member "has no member 'missing'" \
-    $'@json("data/site.json", site)\n@for(item : site.items by item.missing asc){x}' '{"items":[{"name":"a"}]}'
+    $'@json(site, "data/site.json")\n@for(item : site.items by item.missing asc){x}' '{"items":[{"name":"a"}]}'
 expect_cf_failure sort-mixed-types "sort keys must have the same type" \
-    $'@json("data/site.json", site)\n@for(item : site.items by item.key asc){x}' '{"items":[{"key":1},{"key":"2"}]}'
+    $'@json(site, "data/site.json")\n@for(item : site.items by item.key asc){x}' '{"items":[{"key":1},{"key":"2"}]}'
 expect_cf_failure sort-object-key "sort keys must all be numbers or all be strings" \
-    $'@json("data/site.json", site)\n@for(item : site.items by item.key asc){x}' '{"items":[{"key":{"x":1}}]}'
+    $'@json(site, "data/site.json")\n@for(item : site.items by item.key asc){x}' '{"items":[{"key":{"x":1}}]}'
 
 
 # Empty loops render nothing and do not leak loop metadata.
@@ -416,7 +416,7 @@ D7="$TMP/loop-empty"
 make_project "$D7"
 printf '%s\n' '{"empty":[],"obj":{}}' >"$D7/data/site.json"
 cat >"$D7/templates/template.html" <<'TMPL_EMPTY'
-@json("data/site.json", site)
+@json(site, "data/site.json")
 A@for(item : site.empty){BAD}B
 C@for((key,val) : site.obj){BAD}D
 LOOP=$[loop.index]
@@ -433,7 +433,7 @@ D8="$TMP/sort-stability-keys"
 make_project "$D8"
 printf '%s\n' '{"items":[{"id":"a","k":1},{"id":"b","k":1},{"id":"c","k":2}],"obj":{"z":1,"a":2,"m":3}}' >"$D8/data/site.json"
 cat >"$D8/templates/template.html" <<'TMPL_STABLE'
-@json("data/site.json", site)
+@json(site, "data/site.json")
 @for(item : site.items by item.k asc){$[item.id]}
 @for((key,val) : site.obj by key asc){$[key]}
 @content
@@ -447,7 +447,7 @@ D9="$TMP/branch-laziness-new"
 make_project "$D9"
 printf '%s\n' '{"ok":true,"items":[1]}' >"$D9/data/site.json"
 cat >"$D9/templates/template.html" <<'TMPL_LAZY'
-@json("data/site.json", site)
+@json(site, "data/site.json")
 @if(false){$[site.missing.deep]}
 @if(site.ok){GOOD}else{$[site.missing]}
 @for(item : site.items){@if(false){$[item.nope]}OK}
@@ -458,13 +458,13 @@ grep -Fq 'GOOD' "$D9/public/index.html"
 grep -Fq 'OK' "$D9/public/index.html"
 
 expect_cf_failure sort-bad-direction "sorting syntax is" \
-    $'@json("data/site.json", site)\n@for(item : site.items by item ascx){x}' '{"items":[1]}'
+    $'@json(site, "data/site.json")\n@for(item : site.items by item ascx){x}' '{"items":[1]}'
 expect_cf_failure sort-extra-token "sorting syntax is" \
-    $'@json("data/site.json", site)\n@for(item : site.items by item asc extra){x}' '{"items":[1]}'
+    $'@json(site, "data/site.json")\n@for(item : site.items by item asc extra){x}' '{"items":[1]}'
 expect_cf_failure object-same-binding "must be distinct identifiers" \
-    $'@json("data/site.json", site)\n@for((x,x) : site.obj){x}' '{"obj":{"a":1}}'
+    $'@json(site, "data/site.json")\n@for((x,x) : site.obj){x}' '{"obj":{"a":1}}'
 expect_cf_failure object-sort-wrong-root "object sort key must begin with key/value binding" \
-    $'@json("data/site.json", site)\n@for((key,val) : site.obj by site.x asc){x}' '{"obj":{"a":1},"x":1}'
+    $'@json(site, "data/site.json")\n@for((key,val) : site.obj by site.x asc){x}' '{"obj":{"a":1},"x":1}'
 
 echo "Control-flow loop metadata/sorting extensions passed"
 
@@ -487,7 +487,7 @@ cat >"$D7/data/site.json" <<'JSON_BOUND'
 }
 JSON_BOUND
 cat >"$D7/templates/template.html" <<'TMPL_BOUND'
-@json("data/site.json", site)
+@json(site, "data/site.json")
 EMPTY-BEFORE
 @for(item : site.empty){SHOULD-NOT-RENDER=$[loop.index]}
 EMPTY-AFTER=$[loop.index]
@@ -516,13 +516,13 @@ grep -Fq 'EMPTYSTR-FALSE' "$OUT7"
 grep -Fq 'STRING-TRUE' "$OUT7"
 
 expect_cf_failure sort-direction-case "sorting syntax is" \
-    $'@json("data/site.json", site)\n@for(item : site.items by item ASC){x}' '{"items":[1]}'
+    $'@json(site, "data/site.json")\n@for(item : site.items by item ASC){x}' '{"items":[1]}'
 expect_cf_failure sort-extra-token "sorting syntax is" \
-    $'@json("data/site.json", site)\n@for(item : site.items by item asc nope){x}' '{"items":[1]}'
+    $'@json(site, "data/site.json")\n@for(item : site.items by item asc nope){x}' '{"items":[1]}'
 expect_cf_failure object-same-bindings "distinct identifiers" \
-    $'@json("data/site.json", site)\n@for((x,x) : site.object){x}' '{"object":{"a":1}}'
+    $'@json(site, "data/site.json")\n@for((x,x) : site.object){x}' '{"object":{"a":1}}'
 expect_cf_failure object-third-binding "exactly two bindings" \
-    $'@json("data/site.json", site)\n@for((a,b,c) : site.object){x}' '{"object":{"a":1}}'
+    $'@json(site, "data/site.json")\n@for((a,b,c) : site.object){x}' '{"object":{"a":1}}'
 
 echo "Control-flow adversarial boundary extensions passed"
 
@@ -545,7 +545,7 @@ cat > data/logic.json <<'JSON'
 {"a":true,"b":false,"n":5}
 JSON
 cat > content/index.html <<'EOF'
-@json('data/logic.json', d)
+@json(d, 'data/logic.json')
 @if(d.a && !d.b){AND}
 @if(d.b || d.a){OR}
 @if(d.a || missing.value){SHORT_OR}
@@ -582,7 +582,7 @@ cat > data/t.json <<'JSON'
 {"yes":true,"no":false,"kind":"a"}
 JSON
 cat > content/index.html <<'EOF2'
-@json('data/t.json', d)
+@json(d, 'data/t.json')
 <p class="$[d.yes ? active : inactive]">$[d.kind == 'a' && !d.no ? @input('templates/yes.html') : @input('missing.html')]</p>
 $[d.no ? @dep('missing-dep.txt') : SAFE]
 $[d.yes ? SHORTHAND]
@@ -613,7 +613,7 @@ cat >"$D_TERNARY_STR/templates/selected.html" <<'EOF_TERNARY_STR'
 DIRECTIVE-$[title]
 EOF_TERNARY_STR
 cat >"$D_TERNARY_STR/templates/template.html" <<'EOF_TERNARY_STR'
-@json('data/site.json', d)
+@json(d, 'data/site.json')
 SINGLE_TRUE=[$[d.yes ? 'yes' : 'no']]
 SINGLE_FALSE=[$[d.no ? 'yes' : 'no']]
 DOUBLE_TRUE=[$[d.yes ? "double" : "wrong"]]

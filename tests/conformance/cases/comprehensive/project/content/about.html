@@ -3,7 +3,7 @@
 <p>content-path=$[content-path]</p>
 <p>output-path=$[output-path]</p>
 <p>site=$[site.name]</p>
-@json('data/items.json', d)
+@json(d, 'data/items.json')
 @for(x : d.items){<span>$[x.name]</span>}
 <p>home=@pathto("/")</p>
 <p>blog=@pathto("blog/")</p>

@@ -21,7 +21,7 @@ cat > data/items.json <<'JSON'
 {"items":[{"name":"one"},{"name":"two"},{"name":"three"},{"name":"four"},{"name":"five"}]}
 JSON
 cat > content/index.html <<'EOF2'
-@json('data/items.json', d)
+@json(d, 'data/items.json')
 @item{before}
 @paginate
 @for(x : d.items){@item{<b>$[x.name]</b>}}
@@ -33,7 +33,7 @@ cat > content/index.separator.html <<'EOF2'
 <span>|$[paginate.current]|</span>
 EOF2
 cat > content/blog.html <<'EOF2'
-@json('data/items.json', d)
+@json(d, 'data/items.json')
 @for(x : d.items){@item{$[x.name]}}
 @paginate
 EOF2
@@ -212,7 +212,7 @@ cat > data/nav.json <<'JSON'
 {"offset":1}
 JSON
 cat > content/blog.html <<'EOF2'
-@json('data/nav.json', nav)
+@json(nav, 'data/nav.json')
 @item{one}@item{two}@item{three}@paginate
 EOF2
 cat > content/blog.paginate.html <<'EOF2'

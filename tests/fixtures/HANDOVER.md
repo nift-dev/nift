@@ -1,5 +1,5 @@
 # HANDOVER.md
-v0.0.6
+v0.0.7
 
 This is a living handover for working effectively in a Nift project.
 
@@ -117,6 +117,29 @@ literal output rather than something Nift should execute or resolve.
 
 @input('templates/footer.html')
 ```
+
+### Structured JSON and markup sources
+
+Use name-first `@json` when a template needs immutable structured data:
+
+```text
+@json(name, path)
+@json(name, schema-path, path)
+@json(name, schema-name, path)
+@json(name){...}
+@json(name, schema-path){...}
+@json(name, schema-name){...}
+```
+
+Inline bodies are evaluated as Nift templates before JSON parsing. A schema
+name refers to an earlier JSON binding. Data and schema files are automatic
+dependencies and paths must stay inside the project.
+
+Use `@markup(format){...}` or `@markup(format, path)` for Markdown (`md`),
+AsciiDoc (`adoc`) or reStructuredText (`rst`). Nift evaluates template syntax in
+the source first, Markup++ converts it once, and the resulting HTML is appended
+without being parsed as Nift syntax again. File sources and host-resolved
+AsciiDoc/RST includes are automatic dependencies.
 
 `@pathto(...)` creates project-aware links to tracked pages and local assets.
 

@@ -56,7 +56,7 @@ const char* kAboutContent = R"(<h1>About</h1>
 <p>appjs=@pathto("public/app.js")</p>)";
 const char* k404Content = R"(<p>home=@pathto("/")</p>
 <p>blog=@pathto("blog/")</p>)";
-const char* kBlogContent = R"(@json('data/items.json', d)
+const char* kBlogContent = R"(@json(d, 'data/items.json')
 @for(x : d.items){@item{$[x.name]}}
 @paginate)";
 const char* kPaginateHtml = R"(<div class="page-$[paginate.current]">$[paginate.items]</div>)";

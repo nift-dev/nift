@@ -1,18 +1,23 @@
 CXX ?= g++
+CC ?= cc
 CXXFLAGS ?= -std=c++17 -O2 -Wall -Wextra -pedantic -pthread
-CPPFLAGS ?= -Isrc -Iinclude -Iminifypp/include -Iminifypp/src
+CFLAGS ?= -std=c99 -O2 -Wall -Wextra -pedantic
+CPPFLAGS ?= -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark
 LDFLAGS ?=
 LDLIBS ?=
 
 # Shared core + CLI implementation (the ordinary Nift CLI needs only these).
-CORE_SOURCES := src/nift.cpp src/ProjectOwnership.cpp src/CLI.cpp src/Value.cpp src/FileSystem.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp src/Parser.cpp src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp src/WatchList.cpp src/BuildProgress.cpp
+CORE_SOURCES := src/nift.cpp src/ProjectOwnership.cpp src/CLI.cpp src/Value.cpp src/FileSystem.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp markuppp/src/Markup.cpp markuppp/src/AsciiDoc.cpp markuppp/src/ReStructuredText.cpp src/Parser.cpp src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp src/WatchList.cpp src/BuildProgress.cpp
 # Embedding-exclusive implementation (Engine, Context, C ABI). The reduced CLI
 # never compiles or links these; they are built by the embed library and the
 # engine/C ABI test targets.
 EMBED_SOURCES := src/embed/Engine.cpp src/embed/Context.cpp src/embed/c_abi.cpp
 SOURCES := $(CORE_SOURCES) $(EMBED_SOURCES)
-OBJECTS := $(SOURCES:.cpp=.o)
-CLI_OBJECTS := $(CORE_SOURCES:.cpp=.o)
+MARKUP_C_NAMES := blocks buffer cmark cmark_ctype houdini_href_e houdini_html_e houdini_html_u html inlines iterator node references render scanners utf8
+MARKUP_C_SOURCES := $(addprefix markuppp/vendor/cmark/,$(addsuffix .c,$(MARKUP_C_NAMES)))
+MARKUP_C_OBJECTS := $(MARKUP_C_SOURCES:.c=.o)
+OBJECTS := $(SOURCES:.cpp=.o) $(MARKUP_C_OBJECTS)
+CLI_OBJECTS := $(CORE_SOURCES:.cpp=.o) $(MARKUP_C_OBJECTS)
 DEPFILES := $(OBJECTS:.o=.d)
 
 ifeq ($(OS),Windows_NT)
@@ -43,10 +48,10 @@ DESTDIR ?=
 TEST_DIR := .build
 SANITIZER_FLAGS ?= -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined
 SAN_TARGET := $(TEST_DIR)/nift-sanitize$(EXEEXT)
-SAN_OBJECTS := $(patsubst %.cpp,$(TEST_DIR)/san/%.o,$(SOURCES))
+SAN_OBJECTS := $(patsubst %.cpp,$(TEST_DIR)/san/%.o,$(SOURCES)) $(patsubst %.c,$(TEST_DIR)/san/%.o,$(MARKUP_C_SOURCES))
 TSAN_FLAGS ?= -O1 -g -fno-omit-frame-pointer -fsanitize=thread
 TSAN_TARGET := $(TEST_DIR)/nift-tsan$(EXEEXT)
-TSAN_OBJECTS := $(patsubst %.cpp,$(TEST_DIR)/tsan/%.o,$(SOURCES))
+TSAN_OBJECTS := $(patsubst %.cpp,$(TEST_DIR)/tsan/%.o,$(SOURCES)) $(patsubst %.c,$(TEST_DIR)/tsan/%.o,$(MARKUP_C_SOURCES))
 MEMORY_SMOKE := $(TEST_DIR)/nift-memory-san$(EXEEXT)
 JSON_TEST := $(TEST_DIR)/nift-json-smoke$(EXEEXT)
 JSON_SCHEMA_TEST := $(TEST_DIR)/nift-json-schema-smoke$(EXEEXT)
@@ -63,6 +68,9 @@ $(TARGET): $(CLI_OBJECTS)
 %.o: %.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -MMD -MP -c $< -o $@
 
+%.o: %.c
+	$(CC) -Imarkuppp/vendor/cmark $(CFLAGS) -MMD -MP -c $< -o $@
+
 -include $(DEPFILES) $(patsubst %.o,%.d,$(SAN_OBJECTS) $(TSAN_OBJECTS))
 
 test-jsonic:
@@ -71,6 +79,10 @@ test-jsonic:
 test-jsonic-sync:
 	@test -n "$(JSONIC_DIR)" || (echo "JSONIC_DIR=/path/to/jsonic is required" >&2; exit 2)
 	$(MAKE) -C "$(JSONIC_DIR)" check-nift-sync NIFT_DIR="$(CURDIR)"
+
+test-markuppp-sync:
+	@test -n "$(MARKUP_DIR)" || (echo "MARKUP_DIR=/path/to/markup is required" >&2; exit 2)
+	$(MAKE) -C "$(MARKUP_DIR)" check-nift-sync NIFT_DIR="$(CURDIR)"
 
 test-json:
 	mkdir -p "$(TEST_DIR)"
@@ -410,7 +422,7 @@ test-all: test test-embed test-bindings test-build-boundary
 # only). Embedding and binding suites are run through the focused targets.
 test: test-content test-commands test-comments test-contracts test-json \
 	test-json-schema test-console test-diagnostics test-minify \
-	test-json-schema-integration test-pagination test-pagination-ordering \
+	test-json-schema-integration test-markup-json-directives test-pagination test-pagination-ordering \
 	test-template-optional test-requirements test-path-safety test-metadata-safety \
 	test-init-targets test-init-lock test-control-flow test-cross-feature test-config-validation \
 	test-zero-mutation test-repair-campaign test-ownership-concurrency \
@@ -440,6 +452,9 @@ test-comments: $(TARGET)
 
 test-json-binding: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/json_binding_smoke.sh
+
+test-markup-json-directives: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/markup_json_directives_smoke.sh
 
 test-control-flow: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/control_flow_smoke.sh
@@ -613,7 +628,7 @@ clean:
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
-.PHONY: embed go-binding csharp-binding node-binding python-binding bindings test-build-boundary test-embed test-go-binding test-csharp-binding test-node-binding test-python-binding test-bindings test-all test benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-json test-json-schema test-console test-progress-render test-progress-pty test-snap-contract test-diagnostics test-minify test-json-schema-integration test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke test-host-seam benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets test-init-lock test-unreadable-source install uninstall
+.PHONY: embed go-binding csharp-binding node-binding python-binding bindings test-build-boundary test-embed test-go-binding test-csharp-binding test-node-binding test-python-binding test-bindings test-all test benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-markuppp-sync test-json test-json-schema test-console test-progress-render test-progress-pty test-snap-contract test-diagnostics test-minify test-json-schema-integration test-markup-json-directives test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke test-host-seam benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets test-init-lock test-unreadable-source install uninstall
 
 
 test-cross-feature: $(TARGET)
@@ -682,6 +697,10 @@ $(TEST_DIR)/san/%.o: %.cpp
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(SANITIZER_FLAGS) -MMD -MP -c "$<" -o "$@"
 
+$(TEST_DIR)/san/%.o: %.c
+	mkdir -p "$(dir $@)"
+	$(CC) -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic $(SANITIZER_FLAGS) -MMD -MP -c "$<" -o "$@"
+
 $(SAN_TARGET): $(SAN_OBJECTS)
 	mkdir -p "$(TEST_DIR)"
 	$(CXX) -std=c++17 -pthread $(SANITIZER_FLAGS) $(SAN_OBJECTS) -o "$@"
@@ -695,6 +714,10 @@ test-pagination-sanitize: $(SAN_TARGET)
 $(TEST_DIR)/tsan/%.o: %.cpp
 	mkdir -p "$(dir $@)"
 	$(CXX) $(CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(TSAN_FLAGS) -MMD -MP -c "$<" -o "$@"
+
+$(TEST_DIR)/tsan/%.o: %.c
+	mkdir -p "$(dir $@)"
+	$(CC) -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic $(TSAN_FLAGS) -MMD -MP -c "$<" -o "$@"
 
 $(TSAN_TARGET): $(TSAN_OBJECTS)
 	mkdir -p "$(TEST_DIR)"

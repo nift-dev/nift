@@ -22,7 +22,7 @@ for MODE in modified hash hybrid; do
   printf '{"value":1}\n' >"$P/data/site.json"
   printf '%s\n' '{"type":"object","properties":{"value":{"type":"integer","maximum":10}}}' >"$P/schemas/site.json"
   cat >"$P/templates/template.html" <<'EOF'
-@json("data/site.json", site, "schemas/site.json")
+@json(site, "schemas/site.json", "data/site.json")
 <a href="@pathto('public/assets/a.txt')">$[site.value]</a>
 @content
 EOF
@@ -62,7 +62,7 @@ EOF
   # Deleting a schema marks rebuild; changing template to stop using it must repair.
   rm "$P/schemas/site.json"
   cat >"$P/templates/template.html" <<'EOF'
-@json("data/site.json", site)
+@json(site, "data/site.json")
 <span>$[site.value]</span>
 <a href="@pathto('public/assets/a.txt')">asset</a>
 @content
