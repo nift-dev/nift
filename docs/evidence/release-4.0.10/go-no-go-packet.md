@@ -1,10 +1,11 @@
-# Nift 4.0.10 release candidate — go/no-go packet (draft)
+# Nift 4.0.10 release candidate — go/no-go packet (finalized)
 
-This packet records the local release-candidate evidence for Nift 4.0.10. It is a
-**draft**: no tag has been created and nothing has been released, published,
-promoted or deployed. The non-publishing release rehearsal, the Snap rehearsal,
-hosted CI at the final head, the final go/no-go decision and tag authorization
-are marked **pending** — they have not run and are not claimed.
+This packet records the local and hosted release-candidate evidence for Nift
+4.0.10. The non-publishing release rehearsal, the Snap rehearsal, hosted CI at
+the release-preparation head and the pre-tag verifications have all run and are
+recorded below. The tag itself has **not** been created: the final go/no-go
+decision, tag authorization and the tag-triggered publication run are still
+**pending**.
 
 ## 1. Candidate heads and tag target
 
@@ -87,17 +88,18 @@ self-test, plus the bounded libFuzzer job. Evidence-only Markup++ commit
 
 ## 5. Local and hosted validation evidence
 
-- **Hosted CI at Nift `a520921`** (all push-triggered workflows):
-  - Checkpoint 10 cross-platform equivalence: `33963060343` — SUCCESS (linux,
-    windows, macos behavioural corpus + normalized comparison).
-  - packaging matrix (build-only, non-publishing): `33963060241` — SUCCESS (all
+- **Hosted CI at Nift release-preparation head `2c9dd96`** (all push-triggered
+  workflows, dispatched at that exact head):
+  - Test integrity guards: `33966355566` — SUCCESS.
+  - packaging matrix (build-only, non-publishing): `33966357347` — SUCCESS (all
     six jobs incl. language packages).
-  - Test integrity guards: `33963060231` — SUCCESS.
-  - Init targets and performance-regression guards passed at the prior head
-    `5565039`.
+  - Checkpoint 10 cross-platform equivalence: `33966359564` — SUCCESS.
+  - Init targets: `33966361371` — SUCCESS.
 - **Independent regression suite.** `run-contract.sh` → 25/25 modules PASS at
   Nift `a520921`; hosted workflow `33964012981` (main) and `33964185936`
   (explicit full SHA `a520921346a853115a5dfe1f3709b069ba1f9431`) both SUCCESS.
+  The release-preparation commit changes documentation only; the regression
+  suite result carries to the release-preparation head unchanged.
 - **Local Linux (g++ 15.2.0).** `make test` exit 0; `make test-all` exit 0
   (embed, bindings: Go `-race`, C# 27/27, Node 25/25, Python 22/22); sanitizer
   and TSAN targets pass; `make test-markuppp-sync` → 41 files PASS;
@@ -106,27 +108,56 @@ self-test, plus the bounded libFuzzer job. Evidence-only Markup++ commit
   matches + 1 pinned difference), RST14 (17 normalized + 7 pinned differences)
   and the 12-check difference-gate self-test; the Python wheel builds from the
   staged native tree and the clean-consumer render passes.
-- **Websites.** Nift `nift status` → 75/75; Markup++ website → 6/6. Public
-  installer `https://nift.dev/install` is byte-identical to
-  `packaging/install.sh` (SHA-256 `a98bdf72…`), verified at packet draft time.
+- **Websites.** Nift `nift status` → 75/75; Markup++ website → 6/6.
+
+## 5a. Non-publishing rehearsals (run at the release-preparation head)
+
+- **`Release artifacts` rehearsal** — run `33966850169` at `2c9dd96`
+  (`version=4.0.10`), conclusion **SUCCESS**:
+  - `unix (linux-x86_64)`, `unix (macos-arm64)`, `unix (macos-x86_64)`,
+    `windows` — build + extracted-archive native smoke + correct `Nift
+    v4.0.10` version each;
+  - `installer-preflight` — `sh -n packaging/install.sh` + `make
+    test-installer` PASS;
+  - `public-installer-preflight` — `https://nift.dev/install` byte-identical
+    to `packaging/install.sh` PASS;
+  - `rehearse` — exact four-asset set + `SHA256SUMS` manifest generated;
+    publishing jobs (`publish`, `chocolatey`, `homebrew`,
+    `installer-public-smoke`, `snap`) skipped by the dispatch trigger, so no
+    GitHub release or package publication occurred.
+- **`Snap` rehearsal** — run `33967077103` at `2c9dd96`, conclusion **SUCCESS**:
+  - `toolchain-preflight` — pinned Snapcraft 9.0.1, snap revision 18514
+    verified;
+  - `build (amd64)` and `build (arm64)` — validation builds PASS;
+  - `release-coordination` skipped (tag-trigger only), so no Store channel
+    mutation occurred.
+
+## 5b. Pre-tag verifications (at finalization time)
+
+- `src/CLI.cpp:34` reports `Nift v4.0.10`; `snap/snapcraft.yaml` reports
+  `4.0.10`; `packaging/test-version-derivation.sh` PASS (metadata derives the
+  synchronized version).
+- `v4.0.10` does not exist locally, on the remote, or as a GitHub release.
+- `https://nift.dev/install` is byte-identical to `packaging/install.sh`
+  (SHA-256 `a98bdf72…`).
+- Every repository head matches its remote; every working tree is clean of
+  uncommitted changes.
 
 ## 6. Pending items before tag authorization
 
-- [ ] Initial release-preparation commit (notes + this packet) created on `nift`
-      `main`. **PENDING: review and push.**
-- [ ] Hosted CI at the exact release-preparation head (init targets,
-      checkpoint-10, test-integrity, packaging).
-- [ ] Non-publishing `Release artifacts` rehearsal (`version=4.0.10`): exact
-      four-asset set, extracted-archive smokes, installer gates, checksums.
-      **PENDING** (workflow_dispatch).
-- [ ] Non-publishing `Snap` dispatch: pinned Snapcraft toolchain preflight +
-      amd64/arm64 validation builds; no Store mutation. **PENDING**.
+- [x] Initial release-preparation commit `2c9dd96` created on `nift` `main`
+      (notes + this packet) and pushed.
+- [x] Hosted CI at the release-preparation head `2c9dd96` (init targets,
+      checkpoint-10, test-integrity, packaging) — all SUCCESS.
+- [x] Non-publishing `Release artifacts` rehearsal (`version=4.0.10`) —
+      SUCCESS (`33966850169`).
+- [x] Non-publishing `Snap` dispatch — SUCCESS (`33967077103`), no Store
+      mutation.
+- [x] Pre-tag verifications — all pass (version, snap version, tag absence,
+      installer byte-equality, heads match remotes, clean trees).
 - [ ] Final documentation commit carrying this finalized packet. **PENDING:
       review and push.**
-- [ ] Pre-tag verifications: local `main == origin/main`; `v4.0.10` absent
-      locally, remotely and as a GitHub release; public installer still
-      byte-identical; every working tree clean; `./nift version` → `Nift
-      v4.0.10`; `snap/snapcraft.yaml` → `4.0.10`.
+- [ ] Hosted CI at the exact final head after the packet-finalization commit.
 - [ ] The final reviewed commit containing this finalized packet is resolved
       and recorded externally, and explicit tag authorization names it.
 
