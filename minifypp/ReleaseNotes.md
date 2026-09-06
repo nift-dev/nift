@@ -1,6 +1,10 @@
 # Minify++ — Release Notes
 
-## Unreleased
+## v1.1.1
+
+- Added checksum-verifying curl install, download, update and uninstall scripts,
+  cross-platform release archives, release rehearsals and public installer smoke
+  tests.
 
 - Preserved whitespace runs that follow CSS escapes. A hex escape consumes one
   trailing whitespace as its terminator, and an escaped whitespace character is

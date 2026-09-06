@@ -10,6 +10,36 @@ The architectural boundary is intentional: Nift consumes only the public API in 
 
 Supported formats in format version 1 are HTML, CSS, JavaScript, JSX, JSON, XML and SVG.
 
+## Install
+
+Linux x86-64 and macOS arm64/x86-64:
+
+```bash
+curl -fsSL https://nift-dev.github.io/minify-website/install | sh
+```
+
+The installer downloads the latest GitHub release, verifies its archive against
+the published `SHA256SUMS`, and installs `minify` in `~/.local/bin` without
+`sudo`. Set `MINIFY_INSTALL_DIR` to choose another directory or
+`MINIFY_VERSION=1.1.1` to pin a release.
+
+```bash
+# Download the verified archive without installing it.
+curl -fsSL https://nift-dev.github.io/minify-website/download | sh
+
+# Update to the latest release using the same install location.
+curl -fsSL https://nift-dev.github.io/minify-website/update | sh
+
+# Remove the installed executable.
+curl -fsSL https://nift-dev.github.io/minify-website/uninstall | sh
+```
+
+Windows x86-64 users can download the `.zip` archive from the
+[GitHub releases](https://github.com/nift-dev/minify/releases) page and verify it
+with the accompanying `SHA256SUMS` file.
+
+## Build from source
+
 ```bash
 make
 make test

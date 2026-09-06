@@ -76,5 +76,5 @@ if "$BIN" --wat "$TMP/app.js" >"$TMP/option.log" 2>&1; then
 fi
 grep -Fq "unknown option '--wat'" "$TMP/option.log"
 
-test "$($BIN --version)" = 'Minify++ 1.1.0'
+test "$($BIN --version)" = 'Minify++ 1.1.1'
 echo 'Standalone minifier CLI smoke test passed'
