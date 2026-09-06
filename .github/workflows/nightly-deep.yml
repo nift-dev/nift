@@ -71,16 +71,10 @@ jobs:
       - name: Build Nift
         run: make -j2
       - name: Checkpoint 6 integration memory safety
-        # Canonical invocation from `make memory-safety-checkpoint-6`; the Make
-        # target's -sync prerequisite needs sibling jsonic/minify checkouts that
-        # are not present in this nift-only workflow checkout, so the script is
-        # invoked directly with the same retained parameters.
-        run: |
-          python3 scripts/checkpoint6_integration.py \
-            --nift "$PWD/nift" \
-            --rounds 60 \
-            --pages 90 \
-            --output .build/memory-safety/checkpoint-6-integration.json
+        # Single source of truth: the sibling-free execution target owns the
+        # checkpoint-6 script invocation and its parameters, so the workflow
+        # cannot drift from the canonical definition.
+        run: make memory-safety-checkpoint-6-run
 
   incremental-equivalence:
     name: Checkpoint 7 incremental equivalence

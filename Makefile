@@ -773,9 +773,11 @@ memory-safety-checkpoint-6-sync:
 	bash "$(CURDIR)/../jsonic/jsonic/scripts/check-nift-sync.sh" "$(CURDIR)"
 	bash "$(CURDIR)/../minify/minify/scripts/check-nift-sync.sh" "$(CURDIR)/minifypp"
 
-memory-safety-checkpoint-6: memory-safety-checkpoint-6-sync $(TARGET)
+memory-safety-checkpoint-6-run: $(TARGET)
 	mkdir -p .build/memory-safety
 	python3 scripts/checkpoint6_integration.py --nift "$(CURDIR)/$(TARGET)" --rounds 60 --pages 90 --output .build/memory-safety/checkpoint-6-integration.json
+
+memory-safety-checkpoint-6: memory-safety-checkpoint-6-sync memory-safety-checkpoint-6-run
 
 memory-safety-checkpoint-6-sanitize: memory-safety-checkpoint-6-sync $(SAN_TARGET)
 	mkdir -p .build/memory-safety
@@ -785,7 +787,7 @@ valgrind-memory-safety-checkpoint-6: memory-safety-checkpoint-6-sync $(TARGET)
 	mkdir -p .build/memory-safety
 	python3 scripts/checkpoint6_integration.py --valgrind --nift "$(CURDIR)/$(TARGET)" --rounds 12 --pages 40 --output .build/memory-safety/checkpoint-6-valgrind.json
 
-.PHONY: memory-safety-checkpoint-6-sync memory-safety-checkpoint-6 memory-safety-checkpoint-6-sanitize valgrind-memory-safety-checkpoint-6
+.PHONY: memory-safety-checkpoint-6-sync memory-safety-checkpoint-6-run memory-safety-checkpoint-6 memory-safety-checkpoint-6-sanitize valgrind-memory-safety-checkpoint-6
 
 checkpoint-7-incremental-equivalence: $(TARGET)
 	mkdir -p .build/checkpoint-7
