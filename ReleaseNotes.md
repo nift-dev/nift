@@ -1,15 +1,18 @@
 # Nift — Release Notes
 
-## v4.0.10
+## v4.0.11
 
-Development in progress following the public v4.0.9 release.
+Development in progress following the public v4.0.10 release.
 
 - Standardized Nift source comments on familiar opaque forms: `@//` for
   single-line comments and `@/* ... */` for multiline comments. Comment bodies
-  are skipped without parsing or executing Nift syntax.
-- Synchronized the embedded Minify++ CSS recovery fixes found through the new
+  are skipped without parsing or executing Nift syntax, and `@#` is ordinary
+  output text rather than comment syntax.
+- Synchronized the embedded Minify++ CSS correctness fixes found through the
   WPT conformance harness, including browser-style EOF recovery for strings and
-  comments and bad-string newline handling.
+  comments, bad-string newline handling, and token-boundary preservation for
+  nesting selectors, escaped `::part()` identifiers, and attribute-selector
+  namespace whitespace.
 - Synchronized the embedded Minify++ CSS escape-whitespace fix: whitespace runs
   following CSS hex escapes or escaped whitespace are preserved so that
   `@counter-style` and other escape-separated identifier lists cannot be merged
@@ -17,6 +20,18 @@ Development in progress following the public v4.0.9 release.
 - Decoupled Snap Store promotion from the GitHub release workflow. Release runs
   now perform only non-publishing Snap validation; completed connected builds
   are promoted later through the manual `Promote completed Snap builds` workflow.
+- Strengthened the independent Minify++ conformance harness so its CSSOM oracle
+  inspects `@counter-style`/`@property`/`@font-palette-values` descriptors and
+  `@import`/`@charset`, closing a blind spot that previously let the
+  escape-whitespace bug class compare as passing.
+
+## v4.0.10
+
+Nift 4.0.10 embeds the approved Markup++ converter and its vendored cmark
+engine, adds the `@markup` directive for Markdown, AsciiDoc and
+reStructuredText, and reworks `@json` around six name-first forms with inline
+JSON bodies and named schemas.
+
 - Embedded the approved Markup++ library and its vendored cmark engine. The new
   `@markup(format){...}` and `@markup(format, path)` directives render Markdown,
   AsciiDoc or reStructuredText after evaluating Nift template syntax, then append

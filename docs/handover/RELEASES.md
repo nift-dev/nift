@@ -7,8 +7,8 @@ is packaged and published.
 
 ## Authority and current state
 
-The development executable currently reports `Nift v4.0.9`, following the
-public v4.0.8 release. The exact executable identity remains documented in
+The development executable currently reports `Nift v4.0.11`, following the
+public v4.0.10 release. The exact executable identity remains documented in
 project history and release notes, but it is not part of the public product
 version. Exact tag, artifact, and public release conventions must follow
 `PACKAGING.md` and actual Git/release evidence.
@@ -839,3 +839,32 @@ candidate. Final verified state:
   non-x86 architectures.
 - Run `distribution-verification.yml` against the exact public version once
   stores propagate.
+
+## v4.0.10 release report
+
+### Scope
+
+v4.0.10 embeds the approved Markup++ converter and its vendored cmark engine,
+adds the `@markup` directive for Markdown, AsciiDoc and reStructuredText, and
+reworks `@json` around six name-first forms with inline JSON bodies and named
+schemas. The embedded engine, its language bindings, the shared corpus and the
+experimental Rust implementation remain in-tree but are not released,
+documented or promoted.
+
+### Source and workflow
+
+- Annotated tag `v4.0.10` at `5ef3a8f`; public GitHub release
+  `https://github.com/nift-dev/nift/releases/tag/v4.0.10`.
+- Non-publishing release rehearsal and Snap rehearsal completed for
+  `version=4.0.10` before tag authorization (go/no-go packet finalized at
+  `5ef3a8f`).
+- Archives and checksums recorded in
+  `docs/evidence/release-4.0.10/release-notes-4.0.10.md`; extracted binary
+  reports `Nift v4.0.10`.
+
+### Post-release
+
+- Development identity advanced to `Nift v4.0.11` in `src/CLI.cpp`,
+  `snap/snapcraft.yaml`, release notes, and the guarantee registry baseline
+  (released_version 4.0.10, release_commit 5ef3a8f, development_version 4.0.11).
+- Regression-suite version assertions advanced to v4.0.11.
