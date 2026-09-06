@@ -333,6 +333,12 @@ evidence for the release report.
    project on every release platform available for validation.
 8. Commit and push all approved release-preparation changes. Recheck that `main`
    and the intended release commit are exactly the state that was validated.
+   When a change also modifies `nift-regression-suite`, push **Nift first**,
+   verify the intended Nift commit/version is present on `origin/main`, and only
+   then push the regression-suite commit that depends on it. The regression
+   suite's GitHub workflow builds Nift from its remote `main` branch, so pushing
+   the suite first makes CI test its new contract against the previous Nift
+   revision.
 
 ### 2. Create the GitHub release
 

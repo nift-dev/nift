@@ -7,8 +7,8 @@ is packaged and published.
 
 ## Authority and current state
 
-The development executable currently reports `Nift v4.0.11`, following the
-public v4.0.10 release. The exact executable identity remains documented in
+The development executable currently reports `Nift v4.0.12`, following the
+public v4.0.11 release. The exact executable identity remains documented in
 project history and release notes, but it is not part of the public product
 version. Exact tag, artifact, and public release conventions must follow
 `PACKAGING.md` and actual Git/release evidence.
@@ -868,3 +868,47 @@ documented or promoted.
   `snap/snapcraft.yaml`, release notes, and the guarantee registry baseline
   (released_version 4.0.10, release_commit 5ef3a8f, development_version 4.0.11).
 - Regression-suite version assertions advanced to v4.0.11.
+
+## v4.0.11 release report
+
+### Scope
+
+v4.0.11 is a correctness and release-hardening maintenance release driven by
+an adversarial WPT-based review of the embedded Minify++ minifier. It
+standardizes Nift source comments on opaque forms (`@//`, `@/* ... */`, with
+`@#` ordinary text), syncs WPT-derived Minify++ correctness fixes including the
+CSS escape-whitespace correction, decouples Snap Store promotion from the
+GitHub release workflow, and strengthens the independent Minify++ conformance
+oracle.
+
+### Source and workflow
+
+- Annotated tag `v4.0.11` at `6c037cf`; public GitHub release
+  `https://github.com/nift-dev/nift/releases/tag/v4.0.11` (run
+  `34007205386`, conclusion success).
+- Release body: `docs/evidence/release-4.0.11/release-notes-4.0.11.md`.
+- Archives and checksums recorded in the release; extracted binary reports
+  `Nift v4.0.11`.
+
+### Cross-repository push ordering
+
+When a change modifies both Nift and `nift-regression-suite`, push **Nift
+first**, verify the intended Nift commit/version is present on `origin/main`,
+and only then push the regression-suite commit that depends on it. The
+regression suite's GitHub workflow obtains Nift from its remote `main` branch,
+so pushing a new contract first can cause CI to execute that contract against
+the previous Nift revision. A red result in that situation is legitimate but
+tests the wrong cross-repository pair.
+
+The v4.0.11 release hit exactly this race: `nift-regression-suite` `837a616`
+was pushed while Nift `main` was still v4.0.10, so its contract workflow built
+v4.0.10 and failed on the v4.0.11 `@/* ... */` grammar and version assertion.
+The clean 25/25 run (`34008202852`) after Nift `main` was current confirmed no
+regression-suite or Nift corrective change was warranted.
+
+### Post-release
+
+- Development identity advanced to `Nift v4.0.12` in `src/CLI.cpp`,
+  `snap/snapcraft.yaml`, release notes, and the guarantee registry baseline
+  (released_version 4.0.11, release_commit 6c037cf, development_version 4.0.12).
+- Regression-suite version assertions advanced to v4.0.12.

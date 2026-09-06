@@ -1,8 +1,17 @@
 # Nift — Release Notes
 
+## v4.0.12
+
+Development in progress following the public v4.0.11 release.
+
 ## v4.0.11
 
-Development in progress following the public v4.0.10 release.
+Nift 4.0.11 is a correctness and release-hardening maintenance release driven
+by an adversarial WPT-based review of the embedded Minify++ minifier. It
+standardizes Nift source comments on opaque forms, syncs WPT-derived Minify++
+correctness fixes (including a CSS escape-whitespace defect found only after the
+independent conformance oracle was strengthened), and decouples Snap Store
+promotion from the GitHub release workflow.
 
 - Standardized Nift source comments on familiar opaque forms: `@//` for
   single-line comments and `@/* ... */` for multiline comments. Comment bodies
