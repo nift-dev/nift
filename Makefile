@@ -636,7 +636,8 @@ clean:
 	rm -rf bindings/csharp/bench/bin bindings/csharp/bench/obj
 	rm -rf bindings/python/__pycache__ bindings/python/nift/__pycache__ \
 		bindings/python/tests/__pycache__ packaging/__pycache__
-	find bindings/python packaging -type f -name '*.pyc' -delete 2>/dev/null || true
+	find bindings/python packaging tests scripts -type f -name '*.pyc' -delete 2>/dev/null || true
+	rm -rf tests/__pycache__ scripts/__pycache__ packaging/__pycache__
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
