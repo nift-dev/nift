@@ -78,7 +78,7 @@ with tempfile.TemporaryDirectory(prefix="nift-cp4-watch-") as td:
     (root/"data/state.json").write_text('{"name":"ok","n":0}\n')
     (root/"schemas/state.schema.json").write_text('{"type":"object","required":["name","n"],"properties":{"name":{"type":"string"},"n":{"type":"integer"}}}\n')
     (root/"templates/template.html").write_text(
-        '@json("data/state.json", state, "schemas/state.schema.json")\n'
+        '@json(state, "schemas/state.schema.json", "data/state.json")\n'
         '<a href="$[routes.home]">$[state.name]-$[state.n]</a>\n@content\n')
     subprocess.run([nift,"build", "--all"],cwd=root,check=True,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE,text=True)
     # Use a dedicated process group/session. This matters when --nift is a
@@ -102,7 +102,7 @@ with tempfile.TemporaryDirectory(prefix="nift-cp4-watch-") as td:
                 (root/"data/state.json").write_text(json.dumps({"name":"ok","n":i})+"\n")
             elif phase==3:
                 (root/"templates/template.html").write_text(
-                    '@json("data/state.json", state, "schemas/state.schema.json")\n'
+                    '@json(state, "schemas/state.schema.json", "data/state.json")\n'
                     f'<main data-cycle="{i}"><a href="$[routes.home]">$[state.name]-$[state.n]</a></main>\n@content\n')
             else:
                 (root/"data/state.json").write_text(json.dumps({"name":"rotated","n":i})+"\n")

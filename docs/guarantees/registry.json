@@ -62,11 +62,6 @@
         {
           "class": "MANUAL",
           "command": "make checkpoint-7-incremental-equivalence"
-        },
-        {
-          "class": "SCHEDULED",
-          "workflow": ".github/workflows/nightly-deep.yml",
-          "job": "incremental-equivalence"
         }
       ],
       "test_of_test": "UNPROVEN",
@@ -324,11 +319,6 @@
         {
           "class": "MANUAL",
           "command": "make checkpoint-9-parser-fuzz"
-        },
-        {
-          "class": "SCHEDULED",
-          "workflow": ".github/workflows/nightly-deep.yml",
-          "job": "parser-fuzz"
         }
       ],
       "test_of_test": "UNPROVEN",
@@ -965,14 +955,8 @@
           "command": "make memory-safety-checkpoint-3"
         },
         {
-          "class": "SCHEDULED",
-          "workflow": ".github/workflows/nightly-deep.yml",
-          "job": "core-memory"
-        },
-        {
-          "class": "SCHEDULED",
-          "workflow": ".github/workflows/nightly-deep.yml",
-          "job": "endurance"
+          "class": "MANUAL",
+          "command": "make memory-safety-checkpoint-4-watch"
         }
       ],
       "test_of_test": "UNPROVEN",

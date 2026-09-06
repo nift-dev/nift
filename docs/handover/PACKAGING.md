@@ -308,6 +308,23 @@ Use this order for a normal `X.Y.Z` production release. Stop at any failed gate,
 fix the problem before tagging where possible, and retain exact command/workflow
 evidence for the release report.
 
+### Deep-guard policy
+
+The heavyweight guards in `.github/workflows/nightly-deep.yml` (parser fuzzing,
+sanitized core-lifecycle memory safety, watch-mode endurance soaking, and
+incremental clean-build equivalence) are **not** ordinary nightly background CI.
+They are manual `workflow_dispatch`-only deep guards. Run them:
+
+- before a release, explicitly run the relevant deep guards and require them to
+  pass;
+- after changes to the parser, watch mode, incremental rebuild logic,
+  lifecycle/memory-safety code, or other relevant subsystems, run the
+  corresponding deep guard manually;
+- when specifically investigating a regression.
+
+Ordinary push/PR CI retains the fast deterministic correctness contracts via
+`test-integrity.yml`; it does not run the deep guards.
+
 ### 1. Prepare the release candidate
 
 1. Start from the intended clean `main` commit and review unrelated working-tree

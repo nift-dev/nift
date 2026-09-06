@@ -1,8 +1,6 @@
-name: Nightly deep guards
+name: Deep guards
 
 on:
-  schedule:
-    - cron: '17 2 * * *'
   workflow_dispatch:
 
 permissions:

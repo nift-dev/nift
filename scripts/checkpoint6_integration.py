@@ -68,7 +68,7 @@ with tempfile.TemporaryDirectory(prefix="nift-cp6-integration-") as td:
     # Shared template simultaneously exercises embedded Jsonic++ parse/schema/value
     # ownership and Minify++ HTML output ownership.
     (root/"templates/template.html").write_text(
-      '@json("data/state.json", state, "schemas/state.schema.json")\n'
+      '@json(state, "schemas/state.schema.json", "data/state.json")\n'
       '<main><a href="$[routes.home]">$[state.name]</a>'
       '@for(item : state.items){<span>$[item.v]</span>}'
       '@content</main>\n')
