@@ -4,9 +4,24 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Release version already completed on latest/edge (for example 4.0.12)
+        description: 'Release version already completed on latest/edge (for example 4.0.12)'
         required: true
         type: string
+      mode:
+        description: 'Read-only status/check-ready, or promote-candidate / promote-stable'
+        required: true
+        default: status
+        type: choice
+        options:
+          - status
+          - check-ready
+          - candidate
+          - stable
+      promote:
+        description: 'Explicit confirmation: set true to allow a mutation (candidate or stable)'
+        required: true
+        default: false
+        type: boolean
 
 env:
   SNAPCRAFT_SNAP_REVISION: "18514"
@@ -15,17 +30,16 @@ env:
 jobs:
   promote:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     concurrency:
       group: nift-snap-store-promotion
       cancel-in-progress: false
     env:
       SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
       NIFT_SNAP_VERSION: ${{ inputs.version }}
-      # This workflow is deliberately user-triggered only after the connected
-      # builders have completed. Do not hold a GitHub release open waiting for
-      # scarce builders such as riscv64. A short wait only absorbs Store API
-      # propagation after the operator has confirmed edge is complete.
-      NIFT_SNAP_WAIT: "300"
+      # The coordinator only mutates channels in candidate/stable modes and
+      # requires this explicit confirmation; status/check-ready are read-only.
+      NIFT_SNAP_CONFIRM: ${{ inputs.promote && 'yes' || 'no' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - name: Validate requested version
@@ -36,9 +50,24 @@ jobs:
           esac
           package_version="$(sed -nE "s/^version: '([^']+)'/\1/p" snap/snapcraft.yaml)"
           test "$package_version" = "$NIFT_SNAP_VERSION"
+      - name: Require explicit confirmation for mutations
+        shell: bash
+        run: |
+          case "${{ inputs.mode }}" in
+            candidate|stable)
+              test "${{ inputs.promote }}" = "true" || { echo "FAIL: ${{ inputs.mode }} promotion requires promote=true" >&2; exit 1; }
+              ;;
+          esac
       - name: Install and verify pinned snapcraft
         shell: bash
         run: bash packaging/snapcraft-pin.sh
-      - name: Promote completed edge revisions
+      - name: Run coordinator (status/check-ready read-only; mutations only with promote=true)
         shell: bash
-        run: python3 packaging/snap_release.py
+        run: |
+          case "${{ inputs.mode }}" in
+            status)      python3 packaging/snap_release.py --status ;;
+            check-ready) python3 packaging/snap_release.py --check-ready ;;
+            candidate)   python3 packaging/snap_release.py --promote-candidate ;;
+            stable)      python3 packaging/snap_release.py --promote-stable ;;
+            *) echo "unknown mode: ${{ inputs.mode }}" >&2; exit 2 ;;
+          esac

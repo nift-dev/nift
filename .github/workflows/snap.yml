@@ -12,8 +12,8 @@ on:
 
 env:
   # Exact tested Snapcraft snap revision and version used by the
-  # non-publishing toolchain preflight. Manual Store promotion uses the same pin
-  # from snap-promote.yml.
+  # non-publishing toolchain preflight. Live Store promotion is a separate,
+  # manual-only workflow (snap-promote.yml) that uses the same pin.
   SNAPCRAFT_SNAP_REVISION: "18514"
   SNAPCRAFT_EXPECTED_VERSION: "9.0.1"
 
@@ -22,7 +22,9 @@ jobs:
   # regressions on pull requests and tag runs but never upload to the Snap
   # Store: the connected Snapcraft/Launchpad build service is the sole producer
   # of published revisions (it builds every platform declared in
-  # snap/snapcraft.yaml). No Store credential is present in this job.
+  # snap/snapcraft.yaml). No Store credential is present in this job and no
+  # channel is read or mutated here, so this job can never wait on remote
+  # builders or gate a GitHub release on Snap publication.
   build:
     strategy:
       matrix:

@@ -1,25 +1,30 @@
 #!/usr/bin/env python3
-"""Snap release coordinator for the nift snap.
+"""Snap publication coordinator for the nift snap (manual, best-effort).
 
 The Snapcraft/Launchpad build service connected to the GitHub repository reads
-snap/snapcraft.yaml and publishes repository builds for the six declared
-platforms to latest/edge. This coordinator is the sole publisher: it waits for
-every supported architecture to reach the tagged version on latest/edge,
-releases exactly those edge revisions to latest/candidate, verifies the complete
-six-architecture candidate set with no unsupported entries, runs the amd64
-candidate confinement smoke, then revalidates candidate and releases each
-selected revision explicitly to latest/stable (never whole-channel `snapcraft
-promote`), and verifies stable. GitHub-built snaps are never uploaded to the
-Store during ordinary release runs.
+snap/snapcraft.yaml and publishes repository builds for the declared platforms
+to latest/edge. This coordinator is a **manual** maintenance utility and the
+only publisher: it is invoked by the maintainer (via the `Promote completed
+Snap builds` workflow or directly) only after the builders have been inspected
+and are believed ready. It releases exactly the selected edge revisions to
+latest/candidate, verifies the candidate set, runs the amd64 candidate
+confinement smoke, then releases each selected revision explicitly to
+latest/stable (never whole-channel `snapcraft promote`), and verifies stable.
+
+Required coordinated targets (a Nift GitHub release never waits for these or
+for Snap): `amd64`, `arm64`, `armhf`, `ppc64el`, `s390x`.
+
+Best-effort target: `riscv64`. It must never delay or fail a promotion: it is
+included only when its edge build is already at the target version, it may
+remain on an older stable version while builders are unavailable, it may skip
+intermediate versions, and a delayed older build must never downgrade a newer
+stable RISC-V revision.
 
 Whole-channel `snapcraft promote` is deliberately not used: its completeness
 policy requires the entire set of ever-released store architectures, which
 includes the historical i386 entry that Nift no longer declares or builds.
-Snapcraft offers no supported atomic multi-architecture release API that can
-exclude a legacy architecture, so the coordinator releases each selected
-candidate revision to latest/stable directly. Per-revision releases are
-idempotent: a rerun preserves already-correct stable assignments and resumes a
-partial publication safely.
+Per-revision releases are idempotent: a rerun preserves already-correct stable
+assignments and resumes a partial publication safely.
 
 Legacy channel entries outside the declared platform set (e.g. i386 at an old
 version) are ignored and reported in edge and stable, and never released,
@@ -29,11 +34,30 @@ because the strict candidate set is the exact source for the stable releases.
 The decision logic is pure and importable for offline tests; running this module
 executes the real Store transaction (unless --dry-run is given).
 
+Modes:
+  --status (default)     read-only report of per-architecture edge/candidate/
+                         stable state and required/best-effort readiness.
+  --check-ready          read-only preflight: fail if a required architecture
+                         is not yet at the version on latest/edge.
+  --promote-candidate    release the ready edge revisions to latest/candidate.
+  --promote-stable       release the verified candidate revisions to
+                         latest/stable.
+  --dry-run              print snapcraft commands instead of executing them.
+
+No mode performs an initial long poll for remote builds: the maintainer only
+invokes promotion after inspecting the build page, so a missing required build
+fails fast. Short bounded waits (default ~5 minutes each) remain only after a
+deliberate channel mutation (candidate/stable convergence).
+
 Environment:
   SNAP_NAME                   snap name (default: nift)
   NIFT_SNAP_VERSION           release version to coordinate (no leading 'v')
-  NIFT_SNAP_WAIT              seconds to wait for edge builds to reach the
-                              version (default 7200)
+  NIFT_SNAP_CONFIRM           must be "yes" for any mutation mode
+  NIFT_SNAP_CANDIDATE_WAIT    seconds to wait for candidate convergence
+                              (default 300)
+  NIFT_SNAP_STABLE_WAIT       seconds to wait for stable convergence
+                              (default 300)
+  NIFT_SNAP_POLL              poll interval (default 20)
   SNAPCRAFT_STORE_CREDENTIALS required for any release operation
 """
 
@@ -51,7 +75,9 @@ STORE_API = "https://api.snapcraft.io/v2/snaps/info"
 # Documented contract for the complete supported Snap architecture set. The
 # authoritative source is snap/snapcraft.yaml (platforms:); this constant is the
 # documented invariant the offline contract test pins the file to.
-EXPECTED_ARCHS = {"amd64", "arm64", "armhf", "ppc64el", "riscv64", "s390x"}
+REQUIRED_ARCHS = {"amd64", "arm64", "armhf", "ppc64el", "s390x"}
+BEST_EFFORT_ARCHS = {"riscv64"}
+EXPECTED_ARCHS = REQUIRED_ARCHS | BEST_EFFORT_ARCHS
 
 
 def parse_platforms(yaml_text):
@@ -188,6 +214,72 @@ def select_edge_revisions(channel_map, version, archs):
             else:
                 waiting.append(arch)
     return selected, waiting, duplicates, legacy, malformed
+
+
+def version_key(version):
+    """Semantic numeric tuple for version comparison. Never mutates channels."""
+    return tuple(int(p) for p in re.findall(r"\d+", version or ""))
+
+
+def stable_is_newer(stable_version, target_version):
+    return version_key(stable_version) > version_key(target_version)
+
+
+def arch_channel_state(channel_map, arch, risk, track="latest"):
+    """Single (revision, version) for an unbranched arch/risk, or None when
+    missing or duplicated. Used for read-only reporting and downgrade checks."""
+    got = [(rev, ver) for a, rev, ver in channel_entries(channel_map, track, risk) if a == arch]
+    if len(got) == 1:
+        return got[0]
+    return None
+
+
+def promotion_selection(channel_map, version):
+    """Select edge revisions for promotion at `version` (manual preflight).
+
+    Required architectures must all be present at `version` on latest/edge;
+    best-effort architectures are included only when already at `version`.
+    Returns (selected, missing_required, best_effort_skipped, duplicates,
+    malformed). Missing best-effort targets are never an error.
+    """
+    sel, waiting, duplicates, legacy, malformed = select_edge_revisions(
+        channel_map, version, EXPECTED_ARCHS)
+    missing_required = [a for a in sorted(REQUIRED_ARCHS) if a not in sel]
+    best_effort_ready = {a: sel[a] for a in BEST_EFFORT_ARCHS if a in sel}
+    best_effort_skipped = [a for a in sorted(BEST_EFFORT_ARCHS) if a not in sel]
+    selected = {a: sel[a] for a in REQUIRED_ARCHS if a in sel}
+    selected.update(best_effort_ready)
+    return selected, missing_required, best_effort_skipped, duplicates, malformed
+
+
+def candidate_selection(channel_map, version):
+    """Candidate revisions at `version` for the stable phase.
+
+    Required architectures must all be present; best-effort architectures are
+    included only when staged on candidate at `version`. Returns (selected,
+    missing_required).
+    """
+    selected = {}
+    for a, rev, ver in channel_entries(channel_map, "latest", "candidate"):
+        if a in EXPECTED_ARCHS and ver == version:
+            selected[a] = rev
+    missing_required = [a for a in sorted(REQUIRED_ARCHS) if a not in selected]
+    return selected, missing_required
+
+
+def downgrade_refusals(channel_map, selected, version):
+    """Architectures whose current stable is semantically NEWER than `version`.
+
+    Releasing the older revision would downgrade stable (e.g. a delayed older
+    best-effort build after a newer release already landed). Returns sorted
+    (arch, stable_version, stable_revision) tuples to refuse.
+    """
+    refusals = []
+    for arch in sorted(selected):
+        stable = arch_channel_state(channel_map, arch, "stable")
+        if stable and stable_is_newer(stable[1], version):
+            refusals.append((arch, stable[1], stable[0]))
+    return refusals
 
 
 def verify_channel(channel_map, risk, expected, track="latest"):
@@ -487,78 +579,104 @@ def run_snapcraft(argv, dry_run):
     return result.returncode
 
 
-def main(argv=None):
-    dry_run = "--dry-run" in (argv if argv is not None else sys.argv[1:])
-    version = os.environ.get("NIFT_SNAP_VERSION")
-    if not version:
-        print("FAIL: NIFT_SNAP_VERSION is required", file=sys.stderr)
-        return 2
-    if not dry_run and not credentials_present():
-        print("FAIL: SNAPCRAFT_STORE_CREDENTIALS is required for release", file=sys.stderr)
-        return 2
-    wait_seconds = int(os.environ.get("NIFT_SNAP_WAIT", "7200"))
-    candidate_wait = int(os.environ.get("NIFT_SNAP_CANDIDATE_WAIT", "300"))
-    stable_wait = int(os.environ.get("NIFT_SNAP_STABLE_WAIT", "300"))
-    poll_seconds = int(os.environ.get("NIFT_SNAP_POLL", "30"))
+def parse_mode(argv):
+    args = list(argv if argv is not None else sys.argv[1:])
+    dry_run = "--dry-run" in args
+    for mode in ("--status", "--check-ready", "--promote-candidate", "--promote-stable"):
+        if mode in args:
+            return mode[2:], dry_run
+    return "status", dry_run
 
-    archs = load_platforms()
-    if not archs:
-        print("FAIL: could not read platforms from snap/snapcraft.yaml", file=sys.stderr)
-        return 2
 
-    try:
-        channel_map = fetch_channel_map()
-    except (OSError, RuntimeError) as exc:
-        print("FAIL: could not query the Snap Store: {}".format(exc), file=sys.stderr)
+def confirm_ok():
+    return os.environ.get("NIFT_SNAP_CONFIRM") == "yes"
+
+
+def cmd_status(channel_map, version, archs):
+    print("Snap state for {} (target {})".format(SNAP_NAME, version))
+    for arch in sorted(archs):
+        kind = "required" if arch in REQUIRED_ARCHS else "best-effort"
+        edge = arch_channel_state(channel_map, arch, "edge")
+        cand = arch_channel_state(channel_map, arch, "candidate")
+        stab = arch_channel_state(channel_map, arch, "stable")
+        def fmt(state):
+            return "{} rev={}".format(state[1], state[0]) if state else "-"
+        if edge and edge[1] == version:
+            edge_state = "ready"
+        elif edge is None:
+            edge_state = "pending"
+        elif version_key(edge[1]) < version_key(version):
+            edge_state = "older"
+        else:
+            edge_state = "newer"
+        print("  {:10s} {:11s} edge={} ({}) candidate={} stable={}".format(
+            arch, kind, fmt(edge), edge_state, fmt(cand), fmt(stab)))
+    return 0
+
+
+def cmd_check_ready(channel_map, version, archs):
+    selected, missing_required, best_effort_skipped, duplicates, malformed = promotion_selection(
+        channel_map, version)
+    if duplicates:
+        print("FAIL: duplicate latest/edge entries for archs: {}".format(", ".join(duplicates)), file=sys.stderr)
         return 1
+    if malformed:
+        print("FAIL: malformed latest/edge entries for supported archs:", file=sys.stderr)
+        for arch, problem in malformed:
+            print("  {}: {}".format(arch, problem), file=sys.stderr)
+        return 1
+    if missing_required:
+        print("NOT READY: required architecture(s) missing from latest/edge at {}: {}".format(
+            version, ", ".join(missing_required)), file=sys.stderr)
+        return 1
+    print("READY: required architectures all at {} on latest/edge: {}".format(
+        version, ", ".join(sorted(REQUIRED_ARCHS))))
+    for arch in best_effort_skipped:
+        edge = arch_channel_state(channel_map, arch, "edge")
+        if edge is None:
+            print("  best-effort {}: no latest/edge build yet (pending)".format(arch))
+        elif version_key(edge[1]) < version_key(version):
+            print("  best-effort {}: latest/edge still at older {} (promote separately later)".format(
+                arch, edge[1]))
+        else:
+            print("  best-effort {}: latest/edge at {} (newer than target; inspect)".format(arch, edge[1]))
+    return 0
 
-    # A usable rollback snapshot is required before any candidate mutation:
-    # every supported architecture must have exactly one valid unbranched
-    # latest/stable entry. Malformed or duplicate supported entries refuse the
-    # run so candidate is never touched on an unsafe rollback base.
-    snapshot_problems = stable_snapshot_problems(channel_map, archs)
+
+def cmd_promote_candidate(channel_map, version, archs, dry_run):
+    candidate_wait = int(os.environ.get("NIFT_SNAP_CANDIDATE_WAIT", "300"))
+    poll_seconds = int(os.environ.get("NIFT_SNAP_POLL", "20"))
+
+    selected, missing_required, best_effort_skipped, duplicates, malformed = promotion_selection(
+        channel_map, version)
+    if duplicates:
+        print("FAIL: duplicate latest/edge entries for archs: {}".format(", ".join(duplicates)), file=sys.stderr)
+        return 1
+    if malformed:
+        print("FAIL: malformed latest/edge entries for supported archs:", file=sys.stderr)
+        for arch, problem in malformed:
+            print("  {}: {}".format(arch, problem), file=sys.stderr)
+        return 1
+    if missing_required:
+        print("FAIL: required architecture(s) missing from latest/edge at {}: {}".format(
+            version, ", ".join(missing_required)), file=sys.stderr)
+        print("No candidate mutation performed. Inspect the Snap build page and retry later.", file=sys.stderr)
+        return 1
+    for arch in best_effort_skipped:
+        print("SKIP best-effort {}: not at {} on latest/edge; required set proceeds without it".format(
+            arch, version))
+
+    # A usable rollback snapshot for the required set is required before any
+    # candidate mutation. Best-effort stable state (older/pending/newer) is not
+    # part of this rollback base.
+    snapshot_problems = stable_snapshot_problems(channel_map, REQUIRED_ARCHS)
     if snapshot_problems:
         print("FAIL: invalid previous stable snapshot:\n  " + "\n  ".join(snapshot_problems), file=sys.stderr)
         print("Refusing any candidate mutation (no approved first-release exception in place).", file=sys.stderr)
         return 1
-    previous_stable = snapshot_stable(channel_map, archs)
-
-    selected = candidate_at_version(channel_map, archs, version)
-    if selected is None:
-        deadline = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=wait_seconds)
-        while True:
-            try:
-                channel_map = fetch_channel_map()
-            except (OSError, RuntimeError) as exc:
-                print("FAIL: could not query the Snap Store: {}".format(exc), file=sys.stderr)
-                return 1
-            report_legacy(channel_map, "edge", archs)
-            sel, waiting, duplicates, legacy, malformed = select_edge_revisions(channel_map, version, archs)
-            if duplicates:
-                print("FAIL: duplicate latest/edge entries for archs: {}".format(", ".join(duplicates)), file=sys.stderr)
-                return 1
-            if malformed:
-                print("FAIL: malformed latest/edge entries for supported archs:", file=sys.stderr)
-                for arch, problem in malformed:
-                    print("  {}: {}".format(arch, problem), file=sys.stderr)
-                return 1
-            if not waiting:
-                selected = sel
-                break
-            if datetime.datetime.now(datetime.timezone.utc) >= deadline:
-                print("FAIL: timed out waiting for latest/edge to reach version {}; still waiting: {}".format(
-                    version, ", ".join(waiting)), file=sys.stderr)
-                return 1
-            time.sleep(poll_seconds)
+    previous_stable = snapshot_stable(channel_map, REQUIRED_ARCHS)
 
     expected = {arch: {"revision": rev, "version": version} for arch, rev in selected.items()}
-
-    # Distinguish a pristine previous-stable snapshot from an already-partial
-    # target state before any mutation: an architecture whose previous stable
-    # already exposes the target release version (any revision of it) has an
-    # original pre-release revision that is not recoverable from the channel
-    # map, whether it was advanced by a prior partial publication or changed
-    # manually/by another publisher.
     _, already_target = rollback_availability(previous_stable, expected)
     if already_target:
         print("NOTE: previous stable already exposes the target release version for "
@@ -568,47 +686,81 @@ def main(argv=None):
               "unchanged; other revisions of the target version may be corrected."
               .format(", ".join(already_target)))
 
-    if candidate_at_version(channel_map, archs, version) is None:
-        for arch in sorted(expected):
+    if candidate_at_version(channel_map, set(selected), version) is None:
+        for arch in sorted(selected):
             if run_snapcraft(release_command(expected[arch]["revision"]), dry_run) != 0:
                 print("FAIL: release revision {} to candidate".format(expected[arch]["revision"]), file=sys.stderr)
                 return 1
 
-    # Poll candidate until it converges on the exact strict six-revision set.
-    # Unsupported/malformed/duplicate candidate entries fail immediately;
-    # missing/stale expected revisions are retried to a bounded deadline.
     channel_map, ok, problems = poll_convergence(
-        fetch_channel_map, candidate_convergence, expected, archs, candidate_wait, poll_seconds, "candidate")
+        fetch_channel_map, candidate_convergence, expected, set(selected), candidate_wait, poll_seconds, "candidate")
     if not ok:
         print("FAIL: candidate did not converge:\n  " + "\n  ".join(problems or []), file=sys.stderr)
         print("Manual inspection required: review candidate entries in the Snap Store; the "
               "coordinator never modifies unsupported candidate entries.", file=sys.stderr)
         return 1
-    report_legacy(channel_map, "candidate", archs)
+    report_legacy(channel_map, "candidate", EXPECTED_ARCHS)
+    print("Candidate staged and verified at {} for: {}".format(version, ", ".join(sorted(selected))))
+    return 0
 
+
+def cmd_promote_stable(channel_map, version, archs, dry_run):
+    stable_wait = int(os.environ.get("NIFT_SNAP_STABLE_WAIT", "300"))
+    poll_seconds = int(os.environ.get("NIFT_SNAP_POLL", "20"))
+
+    selected, missing_required = candidate_selection(channel_map, version)
+    if missing_required:
+        print("FAIL: required architecture(s) missing from latest/candidate at {}: {}".format(
+            version, ", ".join(missing_required)), file=sys.stderr)
+        print("Run --promote-candidate after edge is complete, or inspect candidate.", file=sys.stderr)
+        return 1
+
+    # Refuse any downgrade of a NEWER stable revision (e.g. a delayed older
+    # best-effort build after a newer release landed). A required architecture
+    # with a newer stable means the target version is stale: fail. A best-effort
+    # architecture is skipped so the required set still publishes.
+    refusals = downgrade_refusals(channel_map, selected, version)
+    required_refusals = [(a, v, r) for a, v, r in refusals if a in REQUIRED_ARCHS]
+    if required_refusals:
+        for arch, stable_version, stable_rev in required_refusals:
+            print("FAIL: refusing to downgrade {} latest/stable ({} rev {}) to {}".format(
+                arch, stable_version, stable_rev, version), file=sys.stderr)
+        return 1
+    for arch, stable_version, stable_rev in refusals:
+        print("SKIP best-effort {}: latest/stable is newer ({} rev {}); refusing to downgrade to {}".format(
+            arch, stable_version, stable_rev, version))
+        del selected[arch]
+
+    expected = {arch: {"revision": rev, "version": version} for arch, rev in selected.items()}
+    previous_stable = snapshot_stable(channel_map, REQUIRED_ARCHS)
+
+    _, already_target = rollback_availability(previous_stable, expected)
+    if already_target:
+        print("NOTE: previous stable already exposes the target release version for "
+              "{}; those original pre-release revisions are not recoverable from the "
+              "channel map. This run resumes publication toward the exact selected "
+              "revisions. Assignments already at their selected revision remain "
+              "unchanged; other revisions of the target version may be corrected."
+              .format(", ".join(already_target)))
+
+    if "amd64" not in selected:
+        print("FAIL: amd64 is required but missing from the selected candidate set", file=sys.stderr)
+        return 1
     if run_snapcraft(smoke_command(version, expected["amd64"]["revision"]), dry_run) != 0:
         print("FAIL: candidate confinement smoke failed; stable not released", file=sys.stderr)
         return 1
 
-    # Revalidate candidate immediately before any stable mutation. The candidate
-    # smoke above is the release gate; this strict revalidation confirms the
-    # exact selected revisions are still the candidate set at release time.
     try:
         channel_map = fetch_channel_map()
     except (OSError, RuntimeError) as exc:
         print("FAIL: could not query the Snap Store before stable release: {}".format(exc), file=sys.stderr)
         return 1
-    ok, problems = verify_candidate_strict(channel_map, expected, archs)
+    ok, problems = verify_candidate_strict(channel_map, expected, set(selected) | BEST_EFFORT_ARCHS)
     if not ok:
         print("FAIL: candidate revalidation before stable release:\n  " + "\n  ".join(problems), file=sys.stderr)
         print("No stable mutation performed.", file=sys.stderr)
         return 1
 
-    # Release each selected revision explicitly to latest/stable. Whole-channel
-    # `snapcraft promote` is not used: its completeness policy requires the
-    # historical i386 store entry that Nift no longer declares. Per-revision
-    # releases are idempotent, so a rerun preserves already-correct stable
-    # assignments and resumes a partial publication safely.
     released = []
     for arch in sorted(expected):
         if run_snapcraft(stable_release_command(expected[arch]["revision"]), dry_run) != 0:
@@ -623,20 +775,57 @@ def main(argv=None):
             return 1
         released.append(arch)
 
-    # Poll stable until it converges on the exact six-revision set. Malformed or
-    # duplicate supported entries fail immediately; missing/stale revisions are
-    # retried to a bounded deadline.
     channel_map, ok, problems = poll_convergence(
-        fetch_channel_map, stable_convergence, expected, archs, stable_wait, poll_seconds, "stable")
+        fetch_channel_map, stable_convergence, expected, set(selected), stable_wait, poll_seconds, "stable")
     if not ok:
         print("FAIL: stable did not converge:\n  " + "\n  ".join(problems or []), file=sys.stderr)
         print_rollback(previous_stable, expected)
         return 1
-    report_legacy(channel_map, "stable", archs)
+    report_legacy(channel_map, "stable", EXPECTED_ARCHS)
 
-    print("Stable verified: all six architectures at version {}".format(version))
+    missing_best_effort = sorted(BEST_EFFORT_ARCHS - set(selected))
+    print("Stable verified at {} for: {}".format(version, ", ".join(sorted(selected))))
+    if missing_best_effort:
+        print("Best-effort not promoted (not staged on candidate at {}): {}".format(
+            version, ", ".join(missing_best_effort)))
     print_rollback(previous_stable, expected)
     return 0
+
+
+def main(argv=None):
+    mode, dry_run = parse_mode(argv)
+    version = os.environ.get("NIFT_SNAP_VERSION")
+    if not version:
+        print("FAIL: NIFT_SNAP_VERSION is required", file=sys.stderr)
+        return 2
+    if mode in ("promote-candidate", "promote-stable"):
+        if not confirm_ok():
+            print("FAIL: NIFT_SNAP_CONFIRM=yes is required for {}".format(mode), file=sys.stderr)
+            return 2
+        if not dry_run and not credentials_present():
+            print("FAIL: SNAPCRAFT_STORE_CREDENTIALS is required for release", file=sys.stderr)
+            return 2
+
+    archs = load_platforms()
+    if not archs:
+        print("FAIL: could not read platforms from snap/snapcraft.yaml", file=sys.stderr)
+        return 2
+
+    try:
+        channel_map = fetch_channel_map()
+    except (OSError, RuntimeError) as exc:
+        print("FAIL: could not query the Snap Store: {}".format(exc), file=sys.stderr)
+        return 1
+
+    if mode == "status":
+        return cmd_status(channel_map, version, archs)
+    if mode == "check-ready":
+        return cmd_check_ready(channel_map, version, archs)
+    if mode == "promote-candidate":
+        return cmd_promote_candidate(channel_map, version, archs, dry_run)
+    if mode == "promote-stable":
+        return cmd_promote_stable(channel_map, version, archs, dry_run)
+    return 2
 
 
 if __name__ == "__main__":

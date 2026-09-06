@@ -1,21 +1,29 @@
 #!/usr/bin/env python3
 """Offline contract tests for the nift Snap publication coordinator.
 
-Covers: the exact six-architecture set; coordination through the connected
-build-service latest/edge revisions (no timestamp-window selection); the real v2
-channel-map schema (architecture inside channel, released-at spelling, branch
-omitted when unbranched); the required fields=channel-map,revision,version
-request; rejection of an API error-list and of entries lacking revision/version;
-entry validation; polling while an edge architecture lags; legacy i386 ignored
-    and reported in edge/stable but fail-closed in candidate; exact edge revision
-    numbers carried through candidate and stable; a complete rollback snapshot
-    before any candidate mutation; candidate staging and confinement smoke ordered
-    before any stable mutation; the exact per-revision stable release invocation
-    (whole-channel promote never used); positional rollback syntax; no
-    duplicate publisher targeting unbranched edge; literal YAML shell expressions
-rejected; the actual immutable Snapcraft pin with post-install assertions; sudo
-candidate install/cleanup; and missing publishing credentials failing rather
-than skipping. No network access and no Store operations are performed.
+Covers: the exact six-architecture set split into five required targets and one
+best-effort target (riscv64); the manual mode-based coordinator (--status,
+--check-ready, --promote-candidate, --promote-stable) with explicit
+confirmation; no initial remote-build polling (a missing required build fails
+fast on manual invocation); the real v2 channel-map schema (architecture inside
+channel, released-at spelling, branch omitted when unbranched); the required
+fields=channel-map,revision,version request; rejection of an API error-list and
+of entries lacking revision/version; entry validation; polling only after a
+deliberate channel mutation (candidate/stable convergence) with short bounded
+timeouts; best-effort riscv64 never blocking or failing a required promotion;
+no-downgrade refusal when stable riscv64 is already newer; legacy i386 ignored
+and reported in edge/stable but fail-closed in candidate; exact edge revision
+numbers carried through candidate and stable; a complete rollback snapshot
+before any candidate mutation; candidate staging and confinement smoke ordered
+before any stable mutation; the exact per-revision stable release invocation
+(whole-channel promote never used); positional rollback syntax; idempotent
+resumption of an interrupted or already-complete promotion; read-only status
+performing no mutations; no live channel mutation or wait in the tag-triggered
+release graph; no duplicate publisher targeting unbranched edge; literal YAML
+shell expressions rejected; the actual immutable Snapcraft pin with post-install
+assertions; sudo candidate install/cleanup; and missing publishing credentials
+or explicit confirmation failing rather than skipping. No network access and no
+Store operations are performed.
 """
 
 import datetime
@@ -398,15 +406,15 @@ class Commands(unittest.TestCase):
 class CoordinatorDryRun(unittest.TestCase):
     """Runs main() in --dry-run against stateful channel-map fixtures (no network)."""
 
-    def build_states(self, candidate_extra=None):
+    def build_states(self, candidate_extra=None, edge_lag_arch=None):
         revs = revision_numbers()
         prev = revision_numbers(offset=500)  # previous stable revisions, 600-605
         prev_stable = stable_map(prev, "4.0.8")
-        edge_waiting = edge_map_at(VERSION, revs)
-        for entry in edge_waiting["channel-map"]:
-            if entry["channel"]["architecture"] == "s390x":
-                entry["version"] = "4.0.8"
-        edge_complete = edge_map_at(VERSION, revs)
+        edge = edge_map_at(VERSION, revs)
+        if edge_lag_arch:
+            for entry in edge["channel-map"]:
+                if entry["channel"]["architecture"] == edge_lag_arch:
+                    entry["version"] = "4.0.8"
         candidate = candidate_map(revs)
         if candidate_extra:
             candidate["channel-map"].extend(candidate_extra)
@@ -418,21 +426,19 @@ class CoordinatorDryRun(unittest.TestCase):
                 entries.extend(m["channel-map"])
             return entries
 
-        s0 = combine(edge_waiting, prev_stable)
-        s2 = combine(edge_complete, prev_stable)
-        s3 = combine(candidate, prev_stable)
-        s4 = combine(candidate, stable_new)
-        states = [s0, s0, s2, s3, s4]
-        index = {"n": 0}
+        # Two-phase mode flow. --promote-candidate fetches edge once (initial)
+        # then polls candidate once; --promote-stable fetches candidate (initial),
+        # candidate again (pre-release revalidation) and then stable (convergence).
+        states = [
+            combine(edge, prev_stable),
+            combine(candidate, prev_stable),
+            combine(candidate, prev_stable),
+            combine(candidate, prev_stable),
+            combine(candidate, stable_new),
+        ]
+        return self.stateful_fetch(states)
 
-        def fetch():
-            state = states[min(index["n"], len(states) - 1)]
-            index["n"] += 1
-            return state
-
-        return fetch
-
-    def run_main(self, env, fetch, argv=("--dry-run",)):
+    def run_main(self, env, fetch, argv=("--status", "--dry-run")):
         saved_fetch = sr.fetch_channel_map
         saved_env = dict(os.environ)
         try:
@@ -452,30 +458,33 @@ class CoordinatorDryRun(unittest.TestCase):
             os.environ.clear()
             os.environ.update(saved_env)
 
+    def run_promotion(self, env, fetch):
+        """Run the two manual phases (candidate then stable) in --dry-run."""
+        env = dict(env)
+        env["NIFT_SNAP_CONFIRM"] = "yes"
+        code_c, out_c = self.run_main(env, fetch, ("--promote-candidate", "--dry-run"))
+        code_s, out_s = self.run_main(env, fetch, ("--promote-stable", "--dry-run"))
+        return code_c, out_c, code_s, out_s
+
     def test_successful_coordination_via_edge(self):
-        code, out = self.run_main(
-            {"NIFT_SNAP_VERSION": VERSION, "NIFT_SNAP_WAIT": "1", "NIFT_SNAP_POLL": "0", "SNAPCRAFT_STORE_CREDENTIALS": "secret"},
-            self.build_states(),
-        )
-        self.assertEqual(code, 0, out)
-        self.assertIn("DRY-RUN: snapcraft release nift 100 latest/candidate", out)
-        self.assertIn("DRY-RUN: bash packaging/snap-candidate-smoke.sh", out)
-        self.assertNotIn("DRY-RUN: snapcraft promote", out)
+        code_c, out_c, code_s, out_s = self.run_promotion(self.env(), self.build_states())
+        self.assertEqual(code_c, 0, out_c)
+        self.assertEqual(code_s, 0, out_s)
+        self.assertIn("DRY-RUN: snapcraft release nift 100 latest/candidate", out_c)
+        self.assertIn("DRY-RUN: bash packaging/snap-candidate-smoke.sh", out_s)
+        self.assertNotIn("DRY-RUN: snapcraft promote", out_c + out_s)
         revs = revision_numbers()
         for arch in ARCHS:
-            self.assertIn("DRY-RUN: snapcraft release nift {} latest/stable".format(revs[arch]), out)
-        self.assertIn("Stable verified", out)
+            self.assertIn("DRY-RUN: snapcraft release nift {} latest/stable".format(revs[arch]), out_s)
+        self.assertIn("Stable verified", out_s)
 
     def test_legacy_candidate_never_promoted(self):
         extra = [channel_entry("i386", 11, "3.0.3", risk="candidate")]
-        code, out = self.run_main(
-            {"NIFT_SNAP_VERSION": VERSION, "NIFT_SNAP_WAIT": "1", "NIFT_SNAP_POLL": "0", "SNAPCRAFT_STORE_CREDENTIALS": "secret"},
-            self.build_states(candidate_extra=extra),
-        )
-        self.assertEqual(code, 1)
-        self.assertIn("unsupported candidate entry i386", out)
-        self.assertNotIn("DRY-RUN: snapcraft promote", out)
-        self.assertNotIn("latest/stable", out)
+        code_c, out_c, code_s, out_s = self.run_promotion(self.env(), self.build_states(candidate_extra=extra))
+        self.assertEqual(code_c, 1, out_c)
+        self.assertIn("unsupported candidate entry i386", out_c)
+        self.assertNotIn("DRY-RUN: snapcraft promote", out_c)
+        self.assertNotIn("latest/stable", out_c)
 
     def test_legacy_i386_ignored_while_six_reach_stable(self):
         revs = revision_numbers()
@@ -496,18 +505,20 @@ class CoordinatorDryRun(unittest.TestCase):
 
         states = [
             combine(edge_complete, prev_stable),
-            combine(edge_complete, prev_stable),
+            combine(candidate, prev_stable),
+            combine(candidate, prev_stable),
             combine(candidate, prev_stable),
             combine(candidate, stable_new),
         ]
-        code, out = self.run_main(self.env(), self.stateful_fetch(states))
-        self.assertEqual(code, 0, out)
-        self.assertNotIn("DRY-RUN: snapcraft promote", out)
+        code_c, out_c, code_s, out_s = self.run_promotion(self.env(), self.stateful_fetch(states))
+        self.assertEqual(code_c, 0, out_c)
+        self.assertEqual(code_s, 0, out_s)
+        self.assertNotIn("DRY-RUN: snapcraft promote", out_c + out_s)
         for arch in ARCHS:
-            self.assertIn("DRY-RUN: snapcraft release nift {} latest/stable".format(revs[arch]), out)
-        self.assertNotIn("DRY-RUN: snapcraft release nift 11 latest/stable", out)
-        self.assertIn("i386", out)  # reported as legacy, never released
-        self.assertIn("Stable verified", out)
+            self.assertIn("DRY-RUN: snapcraft release nift {} latest/stable".format(revs[arch]), out_s)
+        self.assertNotIn("DRY-RUN: snapcraft release nift 11 latest/stable", out_s)
+        self.assertIn("i386", out_c + out_s)  # reported as legacy, never released
+        self.assertIn("Stable verified", out_s)
 
     def test_incomplete_rollback_snapshot_refuses_promotion(self):
         revs = revision_numbers()
@@ -521,8 +532,8 @@ class CoordinatorDryRun(unittest.TestCase):
             return entries
 
         code, out = self.run_main(
-            {"NIFT_SNAP_VERSION": VERSION, "NIFT_SNAP_WAIT": "1", "NIFT_SNAP_POLL": "0", "SNAPCRAFT_STORE_CREDENTIALS": "secret"},
-            fetch,
+            {"NIFT_SNAP_VERSION": VERSION, "NIFT_SNAP_CONFIRM": "yes", "SNAPCRAFT_STORE_CREDENTIALS": "secret"},
+            fetch, ("--promote-candidate", "--dry-run"),
         )
         self.assertEqual(code, 1)
         self.assertIn("invalid previous stable snapshot", out)
@@ -542,8 +553,8 @@ class CoordinatorDryRun(unittest.TestCase):
             return entries
 
         code, out = self.run_main(
-            {"NIFT_SNAP_VERSION": VERSION, "NIFT_SNAP_WAIT": "1", "NIFT_SNAP_POLL": "0", "SNAPCRAFT_STORE_CREDENTIALS": "secret"},
-            fetch,
+            {"NIFT_SNAP_VERSION": VERSION, "NIFT_SNAP_CONFIRM": "yes", "SNAPCRAFT_STORE_CREDENTIALS": "secret"},
+            fetch, ("--promote-candidate", "--dry-run"),
         )
         self.assertEqual(code, 1)
         self.assertIn("malformed", out)
@@ -562,8 +573,8 @@ class CoordinatorDryRun(unittest.TestCase):
             return entries
 
         code, out = self.run_main(
-            {"NIFT_SNAP_VERSION": VERSION, "NIFT_SNAP_WAIT": "1", "NIFT_SNAP_POLL": "0", "SNAPCRAFT_STORE_CREDENTIALS": "secret"},
-            fetch,
+            {"NIFT_SNAP_VERSION": VERSION, "NIFT_SNAP_CONFIRM": "yes", "SNAPCRAFT_STORE_CREDENTIALS": "secret"},
+            fetch, ("--promote-candidate", "--dry-run"),
         )
         self.assertEqual(code, 1)
         self.assertIn("duplicate", out)
@@ -577,8 +588,22 @@ class CoordinatorDryRun(unittest.TestCase):
         saved_env = dict(os.environ)
         try:
             sr.fetch_channel_map = boom
-            os.environ.update({"NIFT_SNAP_VERSION": VERSION, "NIFT_SNAP_WAIT": "1", "NIFT_SNAP_POLL": "0"})
-            self.assertEqual(sr.main([]), 2)
+            os.environ.update({"NIFT_SNAP_VERSION": VERSION, "NIFT_SNAP_CONFIRM": "yes"})
+            self.assertEqual(sr.main(["--promote-candidate"]), 2)
+        finally:
+            sr.fetch_channel_map = saved_fetch
+            os.environ.clear()
+            os.environ.update(saved_env)
+
+    def test_missing_confirmation_fails_closed_before_network(self):
+        def boom():
+            raise AssertionError("fetch must not be called without explicit confirmation")
+        saved_fetch = sr.fetch_channel_map
+        saved_env = dict(os.environ)
+        try:
+            sr.fetch_channel_map = boom
+            os.environ.update({"NIFT_SNAP_VERSION": VERSION, "SNAPCRAFT_STORE_CREDENTIALS": "secret"})
+            self.assertEqual(sr.main(["--promote-candidate"]), 2)
         finally:
             sr.fetch_channel_map = saved_fetch
             os.environ.clear()
@@ -598,24 +623,209 @@ class CoordinatorDryRun(unittest.TestCase):
             os.environ.clear()
             os.environ.update(saved_env)
 
-    def test_timeout_while_architecture_lags_fails_closed(self):
+    def test_required_missing_fails_fast_no_wait(self):
+        # A missing required build must fail immediately on manual invocation:
+        # there is no initial two-hour polling design anymore.
         revs = revision_numbers()
         prev = revision_numbers(offset=500)
         lagging = edge_map_at(VERSION, revs)
         for entry in lagging["channel-map"]:
-            if entry["channel"]["architecture"] == "riscv64":
+            if entry["channel"]["architecture"] == "s390x":
                 entry["version"] = "4.0.8"
         entries = lagging["channel-map"] + stable_map(prev, "4.0.8")["channel-map"]
 
         def always_lagging():
             return entries
 
-        code, out = self.run_main(
-            {"NIFT_SNAP_VERSION": VERSION, "NIFT_SNAP_WAIT": "1", "NIFT_SNAP_POLL": "0", "SNAPCRAFT_STORE_CREDENTIALS": "secret"},
-            always_lagging,
-        )
+        code, out = self.run_main(self.env(), always_lagging, ("--promote-candidate", "--dry-run"))
         self.assertEqual(code, 1)
-        self.assertIn("timed out", out)
+        self.assertIn("required architecture(s) missing", out)
+        self.assertIn("s390x", out)
+        self.assertNotIn("timed out", out)
+        self.assertNotIn("DRY-RUN: snapcraft release", out)
+
+    def test_best_effort_riscv64_lagging_does_not_block(self):
+        # riscv64 is best-effort: a lagging riscv64 edge build must not delay or
+        # fail promotion of the five required architectures.
+        revs = revision_numbers()
+        prev = revision_numbers(offset=500)
+        prev_stable = stable_map(prev, "4.0.8")
+        edge = edge_map_at(VERSION, revs)
+        for entry in edge["channel-map"]:
+            if entry["channel"]["architecture"] == "riscv64":
+                entry["version"] = "4.0.8"
+        candidate = candidate_map(revs)
+        candidate["channel-map"] = [e for e in candidate["channel-map"] if e["channel"]["architecture"] != "riscv64"]
+        stable_new = stable_map(revs, VERSION)
+        stable_new["channel-map"] = [e for e in stable_new["channel-map"] if e["channel"]["architecture"] != "riscv64"]
+
+        def combine(*maps):
+            entries = []
+            for m in maps:
+                entries.extend(m["channel-map"])
+            return entries
+
+        states = [
+            combine(edge, prev_stable),
+            combine(candidate, prev_stable),
+            combine(candidate, prev_stable),
+            combine(candidate, prev_stable),
+            combine(candidate, stable_new),
+        ]
+        code_c, out_c, code_s, out_s = self.run_promotion(self.env(), self.stateful_fetch(states))
+        self.assertEqual(code_c, 0, out_c)
+        self.assertEqual(code_s, 0, out_s)
+        self.assertIn("SKIP best-effort riscv64", out_c)
+        self.assertIn("Best-effort not promoted", out_s)
+        for arch in sorted(sr.REQUIRED_ARCHS):
+            self.assertIn("DRY-RUN: snapcraft release nift {} latest/stable".format(revs[arch]), out_s)
+        self.assertNotIn("DRY-RUN: snapcraft release nift {} latest/stable".format(revs["riscv64"]), out_s)
+        self.assertIn("Stable verified", out_s)
+
+    def test_status_is_read_only(self):
+        # --status performs no channel mutations and needs no credentials.
+        entries = edge_map_at(VERSION, revision_numbers())["channel-map"]
+        code, out = self.run_main(
+            {"NIFT_SNAP_VERSION": VERSION},
+            lambda: entries, ("--status",),
+        )
+        self.assertEqual(code, 0, out)
+        self.assertIn("Snap state", out)
+        self.assertIn("riscv64", out)
+        self.assertNotIn("DRY-RUN: snapcraft release", out)
+
+    def test_check_ready_required_all_ready(self):
+        entries = edge_map_at(VERSION, revision_numbers())["channel-map"]
+        code, out = self.run_main(
+            {"NIFT_SNAP_VERSION": VERSION},
+            lambda: entries, ("--check-ready",),
+        )
+        self.assertEqual(code, 0, out)
+        self.assertIn("READY", out)
+
+    def test_check_ready_missing_required_fails(self):
+        entries = edge_map_at(VERSION, revision_numbers())["channel-map"]
+        entries = [e for e in entries if e["channel"]["architecture"] != "ppc64el"]
+        code, out = self.run_main(
+            {"NIFT_SNAP_VERSION": VERSION},
+            lambda: entries, ("--check-ready",),
+        )
+        self.assertEqual(code, 1, out)
+        self.assertIn("ppc64el", out)
+
+    def test_best_effort_older_on_stable_reported_honestly(self):
+        # riscv64 may remain on an older stable version; status reports it.
+        revs = revision_numbers()
+        prev = revision_numbers(offset=500)
+        edge = edge_map_at(VERSION, revs)
+        candidate = candidate_map(revs)
+        candidate["channel-map"] = [e for e in candidate["channel-map"] if e["channel"]["architecture"] != "riscv64"]
+        stable_old = stable_map(prev, "4.0.9")
+        entries = edge["channel-map"] + candidate["channel-map"] + stable_old["channel-map"]
+        code, out = self.run_main(
+            {"NIFT_SNAP_VERSION": VERSION},
+            lambda: entries, ("--status",),
+        )
+        self.assertEqual(code, 0, out)
+        self.assertIn("best-effort", out)
+        self.assertIn("riscv64", out)
+
+    def test_best_effort_older_delayed_build_refuses_downgrade_of_newer_stable(self):
+        # riscv64 is staged on candidate at the target version, but latest/stable
+        # riscv64 is already at a NEWER version (promoted separately earlier):
+        # releasing the older target revision would downgrade stable, so the
+        # best-effort promotion is refused while the required set publishes.
+        target = "4.0.11"
+        new = "4.0.12"
+        revs = {"amd64": 758, "arm64": 760, "armhf": 762, "ppc64el": 761, "s390x": 759}
+        rv = {"riscv64": 764}
+        candidate = {"channel-map": [channel_entry(arch, rev, target, risk="candidate") for arch, rev in revs.items()] +
+                                     [channel_entry("riscv64", rv["riscv64"], target, risk="candidate")]}
+        stable_new = {"channel-map": [channel_entry(arch, rev, target, risk="stable") for arch, rev in revs.items()] +
+                                      [channel_entry("riscv64", 746, new, risk="stable")]}
+        prev_stable = {"channel-map": [channel_entry(arch, rev - 600, "4.0.10", risk="stable") for arch, rev in revs.items()]}
+
+        def combine(*maps):
+            entries = []
+            for m in maps:
+                entries.extend(m["channel-map"])
+            return entries
+
+        states = [
+            combine(candidate, stable_new),
+            combine(candidate, stable_new),
+            combine(candidate, stable_new),
+            combine(candidate, stable_new),
+        ]
+        code, out = self.run_main(
+            self.env(NIFT_SNAP_VERSION=target), self.stateful_fetch(states),
+            ("--promote-stable", "--dry-run"),
+        )
+        self.assertEqual(code, 0, out)
+        self.assertIn("refusing to downgrade", out)
+        self.assertNotIn("DRY-RUN: snapcraft release nift {} latest/stable".format(rv["riscv64"]), out)
+        for arch in sorted(revs):
+            self.assertIn("DRY-RUN: snapcraft release nift {} latest/stable".format(revs[arch]), out)
+        self.assertIn("Stable verified", out)
+
+    def test_promotion_resumes_idempotently(self):
+        # Interrupted promotion resumes safely: an already-staged candidate and
+        # an already-correct stable assignment are preserved on rerun, and a
+        # candidate already at the version is not re-staged.
+        revs = revision_numbers()
+        prev = revision_numbers(offset=500)
+        prev_stable = stable_map(prev, "4.0.8")
+        edge = edge_map_at(VERSION, revs)
+        candidate = candidate_map(revs)
+        stable = stable_map(revs, VERSION)
+        # candidate already staged and amd64/arm64 already on stable (partial
+        # prior publication). This rerun must preserve those and complete the rest.
+        partial_stable = dict(stable)
+        partial_stable["channel-map"] = [
+            channel_entry("amd64", revs["amd64"], VERSION, risk="stable"),
+            channel_entry("arm64", revs["arm64"], VERSION, risk="stable"),
+        ] + [e for e in partial_stable["channel-map"]
+             if e["channel"]["architecture"] in ("armhf", "ppc64el", "riscv64", "s390x")]
+
+        def combine(*maps):
+            entries = []
+            for m in maps:
+                entries.extend(m["channel-map"])
+            return entries
+
+        states = [
+            combine(edge, candidate, partial_stable),
+            combine(candidate, partial_stable),
+            combine(candidate, partial_stable),
+            combine(candidate, partial_stable),
+            combine(candidate, stable),
+        ]
+        code_c, out_c, code_s, out_s = self.run_promotion(self.env(), self.stateful_fetch(states))
+        self.assertEqual(code_c, 0, out_c)
+        self.assertEqual(code_s, 0, out_s)
+        # Candidate was already at the version: no re-staging of candidate.
+        self.assertNotIn("DRY-RUN: snapcraft release nift 100 latest/candidate", out_c)
+        # amd64/arm64 already at their selected stable revisions are not
+        # re-released (idempotent per-revision assignments are preserved).
+        self.assertIn("DRY-RUN: snapcraft release nift {} latest/stable".format(revs["armhf"]), out_s)
+        self.assertIn("DRY-RUN: snapcraft release nift {} latest/stable".format(revs["s390x"]), out_s)
+        self.assertIn("Stable verified", out_s)
+
+    def test_best_effort_queued_reported_pending(self):
+        # riscv64 with no edge build yet is reported as pending, never blocking.
+        revs = revision_numbers()
+        prev = revision_numbers(offset=500)
+        edge = edge_map_at(VERSION, revs)
+        edge["channel-map"] = [e for e in edge["channel-map"] if e["channel"]["architecture"] != "riscv64"]
+        entries = edge["channel-map"] + stable_map(prev, "4.0.9")["channel-map"]
+        code, out = self.run_main(
+            {"NIFT_SNAP_VERSION": VERSION},
+            lambda: entries, ("--check-ready",),
+        )
+        self.assertEqual(code, 0, out)
+        self.assertIn("READY", out)
+        self.assertIn("riscv64", out)
+        self.assertIn("pending", out)
 
     def test_malformed_edge_entry_fails_closed(self):
         revs = revision_numbers()
@@ -628,10 +838,7 @@ class CoordinatorDryRun(unittest.TestCase):
         def malformed():
             return entries
 
-        code, out = self.run_main(
-            {"NIFT_SNAP_VERSION": VERSION, "NIFT_SNAP_WAIT": "1", "NIFT_SNAP_POLL": "0", "SNAPCRAFT_STORE_CREDENTIALS": "secret"},
-            malformed,
-        )
+        code, out = self.run_main(self.env(), malformed, ("--promote-candidate", "--dry-run"))
         self.assertEqual(code, 1)
         self.assertIn("malformed latest/edge entries", out)
 
@@ -647,7 +854,9 @@ class CoordinatorDryRun(unittest.TestCase):
         return fetch
 
     def env(self, **extra):
-        env = {"NIFT_SNAP_VERSION": VERSION, "NIFT_SNAP_WAIT": "1", "NIFT_SNAP_POLL": "0", "SNAPCRAFT_STORE_CREDENTIALS": "secret"}
+        env = {"NIFT_SNAP_VERSION": VERSION, "NIFT_SNAP_POLL": "0",
+               "NIFT_SNAP_CANDIDATE_WAIT": "1", "NIFT_SNAP_STABLE_WAIT": "1",
+               "NIFT_SNAP_CONFIRM": "yes", "SNAPCRAFT_STORE_CREDENTIALS": "secret"}
         env.update(extra)
         return env
 
@@ -684,18 +893,20 @@ class CoordinatorDryRun(unittest.TestCase):
             return entries
 
         states = [
-            combine(edge_waiting, prev_stable),
-            combine(edge_waiting, prev_stable),
-            combine(edge_complete, prev_stable),
-            combine(candidate_lag, prev_stable),  # candidate not yet visible for s390x
-            combine(candidate, prev_stable),      # candidate converges
-            combine(candidate, stable),
+            combine(edge_complete, prev_stable),   # candidate phase initial
+            combine(candidate_lag, prev_stable),   # candidate not yet visible for s390x
+            combine(candidate, prev_stable),       # candidate converges
+            combine(candidate, prev_stable),       # stable phase initial
+            combine(candidate, prev_stable),       # stable phase revalidate
+            combine(candidate, stable),            # stable converges
         ]
-        code, out = self.run_main(self.env(NIFT_SNAP_CANDIDATE_WAIT="2"), self.stateful_fetch(states))
-        self.assertEqual(code, 0, out)
-        self.assertIn("DRY-RUN: snapcraft release nift 100 latest/stable", out)
-        self.assertNotIn("DRY-RUN: snapcraft promote", out)
-        self.assertIn("Stable verified", out)
+        code_c, out_c, code_s, out_s = self.run_promotion(
+            self.env(NIFT_SNAP_CANDIDATE_WAIT="2"), self.stateful_fetch(states))
+        self.assertEqual(code_c, 0, out_c)
+        self.assertEqual(code_s, 0, out_s)
+        self.assertIn("DRY-RUN: snapcraft release nift 100 latest/stable", out_s)
+        self.assertNotIn("DRY-RUN: snapcraft promote", out_c + out_s)
+        self.assertIn("Stable verified", out_s)
 
     def test_candidate_timeout_prevents_smoke_and_promotion(self):
         revs = revision_numbers()
@@ -711,7 +922,8 @@ class CoordinatorDryRun(unittest.TestCase):
         def steady():
             return entries
 
-        code, out = self.run_main(self.env(NIFT_SNAP_CANDIDATE_WAIT="1"), steady)
+        code, out = self.run_main(self.env(NIFT_SNAP_CANDIDATE_WAIT="1"), steady,
+                                  ("--promote-candidate", "--dry-run"))
         self.assertEqual(code, 1)
         self.assertIn("candidate did not converge", out)
         self.assertNotIn("DRY-RUN: bash packaging/snap-candidate-smoke.sh", out)
@@ -730,14 +942,13 @@ class CoordinatorDryRun(unittest.TestCase):
             return entries
 
         states = [
-            combine(edge_waiting, prev_stable),
-            combine(edge_waiting, prev_stable),
-            combine(edge_complete, prev_stable),
-            combine(candidate, prev_stable),
-            combine(candidate, stable_lag),  # stable not yet visible for s390x
-            combine(candidate, stable),      # stable converges
+            combine(candidate, prev_stable),   # stable phase initial
+            combine(candidate, prev_stable),   # revalidation
+            combine(candidate, stable_lag),    # stable not yet visible for s390x
+            combine(candidate, stable),        # stable converges
         ]
-        code, out = self.run_main(self.env(NIFT_SNAP_STABLE_WAIT="2"), self.stateful_fetch(states))
+        code, out = self.run_main(self.env(NIFT_SNAP_STABLE_WAIT="2"), self.stateful_fetch(states),
+                                  ("--promote-stable", "--dry-run"))
         self.assertEqual(code, 0, out)
         self.assertIn("Stable verified", out)
 
@@ -751,7 +962,8 @@ class CoordinatorDryRun(unittest.TestCase):
         def steady():
             return entries
 
-        code, out = self.run_main(self.env(NIFT_SNAP_STABLE_WAIT="1"), steady)
+        code, out = self.run_main(self.env(NIFT_SNAP_STABLE_WAIT="1"), steady,
+                                  ("--promote-stable", "--dry-run"))
         self.assertEqual(code, 1)
         self.assertIn("stable did not converge", out)
         self.assertIn("Rollback commands", out)
@@ -775,7 +987,8 @@ class CoordinatorDryRun(unittest.TestCase):
         def steady():
             return entries
 
-        code, out = self.run_main(self.env(NIFT_SNAP_STABLE_WAIT="1"), steady)
+        code, out = self.run_main(self.env(NIFT_SNAP_STABLE_WAIT="1"), steady,
+                                  ("--promote-stable", "--dry-run"))
         self.assertEqual(code, 1)
         self.assertIn("stable did not converge", out)
         self.assertIn("not recoverable from the channel map for: amd64, arm64", out)
@@ -812,7 +1025,8 @@ class CoordinatorDryRun(unittest.TestCase):
         def steady():
             return entries
 
-        code, out = self.run_main(self.env(NIFT_SNAP_VERSION="4.0.8", NIFT_SNAP_STABLE_WAIT="1"), steady)
+        code, out = self.run_main(self.env(NIFT_SNAP_VERSION="4.0.8", NIFT_SNAP_STABLE_WAIT="1"), steady,
+                                  ("--promote-stable", "--dry-run"))
         self.assertEqual(code, 1)
         self.assertIn("not recoverable from the channel map for: amd64, arm64", out)
         # The diagnostic must not describe every target-version assignment as
@@ -999,6 +1213,14 @@ class WorkflowStructure(unittest.TestCase):
         snap_job = text.split("  snap:", 1)[1].split("\n  ", 1)[0]
         self.assertNotIn("secrets: inherit", snap_job)
 
-
-if __name__ == "__main__":
-    unittest.main(verbosity=2)
+    def test_tag_release_workflow_has_no_snap_wait_or_store_mutation(self):
+        # The tag-triggered release graph must not wait on remote builders and
+        # must not contain any live Snap Store channel mutation.
+        for path in (".github/workflows/release.yml", ".github/workflows/snap.yml"):
+            text = self.load(path)
+            self.assertNotIn("NIFT_SNAP_WAIT", text)
+            self.assertNotIn("release-coordination", text)
+            self.assertNotIn("packaging/snap_release.py", text)
+            self.assertNotIn("SNAPCRAFT_STORE_CREDENTIALS", text)
+        text = self.load(".github/workflows/release.yml")
+        self.assertIn("uses: ./.github/workflows/snap.yml", text)
