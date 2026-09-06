@@ -310,13 +310,16 @@ evidence for the release report.
 
 ### Deep-guard policy
 
-The heavyweight guards in `.github/workflows/nightly-deep.yml` (parser fuzzing,
-sanitized core-lifecycle memory safety, watch-mode endurance soaking, and
-incremental clean-build equivalence) are **not** ordinary nightly background CI.
-They are manual `workflow_dispatch`-only deep guards. Run them:
+The heavyweight guards in `.github/workflows/nightly-deep.yml` are **not**
+ordinary nightly background CI. They are manual `workflow_dispatch`-only deep
+guards. The complete workflow exercises: checkpoint 9 parser fuzzing, checkpoint
+3 sanitized core-lifecycle memory safety, checkpoint 4 watch-mode endurance
+soaking, checkpoint 6 shared-data integration memory safety, and checkpoint 7
+incremental clean-build equivalence. Run the **complete** workflow:
 
-- before a release, explicitly run the relevant deep guards and require them to
-  pass;
+- before a release, explicitly run the whole `Deep guards` workflow against the
+  final candidate SHA and require every job to pass (do not select a subset by
+  memory);
 - after changes to the parser, watch mode, incremental rebuild logic,
   lifecycle/memory-safety code, or other relevant subsystems, run the
   corresponding deep guard manually;

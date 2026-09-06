@@ -56,12 +56,13 @@ Proportionately include:
     help-like invocations produce the intended diagnostic and direct users to
     `nift commands`; a separate `nift help` command is not part of the contract.
 12. Inspect repository state for generated/debug residue.
-13. **Deep guards (manual-only).** Before tagging a release, manually run the
-    relevant guards in `.github/workflows/nightly-deep.yml` (parser fuzz,
-    sanitized core-lifecycle memory, watch endurance, incremental equivalence)
-    against the candidate and require them to pass. See the deep-guard policy in
+13. **Deep guards (manual-only).** Before tagging a release, run the complete
+    manual `Deep guards` workflow (`.github/workflows/nightly-deep.yml`) against
+    the candidate SHA and require every job to pass: parser fuzz, sanitized
+    core-lifecycle memory, watch endurance, incremental equivalence and the
+    checkpoint-6 shared-data integration gate. See the deep-guard policy in
     `PACKAGING.md`; these are not ordinary nightly background CI.
-13. **Pre-tag public-installer deployment gate.** If `packaging/install.sh` (or
+14. **Pre-tag public-installer deployment gate.** If `packaging/install.sh` (or
     any public update script Nift may later gain) has changed since the previous
     public release, the exact reviewed script must already be deployed at
     `https://nift.dev/install` and byte-verified *before* the release tag is

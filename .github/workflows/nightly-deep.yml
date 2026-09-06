@@ -60,6 +60,28 @@ jobs:
             --interval 0.22 \
             --output .build/memory-safety/checkpoint-4-watch-rss.json
 
+  checkpoint6:
+    name: Checkpoint 6 integration (shared-data isolation)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Build Nift
+        run: make -j2
+      - name: Checkpoint 6 integration memory safety
+        # Canonical invocation from `make memory-safety-checkpoint-6`; the Make
+        # target's -sync prerequisite needs sibling jsonic/minify checkouts that
+        # are not present in this nift-only workflow checkout, so the script is
+        # invoked directly with the same retained parameters.
+        run: |
+          python3 scripts/checkpoint6_integration.py \
+            --nift "$PWD/nift" \
+            --rounds 60 \
+            --pages 90 \
+            --output .build/memory-safety/checkpoint-6-integration.json
+
   incremental-equivalence:
     name: Checkpoint 7 incremental equivalence
     runs-on: ubuntu-latest
