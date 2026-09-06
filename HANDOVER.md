@@ -36,9 +36,15 @@ whether it is a regression.
 - Embedded markup converter: `markuppp/`, synchronized byte-for-byte with the current standalone Markup++ candidate (`make test-markuppp-sync`); standalone remains canonical.
 - Source comments are opaque: `@//` for a single line and `@/* ... */` for a
   multiline block. Comment bodies are skipped without parsing Nift syntax.
-- Snap Store publication is asynchronous relative to GitHub releases: `snap.yml`
-  validates only, while `snap-promote.yml` manually promotes completed connected
-  edge builds after every declared architecture is available.
+- Snap Store publication is asynchronous relative to GitHub releases and is
+  manual-only: `snap.yml` validates and builds locally without contacting or
+  mutating the Store, while `snap-promote.yml` (workflow_dispatch, defaulting to
+  read-only status) promotes completed connected edge builds after the
+  maintainer has inspected the Snapcraft build page. The five required
+  architectures (amd64, arm64, armhf, ppc64el, s390x) must be complete; riscv64
+  is best-effort and never blocks or fails a release. The coordinator
+  (`packaging/snap_release.py`) has no initial remote-build polling and only
+  performs short bounded waits after a deliberate channel mutation.
 
 Do not habitually reduce Nift to “a static site generator.” Nift generates
 website artifacts, but those artifacts may contain client applications, consume

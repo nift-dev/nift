@@ -112,32 +112,61 @@ the GitHub release succeeds; on that release path it requires the recipe version
 to match the tag. GitHub-hosted runners build amd64 and arm64 strictly as
 non-publishing validation. The connected Snap Store/Launchpad build service is
 the sole producer of published revisions and independently publishes repository
-builds for the six declared platforms (`snap/snapcraft.yaml` `platforms:`) to
+builds for the declared platforms (`snap/snapcraft.yaml` `platforms:`) to
 `latest/edge`. A GitHub release does **not** wait for those remote builders and
-does not mutate candidate/stable. This is deliberate: scarce builders such as
-`riscv64` must not make the whole release workflow appear failed or remain open
-for hours.
+does not mutate candidate/stable; a successful Nift GitHub release finishes once
+its own artifacts, installers and deterministic package checks pass. Snap
+publication is an asynchronous follow-up channel.
 
-Once all six architectures for the intended version are visibly complete on
-`latest/edge`, manually run **Promote completed Snap builds**
-(`.github/workflows/snap-promote.yml`) with that version. The manual promotion:
+## Snap promotion policy (manual, best-effort riscv64)
 
-1. selects the exact edge revision for every declared architecture;
-2. releases those exact revisions to `latest/candidate`;
-3. verifies candidate contains exactly those six revisions at the requested
-   version with no unsupported entries;
-4. runs the amd64 candidate confinement smoke;
-5. revalidates candidate, then releases each selected revision explicitly to
-   `latest/stable` with `snapcraft release nift <revision> latest/stable`;
-6. verifies stable contains those six exact revisions.
+This policy was hardened after the v4.0.11 release, when the tag-triggered
+workflow stayed open for two hours waiting for the Snapcraft riscv64 build and
+the five completed architectures had to be promoted manually. Nift itself did
+not fail: the GitHub release, its artifacts and its deterministic package
+checks had already succeeded. The change makes that ordering explicit — a Nift
+release never depends on remote Snap builders.
+
+Required coordinated targets (a release never waits for these or for Snap):
+`amd64`, `arm64`, `armhf`, `ppc64el`, `s390x`.
+
+Best-effort target: `riscv64`. It must never delay or fail a promotion: it is
+included only when its edge build is already at the target version, it may
+remain on an older stable version while builders are unavailable, it may skip
+intermediate versions, and a delayed older build must never downgrade a newer
+stable RISC-V revision.
+
+Once the five required architectures (and any ready best-effort target) for the
+intended version are visibly complete on `latest/edge`, the maintainer runs
+**Promote completed Snap builds** (`.github/workflows/snap-promote.yml`,
+`workflow_dispatch`) with that version. The workflow defaults to read-only
+`status`; mutation modes (`candidate`, `stable`) require the explicit
+`promote=true` confirmation and invoke the coordinator in `--promote-candidate`
+or `--promote-stable` mode:
+
+1. `--promote-candidate` selects the exact edge revision for every required
+   architecture (best-effort only when already ready), fails fast if a required
+   build is missing (no initial remote-build polling), and releases those exact
+   revisions to `latest/candidate`;
+2. verifies candidate contains exactly those revisions at the requested version
+   with no unsupported entries;
+3. `--promote-stable` runs the amd64 candidate confinement smoke, revalidates
+   candidate, refuses any downgrade of a newer stable revision, then releases
+   each selected revision explicitly to `latest/stable` with
+   `snapcraft release nift <revision> latest/stable`;
+4. verifies stable contains those revisions, reporting required-complete and
+   best-effort-pending/older/newer honestly per architecture.
 
 Whole-channel `snapcraft promote` is deliberately not used: its completeness
 policy includes the historical `i386` entry that Nift no longer declares or
 builds. Per-revision releases are idempotent, so a manually retried promotion
 preserves already-correct stable assignments and safely resumes partial
 publication. Before candidate mutation the coordinator still requires a complete
-previous-stable rollback snapshot for every supported architecture. Legacy i386
+previous-stable rollback snapshot for the required architectures. Legacy i386
 entries are ignored/reported in edge and stable and fail closed in candidate.
+The coordinator has no `NIFT_SNAP_WAIT` initial wait; the only waits are short
+bounded convergence checks (default ~5 minutes each) after a deliberate channel
+mutation.
 
 Configure `SNAPCRAFT_STORE_CREDENTIALS` for the manual promotion workflow. The
 ordinary tag release does not require Store credentials. Both Snap workflows use
