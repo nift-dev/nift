@@ -56,8 +56,14 @@ fi
 tar -xzf "$tmp/$archive" -C "$tmp"
 [ -f "$tmp/$root/minify" ] || { echo "minify installer: release archive did not contain minify" >&2; exit 1; }
 mkdir -p "$install_dir"
-cp "$tmp/$root/minify" "$install_dir/minify"
-chmod 0755 "$install_dir/minify"
+# Stage inside install_dir so the final rename is on the same filesystem and
+# atomic. rename(2) replaces an existing destination directory entry, so a
+# pre-existing symlink at the target is replaced rather than followed.
+stage="$install_dir/.minify-install.$$"
+trap 'rm -f -- "$stage"; rm -rf "$tmp"' EXIT HUP INT TERM
+cp "$tmp/$root/minify" "$stage"
+chmod 0755 "$stage"
+mv -f -- "$stage" "$install_dir/minify"
 
 printf 'Installed Minify++ %s to %s/minify\n' "$version" "$install_dir"
 case ":${PATH:-}:" in
