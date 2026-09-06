@@ -62,25 +62,5 @@ chmod 0755 "$install_dir/minify"
 printf 'Installed Minify++ %s to %s/minify\n' "$version" "$install_dir"
 case ":${PATH:-}:" in
     *":$install_dir:"*) ;;
-    *)
-        if [ "$os" = Darwin ] && [ -z "$custom_install_dir" ] && [ "$install_dir" = "$HOME/.local/bin" ]; then
-            case "${SHELL:-}" in
-                */bash) profile="$HOME/.bash_profile" ;;
-                *) profile="$HOME/.zprofile" ;;
-            esac
-            path_line='export PATH="$HOME/.local/bin:$PATH"'
-            if [ ! -f "$profile" ] || ! grep -Fqx "$path_line" "$profile"; then
-                {
-                    printf '\n# Added by the Minify++ installer\n'
-                    printf '%s\n' "$path_line"
-                } >> "$profile"
-                printf 'Added %s to your shell PATH in %s.\n' "$install_dir" "$profile"
-            else
-                printf '%s is already configured in %s.\n' "$install_dir" "$profile"
-            fi
-            printf 'Open a new terminal, or run: export PATH="$HOME/.local/bin:$PATH"\n'
-        else
-            printf 'Add %s to PATH to run minify from any directory.\n' "$install_dir"
-        fi
-        ;;
+    *) printf 'Add %s to PATH to run minify from any directory.\n' "$install_dir" ;;
 esac
