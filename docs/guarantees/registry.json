@@ -1450,7 +1450,7 @@
         {
           "repo": "regression",
           "path": "HANDOVER.md",
-          "needle": "23 modules total"
+          "needle": "25 modules total"
         }
       ]
     }
@@ -1491,8 +1491,8 @@
     {
       "repo": "website",
       "path": "content/docs/battle-tested.html",
-      "sha256": "a35237c320ae0f36c52dcb0896d2b0374fe0b810ba0f66866d59298541311c5a",
-      "mapping_scope": "BH1 manual audit of significant quantitative/reliability claims; source hash invalidates the audit if this page changes."
+      "sha256": "9ab57685bfd146a7bfc65b57896d26de0521aebea7f80f8431b412f4502a86fa",
+      "mapping_scope": "BH1 manual audit of significant quantitative/reliability claims; source hash invalidates the audit if this page changes. Re-audited 2026-09-06: the only source change was the test-comments comment-syntax documentation; all eleven pinned claim needles remain present and unchanged."
     },
     {
       "repo": "website",
