@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Preserved whitespace runs that follow CSS escapes. A hex escape consumes one
+  trailing whitespace as its terminator, and an escaped whitespace character is
+  an identifier character, so collapsing the following whitespace run merged
+  what browsers tokenize as separate identifiers (for example `@counter-style`
+  symbol lists such as `\2020  \2021`) into a single identifier. These cases are
+  outside the structured-CSSOM conformance oracle's view, so they are covered by
+  focused permanent regressions in the smoke suite as well as by the
+  adversarial WPT re-verification.
+
 - Added Web Platform Test-driven CSS recovery coverage. CSS EOF comments and
   strings now follow browser-style recovery semantics instead of becoming
   Minify++ errors, and bad strings stop at unescaped newlines so subsequent CSS

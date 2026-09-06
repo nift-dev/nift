@@ -10,6 +10,10 @@ Development in progress following the public v4.0.9 release.
 - Synchronized the embedded Minify++ CSS recovery fixes found through the new
   WPT conformance harness, including browser-style EOF recovery for strings and
   comments and bad-string newline handling.
+- Synchronized the embedded Minify++ CSS escape-whitespace fix: whitespace runs
+  following CSS hex escapes or escaped whitespace are preserved so that
+  `@counter-style` and other escape-separated identifier lists cannot be merged
+  into a single identifier by minification.
 - Decoupled Snap Store promotion from the GitHub release workflow. Release runs
   now perform only non-publishing Snap validation; completed connected builds
   are promoted later through the manual `Promote completed Snap builds` workflow.

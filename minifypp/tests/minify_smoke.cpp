@@ -92,6 +92,19 @@ int main() {
     expect(out.find("[ |data-test-4]") != std::string::npos, "CSS attribute namespace leading whitespace removed");
     expect(out.find("[ | data-test-4]") != std::string::npos, "CSS invalid attribute namespace whitespace normalized into valid selector");
 
+    // WPT-derived: a CSS hex escape consumes one trailing whitespace as its
+    // terminator, and an escaped whitespace is an identifier character. The
+    // whitespace run after either therefore cannot collapse to a single space:
+    // browsers tokenize `\2020  \2021` as two symbols but `\2020 \2021` as one.
+    expect(minify::css(R"CSS(@counter-style a { symbols: \2020  \2021; suffix: ""; })CSS", out, err), err);
+    expect(out.find(R"CSS(\2020  \2021)CSS") != std::string::npos, "CSS hex escape terminator+separator spaces collapsed");
+    expect(minify::css(R"CSS(@counter-style b { symbols: \   x; suffix: ""; })CSS", out, err), err);
+    expect(out.find(R"CSS(\  x)CSS") != std::string::npos, "CSS escaped-space separator collapsed");
+    expect(minify::css(R"CSS(@counter-style c { symbols: a\0304  a\0301; suffix: ""; })CSS", out, err), err);
+    expect(out.find(R"CSS(a\0304  a\0301)CSS") != std::string::npos, "CSS hex escape run after identifier collapsed");
+    expect(minify::css(R"CSS(@counter-style d { additive-symbols: \66  6, 'e' 5; })CSS", out, err), err);
+    expect(out.find(R"CSS(\66  6)CSS") != std::string::npos, "CSS hex escape additive-symbols weight separator collapsed");
+
     // Invalid declaration values must stay invalid after compaction. Browsers
     // discard these declarations; joining a block with adjacent tokens can
     // accidentally make the declaration survive.

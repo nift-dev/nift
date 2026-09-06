@@ -151,12 +151,23 @@ bool css(const std::string& input, std::string& output, std::string& error) {
     std::size_t bracket_depth = 0;
     std::vector<bool> brace_is_component_value;
     bool just_closed_component_value = false;
+    // CSS escape whitespace tracking. A hex escape (backslash + 1..6 hex
+    // digits) consumes one trailing whitespace as its terminator, and an
+    // escaped whitespace character is an identifier character, not removable
+    // formatting. Collapsing the whitespace run after either merges what a
+    // browser tokenizes as separate identifiers into a single identifier.
+    bool in_hex_escape = false;
+    unsigned hex_escape_digits = 0;
+    bool escaped_ws = false;
 
     for (std::size_t i = 0; i < input.size();) {
         const char c = input[i];
 
         if (c == '\'' || c == '"') {
             emit_pending_css_space(output, pending_space, c);
+            in_hex_escape = false;
+            hex_escape_digits = 0;
+            escaped_ws = false;
             const char quote = c;
             output.push_back(c);
             ++i;
@@ -194,12 +205,32 @@ bool css(const std::string& input, std::string& output, std::string& error) {
         if (c == '\\' && i + 1 < input.size()) {
             emit_pending_css_space(output, pending_space, c);
             output.push_back(c);
-            output.push_back(input[i + 1]);
+            const char escaped = input[i + 1];
+            output.push_back(escaped);
+            if (escaped == ' ' || escaped == '\t' || escaped == '\f') {
+                // An escaped whitespace character is an identifier code point.
+                escaped_ws = true;
+                in_hex_escape = false;
+                hex_escape_digits = 0;
+            } else if (std::isxdigit(static_cast<unsigned char>(escaped))) {
+                // Hex escape: track following digits so a trailing whitespace
+                // terminator and any separator can be preserved.
+                in_hex_escape = true;
+                hex_escape_digits = 1;
+                escaped_ws = false;
+            } else {
+                in_hex_escape = false;
+                hex_escape_digits = 0;
+                escaped_ws = false;
+            }
             i += 2;
             continue;
         }
 
         if (c == '/' && i + 1 < input.size() && input[i + 1] == '*') {
+            in_hex_escape = false;
+            hex_escape_digits = 0;
+            escaped_ws = false;
             const bool preserve = i + 2 < input.size() && input[i + 2] == '!';
             const auto end = input.find("*/", i + 2);
             if (end == std::string::npos) {
@@ -227,6 +258,27 @@ bool css(const std::string& input, std::string& output, std::string& error) {
         }
 
         if (ws(c)) {
+            if (in_hex_escape || escaped_ws) {
+                // A hex escape consumes the first whitespace as its terminator;
+                // any further whitespace is a real token separator. An escaped
+                // whitespace character is itself an identifier character, so
+                // the whitespace following it is a separator. Collapsing this
+                // run to a single space would merge distinct browser tokens.
+                std::size_t run = 1;
+                while (i + run < input.size() && ws(input[i + run])) ++run;
+                if (in_hex_escape) {
+                    output.push_back(' ');
+                    if (run >= 2) output.push_back(' ');
+                } else {
+                    output.push_back(' ');
+                }
+                pending_space = false;
+                in_hex_escape = false;
+                hex_escape_digits = 0;
+                escaped_ws = false;
+                i += run;
+                continue;
+            }
             pending_space = true;
             ++i;
             continue;
@@ -235,6 +287,9 @@ bool css(const std::string& input, std::string& output, std::string& error) {
         const bool punctuation = c == '{' || c == '}' || c == ':' ||
                                  c == ';' || c == ',';
         if (punctuation) {
+            in_hex_escape = false;
+            hex_escape_digits = 0;
+            escaped_ws = false;
             // Whitespace before ':' can distinguish a descendant pseudo-class
             // selector (`.a :hover`) from a compound selector (`.a:hover`).
             // Preserve authored spacing universally rather than guessing
@@ -259,6 +314,15 @@ bool css(const std::string& input, std::string& output, std::string& error) {
                 just_closed_component_value = false;
             }
         } else {
+            if (in_hex_escape) {
+                if (std::isxdigit(static_cast<unsigned char>(c)) && hex_escape_digits < 6) {
+                    ++hex_escape_digits;
+                } else {
+                    in_hex_escape = false;
+                    hex_escape_digits = 0;
+                }
+            }
+            escaped_ws = false;
             if (pending_space && just_closed_component_value && !output.empty() && output.back() == '}') {
                 output.push_back(' ');
                 pending_space = false;
@@ -291,8 +355,14 @@ bool css(const std::string& input, std::string& output, std::string& error) {
         ++i;
     }
 
-    if (!preserve_final_bad_string_newline)
-        while (!output.empty() && ws(output.back())) output.pop_back();
+    if (!preserve_final_bad_string_newline) {
+        // An escaped trailing whitespace is an identifier character and must
+        // survive the trim; only removable formatting whitespace is dropped.
+        while (!output.empty() && ws(output.back()) &&
+               !(output.size() >= 2 && output[output.size() - 2] == '\\')) {
+            output.pop_back();
+        }
+    }
     error.clear();
     return true;
 }
