@@ -1,5 +1,11 @@
 # Minify++ — Release Notes
 
+## v1.1.2 (development)
+
+- Post-release development version after the public **v1.1.1** release. The
+  executable identity is advanced to `1.1.2` for further development; the public
+  API format version remains `1`.
+
 ## v1.1.1
 
 - Added checksum-verifying curl install, download, update and uninstall scripts,

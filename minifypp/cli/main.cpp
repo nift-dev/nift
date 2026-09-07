@@ -147,7 +147,7 @@ int main(int argc, char** argv) {
         const std::string arg = argv[i];
         if (arg == "--help" || arg == "-h") { help(); return 0; }
         if (arg == "--version" || arg == "-v") {
-            std::cout << "Minify++ 1.1.1\n";
+            std::cout << "Minify++ 1.1.2\n";
             return 0;
         }
         if (arg == "--in-place" || arg == "-i") { in_place = true; continue; }
