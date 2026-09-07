@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-repo="${MINIFY_GITHUB_REPOSITORY:-nift-dev/minify}"
+repo="${MINIFY_GITHUB_REPOSITORY:-minify-cx/minify}"
 version="${MINIFY_VERSION:-}"
 download_dir="${MINIFY_DOWNLOAD_DIR:-$PWD}"
 

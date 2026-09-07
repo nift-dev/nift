@@ -15,7 +15,7 @@ Supported formats in format version 1 are HTML, CSS, JavaScript, JSX, JSON, XML 
 Linux x86-64 and macOS arm64/x86-64:
 
 ```bash
-curl -fsSL https://nift-dev.github.io/minify-website/install | sh
+curl -fsSL https://minify.cx/install.sh | sh
 ```
 
 The installer downloads the latest GitHub release, verifies its archive against
@@ -23,19 +23,22 @@ the published `SHA256SUMS`, and installs `minify` in `~/.local/bin` without
 `sudo`. Set `MINIFY_INSTALL_DIR` to choose another directory or
 `MINIFY_VERSION=1.1.1` to pin a release.
 
+You can inspect the script before running it, and the release archive is
+checksum-verified against `SHA256SUMS` before anything is installed.
+
 ```bash
 # Download the verified archive without installing it.
-curl -fsSL https://nift-dev.github.io/minify-website/download | sh
+curl -fsSL https://minify.cx/download.sh | sh
 
 # Update to the latest release using the same install location.
-curl -fsSL https://nift-dev.github.io/minify-website/update | sh
+curl -fsSL https://minify.cx/update.sh | sh
 
 # Remove the installed executable.
-curl -fsSL https://nift-dev.github.io/minify-website/uninstall | sh
+curl -fsSL https://minify.cx/uninstall.sh | sh
 ```
 
 Windows x86-64 users can download the `.zip` archive from the
-[GitHub releases](https://github.com/nift-dev/minify/releases) page and verify it
+[GitHub releases](https://github.com/minify-cx/minify/releases) page and verify it
 with the accompanying `SHA256SUMS` file.
 
 ## Build from source

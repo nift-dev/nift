@@ -29,7 +29,7 @@ MINIFY_VERSION="$version" MINIFY_RELEASE_BASE="file://$tmp/release" MINIFY_DOWNL
 test -f "$tmp/downloads/$archive"
 test -f "$tmp/downloads/$archive.sha256"
 
-cp "$root/packaging/install.sh" "$tmp/website/install"
+cp "$root/packaging/install.sh" "$tmp/website/install.sh"
 MINIFY_VERSION="$version" MINIFY_RELEASE_BASE="file://$tmp/release" MINIFY_INSTALL_DIR="$tmp/bin" MINIFY_WEBSITE_BASE="file://$tmp/website" sh "$root/packaging/update.sh"
 test "$("$tmp/bin/minify" --version)" = "Minify++ $version"
 

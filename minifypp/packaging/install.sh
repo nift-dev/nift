@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-repo="${MINIFY_GITHUB_REPOSITORY:-nift-dev/minify}"
+repo="${MINIFY_GITHUB_REPOSITORY:-minify-cx/minify}"
 custom_install_dir="${MINIFY_INSTALL_DIR:-}"
 install_dir="${custom_install_dir:-$HOME/.local/bin}"
 version="${MINIFY_VERSION:-}"

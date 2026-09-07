@@ -4,6 +4,8 @@
 
 Jsonic++ is a dependency-free, header-only C++17 JSON parser extracted from the JSON implementation battle-tested inside Nift and Minify++.
 
+Project home: <https://github.com/jsonic-cc/jsonic>. Public website: <https://jsonic.cc>.
+
 ```cpp
 #include "json.h"
 
