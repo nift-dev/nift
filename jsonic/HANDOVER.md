@@ -5,8 +5,8 @@ Jsonic++ is the standalone canonical project for the small dependency-free C++17
 - Canonical repository: `jsonic-cc/jsonic` at `https://github.com/jsonic-cc/jsonic`.
 - Public website: `https://jsonic.cc` (source `jsonic-cc/jsonic-cc.github.io` on `stage`; generated output on `main`).
 - Issue tracker: `https://github.com/jsonic-cc/jsonic/issues`.
-- Release/development version: **not yet selected** — no release version is defined in authoritative project files or handover notes. Revisit before any public release.
-- Installer infrastructure: **not present** — Jsonic++ is header-only with no CLI release packaging, so no `https://jsonic.cc/install.sh` endpoint exists yet. This is a tracked release-preparation gap; do not document a curl-install command until the project gains release packaging compatible with it.
+- Release/development version: none defined in authoritative project files or handover notes; Jsonic++ is not scheduled for a tagged CLI release in this phase.
+- Installer infrastructure: intentionally not provided. Jsonic++ is a dependency-free, header-only library and deliberately does not ship the Minify++/Markup++ curl-installer family (`install.sh`, `download.sh`, `update.sh`, `uninstall.sh`) or CLI release packaging. No `https://jsonic.cc/install.sh` endpoint is expected, and no curl-install command should be documented. This is an intentional project/distribution decision, not a tracked gap or outstanding work.
 
 ## Identity and boundary
 
