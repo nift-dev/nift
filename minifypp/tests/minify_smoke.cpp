@@ -180,6 +180,31 @@ int main() {
     expect(out.find("/* raw */") != std::string::npos, "HTML raw style text changed");
     expect(!minify::html("<div class=\"x\"", out, err), "malformed HTML tag accepted");
     expect(err.find("unterminated HTML tag") != std::string::npos, "malformed HTML error missing");
+    expect(minify::html("<link href=mailto:test@example.com\">", out, err), err);
+    eq(out, "<link href=mailto:test@example.com\">", "HTML stray quote in unquoted attribute");
+    expect(minify::html("<img crossorigin=anonymous />", out, err), err);
+    eq(out, "<img crossorigin=anonymous />", "HTML unquoted attribute self-close boundary");
+    expect(minify::html("<<script>  const x = 1;\n</script>", out, err), err);
+    eq(out, "<<script>  const x = 1;\n</script>", "HTML recoverable raw-text opener");
+    expect(minify::html("<div style=\"white-space: pre-line\">  a\n  b  </div><p>  c  </p>", out, err), err);
+    eq(out, "<div style=\"white-space: pre-line\">  a\n  b  </div><p> c </p>",
+       "HTML inline preserved-whitespace style");
+    expect(minify::html("<area href=/ shape=default>", out, err), err);
+    eq(out, "<area href=/ shape=default>", "HTML slash-ended unquoted attribute boundary");
+    expect(minify::html("<listing>\n\nx</listing>", out, err), err);
+    eq(out, "<listing>\n\nx</listing>", "HTML listing initial linefeed");
+    expect(minify::html("<iframe> </body> </html> ", out, err), err);
+    eq(out, "<iframe> </body> </html> ", "HTML iframe raw text");
+    expect(minify::html("<svg><script> a <script> b </script> c </script></svg>", out, err), err);
+    eq(out, "<svg><script> a <script> b </script> c </script></svg>", "HTML foreign SVG subtree");
+    expect(minify::html("<p>x</p><!-- trailing", out, err), err);
+    eq(out, "<p>x</p>", "HTML EOF comment recovery");
+    expect(minify::javascript("''/*\u2028*/''", out, err), err);
+    eq(out, "''\n''", "JavaScript Unicode line separator comment ASI");
+    expect(minify::javascript("const x=`foo ${`bar ${5} baz`} qux`;", out, err), err);
+    eq(out, "const x=`foo ${`bar ${5} baz`} qux`;", "JavaScript nested template raw text");
+    expect(minify::javascript("const x=/a/ instanceof RegExp;", out, err), err);
+    eq(out, "const x=/a/ instanceof RegExp;", "JavaScript regex keyword boundary");
     expect(minify::html("<p>héllo 😀 世界</p>", out, err), err);
     expect(out.find("héllo 😀 世界") != std::string::npos, "HTML Unicode damaged");
     expect(minify::html("<!doctype html><template><span>A</span> <span>B</span></template>", out, err), err);
@@ -522,6 +547,22 @@ int main() {
     expect(minify::jsx("const x = <><A/><B>{ {x: 1}.x }</B></>;", out, err), err);
     expect(out.find("{ {x:1}.x}") != std::string::npos || out.find("{{x:1}.x}") != std::string::npos,
            "nested JSX object expression damaged");
+    // TypeScript JSX-conformance regressions: separate JavaScript fragments
+    // around a JSX root must retain ASI boundaries, closing tags are never
+    // fresh roots, and a line comment before a standalone root is trivia.
+    expect(minify::jsx("import {h} from './h'\n<h></h>\nexport * from './x';", out, err), err);
+    expect(out.find("'./h'\n<h>") != std::string::npos,
+           "line boundary before standalone JSX root removed");
+    expect(out.find("</h>\nexport") != std::string::npos,
+           "line boundary after JSX root removed");
+    expect(minify::jsx("function Test() {}\n<Test></Test>\n", out, err), err);
+    expect(out.find("<Test></Test>") != std::string::npos,
+           "closing JSX tag was treated as a fresh root");
+    expect(minify::jsx("// component expression\n<M a={() => <button>test</button>}/>\n"
+                       "class Next {}", out, err), err);
+    expect(out.find("<button>test</button>") != std::string::npos &&
+           out.find("/>\nclass") != std::string::npos,
+           "comment-delimited JSX root or following ASI boundary damaged");
     expect(minify::svg("<svg xmlns=\"http://www.w3.org/2000/svg\">\n <text>hello   world</text>\n <path d=\"M 0 0 L 10 10\" />\n</svg>", out, err), err);
     expect(out.find("hello   world") != std::string::npos, "SVG text whitespace changed");
     expect(out.find("M 0 0 L 10 10") != std::string::npos, "SVG path attribute changed");

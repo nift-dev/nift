@@ -5,6 +5,30 @@
 - Post-release development version after the public **v1.1.1** release. The
   executable identity is advanced to `1.1.2` for further development; the public
   API format version remains `1`.
+- Accept browser-recoverable stray quotes in unquoted HTML attribute values
+  instead of misclassifying them as unterminated quoted attributes. This defect
+  was found by the independent WPT HTML conformance harness and is retained in
+  the standalone smoke suite.
+- Preserve HTML self-closing and following-attribute boundaries after unquoted
+  values, raw/preformatted content (`iframe`, `xmp`, `listing`, `plaintext` and
+  inline preserved-whitespace styles), foreign SVG/MathML subtrees, recoverable
+  `<<script>` openers, and ordinary comments recovered at EOF. These families
+  were reduced from the complete independent 9,651-case WPT HTML run.
+- Preserve nested template-literal source text, Unicode U+2028/U+2029 line
+  terminators carried by removed JavaScript block comments, and the required
+  boundary between a regular-expression literal and a following word token.
+  These fixes reduce seven genuine failures found by the complete selected
+  Test262 run; all 39,741 cases runnable under the pinned Node runtime then
+  preserve behavior after minification.
+- Preserve ASI-significant line boundaries before and after JSX roots, never
+  reinterpret closing tags as fresh roots, and recognize standalone JSX after
+  line-comment boundaries. The pinned TypeScript JSX corpus exposed these
+  scanner defects; the corrected complete run preserves all 221 eligible
+  JSX/TSX programs.
+- Added independent complete-corpus checkpoints for the remaining claimed
+  formats: 93/93 eligible JSONTestSuite documents, 535/535 conservative W3C XML
+  documents and 1,176/1,176 strict standalone WPT SVG documents preserve their
+  format-specific semantic projections.
 
 ## v1.1.1
 

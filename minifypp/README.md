@@ -62,6 +62,9 @@ silently replaced.
 
 ## Current adversarial gates
 
+- Independent complete external checkpoints: CSS 31,155/31,155, HTML
+  9,651/9,651, JavaScript 39,741/39,741 runtime-applicable, JSX/TSX 221/221,
+  JSON 93/93, XML 535/535 and structural SVG 1,176/1,176.
 - 15,459 executable JavaScript semantic programs.
 - 180 JSX/TSX syntax + idempotence programs.
 - 111 generated non-JavaScript idempotence documents.
