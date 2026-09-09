@@ -1,7 +1,7 @@
 // PA2 evidence: ProjectHost adapts the validated ProjectState snapshot to the
 // existing RenderHost seam, so the existing Parser/rendering core renders real
 // Nift project pages with project-backed content/template/input loading, JSON,
-// contracts, tracked output lookup, current-output @pathto geometry (including
+// contracts, tracked output lookup, current-output @path geometry (including
 // the 404 rule) and pagination - while writing nothing, making no build
 // decisions, and keeping the concurrency contract.
 #include "ProjectHost.h"
@@ -51,11 +51,11 @@ const char* kPageHtml = R"(<main>@content</main>)";
 const char* kAboutContent = R"(<h1>About</h1>
 <p>site=$[site.name]</p>
 <p>app=$[app.name]</p>
-<p>home=@pathto("/")</p>
-<p>blog=@pathto("blog/")</p>
-<p>appjs=@pathto("public/app.js")</p>)";
-const char* k404Content = R"(<p>home=@pathto("/")</p>
-<p>blog=@pathto("blog/")</p>)";
+<p>home=@path("/")</p>
+<p>blog=@path("blog/")</p>
+<p>appjs=@path("public/app.js")</p>)";
+const char* k404Content = R"(<p>home=@path("/")</p>
+<p>blog=@path("blog/")</p>)";
 const char* kBlogContent = R"(@json(d, 'data/items.json')
 @for(x : d.items){@item{$[x.name]}}
 @paginate)";
@@ -190,7 +190,7 @@ void test_project_renders(const ProjectState& state,
         CHECK(std::find(home.dependencies.begin(), home.dependencies.end(), std::string("templates/head.html")) != home.dependencies.end());
     }
 
-    // About: contract + host binding + tracked/concrete @pathto geometry.
+    // About: contract + host binding + tracked/concrete @path geometry.
     RenderResult about = render_page(state, "about", bindings);
     CHECK(about.ok);
     if (about.ok) {
@@ -199,7 +199,7 @@ void test_project_renders(const ProjectState& state,
         CHECK(std::find(about.dependencies.begin(), about.dependencies.end(), std::string("templates/page.html")) != about.dependencies.end());
     }
 
-    // 404: tracked page whose @pathto is root-absolute for web serving.
+    // 404: tracked page whose @path is root-absolute for web serving.
     RenderResult not_found = render_page(state, "404", bindings);
     CHECK(not_found.ok);
     if (not_found.ok) CHECK(contains_all(not_found.output, {"home=/", "blog=/blog/"}));

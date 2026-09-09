@@ -43,7 +43,7 @@ that machinery deliberately. The conclusion was not that those capabilities were
 impossible, but that Nift was better when it did not own them.
 
 The stripped core centered on a very small composition model including
-`@content`, `@input`, `@pathto`, metadata values, and a few explicit operations.
+`@content`, `@input`, `@path`, metadata values, and a few explicit operations.
 It remained capable of building substantial sites and became dramatically
 smaller and easier to reason about. This changed the project's self-understanding:
 capability did not require accumulating a large Nift-specific language.
@@ -60,7 +60,7 @@ The language should remain a build/rendering language rather than general
 scripting. A useful model is:
 
 ```text
-operations: @input, @dep, @json, @pathto, ...
+operations: @input, @dep, @json, @path, ...
 values:     $[...]
 ```
 

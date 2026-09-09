@@ -101,7 +101,7 @@ data is not reparsed. Interpolation is one pass and side-effect-free. Arbitrary
 `@...` operations and dynamic binding identifiers remain outside the feature.
 
 Eligible textual positions are `@input`, every `@dep` argument,
-`@pathto`/`@pathtofile`, `@getenv`, `@ent`, and the `@json` source and optional
+`@path`/`@pathtofile`, `@getenv`, `@ent`, and the `@json` source and optional
 schema. The `@json` binding identifier, `@content`, `@if`, and `@for` grammar are
 not interpolated. Scalars become text; arrays, objects, malformed expressions,
 and unknown roots fail through controlled parser errors. `\$` preserves a

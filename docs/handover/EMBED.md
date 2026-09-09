@@ -50,15 +50,15 @@ should be incapable of using real Nift project state.
 
 An Engine associated with an actual Nift project should eventually be able to
 consume that project's `.nift/tracked.json` and obtain the same named-output
-semantics for `@pathto` as the CLI:
+semantics for `@path` as the CLI:
 
 ```text
 standalone Engine
-    -> no tracking assumed; @pathto uses concrete-project semantics
+    -> no tracking assumed; @path uses concrete-project semantics
 
 Engine attached to Nift project/tracking
     -> real tracked-name resolution
-    -> normal @pathto semantics
+    -> normal @path semantics
 ```
 
 This is the preferred path for SSR/server integration and the eventual Node
@@ -83,7 +83,7 @@ RenderResult render(std::string_view page_name, const Context& context);
 
 Semantics: look up the page in the attached project's `.nift/tracked.json`,
 find its content/template/output metadata, render through the same shared core,
-and return the result. `@pathto("about")` then works naturally because the
+and return the result. `@path("about")` then works naturally because the
 Engine instance holds the real tracked-name -> output mapping; `@input`,
 contracts, dependencies and runtime values compose through the existing core.
 
@@ -106,7 +106,7 @@ app.get("/user/:id", async (req, res) =>
 
 Implemented (PA3): `Engine(project_root)` loads the validated immutable
 snapshot; `render("about"[, context])` drives the same `Parser(host, info).render()`
-path the CLI uses, so content/template composition, `@pathto`, `@input`,
+path the CLI uses, so content/template composition, `@path`, `@input`,
 `@json`, contracts, pagination, dependencies and requirements match the CLI
 exactly (see the PA1–PA6 programme below and the conformance corpus).
 
@@ -169,7 +169,7 @@ consumes a read-only snapshot and never becomes the build system.
   It supplies the existing Parser with project-backed content/template/input
   loading (`read_shared_source`), JSON loading (`read_shared_json`), contracts
   (`is_contract_name`/`contract_source`), tracked output lookup
-  (`tracked_output_path`), current-output geometry for `@pathto` incl. the 404
+  (`tracked_output_path`), current-output geometry for `@path` incl. the 404
   rule (`output_path`, `output_dir`, `has_output_context()=true`), and
   pagination source/geometry (`pagination_output_path`, `build_threads`), plus
   per-render host bindings (`binding`). Preserved: zero project writes, no
@@ -177,7 +177,7 @@ consumes a read-only snapshot and never becomes the build system.
   existing rendering semantics, and the concurrency contract (snapshot read
   caches are mutex-protected). Evidence: `tests/project_host.cpp` renders a
   real project through `Parser(host, info).render()` exactly as the CLI's
-  `build_one` does and asserts byte-identical output for tracked `@pathto`
+  `build_one` does and asserts byte-identical output for tracked `@path`
   (confirmed against the actual `nift` CLI build, incl. `blog=blog/` and the
   404 root-absolute rule), contracts, host bindings, `@input`, `@json` and 3
   pagination pages; plus zero-write tree snapshots and 8-thread concurrent
@@ -191,7 +191,7 @@ consumes a read-only snapshot and never becomes the build system.
   `is_open()`/`open_error()` for construction status; default `Engine()` stays
   deterministic standalone (no implicit discovery). `render("page-name"[, context])`
   drives the same `Parser(host, info).render()` path the CLI uses, so
-  `@pathto`/404, `@input`, `@json`, contracts, pagination, dependencies and
+  `@path`/404, `@input`, `@json`, contracts, pagination, dependencies and
   requirements match the CLI exactly. Controlled failures (never throws, never
   prints): non-project root, invalid config/tracking, unknown page name, and
   render failures all surface as RenderResult errors (`open_error()` is
@@ -201,7 +201,7 @@ consumes a read-only snapshot and never becomes the build system.
   project defines the current output (Context current_output ignored). Context
   title overrides the tracked title; the environment provider flows through
    ProjectHost. Dependency/requirement reporting is live on the public result
-   (`result.dependencies()`/`result.requirements()`), e.g. `@pathto` emits its
+   (`result.dependencies()`/`result.requirements()`), e.g. `@path` emits its
    destination as a requirement. Pagination contract (decided at PA5, not open):
    `render("blog/")` returns the primary pagination output only; explicit
    arbitrary page selection is outside the current project-aware v1 API. No
@@ -259,7 +259,7 @@ consumes a read-only snapshot and never becomes the build system.
     because two C++ paths agree. Cases: `comprehensive` (tracked-name lookup,
     index/trailing-slash geometry, content/template composition, metadata
     title/name/content-path/output-path, `@input`, `@json`, contracts, tracked
-    + concrete `@pathto`, 404 root-absolute geometry, pagination primary page,
+    + concrete `@path`, 404 root-absolute geometry, pagination primary page,
     dependencies, requirements), `schema` (JSON schema validation + schema/data
     dependency recording), `getenv` (default process-environment semantics,
     driver sets the variable for both).
@@ -299,9 +299,9 @@ consumes a read-only snapshot and never becomes the build system.
 - Snapshot semantics: project state read once at construction; serves a stable
   snapshot for all concurrent renders; never watches, never writes.
 - Page-name lookup: exact tracked name; `/` and trailing `/` map to index (same
-  geometry as the CLI). Unknown name → dedicated error (distinct from `@pathto`
+  geometry as the CLI). Unknown name → dedicated error (distinct from `@path`
   404 rule).
-- Current output: the page's own `output_path`, so `@pathto`/404 behave like the
+- Current output: the page's own `output_path`, so `@path`/404 behave like the
   CLI.
 - Failure mode: controlled render/state errors for missing/malformed/stale
   project state; never crashes.
@@ -371,14 +371,14 @@ consumes a read-only snapshot and never becomes the build system.
   This mirrors the `@input` no-cwd guard decision and should be settled
   deliberately (likely: require a root, or define empty-root containment as
   no-containment) in a later checkpoint; it is not claimed as a contract yet.
-- **CP5** (`2266ca2`): `@pathto`/`@pathtofile` through the host path capability.
+- **CP5** (`2266ca2`): `@path`/`@pathtofile` through the host path capability.
   `RenderHost` replaces the parser's tracked lookup with `has_output_context()`
   and `tracked_output_path(name)` (CLI resolves tracked names; the embedded
   engine, with no tracking attached, treats every argument as a concrete
   project path — it must not invent tracked state; a project-backed Engine host
   can later implement `tracked_output_path` from `.nift/tracked.json`, see the
   project-attached requirement above). The per-render `Context::set_current_output` supplies the
-  current output location; without it `@pathto` errors rather than guessing.
+  current output location; without it `@path` errors rather than guessing.
   The shared relative-path computation, the 404 rule (page name "404" ->
   root-absolute web paths), requirements recording and concrete-path existence
   (via `source_exists`) are unchanged. Deferred to API hardening (CP7c): a
@@ -440,7 +440,7 @@ consumes a read-only snapshot and never becomes the build system.
   regression in `tests/engine_project.cpp`).
 - **Loaders**: repeatable lookup functions (probe then read), may be called
   concurrently, must be thread-safe.
-- **`@pathto`**: requires `Context::set_current_output` (and page name for the
+- **`@path`**: requires `Context::set_current_output` (and page name for the
   404 rule); errors without it; the 404 rule yields root-absolute web paths;
   standalone rendering has no tracked pages (concrete-project semantics);
   requirements are recorded in `RenderResult::requirements()`.
@@ -512,7 +512,7 @@ and accumulated evidence, classified rather than silently changed.
 - **ASAN-FLAKE-001**: single historical GCC/ASan stack-instrumentation finding;
   structurally in-bounds, not reproduced in 100k+ constructions, no
   corroborating corruption. Retained; reopen-and-preserve-report on reappearance.
-- **Empty-root containment**: `@json`/`@dep`/`@pathto` containment with an
+- **Empty-root containment**: `@json`/`@dep`/`@path` containment with an
   empty Engine root derives meaning from the process working directory via
   `path_within`; preserved, to be settled deliberately in spec work. Standalone
   only: a project-aware Engine always has a real snapshot root, so this does

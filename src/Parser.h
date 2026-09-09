@@ -76,6 +76,6 @@ private:
                        char open_char,
                        char close_char,
                        std::size_t& close_position) const;
-    std::string path_to(const std::string& argument);
+    std::string path_to(const std::string& argument, const std::string& directive);
     void fail(const std::filesystem::path& source_path, const std::string& source, std::size_t offset, const std::string& message);
 };

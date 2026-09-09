@@ -5,6 +5,6 @@
 <p>site=$[site.name]</p>
 @json(d, 'data/items.json')
 @for(x : d.items){<span>$[x.name]</span>}
-<p>home=@pathto("/")</p>
-<p>blog=@pathto("blog/")</p>
-<p>appjs=@pathto('public/app.js')</p>
+<p>home=@path("/")</p>
+<p>blog=@path("blog/")</p>
+<p>appjs=@path('public/app.js')</p>

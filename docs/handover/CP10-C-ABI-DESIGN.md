@@ -72,7 +72,7 @@ the frozen C++ contract. Every exported function contains C++ exceptions
 
 ## 5. Context / bindings
 
-Context carries per-render page identity, current output (for `@pathto`),
+Context carries per-render page identity, current output (for `@path`),
 title, and string/int/bool/JSON bindings. Engine carries long-lived defaults
 and bindings. `set_json` accepts UTF-8 JSON text (pointer+length); malformed
 JSON is `NIFT_ERROR_INVALID_ARGUMENT`. No Jsonic type is exposed — a host

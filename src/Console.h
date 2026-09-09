@@ -179,7 +179,7 @@ inline bool known_nift_function(std::string_view name) {
         "content", "pathtopage",
         "filter", "map", "sort", "slice", "find", "some", "every",
         "distinct", "reverse", "sum", "prod", "min", "max", "reduce",
-        "substr", "join", "input", "pathto", "pathtofile", "getenv",
+        "substr", "join", "input", "path", "pathto", "pathtofile", "getenv",
         "ent", "json", "dep",
         "if", "for", "item", "paginate"
     };
@@ -300,7 +300,7 @@ inline std::string highlight_nift_source(const std::string& line,
 
         // Colour quotes only while lexically inside a Nift @function call.
         // This deliberately leaves ordinary HTML attributes such as class="x"
-        // alone while still highlighting @input('x') / @pathto("x").
+        // alone while still highlighting @input('x') / @path("x").
         if (nift_call_depth && (line[i] == '\'' || line[i] == '"')) {
             const char quote = line[i];
             std::size_t end = i + 1;

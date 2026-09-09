@@ -1329,10 +1329,10 @@ bool Parser::evaluate_condition(const std::string& expression, bool& value, std:
     return eval(expression, value);
 }
 
-std::string Parser::path_to(const std::string& argument) {
+std::string Parser::path_to(const std::string& argument, const std::string& directive) {
     if (!host_.has_output_context()) {
         result_.ok = false;
-        result_.error = {tracked_info_.name, {}, 0, "@pathto requires a path context; set the current output on the render context to resolve '" + argument + "'"};
+        result_.error = {tracked_info_.name, {}, 0, "@" + directive + " requires a path context; set the current output on the render context to resolve '" + argument + "'"};
         return {};
     }
     const fs::path output = host_.output_path(tracked_info_);
@@ -1348,7 +1348,7 @@ std::string Parser::path_to(const std::string& argument) {
         destination = (host_.root() / argument).lexically_normal();
         if (!filesystem::path_within(host_.root(), destination)) {
             result_.ok = false;
-            result_.error = {tracked_info_.name, {}, 0, "pathto: path must stay inside the Nift project: " + argument};
+            result_.error = {tracked_info_.name, {}, 0, directive + ": path must stay inside the Nift project: " + argument};
             return {};
         }
         if (!host_.source_exists(destination)) {
@@ -2385,7 +2385,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 continue;
             }
 
-            if (function == "pathto" || function == "pathtofile") {
+            if (function == "path" || function == "pathto" || function == "pathtofile") {
                 if (!has_parameters || parameters.size() != 1) { fail(source_path, source, i, "@" + function + " expects exactly one path/name"); break; }
                 std::string resolved, interpolation_error;
                 if (!interpolate_parameter(parameters[0], resolved, interpolation_error)) {
@@ -2401,7 +2401,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     }
                 }
 
-                output += path_to(parameters[0]);
+                output += path_to(parameters[0], function);
                 if (!result_.ok) { if (result_.error.source_file.empty()) fail(source_path, source, i, result_.error.message); break; }
                 fs::path requirement;
                 if (const auto target = host_.tracked_output_path(parameters[0])) requirement = target->path;

@@ -357,7 +357,7 @@ A user may see:
 ```text
 @content
 @input(...)
-@pathto(...)
+@path(...)
 $[...]
 ```
 
@@ -503,16 +503,16 @@ Verify current syntax before preserving this as current documentation.
 
 ---
 
-## `@pathto` semantics
+## `@path` semantics
 
 This was repeatedly misunderstood during earlier work.
 
-The important conceptual distinction is that `@pathto` participates in Nift's build-aware path/requirement model.
+The important conceptual distinction is that `@path` participates in Nift's build-aware path/requirement model.
 
 Do not casually teach:
 
 ```text
-@pathto("public/generated-output.html")
+@path("public/generated-output.html")
 ```
 
 when the directive semantically expects a tracked name.
@@ -520,7 +520,7 @@ when the directive semantically expects a tracked name.
 Historically, tracked-file references should use names such as:
 
 ```text
-@pathto("work")
+@path("work")
 ```
 
 rather than generated output paths.
@@ -564,7 +564,7 @@ Its goals included:
 ```text
 give an AI enough context to use Nift correctly
 provide a barebones project
-show correct @pathto usage
+show correct @path usage
 show @input
 show environment/value usage
 encourage project-local AI context
@@ -861,7 +861,7 @@ The suite grew to cover areas including:
 ```text
 @content
 @input
-@pathto
+@path
 metadata/value access
 escaping
 quoting

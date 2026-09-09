@@ -113,7 +113,7 @@ C. Where is `$[...]` parsed when it occurs in ordinary template output?
 
 D. Where does `$[...]` resolve metadata / JSON / lexical bindings?
 
-E. Where do @input/@dep/@json/@pathto register their dependency or
+E. Where do @input/@dep/@json/@path register their dependency or
    requirement side effects?
 ```
 
@@ -805,7 +805,7 @@ For example, conceptually:
 | ------------- | -------------------------- | ----------------- | ---------------------------------------- |
 | `@input`      | path                       | textual/path      | yes                                      |
 | `@dep`        | path                       | textual/path      | yes                                      |
-| `@pathto`     | name/path                  | textual           | yes                                      |
+| `@path`     | name/path                  | textual           | yes                                      |
 | `@pathtofile` | path                       | textual/path      | probably yes if still applicable         |
 | `@json`       | source path                | textual/path      | yes                                      |
 | `@json`       | binding name               | identifier        | no                                       |
@@ -990,7 +990,7 @@ Still test it explicitly.
 
 # 33. Requirements likewise should refresh
 
-For `@pathto`-style requirements:
+For `@path`-style requirements:
 
 ```text
 asset selector = app-a.js
@@ -1895,7 +1895,7 @@ Verify loaded data comes from resolved file.
 
 ---
 
-# 77. Contract: dynamic `@pathto`
+# 77. Contract: dynamic `@path`
 
 Verify textual path/name generation and requirement semantics.
 
@@ -1986,7 +1986,7 @@ Keep representative old tests around:
 ```text
 @input('header.html')
 @dep('data.json')
-@pathto('docs')
+@path('docs')
 ```
 
 This is mostly covered by the existing suite, but new focused comparison tests can make feature regressions easier to diagnose.
@@ -2118,7 +2118,7 @@ The output may not change directly, so assertions should focus on rebuild decisi
 
 # 96. Dynamic requirement lifecycle
 
-For `@pathto`/concrete requirement:
+For `@path`/concrete requirement:
 
 ```text
 selector = asset-a.js
@@ -2727,7 +2727,7 @@ Once `@input` proves the approach:
 
 ```text
 @dep
-@pathto
+@path
 @json source path
 other textual arguments
 ```
@@ -3040,7 +3040,7 @@ Scope:
 @json path:
     file/function
 
-@pathto:
+@path:
     file/function
 
 Dependency registration:
@@ -3302,7 +3302,7 @@ If the current source already exposes value resolution independently from output
 
 If it does not, a modest extraction there is the refactor I would consider justified.
 
-Everything else—the dependency graph, `@input`, `@dep`, `@json`, `@pathto`, path validation, transaction handling—should ideally see only the final resolved string and behave exactly as it already does.
+Everything else—the dependency graph, `@input`, `@dep`, `@json`, `@path`, path validation, transaction handling—should ideally see only the final resolved string and behave exactly as it already does.
 
 That is both the simplest implementation and the one least likely to undermine the architecture we spent so much time hardening.
 

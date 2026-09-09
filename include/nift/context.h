@@ -26,7 +26,7 @@ inline bool valid_binding_identifier(const std::string& name) {
     });
 }
 
-// Structural built-ins describe the render's own geometry and feed @pathto and
+// Structural built-ins describe the render's own geometry and feed @path and
 // dependency spelling; they must never be shadowed by host values.
 inline bool structural_builtin_name(const std::string& name) {
     static const std::set<std::string> names = {
@@ -51,9 +51,9 @@ class Context {
 public:
     void set_page_name(std::string name) { page_name_ = std::move(name); }
 
-    // The generated output location of the current page, used by @pathto to
+    // The generated output location of the current page, used by @path to
     // compute relative paths (and by the 404 rule for root-absolute paths).
-    // Without it, @pathto has no path context and errors.
+    // Without it, @path has no path context and errors.
     void set_current_output(std::filesystem::path output) { current_output_ = std::move(output); }
 
     // set_title and set("title", ...) write the same per-render title slot:

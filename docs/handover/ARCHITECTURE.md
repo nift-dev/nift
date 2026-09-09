@@ -57,7 +57,7 @@ Project contracts add a third checked relationship at the value layer: configure
 
 Dependencies and requirements are separate contracts. Content, templates,
 `@input`, JSON/schema sources, `@dep`, and user `.deps.json` data contribute to
-dependency invalidation. `@pathto`/`@pathtofile` add requirements. For concrete
+dependency invalidation. `@path`/`@pathtofile` add requirements. For concrete
 project paths, continued existence is checked without making ordinary content
 changes rebuild the referring page. For tracked-name targets, the tracked item
 owns its own build state: a temporarily missing or failed producer output does not
@@ -163,7 +163,7 @@ A TrackedInfo-like record connects logical tracked identity to content, template
 derived output, metadata, and build state. A tracked name such as
 docs/getting-started is not the same semantic object as its derived output
 public/docs/getting-started.html. Keep this distinction visible, especially in
-path-facing APIs such as @pathto.
+path-facing APIs such as @path.
 
 Derived content and output paths require central collision validation: tracked
 items may collide with each other, authored content, generated output, or Nift
@@ -235,7 +235,7 @@ contributes rendered bytes and records a
 content dependency; included-file state may prevent recursive cycles. @dep
 records an external content dependency without rendering it. @json loads
 build-time data, establishes a
-lexical binding, and records the data file as a dependency. @pathto commonly
+lexical binding, and records the data file as a dependency. @path commonly
 records a requirement rather than a content dependency.
 
 JSON and loops use lexical scope:
@@ -456,7 +456,7 @@ TrackedInfo and path derivation
 Parser entry, text scanning, @ dispatch, $ dispatch, and block parsing
 $ expression parsing, value representation, resolution, and output emission
 scope frames, JSON ownership, loops, push/pop, and lookup
-@content, @input, @dep, @json, and @pathto
+@content, @input, @dep, @json, and @path
 dependency and requirement sets, sidecars, and commit timing
 incremental selection, hashes, mtimes, and convergence
 watch initialization and reconciliation
@@ -468,7 +468,7 @@ parallel build and diagnostic synchronization
 
 Trace four templates through source: metadata value output, literal @input, @json
 binding, and a current-syntax loop over JSON. Then trace one mixed incremental
-build and its sidecar state, one stable @pathto requirement through byte change and
+build and its sidecar state, one stable @path requirement through byte change and
 disappearance, one filesystem mutation from CLI through commit, and the 10,000-item
 collision-validation path.
 

@@ -23,7 +23,7 @@ for MODE in modified hash hybrid; do
   printf '%s\n' '{"type":"object","properties":{"value":{"type":"integer","maximum":10}}}' >"$P/schemas/site.json"
   cat >"$P/templates/template.html" <<'EOF'
 @json(site, "schemas/site.json", "data/site.json")
-<a href="@pathto('public/assets/a.txt')">$[site.value]</a>
+<a href="@path('public/assets/a.txt')">$[site.value]</a>
 @content
 EOF
   (cd "$P" && "$NIFT_BIN" build --all >/dev/null)
@@ -64,7 +64,7 @@ EOF
   cat >"$P/templates/template.html" <<'EOF'
 @json(site, "data/site.json")
 <span>$[site.value]</span>
-<a href="@pathto('public/assets/a.txt')">asset</a>
+<a href="@path('public/assets/a.txt')">asset</a>
 @content
 EOF
   (cd "$P" && "$NIFT_BIN" build >/dev/null)

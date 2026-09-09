@@ -22,10 +22,10 @@ printf 'x\n' >"$P/public/assets/a.txt"
 printf 'y\n' >"$P/public/assets/skipped.txt"
 cat >"$P/content/index.html" <<'EOF'
 @json(data, "data.json")
-<a href="@pathto('public/assets/a.txt')">A</a>
-<a href="@pathto('public/assets/a.txt')">A again</a>
-@if(false){<a href="@pathto('public/assets/skipped.txt')">skip</a>}
-@for(x : data.items){<i>@pathto('public/assets/a.txt')</i>}
+<a href="@path('public/assets/a.txt')">A</a>
+<a href="@path('public/assets/a.txt')">A again</a>
+@if(false){<a href="@path('public/assets/skipped.txt')">skip</a>}
+@for(x : data.items){<i>@path('public/assets/a.txt')</i>}
 EOF
 printf '{"items":[1,2,3]}\n' >"$P/data.json"
 (cd "$P" && "$NIFT_BIN" build --all >/dev/null)
@@ -69,7 +69,7 @@ python3 -S - "$P/.nift/tracked.json" <<'PY'
 import json,sys
 p=sys.argv[1]; d=json.load(open(p)); d["tracked"].append({"name":"about","title":"About","template":"templates/template.html"}); json.dump(d,open(p,"w"))
 PY
-printf '<a href="@pathto('"'"'about'"'"')">About</a>\n' >"$P/content/index.html"
+printf '<a href="@path('"'"'about'"'"')">About</a>\n' >"$P/content/index.html"
 printf '<p>about</p>\n' >"$P/content/about.html"
 # Build only the referrer first so its recorded requirement points at an output
 # that has never existed. A normal incremental build should then build only about.

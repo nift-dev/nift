@@ -265,7 +265,7 @@ The stripped architecture initially centered heavily around a tiny set of operat
 ```text
 @content
 @input(...)
-@pathto(...)
+@path(...)
 $[...]
 ```
 
@@ -296,7 +296,7 @@ Someone sees:
 ```text
 @content
 @input
-@pathto
+@path
 $[...]
 ```
 
@@ -557,7 +557,7 @@ Nift operations:
     @input(...)
     @dep(...)
     @json(...)
-    @pathto(...)
+    @path(...)
 
 Nift values:
     $[...]
@@ -607,7 +607,7 @@ For example:
 or:
 
 ```text
-@pathto(@dep('foo.txt'))
+@path(@dep('foo.txt'))
 ```
 
 This creates immediate semantic problems.
@@ -661,7 +661,7 @@ This enables things like:
 
 @input('partials/$[page.layout].html')
 
-@pathto('$[manifest.dir]/$[manifest.file]')
+@path('$[manifest.dir]/$[manifest.file]')
 
 @dep('generated/$[release]/$[dataset].json')
 ```
@@ -806,11 +806,11 @@ Documentation and examples should use the current convention unless discussing h
 
 ---
 
-# 24. `@pathto` is more than string concatenation
+# 24. `@path` is more than string concatenation
 
 **Status: IMPORTANT SEMANTIC PRINCIPLE**
 
-One reason `@pathto` matters is that it can validate relationships during generation.
+One reason `@path` matters is that it can validate relationships during generation.
 
 The React/Vite experiment produced a particularly good demonstration.
 
@@ -819,7 +819,7 @@ Given:
 ```html
 <script
   type="module"
-  src="@pathto('public/assets/app.js')">
+  src="@path('public/assets/app.js')">
 </script>
 ```
 
@@ -2312,7 +2312,7 @@ This is stronger evidence than merely claiming the syntax looks easy for AI.
 
 **Status: EMERGING HYPOTHESIS**
 
-An interesting lesson from `@pathto` is that an agent cannot as easily hallucinate an internal asset path and still get a green build.
+An interesting lesson from `@path` is that an agent cannot as easily hallucinate an internal asset path and still get a green build.
 
 Instead:
 
@@ -3217,7 +3217,7 @@ This is the compact part Codex should refer back to when historical discussion i
 | Unknown CSS-style `@...` pass-through            | **CURRENT/DELIBERATE**                | Nift should coexist with normal CSS                       |
 | Backtick as Nift quote                           | **REJECTED**                          | Single/double quotes only                                 |
 | `public/` output convention                      | **SETTLED CURRENT CONVENTION**        | Use in modern docs/examples                               |
-| `@pathto` validation                             | **CORE SEMANTIC VALUE**               | Catch broken internal references                          |
+| `@path` validation                             | **CORE SEMANTIC VALUE**               | Catch broken internal references                          |
 | Requirement vs content dependency                | **CORE MODEL**                        | Preserve distinction                                      |
 | Missing rebuild vs extra rebuild                 | **SETTLED PRIORITY**                  | Correctness first                                         |
 | Persisted state trusted because Nift wrote it    | **REJECTED ASSUMPTION**               | Always validate                                           |

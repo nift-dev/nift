@@ -485,7 +485,7 @@ output/
 LuaJIT
 ExprTk
 @pathtopage
-old @pathto examples
+old @path examples
 backtick quoting
 old Sift naming
 static site generator
@@ -700,7 +700,7 @@ rather than prose invented from memory.
 This became especially important after mistakes involving:
 
 ```text
-@pathto
+@path
 tracked names
 concrete output paths
 ```
@@ -709,7 +709,7 @@ If practical, use examples taken from real fixtures/projects.
 
 ---
 
-# 24. `@pathto` documentation was repeatedly corrected
+# 24. `@path` documentation was repeatedly corrected
 
 One recurring misunderstanding was using generated paths where Nift expected a tracked name.
 
@@ -719,7 +719,7 @@ This taught us:
 
 Codex should be alert to this when updating examples for `$[...]` interpolation.
 
-For example, do not create a dynamic `@pathto` example unless it is semantically valid for the current argument type.
+For example, do not create a dynamic `@path` example unless it is semantically valid for the current argument type.
 
 ---
 
@@ -1519,7 +1519,7 @@ Examples:
 call Nift website generator
 do not foreground removed scripting
 @dep is advanced
-@pathto examples must use correct semantic category
+@path examples must use correct semantic category
 public/ is modern convention
 minification is opt-in
 AI claims should be evidence-based

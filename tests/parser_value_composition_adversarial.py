@@ -4,7 +4,7 @@
 Guarantee: adversarial parser inputs and value/composition interactions —
 truncated or invalid JSON bound through @json, deep nesting, type mismatches,
 missing/null/coerced values, unicode, missing or cyclic @input fragments, and
-@pathto edge cases — must resolve with a controlled outcome: a successful
+@path edge cases — must resolve with a controlled outcome: a successful
 build with correct output, or a controlled non-zero error. A hang, a signal
 termination (segfault etc.), a sanitizer finding, or silently wrong output is a
 defect this guard flags.
@@ -72,7 +72,7 @@ CASES = [
     ("input-missing", "@input('missing.html')\n@content\n", '{}', {}, False, None),
     ("input-cyclic", "@input('frag.html')\n@content\n", '{}',
      {'templates/frag.html': '@input("template.html")\n'}, False, None),
-    ("pathto-missing", '<a href="@pathto(\'nope\')">x</a>\n@content\n', '{}', {}, False, None),
+    ("pathto-missing", '<a href="@path(\'nope\')">x</a>\n@content\n', '{}', {}, False, None),
     ("for-over-object", "@json(site, 'data/site.json')\n@for(k:site.obj){<i>$[k]</i>}\n@content\n",
      '{"obj":{"a":1,"b":2}}', {}, False, None),
 ]

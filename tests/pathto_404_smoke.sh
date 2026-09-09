@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# @pathto on the tracked page named `404` must emit root-absolute web paths,
+# @path on the tracked page named `404` must emit root-absolute web paths,
 # because a deployed 404 document is served at arbitrary request depth and has
 # no meaningful relative location. Every existence/dependency-checking property
 # is unchanged: only the path representation differs. Ordinary pages keep the
@@ -31,14 +31,14 @@ printf 'css\n' >"$P/content/assets/css/style.css"
 
 fail() { echo "pathto-404 FAIL: $*" >&2; exit 1; }
 
-# The 404 page: every @pathto must be root-absolute.
+# The 404 page: every @path must be root-absolute.
 cat >"$P/content/404.html" <<'EOF'
-<a href="@pathto('/')">Home</a>
-<a href="@pathto('about')">About</a>
-<a href="@pathto('docs')">Docs</a>
-<a href="@pathto('docs/getting-started')">Start</a>
-<a href="@pathto('guides/')">Guides</a>
-<link rel="stylesheet" href="@pathto('assets/css/style')">
+<a href="@path('/')">Home</a>
+<a href="@path('about')">About</a>
+<a href="@path('docs')">Docs</a>
+<a href="@path('docs/getting-started')">Start</a>
+<a href="@path('guides/')">Guides</a>
+<link rel="stylesheet" href="@path('assets/css/style')">
 EOF
 (cd "$P" && "$NIFT_BIN" build --all >log 2>&1) || { echo "log:"; cat "$P/log"; fail "404 project did not build"; }
 for want in 'href="/"' 'href="/about.html"' 'href="/docs.html"' \
@@ -49,9 +49,9 @@ done
 
 # A normal page must keep relative paths.
 cat >"$P/content/index.html" <<'EOF'
-<a href="@pathto('/')">Home</a>
-<a href="@pathto('docs/getting-started')">Start</a>
-<link rel="stylesheet" href="@pathto('assets/css/style')">
+<a href="@path('/')">Home</a>
+<a href="@path('docs/getting-started')">Start</a>
+<link rel="stylesheet" href="@path('assets/css/style')">
 EOF
 (cd "$P" && "$NIFT_BIN" build --all >/dev/null 2>&1) || fail "normal page did not build"
 grep -Fq 'href="./"' "$P/public/index.html" || grep -Fq 'href="./index.html"' "$P/public/index.html" \
@@ -62,9 +62,9 @@ grep -Fq 'href="assets/css/style.css"' "$P/public/index.html" \
   || fail "normal page asset link is not relative"
 
 # Existence/dependency checking must be intact on the 404 page too.
-printf '<a href="@pathto('"'"'missing'"'"')">x</a>\n' >"$P/content/404.html"
-(cd "$P" && "$NIFT_BIN" build --all >log 2>&1) && fail "404 @pathto to a missing target was accepted"
+printf '<a href="@path('"'"'missing'"'"')">x</a>\n' >"$P/content/404.html"
+(cd "$P" && "$NIFT_BIN" build --all >log 2>&1) && fail "404 @path to a missing target was accepted"
 grep -Fq "neither a tracked name nor a file that exists" "$P/log" \
-  || fail "404 @pathto missing-target did not report the usual existence error (got: $(cat "$P/log" 2>/dev/null))"
+  || fail "404 @path missing-target did not report the usual existence error (got: $(cat "$P/log" 2>/dev/null))"
 
 echo "pathto-404 smoke test passed: 404 paths are root-absolute; ordinary pages stay relative; checking intact"

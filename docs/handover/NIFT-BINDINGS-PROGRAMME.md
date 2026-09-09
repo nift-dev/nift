@@ -202,7 +202,7 @@ print(result.output)
 ```
 
 onto ABI calls, and must not know how `@for`, `$[...]`, contracts, pagination or
-`@pathto` work. Design rule: **if a binding starts knowing those things, we have
+`@path` work. Design rule: **if a binding starts knowing those things, we have
 designed it wrong.**
 
 ### 3. Per-binding conformance gate (non-negotiable)

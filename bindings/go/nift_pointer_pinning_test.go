@@ -105,7 +105,7 @@ func TestPointerPinningContextSetters(t *testing.T) {
 	if r.Output != strings.Join(expected, "|") {
 		t.Fatalf("context-bindings render: got %q want %q", r.Output, strings.Join(expected, "|"))
 	}
-	// SetCurrentOutput is observable through @pathto (relative to the output
+	// SetCurrentOutput is observable through @path (relative to the output
 	// location), on a plain filesystem engine like the C++ engine_pathto test.
 	fsRoot := t.TempDir()
 	if err := os.WriteFile(filepath.Join(fsRoot, "index.html"), []byte("<h1>home</h1>"), 0o644); err != nil {
@@ -121,12 +121,12 @@ func TestPointerPinningContextSetters(t *testing.T) {
 	defer pctx.Close()
 	pctx.SetCurrentOutput(filepath.Join(fsRoot, "index.html"))
 	pt, err := pe.RenderSources(RenderSource{Text: "page"},
-		RenderSource{Text: `<a href="@pathto('about.html')">A</a>@content`}, pctx)
+		RenderSource{Text: `<a href="@path('about.html')">A</a>@content`}, pctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !pt.OK || pt.Output != `<a href="./about.html">A</a>page` {
-		t.Fatalf("context current_output via @pathto: ok=%v out=%q err=%+v", pt.OK, pt.Output, pt.Error)
+		t.Fatalf("context current_output via @path: ok=%v out=%q err=%+v", pt.OK, pt.Output, pt.Error)
 	}
 	// SetTitle is observable through a composed render's template.
 	tt, err := e.RenderSources(RenderSource{Text: "page"}, RenderSource{Text: "<h1>$[title]</h1>@content"}, ctx)

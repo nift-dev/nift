@@ -78,7 +78,7 @@ public:
 
     // Project-aware rendering by tracked page name, e.g. render("about").
     // The page's content/template/output geometry comes from the project
-    // snapshot; @pathto, @input, @json, contracts, dependencies, requirements
+    // snapshot; @path, @input, @json, contracts, dependencies, requirements
     // and pagination behave exactly like the CLI. The page-name argument is
     // authoritative (Context::set_page_name is ignored) and the project defines
     // the current output (Context::set_current_output is ignored). Context
@@ -158,8 +158,8 @@ public:
     // never inferred from filesystem state). The single-Source forms below are
     // standalone partials.
     //
-    // @pathto requires a path context: set Context::set_current_output (and
-    // Context::set_page_name for the 404 rule). Without it, @pathto errors
+    // @path requires a path context: set Context::set_current_output (and
+    // Context::set_page_name for the 404 rule). Without it, @path errors
     // rather than guessing a location.
     RenderResult render(const Source& page, const Source& page_template);
     RenderResult render(const Source& page, const Source& page_template, const Context& context);

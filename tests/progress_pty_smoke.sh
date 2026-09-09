@@ -217,7 +217,7 @@ cat > "$P/content/bad.html" <<'EOF'
 title: Bad
 template: templates/template.html
 ---
-@pathto('../../escape')
+@path('../../escape')
 EOF
 python3 - "$P" <<'EOF'
 import json, sys

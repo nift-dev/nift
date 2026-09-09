@@ -408,7 +408,7 @@ The React-islands experiment also clarified an important Nift behavior.
 Given:
 
 ```html
-<script type="module" src="@pathto('public/assets/app.js')"></script>
+<script type="module" src="@path('public/assets/app.js')"></script>
 ```
 
 the React/Vite bundle must exist before the first Nift build because Nift refuses to bless a nonexistent concrete asset.
@@ -480,7 +480,7 @@ Historically, even substantial projects often required little more than:
 ```text
 @content
 @input(...)
-@pathto(...)
+@path(...)
 $[...]
 ```
 
@@ -533,7 +533,7 @@ operations:
     @input(...)
     @dep(...)
     @json(...)
-    @pathto(...)
+    @path(...)
 
 values:
     $[...]
@@ -740,7 +740,7 @@ Historically this included:
 ```text
 @content
 @input
-@pathto
+@path
 $[...]
 @getenv
 @ent
@@ -778,11 +778,11 @@ Nift should teach ordinary relationships through the simpler primary operations 
 
 ---
 
-# 22. `@pathto` teaching
+# 22. `@path` teaching
 
 This was one of the most error-prone parts of our own earlier documentation work.
 
-Do not casually treat `@pathto` as generic string path concatenation.
+Do not casually treat `@path` as generic string path concatenation.
 
 Its value is tied to Nift's build-aware relationship/requirement model.
 
@@ -947,7 +947,7 @@ The page included things like:
 ```text
 barebones project
 AI context prompt
-correct @pathto examples
+correct @path examples
 @input
 @getenv
 asset examples
@@ -1261,7 +1261,7 @@ The suite initially focused on core behavior such as:
 ```text
 @content
 @input
-@pathto
+@path
 metadata
 escaping
 incremental build
@@ -1658,7 +1658,7 @@ and directive integration:
 ```text
 @input
 @dep
-@pathto
+@path
 @json path argument
 other eligible textual parameters
 ```
@@ -4393,7 +4393,7 @@ Do not accidentally:
 ```text
 call Nift only a static site generator
 restore removed scripting-era messaging
-teach incorrect @pathto semantics
+teach incorrect @path semantics
 publish stale benchmark numbers
 edit generated branch as canonical source
 forget AI-facing docs

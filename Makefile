@@ -220,7 +220,7 @@ test-project-state: $(PROJECT_STATE_TEST)
 
 # PA2: ProjectHost adapts the ProjectState snapshot to RenderHost so the
 # existing Parser renders real project pages (content/template/input, JSON,
-# contracts, tracked output lookup, @pathto geometry incl. 404, pagination)
+# contracts, tracked output lookup, @path geometry incl. 404, pagination)
 # with zero writes and no build decisions.
 PROJECT_HOST_TEST := $(TEST_DIR)/project-host$(EXEEXT)
 $(PROJECT_HOST_TEST): tests/project_host.cpp $(ENGINE_CORE_OBJECTS)
@@ -427,7 +427,7 @@ test-all: test test-embed test-bindings test-build-boundary
 test: test-content test-commands test-comments test-contracts test-json \
 	test-json-schema test-console test-diagnostics test-minify \
 	test-json-schema-integration test-markup-json-directives test-pagination test-pagination-ordering \
-	test-template-optional test-requirements test-path-safety test-metadata-safety \
+	test-template-optional test-requirements test-path-alias test-path-safety test-metadata-safety \
 	test-init-targets test-init-lock test-control-flow test-cross-feature test-config-validation \
 	test-zero-mutation test-repair-campaign test-ownership-concurrency \
 	test-progress-render $(PROGRESS_PTY_TARGET) test-snap-contract test-unreadable-source
@@ -525,7 +525,7 @@ test-filesystem-boundary: $(TARGET)
 test-config-validation: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/config_validation.sh
 
-# @pathto on the tracked page `404` must emit root-absolute web paths because a
+# @path on the tracked page `404` must emit root-absolute web paths because a
 # 404 document is served at arbitrary request depth; checking is unchanged.
 test-pathto-404: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/pathto_404_smoke.sh
@@ -559,6 +559,9 @@ test-installer:
 
 test-requirements: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/requirements_smoke.sh
+
+test-path-alias: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/path_alias_smoke.sh
 
 test-path-security: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/path_security_smoke.sh
@@ -641,7 +644,7 @@ clean:
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
-.PHONY: embed go-binding csharp-binding node-binding python-binding bindings test-build-boundary test-embed test-go-binding test-csharp-binding test-node-binding test-python-binding test-bindings test-all test benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-markuppp-sync test-json test-json-schema test-console test-progress-render test-progress-pty test-snap-contract test-diagnostics test-minify test-json-schema-integration test-markup-json-directives test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke test-host-seam benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets test-init-lock test-unreadable-source install uninstall
+.PHONY: embed go-binding csharp-binding node-binding python-binding bindings test-build-boundary test-embed test-go-binding test-csharp-binding test-node-binding test-python-binding test-bindings test-all test benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-markuppp-sync test-json test-json-schema test-console test-progress-render test-progress-pty test-snap-contract test-diagnostics test-minify test-json-schema-integration test-markup-json-directives test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke test-host-seam benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-alias test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets test-init-lock test-unreadable-source install uninstall
 
 
 test-cross-feature: $(TARGET)

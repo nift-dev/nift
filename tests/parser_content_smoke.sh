@@ -45,12 +45,12 @@ cat > content/fragment.html <<'EOF'
 EOF
 
 cat > content/nested.html <<'EOF'
-<img src="@pathto('public/assets/logo.txt')" alt="$[name]">
+<img src="@path('public/assets/logo.txt')" alt="$[name]">
 @dep('data/nested-state.json')
 EOF
 
 cat > content/index.html <<'EOF'
-<a href="@pathto('public/assets/logo.txt')">asset</a>
+<a href="@path('public/assets/logo.txt')">asset</a>
 @input('fragment.html')
 @getenv('NIFT_CONTENT_TEST')
 @ent('&')
@@ -69,7 +69,7 @@ grep -F '<img src="assets/logo.txt" alt="/">' public/index.html >/dev/null
 grep -F 'from-env' public/index.html >/dev/null
 grep -F '&amp;' public/index.html >/dev/null
 
-if grep -F '@pathto(' public/index.html >/dev/null ||
+if grep -F '@path(' public/index.html >/dev/null ||
    grep -F '@input(' public/index.html >/dev/null ||
    grep -F '$[title]' public/index.html >/dev/null; then
   echo "tracked content was not fully parsed" >&2
@@ -155,7 +155,7 @@ grep -F $'<pre><code>alpha\n    beta\ngamma</code></pre>' public/index.html >/de
 }
 
 
-# @pathto(...) records resolved targets as requirements. A requirement only
+# @path(...) records resolved targets as requirements. A requirement only
 # needs to continue existing; modification alone must not invalidate the page.
 cd "$TMP"
 rm -rf .nift content templates public data
@@ -188,8 +188,8 @@ cat > templates/template.html <<'EOF'
 @content
 EOF
 cat > content/index.html <<'EOF'
-<link href="@pathto('public/assets/generated.css')" rel="stylesheet">
-<a href="@pathto('about')">About</a>
+<link href="@path('public/assets/generated.css')" rel="stylesheet">
+<a href="@path('about')">About</a>
 EOF
 cat > content/about.html <<'EOF'
 about
@@ -217,7 +217,7 @@ grep -F 'required path missing: public/assets/generated.css' status-missing.log 
 # reference is no longer needed, the normal rebuild must be allowed to succeed.
 cat > content/index.html <<'EOF'
 <p>No generated stylesheet is required any more.</p>
-<a href="@pathto('about')">About</a>
+<a href="@path('about')">About</a>
 EOF
 "$NIFT_BIN" build >/dev/null
 grep -F 'No generated stylesheet is required any more.' public/index.html >/dev/null
@@ -227,10 +227,10 @@ if grep -F 'public/assets/generated.css' .nift/public/index.info.json >/dev/null
 fi
 
 # Conversely, when source still contains the reference, reqs merely select the
-# page for rebuilding and the ordinary @pathto error is what ultimately fails.
+# page for rebuilding and the ordinary @path error is what ultimately fails.
 printf 'body{}\n' > public/assets/generated.css
 cat > content/index.html <<'EOF'
-<link href="@pathto('public/assets/generated.css')" rel="stylesheet">
+<link href="@path('public/assets/generated.css')" rel="stylesheet">
 EOF
 "$NIFT_BIN" build --all >/dev/null
 rm public/assets/generated.css

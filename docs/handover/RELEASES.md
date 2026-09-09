@@ -394,7 +394,7 @@ v4.0.6 is the first release with intentional user-facing changes since v4.0.4.
 It ships four product changes: `nift init --handover` (a canonical project-root
 `HANDOVER.md`, byte-identical to the live canonical version), generated outputs
 that preserve the source content file's permissions (executable script outputs
-stay executable), `@pathto` root-absolute web paths when rendering the tracked
+stay executable), `@path` root-absolute web paths when rendering the tracked
 page named `404`, and loud rejection of unknown `.nift/config.json` keys.
 
 ### Source and workflow

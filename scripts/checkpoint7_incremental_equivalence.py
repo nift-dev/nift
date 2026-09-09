@@ -61,7 +61,7 @@ def setup(root,mode):
     (root/"content/about.html").write_text("<p>about-0</p>\n")
     (root/"content/docs").mkdir(parents=True,exist_ok=True)
     (root/"content/docs/index.html").write_text("<p>docs-0</p>\n")
-    (root/"content/index.html").write_text('<p>home-0 <a href="@pathto(\'about\')">about</a></p>\n')
+    (root/"content/index.html").write_text('<p>home-0 <a href="@path(\'about\')">about</a></p>\n')
     run(root,"build", "--all")
 def mutate(root,rng,step):
     ops=["content","template","json","contract","schema","config_threads","dependency",

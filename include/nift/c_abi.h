@@ -177,7 +177,7 @@ void nift_context_free(nift_context* context);
 
 nift_status nift_context_set_page_name(nift_context* context, const char* name,
                                        size_t name_len);
-/* The generated output location of the current page, used by @pathto. */
+/* The generated output location of the current page, used by @path. */
 nift_status nift_context_set_current_output(nift_context* context,
                                             const char* path, size_t path_len);
 nift_status nift_context_set_title(nift_context* context, const char* title,

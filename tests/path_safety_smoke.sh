@@ -50,6 +50,6 @@ printf '{}\n' >"$P/data/local.json"
 fail_build schema-symlink 'schema path must stay inside the Nift project' '@json(x, "schemas/link.json", "data/local.json")'
 
 fail_build dep-symlink 'path must stay inside the Nift project' '@dep("data/dep-link.txt")'
-fail_build pathto-symlink 'path must stay inside the Nift project' '@pathto("public/link.txt")'
+fail_build pathto-symlink 'path must stay inside the Nift project' '@path("public/link.txt")'
 
 echo "Path safety smoke test passed"

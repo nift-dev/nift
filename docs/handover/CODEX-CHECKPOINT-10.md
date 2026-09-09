@@ -136,7 +136,7 @@ The corpus should be broad enough to cover Nift's meaningful cross-platform cont
 - template/shared `@input` invalidation;
 - JSON data and JSON Schema invalidation;
 - Project Contract source invalidation;
-- `@pathto` / requirement semantics;
+- `@path` / requirement semantics;
 - tracked entry add / move / remove lifecycle;
 - template-less tracked entries;
 - minified vs non-minified configured outputs where supported;

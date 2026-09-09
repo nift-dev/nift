@@ -325,7 +325,7 @@ A full template parser can encounter operations such as:
 @input
 @dep
 @json
-@pathto
+@path
 @content
 control flow
 ```
@@ -380,7 +380,7 @@ Can @json return anything?
 Likewise:
 
 ```text
-@pathto(@dep('foo.txt'))
+@path(@dep('foo.txt'))
 ```
 
 raises the question:
@@ -410,7 +410,7 @@ operations
     @input(...)
     @dep(...)
     @json(...)
-    @pathto(...)
+    @path(...)
     ...
 
 values
@@ -738,10 +738,10 @@ If the interpolation layer produces a text value, the outer directive should sti
 For example:
 
 ```text
-@pathto('$[something]')
+@path('$[something]')
 ```
 
-should not bypass `@pathto` validation merely because its path came from interpolation.
+should not bypass `@path` validation merely because its path came from interpolation.
 
 Likewise:
 
@@ -1159,27 +1159,27 @@ No special weaker error behavior should exist for interpolated parameters.
 
 ---
 
-# Part X — Interaction with `@pathto`
+# Part X — Interaction with `@path`
 
 ## 38. `$[...]` should be able to select dynamic paths/names where the directive normally accepts them
 
 Examples conceptually include:
 
 ```text
-@pathto($[page.destination])
+@path($[page.destination])
 ```
 
 or:
 
 ```text
-@pathto('downloads/$[name].pdf')
+@path('downloads/$[name].pdf')
 ```
 
-subject to the exact accepted argument semantics of current `@pathto`.
+subject to the exact accepted argument semantics of current `@path`.
 
 ---
 
-# 39. Interpolation must not weaken `@pathto` verification
+# 39. Interpolation must not weaken `@path` verification
 
 The resolved path/name must still pass normal:
 
@@ -1609,7 +1609,7 @@ At minimum, cover conceptual forms equivalent to:
 
 @dep('data/$[name].json')
 
-@pathto('$[path]')
+@path('$[path]')
 ```
 
 adjusted to exact current Nift syntax and fixture semantics.
@@ -1693,7 +1693,7 @@ Possible cases:
 
 ```text
 @input(@input('x'))
-@pathto(@dep('x'))
+@path(@dep('x'))
 ```
 
 The exact expected result depends on how current Nift treats malformed/unquoted argument syntax.
@@ -1763,7 +1763,7 @@ Also test malformed new JSON.
 
 # 70. Requirement-only path
 
-For something like a dynamically resolved concrete `@pathto` asset:
+For something like a dynamically resolved concrete `@path` asset:
 
 ```text
 value changes to another asset
@@ -1776,7 +1776,7 @@ resolved asset disappears
 → requirement invalidated
 ```
 
-The exact behavior depends on current `@pathto` categories.
+The exact behavior depends on current `@path` categories.
 
 Use current source/tests to distinguish tracked-name and concrete-file cases.
 
@@ -1883,7 +1883,7 @@ This feature must preserve behavior for existing templates such as:
 ```text
 @input('partials/header.html')
 @dep('data.json')
-@pathto('docs')
+@path('docs')
 ```
 
 There should be essentially zero semantic cost to users who never use `$[...]` in parameters.
@@ -2093,7 +2093,7 @@ where $[...] is currently parsed
 where values are resolved
 how lexical scope is represented
 how JSON values/types are represented
-how @input/@dep/@json/@pathto consume arguments
+how @input/@dep/@json/@path consume arguments
 how dependency/requirement sets are updated
 ```
 
@@ -2159,7 +2159,7 @@ existing $[...] tests
 existing @input tests
 existing @dep tests
 existing @json tests
-existing @pathto tests
+existing @path tests
 scope/control-flow tests
 path/traversal tests
 ```

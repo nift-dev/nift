@@ -887,7 +887,7 @@ func (c *Context) SetPageName(name string) {
 	C.nift_context_set_page_name(c.ctx, n, nl)
 }
 
-// SetCurrentOutput sets the generated output location used by @pathto.
+// SetCurrentOutput sets the generated output location used by @path.
 func (c *Context) SetCurrentOutput(path string) {
 	p, pl := goString(path)
 	var _pin runtime.Pinner

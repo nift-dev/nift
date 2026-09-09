@@ -65,7 +65,7 @@ BASES=[
   @if(false){bad}else if(true){ok}else{bad2}
   @input("fragment.html")
 }
-<a href="@pathto('public/assets/a.txt')">$[title]</a>
+<a href="@path('public/assets/a.txt')">$[title]</a>
 @content
 ''',
 '''<pre><code>@if(true){literal-ish}

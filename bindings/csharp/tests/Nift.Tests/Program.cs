@@ -296,7 +296,7 @@ internal static class Program
             : HostResult.NotFound());
         using var context = new Context();
         context.SetCurrentOutput("public/blog.html");
-        var result = engine.Render(RenderSource.Text("@pathto(\"public/script.js\")@input(\"part.html\")"), RenderSource.Text("<main>@content</main>"), context);
+        var result = engine.Render(RenderSource.Text("@path(\"public/script.js\")@input(\"part.html\")"), RenderSource.Text("<main>@content</main>"), context);
         AssertOk(result, "dep/req render");
         Assert(result.Requirements.Contains("public/script.js"), "requirement present");
         Assert(result.Dependencies.Contains("part.html"), "dependency present");

@@ -33,12 +33,12 @@ public:
     virtual std::filesystem::path output_path(const TrackedInfo& info) const = 0;
     virtual std::filesystem::path pagination_output_path(const TrackedInfo& info, std::size_t page) const = 0;
 
-    // @pathto capability.
+    // @path capability.
     //
     // has_output_context() reports whether the current page has a usable
     // output location to compute paths from. A filesystem CLI page always
     // does; an Embedded Nift render only does once the caller sets the current
-    // output on the per-render Context. If @pathto is used without it, the
+    // output on the per-render Context. If @path is used without it, the
     // parser must error rather than invent a location.
     virtual bool has_output_context() const = 0;
     struct TrackedOutput {
@@ -47,7 +47,7 @@ public:
     };
     // Output path of a tracked page name (nullopt when the name is not
     // tracked). The CLI resolves tracked names through its tracking model; an
-    // Embedded engine has no tracked pages and returns nullopt, so @pathto
+    // Embedded engine has no tracked pages and returns nullopt, so @path
     // treats every argument as a concrete project path.
     virtual std::optional<TrackedOutput> tracked_output_path(const std::string& name) const = 0;
 

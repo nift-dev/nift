@@ -73,7 +73,7 @@ canonical contract run.
 ## Testing principles
 
 - Test failure families, not vanity counts.
-- For `@pathto` requirements, distinguish concrete-path disappearance from a
+- For `@path` requirements, distinguish concrete-path disappearance from a
   tracked producer whose output is temporarily absent: the former stales the
   referrer; the latter is owned by the producer and must not create transitive
   rebuild/failure noise in referring pages.

@@ -67,7 +67,7 @@ void write_project(const fs::path& root) {
 <p>site=$[site.name]</p>
 <p>app=$[app.name]</p>
 <p>env=@getenv("PA_ENV_VAR")</p>
-<p>home=@pathto("/")</p>)");
+<p>home=@path("/")</p>)");
     write_file(root / "content/blog/index.html",
                R"(@json(d, 'data/items.json')
 @for(x : d.items){@item{$[x.name]}}
@@ -105,7 +105,7 @@ void test_open_and_defaults(const fs::path& root) {
         CHECK(contains(about.output(), "app=DefaultApp"));
         CHECK(contains(about.output(), "site=Nift"));
         CHECK(contains(about.output(), "home=./"));
-        // @pathto emits a requirement (the destination relative path) that the
+        // @path emits a requirement (the destination relative path) that the
         // public result must not discard.
         CHECK(std::find(about.requirements().begin(), about.requirements().end(), std::string("public/index.html")) != about.requirements().end());
         CHECK(std::find(about.dependencies().begin(), about.dependencies().end(), std::string("content/site.json")) != about.dependencies().end());

@@ -35,12 +35,12 @@ grep -Fq 'invalid dependency' "$P/status.log"
 grep -Fq 'invalid requirement' "$P/status.log"
 
 # A req symlink that was safe at build time but is later retargeted outside the
-# project must stop satisfying the project-local @pathto invariant.
+# project must stop satisfying the project-local @path invariant.
 P="$TMP/retarget"; mkproj "$P"
 printf 'inside\n' >"$P/public/assets/inside.txt"
 printf 'outside\n' >"$TMP/outside-target.txt"
 ln -s "inside.txt" "$P/public/assets/link.txt"
-printf '<a href="@pathto('"'"'public/assets/link.txt'"'"')">x</a>\n' >"$P/content/index.html"
+printf '<a href="@path('"'"'public/assets/link.txt'"'"')">x</a>\n' >"$P/content/index.html"
 (cd "$P" && "$NIFT_BIN" build --all >/dev/null)
 rm "$P/public/assets/link.txt"
 ln -s "$TMP/outside-target.txt" "$P/public/assets/link.txt"
@@ -56,7 +56,7 @@ mkdir -p "$P/public/inside-dir" "$TMP/outside-dir"
 printf 'inside\n' >"$P/public/inside-dir/file.txt"
 printf 'outside\n' >"$TMP/outside-dir/file.txt"
 ln -s "inside-dir" "$P/public/linkdir"
-printf '<a href="@pathto('"'"'public/linkdir/file.txt'"'"')">x</a>\n' >"$P/content/index.html"
+printf '<a href="@path('"'"'public/linkdir/file.txt'"'"')">x</a>\n' >"$P/content/index.html"
 (cd "$P" && "$NIFT_BIN" build --all >/dev/null)
 rm "$P/public/linkdir"
 ln -s "$TMP/outside-dir" "$P/public/linkdir"

@@ -13,7 +13,7 @@
 // RenderHost adapter over the read-only ProjectState snapshot (PA2). This lets
 // the existing Parser/rendering core consume real Nift project knowledge:
 // content/template/input loading, JSON loading, contracts, tracked output
-// lookup, current-output geometry for @pathto (including the 404 rule) and
+// lookup, current-output geometry for @path (including the 404 rule) and
 // pagination source/geometry.
 //
 // Like the CLI's ProjectInfoHost, a ProjectHost is a per-render host and

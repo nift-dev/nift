@@ -4,6 +4,18 @@
 
 Development in progress following the public v4.0.11 release.
 
+- Added `@path(...)` as the canonical spelling for checked project-aware paths.
+  It uses the same parser path, interpolation, escaping, tracked-output lookup,
+  project-boundary validation, requirement registration and incremental
+  invalidation behavior as the retained `@pathto(...)` compatibility spelling.
+- Migrated Nift's maintained fixtures, generated handover, examples, regression
+  mirrors, cross-platform scenarios and dogfood website to `@path(...)`, with a
+  focused compatibility contract proving old `@pathto(...)` projects retain
+  byte-identical rendering and `reqs` behavior.
+- Synchronized the embedded Minify++ development tree with the standalone
+  conformance-hardened implementation, including the HTML/JavaScript and JSX
+  correctness fixes and their smoke-test coverage.
+
 ## v4.0.11
 
 Nift 4.0.11 is a correctness and release-hardening maintenance release driven
@@ -165,7 +177,7 @@ grammar and adds an explicit repair path for interrupted builds.
 Nift 4.0.6 is the first release with intentional user-facing changes since
 v4.0.4. It adds a generated project handover for AI-assisted and
 human-directed development, preserves executable permissions on generated
-outputs, hardens `@pathto` semantics for 404 documents, and rejects unknown
+outputs, hardens `@path` semantics for 404 documents, and rejects unknown
 project configuration instead of silently ignoring it.
 
 - **`nift init --handover`.** `nift init` accepts `--handover` to write a
@@ -184,8 +196,8 @@ project configuration instead of silently ignoring it.
   executable across rebuilds, while ordinary content keeps its normal mode.
   Build metadata (`.nift/public/*.info.json`) remains read-only, and deletion of
   owned read-only artifacts remains portable across platforms.
-- **`@pathto` on a tracked page named `404`.** When rendering the tracked page
-  named `404`, `@pathto(...)` emits root-absolute web paths, because a deployed
+- **`@path` on a tracked page named `404`.** When rendering the tracked page
+  named `404`, `@path(...)` emits root-absolute web paths, because a deployed
   404 document is served at arbitrary request depth and has no meaningful
   relative location. Existence and dependency checking is unchanged; only the
   path representation differs.
@@ -245,7 +257,7 @@ from the v4.0.3→v4.0.4 development cycle.
 
 - Fixed the Checkpoint 8 transactional-writer performance regression that made large flat full builds O(n²), restored repeated 10,000-page full-build performance to the retained historical range, and added changed-output scaling guards in both the source tree and independent regression suite. Stale-temporary recovery is now epoch-scoped: each touched parent is scanned at most once per build pass, live-owner temporaries are preserved, and long-running `build-auto` sessions recover dead-owner temporaries on the next relevant build activity without requiring a restart. Added a direct scan-count guard plus a black-box test demonstrated to fail the previous once-per-process recovery implementation.
 - Fixed lazy ternary rendering of quoted string-literal branches. Expressions such as `class="card$[active ? ' active' : '']"` now render the selected string value without leaking its source quote delimiters, while non-literal selected branches still retain lazy Nift-source semantics and may contain directives such as `@input(...)`. Added mirrored source-tree and independent regression coverage for full/shorthand ternaries, true/false branches, empty strings, both quote styles, escaped quotes, nested ternaries, attribute embedding, literal directive text, selected directives and unselected dependency side effects.
-- Improved parser/build diagnostics: source excerpts now expand tabs deterministically before marker placement, underline the full offending Nift expression/call, syntax-highlight the complete current `@function` surface (including `@content`, `@input`, `@pathto`, control-flow, collection and data helpers), colour `$[...]` expressions and quoted Nift values, and accent the offending syntax/value when stderr is a TTY. The highlighter distinguishes Nift functions from unrelated at-sign syntax such as CSS `@media`; redirected/plain diagnostics remain ANSI-free.
+- Improved parser/build diagnostics: source excerpts now expand tabs deterministically before marker placement, underline the full offending Nift expression/call, syntax-highlight the complete current `@function` surface (including `@content`, `@input`, `@path`, control-flow, collection and data helpers), colour `$[...]` expressions and quoted Nift values, and accent the offending syntax/value when stderr is a TTY. The highlighter distinguishes Nift functions from unrelated at-sign syntax such as CSS `@media`; redirected/plain diagnostics remain ANSI-free.
 - Fixed init-target CI to validate generated framework metadata against the running Nift binary version instead of a hard-coded previous release version.
 
 ## v4.0.3
@@ -269,7 +281,7 @@ Nift 4.0.3 is a bounded post-4.0.2 language, pagination and distribution/DX refi
 
 ### Requirements and distribution UX
 
-- Refined `@pathto` requirement semantics for tracked targets: a referring page no longer becomes stale merely because another currently tracked page has not produced its output yet or its build fails. The tracked producer owns its own build result, while concrete project-path requirements retain the existing missing-path rebuild/error behavior. This removes misleading first-build `required path missing` noise without introducing transitive build failure.
+- Refined `@path` requirement semantics for tracked targets: a referring page no longer becomes stale merely because another currently tracked page has not produced its output yet or its build fails. The tracked producer owns its own build result, while concrete project-path requirements retain the existing missing-path rebuild/error behavior. This removes misleading first-build `required path missing` noise without introducing transitive build failure.
 - Added a small verified POSIX installer intended for `curl -fsSL https://nift.dev/install | bash`: it detects supported Linux/macOS architectures, downloads the official release archive and SHA256SUMS, verifies the archive, defaults to `~/.local/bin`, and does not silently invoke sudo or edit shell profiles.
 - Migrated the Snap package to strict confinement with the `home` interface. A real Store-built edge revision was installed and validated successfully against an ordinary project, including project-local `.nift/` state, so the 4.0.3 Snap no longer requires classic confinement or the `--classic` install flag.
 
@@ -323,7 +335,7 @@ Nift 4.0.1 strengthens the v4 model of checked, dependency-aware website composi
 
 ## v1.0.42
 
-- Textual directive parameters now support single-pass `$[...]` interpolation for `@input`, `@dep`, `@pathto`/`@pathtofile`, `@json` source/schema paths, `@getenv`, and `@ent`. Binding names and control-flow grammar remain static; substituted `@...` or `$[...]` text is data and is never recursively parsed.
+- Textual directive parameters now support single-pass `$[...]` interpolation for `@input`, `@dep`, `@path`/`@pathtofile`, `@json` source/schema paths, `@getenv`, and `@ent`. Binding names and control-flow grammar remain static; substituted `@...` or `$[...]` text is data and is never recursively parsed.
 - Dynamic parameter-selected inputs, dependencies, requirements, and JSON sources participate in the existing incremental and transactional contracts.
 - Added an independent 73-check parameter-interpolation contract covering scalar types, escaping, lexical scope, injection boundaries, path safety, A-to-B dependency replacement, and failed-build recovery.
 
@@ -489,7 +501,7 @@ Nift 4.0.1 strengthens the v4 model of checked, dependency-aware website composi
 
 - Ruthless post-feature hardening pass across JSON Schema, JSON bindings, control flow, sorting, loop metadata, internal `reqs`, and path/dependency handling.
 - Fixed `@dep(...)` accepting parent-traversal paths outside the Nift project. `@dep` now applies the same project-containment boundary expected of project-local build inputs and stores the normalized project-relative dependency.
-- Tightened concrete `@pathto(...)` path handling to reject paths outside the Nift project, matching its documented project-local contract.
+- Tightened concrete `@path(...)` path handling to reject paths outside the Nift project, matching its documented project-local contract.
 - Expanded direct JSON Schema smoke coverage for supported shape validation, bounds, type unions, composition edge cases, boolean subschemas, local JSON Pointer escaping, invalid schema shapes, and bounded recursive references.
 - Expanded parser/integration coverage for JSON Schema edge cases, empty/nested/sorted loops, scalar truthiness, object-key sorting, malformed sort clauses, corrupted/legacy `reqs` metadata, missing tracked-output requirements, and repair-on-rebuild semantics.
 - UBSan build plus the ruthless adversarial extension completes without sanitizer findings.
@@ -497,7 +509,7 @@ Nift 4.0.1 strengthens the v4 model of checked, dependency-aware website composi
 
 ## v1.0.20
 
-- Added internal page `reqs` metadata populated automatically by ordinary `@pathto(...)`. Incremental/status checks treat a missing required path as a rebuild reason, but do not treat modification of a requirement as a rebuild reason. A missing req never aborts before rendering: `build-updated` runs the normal page build, allowing changed source to remove/fix the reference; if the reference remains invalid, the ordinary `@pathto` parser error is reported.
+- Added internal page `reqs` metadata populated automatically by ordinary `@path(...)`. Incremental/status checks treat a missing required path as a rebuild reason, but do not treat modification of a requirement as a rebuild reason. A missing req never aborts before rendering: `build-updated` runs the normal page build, allowing changed source to remove/fix the reference; if the reference remains invalid, the ordinary `@path` parser error is reported.
 - Reqs have no public directive or sidecar format: they are an implementation detail of project-aware path correctness.
 
 ## v1.0.18
@@ -598,7 +610,7 @@ A ruthless regression/source-audit release focused on correctness under hostile 
 ### Parsed tracked content compatibility fix
 
 - Fixed a fundamental parser regression where `@content` appended tracked content as raw text instead of parsing it as Nift source.
-- Nift expressions inside tracked content now work as intended, including `@pathto(...)`, `@input(...)`, `$[...]`, `@getenv(...)`, `@ent(...)` and `@dep(...)`.
+- Nift expressions inside tracked content now work as intended, including `@path(...)`, `@input(...)`, `$[...]`, `@getenv(...)`, `@ent(...)` and `@dep(...)`.
 - Tracked content now participates in the parser input stack so content/input recursion is detected cleanly.
 - Added focused regression coverage for expressions and nested inputs inside tracked content.
 
@@ -713,7 +725,7 @@ This file records the development history of the current C++ implementation. It 
 - Implemented multithreaded builds.
 - Implemented modified, hash and hybrid incremental modes.
 - Implemented tracked pages, user dependencies, recursive directory dependencies and watch state.
-- Implemented the stripped templating surface including `@content`, `@input`, `@pathto`, `@dep`, `@getenv` and `@ent`.
+- Implemented the stripped templating surface including `@content`, `@input`, `@path`, `@dep`, `@getenv` and `@ent`.
 - Added structured parser/build diagnostics with tracked name, source path, line/column and source context where available.
 - Added TTY-aware colour and cleaner command output.
 - Added delayed build-progress reporting so fast builds remain silent while longer builds show progress.

@@ -244,7 +244,7 @@
     {
       "id": "parser.value-composition-adversarial",
       "state": "ESTABLISHED",
-      "guarantee": "Adversarial parser/value/composition inputs (truncated or invalid JSON bound through @json, deep nesting, type mismatches, missing/null/coerced values, unicode, missing or cyclic @input fragments, @pathto edges) resolve with a controlled outcome: a successful build with correct output, or a controlled non-zero error. A hang, a signal termination, a sanitizer finding, or missing output is a defect.",
+      "guarantee": "Adversarial parser/value/composition inputs (truncated or invalid JSON bound through @json, deep nesting, type mismatches, missing/null/coerced values, unicode, missing or cyclic @input fragments, @path edges) resolve with a controlled outcome: a successful build with correct output, or a controlled non-zero error. A hang, a signal termination, a sanitizer finding, or missing output is a defect.",
       "scope": "15 deterministic adversarial parser/value/composition cases.",
       "platforms": [
         "linux"
@@ -1475,25 +1475,25 @@
     {
       "repo": "website",
       "path": "content/docs/battle-tested.html",
-      "sha256": "9ab57685bfd146a7bfc65b57896d26de0521aebea7f80f8431b412f4502a86fa",
-      "mapping_scope": "BH1 manual audit of significant quantitative/reliability claims; source hash invalidates the audit if this page changes. Re-audited 2026-09-06: the only source change was the test-comments comment-syntax documentation; all eleven pinned claim needles remain present and unchanged."
+      "sha256": "a035faf4e0ce80825155c88888b2be2f1cf075d53e10c6eb5cddbe152e7bc452",
+      "mapping_scope": "BH1 manual audit of significant quantitative/reliability claims; source hash invalidates the audit if this page changes. Re-audited 2026-09-09 after the canonical @path spelling migration; all pinned claim needles and their underlying claims remain unchanged."
     },
     {
       "repo": "website",
       "path": "content/docs/memory-safety.html",
-      "sha256": "0b515e6c75bb5eb4d7afb69402978b1cdee600208d1c5c5b676766c6681ad4af",
+      "sha256": "78fe1124a724ce577b4fb7c1d7858de55e784ced268dd8cb2d96ba39034f1cae",
       "mapping_scope": "BH1 manual audit of significant quantitative/reliability claims; source hash invalidates the audit if this page changes."
     },
     {
       "repo": "website",
       "path": "content/docs/production-readiness.html",
-      "sha256": "410e84de3e134ab9ab9bcbf65abb8af73b185cdc63a52f369128b07303e0ac80",
+      "sha256": "b445d8d9c1e10c40a995336d04f51eb33e8a71a1281ca07b952cf885d24f0147",
       "mapping_scope": "BH1 manual audit of significant quantitative/reliability claims; source hash invalidates the audit if this page changes."
     },
     {
       "repo": "website",
       "path": "content/docs/platforms.html",
-      "sha256": "057590e80f6afdf8ef5096a643fedf6da8467ba6db27d9aff796d944a7f87d07",
+      "sha256": "a5ac0576cae7ccc26eade2fa9368cfb6780ba2648a72516534089af516c46b31",
       "mapping_scope": "BH1 manual audit of significant quantitative/reliability claims; source hash invalidates the audit if this page changes."
     }
   ]

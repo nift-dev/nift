@@ -1,4 +1,4 @@
-// CP5: @pathto through the host path capability. The embedded engine computes
+// CP5: @path through the host path capability. The embedded engine computes
 // relative paths from the per-render current output, applies the 404 rule when
 // the page name is "404", treats every argument as a concrete project path (no
 // fake tracked names), records requirements, and errors when there is no path
@@ -49,7 +49,7 @@ int main() {
         nift::Context context;
         context.set_current_output(root / "index.html");
         auto r = engine.render(nift::Source::path(root / "index.html"),
-                               nift::Source::text("<a href=\"@pathto('about.html')\">A</a>@content"),
+                               nift::Source::text("<a href=\"@path('about.html')\">A</a>@content"),
                                context);
         CHECK(r.ok());
         CHECK(r.output() == "<a href=\"./about.html\">A</a><h1>home</h1>");
@@ -62,7 +62,7 @@ int main() {
         nift::Context context;
         context.set_current_output(root / "docs" / "page.html");
         auto r = engine.render(nift::Source::path(root / "docs" / "page.html"),
-                               nift::Source::text("<link href=\"@pathto('assets/css/style.css')\">@content"),
+                               nift::Source::text("<link href=\"@path('assets/css/style.css')\">@content"),
                                context);
         CHECK(r.ok());
         CHECK(r.output() == "<link href=\"../assets/css/style.css\"><h1>docs</h1>");
@@ -76,7 +76,7 @@ int main() {
         context.set_page_name(std::string("404"));
         context.set_current_output(root / "404.html");
         auto r = engine.render(nift::Source::path(root / "404.html"),
-                               nift::Source::text("<a href=\"@pathto('about.html')\">A</a>@content"),
+                               nift::Source::text("<a href=\"@path('about.html')\">A</a>@content"),
                                context);
         CHECK(r.ok());
         CHECK(r.output() == "<a href=\"/about.html\">A</a><h1>404</h1>");
@@ -87,7 +87,7 @@ int main() {
         nift::Engine engine;
         engine.set_root(root);
         auto r = engine.render(nift::Source::text("<p>p</p>"),
-                               nift::Source::text("@pathto('about.html')@content"));
+                               nift::Source::text("@path('about.html')@content"));
         CHECK(!r.ok());
         CHECK(r.error().message.find("path context") != std::string::npos);
     }
@@ -99,7 +99,7 @@ int main() {
         nift::Context context;
         context.set_current_output(root / "index.html");
         auto r = engine.render(nift::Source::text("<p>p</p>"),
-                               nift::Source::text("@pathto('missing.html')@content"), context);
+                               nift::Source::text("@path('missing.html')@content"), context);
         CHECK(!r.ok());
         CHECK(r.error().message.find("neither a tracked name nor a file that exists") != std::string::npos);
     }
@@ -112,21 +112,43 @@ int main() {
         nift::Context context;
         context.set_current_output(root / "index.html");
         auto r = engine.render(nift::Source::text("<p>p</p>"),
-                               nift::Source::text("@pathto('about')@content"), context);
+                               nift::Source::text("@path('about')@content"), context);
         CHECK(!r.ok());
     }
 
-    // 7. Requirements are recorded for a resolved @pathto.
+    // 7. Requirements are recorded for a resolved @path.
     {
         nift::Engine engine;
         engine.set_root(root);
         nift::Context context;
         context.set_current_output(root / "index.html");
         auto r = engine.render(nift::Source::path(root / "index.html"),
-                               nift::Source::text("<a href=\"@pathto('about.html')\">A</a>@content"),
+                               nift::Source::text("<a href=\"@path('about.html')\">A</a>@content"),
                                context);
         CHECK(r.ok());
         CHECK(contains(r.requirements(), "about.html"));
+    }
+
+    // 8. Focused compatibility guard: the legacy spelling is an exact alias.
+    // Old templates must keep their rendering and requirement behaviour.
+    {
+        nift::Engine engine;
+        engine.set_root(root);
+        nift::Context context;
+        context.set_current_output(root / "index.html");
+        auto canonical = engine.render(
+            nift::Source::path(root / "index.html"),
+            nift::Source::text("<a href=\"@path('about.html')\">A</a>@content"),
+            context);
+        auto legacy = engine.render(
+            nift::Source::path(root / "index.html"),
+            nift::Source::text("<a href=\"@pathto('about.html')\">A</a>@content"),
+            context);
+        CHECK(canonical.ok());
+        CHECK(legacy.ok());
+        CHECK(canonical.output() == legacy.output());
+        CHECK(canonical.requirements() == legacy.requirements());
+        CHECK(contains(legacy.requirements(), "about.html"));
     }
 
     fs::remove_all(root);

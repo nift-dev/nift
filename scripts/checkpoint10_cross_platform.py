@@ -181,7 +181,7 @@ def setup_project(root):
           '@json(site, "schemas/site.schema.json", "data/site.json")\n'
           '@input("parts/shared.html")\n'
           '<nav><a href="$[routes.home]">$[site.name]</a></nav>\n'
-          '<a href="@pathto(\'docs/index\')">docs</a>\n'
+          '<a href="@path(\'docs/index\')">docs</a>\n'
           '@for(item : site.items){<i>$[item.value]</i>}\n@content\n')
     write(root / "templates/parts/shared.html", "<strong>shared-one</strong>\n")
     write(root / "content/index.html", "<main>home-one</main>\n")

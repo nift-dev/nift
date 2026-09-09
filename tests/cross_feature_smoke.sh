@@ -30,9 +30,9 @@ JSON
 cat >"$P/templates/template.html" <<'EOF'
 @json(site, "schemas/site.schema.json", "data/site.json")
 @if(site.choice == "a"){
-<a href="@pathto('public/assets/a.txt')">A</a>
+<a href="@path('public/assets/a.txt')">A</a>
 }else{
-<a href="@pathto('public/assets/b.txt')">B</a>
+<a href="@path('public/assets/b.txt')">B</a>
 }
 @content
 EOF
@@ -84,7 +84,7 @@ cat >"$P/templates/template.html" <<'EOF'
 @content
 EOF
 cat >"$P/templates/parts/item.html" <<'EOF'
-<span>$[loop.index]:$[item.name]:@pathto('public/assets/$[item.name].txt')</span>
+<span>$[loop.index]:$[item.name]:@path('public/assets/$[item.name].txt')</span>
 EOF
 printf '\n' >"$P/content/index.html"
 (cd "$P" && "$NIFT_BIN" build --all >/dev/null)
@@ -97,7 +97,7 @@ grep -Fq '"public/assets/b.txt"' "$P/.nift/public/index.info.json"
 # build must recreate producer and then allow consumer to succeed.
 P="$TMP/tracked-repair"; mkproj "$P"
 cat >"$P/templates/template.html" <<'EOF'
-<a href="@pathto('about')">about</a>
+<a href="@path('about')">about</a>
 @content
 EOF
 printf '\n' >"$P/content/index.html"

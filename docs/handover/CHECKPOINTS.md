@@ -701,7 +701,7 @@ For `$[...]` parameter interpolation:
 interpolation × lexical scope
 interpolation × @input dependencies
 interpolation × @dep
-interpolation × @pathto requirements
+interpolation × @path requirements
 interpolation × path traversal
 interpolation × incremental rebuild
 interpolation × watch
@@ -2353,7 +2353,7 @@ Baseline:
 Implementation:
   extracted existing value resolver
   added single-pass textual parameter interpolation
-  wired @input/@dep/@json-path/@pathto
+  wired @input/@dep/@json-path/@path
 
 New contract coverage:
   whole value

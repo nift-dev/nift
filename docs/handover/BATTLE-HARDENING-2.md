@@ -342,7 +342,7 @@ Registered as `init.scaffold-functional-truth` (ESTABLISHED, RETAINED).
 
 Adversarial parser/value/composition inputs — truncated or invalid JSON bound
 through `@json`, deep nesting, type mismatches, missing/null/coerced values,
-unicode, missing or cyclic `@input` fragments, `@pathto` edges — must resolve
+unicode, missing or cyclic `@input` fragments, `@path` edges — must resolve
 with a controlled outcome: a successful build with correct output, or a
 controlled non-zero error. A hang, a signal termination, a sanitizer finding,
 or missing output is a defect.
@@ -1352,10 +1352,10 @@ failing on Nift's read-only outputs, regenerating truthful evidence
 full CI-equivalent chain, and the 50-file integrity scan all pass. The next
 release's hardening queue is re-planned from the ledger.
 
-## Nift `@pathto` on the 404 page (2026-08-22)
+## Nift `@path` on the 404 page (2026-08-22)
 
 Warden 404-page authoring surfaced a real path-semantics gap. A deployed 404
-document is served at arbitrary request depth, so a relative `@pathto` path from
+document is served at arbitrary request depth, so a relative `@path` path from
 its on-disk location is meaningless. `Parser::path_to` now emits root-absolute
 web paths when the tracked page being rendered is named `404` (index pages
 become `/dir/`, ordinary targets `/dir/file.ext`), for targets under the output

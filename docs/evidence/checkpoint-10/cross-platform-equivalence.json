@@ -29,7 +29,7 @@
   "portable_contracts": [
     "clean build", "no-op incremental build", "content invalidation", "template invalidation",
     "@input dependency invalidation", "JSON invalidation", "JSON Schema invalidation",
-    "Project Contract invalidation", "@pathto requirement recovery", "tracked add lifecycle",
+    "Project Contract invalidation", "@path requirement recovery", "tracked add lifecycle",
     "tracked move lifecycle", "tracked remove lifecycle", "template-less minified output",
     "Unicode content and nested paths", "failed render last-good preservation",
     "failed render recovery", "malformed parser input controlled failure", "malformed parser recovery"
