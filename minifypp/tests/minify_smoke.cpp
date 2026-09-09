@@ -205,6 +205,29 @@ int main() {
     eq(out, "const x=`foo ${`bar ${5} baz`} qux`;", "JavaScript nested template raw text");
     expect(minify::javascript("const x=/a/ instanceof RegExp;", out, err), err);
     eq(out, "const x=/a/ instanceof RegExp;", "JavaScript regex keyword boundary");
+    // Template-literal expressions must lex regular-expression literals so a
+    // backtick, brace or `//`-lookalike inside a regex cannot corrupt template
+    // or expression frame state. These were valid programs that Minify++
+    // rejected as unterminated templates.
+    expect(minify::javascript("const x=`a${/[`]/.test(s)}b`;", out, err), err);
+    eq(out, "const x=`a${/[`]/.test(s)}b`;", "JavaScript template regex backtick class");
+    expect(minify::javascript("const x=`a${/[{}\\/]/.test(s)}b`;", out, err), err);
+    eq(out, "const x=`a${/[{}\\/]/.test(s)}b`;", "JavaScript template regex brace/escape class");
+    expect(minify::javascript("const x=`a${s.replace(/\\//g, \"\")}b`;", out, err), err);
+    eq(out, "const x=`a${s.replace(/\\//g, \"\")}b`;", "JavaScript template regex escaped slash");
+    expect(minify::javascript("const x=`a${1+/a{2}/.test(s)}b`;", out, err), err);
+    eq(out, "const x=`a${1+/a{2}/.test(s)}b`;", "JavaScript template regex after operator");
+    expect(minify::javascript("const x=`a${`b${c}`}d`;", out, err), err);
+    eq(out, "const x=`a${`b${c}`}d`;", "JavaScript template nested template expression");
+    // The same template/regular-expression lexing applies inside JSX
+    // expression braces, where a backtick inside a regex character class used
+    // to close the quoted-region scan early and corrupt the brace balance.
+    expect(minify::jsx("const x = <A>{`v${/[`]/.test(s)}w`}</A>;", out, err), err);
+    expect(out.find("`v${/[`]/.test(s)}w`") != std::string::npos,
+           "JSX template expression regex backtick class damaged");
+    expect(minify::jsx("const x = <A>{`a${`b${c}d`}e`}</A>;", out, err), err);
+    expect(out.find("`a${`b${c}d`}e`") != std::string::npos,
+           "JSX template expression nested template damaged");
     expect(minify::html("<p>héllo 😀 世界</p>", out, err), err);
     expect(out.find("héllo 😀 世界") != std::string::npos, "HTML Unicode damaged");
     expect(minify::html("<!doctype html><template><span>A</span> <span>B</span></template>", out, err), err);

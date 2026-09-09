@@ -27,10 +27,10 @@ bool js_line_terminator_in(const std::string& input, std::size_t begin, std::siz
 
 bool copy_template_literal(const std::string& input, std::size_t& i,
                            std::string& output, std::string& error) {
-    struct Frame { bool expression; std::size_t braces; };
+    struct Frame { bool expression; std::size_t braces; bool can_start_regex; };
     std::vector<Frame> stack;
     output.push_back(input[i++]);
-    stack.push_back({false, 0});
+    stack.push_back({false, 0, true});
     while (i < input.size()) {
         char c = input[i++];
         output.push_back(c);
@@ -44,7 +44,13 @@ bool copy_template_literal(const std::string& input, std::size_t& i,
                 output.push_back(input[i++]);
                 frame.expression = true;
                 frame.braces = 1;
+                frame.can_start_regex = true;
             }
+            continue;
+        }
+        if (ws(c)) {
+            // Formatting whitespace between tokens preserves the regex
+            // context; only the surrounding tokens change it.
             continue;
         }
         if (c == '\'' || c == '"') {
@@ -56,18 +62,82 @@ bool copy_template_literal(const std::string& input, std::size_t& i,
                 else if (q == '\\') escaped = true;
                 else if (q == quote) break;
             }
+            frame.can_start_regex = false;
         } else if (c == '`') {
-            stack.push_back({false, 0});
+            stack.push_back({false, 0, true});
         } else if (c == '/' && i < input.size() && input[i] == '/') {
             output.push_back(input[i++]);
             while (i < input.size()) { char q=input[i++]; output.push_back(q); if (q=='\n'||q=='\r') break; }
+            frame.can_start_regex = true;
         } else if (c == '/' && i < input.size() && input[i] == '*') {
             output.push_back(input[i++]);
             while (i < input.size()) { char q=input[i++]; output.push_back(q); if (q=='*'&&i<input.size()&&input[i]=='/') { output.push_back(input[i++]); break; } }
+            // A block comment leaves the regex context unchanged.
+        } else if (c == '/' && frame.can_start_regex) {
+            // A regular-expression literal is copied verbatim so that `//`,
+            // `{`, `}` and backticks inside it cannot corrupt expression or
+            // template frame state.
+            bool escaped = false, in_class = false, closed = false;
+            while (i < input.size()) {
+                char q = input[i++]; output.push_back(q);
+                if (escaped) { escaped = false; continue; }
+                if (q == '\\') { escaped = true; continue; }
+                if (q == '[') in_class = true;
+                else if (q == ']') in_class = false;
+                else if (q == '/' && !in_class) { closed = true; break; }
+                else if (q == '\n' || q == '\r') break;
+            }
+            if (!closed) { error = "unterminated JavaScript regular expression"; output.clear(); return false; }
+            while (i < input.size() && std::isalpha(static_cast<unsigned char>(input[i])))
+                output.push_back(input[i++]);
+            frame.can_start_regex = false;
+        } else if (std::isalpha(static_cast<unsigned char>(c)) || c == '_' || c == '$') {
+            const std::size_t begin = i - 1;
+            while (i < input.size() &&
+                   (std::isalnum(static_cast<unsigned char>(input[i])) ||
+                    input[i] == '_' || input[i] == '$')) {
+                output.push_back(input[i]);
+                ++i;
+            }
+            static const std::unordered_set<std::string> prefix_words = {
+                "return","throw","case","delete","void","typeof","new",
+                "in","instanceof","yield","await","else","do"
+            };
+            frame.can_start_regex =
+                prefix_words.count(input.substr(begin, i - begin)) != 0;
+        } else if (std::isdigit(static_cast<unsigned char>(c))) {
+            bool exponent = false;
+            while (i < input.size()) {
+                const unsigned char u = static_cast<unsigned char>(input[i]);
+                const char q = input[i];
+                if (std::isalnum(u) || q == '.' || q == '_') {
+                    exponent = q == 'e' || q == 'E';
+                    output.push_back(q);
+                    ++i;
+                    continue;
+                }
+                if ((q == '+' || q == '-') && exponent) {
+                    exponent = false;
+                    output.push_back(q);
+                    ++i;
+                    continue;
+                }
+                break;
+            }
+            frame.can_start_regex = false;
         } else if (c == '{') {
             ++frame.braces;
+            frame.can_start_regex = true;
         } else if (c == '}' && --frame.braces == 0) {
             frame.expression = false;
+            frame.can_start_regex = false;
+        } else if (c == ';' || c == ',' || c == ':' || c == '(' || c == '[' ||
+                   c == '=' || c == '!' || c == '?' || c == '&' || c == '|' ||
+                   c == '+' || c == '-' || c == '*' || c == '%' || c == '<' ||
+                   c == '>' || c == '~' || c == '^') {
+            frame.can_start_regex = true;
+        } else {
+            frame.can_start_regex = false;
         }
     }
     error = "unterminated JavaScript template literal";
@@ -1339,7 +1409,17 @@ static bool find_jsx_expression_end(const std::string& input, std::size_t start,
             continue;
         }
 
-        if (c == '\'' || c == '"' || c == '`') {
+        if (c == '`') {
+            // Consume the template literal as a unit so nested ${...}
+            // expressions and regular-expression literals inside them (which
+            // may contain backticks, braces or `//`-lookalikes) cannot corrupt
+            // the enclosing brace scan.
+            std::string sink;
+            if (!copy_template_literal(input, i, sink, error)) return false;
+            can_start_regex = false;
+            continue;
+        }
+        if (c == '\'' || c == '"') {
             const char quote = c;
             ++i;
             bool escaped = false;
@@ -1350,7 +1430,7 @@ static bool find_jsx_expression_end(const std::string& input, std::size_t start,
                 else if (q == '\\') escaped = true;
                 else if (q == quote) { closed = true; break; }
             }
-            if (!closed) { error = "unterminated string/template in JSX expression"; return false; }
+            if (!closed) { error = "unterminated string in JSX expression"; return false; }
             can_start_regex = false;
             continue;
         }
