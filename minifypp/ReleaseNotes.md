@@ -25,6 +25,15 @@
   line-comment boundaries. The pinned TypeScript JSX corpus exposed these
   scanner defects; the corrected complete run preserves all 221 eligible
   JSX/TSX programs.
+- Lex regular-expression literals inside template-literal expressions. A bare
+  `/` was previously treated as division unless it opened a comment, so a
+  regex inside a template expression could corrupt template/expression frame
+  state: a backtick in a character class, balanced braces or an escaped-slash
+  pair such as `/\//` was misread and valid programs (for example
+  `` `a${/[`]/.test(s)}b` ``) were rejected as unterminated templates. The
+  same mis-scan propagated into JSX expression braces. Expression scanning now
+  tracks a conservative regex-start state and copies regex literals verbatim;
+  the standalone and embedded smoke suites retain the reduced regressions.
 - Added independent complete-corpus checkpoints for the remaining claimed
   formats: 93/93 eligible JSONTestSuite documents, 535/535 conservative W3C XML
   documents and 1,176/1,176 strict standalone WPT SVG documents preserve their
