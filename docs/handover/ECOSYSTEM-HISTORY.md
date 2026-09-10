@@ -811,11 +811,18 @@ Verify.
 
 ---
 
-# 24. Removed `@pathtopage`
+# 24. `@pathtopage` history
 
-Older `@pathtopage` material was removed.
+At one point `@pathtopage` material was removed from the documentation set,
+but the directive itself remained implemented and was not removed from the
+language.
 
-Do not accidentally resurrect it from old documentation or examples.
+It is currently part of the active language surface: `@pathtopage(n)` resolves
+generated pagination links, including explicit relative offsets such as
+`@pathtopage(+1)` / `@pathtopage(-1)`, it is exercised by
+`tests/pagination_smoke.sh` and the pagination incremental-equivalence checks,
+and it is documented in `README.md` and `HANDOVER.md`. Do not treat it as
+removed, and do not resurrect stale "removed" wording from this history entry.
 
 ---
 
