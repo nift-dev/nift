@@ -210,14 +210,14 @@ public sealed class Engine : IDisposable
     /// error.</summary>
     public RenderResult Render(string pageName, Context? ctx)
     {
-        bool ctxEntered = false;
         bool entered = false;
+        Context? enteredCtx = null;
         try
         {
             if (ctx != null)
             {
                 ctx.EnterRender();
-                ctxEntered = true;
+                enteredCtx = ctx;
             }
             EnterRender();
             entered = true;
@@ -229,21 +229,21 @@ public sealed class Engine : IDisposable
         finally
         {
             if (entered) ExitRender();
-            if (ctxEntered) ctx.ExitRender();
+            enteredCtx?.ExitRender();
         }
     }
 
     /// <summary>Full page + template composition (template must contain exactly one @content).</summary>
     public RenderResult Render(RenderSource page, RenderSource template, Context? ctx = null)
     {
-        bool ctxEntered = false;
         bool entered = false;
+        Context? enteredCtx = null;
         try
         {
             if (ctx != null)
             {
                 ctx.EnterRender();
-                ctxEntered = true;
+                enteredCtx = ctx;
             }
             EnterRender();
             entered = true;
@@ -255,7 +255,7 @@ public sealed class Engine : IDisposable
         finally
         {
             if (entered) ExitRender();
-            if (ctxEntered) ctx.ExitRender();
+            enteredCtx?.ExitRender();
         }
     }
 
@@ -270,14 +270,14 @@ public sealed class Engine : IDisposable
     /// path; a missing path is a controlled missing-path error.</summary>
     public RenderResult RenderPath(string path, Context? ctx)
     {
-        bool ctxEntered = false;
         bool entered = false;
+        Context? enteredCtx = null;
         try
         {
             if (ctx != null)
             {
                 ctx.EnterRender();
-                ctxEntered = true;
+                enteredCtx = ctx;
             }
             EnterRender();
             entered = true;
@@ -289,7 +289,7 @@ public sealed class Engine : IDisposable
         finally
         {
             if (entered) ExitRender();
-            if (ctxEntered) ctx.ExitRender();
+            enteredCtx?.ExitRender();
         }
     }
 
@@ -304,14 +304,14 @@ public sealed class Engine : IDisposable
     /// source and is never checked against the filesystem.</summary>
     public RenderResult RenderText(string text, Context? ctx)
     {
-        bool ctxEntered = false;
         bool entered = false;
+        Context? enteredCtx = null;
         try
         {
             if (ctx != null)
             {
                 ctx.EnterRender();
-                ctxEntered = true;
+                enteredCtx = ctx;
             }
             EnterRender();
             entered = true;
@@ -323,7 +323,7 @@ public sealed class Engine : IDisposable
         finally
         {
             if (entered) ExitRender();
-            if (ctxEntered) ctx.ExitRender();
+            enteredCtx?.ExitRender();
         }
     }
 

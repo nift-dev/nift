@@ -40,9 +40,10 @@ jobs:
       - name: Install g++/pkg-config (ubuntu)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y g++ pkg-config
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: bindings/go/go.mod
+          cache: false
       - name: Build + smoke package target
         shell: bash
         run: |
@@ -143,7 +144,7 @@ jobs:
           fi
           echo "GO_STATIC_OK: no Nift shared-library dependency"
       - name: Upload packaged artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nift-package-${{ matrix.target }}
           path: dist/*/${{ matrix.target }}/
@@ -154,13 +155,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version-file: bindings/go/go.mod
-      - uses: actions/setup-dotnet@v4
+          cache: false
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
       - name: Install python dev + build deps
@@ -268,7 +270,7 @@ jobs:
           cp -r /tmp/npmdist/* "$GITHUB_WORKSPACE/pkg-artifacts/" 2>/dev/null || true
           ls -la "$GITHUB_WORKSPACE/pkg-artifacts"
       - name: Upload language package artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nift-language-packages
           path: pkg-artifacts/

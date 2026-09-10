@@ -32,6 +32,7 @@ internal static class Program
         Run("lifetime: repeated create/dispose", TestRepeatedCreateDispose);
         Run("delegate rooting survives GC", TestDelegateRooting);
         Run("context disposal safety", TestContextDispose);
+        Run("context cleanup across success/failure/exception renders", TestContextCleanupAcrossRenders);
         Run("dispose engine during in-flight render is deferred", TestDisposeEngineDuringRender);
         Run("dispose context during in-flight render is deferred", TestDisposeContextDuringRender);
         Run("non-render operation vs Dispose: engine setter", TestSetterRacesDispose);
@@ -393,6 +394,46 @@ internal static class Program
             threw = true;
         }
         Assert(threw, "disposed context must reject use");
+    }
+
+    private static void TestContextCleanupAcrossRenders()
+    {
+        // The finally path must ExitRender after a successful render, a native
+        // render failure and a managed exception thrown after the context
+        // entered rendering, so the same Context stays balanced and reusable.
+        using var fixture = new ProjectFixture();
+        using var engine = Engine.New();
+        engine.SetRoot(fixture.Root);
+        var ctx = new Context();
+        ctx.SetString("s", "ctx");
+
+        // 1. Successful contextual render.
+        var ok = engine.Render(RenderSource.Text("$[s]"), RenderSource.Text("<main>@content</main>"), ctx);
+        AssertOk(ok, "contextual render");
+        AssertEq(ok.Output, "<main>ctx</main>", "contextual render output");
+
+        // 2. Native render failure with the same context (malformed JSON).
+        var bad = engine.Render(RenderSource.Text("@json(d, \"content/bad.json\")$[d.x]"), RenderSource.Text("<main>@content</main>"), ctx);
+        Assert(!bad.Ok, "malformed JSON must fail with the same context");
+
+        // 3. Reuse the same context after the native failure: the finally path
+        //    must have exited rendering so the context is usable again.
+        var reuse = engine.Render(RenderSource.Text("$[s]"), RenderSource.Text("<main>@content</main>"), ctx);
+        AssertOk(reuse, "context reuse after native failure");
+        AssertEq(reuse.Output, "<main>ctx</main>", "context reuse output after native failure");
+
+        // 4. A managed exception thrown after the context entered rendering
+        //    (the loader runs inside the render, after ctx.EnterRender()) must
+        //    still exit the context in finally so it remains reusable.
+        engine.SetLoader(_ => throw new InvalidOperationException("host exploded"));
+        var failed = engine.Render(RenderSource.Text("@input(\"p.html\")"), RenderSource.Text("<main>@content</main>"), ctx);
+        Assert(!failed.Ok, "loader throw must fail the render");
+        engine.SetLoader(null);
+        var after = engine.Render(RenderSource.Text("$[s]"), RenderSource.Text("<main>@content</main>"), ctx);
+        AssertOk(after, "context reuse after managed exception");
+        AssertEq(after.Output, "<main>ctx</main>", "context reuse output after managed exception");
+
+        ctx.Dispose();
     }
 
     private static void TestLoaderExceptionContainment()

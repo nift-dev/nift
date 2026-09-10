@@ -84,7 +84,7 @@ jobs:
       - name: Ownership lifecycle/concurrency suite (POSIX)
         if: runner.os != 'Windows'
         run: make test-ownership-concurrency
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: checkpoint-10-${{ matrix.id }}
           path: .build/checkpoint-10/${{ matrix.id }}.json
@@ -111,7 +111,7 @@ jobs:
             .build/checkpoint-10/downloaded/macos.json \
             .build/checkpoint-10/downloaded/windows.json \
             --output .build/checkpoint-10/comparison.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: checkpoint-10-comparison
           path: .build/checkpoint-10/comparison.json

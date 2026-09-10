@@ -62,7 +62,7 @@ jobs:
             "$OLDPWD/nift" init >/dev/null && printf 'x\n' > index.html && \
             "$OLDPWD/nift" build --all >/dev/null && "$OLDPWD/nift" status >/dev/null ) || { echo "extracted-archive smoke FAILED" >&2; exit 1; }
           echo "archive smoke PASS: ${{ matrix.platform }}"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ${{ matrix.platform }}
           path: nift-*.tar.gz
@@ -121,7 +121,7 @@ jobs:
           "$EXE" build --all >/dev/null
           "$EXE" status >/dev/null
           echo "archive smoke PASS: windows-x86_64"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: windows-x86_64
           path: nift-*.zip
@@ -232,7 +232,7 @@ jobs:
           echo "assets: $(ls dist/nift-* | sed 's#dist/##' | tr '\n' ' ')"
           cat dist/SHA256SUMS
       - name: Upload rehearsal bundle
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: rehearsal-${{ inputs.version }}
           path: dist/*
