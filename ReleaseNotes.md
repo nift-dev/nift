@@ -1,5 +1,9 @@
 # Nift — Release Notes
 
+## v4.0.13
+
+Development in progress following the public v4.0.12 release.
+
 ## v4.0.12
 
 Development in progress following the public v4.0.11 release.
