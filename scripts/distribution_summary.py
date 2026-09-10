@@ -19,11 +19,11 @@ from pathlib import Path
 
 
 def env_bool(name: str) -> bool:
-    return os.environ.get(f"{name}_SELECTED", "false").strip().lower() == "true"
+    return os.environ.get(f"{name.upper()}_SELECTED", "false").strip().lower() == "true"
 
 
 def env_result(name: str) -> str:
-    return os.environ.get(f"{name}_RESULT", "skipped")
+    return os.environ.get(f"{name.upper()}_RESULT", "skipped")
 
 
 def classify_snap(edge: str | None, stable: str | None) -> dict[str, str]:

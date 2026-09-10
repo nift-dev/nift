@@ -49,6 +49,22 @@ def run_summary(**overrides) -> dict:
 
 
 class DistributionSummaryTest(unittest.TestCase):
+    def test_maintained_channels_recorded_from_env(self) -> None:
+        result = run_summary(
+            SNAP_EDGE_SELECTED="false",
+            SNAP_EDGE_RESULT="skipped",
+            SNAP_EDGE_STATUS="not_selected",
+            SNAP_STABLE_SELECTED="false",
+            SNAP_STABLE_RESULT="skipped",
+            SNAP_STABLE_STATUS="not_selected",
+        )
+        self.assertEqual(result["proc"].returncode, 0)
+        for name in ("github_release", "homebrew", "chocolatey"):
+            self.assertEqual(
+                result["summary"]["maintained_channels"][name],
+                {"selected": True, "result": "success"},
+            )
+
     def test_edge_success_is_not_stable_success(self) -> None:
         result = run_summary(
             SNAP_EDGE_SELECTED="true",
