@@ -76,5 +76,9 @@ if "$BIN" --wat "$TMP/app.js" >"$TMP/option.log" 2>&1; then
 fi
 grep -Fq "unknown option '--wat'" "$TMP/option.log"
 
-test "$($BIN --version)" = 'Minify++ 1.1.2'
+# The version lives in a single authoritative place (cli/main.cpp); the smoke
+# derives the expectation from it so a version bump can never leave the
+# assertion stale.
+expected="$(grep -oE 'Minify\+\+ [0-9]+\.[0-9]+\.[0-9]+' "$ROOT/cli/main.cpp" | head -1)"
+test "$($BIN --version)" = "$expected"
 echo 'Standalone minifier CLI smoke test passed'

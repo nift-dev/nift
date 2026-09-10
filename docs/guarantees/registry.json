@@ -1,24 +1,11 @@
 {
-  "schema_version": 1,
-  "campaign": "battle-hardening-2026-08",
-  "purpose": "Map Nift guarantees and the manually audited quantitative/reliability claims on the pinned public surfaces to retained evidence, enforcement, platform scope, limitations, and test-of-test status. Surface hashes force re-audit when those pages change.",
-"baseline": {
-  "released_version": "4.0.11",
-  "development_version": "4.0.12",
-  "release_commit": "6c037cf",
-  "note": "BH1 is guarantee-durability infrastructure. Existing evidence remains valid unless falsified; UNPROVEN test-of-test status means guard liveness has not yet been demonstrated during this campaign."
- },
-  "repositories": {
-    "nift": ".",
-    "regression": "../nift-regression-suite",
-    "website": "../nift-dev.github.io"
+  "baseline": {
+    "development_version": "4.0.13",
+    "note": "BH1 is guarantee-durability infrastructure. Existing evidence remains valid unless falsified; UNPROVEN test-of-test status means guard liveness has not yet been demonstrated during this campaign. Baseline advanced for the v4.0.12 release (development now 4.0.13).",
+    "release_commit": "5dcc392f9638dc9e6fc7443c80fe724f7e6bc307",
+    "released_version": "4.0.12"
   },
-  "states": [
-    "ESTABLISHED",
-    "NOT_ESTABLISHED",
-    "ACCEPTED_LIMITATION",
-    "OUT_OF_SCOPE"
-  ],
+  "campaign": "battle-hardening-2026-08",
   "evidence_classes": [
     "RETAINED",
     "CI_GATED",
@@ -27,20 +14,13 @@
     "CAMPAIGN",
     "FIELD"
   ],
-  "test_of_test_states": [
-    "VERIFIED_GUARD",
-    "UNPROVEN",
-    "PENDING_REVIEWER",
-    "NOT_APPLICABLE"
-  ],
   "guarantees": [
     {
-      "id": "incremental.clean-build-equivalence",
-      "state": "ESTABLISHED",
-      "guarantee": "For the retained Checkpoint 7 corpus, successful incremental output is byte-equivalent to a clean build from the same logical project state.",
-      "scope": "720 complete output-tree comparisons over modified/hash/hybrid mutation sequences; not an enumeration of every possible project.",
-      "platforms": [
-        "linux"
+      "enforcement": [
+        {
+          "class": "MANUAL",
+          "command": "make checkpoint-7-incremental-equivalence"
+        }
       ],
       "evidence_classes": [
         "RETAINED",
@@ -48,51 +28,30 @@
       ],
       "evidence_refs": [
         {
-          "repo": "nift",
-          "path": "docs/evidence/checkpoint-7/incremental-equivalence.json"
+          "path": "docs/evidence/checkpoint-7/incremental-equivalence.json",
+          "repo": "nift"
         }
       ],
+      "guarantee": "For the retained Checkpoint 7 corpus, successful incremental output is byte-equivalent to a clean build from the same logical project state.",
       "guard_refs": [
         {
-          "repo": "nift",
-          "path": "scripts/checkpoint7_incremental_equivalence.py"
+          "path": "scripts/checkpoint7_incremental_equivalence.py",
+          "repo": "nift"
         }
       ],
-      "enforcement": [
-        {
-          "class": "MANUAL",
-          "command": "make checkpoint-7-incremental-equivalence"
-        }
-      ],
-      "test_of_test": "UNPROVEN",
+      "id": "incremental.clean-build-equivalence",
       "known_limits": [
         "Corpus-scoped",
         "Current retained evidence is Linux-local rather than a per-push platform gate"
-      ]
-    },
-    {
-      "id": "persistence.crash-recovery",
-      "state": "ESTABLISHED",
-      "guarantee": "Interrupting Nift mid-build (SIGKILL at multiple points during build-all) leaves the project crash-safe: tracked and config metadata remain valid JSON, the next build succeeds, and a further build converges to the clean output.",
-      "scope": "3 incremental modes x 3 kill points each, plus clean-rebuild convergence.",
+      ],
       "platforms": [
         "linux"
       ],
-      "evidence_classes": [
-        "RETAINED"
-      ],
-      "evidence_refs": [
-        {
-          "repo": "nift",
-          "path": "docs/evidence/bh7/bh7-crash-recovery-red.json"
-        }
-      ],
-      "guard_refs": [
-        {
-          "repo": "nift",
-          "path": "tests/crash_recovery_adversarial.py"
-        }
-      ],
+      "scope": "720 complete output-tree comparisons over modified/hash/hybrid mutation sequences; not an enumeration of every possible project.",
+      "state": "ESTABLISHED",
+      "test_of_test": "UNPROVEN"
+    },
+    {
       "enforcement": [
         {
           "class": "MANUAL",
@@ -100,33 +59,54 @@
         },
         {
           "class": "CI_GATED",
-          "workflow": ".github/workflows/test-integrity.yml",
-          "job": "fast-suites"
+          "job": "fast-suites",
+          "workflow": ".github/workflows/test-integrity.yml"
         }
       ],
-      "test_of_test": "VERIFIED_GUARD",
+      "evidence_classes": [
+        "RETAINED"
+      ],
+      "evidence_refs": [
+        {
+          "path": "docs/evidence/bh7/bh7-crash-recovery-red.json",
+          "repo": "nift"
+        }
+      ],
+      "guarantee": "Interrupting Nift mid-build (SIGKILL at multiple points during build-all) leaves the project crash-safe: tracked and config metadata remain valid JSON, the next build succeeds, and a further build converges to the clean output.",
+      "guard_refs": [
+        {
+          "path": "tests/crash_recovery_adversarial.py",
+          "repo": "nift"
+        }
+      ],
+      "id": "persistence.crash-recovery",
       "known_limits": [
         "Kill points are coarse (0/20/80ms); scheduler-dependent timing is not exhaustively covered",
         "Process-level kill only; power-loss/cache-flush simulation is out of scope"
       ],
+      "platforms": [
+        "linux"
+      ],
+      "scope": "3 incremental modes x 3 kill points each, plus clean-rebuild convergence.",
+      "state": "ESTABLISHED",
+      "test_of_test": "VERIFIED_GUARD",
       "test_of_test_evidence_refs": [
         {
-          "repo": "nift",
-          "path": "docs/evidence/bh7/bh7-crash-recovery-red.json"
+          "path": "docs/evidence/bh7/bh7-crash-recovery-red.json",
+          "repo": "nift"
         },
         {
-          "repo": "nift",
-          "path": "docs/evidence/bh10/bh3-10-repair-battery.json"
+          "path": "docs/evidence/bh10/bh3-10-repair-battery.json",
+          "repo": "nift"
         }
       ]
     },
     {
-      "id": "filesystem.transaction-integrity",
-      "state": "ESTABLISHED",
-      "guarantee": "The retained Checkpoint 8 corpus exercises controlled filesystem/transaction failure, last-good output behavior, concurrent live-temp preservation, and stale-temp recovery.",
-      "scope": "16 retained Linux cases including long-running build-auto recovery.",
-      "platforms": [
-        "linux"
+      "enforcement": [
+        {
+          "class": "MANUAL",
+          "command": "make checkpoint-8-filesystem-transaction"
+        }
       ],
       "evidence_classes": [
         "RETAINED",
@@ -134,86 +114,65 @@
       ],
       "evidence_refs": [
         {
-          "repo": "nift",
-          "path": "docs/evidence/checkpoint-8/filesystem-transaction.json"
+          "path": "docs/evidence/checkpoint-8/filesystem-transaction.json",
+          "repo": "nift"
         }
       ],
+      "guarantee": "The retained Checkpoint 8 corpus exercises controlled filesystem/transaction failure, last-good output behavior, concurrent live-temp preservation, and stale-temp recovery.",
       "guard_refs": [
         {
-          "repo": "nift",
-          "path": "scripts/checkpoint8_filesystem_transaction.py"
+          "path": "scripts/checkpoint8_filesystem_transaction.py",
+          "repo": "nift"
         }
       ],
+      "id": "filesystem.transaction-integrity",
+      "known_limits": [
+        "PID reuse is an accepted conservative cleanup limitation"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "scope": "16 retained Linux cases including long-running build-auto recovery.",
+      "state": "ESTABLISHED",
+      "test_of_test": "UNPROVEN",
+      "test_of_test_note": "The long-running stale-temp case was demonstrated to fail the previous once-per-process recovery implementation. Historical red behavior was observed, but no dedicated retained red-run artifact is currently referenced; BH3 must promote this guard."
+    },
+    {
       "enforcement": [
         {
           "class": "MANUAL",
           "command": "make checkpoint-8-filesystem-transaction"
         }
       ],
-      "test_of_test": "UNPROVEN",
-      "test_of_test_note": "The long-running stale-temp case was demonstrated to fail the previous once-per-process recovery implementation. Historical red behavior was observed, but no dedicated retained red-run artifact is currently referenced; BH3 must promote this guard.",
-      "known_limits": [
-        "PID reuse is an accepted conservative cleanup limitation"
-      ]
-    },
-    {
-      "id": "filesystem.pid-reuse-conservative",
-      "state": "ACCEPTED_LIMITATION",
+      "evidence_classes": [
+        "RETAINED"
+      ],
+      "evidence_refs": [
+        {
+          "path": "docs/evidence/checkpoint-8/filesystem-transaction.json",
+          "repo": "nift"
+        }
+      ],
       "guarantee": "When process identity is ambiguous because ownership uses PIDs, cleanup must fail conservatively by leaving a temporary rather than deleting a potentially live writer's file.",
-      "scope": "Transactional temporary cleanup only.",
+      "guard_refs": [
+        {
+          "path": "scripts/checkpoint8_filesystem_transaction.py",
+          "repo": "nift"
+        }
+      ],
+      "id": "filesystem.pid-reuse-conservative",
+      "known_limits": [
+        "Nift does not claim globally unique process identity across PID reuse"
+      ],
       "platforms": [
         "linux",
         "macos"
       ],
-      "evidence_classes": [
-        "RETAINED"
-      ],
-      "evidence_refs": [
-        {
-          "repo": "nift",
-          "path": "docs/evidence/checkpoint-8/filesystem-transaction.json"
-        }
-      ],
-      "guard_refs": [
-        {
-          "repo": "nift",
-          "path": "scripts/checkpoint8_filesystem_transaction.py"
-        }
-      ],
-      "enforcement": [
-        {
-          "class": "MANUAL",
-          "command": "make checkpoint-8-filesystem-transaction"
-        }
-      ],
-      "test_of_test": "UNPROVEN",
-      "known_limits": [
-        "Nift does not claim globally unique process identity across PID reuse"
-      ]
+      "scope": "Transactional temporary cleanup only.",
+      "state": "ACCEPTED_LIMITATION",
+      "test_of_test": "UNPROVEN"
     },
     {
-      "id": "incremental.adversarial-state-transitions",
-      "state": "ESTABLISHED",
-      "guarantee": "A deterministic adversarial sequence of incremental state transitions (content change, rm, mv, track, template change, tracked metadata change) leaves the output set exact across modified, hash, and hybrid modes: every expected page present and non-empty, no stale/orphan outputs, and incremental output equals a clean rebuild.",
-      "scope": "3 incremental modes x 6 deterministic transitions each, plus clean-rebuild equivalence and template-propagation checks.",
-      "platforms": [
-        "linux"
-      ],
-      "evidence_classes": [
-        "RETAINED"
-      ],
-      "evidence_refs": [
-        {
-          "repo": "nift",
-          "path": "docs/evidence/bh4/bh4-incremental-state-transitions-red.json"
-        }
-      ],
-      "guard_refs": [
-        {
-          "repo": "nift",
-          "path": "tests/incremental_state_transitions_adversarial.py"
-        }
-      ],
       "enforcement": [
         {
           "class": "MANUAL",
@@ -221,49 +180,49 @@
         },
         {
           "class": "CI_GATED",
-          "workflow": ".github/workflows/test-integrity.yml",
-          "job": "fast-suites"
+          "job": "fast-suites",
+          "workflow": ".github/workflows/test-integrity.yml"
         }
-      ],
-      "test_of_test": "VERIFIED_GUARD",
-      "known_limits": [
-        "Focused deterministic transition sequence; randomized fuzzing over longer horizons remains possible",
-        "Red-run evidence covers drop-page, stale-orphan, and stub defects; a crash mid-transition is BH7 territory"
-      ],
-      "test_of_test_evidence_refs": [
-        {
-          "repo": "nift",
-          "path": "docs/evidence/bh4/bh4-incremental-state-transitions-red.json"
-        },
-        {
-          "repo": "nift",
-          "path": "docs/evidence/bh10/bh3-10-repair-battery.json"
-        }
-      ]
-    },
-    {
-      "id": "parser.value-composition-adversarial",
-      "state": "ESTABLISHED",
-      "guarantee": "Adversarial parser/value/composition inputs (truncated or invalid JSON bound through @json, deep nesting, type mismatches, missing/null/coerced values, unicode, missing or cyclic @input fragments, @path edges) resolve with a controlled outcome: a successful build with correct output, or a controlled non-zero error. A hang, a signal termination, a sanitizer finding, or missing output is a defect.",
-      "scope": "15 deterministic adversarial parser/value/composition cases.",
-      "platforms": [
-        "linux"
       ],
       "evidence_classes": [
         "RETAINED"
       ],
       "evidence_refs": [
         {
-          "repo": "nift",
-          "path": "docs/evidence/bh5/bh5-parser-value-composition-red.json"
+          "path": "docs/evidence/bh4/bh4-incremental-state-transitions-red.json",
+          "repo": "nift"
         }
       ],
+      "guarantee": "A deterministic adversarial sequence of incremental state transitions (content change, rm, mv, track, template change, tracked metadata change) leaves the output set exact across modified, hash, and hybrid modes: every expected page present and non-empty, no stale/orphan outputs, and incremental output equals a clean rebuild.",
       "guard_refs": [
         {
-          "repo": "nift",
-          "path": "tests/parser_value_composition_adversarial.py"
+          "path": "tests/incremental_state_transitions_adversarial.py",
+          "repo": "nift"
         }
       ],
+      "id": "incremental.adversarial-state-transitions",
+      "known_limits": [
+        "Focused deterministic transition sequence; randomized fuzzing over longer horizons remains possible",
+        "Red-run evidence covers drop-page, stale-orphan, and stub defects; a crash mid-transition is BH7 territory"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "scope": "3 incremental modes x 6 deterministic transitions each, plus clean-rebuild equivalence and template-propagation checks.",
+      "state": "ESTABLISHED",
+      "test_of_test": "VERIFIED_GUARD",
+      "test_of_test_evidence_refs": [
+        {
+          "path": "docs/evidence/bh4/bh4-incremental-state-transitions-red.json",
+          "repo": "nift"
+        },
+        {
+          "path": "docs/evidence/bh10/bh3-10-repair-battery.json",
+          "repo": "nift"
+        }
+      ]
+    },
+    {
       "enforcement": [
         {
           "class": "MANUAL",
@@ -271,33 +230,54 @@
         },
         {
           "class": "CI_GATED",
-          "workflow": ".github/workflows/test-integrity.yml",
-          "job": "fast-suites"
+          "job": "fast-suites",
+          "workflow": ".github/workflows/test-integrity.yml"
         }
       ],
-      "test_of_test": "VERIFIED_GUARD",
+      "evidence_classes": [
+        "RETAINED"
+      ],
+      "evidence_refs": [
+        {
+          "path": "docs/evidence/bh5/bh5-parser-value-composition-red.json",
+          "repo": "nift"
+        }
+      ],
+      "guarantee": "Adversarial parser/value/composition inputs (truncated or invalid JSON bound through @json, deep nesting, type mismatches, missing/null/coerced values, unicode, missing or cyclic @input fragments, @path edges) resolve with a controlled outcome: a successful build with correct output, or a controlled non-zero error. A hang, a signal termination, a sanitizer finding, or missing output is a defect.",
+      "guard_refs": [
+        {
+          "path": "tests/parser_value_composition_adversarial.py",
+          "repo": "nift"
+        }
+      ],
+      "id": "parser.value-composition-adversarial",
       "known_limits": [
         "Focused deterministic case set; checkpoint-9 fuzzes the template plane, this guard covers the value/composition plane",
         "Deep-nesting depth is bounded to 200; pathological resource exhaustion is not asserted"
       ],
+      "platforms": [
+        "linux"
+      ],
+      "scope": "15 deterministic adversarial parser/value/composition cases.",
+      "state": "ESTABLISHED",
+      "test_of_test": "VERIFIED_GUARD",
       "test_of_test_evidence_refs": [
         {
-          "repo": "nift",
-          "path": "docs/evidence/bh5/bh5-parser-value-composition-red.json"
+          "path": "docs/evidence/bh5/bh5-parser-value-composition-red.json",
+          "repo": "nift"
         },
         {
-          "repo": "nift",
-          "path": "docs/evidence/bh10/bh3-10-repair-battery.json"
+          "path": "docs/evidence/bh10/bh3-10-repair-battery.json",
+          "repo": "nift"
         }
       ]
     },
     {
-      "id": "parser.controlled-mutation-failure",
-      "state": "ESTABLISHED",
-      "guarantee": "The retained Checkpoint 9 mutation/resource corpus either builds or fails in a controlled way without hangs, crashes, signals, sanitizer findings, or uncontrolled resource failure.",
-      "scope": "1,217 retained n++ parser/resource cases.",
-      "platforms": [
-        "linux"
+      "enforcement": [
+        {
+          "class": "MANUAL",
+          "command": "make checkpoint-9-parser-fuzz"
+        }
       ],
       "evidence_classes": [
         "RETAINED",
@@ -305,51 +285,30 @@
       ],
       "evidence_refs": [
         {
-          "repo": "nift",
-          "path": "docs/evidence/checkpoint-9/parser-fuzz.json"
+          "path": "docs/evidence/checkpoint-9/parser-fuzz.json",
+          "repo": "nift"
         }
       ],
+      "guarantee": "The retained Checkpoint 9 mutation/resource corpus either builds or fails in a controlled way without hangs, crashes, signals, sanitizer findings, or uncontrolled resource failure.",
       "guard_refs": [
         {
-          "repo": "nift",
-          "path": "scripts/checkpoint9_parser_fuzz.py"
+          "path": "scripts/checkpoint9_parser_fuzz.py",
+          "repo": "nift"
         }
       ],
-      "enforcement": [
-        {
-          "class": "MANUAL",
-          "command": "make checkpoint-9-parser-fuzz"
-        }
-      ],
-      "test_of_test": "UNPROVEN",
+      "id": "parser.controlled-mutation-failure",
       "known_limits": [
         "Mutation-family and resource-boundary scoped",
         "Does not claim parser bug-freedom"
-      ]
-    },
-    {
-      "id": "platform.filesystem-boundary",
-      "state": "ESTABLISHED",
-      "guarantee": "Build output is contained within the output directory: adversarial content names (encoded traversal, parent references, spaces, unicode, deep nesting) never write outside public/, the project tree outside the output directory is unchanged by a build, and a read-only output directory yields a controlled failure (never a signal or hang).",
-      "scope": "6 adversarial name families plus read-only output failure, on Linux.",
+      ],
       "platforms": [
         "linux"
       ],
-      "evidence_classes": [
-        "RETAINED"
-      ],
-      "evidence_refs": [
-        {
-          "repo": "nift",
-          "path": "docs/evidence/bh9/bh9-filesystem-boundary-red.json"
-        }
-      ],
-      "guard_refs": [
-        {
-          "repo": "nift",
-          "path": "tests/filesystem_boundary_adversarial.py"
-        }
-      ],
+      "scope": "1,217 retained n++ parser/resource cases.",
+      "state": "ESTABLISHED",
+      "test_of_test": "UNPROVEN"
+    },
+    {
       "enforcement": [
         {
           "class": "MANUAL",
@@ -357,35 +316,60 @@
         },
         {
           "class": "CI_GATED",
-          "workflow": ".github/workflows/test-integrity.yml",
-          "job": "fast-suites"
+          "job": "fast-suites",
+          "workflow": ".github/workflows/test-integrity.yml"
         }
       ],
-      "test_of_test": "VERIFIED_GUARD",
+      "evidence_classes": [
+        "RETAINED"
+      ],
+      "evidence_refs": [
+        {
+          "path": "docs/evidence/bh9/bh9-filesystem-boundary-red.json",
+          "repo": "nift"
+        }
+      ],
+      "guarantee": "Build output is contained within the output directory: adversarial content names (encoded traversal, parent references, spaces, unicode, deep nesting) never write outside public/, the project tree outside the output directory is unchanged by a build, and a read-only output directory yields a controlled failure (never a signal or hang).",
+      "guard_refs": [
+        {
+          "path": "tests/filesystem_boundary_adversarial.py",
+          "repo": "nift"
+        }
+      ],
+      "id": "platform.filesystem-boundary",
       "known_limits": [
         "Linux only; platform-specific path semantics remain with the portable-equivalence corpus",
         "Symlink following within content is Nift behavior, not a boundary violation"
       ],
+      "platforms": [
+        "linux"
+      ],
+      "scope": "6 adversarial name families plus read-only output failure, on Linux.",
+      "state": "ESTABLISHED",
+      "test_of_test": "VERIFIED_GUARD",
       "test_of_test_evidence_refs": [
         {
-          "repo": "nift",
-          "path": "docs/evidence/bh9/bh9-filesystem-boundary-red.json"
+          "path": "docs/evidence/bh9/bh9-filesystem-boundary-red.json",
+          "repo": "nift"
         },
         {
-          "repo": "nift",
-          "path": "docs/evidence/bh10/bh3-10-repair-battery.json"
+          "path": "docs/evidence/bh10/bh3-10-repair-battery.json",
+          "repo": "nift"
         }
       ]
     },
     {
-      "id": "platform.portable-equivalence",
-      "state": "ESTABLISHED",
-      "guarantee": "The same retained portable behavioral corpus produces normalized equivalent semantics on Linux, macOS, and Windows.",
-      "scope": "18 portable Checkpoint 10 cases; explicitly platform-specific filesystem behavior is classified separately.",
-      "platforms": [
-        "linux",
-        "macos",
-        "windows"
+      "enforcement": [
+        {
+          "class": "CROSS_PLATFORM_GATED",
+          "job": "corpus",
+          "workflow": ".github/workflows/checkpoint-10-cross-platform.yml"
+        },
+        {
+          "class": "CROSS_PLATFORM_GATED",
+          "job": "compare",
+          "workflow": ".github/workflows/checkpoint-10-cross-platform.yml"
+        }
       ],
       "evidence_classes": [
         "RETAINED",
@@ -394,57 +378,32 @@
       ],
       "evidence_refs": [
         {
-          "repo": "nift",
-          "path": "docs/evidence/checkpoint-10/cross-platform-equivalence.json"
+          "path": "docs/evidence/checkpoint-10/cross-platform-equivalence.json",
+          "repo": "nift"
         }
       ],
+      "guarantee": "The same retained portable behavioral corpus produces normalized equivalent semantics on Linux, macOS, and Windows.",
       "guard_refs": [
         {
-          "repo": "nift",
-          "path": "scripts/checkpoint10_cross_platform.py"
+          "path": "scripts/checkpoint10_cross_platform.py",
+          "repo": "nift"
         }
       ],
-      "enforcement": [
-        {
-          "class": "CROSS_PLATFORM_GATED",
-          "workflow": ".github/workflows/checkpoint-10-cross-platform.yml",
-          "job": "corpus"
-        },
-        {
-          "class": "CROSS_PLATFORM_GATED",
-          "workflow": ".github/workflows/checkpoint-10-cross-platform.yml",
-          "job": "compare"
-        }
-      ],
-      "test_of_test": "UNPROVEN",
+      "id": "platform.portable-equivalence",
       "known_limits": [
         "Portable corpus only",
         "Platform-specific contracts are not forced into false equivalence"
-      ]
+      ],
+      "platforms": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "scope": "18 portable Checkpoint 10 cases; explicitly platform-specific filesystem behavior is classified separately.",
+      "state": "ESTABLISHED",
+      "test_of_test": "UNPROVEN"
     },
     {
-      "id": "init.scaffold-functional-truth",
-      "state": "ESTABLISHED",
-      "guarantee": "The base init scaffold is functionally true: the generated project builds out of the box, config/tracked/template/content state is internally consistent (every @input reference resolves, content-ext->output-ext mapping holds), a clean rebuild reproduces the init'd public output and page metadata exactly, and builds are idempotent.",
-      "scope": "Base init scaffold reproducibility, consistency, and idempotency.",
-      "platforms": [
-        "linux"
-      ],
-      "evidence_classes": [
-        "RETAINED"
-      ],
-      "evidence_refs": [
-        {
-          "repo": "nift",
-          "path": "docs/evidence/bh6/bh6-init-functional-truth-red.json"
-        }
-      ],
-      "guard_refs": [
-        {
-          "repo": "nift",
-          "path": "tests/init_scaffold_functional_truth.py"
-        }
-      ],
       "enforcement": [
         {
           "class": "MANUAL",
@@ -452,86 +411,86 @@
         },
         {
           "class": "CI_GATED",
-          "workflow": ".github/workflows/test-integrity.yml",
-          "job": "fast-suites"
+          "job": "fast-suites",
+          "workflow": ".github/workflows/test-integrity.yml"
         }
-      ],
-      "test_of_test": "VERIFIED_GUARD",
-      "known_limits": [
-        "Base scaffold only; target-specific scaffolds remain covered by init.target-shape-cross-platform",
-        "This Nift version emits no AI-context files from init, so AI-context truth is not asserted"
-      ],
-      "test_of_test_evidence_refs": [
-        {
-          "repo": "nift",
-          "path": "docs/evidence/bh6/bh6-init-functional-truth-red.json"
-        },
-        {
-          "repo": "nift",
-          "path": "docs/evidence/bh10/bh3-10-repair-battery.json"
-        }
-      ]
-    },
-    {
-      "id": "init.target-shape-cross-platform",
-      "state": "ESTABLISHED",
-      "guarantee": "Initializer target/scaffold output shapes, builds, and diagnostics agree with the target contract on native Linux, macOS, and Windows CI.",
-      "scope": "Supported init target/scaffold contract, not end-to-end provider deployment.",
-      "platforms": [
-        "linux",
-        "macos",
-        "windows"
-      ],
-      "evidence_classes": [
-        "CI_GATED",
-        "CROSS_PLATFORM_GATED"
-      ],
-      "evidence_refs": [],
-      "guard_refs": [
-        {
-          "repo": "nift",
-          "path": "scripts/init_targets_cross_platform.py"
-        },
-        {
-          "repo": "regression",
-          "path": "contract/init_targets_smoke.sh"
-        }
-      ],
-      "enforcement": [
-        {
-          "class": "CROSS_PLATFORM_GATED",
-          "workflow": ".github/workflows/init-targets.yml",
-          "job": "init-targets"
-        }
-      ],
-      "test_of_test": "UNPROVEN",
-      "known_limits": [
-        "Provider deployments are dogfooding/field evidence, not part of this guarantee"
-      ]
-    },
-    {
-      "id": "performance.change-proportional-incremental",
-      "state": "ESTABLISHED",
-      "guarantee": "Incremental builds are change-proportional: a no-op build rewrites no output, and changing one source rebuilds exactly that page (no full re-render), measured structurally by mtime and content across modified/hash/hybrid modes.",
-      "scope": "3 incremental modes x no-op + one-page-change probes.",
-      "platforms": [
-        "linux"
       ],
       "evidence_classes": [
         "RETAINED"
       ],
       "evidence_refs": [
         {
-          "repo": "nift",
-          "path": "docs/evidence/bh8/bh8-complexity-invariants-red.json"
+          "path": "docs/evidence/bh6/bh6-init-functional-truth-red.json",
+          "repo": "nift"
         }
       ],
+      "guarantee": "The base init scaffold is functionally true: the generated project builds out of the box, config/tracked/template/content state is internally consistent (every @input reference resolves, content-ext->output-ext mapping holds), a clean rebuild reproduces the init'd public output and page metadata exactly, and builds are idempotent.",
       "guard_refs": [
         {
-          "repo": "nift",
-          "path": "tests/complexity_invariants.py"
+          "path": "tests/init_scaffold_functional_truth.py",
+          "repo": "nift"
         }
       ],
+      "id": "init.scaffold-functional-truth",
+      "known_limits": [
+        "Base scaffold only; target-specific scaffolds remain covered by init.target-shape-cross-platform",
+        "This Nift version emits no AI-context files from init, so AI-context truth is not asserted"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "scope": "Base init scaffold reproducibility, consistency, and idempotency.",
+      "state": "ESTABLISHED",
+      "test_of_test": "VERIFIED_GUARD",
+      "test_of_test_evidence_refs": [
+        {
+          "path": "docs/evidence/bh6/bh6-init-functional-truth-red.json",
+          "repo": "nift"
+        },
+        {
+          "path": "docs/evidence/bh10/bh3-10-repair-battery.json",
+          "repo": "nift"
+        }
+      ]
+    },
+    {
+      "enforcement": [
+        {
+          "class": "CROSS_PLATFORM_GATED",
+          "job": "init-targets",
+          "workflow": ".github/workflows/init-targets.yml"
+        }
+      ],
+      "evidence_classes": [
+        "CI_GATED",
+        "CROSS_PLATFORM_GATED"
+      ],
+      "evidence_refs": [],
+      "guarantee": "Initializer target/scaffold output shapes, builds, and diagnostics agree with the target contract on native Linux, macOS, and Windows CI.",
+      "guard_refs": [
+        {
+          "path": "scripts/init_targets_cross_platform.py",
+          "repo": "nift"
+        },
+        {
+          "path": "contract/init_targets_smoke.sh",
+          "repo": "regression"
+        }
+      ],
+      "id": "init.target-shape-cross-platform",
+      "known_limits": [
+        "Provider deployments are dogfooding/field evidence, not part of this guarantee"
+      ],
+      "platforms": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "scope": "Supported init target/scaffold contract, not end-to-end provider deployment.",
+      "state": "ESTABLISHED",
+      "test_of_test": "UNPROVEN"
+    },
+    {
       "enforcement": [
         {
           "class": "MANUAL",
@@ -539,218 +498,214 @@
         },
         {
           "class": "CI_GATED",
-          "workflow": ".github/workflows/test-integrity.yml",
-          "job": "fast-suites"
+          "job": "fast-suites",
+          "workflow": ".github/workflows/test-integrity.yml"
         }
-      ],
-      "test_of_test": "VERIFIED_GUARD",
-      "known_limits": [
-        "Structural change-proportionality only; wall-clock scaling remains covered by the near-linear benchmarks",
-        "Filesystem timestamp granularity makes sub-millisecond rewrites undetectable"
-      ],
-      "test_of_test_evidence_refs": [
-        {
-          "repo": "nift",
-          "path": "docs/evidence/bh8/bh8-complexity-invariants-red.json"
-        },
-        {
-          "repo": "nift",
-          "path": "docs/evidence/bh10/bh3-10-repair-battery.json"
-        }
-      ]
-    },
-    {
-      "id": "performance.tracking-near-linear",
-      "state": "ESTABLISHED",
-      "guarantee": "Tracked-project loading remains near-linear over the retained scaling fixture and preserves duplicate/collision rejection.",
-      "scope": "Maintained tracking scaling benchmark and its generous ratio ceiling.",
-      "platforms": [
-        "linux"
-      ],
-      "evidence_classes": [
-        "CI_GATED"
-      ],
-      "evidence_refs": [],
-      "guard_refs": [
-        {
-          "repo": "nift",
-          "path": "tests/tracking_scaling_benchmark.py"
-        }
-      ],
-      "enforcement": [
-        {
-          "class": "CI_GATED",
-          "workflow": ".github/workflows/performance-regression.yml",
-          "job": "scaling"
-        }
-      ],
-      "test_of_test": "UNPROVEN",
-      "known_limits": [
-        "Ratio guard, not a universal wall-clock guarantee"
-      ]
-    },
-    {
-      "id": "performance.full-build-near-linear",
-      "state": "ESTABLISHED",
-      "guarantee": "Changed-output full-build work remains near-linear on the retained large flat-output fixture.",
-      "scope": "1,000\u21924,000 page changed-output scaling guard; identical-output fast path cannot hide the writer cost.",
-      "platforms": [
-        "linux"
-      ],
-      "evidence_classes": [
-        "CI_GATED"
-      ],
-      "evidence_refs": [],
-      "guard_refs": [
-        {
-          "repo": "nift",
-          "path": "tests/full_build_scaling_benchmark.py"
-        }
-      ],
-      "enforcement": [
-        {
-          "class": "CI_GATED",
-          "workflow": ".github/workflows/performance-regression.yml",
-          "job": "scaling"
-        }
-      ],
-      "test_of_test": "UNPROVEN",
-      "test_of_test_note": "The guard was demonstrated to fail the historical per-write stale-temp scan implementation. Historical red behavior was observed, but no dedicated retained red-run artifact is currently referenced; BH3 must promote this guard.",
-      "known_limits": [
-        "Ratio guard, not a universal wall-clock guarantee"
-      ]
-    },
-    {
-      "id": "performance.recovery-scan-bound",
-      "state": "ESTABLISHED",
-      "guarantee": "Transactional stale-temp recovery scans each distinct touched output parent at most once per recovery epoch.",
-      "scope": "Direct operation-count invariant exercised by the dedicated recovery-epoch guard.",
-      "platforms": [
-        "linux"
-      ],
-      "evidence_classes": [
-        "CI_GATED"
-      ],
-      "evidence_refs": [],
-      "guard_refs": [
-        {
-          "repo": "nift",
-          "path": "tests/recovery_epoch_guard.cpp"
-        }
-      ],
-      "enforcement": [
-        {
-          "class": "CI_GATED",
-          "workflow": ".github/workflows/performance-regression.yml",
-          "job": "scaling"
-        }
-      ],
-      "test_of_test": "UNPROVEN",
-      "known_limits": [
-        "Structural scan-count invariant; does not promise idle background garbage collection"
-      ]
-    },
-    {
-      "id": "memory.10k-peak-rss",
-      "state": "ESTABLISHED",
-      "guarantee": "On the retained Linux 10,000-page memory fixture, measured peak RSS remains within the maintained 16 MiB guard.",
-      "scope": "Fixture-specific peak-RSS guard; RSS is not treated as a leak oracle.",
-      "platforms": [
-        "linux"
-      ],
-      "evidence_classes": [
-        "RETAINED",
-        "CAMPAIGN"
-      ],
-      "evidence_refs": [
-        {
-          "repo": "nift",
-          "path": "docs/evidence/memory-safety/checkpoint-4-large-project.json"
-        }
-      ],
-      "guard_refs": [
-        {
-          "repo": "nift",
-          "path": "tests/memory_10k_benchmark.py"
-        }
-      ],
-      "enforcement": [
-        {
-          "class": "MANUAL",
-          "command": "make benchmark-memory-10k"
-        }
-      ],
-      "test_of_test": "UNPROVEN",
-      "known_limits": [
-        "Known BH2 issue: missing /usr/bin/time currently exits 0, so SKIP can masquerade as PASS"
-      ]
-    },
-    {
-      "id": "memory.cross-component-valgrind",
-      "state": "ESTABLISHED",
-      "guarantee": "The retained cross-component Valgrind campaign completed with zero reported Valgrind errors and no non-zero definite/indirect/possible leak bytes for the monitored invocations.",
-      "scope": "19 monitored Nift invocations over the retained Checkpoint 6B workload.",
-      "platforms": [
-        "linux"
-      ],
-      "evidence_classes": [
-        "RETAINED",
-        "CAMPAIGN"
-      ],
-      "evidence_refs": [
-        {
-          "repo": "nift",
-          "path": "docs/evidence/memory-safety/checkpoint-6-valgrind.json"
-        }
-      ],
-      "guard_refs": [
-        {
-          "repo": "nift",
-          "path": "scripts/checkpoint6_integration.py"
-        },
-        {
-          "repo": "nift",
-          "path": "scripts/valgrind_nift.sh"
-        }
-      ],
-      "enforcement": [
-        {
-          "class": "MANUAL",
-          "command": "make valgrind-memory-safety-checkpoint-6"
-        }
-      ],
-      "test_of_test": "UNPROVEN",
-      "known_limits": [
-        "Historical/campaign evidence; not every push is Valgrind-gated"
-      ]
-    },
-    {
-      "id": "contracts.namespace-reservation",
-      "state": "ESTABLISHED",
-      "guarantee": "Configured Project Contract namespaces are project-wide and cannot be shadowed or overloaded by JSON bindings, loop variables, built-ins, or another contract binding.",
-      "scope": "Configured project-contract names and their documented binding collisions.",
-      "platforms": [
-        "linux"
       ],
       "evidence_classes": [
         "RETAINED"
       ],
       "evidence_refs": [
         {
-          "repo": "nift",
-          "path": "docs/evidence/bh10/bh10-reconciliation-evidence.json"
+          "path": "docs/evidence/bh8/bh8-complexity-invariants-red.json",
+          "repo": "nift"
         }
       ],
+      "guarantee": "Incremental builds are change-proportional: a no-op build rewrites no output, and changing one source rebuilds exactly that page (no full re-render), measured structurally by mtime and content across modified/hash/hybrid modes.",
       "guard_refs": [
         {
-          "repo": "nift",
-          "path": "tests/contracts_smoke.sh"
-        },
-        {
-          "repo": "regression",
-          "path": "contract/contracts_smoke.sh"
+          "path": "tests/complexity_invariants.py",
+          "repo": "nift"
         }
       ],
+      "id": "performance.change-proportional-incremental",
+      "known_limits": [
+        "Structural change-proportionality only; wall-clock scaling remains covered by the near-linear benchmarks",
+        "Filesystem timestamp granularity makes sub-millisecond rewrites undetectable"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "scope": "3 incremental modes x no-op + one-page-change probes.",
+      "state": "ESTABLISHED",
+      "test_of_test": "VERIFIED_GUARD",
+      "test_of_test_evidence_refs": [
+        {
+          "path": "docs/evidence/bh8/bh8-complexity-invariants-red.json",
+          "repo": "nift"
+        },
+        {
+          "path": "docs/evidence/bh10/bh3-10-repair-battery.json",
+          "repo": "nift"
+        }
+      ]
+    },
+    {
+      "enforcement": [
+        {
+          "class": "CI_GATED",
+          "job": "scaling",
+          "workflow": ".github/workflows/performance-regression.yml"
+        }
+      ],
+      "evidence_classes": [
+        "CI_GATED"
+      ],
+      "evidence_refs": [],
+      "guarantee": "Tracked-project loading remains near-linear over the retained scaling fixture and preserves duplicate/collision rejection.",
+      "guard_refs": [
+        {
+          "path": "tests/tracking_scaling_benchmark.py",
+          "repo": "nift"
+        }
+      ],
+      "id": "performance.tracking-near-linear",
+      "known_limits": [
+        "Ratio guard, not a universal wall-clock guarantee"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "scope": "Maintained tracking scaling benchmark and its generous ratio ceiling.",
+      "state": "ESTABLISHED",
+      "test_of_test": "UNPROVEN"
+    },
+    {
+      "enforcement": [
+        {
+          "class": "CI_GATED",
+          "job": "scaling",
+          "workflow": ".github/workflows/performance-regression.yml"
+        }
+      ],
+      "evidence_classes": [
+        "CI_GATED"
+      ],
+      "evidence_refs": [],
+      "guarantee": "Changed-output full-build work remains near-linear on the retained large flat-output fixture.",
+      "guard_refs": [
+        {
+          "path": "tests/full_build_scaling_benchmark.py",
+          "repo": "nift"
+        }
+      ],
+      "id": "performance.full-build-near-linear",
+      "known_limits": [
+        "Ratio guard, not a universal wall-clock guarantee"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "scope": "1,000\u21924,000 page changed-output scaling guard; identical-output fast path cannot hide the writer cost.",
+      "state": "ESTABLISHED",
+      "test_of_test": "UNPROVEN",
+      "test_of_test_note": "The guard was demonstrated to fail the historical per-write stale-temp scan implementation. Historical red behavior was observed, but no dedicated retained red-run artifact is currently referenced; BH3 must promote this guard."
+    },
+    {
+      "enforcement": [
+        {
+          "class": "CI_GATED",
+          "job": "scaling",
+          "workflow": ".github/workflows/performance-regression.yml"
+        }
+      ],
+      "evidence_classes": [
+        "CI_GATED"
+      ],
+      "evidence_refs": [],
+      "guarantee": "Transactional stale-temp recovery scans each distinct touched output parent at most once per recovery epoch.",
+      "guard_refs": [
+        {
+          "path": "tests/recovery_epoch_guard.cpp",
+          "repo": "nift"
+        }
+      ],
+      "id": "performance.recovery-scan-bound",
+      "known_limits": [
+        "Structural scan-count invariant; does not promise idle background garbage collection"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "scope": "Direct operation-count invariant exercised by the dedicated recovery-epoch guard.",
+      "state": "ESTABLISHED",
+      "test_of_test": "UNPROVEN"
+    },
+    {
+      "enforcement": [
+        {
+          "class": "MANUAL",
+          "command": "make benchmark-memory-10k"
+        }
+      ],
+      "evidence_classes": [
+        "RETAINED",
+        "CAMPAIGN"
+      ],
+      "evidence_refs": [
+        {
+          "path": "docs/evidence/memory-safety/checkpoint-4-large-project.json",
+          "repo": "nift"
+        }
+      ],
+      "guarantee": "On the retained Linux 10,000-page memory fixture, measured peak RSS remains within the maintained 16 MiB guard.",
+      "guard_refs": [
+        {
+          "path": "tests/memory_10k_benchmark.py",
+          "repo": "nift"
+        }
+      ],
+      "id": "memory.10k-peak-rss",
+      "known_limits": [
+        "Known BH2 issue: missing /usr/bin/time currently exits 0, so SKIP can masquerade as PASS"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "scope": "Fixture-specific peak-RSS guard; RSS is not treated as a leak oracle.",
+      "state": "ESTABLISHED",
+      "test_of_test": "UNPROVEN"
+    },
+    {
+      "enforcement": [
+        {
+          "class": "MANUAL",
+          "command": "make valgrind-memory-safety-checkpoint-6"
+        }
+      ],
+      "evidence_classes": [
+        "RETAINED",
+        "CAMPAIGN"
+      ],
+      "evidence_refs": [
+        {
+          "path": "docs/evidence/memory-safety/checkpoint-6-valgrind.json",
+          "repo": "nift"
+        }
+      ],
+      "guarantee": "The retained cross-component Valgrind campaign completed with zero reported Valgrind errors and no non-zero definite/indirect/possible leak bytes for the monitored invocations.",
+      "guard_refs": [
+        {
+          "path": "scripts/checkpoint6_integration.py",
+          "repo": "nift"
+        },
+        {
+          "path": "scripts/valgrind_nift.sh",
+          "repo": "nift"
+        }
+      ],
+      "id": "memory.cross-component-valgrind",
+      "known_limits": [
+        "Historical/campaign evidence; not every push is Valgrind-gated"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "scope": "19 monitored Nift invocations over the retained Checkpoint 6B workload.",
+      "state": "ESTABLISHED",
+      "test_of_test": "UNPROVEN"
+    },
+    {
       "enforcement": [
         {
           "class": "MANUAL",
@@ -758,197 +713,188 @@
         },
         {
           "class": "CI_GATED",
-          "workflow": ".github/workflows/test-integrity.yml",
-          "job": "fast-suites"
+          "job": "fast-suites",
+          "workflow": ".github/workflows/test-integrity.yml"
         }
       ],
-      "test_of_test": "UNPROVEN",
-      "known_limits": [
-        "Completed-run evidence retained at docs/evidence/bh10/ in BH10 reconciliation"
-      ]
-    },
-    {
-      "id": "embedded.jsonic-sync",
-      "state": "ESTABLISHED",
-      "guarantee": "The embedded Jsonic++ subtree can be checked against a canonical Jsonic++ checkout for exact Nift synchronization.",
-      "scope": "Sync contract exposed by test-jsonic-sync; automatic CI enforcement is not yet established.",
-      "platforms": [
-        "linux",
-        "macos",
-        "windows"
+      "evidence_classes": [
+        "RETAINED"
       ],
-      "evidence_classes": [],
-      "evidence_refs": [],
+      "evidence_refs": [
+        {
+          "path": "docs/evidence/bh10/bh10-reconciliation-evidence.json",
+          "repo": "nift"
+        }
+      ],
+      "guarantee": "Configured Project Contract namespaces are project-wide and cannot be shadowed or overloaded by JSON bindings, loop variables, built-ins, or another contract binding.",
       "guard_refs": [
         {
-          "repo": "nift",
-          "path": "Makefile",
-          "needle": "test-jsonic-sync:"
+          "path": "tests/contracts_smoke.sh",
+          "repo": "nift"
+        },
+        {
+          "path": "contract/contracts_smoke.sh",
+          "repo": "regression"
         }
       ],
+      "id": "contracts.namespace-reservation",
+      "known_limits": [
+        "Completed-run evidence retained at docs/evidence/bh10/ in BH10 reconciliation"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "scope": "Configured project-contract names and their documented binding collisions.",
+      "state": "ESTABLISHED",
+      "test_of_test": "UNPROVEN"
+    },
+    {
       "enforcement": [
         {
           "class": "MANUAL",
           "command": "make test-jsonic-sync JSONIC_DIR=/path/to/jsonic"
         }
       ],
-      "test_of_test": "UNPROVEN",
+      "evidence_classes": [],
+      "evidence_refs": [],
+      "guarantee": "The embedded Jsonic++ subtree can be checked against a canonical Jsonic++ checkout for exact Nift synchronization.",
+      "guard_refs": [
+        {
+          "needle": "test-jsonic-sync:",
+          "path": "Makefile",
+          "repo": "nift"
+        }
+      ],
+      "id": "embedded.jsonic-sync",
       "known_limits": [
         "Requires an external canonical Jsonic++ checkout (JSONIC_DIR); no local completed-run evidence is registered in BH10, so its evidence class is not RETAINED",
         "Automatic CI enforcement not established"
-      ]
-    },
-    {
-      "id": "distribution.public-availability-truth",
-      "state": "ESTABLISHED",
-      "guarantee": "Package-manager availability is reported as public only after the intended store version resolves and a fresh installation succeeds; workflow submission alone is not equivalent to availability.",
-      "scope": "Release/distribution reporting discipline and verification workflow.",
+      ],
       "platforms": [
         "linux",
         "macos",
         "windows"
+      ],
+      "scope": "Sync contract exposed by test-jsonic-sync; automatic CI enforcement is not yet established.",
+      "state": "ESTABLISHED",
+      "test_of_test": "UNPROVEN"
+    },
+    {
+      "enforcement": [
+        {
+          "class": "RELEASE_GATED",
+          "job": "summary",
+          "workflow": ".github/workflows/distribution-verification.yml"
+        }
       ],
       "evidence_classes": [
         "RELEASE_GATED"
       ],
       "evidence_refs": [
         {
-          "repo": "nift",
-          "path": "docs/handover/PACKAGING.md"
+          "path": "docs/handover/PACKAGING.md",
+          "repo": "nift"
         }
       ],
+      "guarantee": "Package-manager availability is reported as public only after the intended store version resolves and a fresh installation succeeds; workflow submission alone is not equivalent to availability.",
       "guard_refs": [
         {
-          "repo": "nift",
-          "path": ".github/workflows/distribution-verification.yml"
+          "path": ".github/workflows/distribution-verification.yml",
+          "repo": "nift"
         }
       ],
-      "enforcement": [
-        {
-          "class": "RELEASE_GATED",
-          "workflow": ".github/workflows/distribution-verification.yml",
-          "job": "summary"
-        }
-      ],
-      "test_of_test": "UNPROVEN",
+      "id": "distribution.public-availability-truth",
       "known_limits": [
         "Distribution verification is manually dispatched rather than an every-push gate"
-      ]
+      ],
+      "platforms": [
+        "linux",
+        "macos",
+        "windows"
+      ],
+      "scope": "Release/distribution reporting discipline and verification workflow.",
+      "state": "ESTABLISHED",
+      "test_of_test": "UNPROVEN"
     },
     {
-      "id": "memory.jsonic-component",
-      "state": "ESTABLISHED",
-      "guarantee": "The embedded Jsonic++ component has retained sanitizer/RSS lifetime testing and independent Valgrind confirmation for its maintained component corpus.",
-      "scope": "Jsonic++ component evidence only; does not by itself establish Nift end-to-end memory behavior.",
-      "platforms": [
-        "linux"
-      ],
-      "evidence_classes": [
-        "RETAINED",
-        "CAMPAIGN"
-      ],
-      "evidence_refs": [
-        {
-          "repo": "nift",
-          "path": "jsonic/docs/evidence/memory-safety-checkpoint-1b-valgrind.json"
-        }
-      ],
-      "guard_refs": [
-        {
-          "repo": "nift",
-          "path": "jsonic/scripts/memory_safety.py"
-        },
-        {
-          "repo": "nift",
-          "path": "jsonic/tests/json_memory_lifetime.cpp"
-        }
-      ],
       "enforcement": [
         {
           "class": "MANUAL",
           "command": "make -C jsonic memory-safety-checkpoint-1a"
         }
       ],
-      "test_of_test": "UNPROVEN",
-      "known_limits": [
-        "Component-scoped historical/campaign evidence"
-      ]
-    },
-    {
-      "id": "memory.minify-component",
-      "state": "ESTABLISHED",
-      "guarantee": "The embedded Minify++ component has retained sanitizer/RSS lifetime testing and independent Valgrind confirmation for its maintained multi-format component corpus.",
-      "scope": "Minify++ component evidence only; does not by itself establish Nift end-to-end memory behavior.",
-      "platforms": [
-        "linux"
-      ],
       "evidence_classes": [
         "RETAINED",
         "CAMPAIGN"
       ],
       "evidence_refs": [
         {
-          "repo": "nift",
-          "path": "minifypp/docs/evidence/memory-safety-checkpoint-2b-valgrind.json"
+          "path": "jsonic/docs/evidence/memory-safety-checkpoint-1b-valgrind.json",
+          "repo": "nift"
         }
       ],
+      "guarantee": "The embedded Jsonic++ component has retained sanitizer/RSS lifetime testing and independent Valgrind confirmation for its maintained component corpus.",
       "guard_refs": [
         {
-          "repo": "nift",
-          "path": "minifypp/scripts/memory_safety.py"
+          "path": "jsonic/scripts/memory_safety.py",
+          "repo": "nift"
         },
         {
-          "repo": "nift",
-          "path": "minifypp/tests/memory_lifetime.cpp"
+          "path": "jsonic/tests/json_memory_lifetime.cpp",
+          "repo": "nift"
         }
       ],
+      "id": "memory.jsonic-component",
+      "known_limits": [
+        "Component-scoped historical/campaign evidence"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "scope": "Jsonic++ component evidence only; does not by itself establish Nift end-to-end memory behavior.",
+      "state": "ESTABLISHED",
+      "test_of_test": "UNPROVEN"
+    },
+    {
       "enforcement": [
         {
           "class": "MANUAL",
           "command": "make -C minifypp memory-safety-checkpoint-2"
         }
       ],
-      "test_of_test": "UNPROVEN",
-      "known_limits": [
-        "Component-scoped historical/campaign evidence"
-      ]
-    },
-    {
-      "id": "memory.nift-lifecycle",
-      "state": "ESTABLISHED",
-      "guarantee": "Nift's retained lifecycle/watch memory campaign exercises sanitizer-backed project mutation/failure/repair paths plus long-running watch endurance without recorded sanitizer findings in the retained evidence.",
-      "scope": "Checkpoint 3 core lifecycle and Checkpoint 4 watch/large-project retained workloads.",
-      "platforms": [
-        "linux"
-      ],
       "evidence_classes": [
         "RETAINED",
         "CAMPAIGN"
       ],
       "evidence_refs": [
         {
-          "repo": "nift",
-          "path": "docs/evidence/memory-safety/checkpoint-3-core.json"
-        },
-        {
-          "repo": "nift",
-          "path": "docs/evidence/memory-safety/checkpoint-4-watch-rss.json"
-        },
-        {
-          "repo": "nift",
-          "path": "docs/evidence/memory-safety/checkpoint-4-watch-valgrind.json"
+          "path": "minifypp/docs/evidence/memory-safety-checkpoint-2b-valgrind.json",
+          "repo": "nift"
         }
       ],
+      "guarantee": "The embedded Minify++ component has retained sanitizer/RSS lifetime testing and independent Valgrind confirmation for its maintained multi-format component corpus.",
       "guard_refs": [
         {
-          "repo": "nift",
-          "path": "scripts/checkpoint3_core_memory.py"
+          "path": "minifypp/scripts/memory_safety.py",
+          "repo": "nift"
         },
         {
-          "repo": "nift",
-          "path": "scripts/memory_safety.py"
+          "path": "minifypp/tests/memory_lifetime.cpp",
+          "repo": "nift"
         }
       ],
+      "id": "memory.minify-component",
+      "known_limits": [
+        "Component-scoped historical/campaign evidence"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "scope": "Minify++ component evidence only; does not by itself establish Nift end-to-end memory behavior.",
+      "state": "ESTABLISHED",
+      "test_of_test": "UNPROVEN"
+    },
+    {
       "enforcement": [
         {
           "class": "MANUAL",
@@ -959,42 +905,47 @@
           "command": "make memory-safety-checkpoint-4-watch"
         }
       ],
-      "test_of_test": "UNPROVEN",
-      "known_limits": [
-        "Campaign-scoped; RSS is not used as a standalone leak oracle"
-      ]
-    },
-    {
-      "id": "pagination.incremental-clean-equivalence",
-      "state": "ESTABLISHED",
-      "guarantee": "Pagination state transitions preserve incremental-vs-clean output equivalence across modified, hash, and hybrid modes.",
-      "scope": "18 focused comparisons: six pagination state transitions under each incremental mode.",
-      "platforms": [
-        "linux"
-      ],
       "evidence_classes": [
-        "RETAINED"
+        "RETAINED",
+        "CAMPAIGN"
       ],
       "evidence_refs": [
         {
-          "repo": "nift",
-          "path": "docs/evidence/bh3/bh3-mutation-tranche1.json"
+          "path": "docs/evidence/memory-safety/checkpoint-3-core.json",
+          "repo": "nift"
         },
         {
-          "repo": "nift",
-          "path": "docs/evidence/bh3/bh3-mutation-tranche2.json"
+          "path": "docs/evidence/memory-safety/checkpoint-4-watch-rss.json",
+          "repo": "nift"
         },
         {
-          "repo": "nift",
-          "path": "docs/evidence/bh3/bh3-pagination-correctness-red.json"
+          "path": "docs/evidence/memory-safety/checkpoint-4-watch-valgrind.json",
+          "repo": "nift"
         }
       ],
+      "guarantee": "Nift's retained lifecycle/watch memory campaign exercises sanitizer-backed project mutation/failure/repair paths plus long-running watch endurance without recorded sanitizer findings in the retained evidence.",
       "guard_refs": [
         {
-          "repo": "nift",
-          "path": "tests/pagination_incremental_equivalence.py"
+          "path": "scripts/checkpoint3_core_memory.py",
+          "repo": "nift"
+        },
+        {
+          "path": "scripts/memory_safety.py",
+          "repo": "nift"
         }
       ],
+      "id": "memory.nift-lifecycle",
+      "known_limits": [
+        "Campaign-scoped; RSS is not used as a standalone leak oracle"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "scope": "Checkpoint 3 core lifecycle and Checkpoint 4 watch/large-project retained workloads.",
+      "state": "ESTABLISHED",
+      "test_of_test": "UNPROVEN"
+    },
+    {
       "enforcement": [
         {
           "class": "MANUAL",
@@ -1002,51 +953,59 @@
         },
         {
           "class": "CI_GATED",
-          "workflow": ".github/workflows/test-integrity.yml",
-          "job": "fast-suites"
+          "job": "fast-suites",
+          "workflow": ".github/workflows/test-integrity.yml"
         }
-      ],
-      "test_of_test": "VERIFIED_GUARD",
-      "test_of_test_evidence_refs": [
-        {
-          "repo": "nift",
-          "path": "docs/evidence/bh3/bh3-pagination-correctness-red.json"
-        },
-        {
-          "repo": "nift",
-          "path": "docs/evidence/bh3/bh3-mutation-tranche2.json"
-        }
-      ],
-      "known_limits": [
-        "Focused pagination fixture; broader incremental state-space remains BH4 territory",
-        "Output correctness (exact page set + nav total) is now asserted, so a stub or a build that under-produces pages in both incremental and clean runs is RED",
-        "Deleting the equivalence comparison specifically (m4 logic removal) remains a live mutation that is not statically catchable; accepted enforcement boundary",
-        "Mutation battery (stub / truncating / sabotaged nift) retained under docs/evidence/bh3/; test_of_test VERIFIED_GUARD via load-bearing proof (m3 inversion flips healthy to FAIL)"
-      ]
-    },
-    {
-      "id": "templating.parameter-interpolation-contract",
-      "state": "ESTABLISHED",
-      "guarantee": "Parameter interpolation behavior is covered by a focused standalone contract module.",
-      "scope": "Checkpoint-specific 73-check parameter-interpolation module.",
-      "platforms": [
-        "linux"
       ],
       "evidence_classes": [
         "RETAINED"
       ],
       "evidence_refs": [
         {
-          "repo": "nift",
-          "path": "docs/evidence/bh10/bh10-reconciliation-evidence.json"
+          "path": "docs/evidence/bh3/bh3-mutation-tranche1.json",
+          "repo": "nift"
+        },
+        {
+          "path": "docs/evidence/bh3/bh3-mutation-tranche2.json",
+          "repo": "nift"
+        },
+        {
+          "path": "docs/evidence/bh3/bh3-pagination-correctness-red.json",
+          "repo": "nift"
         }
       ],
+      "guarantee": "Pagination state transitions preserve incremental-vs-clean output equivalence across modified, hash, and hybrid modes.",
       "guard_refs": [
         {
-          "repo": "regression",
-          "path": "contract/parameter_interpolation_smoke.sh"
+          "path": "tests/pagination_incremental_equivalence.py",
+          "repo": "nift"
         }
       ],
+      "id": "pagination.incremental-clean-equivalence",
+      "known_limits": [
+        "Focused pagination fixture; broader incremental state-space remains BH4 territory",
+        "Output correctness (exact page set + nav total) is now asserted, so a stub or a build that under-produces pages in both incremental and clean runs is RED",
+        "Deleting the equivalence comparison specifically (m4 logic removal) remains a live mutation that is not statically catchable; accepted enforcement boundary",
+        "Mutation battery (stub / truncating / sabotaged nift) retained under docs/evidence/bh3/; test_of_test VERIFIED_GUARD via load-bearing proof (m3 inversion flips healthy to FAIL)"
+      ],
+      "platforms": [
+        "linux"
+      ],
+      "scope": "18 focused comparisons: six pagination state transitions under each incremental mode.",
+      "state": "ESTABLISHED",
+      "test_of_test": "VERIFIED_GUARD",
+      "test_of_test_evidence_refs": [
+        {
+          "path": "docs/evidence/bh3/bh3-pagination-correctness-red.json",
+          "repo": "nift"
+        },
+        {
+          "path": "docs/evidence/bh3/bh3-mutation-tranche2.json",
+          "repo": "nift"
+        }
+      ]
+    },
+    {
       "enforcement": [
         {
           "class": "MANUAL",
@@ -1054,23 +1013,44 @@
         },
         {
           "class": "CI_GATED",
-          "workflow": ".github/workflows/test-integrity.yml",
-          "job": "fast-suites"
+          "job": "fast-suites",
+          "workflow": ".github/workflows/test-integrity.yml"
         }
       ],
-      "test_of_test": "UNPROVEN",
+      "evidence_classes": [
+        "RETAINED"
+      ],
+      "evidence_refs": [
+        {
+          "path": "docs/evidence/bh10/bh10-reconciliation-evidence.json",
+          "repo": "nift"
+        }
+      ],
+      "guarantee": "Parameter interpolation behavior is covered by a focused standalone contract module.",
+      "guard_refs": [
+        {
+          "path": "contract/parameter_interpolation_smoke.sh",
+          "repo": "regression"
+        }
+      ],
+      "id": "templating.parameter-interpolation-contract",
       "known_limits": [
         "Checkpoint count is historical evidence, not a current total-suite count",
         "The standalone 73-check module lives in the regression suite and runs in full 3-repo executions; the nift CI_GATED path runs make test-contracts, whose contracts_smoke.sh also exercises interpolation bindings. Completed-run evidence retained at docs/evidence/bh10/."
-      ]
-    },
-    {
-      "id": "concurrency.shared-data-isolation",
-      "state": "ESTABLISHED",
-      "guarantee": "The retained integration harness exercises shared JSON/schema/input state under parallel page builds and failure/repair transitions.",
-      "scope": "120-page shared-data fixture with 12 workers across repeated forced builds and schema invalidation/repair.",
+      ],
       "platforms": [
         "linux"
+      ],
+      "scope": "Checkpoint-specific 73-check parameter-interpolation module.",
+      "state": "ESTABLISHED",
+      "test_of_test": "UNPROVEN"
+    },
+    {
+      "enforcement": [
+        {
+          "class": "MANUAL",
+          "command": "make memory-safety-checkpoint-6"
+        }
       ],
       "evidence_classes": [
         "RETAINED",
@@ -1078,423 +1058,443 @@
       ],
       "evidence_refs": [
         {
-          "repo": "nift",
-          "path": "docs/evidence/memory-safety/checkpoint-6-integration.json"
+          "path": "docs/evidence/memory-safety/checkpoint-6-integration.json",
+          "repo": "nift"
         }
       ],
+      "guarantee": "The retained integration harness exercises shared JSON/schema/input state under parallel page builds and failure/repair transitions.",
       "guard_refs": [
         {
-          "repo": "nift",
-          "path": "scripts/checkpoint6_integration.py"
+          "path": "scripts/checkpoint6_integration.py",
+          "repo": "nift"
         }
       ],
-      "enforcement": [
-        {
-          "class": "MANUAL",
-          "command": "make memory-safety-checkpoint-6"
-        }
+      "id": "concurrency.shared-data-isolation",
+      "known_limits": [],
+      "platforms": [
+        "linux"
       ],
-      "test_of_test": "UNPROVEN",
-      "known_limits": []
-    }
-  ],
-  "public_claims": [
-    {
-      "id": "battle.incremental-720",
+      "scope": "120-page shared-data fixture with 12 workers across repeated forced builds and schema invalidation/repair.",
       "state": "ESTABLISHED",
-      "guarantee_id": "incremental.clean-build-equivalence",
-      "source": {
-        "repo": "website",
-        "path": "content/docs/battle-tested.html",
-        "needle": "720 complete output-tree comparisons"
-      },
-      "kind": "quantitative"
-    },
-    {
-      "id": "battle.fs-checkpoint8-sixteen",
-      "state": "ESTABLISHED",
-      "guarantee_id": "filesystem.transaction-integrity",
-      "source": {
-        "repo": "website",
-        "path": "content/docs/battle-tested.html",
-        "needle": "maintained Linux corpus now has sixteen cases"
-      },
-      "kind": "quantitative"
-    },
-    {
-      "id": "battle.parser-1217",
-      "state": "ESTABLISHED",
-      "guarantee_id": "parser.controlled-mutation-failure",
-      "source": {
-        "repo": "website",
-        "path": "content/docs/battle-tested.html",
-        "needle": "1,217 n++ parser/resource cases"
-      },
-      "kind": "quantitative"
-    },
-    {
-      "id": "battle.parser-results",
-      "state": "ESTABLISHED",
-      "guarantee_id": "parser.controlled-mutation-failure",
-      "source": {
-        "repo": "website",
-        "path": "content/docs/battle-tested.html",
-        "needle": "234 successful builds and 983 controlled errors"
-      },
-      "kind": "quantitative"
-    },
-    {
-      "id": "battle.platform-18",
-      "state": "ESTABLISHED",
-      "guarantee_id": "platform.portable-equivalence",
-      "source": {
-        "repo": "website",
-        "path": "content/docs/battle-tested.html",
-        "needle": "18-case portable behavioral corpus"
-      },
-      "kind": "quantitative"
-    },
-    {
-      "id": "battle.valgrind-19",
-      "state": "ESTABLISHED",
-      "guarantee_id": "memory.cross-component-valgrind",
-      "source": {
-        "repo": "website",
-        "path": "content/docs/battle-tested.html",
-        "needle": "19 Nift invocations across 12 rounds and 40 pages"
-      },
-      "kind": "quantitative"
-    },
-    {
-      "id": "memory.checkpoint4-watch",
-      "state": "ESTABLISHED",
-      "guarantee_id": "memory.10k-peak-rss",
-      "source": {
-        "repo": "website",
-        "path": "content/docs/memory-safety.html",
-        "needle": "180 deterministic invalidations"
-      },
-      "kind": "quantitative"
-    },
-    {
-      "id": "production.platform-18",
-      "state": "ESTABLISHED",
-      "guarantee_id": "platform.portable-equivalence",
-      "source": {
-        "repo": "website",
-        "path": "content/docs/production-readiness.html",
-        "needle": "same 18-case portable corpus produced equivalent normalized semantics with zero mismatches"
-      },
-      "kind": "reliability"
-    },
-    {
-      "id": "production.performance-scaling",
-      "state": "ESTABLISHED",
-      "guarantee_id": "performance.full-build-near-linear",
-      "source": {
-        "repo": "website",
-        "path": "content/docs/production-readiness.html",
-        "needle": "protected by a dedicated 1,000\u21924,000-page full-build scaling guard"
-      },
-      "kind": "reliability"
-    },
-    {
-      "id": "platforms.init-cross-platform",
-      "state": "ESTABLISHED",
-      "guarantee_id": "init.target-shape-cross-platform",
-      "source": {
-        "repo": "website",
-        "path": "content/docs/platforms.html",
-        "needle": "green in native Linux, macOS and Windows GitHub Actions"
-      },
-      "kind": "reliability"
-    },
-    {
-      "id": "memory.jsonic-sanitizer-120",
-      "state": "ESTABLISHED",
-      "guarantee_id": "memory.jsonic-component",
-      "source": {
-        "repo": "website",
-        "path": "content/docs/memory-safety.html",
-        "needle": "120 ASan + LSan + UBSan corpus iterations completed with zero findings"
-      },
-      "kind": "quantitative"
-    },
-    {
-      "id": "memory.jsonic-valgrind-40",
-      "state": "ESTABLISHED",
-      "guarantee_id": "memory.jsonic-component",
-      "source": {
-        "repo": "website",
-        "path": "content/docs/memory-safety.html",
-        "needle": "40 corpus iterations with 0 errors, 0 bytes in use at exit and all 6,579,515 allocations freed"
-      },
-      "kind": "quantitative"
-    },
-    {
-      "id": "memory.minify-sanitizer-80",
-      "state": "ESTABLISHED",
-      "guarantee_id": "memory.minify-component",
-      "source": {
-        "repo": "website",
-        "path": "content/docs/memory-safety.html",
-        "needle": "80 ASan/LSan/UBSan corpus iterations completed with zero findings"
-      },
-      "kind": "quantitative"
-    },
-    {
-      "id": "memory.minify-valgrind-30",
-      "state": "ESTABLISHED",
-      "guarantee_id": "memory.minify-component",
-      "source": {
-        "repo": "website",
-        "path": "content/docs/memory-safety.html",
-        "needle": "30 maintained lifetime-corpus iterations with 0 errors, 0 bytes in use at exit and all 2,448 allocations freed"
-      },
-      "kind": "quantitative"
-    },
-    {
-      "id": "memory.nift-checkpoint3-57",
-      "state": "ESTABLISHED",
-      "guarantee_id": "memory.nift-lifecycle",
-      "source": {
-        "repo": "website",
-        "path": "content/docs/memory-safety.html",
-        "needle": "Checkpoint 3 exercised 57 sanitizer-backed core lifecycle/test phases"
-      },
-      "kind": "quantitative"
-    },
-    {
-      "id": "memory.nift-10k-under-12mib",
-      "state": "ESTABLISHED",
-      "guarantee_id": "memory.10k-peak-rss",
-      "source": {
-        "repo": "website",
-        "path": "content/docs/memory-safety.html",
-        "needle": "10,000-page matrix remained below 12 MiB peak RSS"
-      },
-      "kind": "quantitative"
-    },
-    {
-      "id": "memory.integration-90-60-20",
-      "state": "ESTABLISHED",
-      "guarantee_id": "memory.cross-component-valgrind",
-      "source": {
-        "repo": "website",
-        "path": "content/docs/memory-safety.html",
-        "needle": "90-page mixed project completed 60 native mutation/recovery rounds"
-      },
-      "kind": "quantitative"
-    },
-    {
-      "id": "memory.integration-valgrind-19",
-      "state": "ESTABLISHED",
-      "guarantee_id": "memory.cross-component-valgrind",
-      "source": {
-        "repo": "website",
-        "path": "content/docs/memory-safety.html",
-        "needle": "directly monitored 19 Nift invocations under Valgrind across a 40-page, 12-round workload with four expected component failures"
-      },
-      "kind": "quantitative"
-    },
-    {
-      "id": "battle.pagination-18",
-      "state": "ESTABLISHED",
-      "guarantee_id": "pagination.incremental-clean-equivalence",
-      "source": {
-        "repo": "website",
-        "path": "content/docs/battle-tested.html",
-        "needle": "Pagination additionally carries 18 focused incremental-vs-clean comparisons"
-      }
-    },
-    {
-      "id": "battle.incremental-eight-by-30",
-      "state": "ESTABLISHED",
-      "guarantee_id": "incremental.clean-build-equivalence",
-      "source": {
-        "repo": "website",
-        "path": "content/docs/battle-tested.html",
-        "needle": "eight deterministic mutation sequences per mode performed 30 mutations each"
-      }
-    },
-    {
-      "id": "battle.concurrency-120-12",
-      "state": "ESTABLISHED",
-      "guarantee_id": "concurrency.shared-data-isolation",
-      "source": {
-        "repo": "website",
-        "path": "content/docs/battle-tested.html",
-        "needle": "builds 120 pages sharing JSON, JSON Schema and nested input sources with 12 workers"
-      }
-    },
-    {
-      "id": "battle.parameter-interpolation-73",
-      "state": "ESTABLISHED",
-      "guarantee_id": "templating.parameter-interpolation-contract",
-      "source": {
-        "repo": "website",
-        "path": "content/docs/battle-tested.html",
-        "needle": "73-check parameter-interpolation module"
-      }
-    },
-    {
-      "id": "battle.integration-fixture-46",
-      "state": "ESTABLISHED",
-      "guarantee_id": "memory.cross-component-valgrind",
-      "source": {
-        "repo": "website",
-        "path": "content/docs/battle-tested.html",
-        "needle": "46-page integration fixture"
-      }
-    },
-    {
-      "id": "memory.watch-rss-band",
-      "state": "ESTABLISHED",
-      "guarantee_id": "memory.nift-lifecycle",
-      "source": {
-        "repo": "website",
-        "path": "content/docs/memory-safety.html",
-        "needle": "RSS stayed within 5,976\u20136,356 KiB"
-      }
-    },
-    {
-      "id": "memory.watch-valgrind-30",
-      "state": "ESTABLISHED",
-      "guarantee_id": "memory.nift-lifecycle",
-      "source": {
-        "repo": "website",
-        "path": "content/docs/memory-safety.html",
-        "needle": "30 acknowledgement-driven watch cycles"
-      }
-    },
-    {
-      "id": "memory.jsonic-rss-400",
-      "state": "ESTABLISHED",
-      "guarantee_id": "memory.jsonic-component",
-      "source": {
-        "repo": "website",
-        "path": "content/docs/memory-safety.html",
-        "needle": "400-iteration RSS soak settled at 10,688 KiB"
-      }
-    },
-    {
-      "id": "memory.minify-rss-300",
-      "state": "ESTABLISHED",
-      "guarantee_id": "memory.minify-component",
-      "source": {
-        "repo": "website",
-        "path": "content/docs/memory-safety.html",
-        "needle": "300-iteration native soak stabilized at 7,160 KiB RSS"
-      }
+      "test_of_test": "UNPROVEN"
     }
   ],
   "known_discrepancies": [
     {
       "id": "evidence.ci-coverage-gap",
-      "state": "NOT_ESTABLISHED",
-      "summary": "Several retained correctness/checkpoint families are not enforced on every relevant change. BH2 owns the enforcement-tier design rather than silently upgrading RETAINED evidence to CI_GATED.",
       "refs": [
         {
-          "repo": "nift",
-          "path": ".github/workflows/performance-regression.yml"
+          "path": ".github/workflows/performance-regression.yml",
+          "repo": "nift"
         },
         {
-          "repo": "nift",
-          "path": ".github/workflows/checkpoint-10-cross-platform.yml"
+          "path": ".github/workflows/checkpoint-10-cross-platform.yml",
+          "repo": "nift"
         }
-      ]
+      ],
+      "state": "NOT_ESTABLISHED",
+      "summary": "Several retained correctness/checkpoint families are not enforced on every relevant change. BH2 owns the enforcement-tier design rather than silently upgrading RETAINED evidence to CI_GATED."
     },
     {
       "id": "docs.battle-tested.focused-target-count",
-      "state": "NOT_ESTABLISHED",
-      "summary": "Battle Tested says the current development tree exposes 30 focused Makefile targets, while the current Makefile contains more test-* targets after later additions. The page needs semantic reconciliation rather than blindly replacing 30 with the raw target count because some targets are aggregate/sanitizer helpers.",
       "refs": [
         {
-          "repo": "website",
+          "needle": "current development tree exposes 30 focused Makefile targets",
           "path": "content/docs/battle-tested.html",
-          "needle": "current development tree exposes 30 focused Makefile targets"
+          "repo": "website"
         },
         {
-          "repo": "nift",
+          "needle": "test-guarantee-registry:",
           "path": "Makefile",
-          "needle": "test-guarantee-registry:"
+          "repo": "nift"
         }
-      ]
+      ],
+      "state": "NOT_ESTABLISHED",
+      "summary": "Battle Tested says the current development tree exposes 30 focused Makefile targets, while the current Makefile contains more test-* targets after later additions. The page needs semantic reconciliation rather than blindly replacing 30 with the raw target count because some targets are aggregate/sanitizer helpers."
     },
     {
       "id": "docs.production-readiness.contract-module-count",
-      "state": "NOT_ESTABLISHED",
-      "summary": "Production Readiness carries the historical 16-module project-contract checkpoint count while the independent regression suite has subsequently grown. The sentence may be intentionally historical, but BH10 must ensure readers cannot mistake it for the current suite total.",
       "refs": [
         {
-          "repo": "website",
+          "needle": "22-module external contract",
           "path": "content/docs/production-readiness.html",
-          "needle": "22-module external contract"
+          "repo": "website"
         },
         {
-          "repo": "regression",
+          "needle": "25 modules total",
           "path": "HANDOVER.md",
-          "needle": "25 modules total"
+          "repo": "regression"
         }
-      ]
+      ],
+      "state": "NOT_ESTABLISHED",
+      "summary": "Production Readiness carries the historical 16-module project-contract checkpoint count while the independent regression suite has subsequently grown. The sentence may be intentionally historical, but BH10 must ensure readers cannot mistake it for the current suite total."
     }
   ],
   "meta_guards": [
     {
-      "id": "guarantee-registry.structural-checker",
       "guard_ref": {
-        "repo": "nift",
-        "path": "scripts/check_guarantee_registry.py"
+        "path": "scripts/check_guarantee_registry.py",
+        "repo": "nift"
       },
-      "test_of_test": "VERIFIED_GUARD",
+      "id": "guarantee-registry.structural-checker",
       "note": "BH1 closed after DeepSeek independently attacked exact candidate 8419cec: 12 reviewer-authored corruption cases went red and the clean registry stayed green. Residual CI-semantic depth is explicitly deferred to BH2; guard/evidence semantic binding is BH3.",
       "red_run_evidence": {
-        "repo": "nift",
-        "path": "docs/evidence/bh1/registry-reviewer-round3.json"
-      }
+        "path": "docs/evidence/bh1/registry-reviewer-round3.json",
+        "repo": "nift"
+      },
+      "test_of_test": "VERIFIED_GUARD"
     },
     {
-      "id": "test-integrity.static-scanner",
       "guard_ref": {
-        "repo": "nift",
-        "path": "scripts/test_integrity_check.py"
+        "path": "scripts/test_integrity_check.py",
+        "repo": "nift"
       },
-      "test_of_test": "VERIFIED_GUARD",
+      "id": "test-integrity.static-scanner",
       "note": "BH2: static scanner demonstrated RED against 6 injected false-green/vacuous fixtures across all five families and against 4 independent reviewer fixtures (sys.exit(0) skip, dead-code returncode, arbitrary-command pipeline, plain swallowed returncode); GREEN on the real tests/ + scripts/ trees (42 files). Static and pattern-based; runtime guard mutation is BH3.",
       "red_run_evidence": {
-        "repo": "nift",
-        "path": "docs/evidence/bh2/bh2-fixtures-report.json"
+        "path": "docs/evidence/bh2/bh2-fixtures-report.json",
+        "repo": "nift"
       },
       "reviewer_red_run_evidence": {
-        "repo": "nift",
-        "path": "docs/evidence/bh2/bh2-reviewer-fixtures-report.json"
-      }
+        "path": "docs/evidence/bh2/bh2-reviewer-fixtures-report.json",
+        "repo": "nift"
+      },
+      "test_of_test": "VERIFIED_GUARD"
     }
   ],
   "public_claim_surfaces": [
     {
-      "repo": "website",
+      "mapping_scope": "BH1 manual audit of significant quantitative/reliability claims; source hash invalidates the audit if this page changes. Re-audited 2026-09-09 after the canonical @path spelling migration; all pinned claim needles and their underlying claims remain unchanged.",
       "path": "content/docs/battle-tested.html",
-      "sha256": "a035faf4e0ce80825155c88888b2be2f1cf075d53e10c6eb5cddbe152e7bc452",
-      "mapping_scope": "BH1 manual audit of significant quantitative/reliability claims; source hash invalidates the audit if this page changes. Re-audited 2026-09-09 after the canonical @path spelling migration; all pinned claim needles and their underlying claims remain unchanged."
+      "repo": "website",
+      "sha256": "a035faf4e0ce80825155c88888b2be2f1cf075d53e10c6eb5cddbe152e7bc452"
     },
     {
-      "repo": "website",
+      "mapping_scope": "BH1 manual audit of significant quantitative/reliability claims; source hash invalidates the audit if this page changes.",
       "path": "content/docs/memory-safety.html",
-      "sha256": "78fe1124a724ce577b4fb7c1d7858de55e784ced268dd8cb2d96ba39034f1cae",
-      "mapping_scope": "BH1 manual audit of significant quantitative/reliability claims; source hash invalidates the audit if this page changes."
+      "repo": "website",
+      "sha256": "78fe1124a724ce577b4fb7c1d7858de55e784ced268dd8cb2d96ba39034f1cae"
     },
     {
-      "repo": "website",
+      "mapping_scope": "BH1 manual audit of significant quantitative/reliability claims; source hash invalidates the audit if this page changes.",
       "path": "content/docs/production-readiness.html",
-      "sha256": "b445d8d9c1e10c40a995336d04f51eb33e8a71a1281ca07b952cf885d24f0147",
-      "mapping_scope": "BH1 manual audit of significant quantitative/reliability claims; source hash invalidates the audit if this page changes."
+      "repo": "website",
+      "sha256": "b445d8d9c1e10c40a995336d04f51eb33e8a71a1281ca07b952cf885d24f0147"
     },
     {
-      "repo": "website",
+      "mapping_scope": "BH1 manual audit of significant quantitative/reliability claims; source hash invalidates the audit if this page changes.",
       "path": "content/docs/platforms.html",
-      "sha256": "a5ac0576cae7ccc26eade2fa9368cfb6780ba2648a72516534089af516c46b31",
-      "mapping_scope": "BH1 manual audit of significant quantitative/reliability claims; source hash invalidates the audit if this page changes."
+      "repo": "website",
+      "sha256": "a5ac0576cae7ccc26eade2fa9368cfb6780ba2648a72516534089af516c46b31"
     }
+  ],
+  "public_claims": [
+    {
+      "guarantee_id": "incremental.clean-build-equivalence",
+      "id": "battle.incremental-720",
+      "kind": "quantitative",
+      "source": {
+        "needle": "720 complete output-tree comparisons",
+        "path": "content/docs/battle-tested.html",
+        "repo": "website"
+      },
+      "state": "ESTABLISHED"
+    },
+    {
+      "guarantee_id": "filesystem.transaction-integrity",
+      "id": "battle.fs-checkpoint8-sixteen",
+      "kind": "quantitative",
+      "source": {
+        "needle": "maintained Linux corpus now has sixteen cases",
+        "path": "content/docs/battle-tested.html",
+        "repo": "website"
+      },
+      "state": "ESTABLISHED"
+    },
+    {
+      "guarantee_id": "parser.controlled-mutation-failure",
+      "id": "battle.parser-1217",
+      "kind": "quantitative",
+      "source": {
+        "needle": "1,217 n++ parser/resource cases",
+        "path": "content/docs/battle-tested.html",
+        "repo": "website"
+      },
+      "state": "ESTABLISHED"
+    },
+    {
+      "guarantee_id": "parser.controlled-mutation-failure",
+      "id": "battle.parser-results",
+      "kind": "quantitative",
+      "source": {
+        "needle": "234 successful builds and 983 controlled errors",
+        "path": "content/docs/battle-tested.html",
+        "repo": "website"
+      },
+      "state": "ESTABLISHED"
+    },
+    {
+      "guarantee_id": "platform.portable-equivalence",
+      "id": "battle.platform-18",
+      "kind": "quantitative",
+      "source": {
+        "needle": "18-case portable behavioral corpus",
+        "path": "content/docs/battle-tested.html",
+        "repo": "website"
+      },
+      "state": "ESTABLISHED"
+    },
+    {
+      "guarantee_id": "memory.cross-component-valgrind",
+      "id": "battle.valgrind-19",
+      "kind": "quantitative",
+      "source": {
+        "needle": "19 Nift invocations across 12 rounds and 40 pages",
+        "path": "content/docs/battle-tested.html",
+        "repo": "website"
+      },
+      "state": "ESTABLISHED"
+    },
+    {
+      "guarantee_id": "memory.10k-peak-rss",
+      "id": "memory.checkpoint4-watch",
+      "kind": "quantitative",
+      "source": {
+        "needle": "180 deterministic invalidations",
+        "path": "content/docs/memory-safety.html",
+        "repo": "website"
+      },
+      "state": "ESTABLISHED"
+    },
+    {
+      "guarantee_id": "platform.portable-equivalence",
+      "id": "production.platform-18",
+      "kind": "reliability",
+      "source": {
+        "needle": "same 18-case portable corpus produced equivalent normalized semantics with zero mismatches",
+        "path": "content/docs/production-readiness.html",
+        "repo": "website"
+      },
+      "state": "ESTABLISHED"
+    },
+    {
+      "guarantee_id": "performance.full-build-near-linear",
+      "id": "production.performance-scaling",
+      "kind": "reliability",
+      "source": {
+        "needle": "protected by a dedicated 1,000\u21924,000-page full-build scaling guard",
+        "path": "content/docs/production-readiness.html",
+        "repo": "website"
+      },
+      "state": "ESTABLISHED"
+    },
+    {
+      "guarantee_id": "init.target-shape-cross-platform",
+      "id": "platforms.init-cross-platform",
+      "kind": "reliability",
+      "source": {
+        "needle": "green in native Linux, macOS and Windows GitHub Actions",
+        "path": "content/docs/platforms.html",
+        "repo": "website"
+      },
+      "state": "ESTABLISHED"
+    },
+    {
+      "guarantee_id": "memory.jsonic-component",
+      "id": "memory.jsonic-sanitizer-120",
+      "kind": "quantitative",
+      "source": {
+        "needle": "120 ASan + LSan + UBSan corpus iterations completed with zero findings",
+        "path": "content/docs/memory-safety.html",
+        "repo": "website"
+      },
+      "state": "ESTABLISHED"
+    },
+    {
+      "guarantee_id": "memory.jsonic-component",
+      "id": "memory.jsonic-valgrind-40",
+      "kind": "quantitative",
+      "source": {
+        "needle": "40 corpus iterations with 0 errors, 0 bytes in use at exit and all 6,579,515 allocations freed",
+        "path": "content/docs/memory-safety.html",
+        "repo": "website"
+      },
+      "state": "ESTABLISHED"
+    },
+    {
+      "guarantee_id": "memory.minify-component",
+      "id": "memory.minify-sanitizer-80",
+      "kind": "quantitative",
+      "source": {
+        "needle": "80 ASan/LSan/UBSan corpus iterations completed with zero findings",
+        "path": "content/docs/memory-safety.html",
+        "repo": "website"
+      },
+      "state": "ESTABLISHED"
+    },
+    {
+      "guarantee_id": "memory.minify-component",
+      "id": "memory.minify-valgrind-30",
+      "kind": "quantitative",
+      "source": {
+        "needle": "30 maintained lifetime-corpus iterations with 0 errors, 0 bytes in use at exit and all 2,448 allocations freed",
+        "path": "content/docs/memory-safety.html",
+        "repo": "website"
+      },
+      "state": "ESTABLISHED"
+    },
+    {
+      "guarantee_id": "memory.nift-lifecycle",
+      "id": "memory.nift-checkpoint3-57",
+      "kind": "quantitative",
+      "source": {
+        "needle": "Checkpoint 3 exercised 57 sanitizer-backed core lifecycle/test phases",
+        "path": "content/docs/memory-safety.html",
+        "repo": "website"
+      },
+      "state": "ESTABLISHED"
+    },
+    {
+      "guarantee_id": "memory.10k-peak-rss",
+      "id": "memory.nift-10k-under-12mib",
+      "kind": "quantitative",
+      "source": {
+        "needle": "10,000-page matrix remained below 12 MiB peak RSS",
+        "path": "content/docs/memory-safety.html",
+        "repo": "website"
+      },
+      "state": "ESTABLISHED"
+    },
+    {
+      "guarantee_id": "memory.cross-component-valgrind",
+      "id": "memory.integration-90-60-20",
+      "kind": "quantitative",
+      "source": {
+        "needle": "90-page mixed project completed 60 native mutation/recovery rounds",
+        "path": "content/docs/memory-safety.html",
+        "repo": "website"
+      },
+      "state": "ESTABLISHED"
+    },
+    {
+      "guarantee_id": "memory.cross-component-valgrind",
+      "id": "memory.integration-valgrind-19",
+      "kind": "quantitative",
+      "source": {
+        "needle": "directly monitored 19 Nift invocations under Valgrind across a 40-page, 12-round workload with four expected component failures",
+        "path": "content/docs/memory-safety.html",
+        "repo": "website"
+      },
+      "state": "ESTABLISHED"
+    },
+    {
+      "guarantee_id": "pagination.incremental-clean-equivalence",
+      "id": "battle.pagination-18",
+      "source": {
+        "needle": "Pagination additionally carries 18 focused incremental-vs-clean comparisons",
+        "path": "content/docs/battle-tested.html",
+        "repo": "website"
+      },
+      "state": "ESTABLISHED"
+    },
+    {
+      "guarantee_id": "incremental.clean-build-equivalence",
+      "id": "battle.incremental-eight-by-30",
+      "source": {
+        "needle": "eight deterministic mutation sequences per mode performed 30 mutations each",
+        "path": "content/docs/battle-tested.html",
+        "repo": "website"
+      },
+      "state": "ESTABLISHED"
+    },
+    {
+      "guarantee_id": "concurrency.shared-data-isolation",
+      "id": "battle.concurrency-120-12",
+      "source": {
+        "needle": "builds 120 pages sharing JSON, JSON Schema and nested input sources with 12 workers",
+        "path": "content/docs/battle-tested.html",
+        "repo": "website"
+      },
+      "state": "ESTABLISHED"
+    },
+    {
+      "guarantee_id": "templating.parameter-interpolation-contract",
+      "id": "battle.parameter-interpolation-73",
+      "source": {
+        "needle": "73-check parameter-interpolation module",
+        "path": "content/docs/battle-tested.html",
+        "repo": "website"
+      },
+      "state": "ESTABLISHED"
+    },
+    {
+      "guarantee_id": "memory.cross-component-valgrind",
+      "id": "battle.integration-fixture-46",
+      "source": {
+        "needle": "46-page integration fixture",
+        "path": "content/docs/battle-tested.html",
+        "repo": "website"
+      },
+      "state": "ESTABLISHED"
+    },
+    {
+      "guarantee_id": "memory.nift-lifecycle",
+      "id": "memory.watch-rss-band",
+      "source": {
+        "needle": "RSS stayed within 5,976\u20136,356 KiB",
+        "path": "content/docs/memory-safety.html",
+        "repo": "website"
+      },
+      "state": "ESTABLISHED"
+    },
+    {
+      "guarantee_id": "memory.nift-lifecycle",
+      "id": "memory.watch-valgrind-30",
+      "source": {
+        "needle": "30 acknowledgement-driven watch cycles",
+        "path": "content/docs/memory-safety.html",
+        "repo": "website"
+      },
+      "state": "ESTABLISHED"
+    },
+    {
+      "guarantee_id": "memory.jsonic-component",
+      "id": "memory.jsonic-rss-400",
+      "source": {
+        "needle": "400-iteration RSS soak settled at 10,688 KiB",
+        "path": "content/docs/memory-safety.html",
+        "repo": "website"
+      },
+      "state": "ESTABLISHED"
+    },
+    {
+      "guarantee_id": "memory.minify-component",
+      "id": "memory.minify-rss-300",
+      "source": {
+        "needle": "300-iteration native soak stabilized at 7,160 KiB RSS",
+        "path": "content/docs/memory-safety.html",
+        "repo": "website"
+      },
+      "state": "ESTABLISHED"
+    }
+  ],
+  "purpose": "Map Nift guarantees and the manually audited quantitative/reliability claims on the pinned public surfaces to retained evidence, enforcement, platform scope, limitations, and test-of-test status. Surface hashes force re-audit when those pages change.",
+  "repositories": {
+    "nift": ".",
+    "regression": "../nift-regression-suite",
+    "website": "../nift-dev.github.io"
+  },
+  "schema_version": 1,
+  "states": [
+    "ESTABLISHED",
+    "NOT_ESTABLISHED",
+    "ACCEPTED_LIMITATION",
+    "OUT_OF_SCOPE"
+  ],
+  "test_of_test_states": [
+    "VERIFIED_GUARD",
+    "UNPROVEN",
+    "PENDING_REVIEWER",
+    "NOT_APPLICABLE"
   ]
 }

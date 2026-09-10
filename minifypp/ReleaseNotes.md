@@ -1,10 +1,28 @@
 # Minify++ — Release Notes
 
-## v1.1.2 (development)
+## v1.1.3 (development)
 
-- Post-release development version after the public **v1.1.1** release. The
-  executable identity is advanced to `1.1.2` for further development; the public
-  API format version remains `1`.
+- Development version after the public **v1.1.2** release. The executable
+  identity is advanced to `1.1.3` for further development; the public API
+  format version remains `1`.
+
+## v1.1.2
+
+- This release is backed by independent conformance checkpoints, each recorded
+  at a pinned upstream revision: HTML 9,651/9,651 (WPT
+  `aed18189e54793ee12286eb96509e87df27f52dd`, html5lib 1.1); JavaScript 48,011
+  eligible scripts with all 39,741 runnable on the pinned Node runtime passing
+  and zero transformed failures (Test262 `419d3e0a2273ba01a3bfcbec423f2801425b8e93`);
+  JSX/TSX 221/221 (TypeScript `1e4744d68260a7cb91b62b12edc3f6a2187faaf1`);
+  JSON 93/93 (JSONTestSuite `1ef36fa01286573e846ac449e8683f8833c5b26a`);
+  XML 535/535 (SHA-256-pinned W3C XML Conformance archive); SVG 1,176/1,176
+  (WPT `aed18189e54793ee12286eb96509e87df27f52dd`); and a complete CSS run of
+  31,155/31,155 at WPT `a53926ac643a128435401793216d72e11a5928d7` using the
+  strengthened Chromium CSSOM oracle. These are structural, lexical and runtime
+  projections with explicit exclusion accounting; they are not claims of
+  complete language or rendering conformance, and the CSS dashboard continues
+  to track upstream WPT as a living snapshot at its own recorded revision.
+- The public API format version remains `1`.
 - Accept browser-recoverable stray quotes in unquoted HTML attribute values
   instead of misclassifying them as unterminated quoted attributes. This defect
   was found by the independent WPT HTML conformance harness and is retained in
