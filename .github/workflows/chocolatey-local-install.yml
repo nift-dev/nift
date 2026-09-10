@@ -1,0 +1,105 @@
+name: Chocolatey local-install diagnostic
+
+on:
+  workflow_dispatch:
+    inputs:
+      artifact_run:
+        description: Workflow run that produced the retained nift-chocolatey artifact
+        required: true
+        default: '34467451324'
+      expected_sha256:
+        description: Exact SHA-256 of the retained nift.4.0.12.nupkg
+        required: true
+        default: 'f1709b315ad90d58ae01fbb0b83cee841f8bb273ba15fd1de87467498a67a2b2'
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  local-install:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          name: nift-chocolatey
+          run_id: ${{ inputs.artifact_run }}
+          github-token: ${{ github.token }}
+          path: retained
+      - name: Verify retained artifact hash
+        shell: pwsh
+        run: |
+          $nupkg = Get-ChildItem retained -Filter *.nupkg | Select-Object -First 1
+          if (-not $nupkg) { throw 'no .nupkg found in retained artifact' }
+          $expected = '${{ inputs.expected_sha256 }}'.ToLowerInvariant()
+          $actual = (Get-FileHash $nupkg.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) {
+            throw "SHA-256 mismatch: expected $expected, got $actual"
+          }
+          "NUPKG=$($nupkg.FullName)" >> $env:GITHUB_ENV
+          Write-Host "artifact verified: $($nupkg.Name) sha256=$actual"
+      - name: Configure local-only Chocolatey source
+        shell: pwsh
+        run: |
+          New-Item local-repo -ItemType Directory -Force | Out-Null
+          Copy-Item $env:NUPKG local-repo/
+          $sourceName = 'nift-local-install'
+          choco source remove --name="$sourceName" --confirm >$null 2>&1 || $true
+          choco source add --name="$sourceName" --source="$PWD\local-repo" --priority=1 --confirm
+          choco source disable --name="chocolatey" --confirm
+      - name: Install exact local .nupkg (community feed isolated)
+        shell: pwsh
+        run: |
+          choco install nift --version 4.0.12 -s nift-local-install -y --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "choco install failed with exit code $LASTEXITCODE" }
+      - name: Locate and smoke nift.exe
+        shell: pwsh
+        run: |
+          $shim = Get-Command nift -ErrorAction Stop
+          $toolsExe = Get-ChildItem "$env:ChocolateyInstall\lib\nift" -Recurse -Filter nift.exe |
+            Where-Object { $_.FullName -notmatch '\\bin\\' } |
+            Select-Object -First 1
+          if (-not $toolsExe) { throw 'nift.exe not found under Chocolatey lib\nift' }
+          "SHIM=$($shim.Source)" >> $env:GITHUB_ENV
+          "TOOLS_EXE=$($toolsExe.FullName)" >> $env:GITHUB_ENV
+          $v = & $toolsExe.FullName version
+          if ($LASTEXITCODE -ne 0) { throw "nift version failed: $v" }
+          if ($v -notmatch '^Nift v4\.0\.12') { throw "version mismatch: $v" }
+          Write-Host "shim: $($shim.Source)"
+          Write-Host "tools exe: $($toolsExe.FullName)"
+          Write-Host "reported: $v"
+      - name: Minimal generated-project build
+        shell: pwsh
+        run: |
+          $proj = Join-Path $env:RUNNER_TEMP 'choco-install-proj'
+          New-Item $proj -ItemType Directory -Force | Out-Null
+          Push-Location $proj
+          & $env:TOOLS_EXE init
+          if ($LASTEXITCODE -ne 0) { throw "nift init failed" }
+          & $env:TOOLS_EXE build
+          if ($LASTEXITCODE -ne 0) { throw "nift build failed" }
+          if (-not (Test-Path 'public\index.html')) { throw 'public/index.html was not produced' }
+          Pop-Location
+          Write-Host "minimal project build OK: $proj"
+      - name: Uninstall package
+        shell: pwsh
+        run: |
+          choco uninstall nift -y --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "choco uninstall failed with exit code $LASTEXITCODE" }
+      - name: Verify installed files and shims removed
+        shell: pwsh
+        run: |
+          $libDir = Join-Path $env:ChocolateyInstall 'lib\nift'
+          $binShim = Join-Path $env:ChocolateyInstall 'bin\nift.exe'
+          if (Test-Path $libDir) { throw "lib\nift still present: $libDir" }
+          if (Test-Path $binShim) { throw "shim still present: $binShim" }
+          $residual = Get-ChildItem "$env:ChocolateyInstall\lib" -Recurse -Filter '*.exe' -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match 'nift' }
+          if ($residual) { throw "residual nift executable: $($residual.FullName)" }
+          Write-Host 'uninstall verified: lib\nift removed, shim removed, no residual executables'
+      - name: Restore Chocolatey default source
+        if: always()
+        shell: pwsh
+        run: |
+          choco source enable --name="chocolatey" --confirm
+          choco source remove --name="nift-local-install" --confirm
