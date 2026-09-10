@@ -67,7 +67,8 @@ jobs:
           "TOOLS_EXE=$($toolsExe.FullName)" >> $env:GITHUB_ENV
           $v = & $toolsExe.FullName version
           if ($LASTEXITCODE -ne 0) { throw "nift version failed: $v" }
-          if ($v -notmatch "^Nift v$([regex]::Escape($env:EXPECTED_VERSION))") {
+          $expectedVersion = [regex]::Escape($env:EXPECTED_VERSION)
+          if ($v -notmatch "^Nift v$expectedVersion(?: |$)") {
             throw "version mismatch: expected Nift v$env:EXPECTED_VERSION, got $v"
           }
           Write-Host "shim: $($shim.Source)"
