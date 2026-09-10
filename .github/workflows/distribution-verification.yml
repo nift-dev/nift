@@ -4,9 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Public Nift version to require from every selected channel
+        description: Public Nift version to require from every selected channel (for example 4.0.12)
         required: true
-        default: '4.0.2'
         type: string
       github_release:
         description: Verify public GitHub release archives
@@ -23,13 +22,13 @@ on:
         required: true
         default: true
         type: boolean
-      snap:
-        description: Verify Snap Store latest/stable
+      snap_edge:
+        description: Verify the release version reached Snap Store latest/edge (promotion readiness)
         required: true
-        default: true
+        default: false
         type: boolean
-      flathub:
-        description: Verify Flathub package
+      snap_stable:
+        description: Verify Snap Store latest/stable (maintained public-release gate)
         required: true
         default: true
         type: boolean
@@ -38,8 +37,23 @@ permissions:
   contents: read
 
 jobs:
+  validate_version:
+    name: Validate release version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require a strict X.Y.Z release version
+        shell: bash
+        run: |
+          version='${{ inputs.version }}'
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "invalid release version: $version" >&2
+            exit 1
+          fi
+          echo "validated version: $version"
+
   github_release:
     if: inputs.github_release
+    needs: validate_version
     name: GitHub release / ${{ matrix.platform }}
     strategy:
       fail-fast: false
@@ -118,6 +132,7 @@ jobs:
 
   homebrew:
     if: inputs.homebrew
+    needs: validate_version
     name: Homebrew / ${{ matrix.platform }}
     strategy:
       fail-fast: false
@@ -165,6 +180,7 @@ jobs:
 
   chocolatey:
     if: inputs.chocolatey
+    needs: validate_version
     name: Chocolatey / windows-x86_64
     runs-on: windows-latest
     steps:
@@ -196,10 +212,61 @@ jobs:
           path: .build/distribution/evidence/*.json
           if-no-files-found: warn
 
-  snap:
-    if: inputs.snap
-    name: Snap Store / linux-x86_64
+  snap_edge:
+    if: inputs.snap_edge
+    needs: validate_version
+    name: Snap edge / linux-x86_64
     runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.classify.outputs.status }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.13'
+      - name: Fresh install from Snap edge
+        shell: bash
+        run: |
+          sudo snap remove nift >/dev/null 2>&1 || true
+          sudo snap install nift --channel=latest/edge
+      - name: Smoke public Snap edge package
+        shell: bash
+        run: |
+          python scripts/distribution_smoke.py \
+            --channel snap-edge-linux-x86_64 \
+            --expected-version '${{ inputs.version }}' \
+            --evidence '.build/distribution/evidence/snap-edge-linux-x86_64.json' \
+            --command nift
+      - name: Classify edge result
+        id: classify
+        if: always()
+        shell: bash
+        run: |
+          evidence='.build/distribution/evidence/snap-edge-linux-x86_64.json'
+          status='install_runtime_failure'
+          if [ -f "$evidence" ]; then
+            status="$(python3 -c "import json; d=json.load(open('$evidence')); print('passed' if d['status']=='passed' else ('version_mismatch' if 'version mismatch' in d.get('error','') else 'install_runtime_failure'))")"
+          fi
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          echo "snap edge status: $status"
+      - name: Uninstall Snap package
+        if: always()
+        shell: bash
+        run: sudo snap remove nift >/dev/null 2>&1 || true
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: distribution-snap-edge-linux-x86_64
+          path: .build/distribution/evidence/*.json
+          if-no-files-found: warn
+
+  snap_stable:
+    if: inputs.snap_stable
+    needs: validate_version
+    name: Snap stable / linux-x86_64
+    runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.classify.outputs.status }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
@@ -210,14 +277,26 @@ jobs:
         run: |
           sudo snap remove nift >/dev/null 2>&1 || true
           sudo snap install nift --channel=latest/stable
-      - name: Smoke public Snap package
+      - name: Smoke public Snap stable package
         shell: bash
         run: |
           python scripts/distribution_smoke.py \
-            --channel snap-latest-stable-linux-x86_64 \
+            --channel snap-stable-linux-x86_64 \
             --expected-version '${{ inputs.version }}' \
-            --evidence '.build/distribution/evidence/snap-linux-x86_64.json' \
+            --evidence '.build/distribution/evidence/snap-stable-linux-x86_64.json' \
             --command nift
+      - name: Classify stable result
+        id: classify
+        if: always()
+        shell: bash
+        run: |
+          evidence='.build/distribution/evidence/snap-stable-linux-x86_64.json'
+          status='install_runtime_failure'
+          if [ -f "$evidence" ]; then
+            status="$(python3 -c "import json; d=json.load(open('$evidence')); print('passed' if d['status']=='passed' else ('version_mismatch' if 'version mismatch' in d.get('error','') else 'install_runtime_failure'))")"
+          fi
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          echo "snap stable status: $status"
       - name: Uninstall Snap package
         if: always()
         shell: bash
@@ -225,92 +304,36 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with:
-          name: distribution-snap-linux-x86_64
-          path: .build/distribution/evidence/*.json
-          if-no-files-found: warn
-
-  flathub:
-    if: inputs.flathub
-    name: Flathub / linux-x86_64
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
-        with:
-          python-version: '3.13'
-      - name: Install Flatpak tooling
-        shell: bash
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y flatpak
-          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-      - name: Fresh install from Flathub
-        shell: bash
-        run: |
-          flatpak uninstall --user -y cc.nift.nsm >/dev/null 2>&1 || true
-          flatpak install --user -y flathub cc.nift.nsm
-      - name: Smoke public Flathub package
-        shell: bash
-        run: |
-          python scripts/distribution_smoke.py \
-            --channel flathub-linux-x86_64 \
-            --expected-version '${{ inputs.version }}' \
-            --evidence '.build/distribution/evidence/flathub-linux-x86_64.json' \
-            --command flatpak \
-            --command run \
-            --command cc.nift.nsm
-      - name: Uninstall Flathub package
-        if: always()
-        shell: bash
-        run: flatpak uninstall --user -y cc.nift.nsm >/dev/null 2>&1 || true
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        if: always()
-        with:
-          name: distribution-flathub-linux-x86_64
+          name: distribution-snap-stable-linux-x86_64
           path: .build/distribution/evidence/*.json
           if-no-files-found: warn
 
   summary:
     if: always()
     name: Distribution summary
-    needs: [github_release, homebrew, chocolatey, snap, flathub]
+    needs: [validate_version, github_release, homebrew, chocolatey, snap_edge, snap_stable]
     runs-on: ubuntu-latest
     steps:
       - name: Record selected channel results
         env:
           EXPECTED_VERSION: ${{ inputs.version }}
+          VALIDATE_VERSION_RESULT: ${{ needs.validate_version.result }}
           GITHUB_RELEASE_SELECTED: ${{ inputs.github_release }}
           HOMEBREW_SELECTED: ${{ inputs.homebrew }}
           CHOCOLATEY_SELECTED: ${{ inputs.chocolatey }}
-          SNAP_SELECTED: ${{ inputs.snap }}
-          FLATHUB_SELECTED: ${{ inputs.flathub }}
+          SNAP_EDGE_SELECTED: ${{ inputs.snap_edge }}
+          SNAP_STABLE_SELECTED: ${{ inputs.snap_stable }}
           GITHUB_RELEASE_RESULT: ${{ needs.github_release.result }}
           HOMEBREW_RESULT: ${{ needs.homebrew.result }}
           CHOCOLATEY_RESULT: ${{ needs.chocolatey.result }}
-          SNAP_RESULT: ${{ needs.snap.result }}
-          FLATHUB_RESULT: ${{ needs.flathub.result }}
+          SNAP_EDGE_RESULT: ${{ needs.snap_edge.result }}
+          SNAP_STABLE_RESULT: ${{ needs.snap_stable.result }}
+          SNAP_EDGE_STATUS: ${{ needs.snap_edge.outputs.status }}
+          SNAP_STABLE_STATUS: ${{ needs.snap_stable.outputs.status }}
         shell: bash
         run: |
           mkdir -p .build/distribution
-          python - <<'PY'
-          import json, os
-          names = ["github_release", "homebrew", "chocolatey", "snap", "flathub"]
-          data = {
-              "schema": 1,
-              "expected_version": os.environ["EXPECTED_VERSION"],
-              "channels": {},
-          }
-          for name in names:
-              key = name.upper()
-              data["channels"][name] = {
-                  "selected": os.environ[f"{key}_SELECTED"].lower() == "true",
-                  "result": os.environ[f"{key}_RESULT"],
-              }
-          with open(".build/distribution/summary.json", "w", encoding="utf-8") as handle:
-              json.dump(data, handle, indent=2, sort_keys=True)
-              handle.write("\n")
-          print(json.dumps(data, indent=2, sort_keys=True))
-          PY
+          python scripts/distribution_summary.py
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: distribution-summary

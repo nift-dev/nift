@@ -1,17 +1,15 @@
-# Flathub update source
+# Flatpak / Flathub (legacy, externally maintained)
 
-Nift already exists on Flathub as `cc.nift.nsm`. Its authoritative manifest is
-maintained in `flathub/cc.nift.nsm`; it is intentionally not published from this
-directory.
+Nift exists on Flathub as `cc.nift.nsm`. That listing is **externally
+maintained and legacy**: it is owned by the `flathub/cc.nift.nsm` repository
+and is outside Nift's maintained release pipeline and release gate.
 
-`cc.nift.nsm.json.in` is an upstream migration aid for the C++ rewrite. Replace
-`@VERSION@` and `@SHA256@` with the released source archive version and checksum,
-then reconcile the result in the Flathub repository. Preserve the existing app
-ID and its established AppStream, desktop and icon assets. The current Flathub
-manifest builds the legacy 2.4.12 `nsm-flatpak` repository, bundles Git and
-LuaRocks, and applies a legacy patch; those inputs must be removed or reviewed
-rather than carried into the rewrite mechanically.
+This directory is retained only as a historical reference. It is not a
+maintained release channel, is not used by any release workflow, and Nift does
+not prepare, open, update, submit, test or verify Flathub contributions.
+Automated or AI-agent Flathub contribution work is outside this project's
+release process.
 
-The candidate deliberately does not duplicate the Flathub-owned store metadata.
-Run `flatpak-builder` and Flathub linting against the complete external repository
-before opening an update pull request.
+`cc.nift.nsm.json.in` is a historical template describing an upstream migration
+to the current C++ `nift` source and command. It is deliberately not a complete
+store manifest and is not kept in sync with any live Flathub state.

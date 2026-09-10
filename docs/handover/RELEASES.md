@@ -1,9 +1,9 @@
 # Nift release and publication handover
 
 Package-manager recipes, GitHub release workflows, store credentials, artifact
-names, and the existing Flathub update path are documented in `PACKAGING.md`.
-This document owns release readiness; `PACKAGING.md` owns how an approved release
-is packaged and published.
+names, and the externally maintained/legacy Flathub listing are documented in
+`PACKAGING.md`. This document owns release readiness; `PACKAGING.md` owns how an
+approved release is packaged and published.
 
 ## Authority and current state
 
@@ -158,8 +158,8 @@ material, package contents, known limitations, and publication status. Separate
 facts from interpretation and avoid universal performance claims from one host.
 
 For packaged releases, also record artifact checksums, the installed package
-version tested from each store, the store/channel publication state, and the
-external Flathub manifest commit where applicable. A successful workflow upload
+version tested from each maintained store/channel, and the store/channel
+publication state. A successful workflow upload
 is not evidence that a store has published or served the package.
 
 Treat these as separate states and report them precisely:

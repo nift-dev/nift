@@ -110,7 +110,8 @@ themselves. Nift owns the small build-time job it can perform precisely.
 - `docs/handover/DECISIONS.md`: settled, rejected, and unresolved decisions.
 - `docs/handover/RELEASES.md`: release-candidate and public-action guidance.
 - `docs/handover/PACKAGING.md`: release artifacts, package recipes, store
-  publication workflows, credentials, and the external Flathub relationship.
+  publication workflows, credentials, and the externally maintained/legacy
+  Flathub listing.
 - `docs/handover/PENDING-WEBSITE.md`: internal queue of implementation-driven
   website changes that must be completed during release preparation.
 - `docs/handover/ROADMAP.md`: living production-readiness risk assessment.

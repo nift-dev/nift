@@ -17,11 +17,11 @@ The current sequence is now:
 1. Maintain the current public language/configuration documentation and retain the focused/independent regressions established for the new contracts.
 2. Treat the 18 pagination incremental-vs-clean comparisons plus compact sanitizer/TSan pagination gates as scoped evidence for the exercised states, not universal proof.
 3. Continue dogfooding real sites and platform targets; turn concrete field failures into focused regressions instead of opening synthetic checkpoint sequences without a trigger.
-4. Monitor downstream distribution propagation (Homebrew auto-bump, Flathub) for v4.0.7.
+4. Monitor downstream distribution propagation (Homebrew auto-bump, Snap stable) for the current release.
 
 ## Distribution validation direction
 
-Once the latest code is released through the intended channels, prefer a CI matrix that validates installation and a small post-install contract through each channel on the environment that actually consumes it. Examples may include Homebrew on macOS, Chocolatey/winget-style Windows channels where supported, Snap/Flatpak or other Linux channels, and direct GitHub release artifacts.
+Once the latest code is released through the intended channels, prefer a CI matrix that validates installation and a small post-install contract through each channel on the environment that actually consumes it. Examples may include Homebrew on macOS, Chocolatey/winget-style Windows channels where supported, Snap or other Linux channels, and direct GitHub release artifacts.
 
 The important distinction is:
 

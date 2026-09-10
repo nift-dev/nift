@@ -12,7 +12,10 @@ The tagged Nift source commit is authoritative for implementation. A GitHub
 release is authoritative for portable release archives and checksums. The
 in-repository Snap and Chocolatey definitions are authoritative for those
 packages. The Flathub-owned `flathub/cc.nift.nsm` repository remains
-authoritative for the published Flatpak manifest.
+authoritative for the published Flatpak manifest, but the Flathub listing is
+**externally maintained and legacy**: it is outside Nift's maintained release
+pipeline and release gate, and this project does not update, submit, test or
+verify it.
 
 Publishing, pushing, tagging, changing a public version, or promoting a package
 store channel is a public action and requires Nick's explicit approval.
@@ -41,7 +44,7 @@ whoami`, then securely delete the exported local file when no longer needed.
 ```text
 snap/snapcraft.yaml                         Snap recipe
 packaging/chocolatey/                       Chocolatey source templates
-packaging/flatpak/                          upstream Flathub migration aid
+packaging/flatpak/                          legacy/external Flathub reference (not maintained)
 packaging/homebrew/                         upstream homebrew-core formula template
 .github/workflows/release.yml               portable GitHub release archives
 .github/workflows/snap.yml                  Non-publishing Snap validation
@@ -55,8 +58,9 @@ with source/build changes and to prevent version drift. The historical
 `nsm-chocolatey-nift` URLs are institutional history, not current upstream
 authority. They were initially unavailable anonymously, then inspected from the
 retained clones in `package-specific-repos`. Current recipes were reconciled
-against those sources, the live Flathub manifest, and the current C++
-Make/install contract rather than copied mechanically.
+against those sources and the current C++
+Make/install contract rather than copied mechanically. The Flathub listing is
+externally maintained and is not part of the maintained release pipeline.
 
 ## Version and artifact contract
 
@@ -91,7 +95,7 @@ Published release assets are immutable inputs to downstream package managers.
 Once a GitHub release exists, `release.yml` deliberately leaves its assets
 unchanged on a rerun. Never restore `gh release upload --clobber`, replace an
 archive, or otherwise mutate a published asset after Homebrew, Chocolatey,
-Flathub or another consumer has recorded its checksum. If a release is partial
+or another consumer has recorded its checksum. If a release is partial
 or defective, investigate it explicitly; do not repair it by silently replacing
 files at the same URLs.
 
@@ -245,36 +249,20 @@ current installation state. `Homebrew/homebrew-core#299226` was closed with a
 request to use Homebrew's automated bump infrastructure; Homebrew subsequently
 published 4.0.1 through the canonical formula.
 
-## Flatpak and Flathub
+## Flatpak and Flathub (externally maintained / legacy)
 
-Nift is already published on Flathub with immutable app ID `cc.nift.nsm`. Do not
-submit it as a new app or change the ID as part of a normal update. The canonical
-`flathub/cc.nift.nsm` manifest was migrated to the `nift-dev/nift` source and
-current `nift` command by PR #12 on 18 August 2026; ordinary updates now advance
-that manifest's immutable tag URL and checksum without restoring legacy Git,
-LuaRocks, patch, or `nsm` inputs.
+The Flathub listing `cc.nift.nsm` is **externally maintained and legacy**. It is
+owned and updated by the `flathub/cc.nift.nsm` repository, not by this project.
+It is outside Nift's maintained release pipeline and release gate, and this
+project does not prepare, open, update, submit, test or verify Flathub
+contributions. Automated or AI-agent Flathub contribution work (pull requests,
+commit messages, descriptions, review comments or replies) is outside this
+project's release process.
 
-`packaging/flatpak/cc.nift.nsm.json.in` describes the core source migration for
-the current C++ rewrite. It is deliberately a template and deliberately does not
-duplicate the canonical repository's AppStream, desktop, and icon assets. For an
-actual update:
-
-1. create and validate the public Nift tag and source archive;
-2. replace `@VERSION@` and `@SHA256@` with the immutable tag/archive checksum;
-3. update `flathub/cc.nift.nsm`, retaining its established metadata/assets;
-4. change the command from legacy `nsm` to `nift` only after checking launcher
-   and user compatibility;
-5. remove legacy Git, LuaRocks, patch and source inputs only after confirming the
-   rewrite no longer needs them;
-6. build locally with `flatpak-builder`/`org.flatpak.Builder`, run Flathub lint,
-   and exercise the CLI against host project files; and
-7. submit the update through the existing Flathub repository and observe its
-   build/publish result.
-
-The existing listing is the reason an update path exists despite current Flathub
-rules for new console-app submissions. Grandfathered presence is not proof that
-a major source/runtime migration will be accepted unchanged; reviewers and the
-external repository remain authoritative.
+`packaging/flatpak/` is retained only as a historical reference; it is not a
+maintained release channel and is not used by any release workflow. The Flathub
+listing's version state never determines the maintained-distribution release
+gate.
 
 ## Changing upstream repository references
 
@@ -288,9 +276,9 @@ each service with its source metadata changed:
 - Chocolatey's next `.nupkg` carries `packageSourceUrl`, `projectSourceUrl`,
   `bugTrackerUrl`, release URLs, and checksums from `packaging/chocolatey`.
   Published old package versions remain immutable historical records.
-- Flathub's `flathub/cc.nift.nsm` manifest must change its source URL to the
-  immutable `nift-dev/nift` release. Update its AppStream bugtracker and
-  VCS-browser URLs in the same external pull request.
+- The Flathub listing is externally maintained and legacy; this project does
+  not change its upstream source metadata and does not open Flathub pull
+  requests.
 - Homebrew's canonical `nift.rb` is updated through Homebrew's automatic bump
   infrastructure for ordinary releases. Do not open a manual simple-bump pull
   request; the in-repository template only validates the candidate formula.
@@ -304,17 +292,20 @@ README pointing at `nift-dev/nift` where practical.
 After a public release and downstream propagation, run the maintained
 `.github/workflows/distribution-verification.yml` workflow against the exact
 public version. It installs Nift from the public GitHub release archives,
-Homebrew, Chocolatey, Snap stable, and Flathub rather than rebuilding those
-channels from this checkout. The shared `scripts/distribution_smoke.py` contract
-requires the exact version and exercises `version`, `about`, `commands`, a basic
-`init`/`build`, and a representative `--target=vercel` build.
+Homebrew, Chocolatey, and Snap (edge and stable independently) rather than
+rebuilding those channels from this checkout. The shared
+`scripts/distribution_smoke.py` contract requires the exact version and
+exercises `version`, `about`, `commands`, a basic `init`/`build`, and a
+representative `--target=vercel` build.
 
 The workflow is intentionally strict while stores propagate. An older Homebrew,
-Chocolatey, or Flathub package should make that channel fail until the public
-store catches up; do not weaken the requested version to manufacture a green
-run. Each successful channel uploads normalized JSON evidence and the final job
-retains a channel-result summary. See `DISTRIBUTION-VERIFICATION.md` for the
-full contract, failure classification, and rerun policy.
+Chocolatey, or Snap stable package should make that channel fail until the
+public store catches up; do not weaken the requested version to manufacture a
+green run. Snap edge success is reported as promotion readiness, never as
+stable success. Each successful channel uploads normalized JSON evidence and
+the final job retains a channel-result summary. See
+`DISTRIBUTION-VERIFICATION.md` for the full contract, failure classification,
+and rerun policy.
 
 ## Minify++ packaging boundary
 
@@ -466,24 +457,7 @@ Ordinary push/PR CI retains the fast deterministic correctness contracts via
 5. After merge and bottle publication, run `brew update`, install/upgrade Nift
    from Homebrew, verify `nift version`, and record the merged PR and formula URL.
 
-### 6. Update Flathub
-
-1. Work in the external `flathub/cc.nift.nsm` repository; do not create a new app
-   or change the established `cc.nift.nsm` app ID.
-2. Point the manifest source at the immutable `nift-dev/nift` `vX.Y.Z` archive
-   and set its exact SHA-256.
-3. Update AppStream `bugtracker` and `vcs-browser` fields to `nift-dev/nift` when
-   migrating from the legacy repository. Preserve the established desktop, icon
-   and AppStream assets unless the update deliberately changes them.
-4. Reconcile the command with `nift` and remove legacy Git, LuaRocks, patches and
-   source inputs only after verifying they are no longer required.
-5. Build the complete external manifest with `flatpak-builder` or
-   `org.flatpak.Builder`, run Flathub lint, and test Nift against host project
-   files.
-6. Submit the external pull request and wait for Flathub review/build/publication.
-   Verify a fresh Flathub install reports `X.Y.Z` before calling it available.
-
-### 7. Close the release
+### 6. Close the release
 
 1. Record the exact tag/commit, GitHub release and workflow URLs, final checksums,
    package-manager PRs/builds/revisions/channels, installation tests and known
