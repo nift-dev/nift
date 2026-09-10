@@ -22,8 +22,8 @@ jobs:
     steps:
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          name: nift-chocolatey
-          run_id: ${{ inputs.artifact_run }}
+          artifact-ids: 10148170622
+          run-id: ${{ inputs.artifact_run }}
           github-token: ${{ github.token }}
           path: retained
       - name: Verify retained artifact hash
