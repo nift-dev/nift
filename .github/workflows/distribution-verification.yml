@@ -314,6 +314,7 @@ jobs:
     needs: [validate_version, github_release, homebrew, chocolatey, snap_edge, snap_stable]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
       - name: Record selected channel results
         env:
           EXPECTED_VERSION: ${{ inputs.version }}
