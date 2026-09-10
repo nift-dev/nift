@@ -1,20 +1,20 @@
-name: Chocolatey local-install diagnostic
+name: Retained v4.0.12 Chocolatey local-install diagnostic
 
 on:
   workflow_dispatch:
-    inputs:
-      artifact_run:
-        description: Workflow run that produced the retained nift-chocolatey artifact
-        required: true
-        default: '34467451324'
-      expected_sha256:
-        description: Exact SHA-256 of the retained nift.4.0.12.nupkg
-        required: true
-        default: 'f1709b315ad90d58ae01fbb0b83cee841f8bb273ba15fd1de87467498a67a2b2'
 
 permissions:
   contents: read
   actions: read
+
+env:
+  # Incident-specific retained artifact for the v4.0.12 release. Both the
+  # release run and the artifact ID are pinned together so the workflow cannot
+  # be pointed at an unrelated artifact while pretending it is this one.
+  ARTIFACT_RUN_ID: '34467451324'
+  ARTIFACT_ID: '10148170622'
+  EXPECTED_SHA256: 'f1709b315ad90d58ae01fbb0b83cee841f8bb273ba15fd1de87467498a67a2b2'
+  EXPECTED_VERSION: '4.0.12'
 
 jobs:
   local-install:
@@ -22,16 +22,19 @@ jobs:
     steps:
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
-          artifact-ids: 10148170622
-          run-id: ${{ inputs.artifact_run }}
+          artifact-ids: ${{ env.ARTIFACT_ID }}
+          run-id: ${{ env.ARTIFACT_RUN_ID }}
           github-token: ${{ github.token }}
           path: retained
-      - name: Verify retained artifact hash
+      - name: Verify retained artifact hash and exactly one nupkg
         shell: pwsh
         run: |
-          $nupkg = Get-ChildItem retained -Filter *.nupkg | Select-Object -First 1
-          if (-not $nupkg) { throw 'no .nupkg found in retained artifact' }
-          $expected = '${{ inputs.expected_sha256 }}'.ToLowerInvariant()
+          $nupkgs = @(Get-ChildItem retained -Filter *.nupkg)
+          if ($nupkgs.Count -ne 1) {
+            throw "expected exactly one .nupkg, found $($nupkgs.Count)"
+          }
+          $nupkg = $nupkgs[0]
+          $expected = $env:EXPECTED_SHA256.ToLowerInvariant()
           $actual = (Get-FileHash $nupkg.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($actual -ne $expected) {
             throw "SHA-256 mismatch: expected $expected, got $actual"
@@ -50,7 +53,7 @@ jobs:
       - name: Install exact local .nupkg (community feed isolated)
         shell: pwsh
         run: |
-          choco install nift --version 4.0.12 -s nift-local-install -y --no-progress
+          choco install nift --version $env:EXPECTED_VERSION -s nift-local-install -y --no-progress
           if ($LASTEXITCODE -ne 0) { throw "choco install failed with exit code $LASTEXITCODE" }
       - name: Locate and smoke nift.exe
         shell: pwsh
@@ -64,7 +67,9 @@ jobs:
           "TOOLS_EXE=$($toolsExe.FullName)" >> $env:GITHUB_ENV
           $v = & $toolsExe.FullName version
           if ($LASTEXITCODE -ne 0) { throw "nift version failed: $v" }
-          if ($v -notmatch '^Nift v4\.0\.12') { throw "version mismatch: $v" }
+          if ($v -notmatch "^Nift v$([regex]::Escape($env:EXPECTED_VERSION))") {
+            throw "version mismatch: expected Nift v$env:EXPECTED_VERSION, got $v"
+          }
           Write-Host "shim: $($shim.Source)"
           Write-Host "tools exe: $($toolsExe.FullName)"
           Write-Host "reported: $v"
