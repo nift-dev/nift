@@ -13,7 +13,7 @@ checker must reject that disagreement before any packaging or publication step
 can run.
 
 Usage:
-  check_version_consistency.py [--tag vX.Y.Z] [--expected X.Y.Z]
+  check_version_consistency.py [--tag vX.Y.Z] [--expected X.Y.Z|vX.Y.Z]
 
 Exit codes:
   0  all authoritative versions agree
@@ -29,6 +29,22 @@ import sys
 from pathlib import Path
 
 VERSION_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
+TAG_RE = re.compile(r"^v\d+\.\d+\.\d+$")
+
+
+def normalize_version(value: str | None) -> str | None:
+    """Accept X.Y.Z or vX.Y.Z and return bare X.Y.Z, else None.
+
+    The reusable Chocolatey/Homebrew workflows document accepting versions with
+    or without a leading 'v', and release.yml passes github.ref_name (e.g.
+    v4.0.13) through to them, so the checker must accept both forms.
+    """
+    if value is None:
+        return None
+    v = value[1:] if value.startswith("v") else value
+    if VERSION_RE.match(v):
+        return v
+    return None
 
 
 def repo_root() -> Path:
@@ -89,28 +105,34 @@ def check(expected: str | None = None, tag: str | None = None) -> int:
             failures += 1
 
     if expected is not None:
-        failures += validate_version(expected, "expected/release")
-        if VERSION_RE.match(expected or ""):
+        expected_bare = normalize_version(expected)
+        if expected_bare is None:
+            print(f"FAIL: expected/release version is malformed: {expected!r}",
+                  file=sys.stderr)
+            failures += 1
+        else:
             for value, label in ((exe, "executable"), (snap, "Snap metadata")):
-                if value is not None and value != expected:
+                if value is not None and value != expected_bare:
                     print(
-                        f"FAIL: {label} {value} != expected {expected}",
+                        f"FAIL: {label} {value} != expected {expected_bare}",
                         file=sys.stderr,
                     )
                     failures += 1
 
     if tag is not None:
-        if not re.match(r"^v\d+\.\d+\.\d+$", tag):
+        if not TAG_RE.match(tag):
             print(f"FAIL: tag is malformed: {tag!r} (expected vX.Y.Z)", file=sys.stderr)
             failures += 1
         else:
             tag_version = tag[1:]
-            if expected is not None and tag_version != expected:
-                print(
-                    f"FAIL: tag version {tag_version} != expected {expected}",
-                    file=sys.stderr,
-                )
-                failures += 1
+            if expected is not None:
+                expected_bare = normalize_version(expected)
+                if expected_bare is not None and tag_version != expected_bare:
+                    print(
+                        f"FAIL: tag version {tag_version} != expected {expected_bare}",
+                        file=sys.stderr,
+                    )
+                    failures += 1
             for value, label in ((exe, "executable"), (snap, "Snap metadata")):
                 if value is not None and value != tag_version:
                     print(
@@ -131,7 +153,7 @@ def check(expected: str | None = None, tag: str | None = None) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--expected", help="expected release version X.Y.Z")
+    parser.add_argument("--expected", help="expected release version X.Y.Z or vX.Y.Z")
     parser.add_argument("--tag", help="release tag vX.Y.Z")
     args = parser.parse_args(argv)
     return check(expected=args.expected, tag=args.tag)

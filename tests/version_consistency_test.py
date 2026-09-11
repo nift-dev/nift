@@ -144,6 +144,51 @@ class VersionConsistencyTest(unittest.TestCase):
             finally:
                 vc.repo_root = old
 
+    def test_expected_accepts_leading_v_prefix(self) -> None:
+        # release.yml passes github.ref_name (e.g. v4.0.13) to the reusable
+        # Chocolatey/Homebrew workflows; the checker must accept both spellings.
+        vc = self.vc
+        self.assertEqual(vc.check(expected="4.0.13"), 0)
+        self.assertEqual(vc.check(expected="v4.0.13"), 0)
+        self.assertEqual(vc.check(expected="v4.0.13", tag="v4.0.13"), 0)
+        # The exact value release.yml supplies (github.ref_name for a tag).
+        ref_name = "v4.0.13"
+        self.assertEqual(vc.check(expected=ref_name, tag=ref_name), 0)
+
+    def test_expected_rejects_malformed_prefixes(self) -> None:
+        vc = self.vc
+        # Double 'v', trailing dot, extra component, and bare 'v' are all invalid.
+        self.assertIsNone(vc.normalize_version("vv4.0.13"))
+        self.assertIsNone(vc.normalize_version("v4.0"))
+        self.assertIsNone(vc.normalize_version("4.0.13.1"))
+        self.assertIsNone(vc.normalize_version("v"))
+        self.assertIsNone(vc.normalize_version(""))
+        self.assertEqual(vc.check(expected="vv4.0.13"), 1)
+        self.assertEqual(vc.check(expected="v4.0"), 1)
+        self.assertEqual(vc.check(expected="4.0.13.1"), 1)
+
+    def test_expected_prefix_does_not_mask_repo_mismatch(self) -> None:
+        # A leading 'v' must not hide a real version disagreement.
+        vc = self.vc
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "src").mkdir()
+            (root / "snap").mkdir()
+            (root / "src" / "CLI.cpp").write_text(
+                'constexpr const char* version_text = "Nift v4.0.14";\n',
+                encoding="utf-8",
+            )
+            (root / "snap" / "snapcraft.yaml").write_text(
+                "version: '4.0.13'\n", encoding="utf-8"
+            )
+            old = vc.repo_root
+            vc.repo_root = lambda: root
+            try:
+                self.assertEqual(vc.check(expected="v4.0.13"), 1)
+                self.assertEqual(vc.check(expected="v4.0.14"), 1)
+            finally:
+                vc.repo_root = old
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
