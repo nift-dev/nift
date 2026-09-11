@@ -28,6 +28,7 @@ on:
       - '.github/workflows/init-targets.yml'
       - '.github/workflows/nightly-deep.yml'
       - '.github/workflows/distribution-verification.yml'
+  workflow_dispatch:
 
 jobs:
   scaling:

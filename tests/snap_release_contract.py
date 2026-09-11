@@ -1230,6 +1230,25 @@ class WorkflowStructure(unittest.TestCase):
         self.assertNotIn("uses: ./.github/workflows/snap.yml", release_text)
         self.assertNotIn("snap:", release_text.split("jobs:")[1] if "jobs:" in release_text else release_text)
 
+    def test_pre_release_validation_workflows_are_manually_invocable(self):
+        # Every principal non-publishing validation workflow must be manually
+        # dispatchable (workflow_dispatch), so Phase 1 can produce a fresh,
+        # complete pre-release matrix against a single candidate SHA even when
+        # path filters do not auto-trigger them.
+        manual_workflows = {
+            ".github/workflows/test-integrity.yml",
+            ".github/workflows/performance-regression.yml",
+            ".github/workflows/checkpoint-10-cross-platform.yml",
+            ".github/workflows/init-targets.yml",
+            ".github/workflows/packaging.yml",
+            ".github/workflows/nightly-deep.yml",
+            ".github/workflows/snap.yml",
+        }
+        for path in sorted(manual_workflows):
+            text = self.load(path)
+            self.assertIn("workflow_dispatch", text,
+                          "{} must be manually dispatchable".format(path))
+
     def test_tag_release_workflow_has_no_snap_wait_or_store_mutation(self):
         # The tag-triggered release graph must not wait on remote builders and
         # must not contain any live Snap Store channel mutation or packaging
