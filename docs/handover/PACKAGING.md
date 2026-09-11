@@ -140,6 +140,26 @@ checker is now required before any Snap promotion. Do not rely on `latest/edge`
 occupancy as promotion authority without verifying the executable identity of
 the revision being promoted.
 
+## Connected Snap build: inspect and correct by Nick
+
+The v4.0.12 recurrence risk is not fully closed by the repository gate. The
+external Snap Store/Launchpad connected build service is connected at the
+GitHub repository level; its exact trigger (every `main` push vs tags only),
+auto-release target, and whether it observes GitHub check results must be
+confirmed from the Snapcraft dashboard. **Nick must inspect and, if needed,
+correct the connected-build settings so ordinary `main` pushes cannot
+unexpectedly publish release candidates to `latest/edge`.**
+
+Repository CI detects a disagreement between `snap/snapcraft.yaml` and
+`src/CLI.cpp` after a push and fails the workflow. It cannot guarantee agreement
+before the independent connected builder starts, and it does not prove the
+provenance of Store artifacts. The human release procedure is: Nick verifies or
+corrects the connected-build settings, prepares the release with the established
+process, runs the non-publishing rehearsal, requires green Actions, tags, lets
+the established Snap builder produce the release builds, manually inspects the
+build records and available revisions, smoke-tests the installable amd64
+candidate, then promotes manually only after inspection.
+
 ## Snap promotion policy (manual, best-effort riscv64)
 
 This policy was hardened after the v4.0.11 release, when the tag-triggered
@@ -486,9 +506,33 @@ Ordinary push/PR CI retains the fast deterministic correctness contracts via
    confirmed from the public store.
 4. Track incomplete downstream work explicitly rather than reopening or mutating
    the GitHub release.
+5. Verify every intended public installation and record any incomplete channel
+   separately. Do not collapse a pending moderation, promotion or propagation
+   state into a successful installation.
 
 Never describe a release as available through a package manager until its public
 store entry resolves to the intended version and a fresh installation succeeds.
+
+### 7. Maintainer pause before development-version advancement
+
+The release procedure ends here. After the release is published and every
+intended public installation has been verified and recorded:
+
+1. Produce the completed release report covering each channel's actual result
+   and every incomplete, delayed or failed channel.
+2. **Stop.** Do not advance the development version.
+3. Wait for Nick's separate, explicit approval that the release is complete and
+   accepted. Passing public installation checks is not permission to bump the
+   development version.
+4. Only after that approval, advance the development version as a **distinct
+   post-release commit** (`src/CLI.cpp`, `snap/snapcraft.yaml` and any version
+   fixtures together).
+5. Verify that post-release bump's Actions independently and ensure it cannot
+   alter or republish the released distribution artifacts.
+
+The development-version advancement must not be combined with release
+verification, inferred from successful verification, or performed in the same
+workflow, checkpoint, commit or agent continuation as the release.
 
 ## v4.0.0 publication record
 

@@ -40,6 +40,8 @@ jobs:
         shell: bash
         run: |
           if [ "${{ github.event_name }}" = "push" ] && [[ "$GITHUB_REF_NAME" == v* ]]; then
+            package_version="$(sed -nE "s/^version: '([^']+)'/\1/p" snap/snapcraft.yaml)"
+            test "$package_version" = "${GITHUB_REF_NAME#v}"
             python3 scripts/check_version_consistency.py --tag "$GITHUB_REF_NAME"
           else
             python3 scripts/check_version_consistency.py

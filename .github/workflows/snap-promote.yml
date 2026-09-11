@@ -32,7 +32,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-      - name: Fail-closed version consistency before any promotion
+        with:
+          ref: v${{ inputs.version }}
+      - name: Fail-closed version consistency at the release tag
         shell: bash
         run: |
           python3 scripts/check_version_consistency.py --expected "${{ inputs.version }}"
@@ -52,7 +54,9 @@ jobs:
       NIFT_SNAP_CONFIRM: ${{ inputs.promote && 'yes' || 'no' }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
-      - name: Validate requested version
+        with:
+          ref: v${{ inputs.version }}
+      - name: Validate requested version at the release tag
         shell: bash
         run: |
           case "$NIFT_SNAP_VERSION" in
