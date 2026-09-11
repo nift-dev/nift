@@ -1261,3 +1261,28 @@ class WorkflowStructure(unittest.TestCase):
             self.assertNotIn("SNAPCRAFT_STORE_CREDENTIALS", text)
         text = self.load(".github/workflows/release.yml")
         self.assertNotIn("uses: ./.github/workflows/snap.yml", text)
+
+    def test_rehearsal_requires_committed_release_notes(self):
+        # A workflow_dispatch rehearsal for X.Y.Z must fail closed if the
+        # correctly versioned release-notes file is not committed, so Phase 1
+        # catches a missing notes body before a real tag release.
+        text = self.load(".github/workflows/release.yml")
+        rehearse = text.split("rehearse:", 1)[1].split("installer-public-smoke:", 1)[0]
+        self.assertIn("docs/evidence/release-${version}/release-notes-${version}.md", rehearse)
+        self.assertIn("test -f", rehearse)
+        self.assertIn("git ls-files --error-unmatch", rehearse)
+        # The rehearsal must remain non-publishing: no gh release create here.
+        self.assertNotIn("gh release create", rehearse)
+        # The tag-triggered publish job retains its own fail-closed notes check.
+        publish = text.split("publish:", 1)[1].split("rehearse:", 1)[0]
+        self.assertIn("release-notes-$version.md", publish)
+        self.assertIn("[ -f \"$NOTES\" ]", publish)
+
+    def test_rehearsal_notes_check_cannot_publish(self):
+        # The release-notes check in the rehearsal path cannot publish anything:
+        # the rehearsal job has no write permission and no gh release command.
+        text = self.load(".github/workflows/release.yml")
+        rehearse = text.split("rehearse:", 1)[1].split("installer-public-smoke:", 1)[0]
+        self.assertNotIn("permissions:\n      contents: write", rehearse)
+        self.assertNotIn("gh release", rehearse)
+        self.assertNotIn("GH_TOKEN", rehearse)

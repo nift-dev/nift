@@ -232,6 +232,23 @@ jobs:
     needs: [unix, windows, installer-preflight, public-installer-preflight]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Fail closed if the release-notes file is missing or misnamed
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ inputs.version }}"
+          notes="docs/evidence/release-${version}/release-notes-${version}.md"
+          test -f "$notes" || {
+            echo "FAIL: release-notes file missing at $notes (a reviewed body must be committed before the release candidate)" >&2
+            exit 1
+          }
+          # The notes file must be tracked (committed), not an untracked working file.
+          git ls-files --error-unmatch "$notes" >/dev/null 2>&1 || {
+            echo "FAIL: release-notes file $notes is not tracked in the candidate commit" >&2
+            exit 1
+          }
+          echo "release notes present and tracked: $notes"
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
           path: dist
