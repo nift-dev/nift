@@ -19,7 +19,22 @@ permissions:
   contents: read
 
 jobs:
+  validate_version_consistency:
+    name: Validate version consistency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Fail-closed version consistency (executable vs Snap metadata vs tag)
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            python3 scripts/check_version_consistency.py --tag "$GITHUB_REF_NAME"
+          else
+            python3 scripts/check_version_consistency.py --expected "${{ inputs.version }}"
+          fi
+
   unix:
+    needs: validate_version_consistency
     strategy:
       matrix:
         include:
@@ -68,6 +83,7 @@ jobs:
           path: nift-*.tar.gz
 
   windows:
+    needs: validate_version_consistency
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
@@ -127,6 +143,7 @@ jobs:
           path: nift-*.zip
 
   installer-preflight:
+    needs: validate_version_consistency
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
@@ -147,6 +164,7 @@ jobs:
   #     live script actually installs the published artifacts (equality alone
   #     does not prove that).
   public-installer-preflight:
+    needs: validate_version_consistency
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09

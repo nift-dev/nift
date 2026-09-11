@@ -28,7 +28,23 @@ on:
         type: boolean
 
 jobs:
+  validate_version_consistency:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Fail-closed version consistency
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # PR/validation runs have no release version; assert dev consistency
+            # only (executable == Snap metadata).
+            python3 scripts/check_version_consistency.py
+          else
+            python3 scripts/check_version_consistency.py --expected "${{ inputs.version }}"
+          fi
+
   package:
+    needs: validate_version_consistency
     runs-on: windows-latest
     env:
       CHOCOLATEY_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
