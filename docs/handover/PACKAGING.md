@@ -362,9 +362,18 @@ contract; do not source a public Minify++ package from Nift's embedded copy.
 
 ## Step-by-step release guide
 
-Use this order for a normal `X.Y.Z` production release. Stop at any failed gate,
-fix the problem before tagging where possible, and retain exact command/workflow
-evidence for the release report.
+The release procedure is **four mandatory phases** with **two hard human
+approval gates**. Each phase ends with a **STOP**. Green Actions are evidence,
+not release authorization; a successful GitHub release is evidence, not
+packaging authorization. Silence, elapsed time, an earlier approval or an agent
+continuing its task does not constitute approval.
+
+```text
+Phase 1  push + validate  -> STOP -> Nick approves release
+Phase 2  release + verify -> STOP -> Nick approves packaging
+Phase 3  packaging        -> STOP -> Nick approves development bump
+Phase 4  development bump
+```
 
 ### Deep-guard policy
 
@@ -386,7 +395,7 @@ incremental clean-build equivalence. Run the **complete** workflow:
 Ordinary push/PR CI retains the fast deterministic correctness contracts via
 `test-integrity.yml`; it does not run the deep guards.
 
-### 1. Prepare the release candidate
+## Phase 1 — push and validate (STOP after green)
 
 1. Start from the intended clean `main` commit and review unrelated working-tree
    changes before touching release files.
@@ -417,29 +426,65 @@ Ordinary push/PR CI retains the fast deterministic correctness contracts via
    suite's GitHub workflow builds Nift from its remote `main` branch, so pushing
    the suite first makes CI test its new contract against the previous Nift
    revision.
+9. Run every applicable non-publishing CI, build, regression and
+   packaging-validation workflow against the pushed commit. Monitor every job to
+   completion. Fix actual failures from their remote logs and repeat until the
+   complete applicable matrix is green.
+10. Produce the Phase 1 report: exact commit hash, every workflow and run URL,
+    every job result, any deliberately inapplicable workflow and why, and
+    repository cleanliness/version consistency.
 
-### 2. Create the GitHub release
+**STOP.** Wait for Nick's explicit manual confirmation that the Actions results
+have been reviewed and the release may proceed. An agent must never infer
+release authorization from green Actions, and must not push then proceed
+directly to tagging or releasing in the same continuation, checkpoint or turn.
 
-1. Obtain explicit approval for the public release action.
-2. Create the approved signed or annotated `vX.Y.Z` tag at the validated commit
+## Phase 2 — release and verify (STOP after verification)
+
+This phase is authorized only after Nick explicitly authorizes the release.
+
+1. Create the approved signed or annotated `vX.Y.Z` tag at the validated commit
    and push that tag to `nift-dev/nift`.
-3. Watch `.github/workflows/release.yml`. All Linux, macOS and Windows artifact
+2. Watch `.github/workflows/release.yml`. All Linux, macOS and Windows artifact
    jobs plus `installer-preflight` must succeed before the GitHub release is
    created. After publication, require `installer-public-smoke` to pass on Linux
    x86-64, macOS ARM64 and macOS x86-64; this proves the live nift.dev script
    matches the tag, verifies the release checksum and can initialize/build a
    fresh project using the installed binary.
-4. Confirm the release contains exactly the expected four platform archives and
+3. Confirm the release contains exactly the expected four platform archives and
    `SHA256SUMS`, and that each archive name and embedded executable version match
    `X.Y.Z`.
-5. Download at least the checksums and representative archives from the public
+4. Download at least the checksums and representative archives from the public
    release URL, verify them independently, and record the release URL, tag commit,
    workflow run and final checksums.
-6. From this point, treat every published asset as immutable. Never replace an
+5. From this point, treat every published asset as immutable. Never replace an
    archive at the same URL. A workflow rerun should leave an existing release
    untouched.
+6. Produce the complete release-verification report: tag points at the approved
+   commit, the exact asset set exists, SHA256SUMS covers every archive and no
+   unexpected archive, every public archive was downloaded and checksum-verified,
+   every supported-platform artifact was extracted and smoke-tested, every binary
+   reports the released version, the public installer uses the released artifacts
+   successfully, and release notes/public metadata are correct.
 
-### 3. Publish and verify Snap
+The tag-triggered `release.yml` workflow **ends here**. It builds, publishes and
+verifies the GitHub release and then **STOPs**; it does **not** invoke
+Chocolatey, Homebrew or Snap. There is no `workflow_run`, reusable-workflow call,
+dependency job or script that starts packaging after a release succeeds.
+
+**STOP.** Wait for Nick's separate, explicit manual confirmation that the GitHub
+release has succeeded and packaging may begin. An agent must never infer
+packaging authorization from a successful GitHub release, and must not proceed
+directly from releasing to Chocolatey, Homebrew, Snap or any other package
+channel.
+
+## Phase 3 — packaging (manual, STOP after packaging verification)
+
+This phase is authorized only after Nick explicitly authorizes packaging. Each
+channel is processed and verified independently by its **manual
+`workflow_dispatch`** workflow. Flathub is out of scope.
+
+### 3a. Publish and verify Snap
 
 1. The connected Snap Store/Launchpad build service is the sole producer of
    published Snap revisions. It publishes every declared platform (amd64,
@@ -449,22 +494,24 @@ Ordinary push/PR CI retains the fast deterministic correctness contracts via
 2. Wait until `snap info nift`/the Store shows the exact release version on edge
    for all six supported architectures. Do not retrigger while a slow builder
    is merely queued; duplicate revisions make exact selection harder.
-3. Manually dispatch **Promote completed Snap builds** with version `X.Y.Z`. It
-   uses the pinned Snapcraft toolchain, exact-revision selection, strict
-   candidate verification, candidate confinement smoke and explicit
-   per-revision stable releases implemented by `packaging/snap_release.py`.
-4. Confirm the workflow succeeds and `snap info nift` reports `X.Y.Z` on
+3. Nick manually inspects the build records and available revisions, then
+   smoke-tests the installable amd64 candidate.
+4. Manually dispatch **Promote completed Snap builds** with version `X.Y.Z` only
+   after that inspection. It uses the pinned Snapcraft toolchain, exact-revision
+   selection, strict candidate verification, candidate confinement smoke and
+   explicit per-revision stable releases implemented by `packaging/snap_release.py`.
+5. Confirm the workflow succeeds and `snap info nift` reports `X.Y.Z` on
    `latest/stable` for every supported architecture, then perform a fresh Store
    install. If the promotion fails, fix the concrete Store/build issue and rerun
    the manual workflow; do not create a new GitHub release merely to retry Snap.
 
-### 4. Publish and verify Chocolatey
+### 3b. Publish and verify Chocolatey
 
 1. Confirm the final Windows ZIP is publicly downloadable and will no longer be
    replaced. `chocolatey.yml` derives its checksum from that release asset.
-2. Let the tag-triggered release call the Chocolatey workflow, or manually run
-   `chocolatey.yml` with `version: X.Y.Z`. `CHOCOLATEY_API_KEY` must be configured
-   to push; otherwise only the `.nupkg` artifact is produced.
+2. Manually run `chocolatey.yml` with `version: X.Y.Z`. `CHOCOLATEY_API_KEY` must
+   be configured to push; otherwise only the `.nupkg` artifact is produced.
+   This is a manual invocation, not an automatic step of the tag release.
 3. Inspect the workflow result and retain the generated `.nupkg`. When practical,
    test install, shimmed `nift` execution, a real project, upgrade and uninstall
    in a disposable clean Windows VM.
@@ -479,10 +526,11 @@ Ordinary push/PR CI retains the fast deterministic correctness contracts via
 7. Declare Chocolatey availability only after approval and a fresh
    `choco install nift --version X.Y.Z` succeeds from the community repository.
 
-### 5. Update Homebrew
+### 3c. Update Homebrew
 
-1. Download the resolved formula artifact from `homebrew.yml` and confirm its URL
-   and SHA-256 refer to the immutable `nift-dev/nift` tagged source archive.
+1. Manually run `homebrew.yml` with `version: X.Y.Z`; download the resolved
+   formula artifact and confirm its URL and SHA-256 refer to the immutable
+   `nift-dev/nift` tagged source archive.
 2. Confirm the workflow tested the formula on both supported macOS and Linux
    runners. Do not copy legacy LuaJIT, patch or `nsm` behavior into the formula.
 3. Wait for and monitor Homebrew's automatic bump service. Check existing pull
@@ -495,7 +543,7 @@ Ordinary push/PR CI retains the fast deterministic correctness contracts via
 5. After merge and bottle publication, run `brew update`, install/upgrade Nift
    from Homebrew, verify `nift version`, and record the merged PR and formula URL.
 
-### 6. Close the release
+### 3d. Close the release
 
 1. Record the exact tag/commit, GitHub release and workflow URLs, final checksums,
    package-manager PRs/builds/revisions/channels, installation tests and known
@@ -513,22 +561,20 @@ Ordinary push/PR CI retains the fast deterministic correctness contracts via
 Never describe a release as available through a package manager until its public
 store entry resolves to the intended version and a fresh installation succeeds.
 
-### 7. Maintainer pause before development-version advancement
+**STOP.** Wait for Nick's separate explicit confirmation that the release and
+packaging work is complete and accepted.
 
-The release procedure ends here. After the release is published and every
-intended public installation has been verified and recorded:
+## Phase 4 — development-version advancement
 
-1. Produce the completed release report covering each channel's actual result
-   and every incomplete, delayed or failed channel.
-2. **Stop.** Do not advance the development version.
-3. Wait for Nick's separate, explicit approval that the release is complete and
-   accepted. Passing public installation checks is not permission to bump the
-   development version.
-4. Only after that approval, advance the development version as a **distinct
-   post-release commit** (`src/CLI.cpp`, `snap/snapcraft.yaml` and any version
-   fixtures together).
-5. Verify that post-release bump's Actions independently and ensure it cannot
-   alter or republish the released distribution artifacts.
+This phase is authorized only after Nick separately confirms the release and
+packaging work is complete.
+
+1. Advance the development version in one **distinct post-release commit**,
+   updating every authoritative version location together (`src/CLI.cpp`,
+   `snap/snapcraft.yaml` and any version fixtures).
+2. Push it.
+3. Run the complete applicable Actions matrix again.
+4. Report and stop.
 
 The development-version advancement must not be combined with release
 verification, inferred from successful verification, or performed in the same

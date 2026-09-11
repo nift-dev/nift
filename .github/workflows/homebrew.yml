@@ -1,12 +1,6 @@
 name: Homebrew
 
 on:
-  workflow_call:
-    inputs:
-      version:
-        description: Existing GitHub release version, with or without v prefix
-        required: true
-        type: string
   workflow_dispatch:
     inputs:
       version:

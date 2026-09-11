@@ -1,7 +1,6 @@
 name: Snap
 
 on:
-  workflow_call:
   pull_request:
     paths:
       - 'snap/**'

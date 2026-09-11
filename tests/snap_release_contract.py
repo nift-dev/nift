@@ -1207,15 +1207,33 @@ class WorkflowStructure(unittest.TestCase):
         self.assertIn('[ "$installed_version" = "$EXPECTED" ]', script)
         self.assertIn('[ "$installed_revision" = "$REVISION" ]', script)
 
-    def test_release_workflow_calls_snap_via_workflow_call(self):
+    def test_release_workflow_does_not_invoke_snap_packaging(self):
+        # Phase 2 (GitHub release) must end before any package-manager work.
+        # release.yml must not call snap/chocolatey/homebrew, and no
+        # reusable-workflow call, workflow_run or dependency job may start
+        # packaging after a successful release.
         text = self.load(".github/workflows/release.yml")
-        self.assertIn("uses: ./.github/workflows/snap.yml", text)
-        snap_job = text.split("  snap:", 1)[1].split("\n  ", 1)[0]
-        self.assertNotIn("secrets: inherit", snap_job)
+        self.assertNotIn("uses: ./.github/workflows/snap.yml", text)
+        self.assertNotIn("uses: ./.github/workflows/chocolatey.yml", text)
+        self.assertNotIn("uses: ./.github/workflows/homebrew.yml", text)
+        # No actual workflow_run trigger (comments may mention the term).
+        self.assertNotIn("workflow_run:", text)
+        self.assertNotIn("packaging/snap_release.py", text)
+        self.assertNotIn("SNAPCRAFT_STORE_CREDENTIALS", text)
+
+    def test_snap_packaging_is_manual_only(self):
+        # snap.yml must be separately manually invoked (workflow_dispatch) and
+        # must not be reachable automatically from release.yml.
+        snap_text = self.load(".github/workflows/snap.yml")
+        self.assertIn("workflow_dispatch", snap_text)
+        release_text = self.load(".github/workflows/release.yml")
+        self.assertNotIn("uses: ./.github/workflows/snap.yml", release_text)
+        self.assertNotIn("snap:", release_text.split("jobs:")[1] if "jobs:" in release_text else release_text)
 
     def test_tag_release_workflow_has_no_snap_wait_or_store_mutation(self):
         # The tag-triggered release graph must not wait on remote builders and
-        # must not contain any live Snap Store channel mutation.
+        # must not contain any live Snap Store channel mutation or packaging
+        # invocation.
         for path in (".github/workflows/release.yml", ".github/workflows/snap.yml"):
             text = self.load(path)
             self.assertNotIn("NIFT_SNAP_WAIT", text)
@@ -1223,4 +1241,4 @@ class WorkflowStructure(unittest.TestCase):
             self.assertNotIn("packaging/snap_release.py", text)
             self.assertNotIn("SNAPCRAFT_STORE_CREDENTIALS", text)
         text = self.load(".github/workflows/release.yml")
-        self.assertIn("uses: ./.github/workflows/snap.yml", text)
+        self.assertNotIn("uses: ./.github/workflows/snap.yml", text)

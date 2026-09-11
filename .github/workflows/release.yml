@@ -289,19 +289,12 @@ jobs:
           "$install_dir/nift" build
           "$install_dir/nift" status
 
-  chocolatey:
-    needs: publish
-    uses: ./.github/workflows/chocolatey.yml
-    with:
-      version: ${{ github.ref_name }}
-    secrets: inherit
-
-  snap:
-    needs: publish
-    uses: ./.github/workflows/snap.yml
-
-  homebrew:
-    needs: publish
-    uses: ./.github/workflows/homebrew.yml
-    with:
-      version: ${{ github.ref_name }}
+  # HARD STOP (Phase 2): the tag-triggered release workflow ends here. It
+  # builds, publishes and verifies the GitHub release and its platform
+  # archives, and then STOPS. It deliberately does NOT invoke Chocolatey,
+  # Homebrew or Snap: package-manager work is a separate Phase 3 that requires
+  # Nick's explicit manual authorization after this release has been reviewed.
+  # Chocolatey/Homebrew/Snap are invoked only through their own manual
+  # workflow_dispatch (never via a reusable-workflow call, workflow_run or
+  # dependency job from this file), so a successful release can never
+  # automatically start packaging.
