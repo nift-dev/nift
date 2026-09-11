@@ -19,11 +19,12 @@ behaviour are unchanged since v4.0.12.
 
 ## Reliability and release-safety improvements
 
-- A fail-closed version-consistency check now runs on every push, pull request
-  and manual dispatch: it asserts that the executable version in `src/CLI.cpp`
-  and the Snap metadata version in `snap/snapcraft.yaml` agree, and that any
-  expected or tag version matches both. A disagreement fails before any
-  packaging or publication step.
+- A fail-closed version-consistency check now gates the maintained release and
+  packaging workflows. It verifies that the executable version in `src/CLI.cpp`
+  and the Snap metadata version in `snap/snapcraft.yaml` agree and, when an
+  expected release version or tag is supplied, that it matches both. A
+  mismatch stops the applicable workflow before its packaging or publication
+  steps.
 - The GitHub release workflow now publishes only the release archives and then
   stops; Chocolatey, Homebrew and Snap are separate manual steps that require
   a distinct approval. A successful GitHub release no longer automatically
