@@ -122,6 +122,24 @@ does not mutate candidate/stable; a successful Nift GitHub release finishes once
 its own artifacts, installers and deterministic package checks pass. Snap
 publication is an asynchronous follow-up channel.
 
+## Snap release status (v4.0.12 decision)
+
+The v4.0.12 Snap rollout is **abandoned** and must not be promoted. The defect
+was specific to the Snap build/promotion process: the post-release development
+bump advanced the executable identity to 4.0.13 but left `snap/snapcraft.yaml`
+at 4.0.12, and the connected build service re-published `latest/edge` from every
+subsequent default-branch push with Snap metadata `4.0.12` and an executable
+reporting `Nift v4.0.13`. The promotion coordinator selected revisions by
+Store-declared version metadata alone. See
+`docs/evidence/release-4.0.12/snap-release-decision.md`.
+
+Snap stable remains on its prior valid version (4.0.11) until v4.0.13 is
+released through the repaired Snap pipeline. Historical Snap revisions 802–822
+must not be used without authoritative provenance. A version-consistency
+checker is now required before any Snap promotion. Do not rely on `latest/edge`
+occupancy as promotion authority without verifying the executable identity of
+the revision being promoted.
+
 ## Snap promotion policy (manual, best-effort riscv64)
 
 This policy was hardened after the v4.0.11 release, when the tag-triggered

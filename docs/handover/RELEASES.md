@@ -7,11 +7,31 @@ approved release is packaged and published.
 
 ## Authority and current state
 
-The development executable currently reports `Nift v4.0.12`, following the
-public v4.0.11 release. The exact executable identity remains documented in
+The development executable currently reports `Nift v4.0.13`, following the
+public v4.0.12 release. The exact executable identity remains documented in
 project history and release notes, but it is not part of the public product
 version. Exact tag, artifact, and public release conventions must follow
 `PACKAGING.md` and actual Git/release evidence.
+
+## v4.0.12 release status and Snap decision
+
+- v4.0.12 remains the current release on the channels where it successfully
+  shipped (GitHub release archives, Homebrew, and the Chocolatey submission).
+  It is not globally withdrawn or broken.
+- The v4.0.12 Snap rollout is **abandoned** and must not be promoted.
+  Historical Snap revisions 802–822 must not be used without authoritative
+  provenance.
+- Snap stable remains on its prior valid version (4.0.11) until v4.0.13 is
+  released through the repaired Snap pipeline.
+- Chocolatey v4.0.12 remains under moderation and must not be resubmitted
+  without a separate decision.
+- Flathub is outside the maintained release process.
+
+The defect is specific to the Snap build and promotion process: the post-release
+development bump advanced the executable identity to 4.0.13 but left
+`snap/snapcraft.yaml` at 4.0.12, and the promotion coordinator selects revisions
+by Store-declared version metadata alone. See
+`docs/evidence/release-4.0.12/snap-release-decision.md`.
 
 A website content checkpoint, regression-suite checkpoint, and executable version
 are distinct identities. Do not synchronize version numbers mechanically.
