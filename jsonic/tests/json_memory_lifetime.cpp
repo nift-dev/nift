@@ -113,11 +113,20 @@ void malformed_cleanup_pressure() {
     const std::vector<std::string> invalid = {
         "", " ", "[", "{", "true false", "+1", ".1", "01", "-01", "1.", "1e", "1e+", "--1",
         "[1,]", "[1,,2]", "[1 2]", R"({"a":})", R"({"a":1 "b":2})",
-        R"({"a":1,})", R"({"a":1,"a":2})", R"({a:1})", R"("\x")",
+        R"({"a":1,})", R"({a:1})", R"("\x")",
         R"("\uD800")", R"("\uDC00")", R"("\uD800\u0041")",
         std::string("\"raw\nnewline\"")
     };
     for (const auto& source : invalid) must_reject(source);
+
+    json::Document duplicate;
+    must_parse(R"({"a":1,"a":2})", duplicate);
+    assert(duplicate.object.size() == 2);
+    json::ParseOptions unique;
+    unique.duplicate_keys = json::DuplicateKeyPolicy::Reject;
+    std::string duplicate_error;
+    assert(!json::Document::parse(R"({"a":1,"a":2})", duplicate,
+                                  duplicate_error, unique));
 
     // Force failures after substantial partial allocation, not only at byte 0.
     std::string partial_array = "[";

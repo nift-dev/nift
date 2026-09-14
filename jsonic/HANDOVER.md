@@ -15,7 +15,7 @@ Jsonic++ is the standalone canonical project for the small dependency-free C++17
 - Public header: `include/json.h`.
 - Public namespace/type: `json::Document` plus `json::Type`.
 - Toolchain: C++17; header-only parser/value implementation.
-- Product boundary: parse JSON correctly, represent/query values, serialize when useful, and provide actionable errors. Do not grow into JSON Pointer/Patch, binary encodings, networking, schema frameworks, or a general serialization platform without a separately justified contract.
+- Product boundary: parse JSON correctly, represent/query values, serialize when useful, and provide actionable errors. Strict RFC 8259 parsing is the default; configuration consumers may independently opt into comments and trailing commas. Do not grow into JSON Pointer/Patch, binary encodings, networking, schema frameworks, or a general serialization platform without a separately justified contract.
 
 ## Source of truth and vendoring
 
@@ -53,6 +53,17 @@ make check-minify-sync MINIFY_DIR=/path/to/minify
 
 Parser work should test both acceptance and rejection. Important families include JSON grammar, number grammar/range handling, duplicate keys, escapes, Unicode surrogate handling, deeply nested structures, serialization round trips, named-array streaming, malformed/error paths, and memory/lifetime safety.
 
+The additive parsing surface consists of `ParseOptions`,
+`DuplicateKeyPolicy`, and `ParseDiagnostic`. Preserve these contracts:
+
+- no options means strict RFC 8259 JSON;
+- comments and trailing commas are independent opt-ins;
+- duplicate members are preserved by default and rejected only on request;
+- diagnostic offsets are zero-based bytes while lines/columns are one-based;
+- 512 remains the default depth limit, and consumers may lower it;
+- do not burden every `Document` with source spans without a separately proven
+  consumer need.
+
 A substantial parser checkpoint should run at least:
 
 ```bash
@@ -61,6 +72,11 @@ make test-sanitize
 ```
 
 For lifetime/resource-safety work, `make memory-safety-checkpoint-1a` runs the maintained long-lived Jsonic++ corpus under ASan/LSan/UBSan and a separate non-sanitized RSS soak. `make valgrind-memory-safety-checkpoint-1a` is the independent Linux confirmation gate when Valgrind is available. Checkpoint 1A validated the corpus without requiring a parser implementation change. Checkpoint 1B then passed independently under Valgrind 3.26.0 on Linux: 40 corpus iterations, 0 errors, 0 bytes in use at exit, all 6,579,515 allocations freed. Exact evidence is recorded in `docs/MEMORY-SAFETY.md` and `docs/evidence/memory-safety-checkpoint-1b-valgrind.json`.
+
+The independent `jsonic-cc/jsonic-conformance` repository is now the external
+correctness gate. Its initial 810-case corpus found and permanently tests
+duplicate-member acceptance, malformed raw UTF-8 rejection and bounded nesting.
+Jsonic++ must retain 810/810 before benchmark work or public conformance claims.
 
 and then the relevant Nift/Minify++ integration suites after synchronization. External conformance corpora and fuzzing are desirable production gates; preserve exact corpus/version evidence rather than converting one successful run into a timeless claim.
 
