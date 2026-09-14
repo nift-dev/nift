@@ -440,3 +440,7 @@ The post-v4.0.4 hardening campaign now attacks **guarantee durability** rather t
 BH1 adds the small machine-checked `docs/guarantees/registry.json` plus `scripts/check_guarantee_registry.py`. The registry maps significant guarantees/public reliability claims to evidence class, enforcement, platform scope, limitations and test-of-test status; existing guards without a demonstrated campaign red-run are marked `UNPROVEN` rather than treated as invalid. Known Battle Tested count, `ai-context.txt`, memory-SKIP and CI-enforcement discrepancies are seeded explicitly instead of being hidden by the inventory.
 
 ChatGPT owns the BH1 implementation; DeepSeek owns independent review and reviewer-authored liveness proof. Until that review lands, the registry checker itself remains `PENDING_REVIEWER` and BH1 is not complete. Use `make test-guarantee-registry` for the repository-local structural check or `make bh1-guarantee-registry` when the sibling website/regression repositories are available.
+
+## Nift v4.1 template-language campaign
+
+The active v4.1 language campaign is specified and tracked in `docs/handover/V4.1-TEMPLATE-LANGUAGE.md`. Keep that ledger current at every checkpoint; do not silently change its frozen semantics during implementation.
