@@ -45,6 +45,13 @@ private:
     std::unordered_map<std::string, std::shared_ptr<const json::Document>> json_bindings_;
     std::unordered_map<std::string, std::shared_ptr<const json::Document>> contract_bindings_;
     std::vector<std::vector<std::string>> json_binding_scopes_;
+    struct VariableBinding {
+        std::shared_ptr<json::Document> value;
+        int type = 0;
+        bool mutable_binding = true;
+        bool deep_readonly = false;
+    };
+    std::vector<std::unordered_map<std::string, VariableBinding>> variable_scopes_;
     bool pagination_collecting_ = false;
     bool pagination_context_active_ = false;
     std::size_t pagination_current_ = 1;

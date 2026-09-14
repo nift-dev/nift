@@ -264,7 +264,7 @@ std::string entity(const std::string& value, bool& ok) {
 }
 
 Parser::Parser(RenderHost& host, TrackedInfo& tracked_info)
-    : host_(host), tracked_info_(tracked_info) {}
+    : host_(host), tracked_info_(tracked_info) { variable_scopes_.emplace_back(); }
 
 void Parser::fail(const fs::path& source_path, const std::string& source, std::size_t offset, const std::string& message) {
     result_.ok = false;
@@ -341,12 +341,14 @@ std::string Parser::metadata(const std::string& key) const {
 
 void Parser::push_json_scope() {
     json_binding_scopes_.emplace_back();
+    variable_scopes_.emplace_back();
 }
 
 void Parser::pop_json_scope() {
     if (json_binding_scopes_.empty()) return;
     for (const auto& name : json_binding_scopes_.back()) json_bindings_.erase(name);
     json_binding_scopes_.pop_back();
+    if (variable_scopes_.size() > 1) variable_scopes_.pop_back();
 }
 
 std::string Parser::trim_copy(const std::string& text) const {
