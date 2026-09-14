@@ -2458,7 +2458,9 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 const auto input_source = host_.read_shared_source(input_path);
                 if (input_source.status == nift::HostStatus::Error) { fail(source_path, source, i, input_source.error); break; }
                 if (!input_source.content) { fail(source_path, source, i, "input file is not readable"); break; }
+                push_json_scope();
                 const auto nested = parse(*input_source.content, input_path, depth + 1);
+                pop_json_scope();
                 input_stack_.pop_back();
                 if (!nested.ok) break;
                 append_indented(output, nested.output, indent, insertion_code_block_depth);
