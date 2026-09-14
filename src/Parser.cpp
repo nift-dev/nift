@@ -1102,6 +1102,24 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             return std::string::npos;
         };
 
+        auto find_top_level_assignment = [&]() -> std::size_t {
+            bool quoted=false; char quote=0; int parens=0, brackets=0, braces=0;
+            for (std::size_t i=0; i<text.size(); ++i) {
+                const char c=text[i];
+                if (quoted) { if (c=='\\' && i+1<text.size()) ++i; else if (c==quote) quoted=false; continue; }
+                if (c=='\'' || c=='"') { quoted=true; quote=c; continue; }
+                if (c=='(') { ++parens; continue; } if (c==')') { if (parens) --parens; continue; }
+                if (c=='[') { ++brackets; continue; } if (c==']') { if (brackets) --brackets; continue; }
+                if (c=='{') { ++braces; continue; } if (c=='}') { if (braces) --braces; continue; }
+                if (parens || brackets || braces || c!='=') continue;
+                const char prev = i ? text[i-1] : '\0';
+                const char next = i+1<text.size() ? text[i+1] : '\0';
+                if (prev==':' || prev=='=' || prev=='!' || prev=='<' || prev=='>' || next=='=' || next=='>') continue;
+                return i;
+            }
+            return std::string::npos;
+        };
+
         if (const auto p=find_top_level_op(":="); p!=std::string::npos) {
             const std::string name = trim_copy(text.substr(0, p));
             if (!valid_binding_identifier(name)) { error = "declaration requires an identifier before ':='"; return false; }
@@ -1113,6 +1131,23 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             if (!eval(text.substr(p + 2), assigned)) return false;
             auto stored = std::make_shared<json::Document>(assigned);
             scope.emplace(name, VariableBinding{stored, static_cast<int>(assigned.type), true, false});
+            out = std::move(assigned);
+            return true;
+        }
+
+        if (const auto p=find_top_level_assignment(); p!=std::string::npos) {
+            const std::string name = trim_copy(text.substr(0, p));
+            if (!valid_binding_identifier(name)) { error = "assignment requires an identifier before '='"; return false; }
+            VariableBinding* binding = nullptr;
+            for (auto scope = variable_scopes_.rbegin(); scope != variable_scopes_.rend(); ++scope) {
+                const auto it = scope->find(name);
+                if (it != scope->end()) { binding = &it->second; break; }
+            }
+            if (!binding) { error = "assignment to undefined binding: " + name; return false; }
+            if (!binding->mutable_binding) { error = "cannot assign to const binding: " + name; return false; }
+            json::Document assigned;
+            if (!eval(text.substr(p + 1), assigned)) return false;
+            *binding->value = assigned;
             out = std::move(assigned);
             return true;
         }
@@ -1612,7 +1647,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                         fail(source_path, source, i, "cannot render JSON object $[" + key + "]; select a member first");
                         break;
                     }
-                    if (key.find(":=") == std::string::npos) output += render_expression_value(expression_value);
+                    if (key.find(":=") == std::string::npos && key.find("=") == std::string::npos || key.find("==") != std::string::npos || key.find("!=") != std::string::npos || key.find("<=") != std::string::npos || key.find(">=") != std::string::npos) output += render_expression_value(expression_value);
                     i = end + 1;
                     continue;
                 }
