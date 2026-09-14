@@ -1,4 +1,8 @@
-# Nift — Release Notes
+# Nift release notes
+
+## v4.1.0 (development)
+
+Template-language expansion campaign; see `docs/handover/V4.1-TEMPLATE-LANGUAGE.md`.
 
 ## v4.0.13
 
