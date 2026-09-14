@@ -1020,6 +1020,10 @@ bool Parser::evaluate_collection_value(const std::string& expression, json::Docu
 bool Parser::evaluate_expression(const std::string& expression, json::Document& value, std::string& error) {
     auto resolve_direct = [&](const std::string& raw, json::Document& out) -> bool {
         const std::string text = trim_copy(raw);
+        for (auto scope = variable_scopes_.rbegin(); scope != variable_scopes_.rend(); ++scope) {
+            const auto it = scope->find(text);
+            if (it != scope->end()) { out = *it->second.value; return true; }
+        }
         std::shared_ptr<const json::Document> document;
         if (resolve_pagination_value(text, document)) { out = *document; return true; }
         std::string local_error;
@@ -1037,6 +1041,11 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
         if (built_in_metadata_name(text)) { out = json::Document(metadata(text)); return true; }
         json::Document literal;
         std::string literal_error;
+        if (!text.empty() && (text.front() == '{' || text.front() == '[')) {
+            if (json::Document::parse(text, literal, literal_error)) { out = std::move(literal); return true; }
+            error = "invalid structured literal: " + literal_error;
+            return false;
+        }
         if (scalar_literal(text, literal, literal_error)) { out = std::move(literal); return true; }
         return false;
     };
@@ -1092,6 +1101,21 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             }
             return std::string::npos;
         };
+
+        if (const auto p=find_top_level_op(":="); p!=std::string::npos) {
+            const std::string name = trim_copy(text.substr(0, p));
+            if (!valid_binding_identifier(name)) { error = "declaration requires an identifier before ':='"; return false; }
+            if (reserved_binding_name(name) || host_.is_contract_name(name)) { error = "declaration name is reserved: " + name; return false; }
+            if (variable_scopes_.empty()) variable_scopes_.emplace_back();
+            auto& scope = variable_scopes_.back();
+            if (scope.find(name) != scope.end()) { error = "binding already declared in this scope: " + name; return false; }
+            json::Document assigned;
+            if (!eval(text.substr(p + 2), assigned)) return false;
+            auto stored = std::make_shared<json::Document>(assigned);
+            scope.emplace(name, VariableBinding{stored, static_cast<int>(assigned.type), true, false});
+            out = std::move(assigned);
+            return true;
+        }
 
         if (const auto p=find_top_level_op("||"); p!=std::string::npos) {
             json::Document left;
@@ -1588,7 +1612,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                         fail(source_path, source, i, "cannot render JSON object $[" + key + "]; select a member first");
                         break;
                     }
-                    output += render_expression_value(expression_value);
+                    if (key.find(":=") == std::string::npos) output += render_expression_value(expression_value);
                     i = end + 1;
                     continue;
                 }
