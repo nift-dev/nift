@@ -15,7 +15,8 @@ std::string type_name(const json::Document& value) {
     switch (value.type) {
         case json::Type::Null: return "null";
         case json::Type::Boolean: return "boolean";
-        case json::Type::Number: return "number";
+        case json::Type::Number:
+        case json::Type::StrNumber: return "number";
         case json::Type::String: return "string";
         case json::Type::Array: return "array";
         case json::Type::Object: return "object";
@@ -28,7 +29,8 @@ bool json_equal(const json::Document& a, const json::Document& b) {
     switch (a.type) {
         case json::Type::Null: return true;
         case json::Type::Boolean: return a.boolean == b.boolean;
-        case json::Type::Number: return a.num == b.num;
+        case json::Type::Number:
+        case json::Type::StrNumber: return a.num == b.num;
         case json::Type::String: return a.string == b.string;
         case json::Type::Array:
             if (a.array.size() != b.array.size()) return false;

@@ -52,6 +52,7 @@ private:
         bool deep_readonly = false;
     };
     std::vector<std::unordered_map<std::string, VariableBinding>> variable_scopes_;
+    bool last_expression_mutation_ = false;
     bool pagination_collecting_ = false;
     bool pagination_context_active_ = false;
     std::size_t pagination_current_ = 1;
@@ -78,6 +79,8 @@ private:
     std::string trim_copy(const std::string& text) const;
     void push_json_scope();
     void pop_json_scope();
+    void push_variable_scope();
+    void pop_variable_scope();
     bool find_balanced(const std::string& source,
                        std::size_t open_position,
                        char open_char,

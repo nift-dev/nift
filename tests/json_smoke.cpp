@@ -31,7 +31,12 @@ int main() {
     assert(reparsed["extra"].string == "value");
 
     // Structural errors and ambiguous objects.
-    expect_invalid(R"({"a":1,"a":2})");
+    {
+        json::Document duplicate;
+        json::ParseOptions strict;
+        strict.duplicate_keys = json::DuplicateKeyPolicy::Reject;
+        assert(!json::Document::parse(R"({"a":1,"a":2})", duplicate, error, strict));
+    }
     expect_invalid(R"([1,])");
     expect_invalid(R"({"a":1,})");
     expect_invalid(R"({"a" 1})");
@@ -59,7 +64,8 @@ int main() {
     bool callback_called = false;
     assert(!json::Document::for_each_array_item(
         R"({"tracked":[],"tracked":[]})", "tracked",
-        [&](json::Document&&) { callback_called = true; return true; }, error));
+        [&](json::Document&&) { callback_called = true; return true; }, error,
+        [] { json::ParseOptions o; o.duplicate_keys = json::DuplicateKeyPolicy::Reject; return o; }()));
     assert(!callback_called);
 
     std::cout << "JSON smoke test passed\n";

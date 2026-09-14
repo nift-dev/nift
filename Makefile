@@ -441,7 +441,7 @@ test: test-content test-commands test-comments test-contracts test-json \
 	test-json-schema test-console test-diagnostics test-minify \
 	test-json-schema-integration test-markup-json-directives test-pagination test-pagination-ordering \
 	test-template-optional test-requirements test-path-alias test-path-safety test-metadata-safety \
-	test-init-targets test-init-lock test-control-flow test-cross-feature test-config-validation \
+	test-init-targets test-init-lock test-control-flow test-template-variables test-cross-feature test-config-validation \
 	test-zero-mutation test-repair-campaign test-ownership-concurrency \
 	test-progress-render $(PROGRESS_PTY_TARGET) test-snap-contract test-distribution-summary test-version-consistency test-unreadable-source
 
@@ -475,6 +475,9 @@ test-markup-json-directives: $(TARGET)
 
 test-control-flow: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/control_flow_smoke.sh
+test-template-variables: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/template_variables_smoke.sh
+
 
 test-collections: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/collection_ops_smoke.sh

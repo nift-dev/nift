@@ -353,16 +353,19 @@ std::string Parser::metadata(const std::string& key) const {
 
 
 
+void Parser::push_variable_scope() { variable_scopes_.emplace_back(); }
+void Parser::pop_variable_scope() { if (variable_scopes_.size() > 1) variable_scopes_.pop_back(); }
+
 void Parser::push_json_scope() {
     json_binding_scopes_.emplace_back();
-    variable_scopes_.emplace_back();
+    push_variable_scope();
 }
 
 void Parser::pop_json_scope() {
     if (json_binding_scopes_.empty()) return;
     for (const auto& name : json_binding_scopes_.back()) json_bindings_.erase(name);
     json_binding_scopes_.pop_back();
-    if (variable_scopes_.size() > 1) variable_scopes_.pop_back();
+    pop_variable_scope();
 }
 
 std::string Parser::trim_copy(const std::string& text) const {
@@ -1032,6 +1035,7 @@ bool Parser::evaluate_collection_value(const std::string& expression, json::Docu
 }
 
 bool Parser::evaluate_expression(const std::string& expression, json::Document& value, std::string& error) {
+    last_expression_mutation_ = false;
     auto resolve_direct = [&](const std::string& raw, json::Document& out) -> bool {
         const std::string text = trim_copy(raw);
         for (auto scope = variable_scopes_.rbegin(); scope != variable_scopes_.rend(); ++scope) {
@@ -1135,7 +1139,13 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
         };
 
         if (const auto p=find_top_level_op(":="); p!=std::string::npos) {
-            const std::string name = trim_copy(text.substr(0, p));
+            std::string declaration = trim_copy(text.substr(0, p));
+            bool mutable_binding = true;
+            if (declaration.rfind("const ", 0) == 0) {
+                mutable_binding = false;
+                declaration = trim_copy(declaration.substr(6));
+            }
+            const std::string name = declaration;
             if (!valid_binding_identifier(name)) { error = "declaration requires an identifier before ':='"; return false; }
             if (reserved_binding_name(name) || host_.is_contract_name(name)) { error = "declaration name is reserved: " + name; return false; }
             if (variable_scopes_.empty()) variable_scopes_.emplace_back();
@@ -1144,7 +1154,8 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             json::Document assigned;
             if (!eval(text.substr(p + 2), assigned)) return false;
             auto stored = std::make_shared<json::Document>(assigned);
-            scope.emplace(name, VariableBinding{stored, nift_binding_type(assigned), true, false});
+            scope.emplace(name, VariableBinding{stored, nift_binding_type(assigned), mutable_binding, false});
+            last_expression_mutation_ = true;
             out = std::move(assigned);
             return true;
         }
@@ -1168,6 +1179,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                 return false;
             }
             *binding->value = assigned;
+            last_expression_mutation_ = true;
             out = std::move(assigned);
             return true;
         }
@@ -1667,7 +1679,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                         fail(source_path, source, i, "cannot render JSON object $[" + key + "]; select a member first");
                         break;
                     }
-                    if (key.find(":=") == std::string::npos && key.find("=") == std::string::npos || key.find("==") != std::string::npos || key.find("!=") != std::string::npos || key.find("<=") != std::string::npos || key.find(">=") != std::string::npos) output += render_expression_value(expression_value);
+                    if (!last_expression_mutation_) output += render_expression_value(expression_value);
                     i = end + 1;
                     continue;
                 }
@@ -2458,9 +2470,9 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 const auto input_source = host_.read_shared_source(input_path);
                 if (input_source.status == nift::HostStatus::Error) { fail(source_path, source, i, input_source.error); break; }
                 if (!input_source.content) { fail(source_path, source, i, "input file is not readable"); break; }
-                push_json_scope();
+                push_variable_scope();
                 const auto nested = parse(*input_source.content, input_path, depth + 1);
-                pop_json_scope();
+                pop_variable_scope();
                 input_stack_.pop_back();
                 if (!nested.ok) break;
                 append_indented(output, nested.output, indent, insertion_code_block_depth);
