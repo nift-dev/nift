@@ -8,8 +8,20 @@ trap 'rm -rf "$TMP"' EXIT
 
 printf 'const  x =  1 ;\n' >"$TMP/app.js"
 "$BIN" "$TMP/app.js" >/dev/null
-grep -Fxq 'const x=1;' "$TMP/app.min.js"
+grep -Fxq 'const x=1' "$TMP/app.min.js"
 grep -Fxq 'const  x =  1 ;' "$TMP/app.js"
+
+printf 'function total(longLeft,longRight){ return longLeft + longRight; }\n' >"$TMP/structured.js"
+"$BIN" --structured "$TMP/structured.js" >/dev/null
+grep -Fxq 'function total($,_){return $+_}' "$TMP/structured.min.js"
+
+cp "$TMP/structured.js" "$TMP/aggressive.js"
+"$BIN" --aggressive "$TMP/aggressive.js" >/dev/null
+grep -Fxq 'function total($,_){return $+_}' "$TMP/aggressive.min.js"
+
+printf 'const view = <Card value={(function total(longName){return longName})(3)} />;\n' >"$TMP/structured.jsx"
+"$BIN" --structured-jsx-expressions "$TMP/structured.jsx" >/dev/null
+grep -Fxq 'const view=<Card value={(function _($){return $})(3)} />;' "$TMP/structured.min.jsx"
 
 printf '.x { color : red ; }\n' >"$TMP/site.css"
 "$BIN" --in-place "$TMP/site.css" >/dev/null
@@ -19,7 +31,7 @@ test ! -e "$TMP/site.min.css"
 printf 'const  executable =  true ;\n' >"$TMP/tool.js"
 chmod 755 "$TMP/tool.js"
 "$BIN" --in-place "$TMP/tool.js" >/dev/null
-grep -Fxq 'const executable=true;' "$TMP/tool.js"
+grep -Fxq 'const executable=!0' "$TMP/tool.js"
 # Executable-bit preservation is a POSIX permission contract; Windows has no
 # exec bit visible to std::filesystem, so the -x assertion is POSIX-only.
 case "$(uname -s)" in

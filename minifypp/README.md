@@ -51,6 +51,7 @@ make benchmark
 make distcheck       # from a clean committed standalone checkout
 ./minify app.js        # app.min.js
 ./minify -i app.js     # overwrite app.js
+./minify --structured app.js # experimental, proven-safe binding renames
 ```
 
 The library API accepts strings and returns strings/errors. File naming and destructive/non-destructive behavior belong to the calling CLI rather than the minification engine.
@@ -59,6 +60,49 @@ CLI output is prepared in a sibling temporary directory and committed only after
 a complete successful write. Replacing an existing regular file preserves its
 permission bits. Symbolic-link destinations are rejected rather than followed or
 silently replaced.
+
+## Experimental structured optimization
+
+The default remains the conservative lexical minifier. `--structured` adds a
+lossless token inventory, balanced delimiter model, scope graph, reference
+resolution and deterministic printer, then renames only bindings whose safety
+has been established. Dynamic lookup (`eval`/`with`), contextual names and
+ambiguous syntax are excluded. `--structured-jsx-expressions` additionally
+enables the same rewrite only inside JSX expression regions that were fully
+parsed; JSX markup and surrounding JavaScript retain conservative behavior.
+
+The token-inventory profile used 40 iterations. The former type-erased callback
+manager ran about 60.4 million times and accounted for 4.1% of sampled time.
+The conservative path now passes a nullable recorder pointer, so it does not pay
+that callback dispatch cost when structured collection is disabled.
+
+Checkpoints 11–20 establish collection, delimiter structure, scope discovery,
+reference resolution, deterministic printing, safe parameter/local renaming,
+object-shorthand expansion, JSX expression gating, and the explicit CLI release
+gate. The structured mode remains opt-in while coverage expands to more binding
+forms and transformations; aggressive compression remains reserved and inactive.
+
+## Optional aggressive compression
+
+`--aggressive` is an explicit CLI/API contract and is never selected by legacy
+calls, `--structured`, or JSX defaults. It preserves successful execution and
+produced values for supported transformations, but may change source shape,
+stack/diagnostic detail and otherwise unobservable intermediate allocations.
+Dynamic scope, unsupported syntax and transformations without a local proof are
+left unchanged. Each aggressive transform is independently testable and must
+fall back to structured output when its proof conditions are not met.
+
+Property mangling has a stricter boundary: only names repeated through an
+explicit `property_mangle_allowlist` (or CLI `--mangle-property=NAME`) are
+eligible. Minify++ does not infer that a property is private or safe at an API
+boundary; bracket-string, reflective and dynamically constructed access must be
+accounted for by the caller before opting a name in.
+
+The current aggressive implementation additionally covers locally proven exact
+integer folding, literal conditional selection, narrowly unreachable debugger
+removal, resolved compound assignment shortening, adjacent uninitialized `var`
+joining and literal IIFE elimination. This is an experimental Linux checkpoint,
+not a claim of broad optimizer parity with Terser, esbuild or Closure Compiler.
 
 ## Current adversarial gates
 

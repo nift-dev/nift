@@ -1,0 +1,9 @@
+checkpoint_date=2026-08-18
+host_kernel=Linux 6.18.35 x86-64
+cpu=Intel Xeon Platinum 8272CL @ 2.60GHz
+compiler=g++ 14.2.0
+cxxflags=-std=c++17 -O2 -Wall -Wextra -pedantic
+css_warmups=5
+css_iterations=45
+regression_repetitions=10000
+regression_iterations=20

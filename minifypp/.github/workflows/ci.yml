@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  unix:
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+          - runner: macos-latest
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Install test oracles
+        run: |
+          npm install --no-save --no-package-lock typescript postcss postcss-selector-parser postcss-value-parser
+      - name: Build
+        run: make -j2
+      - name: Test
+        run: |
+          make test
+          make test-packaging
+      - name: Sanitize build
+        run: make test-sanitize
+      - name: distcheck
+        run: make distcheck
+        if: runner.os == 'Linux'
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 20
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          path-type: inherit
+          install: make mingw-w64-ucrt-x86_64-gcc diffutils
+      - name: Build and test (msys2)
+        shell: msys2 {0}
+        run: |
+          npm install --no-save --no-package-lock typescript postcss postcss-selector-parser postcss-value-parser
+          make -j2
+          make test

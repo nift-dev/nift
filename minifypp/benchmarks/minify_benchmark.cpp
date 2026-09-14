@@ -14,6 +14,7 @@ struct Workload {
     const char* name;
     minify::Format format;
     std::string unit;
+    minify::OptimizationLevel optimization = minify::OptimizationLevel::Conservative;
 };
 }
 
@@ -28,6 +29,9 @@ int main(int argc, char** argv) {
         {"html", minify::Format::Html, "<section class=\"card\"> <h2> Title </h2> <p>alpha <b>beta</b></p> </section>\n"},
         {"css", minify::Format::Css, "@container card (width > 20rem) { .item { width: calc(100% - 2rem); color: rgb(10 20 30 / 80%); } }\n"},
         {"javascript", minify::Format::JavaScript, "const value = /[<>]/.test(text) ? object?.item ?? 0 : total / 2; console.log(value);\n"},
+        {"javascript-scope", minify::Format::JavaScript, "function combine(longLeft,longRight){ return longLeft + longRight; }\n"},
+        {"javascript-scope-structured", minify::Format::JavaScript, "function combine(longLeft,longRight){ return longLeft + longRight; }\n", minify::OptimizationLevel::Structured},
+        {"javascript-aggressive", minify::Format::JavaScript, "function combine(longLeft,longRight){longLeft=longLeft+(200+30);return true?longLeft:0;}\n", minify::OptimizationLevel::Aggressive},
         {"jsx", minify::Format::Jsx, "const view = <Card<Map<string,number>> value={data?.item ?? 0}><span>{/[<>]/.test(text) ? 'a' : 'b'}</span></Card>;\n"},
         {"json", minify::Format::Json, "{\"name\":\"entry\",\"enabled\":true,\"items\":[1,2,3],\"meta\":{\"value\":null}}\n"},
         {"xml", minify::Format::Xml, "<entry xmlns:x=\"urn:x\"><x:name> alpha  beta </x:name><![CDATA[a < b]]></entry>\n"},
@@ -54,7 +58,9 @@ int main(int argc, char** argv) {
         for (std::size_t iteration = 0; iteration < iterations; ++iteration) {
             std::string output, error;
             const auto start = std::chrono::steady_clock::now();
-            if (!minify::run(workload.format, input, output, error)) {
+            minify::Options options;
+            options.optimization = workload.optimization;
+            if (!minify::run(workload.format, input, output, error, options)) {
                 std::cerr << workload.name << " benchmark failed: " << error << '\n';
                 return 1;
             }

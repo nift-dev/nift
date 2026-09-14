@@ -1,0 +1,198 @@
+name: Release artifacts
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to rehearse without publishing (for example 1.1.1)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Full release-candidate suite
+        run: |
+          npm install --no-save --no-package-lock typescript postcss postcss-selector-parser postcss-value-parser
+          make -j2
+          make test
+          make test-sanitize
+
+  unix:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: ubuntu-latest, platform: linux-x86_64}
+          - {runner: macos-15, platform: macos-arm64}
+          - {runner: macos-15-intel, platform: macos-x86_64}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = push ]; then version="${GITHUB_REF_NAME#v}"; else version="${{ inputs.version }}"; fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Build and packaging smoke
+        run: |
+          make -j2
+          make test-packaging
+      - name: Stage and test archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ steps.version.outputs.version }}"
+          test "$(./minify --version | sed -E 's/^Minify\+\+ ([^ ]+)$/\1/')" = "$version"
+          root="minify-$version-${{ matrix.platform }}"
+          mkdir "$root"
+          cp minify README.md LICENSE "$root/"
+          tar -czf "$root.tar.gz" "$root"
+          mkdir archive-check
+          tar -xzf "$root.tar.gz" -C archive-check
+          test "$("archive-check/$root/minify" --version)" = "Minify++ $version"
+          printf 'const answer = 40 + 2;\n' > archive-check/input.js
+          "archive-check/$root/minify" archive-check/input.js
+          test -s archive-check/input.min.js
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: ${{ matrix.platform }}
+          path: minify-*.tar.gz
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - uses: msys2/setup-msys2@66cd2cce69caa17b53920067426061ca1de3a884
+        with:
+          msystem: UCRT64
+          update: true
+          install: make mingw-w64-ucrt-x86_64-gcc
+      - name: Resolve version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = push ]; then version="${GITHUB_REF_NAME#v}"; else version="${{ inputs.version }}"; fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Build, stage and test archive
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          make -j2 LDFLAGS='-static -static-libgcc -static-libstdc++'
+          version="${{ steps.version.outputs.version }}"
+          test "$(./minify.exe --version | sed -E 's/^Minify\+\+ ([^ ]+)$/\1/')" = "$version"
+          if objdump -p minify.exe | sed -n 's/.*DLL Name: //p' | grep -Eiq '^(libgcc|libstdc\+\+|libwinpthread)'; then
+            echo 'Windows executable depends on a MinGW runtime DLL' >&2; exit 1
+          fi
+          root="minify-$version-windows-x86_64"
+          mkdir "$root"
+          cp minify.exe README.md LICENSE "$root/"
+          powershell.exe -NoProfile -Command "Compress-Archive -Path '$root' -DestinationPath '$root.zip'"
+          mkdir archive-check
+          powershell.exe -NoProfile -Command "Expand-Archive -Path '$root.zip' -DestinationPath 'archive-check'"
+          test "$("archive-check/$root/minify.exe" --version)" = "Minify++ $version"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: windows-x86_64
+          path: minify-*.zip
+
+  scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Test and verify public scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          make -j2
+          make test-packaging
+          for script in install download update uninstall; do
+            curl --retry 5 --retry-all-errors --retry-delay 2 -fsSL "https://minify.cx/$script.sh" -o "/tmp/$script.sh"
+            cmp "packaging/$script.sh" "/tmp/$script.sh"
+            sh -n "/tmp/$script.sh"
+          done
+
+  publish:
+    if: github.event_name == 'push'
+    needs: [validation, unix, windows, scripts]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Validate and publish immutable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          expected="minify-$version-linux-x86_64.tar.gz minify-$version-macos-arm64.tar.gz minify-$version-macos-x86_64.tar.gz minify-$version-windows-x86_64.zip"
+          for asset in $expected; do test -f "dist/$asset" || { echo "missing $asset" >&2; exit 1; }; done
+          actual="$(find dist -maxdepth 1 -type f -printf '%f\n' | sort | tr '\n' ' ')"
+          expected_sorted="$(printf '%s\n' $expected | sort | tr '\n' ' ')"
+          test "$actual" = "$expected_sorted" || { echo "unexpected assets: $actual" >&2; exit 1; }
+          (cd dist && sha256sum minify-* | sort > SHA256SUMS)
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "release already exists; refusing to modify it" >&2; exit 1
+          fi
+          gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --title "Minify++ $version" --generate-notes
+
+  rehearse:
+    if: github.event_name == 'workflow_dispatch'
+    needs: [validation, unix, windows, scripts]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Validate rehearsal bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ inputs.version }}"
+          expected="minify-$version-linux-x86_64.tar.gz minify-$version-macos-arm64.tar.gz minify-$version-macos-x86_64.tar.gz minify-$version-windows-x86_64.zip"
+          for asset in $expected; do test -f "dist/$asset"; done
+          actual="$(find dist -maxdepth 1 -type f -printf '%f\n' | sort | tr '\n' ' ')"
+          expected_sorted="$(printf '%s\n' $expected | sort | tr '\n' ' ')"
+          test "$actual" = "$expected_sorted"
+          (cd dist && sha256sum minify-* | sort > SHA256SUMS)
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: rehearsal-${{ inputs.version }}
+          path: dist/*
+
+  installer-public-smoke:
+    if: github.event_name == 'push'
+    needs: publish
+    strategy:
+      matrix:
+        runner: [ubuntu-latest, macos-15, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Install tagged release through public installer
+        shell: bash
+        run: |
+          curl --retry 5 --retry-all-errors --retry-delay 2 -fsSL https://minify.cx/install.sh -o /tmp/minify-install.sh
+          cmp packaging/install.sh /tmp/minify-install.sh
+          version="${GITHUB_REF_NAME#v}"
+          MINIFY_VERSION="$version" MINIFY_INSTALL_DIR="$RUNNER_TEMP/minify-bin" sh /tmp/minify-install.sh
+          test "$("$RUNNER_TEMP/minify-bin/minify" --version)" = "Minify++ $version"

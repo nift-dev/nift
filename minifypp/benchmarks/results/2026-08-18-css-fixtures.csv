@@ -1,0 +1,4 @@
+fixture,input_bytes,output_bytes,median_ms,MiB_per_second,iterations
+bootstrap-4.css,200078,165836,1.156,165.0,45
+animate.css,95374,77454,0.517,176.1,45
+tailwind.css,2380419,1973801,12.843,176.8,45

@@ -1,0 +1,10 @@
+checkpoint_date=2026-08-18
+fixture=pptxgenjs 4.0.0 dist/pptxgen.es.js
+input_bytes=515136
+minifypp_output_bytes=341584
+nift_output_bytes=341584
+gzip_9_bytes=102233
+minifypp_median_cli_ms=19.538
+nift_median_cli_ms=16.588
+iterations=5
+note=integration probe only; not a privatenumber/minification-benchmarks leaderboard result

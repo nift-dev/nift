@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+MINIFY_ROOT=$(cd "$(dirname "$0")" && pwd)
+exec "$MINIFY_ROOT/minify" --structured "$@"

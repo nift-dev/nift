@@ -1,0 +1,2135 @@
+{
+  "schema_version": 1,
+  "benchmark": "privatenumber/minification-benchmarks with Nift integrated CLI adapter",
+  "benchmark_date": "2026-08-18",
+  "upstream_commit": "fe89864fdf0e9e8f178d5cfa704f4b032986aade",
+  "command": "pnpm bench-all --force --runs 5",
+  "methodology": {
+    "process": "Each upstream benchmark run executes in a fresh Node process; Nift additionally spawns a fresh nift process and performs temporary-file I/O inside the measured adapter boundary.",
+    "runs": 5,
+    "timeout_ms": 10000,
+    "validation": "Upstream artifact integrity checks before and after minification."
+  },
+  "environment": {
+    "host": "nick-NUC12SNKi72",
+    "cpu": "12th Gen Intel(R) Core(TM) i7-12700H",
+    "os": "Linux 7.0.0-29-generic x86_64",
+    "node": "24.14.1",
+    "pnpm": "10.17.0",
+    "nift_version": "4.0.2",
+    "nift_commit": "aa60ab3",
+    "embedded_minifypp_version": "1.1.0",
+    "minifypp_commit": "9b56d9b"
+  },
+  "limitations": [
+    "tedivm/jshrink was not run because PHP and Composer were unavailable; stale upstream repository results for it are excluded from this snapshot.",
+    "google-closure-compiler failed because Java was unavailable; failures are retained.",
+    "Nift is an integrated CLI result, not an in-process Minify++ engine result."
+  ],
+  "equivalence_probe": {
+    "artifact": "d3 6.3.1",
+    "input_bytes": 555767,
+    "output_bytes": 415104,
+    "sha256": "983e7584494c44d7e4bfe454cf99acbdd46a9545591026b9607f73642011fcb1",
+    "result": "Standalone Minify++ and Nift outputs were byte-identical."
+  },
+  "artifacts": {
+    "react": {
+      "version": "17.0.2",
+      "filePath": "/cjs/react.development.js",
+      "size": 72132,
+      "gzipSize": 19385,
+      "minified": {
+        "@cminify/cminify-linux-x64": {
+          "minifierPath": "cminify.ts",
+          "version": "3.0.1",
+          "configHash": "76612a7257",
+          "result": {
+            "data": {
+              "minifiedBytes": 40036,
+              "minzippedBytes": 10858,
+              "time": 12.1937094,
+              "runs": 5
+            }
+          }
+        },
+        "@swc/core": {
+          "minifierPath": "swc.ts",
+          "version": "1.15.46",
+          "configHash": "3f4708371f",
+          "result": {
+            "data": {
+              "minifiedBytes": 22817,
+              "minzippedBytes": 8186,
+              "time": 16.244053400000002,
+              "runs": 5
+            }
+          }
+        },
+        "@tdewolff/minify": {
+          "minifierPath": "tdewolff-minify.ts",
+          "version": "2.24.8",
+          "configHash": "b487ebf39d",
+          "result": {
+            "data": {
+              "minifiedBytes": 23494,
+              "minzippedBytes": 8628,
+              "time": 3.1976824,
+              "runs": 5
+            }
+          }
+        },
+        "babel-minify": {
+          "minifierPath": "babel-minify.ts",
+          "version": "0.5.2",
+          "configHash": "b63b201604",
+          "result": {
+            "data": {
+              "minifiedBytes": 23606,
+              "minzippedBytes": 8447,
+              "time": 247.17595920000002,
+              "runs": 5
+            }
+          }
+        },
+        "bun": {
+          "minifierPath": "bun.ts",
+          "version": "1.3.14",
+          "configHash": "df04df4c6c",
+          "result": {
+            "data": {
+              "minifiedBytes": 23984,
+              "minzippedBytes": 8657,
+              "time": 17.0170368,
+              "runs": 5
+            }
+          }
+        },
+        "esbuild": {
+          "minifierPath": "esbuild.ts",
+          "version": "0.28.1",
+          "configHash": "82ce28f1f1",
+          "result": {
+            "data": {
+              "minifiedBytes": 23699,
+              "minzippedBytes": 8542,
+              "time": 12.329701400000001,
+              "runs": 5
+            }
+          }
+        },
+        "google-closure-compiler": {
+          "minifierPath": "google-closure-compiler.ts",
+          "version": "20251216.0.0",
+          "configHash": "52d5a255dc",
+          "result": {
+            "error": {
+              "message": "\"java -XX:+IgnoreUnrecognizedVMOptions --sun-misc-unsafe-memory-access=allow -jar /tmp/minifypp-competitive-2026-08-18/minification-benchmarks/node_modules/.pnpm/google-closure-compiler-java@20251216.0.0/node_modules/google-closure-compiler-java/compiler.jar --js=/tmp/minifypp-competitive-2026-08-18/minification-benchmarks/packages/artifacts/node_modules/react/cjs/react.development.no-comments.js --dependency_mode=NONE --generate_exports=false --export_local_property_definitions=false --rewrite_polyfills=false --apply_input_source_maps=false --parse_inline_source_maps=false --language_in=ECMASCRIPT_NEXT --language_out=ECMASCRIPT_NEXT --assume_function_wrapper=true --emit_use_strict=false --compilation_level=SIMPLE\\n\\nProcess spawn error. Is java in the path?\\nspawn java ENOENT\\n\\n\"",
+              "stage": "minification"
+            }
+          }
+        },
+        "nift": {
+          "minifierPath": "nift.ts",
+          "version": "4.0.2",
+          "configHash": "cf379e24dd",
+          "result": {
+            "data": {
+              "minifiedBytes": 42201,
+              "minzippedBytes": 11180,
+              "time": 8.449024,
+              "runs": 5
+            }
+          }
+        },
+        "oxc-minify": {
+          "minifierPath": "oxc-minify.ts",
+          "version": "0.141.0",
+          "configHash": "6d06706e9d",
+          "result": {
+            "data": {
+              "minifiedBytes": 23150,
+              "minzippedBytes": 8357,
+              "time": 2.380658,
+              "runs": 5
+            }
+          }
+        },
+        "terser": {
+          "minifierPath": "terser.ts",
+          "version": "5.49.0",
+          "configHash": "32a6c74a58",
+          "result": {
+            "data": {
+              "minifiedBytes": 23052,
+              "minzippedBytes": 8255,
+              "time": 115.44706799999999,
+              "runs": 5
+            }
+          }
+        },
+        "terser (no compress)": {
+          "minifierPath": "terser.ts",
+          "version": "5.49.0",
+          "configHash": "32a6c74a58",
+          "result": {
+            "data": {
+              "minifiedBytes": 25063,
+              "minzippedBytes": 8739,
+              "time": 45.28088700000001,
+              "runs": 5
+            }
+          }
+        },
+        "uglify-js": {
+          "minifierPath": "uglify-js.ts",
+          "version": "3.19.3",
+          "configHash": "e8b5952820",
+          "result": {
+            "data": {
+              "minifiedBytes": 22641,
+              "minzippedBytes": 8177,
+              "time": 227.33179639999997,
+              "runs": 5
+            }
+          }
+        },
+        "uglify-js (no compress)": {
+          "minifierPath": "uglify-js.ts",
+          "version": "3.19.3",
+          "configHash": "e8b5952820",
+          "result": {
+            "data": {
+              "minifiedBytes": 25030,
+              "minzippedBytes": 8668,
+              "time": 37.5481602,
+              "runs": 5
+            }
+          }
+        }
+      },
+      "nift_rank_among_successful": 12
+    },
+    "moment": {
+      "version": "2.29.1",
+      "filePath": "/moment.js",
+      "size": 173902,
+      "gzipSize": 36231,
+      "minified": {
+        "@cminify/cminify-linux-x64": {
+          "minifierPath": "cminify.ts",
+          "version": "3.0.1",
+          "configHash": "76612a7257",
+          "result": {
+            "data": {
+              "minifiedBytes": 95933,
+              "minzippedBytes": 24744,
+              "time": 12.801725199999998,
+              "runs": 5
+            }
+          }
+        },
+        "@swc/core": {
+          "minifierPath": "swc.ts",
+          "version": "1.15.46",
+          "configHash": "3f4708371f",
+          "result": {
+            "data": {
+              "minifiedBytes": 58368,
+              "minzippedBytes": 18747,
+              "time": 26.565429599999998,
+              "runs": 5
+            }
+          }
+        },
+        "@tdewolff/minify": {
+          "minifierPath": "tdewolff-minify.ts",
+          "version": "2.24.8",
+          "configHash": "b487ebf39d",
+          "result": {
+            "data": {
+              "minifiedBytes": 59889,
+              "minzippedBytes": 19480,
+              "time": 5.3057724,
+              "runs": 5
+            }
+          }
+        },
+        "babel-minify": {
+          "minifierPath": "babel-minify.ts",
+          "version": "0.5.2",
+          "configHash": "b63b201604",
+          "result": {
+            "data": {
+              "minifiedBytes": 59793,
+              "minzippedBytes": 19014,
+              "time": 632.1236218,
+              "runs": 5
+            }
+          }
+        },
+        "bun": {
+          "minifierPath": "bun.ts",
+          "version": "1.3.14",
+          "configHash": "df04df4c6c",
+          "result": {
+            "data": {
+              "minifiedBytes": 61758,
+              "minzippedBytes": 19850,
+              "time": 17.239833,
+              "runs": 5
+            }
+          }
+        },
+        "esbuild": {
+          "minifierPath": "esbuild.ts",
+          "version": "0.28.1",
+          "configHash": "82ce28f1f1",
+          "result": {
+            "data": {
+              "minifiedBytes": 59803,
+              "minzippedBytes": 19330,
+              "time": 17.3848558,
+              "runs": 5
+            }
+          }
+        },
+        "google-closure-compiler": {
+          "minifierPath": "google-closure-compiler.ts",
+          "version": "20251216.0.0",
+          "configHash": "52d5a255dc",
+          "result": {
+            "error": {
+              "message": "\"java -XX:+IgnoreUnrecognizedVMOptions --sun-misc-unsafe-memory-access=allow -jar /tmp/minifypp-competitive-2026-08-18/minification-benchmarks/node_modules/.pnpm/google-closure-compiler-java@20251216.0.0/node_modules/google-closure-compiler-java/compiler.jar --js=/tmp/minifypp-competitive-2026-08-18/minification-benchmarks/packages/artifacts/node_modules/moment/moment.js --dependency_mode=NONE --generate_exports=false --export_local_property_definitions=false --rewrite_polyfills=false --apply_input_source_maps=false --parse_inline_source_maps=false --language_in=ECMASCRIPT_NEXT --language_out=ECMASCRIPT_NEXT --assume_function_wrapper=true --emit_use_strict=false --compilation_level=SIMPLE\\n\\nProcess spawn error. Is java in the path?\\nspawn java ENOENT\\n\\n\"",
+              "stage": "minification"
+            }
+          }
+        },
+        "nift": {
+          "minifierPath": "nift.ts",
+          "version": "4.0.2",
+          "configHash": "cf379e24dd",
+          "result": {
+            "data": {
+              "minifiedBytes": 101704,
+              "minzippedBytes": 25773,
+              "time": 11.0373064,
+              "runs": 5
+            }
+          }
+        },
+        "oxc-minify": {
+          "minifierPath": "oxc-minify.ts",
+          "version": "0.141.0",
+          "configHash": "6d06706e9d",
+          "result": {
+            "data": {
+              "minifiedBytes": 59365,
+              "minzippedBytes": 19235,
+              "time": 5.7395932,
+              "runs": 5
+            }
+          }
+        },
+        "terser": {
+          "minifierPath": "terser.ts",
+          "version": "5.49.0",
+          "configHash": "32a6c74a58",
+          "result": {
+            "data": {
+              "minifiedBytes": 59010,
+              "minzippedBytes": 18689,
+              "time": 263.14014599999996,
+              "runs": 5
+            }
+          }
+        },
+        "terser (no compress)": {
+          "minifierPath": "terser.ts",
+          "version": "5.49.0",
+          "configHash": "32a6c74a58",
+          "result": {
+            "data": {
+              "minifiedBytes": 63011,
+              "minzippedBytes": 19651,
+              "time": 109.6651838,
+              "runs": 5
+            }
+          }
+        },
+        "uglify-js": {
+          "minifierPath": "uglify-js.ts",
+          "version": "3.19.3",
+          "configHash": "e8b5952820",
+          "result": {
+            "data": {
+              "minifiedBytes": 57728,
+              "minzippedBytes": 18568,
+              "time": 499.31698059999997,
+              "runs": 5
+            }
+          }
+        },
+        "uglify-js (no compress)": {
+          "minifierPath": "uglify-js.ts",
+          "version": "3.19.3",
+          "configHash": "e8b5952820",
+          "result": {
+            "data": {
+              "minifiedBytes": 62495,
+              "minzippedBytes": 19569,
+              "time": 92.0441894,
+              "runs": 5
+            }
+          }
+        }
+      },
+      "nift_rank_among_successful": 12
+    },
+    "jquery": {
+      "version": "3.5.1",
+      "filePath": "/dist/jquery.js",
+      "size": 287628,
+      "gzipSize": 84498,
+      "minified": {
+        "@cminify/cminify-linux-x64": {
+          "minifierPath": "cminify.ts",
+          "version": "3.0.1",
+          "configHash": "76612a7257",
+          "result": {
+            "data": {
+              "minifiedBytes": 141454,
+              "minzippedBytes": 40365,
+              "time": 14.993516599999998,
+              "runs": 5
+            }
+          }
+        },
+        "@swc/core": {
+          "minifierPath": "swc.ts",
+          "version": "1.15.46",
+          "configHash": "3f4708371f",
+          "result": {
+            "data": {
+              "minifiedBytes": 89163,
+              "minzippedBytes": 30856,
+              "time": 37.741135,
+              "runs": 5
+            }
+          }
+        },
+        "@tdewolff/minify": {
+          "minifierPath": "tdewolff-minify.ts",
+          "version": "2.24.8",
+          "configHash": "b487ebf39d",
+          "result": {
+            "data": {
+              "minifiedBytes": 89681,
+              "minzippedBytes": 31446,
+              "time": 10.6232246,
+              "runs": 5
+            }
+          }
+        },
+        "babel-minify": {
+          "minifierPath": "babel-minify.ts",
+          "version": "0.5.2",
+          "configHash": "b63b201604",
+          "result": {
+            "data": {
+              "minifiedBytes": 92111,
+              "minzippedBytes": 31798,
+              "time": 1029.9149784,
+              "runs": 5
+            }
+          }
+        },
+        "bun": {
+          "minifierPath": "bun.ts",
+          "version": "1.3.14",
+          "configHash": "df04df4c6c",
+          "result": {
+            "data": {
+              "minifiedBytes": 92388,
+              "minzippedBytes": 32641,
+              "time": 22.0017014,
+              "runs": 5
+            }
+          }
+        },
+        "esbuild": {
+          "minifierPath": "esbuild.ts",
+          "version": "0.28.1",
+          "configHash": "82ce28f1f1",
+          "result": {
+            "data": {
+              "minifiedBytes": 90073,
+              "minzippedBytes": 31955,
+              "time": 23.6581776,
+              "runs": 5
+            }
+          }
+        },
+        "google-closure-compiler": {
+          "minifierPath": "google-closure-compiler.ts",
+          "version": "20251216.0.0",
+          "configHash": "52d5a255dc",
+          "result": {
+            "error": {
+              "message": "\"java -XX:+IgnoreUnrecognizedVMOptions --sun-misc-unsafe-memory-access=allow -jar /tmp/minifypp-competitive-2026-08-18/minification-benchmarks/node_modules/.pnpm/google-closure-compiler-java@20251216.0.0/node_modules/google-closure-compiler-java/compiler.jar --js=/tmp/minifypp-competitive-2026-08-18/minification-benchmarks/packages/artifacts/node_modules/jquery/dist/jquery.no-comments.js --dependency_mode=NONE --generate_exports=false --export_local_property_definitions=false --rewrite_polyfills=false --apply_input_source_maps=false --parse_inline_source_maps=false --language_in=ECMASCRIPT_NEXT --language_out=ECMASCRIPT_NEXT --assume_function_wrapper=true --emit_use_strict=false --compilation_level=SIMPLE\\n\\nProcess spawn error. Is java in the path?\\nspawn java ENOENT\\n\\n\"",
+              "stage": "minification"
+            }
+          }
+        },
+        "nift": {
+          "minifierPath": "nift.ts",
+          "version": "4.0.2",
+          "configHash": "cf379e24dd",
+          "result": {
+            "data": {
+              "minifiedBytes": 150438,
+              "minzippedBytes": 41892,
+              "time": 12.248084,
+              "runs": 5
+            }
+          }
+        },
+        "oxc-minify": {
+          "minifierPath": "oxc-minify.ts",
+          "version": "0.141.0",
+          "configHash": "6d06706e9d",
+          "result": {
+            "data": {
+              "minifiedBytes": 89244,
+              "minzippedBytes": 30927,
+              "time": 9.3554496,
+              "runs": 5
+            }
+          }
+        },
+        "terser": {
+          "minifierPath": "terser.ts",
+          "version": "5.49.0",
+          "configHash": "32a6c74a58",
+          "result": {
+            "data": {
+              "minifiedBytes": 89244,
+              "minzippedBytes": 30856,
+              "time": 368.7235246,
+              "runs": 5
+            }
+          }
+        },
+        "terser (no compress)": {
+          "minifierPath": "terser.ts",
+          "version": "5.49.0",
+          "configHash": "32a6c74a58",
+          "result": {
+            "data": {
+              "minifiedBytes": 94258,
+              "minzippedBytes": 31555,
+              "time": 149.5709238,
+              "runs": 5
+            }
+          }
+        },
+        "uglify-js": {
+          "minifierPath": "uglify-js.ts",
+          "version": "3.19.3",
+          "configHash": "e8b5952820",
+          "result": {
+            "data": {
+              "minifiedBytes": 88448,
+              "minzippedBytes": 30903,
+              "time": 719.8055432,
+              "runs": 5
+            }
+          }
+        },
+        "uglify-js (no compress)": {
+          "minifierPath": "uglify-js.ts",
+          "version": "3.19.3",
+          "configHash": "e8b5952820",
+          "result": {
+            "data": {
+              "minifiedBytes": 94082,
+              "minzippedBytes": 31470,
+              "time": 130.06303439999996,
+              "runs": 5
+            }
+          }
+        }
+      },
+      "nift_rank_among_successful": 12
+    },
+    "vue": {
+      "version": "2.6.12",
+      "filePath": "/dist/vue.js",
+      "size": 342146,
+      "gzipSize": 89668,
+      "minified": {
+        "@cminify/cminify-linux-x64": {
+          "minifierPath": "cminify.ts",
+          "version": "3.0.1",
+          "configHash": "76612a7257",
+          "result": {
+            "data": {
+              "minifiedBytes": 193907,
+              "minzippedBytes": 56356,
+              "time": 16.733102999999996,
+              "runs": 5
+            }
+          }
+        },
+        "@swc/core": {
+          "minifierPath": "swc.ts",
+          "version": "1.15.46",
+          "configHash": "3f4708371f",
+          "result": {
+            "data": {
+              "minifiedBytes": 115530,
+              "minzippedBytes": 42714,
+              "time": 49.1776848,
+              "runs": 5
+            }
+          }
+        },
+        "@tdewolff/minify": {
+          "minifierPath": "tdewolff-minify.ts",
+          "version": "2.24.8",
+          "configHash": "b487ebf39d",
+          "result": {
+            "data": {
+              "minifiedBytes": 117698,
+              "minzippedBytes": 44367,
+              "time": 11.450014200000002,
+              "runs": 5
+            }
+          }
+        },
+        "babel-minify": {
+          "minifierPath": "babel-minify.ts",
+          "version": "0.5.2",
+          "configHash": "b63b201604",
+          "result": {
+            "data": {
+              "minifiedBytes": 117921,
+              "minzippedBytes": 43889,
+              "time": 1194.0102164,
+              "runs": 5
+            }
+          }
+        },
+        "bun": {
+          "minifierPath": "bun.ts",
+          "version": "1.3.14",
+          "configHash": "df04df4c6c",
+          "result": {
+            "data": {
+              "minifiedBytes": 121278,
+              "minzippedBytes": 45386,
+              "time": 23.7868508,
+              "runs": 5
+            }
+          }
+        },
+        "esbuild": {
+          "minifierPath": "esbuild.ts",
+          "version": "0.28.1",
+          "configHash": "82ce28f1f1",
+          "result": {
+            "data": {
+              "minifiedBytes": 118144,
+              "minzippedBytes": 44373,
+              "time": 28.375399199999997,
+              "runs": 5
+            }
+          }
+        },
+        "google-closure-compiler": {
+          "minifierPath": "google-closure-compiler.ts",
+          "version": "20251216.0.0",
+          "configHash": "52d5a255dc",
+          "result": {
+            "error": {
+              "message": "\"java -XX:+IgnoreUnrecognizedVMOptions --sun-misc-unsafe-memory-access=allow -jar /tmp/minifypp-competitive-2026-08-18/minification-benchmarks/node_modules/.pnpm/google-closure-compiler-java@20251216.0.0/node_modules/google-closure-compiler-java/compiler.jar --js=/tmp/minifypp-competitive-2026-08-18/minification-benchmarks/packages/artifacts/node_modules/vue/dist/vue.no-comments.js --dependency_mode=NONE --generate_exports=false --export_local_property_definitions=false --rewrite_polyfills=false --apply_input_source_maps=false --parse_inline_source_maps=false --language_in=ECMASCRIPT_NEXT --language_out=ECMASCRIPT_NEXT --assume_function_wrapper=true --emit_use_strict=false --compilation_level=SIMPLE\\n\\nProcess spawn error. Is java in the path?\\nspawn java ENOENT\\n\\n\"",
+              "stage": "minification"
+            }
+          }
+        },
+        "nift": {
+          "minifierPath": "nift.ts",
+          "version": "4.0.2",
+          "configHash": "cf379e24dd",
+          "result": {
+            "data": {
+              "minifiedBytes": 205613,
+              "minzippedBytes": 58877,
+              "time": 12.3778706,
+              "runs": 5
+            }
+          }
+        },
+        "oxc-minify": {
+          "minifierPath": "oxc-minify.ts",
+          "version": "0.141.0",
+          "configHash": "6d06706e9d",
+          "result": {
+            "data": {
+              "minifiedBytes": 116978,
+              "minzippedBytes": 43245,
+              "time": 12.229331400000001,
+              "runs": 5
+            }
+          }
+        },
+        "terser": {
+          "minifierPath": "terser.ts",
+          "version": "5.49.0",
+          "configHash": "32a6c74a58",
+          "result": {
+            "data": {
+              "minifiedBytes": 116604,
+              "minzippedBytes": 42870,
+              "time": 461.3969916,
+              "runs": 5
+            }
+          }
+        },
+        "terser (no compress)": {
+          "minifierPath": "terser.ts",
+          "version": "5.49.0",
+          "configHash": "32a6c74a58",
+          "result": {
+            "data": {
+              "minifiedBytes": 126386,
+              "minzippedBytes": 44636,
+              "time": 193.736507,
+              "runs": 5
+            }
+          }
+        },
+        "uglify-js": {
+          "minifierPath": "uglify-js.ts",
+          "version": "3.19.3",
+          "configHash": "e8b5952820",
+          "result": {
+            "data": {
+              "minifiedBytes": 113796,
+              "minzippedBytes": 43036,
+              "time": 1006.3830904,
+              "runs": 5
+            }
+          }
+        },
+        "uglify-js (no compress)": {
+          "minifierPath": "uglify-js.ts",
+          "version": "3.19.3",
+          "configHash": "e8b5952820",
+          "result": {
+            "data": {
+              "minifiedBytes": 126137,
+              "minzippedBytes": 44450,
+              "time": 160.68703299999999,
+              "runs": 5
+            }
+          }
+        }
+      },
+      "nift_rank_among_successful": 12
+    },
+    "lodash": {
+      "version": "4.17.21",
+      "filePath": "/lodash.js",
+      "size": 544089,
+      "gzipSize": 96690,
+      "minified": {
+        "@cminify/cminify-linux-x64": {
+          "minifierPath": "cminify.ts",
+          "version": "3.0.1",
+          "configHash": "76612a7257",
+          "result": {
+            "data": {
+              "minifiedBytes": 146273,
+              "minzippedBytes": 35944,
+              "time": 14.5980244,
+              "runs": 5
+            }
+          }
+        },
+        "@swc/core": {
+          "minifierPath": "swc.ts",
+          "version": "1.15.46",
+          "configHash": "3f4708371f",
+          "result": {
+            "data": {
+              "minifiedBytes": 69823,
+              "minzippedBytes": 25241,
+              "time": 43.17561479999999,
+              "runs": 5
+            }
+          }
+        },
+        "@tdewolff/minify": {
+          "minifierPath": "tdewolff-minify.ts",
+          "version": "2.24.8",
+          "configHash": "b487ebf39d",
+          "result": {
+            "data": {
+              "minifiedBytes": 71895,
+              "minzippedBytes": 26498,
+              "time": 12.071045600000001,
+              "runs": 5
+            }
+          }
+        },
+        "babel-minify": {
+          "minifierPath": "babel-minify.ts",
+          "version": "0.5.2",
+          "configHash": "b63b201604",
+          "result": {
+            "data": {
+              "minifiedBytes": 72787,
+              "minzippedBytes": 25407,
+              "time": 930.8631786,
+              "runs": 5
+            }
+          }
+        },
+        "bun": {
+          "minifierPath": "bun.ts",
+          "version": "1.3.14",
+          "configHash": "df04df4c6c",
+          "result": {
+            "data": {
+              "minifiedBytes": 73448,
+              "minzippedBytes": 26655,
+              "time": 22.808047600000002,
+              "runs": 5
+            }
+          }
+        },
+        "esbuild": {
+          "minifierPath": "esbuild.ts",
+          "version": "0.28.1",
+          "configHash": "82ce28f1f1",
+          "result": {
+            "data": {
+              "minifiedBytes": 72497,
+              "minzippedBytes": 26204,
+              "time": 26.5205558,
+              "runs": 5
+            }
+          }
+        },
+        "google-closure-compiler": {
+          "minifierPath": "google-closure-compiler.ts",
+          "version": "20251216.0.0",
+          "configHash": "52d5a255dc",
+          "result": {
+            "error": {
+              "message": "\"java -XX:+IgnoreUnrecognizedVMOptions --sun-misc-unsafe-memory-access=allow -jar /tmp/minifypp-competitive-2026-08-18/minification-benchmarks/node_modules/.pnpm/google-closure-compiler-java@20251216.0.0/node_modules/google-closure-compiler-java/compiler.jar --js=/tmp/minifypp-competitive-2026-08-18/minification-benchmarks/packages/artifacts/node_modules/lodash/lodash.no-comments.js --dependency_mode=NONE --generate_exports=false --export_local_property_definitions=false --rewrite_polyfills=false --apply_input_source_maps=false --parse_inline_source_maps=false --language_in=ECMASCRIPT_NEXT --language_out=ECMASCRIPT_NEXT --assume_function_wrapper=true --emit_use_strict=false --compilation_level=SIMPLE\\n\\nProcess spawn error. Is java in the path?\\nspawn java ENOENT\\n\\n\"",
+              "stage": "minification"
+            }
+          }
+        },
+        "nift": {
+          "minifierPath": "nift.ts",
+          "version": "4.0.2",
+          "configHash": "cf379e24dd",
+          "result": {
+            "data": {
+              "minifiedBytes": 153897,
+              "minzippedBytes": 37129,
+              "time": 12.269195200000002,
+              "runs": 5
+            }
+          }
+        },
+        "oxc-minify": {
+          "minifierPath": "oxc-minify.ts",
+          "version": "0.141.0",
+          "configHash": "6d06706e9d",
+          "result": {
+            "data": {
+              "minifiedBytes": 70909,
+              "minzippedBytes": 25865,
+              "time": 8.5608972,
+              "runs": 5
+            }
+          }
+        },
+        "terser": {
+          "minifierPath": "terser.ts",
+          "version": "5.49.0",
+          "configHash": "32a6c74a58",
+          "result": {
+            "data": {
+              "minifiedBytes": 70408,
+              "minzippedBytes": 25152,
+              "time": 400.83807459999997,
+              "runs": 5
+            }
+          }
+        },
+        "terser (no compress)": {
+          "minifierPath": "terser.ts",
+          "version": "5.49.0",
+          "configHash": "32a6c74a58",
+          "result": {
+            "data": {
+              "minifiedBytes": 75035,
+              "minzippedBytes": 26187,
+              "time": 166.06295699999998,
+              "runs": 5
+            }
+          }
+        },
+        "uglify-js": {
+          "minifierPath": "uglify-js.ts",
+          "version": "3.19.3",
+          "configHash": "e8b5952820",
+          "result": {
+            "data": {
+              "minifiedBytes": 68167,
+              "minzippedBytes": 24686,
+              "time": 760.585022,
+              "runs": 5
+            }
+          }
+        },
+        "uglify-js (no compress)": {
+          "minifierPath": "uglify-js.ts",
+          "version": "3.19.3",
+          "configHash": "e8b5952820",
+          "result": {
+            "data": {
+              "minifiedBytes": 74607,
+              "minzippedBytes": 25862,
+              "time": 144.78028239999998,
+              "runs": 5
+            }
+          }
+        }
+      },
+      "nift_rank_among_successful": 12
+    },
+    "d3": {
+      "version": "6.3.1",
+      "filePath": "/dist/d3.js",
+      "size": 555767,
+      "gzipSize": 130686,
+      "minified": {
+        "@cminify/cminify-linux-x64": {
+          "minifierPath": "cminify.ts",
+          "version": "3.0.1",
+          "configHash": "76612a7257",
+          "result": {
+            "data": {
+              "minifiedBytes": 393697,
+              "minzippedBytes": 103813,
+              "time": 20.3171864,
+              "runs": 5
+            }
+          }
+        },
+        "@swc/core": {
+          "minifierPath": "swc.ts",
+          "version": "1.15.46",
+          "configHash": "3f4708371f",
+          "result": {
+            "data": {
+              "minifiedBytes": 265026,
+              "minzippedBytes": 87392,
+              "time": 105.43062479999999,
+              "runs": 5
+            }
+          }
+        },
+        "@tdewolff/minify": {
+          "minifierPath": "tdewolff-minify.ts",
+          "version": "2.24.8",
+          "configHash": "b487ebf39d",
+          "result": {
+            "data": {
+              "minifiedBytes": 269065,
+              "minzippedBytes": 89866,
+              "time": 26.904485599999997,
+              "runs": 5
+            }
+          }
+        },
+        "babel-minify": {
+          "minifierPath": "babel-minify.ts",
+          "version": "0.5.2",
+          "configHash": "b63b201604",
+          "result": {
+            "error": {
+              "message": "unknown file: Cannot read properties of undefined (reading 'add')",
+              "stack": "TypeError: unknown file: Cannot read properties of undefined (reading 'add')\n    at ScopeTracker.addReference (/node_modules/.pnpm/babel-plugin-minify-mangle-names@0.5.1/node_modules/babel-plugin-minify-mangle-names/lib/scope-tracker.js:47:34)\n    at ReferencedIdentifier (/node_modules/.pnpm/babel-plugin-minify-mangle-names@0.5.1/node_modules/babel-plugin-minify-mangle-names/lib/index.js:202:26)\n    at newFn (/node_modules/.pnpm/@babel+traverse@7.28.4/node_modules/@babel/traverse/lib/visitors.js:207:17)\n    at bfsTraverse (/node_modules/.pnpm/babel-plugin-minify-mangle-names@0.5.1/node_modules/babel-plugin-minify-mangle-names/lib/bfs-traverse.js:38:43)\n    at Mangler.collect (/node_modules/.pnpm/babel-plugin-minify-mangle-names@0.5.1/node_modules/babel-plugin-minify-mangle-names/lib/index.js:235:7)\n    at Mangler.run (/node_modules/.pnpm/babel-plugin-minify-mangle-names@0.5.1/node_modules/babel-plugin-minify-mangle-names/lib/index.js:60:12)\n    at PluginPass.exit (/node_modules/.pnpm/babel-plugin-minify-mangle-names@0.5.1/node_modules/babel-plugin-minify-mangle-names/lib/index.js:546:19)\n    at newFn (/node_modules/.pnpm/@babel+traverse@7.28.4/node_modules/@babel/traverse/lib/visitors.js:172:14)\n    at NodePath._call (/node_modules/.pnpm/@babel+traverse@7.28.4/node_modules/@babel/traverse/lib/path/context.js:49:20)\n    at NodePath.call (/node_modules/.pnpm/@babel+traverse@7.28.4/node_modules/@babel/traverse/lib/path/context.js:39:18)\n    at NodePath.visit (/node_modules/.pnpm/@babel+traverse@7.28.4/node_modules/@babel/traverse/lib/path/context.js:96:8)\n    at TraversalContext.visitQueue (/node_modules/.pnpm/@babel+traverse@7.28.4/node_modules/@babel/traverse/lib/context.js:90:16)\n    at TraversalContext.visitSingle (/node_modules/.pnpm/@babel+traverse@7.28.4/node_modules/@babel/traverse/lib/context.js:66:19)\n    at TraversalContext.visit (/node_modules/.pnpm/@babel+traverse@7.28.4/node_modules/@babel/traverse/lib/context.js:113:19)\n    at traverseNode (/node_modules/.pnpm/@babel+traverse@7.28.4/node_modules/@babel/traverse/lib/traverse-node.js:131:17)\n    at traverse (/node_modules/.pnpm/@babel+traverse@7.28.4/node_modules/@babel/traverse/lib/index.js:53:34)\n    at transformFile (/node_modules/.pnpm/@babel+core@7.28.4/node_modules/@babel/core/lib/transformation/index.js:80:31)\n    at transformFile.next (<anonymous>)\n    at run (/node_modules/.pnpm/@babel+core@7.28.4/node_modules/@babel/core/lib/transformation/index.js:25:12)\n    at run.next (<anonymous>)\n    at transform (/node_modules/.pnpm/@babel+core@7.28.4/node_modules/@babel/core/lib/transform.js:22:33)\n    at transform.next (<anonymous>)\n    at evaluateSync (/node_modules/.pnpm/gensync@1.0.0-beta.2/node_modules/gensync/index.js:251:28)\n    at sync (/node_modules/.pnpm/gensync@1.0.0-beta.2/node_modules/gensync/index.js:89:14)\n    at stopHiding - secret - don't use this - v1 (/node_modules/.pnpm/@babel+core@7.28.4/node_modules/@babel/core/lib/errors/rewrite-stack-trace.js:47:12)\n    at Object.transformSync (/node_modules/.pnpm/@babel+core@7.28.4/node_modules/@babel/core/lib/transform.js:42:76)\n    at babelMinify (/node_modules/.pnpm/babel-minify@0.5.2/node_modules/babel-minify/lib/index.js:24:16)\n    at default (file:///packages/minifiers/minifiers/babel-minify.ts:8:27)\n    at runMinifier (file:///packages/bench/benchmark/cli.ts:21:24)\n    at file:///packages/bench/benchmark/cli.ts:95:24\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)",
+              "stage": "minification"
+            }
+          }
+        },
+        "bun": {
+          "minifierPath": "bun.ts",
+          "version": "1.3.14",
+          "configHash": "df04df4c6c",
+          "result": {
+            "data": {
+              "minifiedBytes": 272734,
+              "minzippedBytes": 92345,
+              "time": 35.62122420000001,
+              "runs": 5
+            }
+          }
+        },
+        "esbuild": {
+          "minifierPath": "esbuild.ts",
+          "version": "0.28.1",
+          "configHash": "82ce28f1f1",
+          "result": {
+            "data": {
+              "minifiedBytes": 270207,
+              "minzippedBytes": 90809,
+              "time": 49.2311086,
+              "runs": 5
+            }
+          }
+        },
+        "google-closure-compiler": {
+          "minifierPath": "google-closure-compiler.ts",
+          "version": "20251216.0.0",
+          "configHash": "52d5a255dc",
+          "result": {
+            "error": {
+              "message": "\"java -XX:+IgnoreUnrecognizedVMOptions --sun-misc-unsafe-memory-access=allow -jar /tmp/minifypp-competitive-2026-08-18/minification-benchmarks/node_modules/.pnpm/google-closure-compiler-java@20251216.0.0/node_modules/google-closure-compiler-java/compiler.jar --js=/tmp/minifypp-competitive-2026-08-18/minification-benchmarks/packages/artifacts/node_modules/d3/dist/d3.js --dependency_mode=NONE --generate_exports=false --export_local_property_definitions=false --rewrite_polyfills=false --apply_input_source_maps=false --parse_inline_source_maps=false --language_in=ECMASCRIPT_NEXT --language_out=ECMASCRIPT_NEXT --assume_function_wrapper=true --emit_use_strict=false --compilation_level=SIMPLE\\n\\nProcess spawn error. Is java in the path?\\nspawn java ENOENT\\n\\n\"",
+              "stage": "minification"
+            }
+          }
+        },
+        "nift": {
+          "minifierPath": "nift.ts",
+          "version": "4.0.2",
+          "configHash": "cf379e24dd",
+          "result": {
+            "data": {
+              "minifiedBytes": 415104,
+              "minzippedBytes": 106901,
+              "time": 18.240959599999996,
+              "runs": 5
+            }
+          }
+        },
+        "oxc-minify": {
+          "minifierPath": "oxc-minify.ts",
+          "version": "0.141.0",
+          "configHash": "6d06706e9d",
+          "result": {
+            "data": {
+              "minifiedBytes": 267203,
+              "minzippedBytes": 87952,
+              "time": 28.0579052,
+              "runs": 5
+            }
+          }
+        },
+        "terser": {
+          "minifierPath": "terser.ts",
+          "version": "5.49.0",
+          "configHash": "32a6c74a58",
+          "result": {
+            "data": {
+              "minifiedBytes": 267417,
+              "minzippedBytes": 87997,
+              "time": 967.1814529999999,
+              "runs": 5
+            }
+          }
+        },
+        "terser (no compress)": {
+          "minifierPath": "terser.ts",
+          "version": "5.49.0",
+          "configHash": "32a6c74a58",
+          "result": {
+            "data": {
+              "minifiedBytes": 276125,
+              "minzippedBytes": 89069,
+              "time": 456.9333952,
+              "runs": 5
+            }
+          }
+        },
+        "uglify-js": {
+          "minifierPath": "uglify-js.ts",
+          "version": "3.19.3",
+          "configHash": "e8b5952820",
+          "result": {
+            "data": {
+              "minifiedBytes": 263558,
+              "minzippedBytes": 87016,
+              "time": 1801.9479265999998,
+              "runs": 5
+            }
+          }
+        },
+        "uglify-js (no compress)": {
+          "minifierPath": "uglify-js.ts",
+          "version": "3.19.3",
+          "configHash": "e8b5952820",
+          "result": {
+            "data": {
+              "minifiedBytes": 275347,
+              "minzippedBytes": 88319,
+              "time": 330.2062658,
+              "runs": 5
+            }
+          }
+        }
+      },
+      "nift_rank_among_successful": 11
+    },
+    "terser": {
+      "version": "5.30.3",
+      "filePath": "/dist/bundle.min.js",
+      "size": 1009635,
+      "gzipSize": 193763,
+      "minified": {
+        "@cminify/cminify-linux-x64": {
+          "minifierPath": "cminify.ts",
+          "version": "3.0.1",
+          "configHash": "76612a7257",
+          "result": {
+            "data": {
+              "minifiedBytes": 625930,
+              "minzippedBytes": 144303,
+              "time": 21.6567712,
+              "runs": 5
+            }
+          }
+        },
+        "@swc/core": {
+          "minifierPath": "swc.ts",
+          "version": "1.15.46",
+          "configHash": "3f4708371f",
+          "result": {
+            "data": {
+              "minifiedBytes": 455452,
+              "minzippedBytes": 123294,
+              "time": 89.31027999999999,
+              "runs": 5
+            }
+          }
+        },
+        "@tdewolff/minify": {
+          "minifierPath": "tdewolff-minify.ts",
+          "version": "2.24.8",
+          "configHash": "b487ebf39d",
+          "result": {
+            "data": {
+              "minifiedBytes": 456592,
+              "minzippedBytes": 124878,
+              "time": 26.9770784,
+              "runs": 5
+            }
+          }
+        },
+        "babel-minify": {
+          "minifierPath": "babel-minify.ts",
+          "version": "0.5.2",
+          "configHash": "b63b201604",
+          "result": {
+            "error": {
+              "message": "unknown file: Cannot read properties of undefined (reading 'add')",
+              "stack": "TypeError: unknown file: Cannot read properties of undefined (reading 'add')\n    at ScopeTracker.addReference (/node_modules/.pnpm/babel-plugin-minify-mangle-names@0.5.1/node_modules/babel-plugin-minify-mangle-names/lib/scope-tracker.js:47:34)\n    at ReferencedIdentifier (/node_modules/.pnpm/babel-plugin-minify-mangle-names@0.5.1/node_modules/babel-plugin-minify-mangle-names/lib/index.js:202:26)\n    at newFn (/node_modules/.pnpm/@babel+traverse@7.28.4/node_modules/@babel/traverse/lib/visitors.js:207:17)\n    at bfsTraverse (/node_modules/.pnpm/babel-plugin-minify-mangle-names@0.5.1/node_modules/babel-plugin-minify-mangle-names/lib/bfs-traverse.js:38:43)\n    at Mangler.collect (/node_modules/.pnpm/babel-plugin-minify-mangle-names@0.5.1/node_modules/babel-plugin-minify-mangle-names/lib/index.js:235:7)\n    at Mangler.run (/node_modules/.pnpm/babel-plugin-minify-mangle-names@0.5.1/node_modules/babel-plugin-minify-mangle-names/lib/index.js:60:12)\n    at PluginPass.exit (/node_modules/.pnpm/babel-plugin-minify-mangle-names@0.5.1/node_modules/babel-plugin-minify-mangle-names/lib/index.js:546:19)\n    at newFn (/node_modules/.pnpm/@babel+traverse@7.28.4/node_modules/@babel/traverse/lib/visitors.js:172:14)\n    at NodePath._call (/node_modules/.pnpm/@babel+traverse@7.28.4/node_modules/@babel/traverse/lib/path/context.js:49:20)\n    at NodePath.call (/node_modules/.pnpm/@babel+traverse@7.28.4/node_modules/@babel/traverse/lib/path/context.js:39:18)\n    at NodePath.visit (/node_modules/.pnpm/@babel+traverse@7.28.4/node_modules/@babel/traverse/lib/path/context.js:96:8)\n    at TraversalContext.visitQueue (/node_modules/.pnpm/@babel+traverse@7.28.4/node_modules/@babel/traverse/lib/context.js:90:16)\n    at TraversalContext.visitSingle (/node_modules/.pnpm/@babel+traverse@7.28.4/node_modules/@babel/traverse/lib/context.js:66:19)\n    at TraversalContext.visit (/node_modules/.pnpm/@babel+traverse@7.28.4/node_modules/@babel/traverse/lib/context.js:113:19)\n    at traverseNode (/node_modules/.pnpm/@babel+traverse@7.28.4/node_modules/@babel/traverse/lib/traverse-node.js:131:17)\n    at traverse (/node_modules/.pnpm/@babel+traverse@7.28.4/node_modules/@babel/traverse/lib/index.js:53:34)\n    at transformFile (/node_modules/.pnpm/@babel+core@7.28.4/node_modules/@babel/core/lib/transformation/index.js:80:31)\n    at transformFile.next (<anonymous>)\n    at run (/node_modules/.pnpm/@babel+core@7.28.4/node_modules/@babel/core/lib/transformation/index.js:25:12)\n    at run.next (<anonymous>)\n    at transform (/node_modules/.pnpm/@babel+core@7.28.4/node_modules/@babel/core/lib/transform.js:22:33)\n    at transform.next (<anonymous>)\n    at evaluateSync (/node_modules/.pnpm/gensync@1.0.0-beta.2/node_modules/gensync/index.js:251:28)\n    at sync (/node_modules/.pnpm/gensync@1.0.0-beta.2/node_modules/gensync/index.js:89:14)\n    at stopHiding - secret - don't use this - v1 (/node_modules/.pnpm/@babel+core@7.28.4/node_modules/@babel/core/lib/errors/rewrite-stack-trace.js:47:12)\n    at Object.transformSync (/node_modules/.pnpm/@babel+core@7.28.4/node_modules/@babel/core/lib/transform.js:42:76)\n    at babelMinify (/node_modules/.pnpm/babel-minify@0.5.2/node_modules/babel-minify/lib/index.js:24:16)\n    at default (file:///packages/minifiers/minifiers/babel-minify.ts:8:27)\n    at runMinifier (file:///packages/bench/benchmark/cli.ts:21:24)\n    at file:///packages/bench/benchmark/cli.ts:95:24\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)",
+              "stage": "minification"
+            }
+          }
+        },
+        "bun": {
+          "minifierPath": "bun.ts",
+          "version": "1.3.14",
+          "configHash": "df04df4c6c",
+          "result": {
+            "data": {
+              "minifiedBytes": 466687,
+              "minzippedBytes": 127642,
+              "time": 36.17971680000001,
+              "runs": 5
+            }
+          }
+        },
+        "esbuild": {
+          "minifierPath": "esbuild.ts",
+          "version": "0.28.1",
+          "configHash": "82ce28f1f1",
+          "result": {
+            "data": {
+              "minifiedBytes": 458925,
+              "minzippedBytes": 126711,
+              "time": 54.536898400000005,
+              "runs": 5
+            }
+          }
+        },
+        "google-closure-compiler": {
+          "minifierPath": "google-closure-compiler.ts",
+          "version": "20251216.0.0",
+          "configHash": "52d5a255dc",
+          "result": {
+            "error": {
+              "message": "\"java -XX:+IgnoreUnrecognizedVMOptions --sun-misc-unsafe-memory-access=allow -jar /tmp/minifypp-competitive-2026-08-18/minification-benchmarks/node_modules/.pnpm/google-closure-compiler-java@20251216.0.0/node_modules/google-closure-compiler-java/compiler.jar --js=/tmp/minifypp-competitive-2026-08-18/minification-benchmarks/packages/artifacts/node_modules/terser/dist/bundle.min.js --dependency_mode=NONE --generate_exports=false --export_local_property_definitions=false --rewrite_polyfills=false --apply_input_source_maps=false --parse_inline_source_maps=false --language_in=ECMASCRIPT_NEXT --language_out=ECMASCRIPT_NEXT --assume_function_wrapper=true --emit_use_strict=false --compilation_level=SIMPLE\\n\\nProcess spawn error. Is java in the path?\\nspawn java ENOENT\\n\\n\"",
+              "stage": "minification"
+            }
+          }
+        },
+        "nift": {
+          "minifierPath": "nift.ts",
+          "version": "4.0.2",
+          "configHash": "cf379e24dd",
+          "result": {
+            "data": {
+              "minifiedBytes": 660182,
+              "minzippedBytes": 147930,
+              "time": 19.921623,
+              "runs": 5
+            }
+          }
+        },
+        "oxc-minify": {
+          "minifierPath": "oxc-minify.ts",
+          "version": "0.141.0",
+          "configHash": "6d06706e9d",
+          "result": {
+            "data": {
+              "minifiedBytes": 439265,
+              "minzippedBytes": 121988,
+              "time": 27.066077200000002,
+              "runs": 5
+            }
+          }
+        },
+        "terser": {
+          "minifierPath": "terser.ts",
+          "version": "5.49.0",
+          "configHash": "32a6c74a58",
+          "result": {
+            "data": {
+              "minifiedBytes": 456593,
+              "minzippedBytes": 123346,
+              "time": 937.8077251999999,
+              "runs": 5
+            }
+          }
+        },
+        "terser (no compress)": {
+          "minifierPath": "terser.ts",
+          "version": "5.49.0",
+          "configHash": "32a6c74a58",
+          "result": {
+            "data": {
+              "minifiedBytes": 472579,
+              "minzippedBytes": 124253,
+              "time": 432.7877332,
+              "runs": 5
+            }
+          }
+        },
+        "uglify-js": {
+          "minifierPath": "uglify-js.ts",
+          "version": "3.19.3",
+          "configHash": "e8b5952820",
+          "result": {
+            "data": {
+              "minifiedBytes": 451192,
+              "minzippedBytes": 123334,
+              "time": 1706.4076658,
+              "runs": 5
+            }
+          }
+        },
+        "uglify-js (no compress)": {
+          "minifierPath": "uglify-js.ts",
+          "version": "3.19.3",
+          "configHash": "e8b5952820",
+          "result": {
+            "data": {
+              "minifiedBytes": 472162,
+              "minzippedBytes": 124609,
+              "time": 356.0130952,
+              "runs": 5
+            }
+          }
+        }
+      },
+      "nift_rank_among_successful": 11
+    },
+    "three": {
+      "version": "0.124.0",
+      "filePath": "/build/three.js",
+      "size": 1247235,
+      "gzipSize": 248267,
+      "minified": {
+        "@cminify/cminify-linux-x64": {
+          "minifierPath": "cminify.ts",
+          "version": "3.0.1",
+          "configHash": "76612a7257",
+          "result": {
+            "data": {
+              "minifiedBytes": 941063,
+              "minzippedBytes": 191965,
+              "time": 23.8107052,
+              "runs": 5
+            }
+          }
+        },
+        "@swc/core": {
+          "minifierPath": "swc.ts",
+          "version": "1.15.46",
+          "configHash": "3f4708371f",
+          "result": {
+            "data": {
+              "minifiedBytes": 642749,
+              "minzippedBytes": 158727,
+              "time": 144.87449940000002,
+              "runs": 5
+            }
+          }
+        },
+        "@tdewolff/minify": {
+          "minifierPath": "tdewolff-minify.ts",
+          "version": "2.24.8",
+          "configHash": "b487ebf39d",
+          "result": {
+            "data": {
+              "minifiedBytes": 642204,
+              "minzippedBytes": 164595,
+              "time": 39.2802278,
+              "runs": 5
+            }
+          }
+        },
+        "babel-minify": {
+          "minifierPath": "babel-minify.ts",
+          "version": "0.5.2",
+          "configHash": "b63b201604",
+          "result": {
+            "data": {
+              "minifiedBytes": 648438,
+              "minzippedBytes": 162694,
+              "time": 6013.07492,
+              "runs": 5
+            }
+          }
+        },
+        "bun": {
+          "minifierPath": "bun.ts",
+          "version": "1.3.14",
+          "configHash": "df04df4c6c",
+          "result": {
+            "data": {
+              "minifiedBytes": 655587,
+              "minzippedBytes": 166171,
+              "time": 47.49177519999999,
+              "runs": 5
+            }
+          }
+        },
+        "esbuild": {
+          "minifierPath": "esbuild.ts",
+          "version": "0.28.1",
+          "configHash": "82ce28f1f1",
+          "result": {
+            "data": {
+              "minifiedBytes": 646934,
+              "minzippedBytes": 163747,
+              "time": 74.46774079999999,
+              "runs": 5
+            }
+          }
+        },
+        "google-closure-compiler": {
+          "minifierPath": "google-closure-compiler.ts",
+          "version": "20251216.0.0",
+          "configHash": "52d5a255dc",
+          "result": {
+            "error": {
+              "message": "\"java -XX:+IgnoreUnrecognizedVMOptions --sun-misc-unsafe-memory-access=allow -jar /tmp/minifypp-competitive-2026-08-18/minification-benchmarks/node_modules/.pnpm/google-closure-compiler-java@20251216.0.0/node_modules/google-closure-compiler-java/compiler.jar --js=/tmp/minifypp-competitive-2026-08-18/minification-benchmarks/packages/artifacts/node_modules/three/build/three.js --dependency_mode=NONE --generate_exports=false --export_local_property_definitions=false --rewrite_polyfills=false --apply_input_source_maps=false --parse_inline_source_maps=false --language_in=ECMASCRIPT_NEXT --language_out=ECMASCRIPT_NEXT --assume_function_wrapper=true --emit_use_strict=false --compilation_level=SIMPLE\\n\\nProcess spawn error. Is java in the path?\\nspawn java ENOENT\\n\\n\"",
+              "stage": "minification"
+            }
+          }
+        },
+        "nift": {
+          "minifierPath": "nift.ts",
+          "version": "4.0.2",
+          "configHash": "cf379e24dd",
+          "result": {
+            "data": {
+              "minifiedBytes": 978976,
+              "minzippedBytes": 195563,
+              "time": 26.606548600000004,
+              "runs": 5
+            }
+          }
+        },
+        "oxc-minify": {
+          "minifierPath": "oxc-minify.ts",
+          "version": "0.141.0",
+          "configHash": "6d06706e9d",
+          "result": {
+            "data": {
+              "minifiedBytes": 642455,
+              "minzippedBytes": 159883,
+              "time": 41.067517800000005,
+              "runs": 5
+            }
+          }
+        },
+        "terser": {
+          "minifierPath": "terser.ts",
+          "version": "5.49.0",
+          "configHash": "32a6c74a58",
+          "result": {
+            "data": {
+              "minifiedBytes": 653180,
+              "minzippedBytes": 159165,
+              "time": 1264.7156444,
+              "runs": 5
+            }
+          }
+        },
+        "terser (no compress)": {
+          "minifierPath": "terser.ts",
+          "version": "5.49.0",
+          "configHash": "32a6c74a58",
+          "result": {
+            "data": {
+              "minifiedBytes": 675428,
+              "minzippedBytes": 163181,
+              "time": 569.2799568,
+              "runs": 5
+            }
+          }
+        },
+        "uglify-js": {
+          "minifierPath": "uglify-js.ts",
+          "version": "3.19.3",
+          "configHash": "e8b5952820",
+          "result": {
+            "data": {
+              "minifiedBytes": 641593,
+              "minzippedBytes": 159071,
+              "time": 2391.2224533999997,
+              "runs": 5
+            }
+          }
+        },
+        "uglify-js (no compress)": {
+          "minifierPath": "uglify-js.ts",
+          "version": "3.19.3",
+          "configHash": "e8b5952820",
+          "result": {
+            "data": {
+              "minifiedBytes": 674490,
+              "minzippedBytes": 163036,
+              "time": 467.34981480000005,
+              "runs": 5
+            }
+          }
+        }
+      },
+      "nift_rank_among_successful": 12
+    },
+    "victory": {
+      "version": "35.8.4",
+      "filePath": "/dist/victory.js",
+      "size": 2132722,
+      "gzipSize": 309942,
+      "minified": {
+        "@cminify/cminify-linux-x64": {
+          "minifierPath": "cminify.ts",
+          "version": "3.0.1",
+          "configHash": "76612a7257",
+          "result": {
+            "data": {
+              "minifiedBytes": 1433404,
+              "minzippedBytes": 221118,
+              "time": 31.6770262,
+              "runs": 5
+            }
+          }
+        },
+        "@swc/core": {
+          "minifierPath": "swc.ts",
+          "version": "1.15.46",
+          "configHash": "3f4708371f",
+          "result": {
+            "data": {
+              "minifiedBytes": 705898,
+              "minzippedBytes": 157731,
+              "time": 206.4207012,
+              "runs": 5
+            }
+          }
+        },
+        "@tdewolff/minify": {
+          "minifierPath": "tdewolff-minify.ts",
+          "version": "2.24.8",
+          "configHash": "b487ebf39d",
+          "result": {
+            "data": {
+              "minifiedBytes": 716620,
+              "minzippedBytes": 164946,
+              "time": 44.9343244,
+              "runs": 5
+            }
+          }
+        },
+        "babel-minify": {
+          "minifierPath": "babel-minify.ts",
+          "version": "0.5.2",
+          "configHash": "b63b201604",
+          "result": {
+            "error": {
+              "message": "unknown file: Cannot read properties of undefined (reading 'add')",
+              "stack": "TypeError: unknown file: Cannot read properties of undefined (reading 'add')\n    at ScopeTracker.addReference (/node_modules/.pnpm/babel-plugin-minify-mangle-names@0.5.1/node_modules/babel-plugin-minify-mangle-names/lib/scope-tracker.js:47:34)\n    at ReferencedIdentifier (/node_modules/.pnpm/babel-plugin-minify-mangle-names@0.5.1/node_modules/babel-plugin-minify-mangle-names/lib/index.js:202:26)\n    at newFn (/node_modules/.pnpm/@babel+traverse@7.28.4/node_modules/@babel/traverse/lib/visitors.js:207:17)\n    at bfsTraverse (/node_modules/.pnpm/babel-plugin-minify-mangle-names@0.5.1/node_modules/babel-plugin-minify-mangle-names/lib/bfs-traverse.js:38:43)\n    at Mangler.collect (/node_modules/.pnpm/babel-plugin-minify-mangle-names@0.5.1/node_modules/babel-plugin-minify-mangle-names/lib/index.js:235:7)\n    at Mangler.run (/node_modules/.pnpm/babel-plugin-minify-mangle-names@0.5.1/node_modules/babel-plugin-minify-mangle-names/lib/index.js:60:12)\n    at PluginPass.exit (/node_modules/.pnpm/babel-plugin-minify-mangle-names@0.5.1/node_modules/babel-plugin-minify-mangle-names/lib/index.js:546:19)\n    at newFn (/node_modules/.pnpm/@babel+traverse@7.28.4/node_modules/@babel/traverse/lib/visitors.js:172:14)\n    at NodePath._call (/node_modules/.pnpm/@babel+traverse@7.28.4/node_modules/@babel/traverse/lib/path/context.js:49:20)\n    at NodePath.call (/node_modules/.pnpm/@babel+traverse@7.28.4/node_modules/@babel/traverse/lib/path/context.js:39:18)\n    at NodePath.visit (/node_modules/.pnpm/@babel+traverse@7.28.4/node_modules/@babel/traverse/lib/path/context.js:96:8)\n    at TraversalContext.visitQueue (/node_modules/.pnpm/@babel+traverse@7.28.4/node_modules/@babel/traverse/lib/context.js:90:16)\n    at TraversalContext.visitSingle (/node_modules/.pnpm/@babel+traverse@7.28.4/node_modules/@babel/traverse/lib/context.js:66:19)\n    at TraversalContext.visit (/node_modules/.pnpm/@babel+traverse@7.28.4/node_modules/@babel/traverse/lib/context.js:113:19)\n    at traverseNode (/node_modules/.pnpm/@babel+traverse@7.28.4/node_modules/@babel/traverse/lib/traverse-node.js:131:17)\n    at traverse (/node_modules/.pnpm/@babel+traverse@7.28.4/node_modules/@babel/traverse/lib/index.js:53:34)\n    at transformFile (/node_modules/.pnpm/@babel+core@7.28.4/node_modules/@babel/core/lib/transformation/index.js:80:31)\n    at transformFile.next (<anonymous>)\n    at run (/node_modules/.pnpm/@babel+core@7.28.4/node_modules/@babel/core/lib/transformation/index.js:25:12)\n    at run.next (<anonymous>)\n    at transform (/node_modules/.pnpm/@babel+core@7.28.4/node_modules/@babel/core/lib/transform.js:22:33)\n    at transform.next (<anonymous>)\n    at evaluateSync (/node_modules/.pnpm/gensync@1.0.0-beta.2/node_modules/gensync/index.js:251:28)\n    at sync (/node_modules/.pnpm/gensync@1.0.0-beta.2/node_modules/gensync/index.js:89:14)\n    at stopHiding - secret - don't use this - v1 (/node_modules/.pnpm/@babel+core@7.28.4/node_modules/@babel/core/lib/errors/rewrite-stack-trace.js:47:12)\n    at Object.transformSync (/node_modules/.pnpm/@babel+core@7.28.4/node_modules/@babel/core/lib/transform.js:42:76)\n    at babelMinify (/node_modules/.pnpm/babel-minify@0.5.2/node_modules/babel-minify/lib/index.js:24:16)\n    at default (file:///packages/minifiers/minifiers/babel-minify.ts:8:27)\n    at runMinifier (file:///packages/bench/benchmark/cli.ts:21:24)\n    at file:///packages/bench/benchmark/cli.ts:95:24\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)",
+              "stage": "minification"
+            }
+          }
+        },
+        "bun": {
+          "minifierPath": "bun.ts",
+          "version": "1.3.14",
+          "configHash": "df04df4c6c",
+          "result": {
+            "data": {
+              "minifiedBytes": 726797,
+              "minzippedBytes": 182607,
+              "time": 60.9240594,
+              "runs": 5
+            }
+          }
+        },
+        "esbuild": {
+          "minifierPath": "esbuild.ts",
+          "version": "0.28.1",
+          "configHash": "82ce28f1f1",
+          "result": {
+            "data": {
+              "minifiedBytes": 725650,
+              "minzippedBytes": 181233,
+              "time": 93.25965959999999,
+              "runs": 5
+            }
+          }
+        },
+        "google-closure-compiler": {
+          "minifierPath": "google-closure-compiler.ts",
+          "version": "20251216.0.0",
+          "configHash": "52d5a255dc",
+          "result": {
+            "error": {
+              "message": "\"java -XX:+IgnoreUnrecognizedVMOptions --sun-misc-unsafe-memory-access=allow -jar /tmp/minifypp-competitive-2026-08-18/minification-benchmarks/node_modules/.pnpm/google-closure-compiler-java@20251216.0.0/node_modules/google-closure-compiler-java/compiler.jar --js=/tmp/minifypp-competitive-2026-08-18/minification-benchmarks/packages/artifacts/node_modules/victory/dist/victory.no-comments.js --dependency_mode=NONE --generate_exports=false --export_local_property_definitions=false --rewrite_polyfills=false --apply_input_source_maps=false --parse_inline_source_maps=false --language_in=ECMASCRIPT_NEXT --language_out=ECMASCRIPT_NEXT --assume_function_wrapper=true --emit_use_strict=false --compilation_level=SIMPLE\\n\\nProcess spawn error. Is java in the path?\\nspawn java ENOENT\\n\\n\"",
+              "stage": "minification"
+            }
+          }
+        },
+        "nift": {
+          "minifierPath": "nift.ts",
+          "version": "4.0.2",
+          "configHash": "cf379e24dd",
+          "result": {
+            "data": {
+              "minifiedBytes": 1478311,
+              "minzippedBytes": 226532,
+              "time": 140.6411928,
+              "runs": 5
+            }
+          }
+        },
+        "oxc-minify": {
+          "minifierPath": "oxc-minify.ts",
+          "version": "0.141.0",
+          "configHash": "6d06706e9d",
+          "result": {
+            "data": {
+              "minifiedBytes": 710898,
+              "minzippedBytes": 160841,
+              "time": 58.993878599999995,
+              "runs": 5
+            }
+          }
+        },
+        "terser": {
+          "minifierPath": "terser.ts",
+          "version": "5.49.0",
+          "configHash": "32a6c74a58",
+          "result": {
+            "data": {
+              "minifiedBytes": 712872,
+              "minzippedBytes": 158459,
+              "time": 1791.3390749999999,
+              "runs": 5
+            }
+          }
+        },
+        "terser (no compress)": {
+          "minifierPath": "terser.ts",
+          "version": "5.49.0",
+          "configHash": "32a6c74a58",
+          "result": {
+            "data": {
+              "minifiedBytes": 756623,
+              "minzippedBytes": 166176,
+              "time": 730.9232138,
+              "runs": 5
+            }
+          }
+        },
+        "uglify-js": {
+          "minifierPath": "uglify-js.ts",
+          "version": "3.19.3",
+          "configHash": "e8b5952820",
+          "result": {
+            "data": {
+              "minifiedBytes": 694781,
+              "minzippedBytes": 157435,
+              "time": 3227.3573974,
+              "runs": 5
+            }
+          }
+        },
+        "uglify-js (no compress)": {
+          "minifierPath": "uglify-js.ts",
+          "version": "3.19.3",
+          "configHash": "e8b5952820",
+          "result": {
+            "data": {
+              "minifiedBytes": 756530,
+              "minzippedBytes": 167579,
+              "time": 615.9394358,
+              "runs": 5
+            }
+          }
+        }
+      },
+      "nift_rank_among_successful": 11
+    },
+    "echarts": {
+      "version": "5.1.1",
+      "filePath": "/dist/echarts.js",
+      "size": 3196329,
+      "gzipSize": 684611,
+      "minified": {
+        "@cminify/cminify-linux-x64": {
+          "minifierPath": "cminify.ts",
+          "version": "3.0.1",
+          "configHash": "76612a7257",
+          "result": {
+            "data": {
+              "minifiedBytes": 1770178,
+              "minzippedBytes": 434451,
+              "time": 37.059182199999995,
+              "runs": 5
+            }
+          }
+        },
+        "@swc/core": {
+          "minifierPath": "swc.ts",
+          "version": "1.15.46",
+          "configHash": "3f4708371f",
+          "result": {
+            "data": {
+              "minifiedBytes": 993621,
+              "minzippedBytes": 321076,
+              "time": 393.3792244,
+              "runs": 5
+            }
+          }
+        },
+        "@tdewolff/minify": {
+          "minifierPath": "tdewolff-minify.ts",
+          "version": "2.24.8",
+          "configHash": "b487ebf39d",
+          "result": {
+            "data": {
+              "minifiedBytes": 1013650,
+              "minzippedBytes": 331760,
+              "time": 91.4382876,
+              "runs": 5
+            }
+          }
+        },
+        "babel-minify": {
+          "minifierPath": "babel-minify.ts",
+          "version": "0.5.2",
+          "configHash": "b63b201604",
+          "result": {
+            "error": {
+              "message": "timeout"
+            }
+          }
+        },
+        "bun": {
+          "minifierPath": "bun.ts",
+          "version": "1.3.14",
+          "configHash": "df04df4c6c",
+          "result": {
+            "data": {
+              "minifiedBytes": 1024248,
+              "minzippedBytes": 337874,
+              "time": 89.55800820000002,
+              "runs": 5
+            }
+          }
+        },
+        "esbuild": {
+          "minifierPath": "esbuild.ts",
+          "version": "0.28.1",
+          "configHash": "82ce28f1f1",
+          "result": {
+            "data": {
+              "minifiedBytes": 1011956,
+              "minzippedBytes": 331621,
+              "time": 142.8227334,
+              "runs": 5
+            }
+          }
+        },
+        "google-closure-compiler": {
+          "minifierPath": "google-closure-compiler.ts",
+          "version": "20251216.0.0",
+          "configHash": "52d5a255dc",
+          "result": {
+            "error": {
+              "message": "\"java -XX:+IgnoreUnrecognizedVMOptions --sun-misc-unsafe-memory-access=allow -jar /tmp/minifypp-competitive-2026-08-18/minification-benchmarks/node_modules/.pnpm/google-closure-compiler-java@20251216.0.0/node_modules/google-closure-compiler-java/compiler.jar --js=/tmp/minifypp-competitive-2026-08-18/minification-benchmarks/packages/artifacts/node_modules/echarts/dist/echarts.no-comments.js --dependency_mode=NONE --generate_exports=false --export_local_property_definitions=false --rewrite_polyfills=false --apply_input_source_maps=false --parse_inline_source_maps=false --language_in=ECMASCRIPT_NEXT --language_out=ECMASCRIPT_NEXT --assume_function_wrapper=true --emit_use_strict=false --compilation_level=SIMPLE\\n\\nProcess spawn error. Is java in the path?\\nspawn java ENOENT\\n\\n\"",
+              "stage": "minification"
+            }
+          }
+        },
+        "nift": {
+          "minifierPath": "nift.ts",
+          "version": "4.0.2",
+          "configHash": "cf379e24dd",
+          "result": {
+            "data": {
+              "minifiedBytes": 1857847,
+              "minzippedBytes": 445868,
+              "time": 48.8328652,
+              "runs": 5
+            }
+          }
+        },
+        "oxc-minify": {
+          "minifierPath": "oxc-minify.ts",
+          "version": "0.141.0",
+          "configHash": "6d06706e9d",
+          "result": {
+            "data": {
+              "minifiedBytes": 1001944,
+              "minzippedBytes": 323071,
+              "time": 105.8663698,
+              "runs": 5
+            }
+          }
+        },
+        "terser": {
+          "minifierPath": "terser.ts",
+          "version": "5.49.0",
+          "configHash": "32a6c74a58",
+          "result": {
+            "data": {
+              "minifiedBytes": 998445,
+              "minzippedBytes": 321556,
+              "time": 3048.8820426,
+              "runs": 5
+            }
+          }
+        },
+        "terser (no compress)": {
+          "minifierPath": "terser.ts",
+          "version": "5.49.0",
+          "configHash": "32a6c74a58",
+          "result": {
+            "data": {
+              "minifiedBytes": 1069227,
+              "minzippedBytes": 330348,
+              "time": 1431.0441085999998,
+              "runs": 5
+            }
+          }
+        },
+        "uglify-js": {
+          "minifierPath": "uglify-js.ts",
+          "version": "3.19.3",
+          "configHash": "e8b5952820",
+          "result": {
+            "data": {
+              "minifiedBytes": 979099,
+              "minzippedBytes": 326944,
+              "time": 6260.9110778,
+              "runs": 5
+            }
+          }
+        },
+        "uglify-js (no compress)": {
+          "minifierPath": "uglify-js.ts",
+          "version": "3.19.3",
+          "configHash": "e8b5952820",
+          "result": {
+            "data": {
+              "minifiedBytes": 1068386,
+              "minzippedBytes": 331412,
+              "time": 902.8376415999999,
+              "runs": 5
+            }
+          }
+        }
+      },
+      "nift_rank_among_successful": 11
+    },
+    "antd": {
+      "version": "4.16.1",
+      "filePath": "/dist/antd.js",
+      "size": 6672611,
+      "gzipSize": 825175,
+      "minified": {
+        "@cminify/cminify-linux-x64": {
+          "minifierPath": "cminify.ts",
+          "version": "3.0.1",
+          "configHash": "76612a7257",
+          "result": {
+            "data": {
+              "minifiedBytes": 4428662,
+              "minzippedBytes": 623370,
+              "time": 54.35763059999999,
+              "runs": 5
+            }
+          }
+        },
+        "@swc/core": {
+          "minifierPath": "swc.ts",
+          "version": "1.15.46",
+          "configHash": "3f4708371f",
+          "result": {
+            "data": {
+              "minifiedBytes": 2145391,
+              "minzippedBytes": 452471,
+              "time": 489.5422294,
+              "runs": 5
+            }
+          }
+        },
+        "@tdewolff/minify": {
+          "minifierPath": "tdewolff-minify.ts",
+          "version": "2.24.8",
+          "configHash": "b487ebf39d",
+          "result": {
+            "data": {
+              "minifiedBytes": 2292191,
+              "minzippedBytes": 471635,
+              "time": 104.34140320000002,
+              "runs": 5
+            }
+          }
+        },
+        "babel-minify": {
+          "minifierPath": "babel-minify.ts",
+          "version": "0.5.2",
+          "configHash": "b63b201604",
+          "result": {
+            "error": {
+              "message": "timeout"
+            }
+          }
+        },
+        "bun": {
+          "minifierPath": "bun.ts",
+          "version": "1.3.14",
+          "configHash": "df04df4c6c",
+          "result": {
+            "data": {
+              "minifiedBytes": 2295708,
+              "minzippedBytes": 491712,
+              "time": 118.2736894,
+              "runs": 5
+            }
+          }
+        },
+        "esbuild": {
+          "minifierPath": "esbuild.ts",
+          "version": "0.28.1",
+          "configHash": "82ce28f1f1",
+          "result": {
+            "data": {
+              "minifiedBytes": 2311586,
+              "minzippedBytes": 488405,
+              "time": 208.58962839999998,
+              "runs": 5
+            }
+          }
+        },
+        "google-closure-compiler": {
+          "minifierPath": "google-closure-compiler.ts",
+          "version": "20251216.0.0",
+          "configHash": "52d5a255dc",
+          "result": {
+            "error": {
+              "message": "\"java -XX:+IgnoreUnrecognizedVMOptions --sun-misc-unsafe-memory-access=allow -jar /tmp/minifypp-competitive-2026-08-18/minification-benchmarks/node_modules/.pnpm/google-closure-compiler-java@20251216.0.0/node_modules/google-closure-compiler-java/compiler.jar --js=/tmp/minifypp-competitive-2026-08-18/minification-benchmarks/packages/artifacts/node_modules/antd/dist/antd.no-comments.js --dependency_mode=NONE --generate_exports=false --export_local_property_definitions=false --rewrite_polyfills=false --apply_input_source_maps=false --parse_inline_source_maps=false --language_in=ECMASCRIPT_NEXT --language_out=ECMASCRIPT_NEXT --assume_function_wrapper=true --emit_use_strict=false --compilation_level=SIMPLE\\n\\nProcess spawn error. Is java in the path?\\nspawn java ENOENT\\n\\n\"",
+              "stage": "minification"
+            }
+          }
+        },
+        "nift": {
+          "minifierPath": "nift.ts",
+          "version": "4.0.2",
+          "configHash": "cf379e24dd",
+          "result": {
+            "data": {
+              "minifiedBytes": 4528605,
+              "minzippedBytes": 633969,
+              "time": 2109.909599,
+              "runs": 5
+            }
+          }
+        },
+        "oxc-minify": {
+          "minifierPath": "oxc-minify.ts",
+          "version": "0.141.0",
+          "configHash": "6d06706e9d",
+          "result": {
+            "data": {
+              "minifiedBytes": 2121515,
+              "minzippedBytes": 451562,
+              "time": 162.0760248,
+              "runs": 5
+            }
+          }
+        },
+        "terser": {
+          "minifierPath": "terser.ts",
+          "version": "5.49.0",
+          "configHash": "32a6c74a58",
+          "result": {
+            "data": {
+              "minifiedBytes": 2244767,
+              "minzippedBytes": 457351,
+              "time": 3389.0577963999995,
+              "runs": 5
+            }
+          }
+        },
+        "terser (no compress)": {
+          "minifierPath": "terser.ts",
+          "version": "5.49.0",
+          "configHash": "32a6c74a58",
+          "result": {
+            "data": {
+              "minifiedBytes": 2420814,
+              "minzippedBytes": 474973,
+              "time": 1527.6890736,
+              "runs": 5
+            }
+          }
+        },
+        "uglify-js": {
+          "minifierPath": "uglify-js.ts",
+          "version": "3.19.3",
+          "configHash": "e8b5952820",
+          "result": {
+            "data": {
+              "minifiedBytes": 2195814,
+              "minzippedBytes": 452625,
+              "time": 5829.179109000001,
+              "runs": 5
+            }
+          }
+        },
+        "uglify-js (no compress)": {
+          "minifierPath": "uglify-js.ts",
+          "version": "3.19.3",
+          "configHash": "e8b5952820",
+          "result": {
+            "data": {
+              "minifiedBytes": 2420587,
+              "minzippedBytes": 478572,
+              "time": 1353.2513526000002,
+              "runs": 5
+            }
+          }
+        }
+      },
+      "nift_rank_among_successful": 11
+    },
+    "typescript": {
+      "version": "4.9.5",
+      "filePath": "/lib/typescript.js",
+      "size": 10945727,
+      "gzipSize": 1884998,
+      "minified": {
+        "@cminify/cminify-linux-x64": {
+          "minifierPath": "cminify.ts",
+          "version": "3.0.1",
+          "configHash": "76612a7257",
+          "result": {
+            "data": {
+              "minifiedBytes": 5853398,
+              "minzippedBytes": 1128072,
+              "time": 88.1048352,
+              "runs": 5
+            }
+          }
+        },
+        "@swc/core": {
+          "minifierPath": "swc.ts",
+          "version": "1.15.46",
+          "configHash": "3f4708371f",
+          "result": {
+            "data": {
+              "minifiedBytes": 3307669,
+              "minzippedBytes": 859055,
+              "time": 1045.6885384000002,
+              "runs": 5
+            }
+          }
+        },
+        "@tdewolff/minify": {
+          "minifierPath": "tdewolff-minify.ts",
+          "version": "2.24.8",
+          "configHash": "b487ebf39d",
+          "result": {
+            "data": {
+              "minifiedBytes": 3348076,
+              "minzippedBytes": 875768,
+              "time": 195.9074296,
+              "runs": 5
+            }
+          }
+        },
+        "babel-minify": {
+          "minifierPath": "babel-minify.ts",
+          "version": "0.5.2",
+          "configHash": "b63b201604",
+          "result": {
+            "error": {
+              "message": "timeout"
+            }
+          }
+        },
+        "bun": {
+          "minifierPath": "bun.ts",
+          "version": "1.3.14",
+          "configHash": "df04df4c6c",
+          "result": {
+            "data": {
+              "minifiedBytes": 3537725,
+              "minzippedBytes": 923276,
+              "time": 203.407563,
+              "runs": 5
+            }
+          }
+        },
+        "esbuild": {
+          "minifierPath": "esbuild.ts",
+          "version": "0.28.1",
+          "configHash": "82ce28f1f1",
+          "result": {
+            "data": {
+              "minifiedBytes": 3489456,
+              "minzippedBytes": 915541,
+              "time": 344.13631139999995,
+              "runs": 5
+            }
+          }
+        },
+        "google-closure-compiler": {
+          "minifierPath": "google-closure-compiler.ts",
+          "version": "20251216.0.0",
+          "configHash": "52d5a255dc",
+          "result": {
+            "error": {
+              "message": "\"java -XX:+IgnoreUnrecognizedVMOptions --sun-misc-unsafe-memory-access=allow -jar /tmp/minifypp-competitive-2026-08-18/minification-benchmarks/node_modules/.pnpm/google-closure-compiler-java@20251216.0.0/node_modules/google-closure-compiler-java/compiler.jar --js=/tmp/minifypp-competitive-2026-08-18/minification-benchmarks/packages/artifacts/node_modules/typescript/lib/typescript.no-comments.js --dependency_mode=NONE --generate_exports=false --export_local_property_definitions=false --rewrite_polyfills=false --apply_input_source_maps=false --parse_inline_source_maps=false --language_in=ECMASCRIPT_NEXT --language_out=ECMASCRIPT_NEXT --assume_function_wrapper=true --emit_use_strict=false --compilation_level=SIMPLE\\n\\nProcess spawn error. Is java in the path?\\nspawn java ENOENT\\n\\n\"",
+              "stage": "minification"
+            }
+          }
+        },
+        "nift": {
+          "minifierPath": "nift.ts",
+          "version": "4.0.2",
+          "configHash": "cf379e24dd",
+          "result": {
+            "data": {
+              "minifiedBytes": 6046895,
+              "minzippedBytes": 1150480,
+              "time": 2368.082544,
+              "runs": 5
+            }
+          }
+        },
+        "oxc-minify": {
+          "minifierPath": "oxc-minify.ts",
+          "version": "0.141.0",
+          "configHash": "6d06706e9d",
+          "result": {
+            "data": {
+              "minifiedBytes": 3330575,
+              "minzippedBytes": 852779,
+              "time": 326.7171714,
+              "runs": 5
+            }
+          }
+        },
+        "terser": {
+          "minifierPath": "terser.ts",
+          "version": "5.49.0",
+          "configHash": "32a6c74a58",
+          "result": {
+            "data": {
+              "minifiedBytes": 3344841,
+              "minzippedBytes": 853479,
+              "time": 7291.6900358,
+              "runs": 5
+            }
+          }
+        },
+        "terser (no compress)": {
+          "minifierPath": "terser.ts",
+          "version": "5.49.0",
+          "configHash": "32a6c74a58",
+          "result": {
+            "data": {
+              "minifiedBytes": 3525593,
+              "minzippedBytes": 878642,
+              "time": 2643.1853628,
+              "runs": 5
+            }
+          }
+        },
+        "uglify-js": {
+          "minifierPath": "uglify-js.ts",
+          "version": "3.19.3",
+          "configHash": "e8b5952820",
+          "result": {
+            "error": {
+              "message": "timeout"
+            }
+          }
+        },
+        "uglify-js (no compress)": {
+          "minifierPath": "uglify-js.ts",
+          "version": "3.19.3",
+          "configHash": "e8b5952820",
+          "result": {
+            "data": {
+              "minifiedBytes": 3538024,
+              "minzippedBytes": 876535,
+              "time": 2151.0578864000004,
+              "runs": 5
+            }
+          }
+        }
+      },
+      "nift_rank_among_successful": 10
+    }
+  }
+}

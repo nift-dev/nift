@@ -1,0 +1,4 @@
+fixture,tool,input_bytes,output_bytes,median_ms,iterations
+bootstrap-4.css,minifypp,200078,165836,11.224,15
+animate.css,minifypp,95374,77454,9.048,15
+tailwind.css,minifypp,2380419,1973801,63.137,15

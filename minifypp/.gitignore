@@ -1,0 +1,20 @@
+# Native build products
+*.o
+*.obj
+*.d
+*.exe
+*.pdb
+/.build/
+/minify
+
+# Node semantic-test oracles (installed transiently by CI/release.yml)
+node_modules/
+/.deps/
+
+# Local diagnostics
+*.log
+*.tmp
+*.swp
+*~
+.DS_Store
+Thumbs.db

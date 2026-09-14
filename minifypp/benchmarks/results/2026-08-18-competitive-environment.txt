@@ -1,0 +1,27 @@
+benchmark_date=2026-08-18
+host=nick-NUC12SNKi72
+cpu=12th Gen Intel(R) Core(TM) i7-12700H
+logical_cpus=20
+os=Linux 7.0.0-29-generic x86_64
+compiler=g++ 15.2.0
+cxxflags=-std=c++17 -O2 -Wall -Wextra -pedantic
+minifypp_version=1.1.0
+minifypp_commit=9b56d9b
+nift_version=4.0.2
+nift_commit=aa60ab3
+esbuild_css_version=0.28.2
+lightningcss_cli_package_version=1.33.0
+lightningcss_reported_version=lightningcss 1.0.0-alpha.72
+css_fixture_repository=https://github.com/GoalSmashers/css-minification-benchmark
+css_fixture_commit=d6c72992f42ec81f2a9d70e93a701f61ea7484b7
+css_warmups=5
+css_iterations=45
+js_benchmark_repository=https://github.com/privatenumber/minification-benchmarks
+js_benchmark_commit=fe89864fdf0e9e8f178d5cfa704f4b032986aade
+node_version=24.14.1
+pnpm_version=10.17.0
+js_runs=5
+js_timeout_ms=10000
+js_artifacts=12
+js_jshrink=not_run_php_and_composer_unavailable
+js_closure=failed_java_unavailable

@@ -27,12 +27,15 @@ run_case(){
 run_case regex_division "const s='https://x'; console.log(/https?:\\/\\//.test(s), 12 / 3 / 2);"
 run_case asi $'function f(){return\n{x:1}}; console.log(String(f()));'
 run_case empty_while "let x=0; while(x++<1); console.log(x);"
+run_case empty_else "let x=0;if(true)x=1;else;console.log(x);"
+run_case annex_b_empty_else "if(false)function f(){}else;console.log(typeof f);"
 run_case unicode "const π=3,café=2; console.log(π+café);"
 run_case number_member "console.log(1 .toString(), 1e3 .toString());"
 run_case templates 'const x=2; console.log(`a ${x > 1 ? `b ${x}` : "c"}`);'
 run_case class_fields 'class A{#x=2;static y=3;get z(){return this.#x}} console.log(new A().z+A.y);'
 run_case optional 'const x={a:{b:2}}; console.log(x?.a?.b ?? 0);'
 run_case bigint 'console.log(String(12n+1n));'
+run_case boolean_members 'console.log(true.toString(),false["valueOf"](),new Boolean(true));'
 run_case control_regex "let x=true,s='https://x'; if(x) /https?:\\/\\//.test(s) && console.log('yes');"
 run_case regex_after_block "let s='https://x'; if(false){} /https?:\\/\\//.test(s)&&console.log('yes');"
 run_case regex_after_function "let s='https://x'; function f(){} /https?:\\/\\//.test(s)&&console.log('yes');"
@@ -46,5 +49,7 @@ run_case class_expression_division "const x=class {static valueOf(){return 12}} 
 run_case named_class_expression_division "const x=class X {static valueOf(){return 12}} / 2; console.log(Number.isNaN(x));"
 run_case function_expression_division "const x=function(){} / 2; console.log(Number.isNaN(x));"
 run_case async_function_expression_division "const x=async function(){} / 2; console.log(Number.isNaN(x));"
+run_case async_function_expression_asi $'const f=async function(){return 1}\nf().then(console.log);'
+run_case nested_default_function_asi $'const f=async function(x=(function(){return 1})()){return x}\nf().then(console.log);'
 run_case catch_without_binding_regex "try{}catch{} /https?:\\/\\//.test('https://x')&&console.log('yes');"
 echo "JavaScript minifier Node semantic differential test passed"

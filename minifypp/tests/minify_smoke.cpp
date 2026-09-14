@@ -130,13 +130,54 @@ int main() {
     expect(out.find("<!--[if IE]>") != std::string::npos, "conditional comment removed");
 
     expect(minify::javascript("const  x = 1; // comment\nconst y = x + 2;\n", out, err), err);
+    eq(out, "const x=1;const y=x+2", "JavaScript delimited newline removal");
     expect(out.find("// comment") == std::string::npos, "JS line comment retained");
-    expect(out.find('\n') != std::string::npos, "JS newline removed");
     expect(minify::javascript("const r = /https?:\\/\\/example\\.com/; /*x*/\nconst t=` a  b `;", out, err), err);
     expect(out.find("/https?:\\/\\/example\\.com/") != std::string::npos, "JS regex damaged");
     expect(out.find("` a  b `") != std::string::npos, "JS template damaged");
     expect(minify::javascript("return\n  value;", out, err), err);
+    eq(out, "return\nvalue", "JavaScript restricted-production newline preservation");
     expect(out.find("return\n") != std::string::npos, "ASI-sensitive newline removed");
+    expect(minify::javascript("a\n(b);a\n[b];a\n/regex/.test(b);", out, err), err);
+    expect(out.find("a\n(b)") != std::string::npos &&
+           out.find("a\n[b]") != std::string::npos &&
+           out.find("a\n/regex/") != std::string::npos,
+           "JavaScript expression-continuation newlines stripped");
+    expect(minify::javascript("if(a){\nwork();\n}\nnext();", out, err), err);
+    eq(out, "if(a){work()}\nnext()", "JavaScript closing-brace newline preservation");
+    expect(minify::javascript("function f(){return call();}const x=1;", out, err), err);
+    eq(out, "function f(){return call()}const x=1", "JavaScript redundant semicolon removal");
+    expect(minify::javascript("function f(){while(test);label:;}for(;;);", out, err), err);
+    eq(out, "function f(){while(test);label:;}for(;;);",
+       "JavaScript meaningful empty statements preserved");
+    expect(minify::javascript("if(test)function f(){}else;", out, err), err);
+    eq(out, "if(test)function f(){}else;",
+       "JavaScript Annex B empty else statement preserved");
+    expect(minify::javascript("const a=true,b=false;return true;", out, err), err);
+    eq(out, "const a=!0,b=!1;return!0", "JavaScript boolean literal shortening");
+    expect(minify::javascript("const x={true:1,false(){return false}};x.true;", out, err), err);
+    eq(out, "const x={true:1,false(){return!1}};x.true",
+       "JavaScript boolean property names preserved");
+    expect(minify::javascript("true.toString();false['valueOf']();new true;", out, err), err);
+    eq(out, "true.toString();false['valueOf']();new true",
+       "JavaScript boolean precedence boundaries preserved");
+    expect(minify::javascript("const a=0xeac7,b=0b111111,c=0o17,d=0xffffffffffffffffn;", out, err), err);
+    eq(out, "const a=60103,b=63,c=15,d=0xffffffffffffffffn",
+       "JavaScript radix integer shortening");
+    expect(minify::javascript("const a=\"don't stop\",b='say \\\'hi\\\'';", out, err), err);
+    eq(out, "const a=\"don't stop\",b=\"say 'hi'\"",
+       "JavaScript string quote selection");
+    expect(minify::javascript("const a='\\n\\x41\\u0042\\\\';", out, err), err);
+    eq(out, "const a='\\n\\x41\\u0042\\\\'",
+       "JavaScript non-quote escapes preserved");
+    expect(minify::javascript(
+        "function total(longLeft,longRight){return longLeft+longRight;}", out, err), err);
+    eq(out, "function total(longLeft,longRight){return longLeft+longRight}",
+       "JavaScript conservative mode preserves parameter names");
+    expect(minify::javascript(
+        "function keep(longName){return {longName,value:longName}.longName;}", out, err), err);
+    eq(out, "function keep(longName){return{longName,value:longName}.longName}",
+       "JavaScript shorthand blocks parameter mangling");
     expect(minify::javascript("const x = value / *ptr; const y = left * /re/.test(s);", out, err), err);
     expect(out.find("/ *") != std::string::npos,
            "JS whitespace removal created a block-comment opener");
@@ -202,23 +243,23 @@ int main() {
     expect(minify::javascript("''/*\u2028*/''", out, err), err);
     eq(out, "''\n''", "JavaScript Unicode line separator comment ASI");
     expect(minify::javascript("const x=`foo ${`bar ${5} baz`} qux`;", out, err), err);
-    eq(out, "const x=`foo ${`bar ${5} baz`} qux`;", "JavaScript nested template raw text");
+    eq(out, "const x=`foo ${`bar ${5} baz`} qux`", "JavaScript nested template raw text");
     expect(minify::javascript("const x=/a/ instanceof RegExp;", out, err), err);
-    eq(out, "const x=/a/ instanceof RegExp;", "JavaScript regex keyword boundary");
+    eq(out, "const x=/a/ instanceof RegExp", "JavaScript regex keyword boundary");
     // Template-literal expressions must lex regular-expression literals so a
     // backtick, brace or `//`-lookalike inside a regex cannot corrupt template
     // or expression frame state. These were valid programs that Minify++
     // rejected as unterminated templates.
     expect(minify::javascript("const x=`a${/[`]/.test(s)}b`;", out, err), err);
-    eq(out, "const x=`a${/[`]/.test(s)}b`;", "JavaScript template regex backtick class");
+    eq(out, "const x=`a${/[`]/.test(s)}b`", "JavaScript template regex backtick class");
     expect(minify::javascript("const x=`a${/[{}\\/]/.test(s)}b`;", out, err), err);
-    eq(out, "const x=`a${/[{}\\/]/.test(s)}b`;", "JavaScript template regex brace/escape class");
+    eq(out, "const x=`a${/[{}\\/]/.test(s)}b`", "JavaScript template regex brace/escape class");
     expect(minify::javascript("const x=`a${s.replace(/\\//g, \"\")}b`;", out, err), err);
-    eq(out, "const x=`a${s.replace(/\\//g, \"\")}b`;", "JavaScript template regex escaped slash");
+    eq(out, "const x=`a${s.replace(/\\//g, \"\")}b`", "JavaScript template regex escaped slash");
     expect(minify::javascript("const x=`a${1+/a{2}/.test(s)}b`;", out, err), err);
-    eq(out, "const x=`a${1+/a{2}/.test(s)}b`;", "JavaScript template regex after operator");
+    eq(out, "const x=`a${1+/a{2}/.test(s)}b`", "JavaScript template regex after operator");
     expect(minify::javascript("const x=`a${`b${c}`}d`;", out, err), err);
-    eq(out, "const x=`a${`b${c}`}d`;", "JavaScript template nested template expression");
+    eq(out, "const x=`a${`b${c}`}d`", "JavaScript template nested template expression");
     // The same template/regular-expression lexing applies inside JSX
     // expression braces, where a backtick inside a regex character class used
     // to close the quoted-region scan early and corrupt the brace balance.
@@ -397,7 +438,7 @@ int main() {
     expect(minify::javascript("const s = 1 .toString();", out, err), err);
     expect(out.find("1 .toString") != std::string::npos, "numeric literal/member boundary collapsed");
     expect(minify::javascript("const s = 0x1 .toString();", out, err), err);
-    expect(out.find("0x1 .toString") != std::string::npos, "hex numeric/member boundary collapsed");
+    expect(out.find("1 .toString") != std::string::npos, "hex numeric/member boundary collapsed");
     expect(minify::javascript("const s = 1e3 .toString();", out, err), err);
     expect(out.find("1e3 .toString") != std::string::npos, "exponent numeric/member boundary collapsed");
     expect(minify::javascript("const y = x / /a/.test(s);", out, err), err);
@@ -466,6 +507,28 @@ int main() {
     eq(out, "a{", "CSS short EOF comment recovery");
     expect(!minify::javascript("/*", out, err), "unterminated JS comment accepted");
 
+    // The separator oracle must prevent adjacent source tokens from being
+    // reinterpreted as identifiers, comments, update operators or members.
+    expect(minify::javascript("a + +b; c - -d; 1 .toString(); /x/g instanceof RegExp;", out, err), err);
+    expect(out.find("a+ +b") != std::string::npos, "plus tokens merged");
+    expect(out.find("c - -d") != std::string::npos, "minus tokens merged");
+    expect(out.find("1 .toString") != std::string::npos, "numeric member boundary merged");
+    expect(out.find("/x/g instanceof") != std::string::npos, "regex flag boundary merged");
+
+    expect(minify::javascript("function f(){return\nvalue}\na\n++b\nasync\nx=>x", out, err), err);
+    expect(out.find("return\nvalue") != std::string::npos, "return line terminator removed");
+    expect(out.find("a\n++b") != std::string::npos, "postfix line terminator removed");
+    expect(out.find("async\nx=>x") != std::string::npos, "async arrow boundary removed");
+
+    expect(minify::javascript("while(condition);", out, err), err);
+    eq(out, "while(condition);", "while empty statement removed");
+    expect(minify::javascript("for(;;);", out, err), err);
+    eq(out, "for(;;);", "for empty statement removed");
+    expect(minify::javascript("label:;", out, err), err);
+    eq(out, "label:;", "label empty statement removed");
+    expect(minify::javascript("do;while(condition);", out, err), err);
+    eq(out, "do;while(condition);", "do/while empty statement removed");
+
     // Idempotence: a second minification pass must be byte-identical.
     auto idem = [&](minify::Format fmt, const std::string& src, const char* label) {
         std::string a,b,e;
@@ -497,7 +560,9 @@ int main() {
             std::exit(1);
         }
     };
-    idem_fn(minify::jsx, "const x=<div> hello  world </div>;", "JSX");
+    idem_fn([](const std::string& source, std::string& result, std::string& message) {
+        return minify::jsx(source, result, message);
+    }, "const x=<div> hello  world </div>;", "JSX");
 
 
     // JSX: preserve text/markup spelling, but minify embedded JS expressions and
@@ -506,6 +571,9 @@ int main() {
     expect(out.find("const el=") != std::string::npos, "JS around JSX was not minified");
     expect(out.find(" hello  world ") != std::string::npos, "JSX text whitespace changed");
     expect(out.find("{value+1}") != std::string::npos, "JSX expression was not minified");
+    expect(minify::jsx("const x = <div>{ true ? 0xff : 'value' }</div>;", out, err), err);
+    eq(out, "const x=<div>{true?0xff:'value'}</div>;",
+       "JSX preserves non-trivia JavaScript tokens");
     expect(minify::jsx("const x=<><span>A</span><span>{ b + 1 }</span></>;", out, err), err);
     expect(out.find("{b+1}") != std::string::npos, "fragment JSX expression damaged");
     expect(!minify::jsx("const x=<div>{a+1</div>;", out, err), "unterminated JSX expression accepted");
@@ -593,6 +661,11 @@ int main() {
     idem(minify::Format::Xml, "<root>\\n <a> text  here </a>\\n</root>", "XML");
     idem(minify::Format::Svg, "<svg>\\n<text>a  b</text>\\n</svg>", "SVG");
     idem(minify::Format::Jsx, "const x = <div>{ value + 1 }</div>;", "JSX");
+    expect(minify::jsx(
+        "cost x=<Comp<Map<string,numbZr>> value={a?.b ?? /[<>]//.est(s)} />.est(s)} />",
+        out, err), err);
+    std::string recovered;
+    expect(minify::jsx(out, recovered, err), "JSX regex/division recovery: " + err);
 
     minify::Format f;
     expect(minify::format_for_extension(".html", f) && f == minify::Format::Html, "html extension");
@@ -602,6 +675,326 @@ int main() {
     expect(minify::format_for_extension(".svg", f) && f == minify::Format::Svg, "svg extension");
     expect(!minify::format_for_extension(".ts", f), "TypeScript source extension unexpectedly supported");
     expect(!minify::format_for_extension(".tsx", f), "TSX source extension unexpectedly supported");
+
+    const std::string policy_source =
+        "const value = {number: 0xff, text: 'x', match: /x+/giu, "
+        "template: `raw ${value + `${/}/.test(text) ? {x: 1}.x : 0}`}`};";
+    std::string conservative, structured, aggressive;
+    expect(minify::javascript(policy_source, conservative, err,
+                              {minify::OptimizationLevel::Conservative}), err);
+    expect(minify::javascript(policy_source, structured, err,
+                              {minify::OptimizationLevel::Structured}), err);
+    expect(minify::javascript(policy_source, aggressive, err,
+                              {minify::OptimizationLevel::Aggressive}), err);
+    eq(structured, conservative, "inactive structured policy changed output");
+    eq(aggressive, conservative, "inactive aggressive policy changed output");
+
+    const std::string jsx_policy_source =
+        "const  view = <Panel value={ left +  right }>"
+        "  exact  text <Child>{/*gone*/ nested + 1}</Child></Panel>;";
+    expect(minify::jsx(jsx_policy_source, conservative, err,
+                       {minify::OptimizationLevel::Conservative}), err);
+    expect(minify::jsx(jsx_policy_source, structured, err,
+                       {minify::OptimizationLevel::Structured}), err);
+    expect(minify::jsx(jsx_policy_source, aggressive, err,
+                       {minify::OptimizationLevel::Aggressive}), err);
+    eq(structured, conservative, "inactive structured JSX policy changed output");
+    eq(aggressive, conservative, "inactive aggressive JSX policy changed output");
+    expect(conservative.find("  exact  text ") != std::string::npos,
+           "JSX child text changed across policy regions");
+    expect(conservative.find("value={left+right}") != std::string::npos &&
+           conservative.find("{nested+1}") != std::string::npos,
+           "JSX JavaScript regions were not conservatively minified");
+
+    expect(minify::javascript("function total(longLeft,longRight){return longLeft+longRight;}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function total($,_){return $+_}","structured simple parameter renaming");
+    expect(minify::javascript("function total(longValue){const doubledValue=longValue*2;return doubledValue;}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function total($){const _=$*2;return _}","structured local binding renaming");
+    expect(minify::javascript("function total(longValue=1,otherValue=2){let firstValue=longValue,secondValue=otherValue;return firstValue+secondValue;}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function total($=1,_=2){let a=$,b=_;return a+b}","structured simple default and comma binding discovery");
+    expect(minify::javascript("function total(){var repeatedValue=1;var repeatedValue;return repeatedValue;}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function total(){var $=1;var $;return $}","structured merged var declaration identity");
+    expect(minify::javascript("function keep(longName){return {longName};}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function keep($){return{longName:$}}","structured shorthand-aware printing");
+    expect(minify::javascript("function keep(longName){return {...longName};}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function keep($){return{...$}}","structured object spread reference renaming");
+    expect(minify::javascript("const total=(longValue)=>{const doubledValue=longValue*2;return doubledValue;};",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"const total=$=>{const _=$*2;return _}","structured block arrow scope safety");
+    expect(minify::javascript("const total=(longValue)=>longValue*2;",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"const total=$=>$*2","structured concise arrow parameter renaming");
+    expect(minify::javascript("const total=longValue=>({longValue,externalValue});",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"const total=$=>({longValue:$,externalValue})","structured concise arrow shorthand preservation");
+    expect(minify::javascript("const total=longValue=>()=>longValue;",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"const total=$=>()=>$","structured concise arrow capture mangling");
+    expect(minify::javascript("function choose(async){return async?left:right}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function choose($){return $?left:right}","structured contextual async reference mangling");
+    expect(minify::javascript("const box={method(longParameter){const localValue=longParameter;return localValue}}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"const box={method($){const _=$;return _}}","structured object method scope mangling");
+    expect(minify::javascript("class Box{method(longParameter){return longParameter}}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"class Box{method($){return $}}","structured class method scope mangling");
+    expect(minify::javascript("const box={async load(longName){return longName},*walk(otherName){yield otherName},set value(nextValue){this._value=nextValue}}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"const box={async load($){return $},*walk($){yield $},set value($){this._value=$}}","structured async generator and setter method mangling");
+    expect(minify::javascript("function nested({firstName:nestedName,deep:{secondName},...remainingValues},[arrayValue]){return nestedName+secondName+remainingValues.length+arrayValue}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function nested({firstName:$,deep:{secondName:_},...a},[b]){return $+_+a.length+b}","structured recursive destructuring parameter mangling");
+    expect(minify::javascript("function declarations(source){const {longProperty:localValue,nested:{deepValue},...restValues}=source;return localValue+deepValue+restValues.count}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function declarations($){const{longProperty:_,nested:{deepValue:a},...b}=$;return _+a+b.count}","structured recursive destructuring declaration mangling");
+    expect(minify::javascript("function entries(items){for(const [longKey,longValue] of items){use(longKey,longValue)}}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function entries($){for(const[_,a]of $){use(_,a)}}","structured for-of destructuring binding mangling");
+    expect(minify::javascript("function keys(object){for(const {longKey} in object){use(longKey)}}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function keys($){for(const{longKey:_}in $){use(_)}}","structured for-in destructuring binding mangling");
+    expect(minify::javascript("function loops(items){for(let longIndex=0;longIndex<items.length;longIndex++){use(longIndex)}let longIndex=3;return longIndex}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function loops($){for(let longIndex=0;longIndex<$.length;longIndex++){use(longIndex)}let longIndex=3;return longIndex}","structured shadowed for-head fallback");
+    expect(minify::javascript("function caught(){try{work()}catch({message:longMessage,code:{valueCode}}){return longMessage+valueCode}}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function caught(){try{work()}catch({message:$,code:{valueCode:_}}){return $+_}}","structured recursive catch binding mangling");
+    expect(minify::javascript("function outer(){function longHelper(longValue){return longValue}use(longHelper(1));return 2}",aggressive,err,{minify::OptimizationLevel::Aggressive}),err);
+    eq(aggressive,"function outer(){function $($){return $}use($(1));return 2}","aggressive local function binding mangling");
+    expect(minify::javascript("function outer(){const factorial=function longFactorial(value){return value?value*longFactorial(value-1):1};return factorial(4)}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function outer(){const $=function _($){return $?$*_($-1):1};return $(4)}","structured named function expression mangling");
+    expect(minify::javascript("function make(){class LongClass{method(longValue){return longValue}static{var staticValue=1;use(staticValue)}}return new LongClass}",aggressive,err,{minify::OptimizationLevel::Aggressive}),err);
+    eq(aggressive,"function make(){class ${method($){return $}static{var $=1;use($)}}return new $}","aggressive class binding with method and static-block mangling");
+    expect(minify::javascript("function make(){class RecursiveClass{method(){return RecursiveClass}}return RecursiveClass}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function make(){class RecursiveClass{method(){return RecursiveClass}}return RecursiveClass}","structured self-referential class fallback");
+    expect(minify::javascript("function outer(longValue){class Box{method(otherValue){return otherValue}}return longValue}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function outer($){class _{method($){return $}}return $}","structured class subtree does not block unrelated outer binding");
+    expect(minify::javascript("function outer(longValue){class Box{field=longValue;method(otherValue){return otherValue}}return longValue}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function outer(longValue){class ${field=longValue;method($){return $}}return longValue}","structured opaque class reference blocks only affected outer binding");
+    expect(minify::javascript("function keep(mangle_options){return {mangle_options(){return 1},value:mangle_options}}",aggressive,err,{minify::OptimizationLevel::Aggressive}),err);
+    eq(aggressive,"function keep($){return{mangle_options(){return 1},value:$}}","method key excluded from binding mangling");
+    expect(minify::javascript("function total(...longValues){return longValues.length;}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function total(...$){return $.length}","structured rest parameter binding");
+    expect(minify::javascript("function total({longValue}){return longValue+longValue;}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function total({longValue:$}){return $+$}","structured object destructuring parameter");
+    expect(minify::javascript("function total([longValue]){return longValue+longValue;}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function total([$]){return $+$}","structured array destructuring parameter");
+    expect(minify::javascript("function total({longValue}){return function(){return longValue+longValue}}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function total({longValue:$}){return function(){return $+$}}","structured captured destructuring parameter");
+    expect(minify::javascript("function blocks(flag){if(flag){let firstValue=1;use(firstValue)}else{let secondValue=2;use(secondValue)}}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function blocks($){if($){let _=1;use(_)}else{let _=2;use(_)}}","structured disjoint lexical name reuse");
+    expect(minify::javascript("function siblings(){function first(longValue){return longValue}function second(otherValue){return otherValue}return first(1)+second(2)}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function siblings(){function $($){return $}function _($){return $}return $(1)+_(2)}","structured sibling function mangling and local name reuse");
+    expect(minify::javascript("function sequential(){var firstValue=1;use(firstValue);var secondValue=2;use(secondValue)}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function sequential(){var $=1;use($);var $=2;use($)}","structured straight-line var live-range reuse");
+    expect(minify::javascript("function keep(longName){return {value:call(0,longName,2)};}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function keep($){return{value:call(0,$,2)}}","structured call argument is not shorthand");
+    expect(minify::javascript("function keep(longName){return eval('longName');}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function keep(longName){return eval('longName')}","structured dynamic lookup exclusion");
+    expect(minify::javascript("function keep(longName){return (eval)('longName');}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function keep(longName){return(eval)('longName')}","structured parenthesized direct eval exclusion");
+    expect(minify::javascript("function keep(longName){const localValue=1;return arguments[0]+localValue}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function keep(longName){const $=1;return arguments[0]+$}","structured arguments preserves parameters but permits independent locals");
+    expect(minify::javascript("function keep(longName){return function(){return eval('longName')}}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function keep(longName){return function(){return eval('longName')}}","structured descendant dynamic lookup barrier");
+    expect(minify::javascript("function outer(longValue){return function(innerValue){return function(deepValue){return longValue+innerValue+deepValue}}}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function outer($){return function(_){return function(a){return $+_+a}}}","structured transitive captured binding allocation");
+    expect(minify::javascript("function outer(longValue){const callback=(innerValue)=>{return longValue+innerValue};return callback}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function outer($){const _=a=>{return $+a};return _}","structured coordinated block-arrow mangling");
+    std::string original_signature, renamed_signature;
+    expect(minify::javascript_binding_signature("function total(longValue){return longValue+externalValue}",original_signature,err),err);
+    expect(minify::javascript_binding_signature("function total($){return $+externalValue}",renamed_signature,err),err);
+    eq(renamed_signature,original_signature,"binding signature accepts consistent alpha renaming");
+    expect(minify::javascript_binding_signature("function total($){return otherValue+externalValue}",renamed_signature,err),err);
+    expect(renamed_signature != original_signature,"binding signature rejected inconsistent alpha renaming");
+    expect(minify::javascript_binding_signature("function outer(){function longHelper(value){return longHelper(value-1)}return longHelper(2)}",original_signature,err),err);
+    expect(minify::javascript_binding_signature("function outer(){function $(value){return $(value-1)}return $(2)}",renamed_signature,err),err);
+    eq(renamed_signature,original_signature,"named function declaration binding topology");
+    expect(minify::javascript_binding_signature("function outer(){return second(2);function first(value){return second(value)}function second(value){return value?first(value-1):0}}",original_signature,err),err);
+    expect(minify::javascript_binding_signature("function outer(){return _(2);function $(value){return _(value)}function _(value){return value?$(value-1):0}}",renamed_signature,err),err);
+    eq(renamed_signature,original_signature,"hoisted mutually recursive function topology");
+    expect(minify::javascript_binding_signature("function outer(){function helper(){return 1}function nested(){function helper(){return 2}return helper()}return helper()+nested()}",original_signature,err),err);
+    expect(minify::javascript_binding_signature("function outer(){function $(){return 1}function nested(){function _(){return 2}return _()}return $()+nested()}",renamed_signature,err),err);
+    eq(renamed_signature,original_signature,"nested shadowed function declaration topology");
+    const std::vector<std::pair<std::string,std::string>> function_boundary_cases = {
+        {"function outer(){function helper(value=helper){return class Box{field=helper;method(){return helper(value)}}}return helper()}","function outer(){function $(value=$){return class Box{field=$;method(){return $(value)}}}return $()}"},
+        {"function outer(){function helper(){return 1}class Box{static value=helper;static{use(helper)}method(){return helper()}}return Box}","function outer(){function $(){return 1}class Box{static value=$;static{use($)}method(){return $()}}return Box}"}
+    };
+    for (const auto& item : function_boundary_cases) {
+        expect(minify::javascript_binding_signature(item.first,original_signature,err),err);
+        expect(minify::javascript_binding_signature(item.second,renamed_signature,err),err);
+        eq(renamed_signature,original_signature,"named function cross-boundary topology");
+    }
+    expect(minify::javascript_binding_signature("function outer(){function helper(){return 1}return {publicHelper:helper,method:helper}.publicHelper}",original_signature,err),err);
+    expect(minify::javascript_binding_signature("function outer(){function $(){return 1}return {publicHelper:$,method:$}.publicHelper}",renamed_signature,err),err);
+    eq(renamed_signature,original_signature,"function binding names remain distinct from observable property spelling");
+    expect(minify::javascript_binding_signature("import {sourceName as localName} from 'pkg';export {localName as publicName};use(localName)",original_signature,err),err);
+    expect(minify::javascript_binding_signature("import {sourceName as $} from 'pkg';export {$ as publicName};use($)",renamed_signature,err),err);
+    eq(renamed_signature,original_signature,"module signature resolves local aliases while preserving external names");
+    expect(minify::javascript_binding_signature("import {sourceName as $} from 'pkg';export {$ as changedName};use($)",renamed_signature,err),err);
+    expect(renamed_signature != original_signature,"module signature keeps exported spelling observable");
+    expect(minify::javascript_mangle_report("function total(longValue){return longValue+externalValue}",original_signature,err),err);
+    expect(original_signature.find("bindings\t2")!=std::string::npos&&
+           original_signature.find("eligible\t1")!=std::string::npos&&
+           original_signature.find("top-level\t1")!=std::string::npos,
+           "mangle coverage report");
+    minify::Options top_level_options(minify::OptimizationLevel::Aggressive);
+    top_level_options.mangle_top_level=true;
+    expect(minify::javascript("const longValue=1;use(longValue)",aggressive,err,top_level_options),err);
+    eq(aggressive,"const $=1;use($)","explicit closed-world top-level mangling");
+    expect(minify::javascript("export const longValue=1;use(longValue)",aggressive,err,top_level_options),err);
+    eq(aggressive,"export const longValue=1;use(longValue)","top-level mangling excludes modules");
+    expect(minify::javascript_effect_signature("function total(longValue){return call(longValue)}",original_signature,err),err);
+    expect(minify::javascript_effect_signature("function total($){return call($)}",renamed_signature,err),err);
+    eq(renamed_signature,original_signature,"effect signature accepts alpha renaming");
+    expect(minify::javascript_ir_signature("function f(a){return(a+1)}",original_signature,err),err);
+    expect(minify::javascript_ir_signature("function  f ( a ) { return ( a + 1 ) }",renamed_signature,err),err);
+    eq(renamed_signature,original_signature,"IR node IDs ignore trivia spelling");
+    expect(minify::javascript_ir_signature("a=b?c+d:e*f,g",original_signature,err),err);
+    expect(original_signature.find("E")!=std::string::npos,"IR expression inventory");
+    expect(minify::javascript_ir_signature("new Box(obj.value,import('x'))",original_signature,err),err);
+    expect(original_signature.find("A")!=std::string::npos&&original_signature.find("P")!=std::string::npos&&original_signature.find("K")!=std::string::npos,"IR invocation and identifier-role inventory");
+    expect(minify::javascript_ir_signature("label:try{if(x)throw y;switch(z){case 1:break}}catch(e){}finally{}",original_signature,err),err);
+    expect(original_signature.find("S")!=std::string::npos&&original_signature.find("C")!=std::string::npos,"IR statement and lexical-scope inventory");
+    expect(minify::javascript_ir_signature("async function* f(a=call()){class C{static{}get x(){return a}}}",original_signature,err),err);
+    expect(original_signature.find("F")!=std::string::npos&&original_signature.find("I")!=std::string::npos,"IR function and initialization inventory");
+    expect(minify::javascript_ir_signature("import x from'x';export{x};function f(){eval('x')}",original_signature,err),err);
+    expect(original_signature.find("M")!=std::string::npos&&original_signature.find("B")!=std::string::npos,"IR module and dynamic-scope inventory");
+    expect(minify::javascript_binding_signature("function f(longName){longName+=external;return()=>longName}",original_signature,err),err);
+    expect(original_signature.find("J")!=std::string::npos,"IR reference-resolution inventory");
+    expect(minify::javascript("while(condition);for(;;);do;while(condition);",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"while(condition);for(;;);do;while(condition);","semantic printer preserves loop empty statements");
+    expect(minify::javascript("function f(){return\n{x:1}}\n/a/.test(x)",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function f(){return\n{x:1}}/a/.test(x)","semantic printer preserves restricted return boundary while removing declaration boundary");
+    expect(minify::javascript("if(flag){work()}\nelse{other()}\nfunction next(){return 1}\nnext()",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"if(flag){work()}else{other()}function next(){return 1}next()","structured printer removes block-boundary line terminators");
+    expect(minify::javascript("function grouped(longValue){return (longValue)}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function grouped($){return $}","structured printer removes redundant primary grouping");
+    expect(minify::javascript("function conditions(value){if(value)return (value);return (eval)('value')}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function conditions(value){if(value)return value;return(eval)('value')}","structured printer preserves grammar and direct-eval grouping");
+    expect(minify::javascript("function shorthand(errorCodes){eval('');return {errorCodes:errorCodes}}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function shorthand(errorCodes){eval('');return{errorCodes}}","structured printer restores redundant shorthand properties");
+    expect(minify::javascript("function publicKey(longValue){return {publicName:longValue}}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function publicKey($){return{publicName:$}}","structured shorthand restoration preserves public property spelling");
+    expect(minify::javascript("function mixed(longValue){const stable=external;return {stable:stable,value:longValue}}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function mixed($){const _=external;return{stable:_,value:$}}","structured binding and shorthand rewrites do not overlap");
+    expect(minify::javascript("function neighbors(i,b){return [{i:i-4},b.delete(\"this\"),b.return(1)]}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function neighbors(i,b){return[{i:i-4},b.delete(\"this\"),b.return(1)]}","printer excludes shorthand expressions and keyword-named method calls");
+    expect(minify::javascript("function outer($){return function(longName){return $+longName}(2)}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function outer($){return function(_){return $+_}(2)}","nested allocator reserves unchanged captured spelling");
+    expect(minify::javascript("const handler=log=>({get:()=>(...args)=>{const item=args[0];log.push(item)}})",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"const handler=$=>({get:()=>(..._)=>{const a=_[0];$.push(a)}})","nested-arrow chains allocate parents before children");
+    expect(minify::javascript("function words(value){return(value)+typeof(Infinity)+void(value)}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function words($){return $+typeof Infinity+void $}","parenthesis removal preserves keyword token boundaries");
+    expect(minify::javascript("const parsed=JSON.parse(text,function(key,value,{source}){return source||value})",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"const parsed=JSON.parse(text,function(a,$,{source:_}){return _||$})","later destructuring parameter preserves shorthand property spelling");
+    expect(minify::javascript("function declarations(longInput){var firstValue,obj2,locale1;obj2=longInput;return obj2}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function declarations(_){var a,$,b;$=_;return $}","ordinary comma declarations are not object shorthand patterns");
+    expect(minify::javascript("function await(){return value}function* g(){return '' in (yield);(yield)?yield:yield}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function await(){return value}function*g(){return''in(yield);(yield)?yield:yield}","contextual await and yield grouping is preserved");
+    expect(minify::javascript("var probeHeritage,setHeritage;var cls=class C extends(probeHeritage=function(){return C},setHeritage=function(){C=null}){}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"var probeHeritage,setHeritage;var cls=class C extends(probeHeritage=function(){return C},setHeritage=function(){C=null}){}","class heritage preserves outer assignment bindings");
+    expect(minify::javascript("assert.throws(TypeError,()=>{var C=class extends(async()=>{}){}})",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"assert.throws(TypeError,()=>{var C=class extends(async()=>{}){}})","async arrow prefix is not treated as a binding");
+    expect(minify::javascript("async function consume(longItems){for await(const {longValue=probe()} of longItems){use(longValue)}}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"async function consume(longItems){for await(const{longValue=probe()}of longItems){use(longValue)}}","for-await destructuring retains conservative binding barrier");
+    expect(minify::javascript("let f=()=>{import.source(obj).catch(error=>{assert.sameValue(error,'custom error')})}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"let f=()=>{import.source(obj).catch(error=>{assert.sameValue(error,'custom error')})}","dynamic import retains conservative binding barrier");
+    expect(minify::javascript("function __cont(){function __func(){return 1}if(delete __func)throw Error();return __func()}__cont()",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function __cont(){function $(){return 1}if(delete $)throw Error();return $()}__cont()","unresolved same-name occurrences block only affected function mangling");
+    expect(minify::javascript("function nested(flag){let value=1;if(flag){let value=2;use(value)}return value}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function nested($){let value=1;if($){let value=2;use(value)}return value}","same-spelling nested bindings remain conservative");
+    expect(minify::javascript("function thrower(){throw Error()}var f=({[thrower()]:x}={})=>{}",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"function thrower(){throw Error()}var f=({[thrower()]:x}={})=>{}","script-level function declaration remains externally named");
+    expect(minify::javascript("const half=0.5,tiny=0.0001,whole=10.5;",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"const half=.5,tiny=.0001,whole=10.5","JavaScript decimal fraction literal shortening");
+    expect(minify::javascript("const quotes=\"can't\";",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"const quotes=\"can't\"","JavaScript string quote normalization remains costed");
+    expect(minify::javascript("const callback=function(){}\n(callback)()",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"const callback=function(){}\n(callback)()","structured printer preserves expression-body ASI boundary");
+    expect(minify::javascript("const callback=async()=>{}\ncallback()",structured,err,{minify::OptimizationLevel::Structured}),err);
+    eq(structured,"const callback=async()=>{}\ncallback()","structured printer preserves arrow-body ASI boundary");
+    expect(minify::javascript_effect_signature("async function f(xs){for(const x of xs)await new Box(x);return x}",original_signature,err),err);
+    expect(original_signature.find("A;")!=std::string::npos&&original_signature.find("I;")!=std::string::npos&&original_signature.find("S;")!=std::string::npos&&original_signature.find("X;")!=std::string::npos,"composable effect lattice inventory");
+    expect(minify::javascript_effect_signature("0;2;0n;'x';false",original_signature,err),err);
+    expect(original_signature.find("V")!=std::string::npos&&original_signature.find("Q")!=std::string::npos,"primitive value and truthiness facts");
+    expect(minify::javascript_effect_signature("!a;a+b;a*b;a<b;a[key]",original_signature,err),err);
+    expect(original_signature.find("Z")!=std::string::npos,"abstract conversion inventory");
+    expect(minify::javascript_effect_signature("obj.x;obj[key];obj?.x;delete obj.x;#x in obj",original_signature,err),err);
+    expect(original_signature.find("Y")!=std::string::npos,"property effect inventory");
+    expect(minify::javascript_effect_signature("function local(){}local();unknown();new Box()",original_signature,err),err);
+    expect(original_signature.find("L;")!=std::string::npos&&original_signature.find("C;")!=std::string::npos&&original_signature.find("N;")!=std::string::npos,"resolved and unknown invocation inventory");
+    expect(minify::javascript_ir_signature("const x={a:1,...b},y=[...x],z=`v${x}`",original_signature,err),err);
+    expect(original_signature.find("O")!=std::string::npos&&original_signature.find("R")!=std::string::npos&&original_signature.find("G")!=std::string::npos&&original_signature.find("D")!=std::string::npos,"construction and spread inventory");
+    expect(minify::javascript_ir_signature("const {a} = source;let [b]=items;function f(c=next(),...rest){}",original_signature,err),err);
+    expect(original_signature.find("H")!=std::string::npos&&original_signature.find("I")!=std::string::npos,"destructuring and default inventory");
+    expect(minify::javascript_effect_signature("const f=function(){};class C extends base{static{x()}[key]=value}",original_signature,err),err);
+    expect(original_signature.find("A;")!=std::string::npos,"function and class allocation effects");
+    expect(minify::javascript_effect_signature("if(true)x();while(false)y();if(flag)z()",original_signature,err),err);
+    expect(original_signature.find("B2:T;")!=std::string::npos&&original_signature.find(":F;")!=std::string::npos&&original_signature.find(":?;")!=std::string::npos,"branch path facts");
+    const std::vector<std::pair<std::string,std::string>> effect_alpha_cases = {
+        {"function f(longName){return proxy[longName]}","function f($){return proxy[$]}"},
+        {"function f(longName){return object.value+longName}","function f($){return object.value+$}"},
+        {"function f(longName){return call(longName)}","function f($){return call($)}"},
+        {"function f(longName){if(longName)throw error;return longName}","function f($){if($)throw error;return $}"}
+    };
+    for (const auto& item : effect_alpha_cases) {
+        expect(minify::javascript_effect_signature(item.first,original_signature,err),err);
+        expect(minify::javascript_effect_signature(item.second,renamed_signature,err),err);
+        eq(renamed_signature,original_signature,"effect oracle alpha-equivalent trace");
+    }
+    expect(minify::javascript_cfg_signature("a();return b",original_signature,err),err);
+    expect(original_signature.find("E0;")!=std::string::npos&&original_signature.find("N")!=std::string::npos&&original_signature.find("X")!=std::string::npos,"CFG entry and exits");
+    expect(minify::javascript_cfg_signature("a&&b;c||d;e??f;g?h:i",original_signature,err),err);
+    expect(original_signature.find("1>4;")!=std::string::npos&&original_signature.find("11>14;")!=std::string::npos&&original_signature.find("16>19;")!=std::string::npos,"CFG short-circuit and conditional edges");
+    expect(minify::javascript_cfg_signature("while(x){work()}after();for(;;);done()",original_signature,err),err);
+    expect(original_signature.find("8>1;")!=std::string::npos&&original_signature.find("18>14;")!=std::string::npos,"CFG loop back edges");
+    minify::Options structured_jsx;structured_jsx.optimization=minify::OptimizationLevel::Structured;structured_jsx.structured_jsx_expressions=true;
+    expect(minify::jsx("const view=<Card value={(function total(longName){return longName})(3)} />;",structured,err,structured_jsx),err);
+    eq(structured,"const view=<Card value={(function _($){return $})(3)} />;","explicit structured JSX expression optimization");
+    expect(minify::javascript("const n=(200+30);",aggressive,err,{minify::OptimizationLevel::Aggressive}),err);
+    eq(aggressive,"const n=230","aggressive exact integer constant folding");
+    expect(minify::javascript("const a=(100%7);const b=(255&15);const c=(8|3);const d=(7^3);const e=(1<2);",aggressive,err,{minify::OptimizationLevel::Aggressive}),err);
+    eq(aggressive,"const a=2;const b=15;const c=11;const d=4;const e=(!0)","aggressive exact integer operator folding");
+    expect(minify::javascript("const a=(100/4);const b=(100/3);",aggressive,err,{minify::OptimizationLevel::Aggressive}),err);
+    eq(aggressive,"const a=25;const b=(100/3)","aggressive costed exact division compression");
+    expect(minify::javascript("function f(){return undefined;}function g(undefined){return undefined;}",aggressive,err,{minify::OptimizationLevel::Aggressive}),err);
+    eq(aggressive,"function f(){return void 0}function g($){return $}","aggressive unresolved undefined compression");
+    expect(minify::javascript("undefined.value;undefined();undefined?.value;undefined=1;",aggressive,err,{minify::OptimizationLevel::Aggressive}),err);
+    eq(aggressive,"(void 0).value;(void 0)();(void 0)?.value;undefined=1","aggressive undefined context preservation");
+    expect(minify::javascript("const n=(9007199254740991+1);",aggressive,err,{minify::OptimizationLevel::Aggressive}),err);
+    eq(aggressive,"const n=(9007199254740991+1)","aggressive unsafe integer fold exclusion");
+    expect(minify::javascript("const n=true?123:456;const s=false?'a':'b';",aggressive,err,{minify::OptimizationLevel::Aggressive}),err);
+    eq(aggressive,"const n=123;const s='b'","aggressive constant conditional simplification");
+    expect(minify::javascript("const n=true?sideEffect():456;",aggressive,err,{minify::OptimizationLevel::Aggressive}),err);
+    eq(aggressive,"const n=!0?sideEffect():456","aggressive effectful conditional exclusion");
+    expect(minify::javascript("const n=false??true?0:42;",aggressive,err,{minify::OptimizationLevel::Aggressive}),err);
+    eq(aggressive,"const n=!1?" "?!0?0:42","aggressive nested conditional precedence exclusion");
+    expect(minify::javascript("const a=true&&longValue;const b=false||otherValue;const c=false&&unusedValue;const d=true||unusedValue;",aggressive,err,{minify::OptimizationLevel::Aggressive}),err);
+    eq(aggressive,"const a=longValue;const b=otherValue;const c=!1;const d=!0","aggressive constant logical simplification");
+    expect(minify::javascript("function f(){return 7;debugger;}",aggressive,err,{minify::OptimizationLevel::Aggressive}),err);
+    eq(aggressive,"function f(){return 7}","aggressive unreachable debugger elimination");
+    expect(minify::javascript("function f(){return 7;42;'unused';}",aggressive,err,{minify::OptimizationLevel::Aggressive}),err);
+    eq(aggressive,"function f(){return 7}","aggressive unreachable literal statement elimination");
+    expect(minify::javascript("function choose(conditionValue){if(conditionValue)return firstValue;return secondValue;}",aggressive,err,{minify::OptimizationLevel::Aggressive}),err);
+    eq(aggressive,"function choose($){return $?firstValue:secondValue}","aggressive return conditional compression");
+    expect(minify::javascript("function choose(conditionValue){if(conditionValue)return 1;else return 2;}",aggressive,err,{minify::OptimizationLevel::Aggressive}),err);
+    eq(aggressive,"function choose($){return $?1:2}","aggressive else-return conditional compression");
+    expect(minify::javascript("function add(longValue){longValue=longValue+2;return longValue;}",aggressive,err,{minify::OptimizationLevel::Aggressive}),err);
+    eq(aggressive,"function add($){$+=2;return $}","aggressive local compound assignment compression");
+    expect(minify::javascript("function f(){var first;var second;return 1;}",aggressive,err,{minify::OptimizationLevel::Aggressive}),err);
+    eq(aggressive,"function f(){return 1}","aggressive unused declarations before joining");
+    expect(minify::javascript("function f(){var unusedValue;return 1}",aggressive,err,{minify::OptimizationLevel::Aggressive}),err);
+    eq(aggressive,"function f(){return 1}","aggressive unused empty var elimination");
+    expect(minify::javascript("function f(){var currentValue;currentValue=1;currentValue=2;return currentValue}",aggressive,err,{minify::OptimizationLevel::Aggressive}),err);
+    eq(aggressive,"function f(){var $;$=2;return $}","aggressive adjacent dead var store elimination");
+    expect(minify::javascript("function f(){var first=call(1);var second=call(2);return first+second;}",aggressive,err,{minify::OptimizationLevel::Aggressive}),err);
+    eq(aggressive,"function f(){var $=call(1),_=call(2);return $+_}","aggressive initialized var declaration join");
+    expect(minify::javascript("function f(values){for(var key in values)use(key);var result=1;return result;}",aggressive,err,{minify::OptimizationLevel::Aggressive}),err);
+    eq(aggressive,"function f($){for(var _ in $)use(_);var a=1;return a}","aggressive for-in declaration boundary");
+    expect(minify::javascript("const answer=(function(){return 42;})();",aggressive,err,{minify::OptimizationLevel::Aggressive}),err);
+    eq(aggressive,"const answer=42","aggressive literal IIFE compression");
+    minify::Options bisect_options(minify::OptimizationLevel::Aggressive);
+    bisect_options.disabled_javascript_passes = {
+        minify::JavaScriptOptimizationPass::BindingRename,
+        minify::JavaScriptOptimizationPass::ConstantFold
+    };
+    expect(minify::javascript("function total(longName){return (200+30)+longName;}",aggressive,err,bisect_options),err);
+    eq(aggressive,"function total(longName){return(200+30)+longName}","independent JavaScript pass disablement");
+    minify::Options property_options;property_options.optimization=minify::OptimizationLevel::Aggressive;property_options.property_mangle_allowlist={"internalValue"};
+    expect(minify::javascript("const box={internalValue:3};box.internalValue;box.publicValue;",aggressive,err,property_options),err);
+    eq(aggressive,"const box={$:3};box.$;box.publicValue","explicit property allowlist mangling");
+    minify::Options aggressive_jsx(minify::OptimizationLevel::Aggressive);aggressive_jsx.structured_jsx_expressions=true;
+    expect(minify::jsx("const view=<Card value={(200+30)} />;",aggressive,err,aggressive_jsx),err);
+    eq(aggressive,"const view=<Card value={(230)} />;","explicit aggressive JSX expression folding");
+
 
     std::cout << "Standalone minifier smoke test passed\n";
 }
