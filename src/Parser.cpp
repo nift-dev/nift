@@ -18,6 +18,20 @@
 #include <atomic>
 
 namespace fs = std::filesystem;
+static int nift_binding_type(const json::Document& value) {
+    if (value.is_null()) return 0;
+    if (value.is_bool()) return 1;
+    if (value.is_number()) return std::trunc(value.num) == value.num ? 2 : 3;
+    if (value.is_string()) return 4;
+    if (value.is_array()) return 5;
+    if (value.is_object()) return 6;
+    return -1;
+}
+
+static const char* nift_binding_type_name(int type) {
+    switch (type) { case 0:return "null"; case 1:return "bool"; case 2:return "int"; case 3:return "double"; case 4:return "string"; case 5:return "array"; case 6:return "json"; default:return "unknown"; }
+}
+
 
 namespace {
 std::vector<std::string> parse_parameters(const std::string& text, bool& ok,
@@ -1130,7 +1144,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             json::Document assigned;
             if (!eval(text.substr(p + 2), assigned)) return false;
             auto stored = std::make_shared<json::Document>(assigned);
-            scope.emplace(name, VariableBinding{stored, static_cast<int>(assigned.type), true, false});
+            scope.emplace(name, VariableBinding{stored, nift_binding_type(assigned), true, false});
             out = std::move(assigned);
             return true;
         }
@@ -1147,6 +1161,12 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             if (!binding->mutable_binding) { error = "cannot assign to const binding: " + name; return false; }
             json::Document assigned;
             if (!eval(text.substr(p + 1), assigned)) return false;
+            const int assigned_type = nift_binding_type(assigned);
+            if (assigned_type != binding->type) {
+                error = "cannot assign " + std::string(nift_binding_type_name(assigned_type)) +
+                        " to " + nift_binding_type_name(binding->type) + " binding '" + name + "'";
+                return false;
+            }
             *binding->value = assigned;
             out = std::move(assigned);
             return true;
