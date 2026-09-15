@@ -1086,6 +1086,11 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             if (root_len == 0 || root_len == text.size()) continue;
             auto root_it = scope->find(text.substr(0, root_len));
             if (root_it == scope->end()) continue;
+            if (root_it->second.value && root_it->second.value->is_string() && root_it->second.value->string.rfind("\x1fnift:struct:",0)==0 && text[root_len]=='.') {
+                const std::string id=root_it->second.value->string.substr(13); auto inst=struct_instances_.find(id);
+                const std::string member=text.substr(root_len+1);
+                if(inst!=struct_instances_.end()){auto fit=inst->second->fields.find(member); if(fit!=inst->second->fields.end()){out=*fit->second.value;return true;}}
+            }
             const json::Document* cur = root_it->second.value.get();
             std::size_t pos = root_len;
             bool walk_ok = true;
@@ -1306,6 +1311,17 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
 
         if (const auto p=find_top_level_assignment(); p!=std::string::npos) {
             const std::string name = trim_copy(text.substr(0, p));
+            const auto dot=name.find('.');
+            if(dot!=std::string::npos){
+                const std::string root=name.substr(0,dot), member=name.substr(dot+1); VariableBinding* rb=nullptr;
+                for(auto scope=variable_scopes_.rbegin();scope!=variable_scopes_.rend();++scope){auto it=scope->find(root);if(it!=scope->end()){rb=&it->second;break;}}
+                if(!rb||!rb->value->is_string()||rb->value->string.rfind("\x1fnift:struct:",0)!=0){error="member assignment requires a struct instance: "+root;return false;}
+                auto inst=struct_instances_.find(rb->value->string.substr(13)); if(inst==struct_instances_.end()){error="invalid struct instance";return false;}
+                auto fit=inst->second->fields.find(member); if(fit==inst->second->fields.end()){error="struct has no field: "+member;return false;}
+                json::Document assigned; if(!eval(text.substr(p+1),assigned,depth+1))return false; const int at=nift_binding_type(assigned);
+                if(at!=fit->second.type){error="cannot change struct field type: "+member;return false;}
+                fit->second.value=std::make_shared<json::Document>(std::move(assigned)); out=*fit->second.value; if(depth==0)last_expression_mutation_=true; return true;
+            }
             if (!valid_binding_identifier(name)) { error = "assignment requires an identifier before '='"; return false; }
             VariableBinding* binding = nullptr;
             for (auto scope = variable_scopes_.rbegin(); scope != variable_scopes_.rend(); ++scope) {
