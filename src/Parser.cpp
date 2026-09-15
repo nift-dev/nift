@@ -2103,6 +2103,19 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             continue;
         }
 
+        if (source.compare(i, 7, "@while(") == 0) {
+            std::size_t hc=0;if(!find_balanced(source,i+6,'(',')',hc)){fail(source_path,source,i,"@while has no matching ')' for its condition");break;}
+            std::size_t bo=hc+1;while(bo<source.size()&&std::isspace((unsigned char)source[bo]))++bo;std::size_t bc=0;
+            if(bo>=source.size()||source[bo]!='{'||!find_balanced(source,bo,'{','}',bc)){fail(source_path,source,i,"@while(...) must be followed by a '{...}' block");break;}
+            const std::string condition=source.substr(i+7,hc-(i+7));
+            const auto body=normalize_control_block_body(source.substr(bo+1,bc-bo-1));
+            while(result_.ok){bool yes=false;std::string e;if(!evaluate_condition(condition,yes,e)){fail(source_path,source,i,e);break;}if(!yes)break;
+                push_json_scope();auto nested=parse(body.text,source_path,depth+1);pop_json_scope();if(!nested.ok)break;append_indented(output,nested.output,"",code_block_depth_);
+                if(pending_control_.kind!=ControlFlow::None)break;
+            }
+            if(!result_.ok)break;i=bc+1;continue;
+        }
+
         if (source.compare(i, 5, "@for(") == 0) {
             std::size_t header_close = 0;
             if (!find_balanced(source, i + 4, '(', ')', header_close)) {
