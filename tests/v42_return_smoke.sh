@@ -11,3 +11,11 @@ RESULT=$[classify(0)]
 EOT
 "$NIFT_BIN" build --all >/dev/null
 grep -q 'RESULT=zero' public/index.html
+# no-value return/fallthrough are null
+cat > content/index.html <<'EOT'
+@fn(a()) { return }
+@fn(b()) { x := 1 }
+A=$[a() == null] B=$[b() == null]
+EOT
+"$NIFT_BIN" build --all >/dev/null
+grep -q 'A=true B=true' public/index.html

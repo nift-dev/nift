@@ -1188,8 +1188,8 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                         auto body_result = call_ok ? parse(program_body, ci->second.source_path, 1) : RenderResult{};
                         --function_call_depth_;
                         if (!body_result.ok) { call_ok = false; call_error = body_result.error.message; }
-                        else if (pending_control_.kind == ControlFlow::None) { call_ok = false; call_error = "function requires @return(expr): " + call_name; }
-                        else { out = std::move(*pending_control_.value); pending_control_ = {}; }
+                        else if (pending_control_.kind == ControlFlow::None) { out = json::Document(nullptr); }
+                        else { out = pending_control_.value ? std::move(*pending_control_.value) : json::Document(nullptr); pending_control_ = {}; }
                     }
                     last_expression_mutation_ = saved_mutation;
                     pop_variable_scope();
@@ -2529,12 +2529,14 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     fail(source_path, source, i, "return: malformed expression");
                     break;
                 }
-                const std::string return_expr = source.substr(call_start + 1, return_close - call_start - 1);
-                json::Document return_value;
-                std::string return_error;
-                if (!evaluate_expression(return_expr, return_value, return_error)) {
-                    fail(source_path, source, i, "return: " + return_error);
-                    break;
+                const std::string return_expr = trim_copy(source.substr(call_start + 1, return_close - call_start - 1));
+                json::Document return_value(nullptr);
+                if (!return_expr.empty()) {
+                    std::string return_error;
+                    if (!evaluate_expression(return_expr, return_value, return_error)) {
+                        fail(source_path, source, i, "return: " + return_error);
+                        break;
+                    }
                 }
                 pending_control_.value = std::make_shared<json::Document>(std::move(return_value));
                 pending_control_.kind = ControlFlow::Return;
