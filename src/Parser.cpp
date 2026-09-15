@@ -1087,9 +1087,8 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             auto root_it = scope->find(text.substr(0, root_len));
             if (root_it == scope->end()) continue;
             if (root_it->second.value && root_it->second.value->is_string() && root_it->second.value->string.rfind("\x1fnift:struct:",0)==0 && text[root_len]=='.') {
-                const std::string id=root_it->second.value->string.substr(13); auto inst=struct_instances_.find(id);
-                const std::string member=text.substr(root_len+1);
-                if(inst!=struct_instances_.end()){auto fit=inst->second->fields.find(member); if(fit!=inst->second->fields.end()){auto sd=structs_.find(inst->second->type_name);bool priv=false;if(sd!=structs_.end())for(const auto& f:sd->second.fields)if(f.name==member)priv=f.private_member;if(priv&&(receiver_stack_.empty()||receiver_stack_.back()!=inst->second)){error="private struct field: "+member;return false;}out=*fit->second.value;return true;}}
+                json::Document current=*root_it->second.value; std::size_t mp=root_len+1; bool ok=true;
+                while(mp<text.size()){std::size_t me=mp;while(me<text.size()&&(std::isalnum((unsigned char)text[me])||text[me]=='_'))++me;const std::string member=text.substr(mp,me-mp);if(member.empty()||!current.is_string()||current.string.rfind("\x1fnift:struct:",0)!=0){ok=false;break;}auto inst=struct_instances_.find(current.string.substr(13));if(inst==struct_instances_.end()){ok=false;break;}auto fit=inst->second->fields.find(member);if(fit==inst->second->fields.end()){ok=false;break;}auto sd=structs_.find(inst->second->type_name);bool priv=false;if(sd!=structs_.end())for(const auto& f:sd->second.fields)if(f.name==member)priv=f.private_member;if(priv&&(receiver_stack_.empty()||receiver_stack_.back()!=inst->second)){error="private struct field: "+member;return false;}current=*fit->second.value;if(me==text.size()){out=current;return true;}if(text[me]!='.'){ok=false;break;}mp=me+1;} (void)ok;
             }
             const json::Document* cur = root_it->second.value.get();
             std::size_t pos = root_len;
@@ -1230,6 +1229,17 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             out=source; return true;
         }
 
+        if (text.rfind("deepcopy(",0)==0 && text.back()==')') {
+            json::Document source; if(!eval(text.substr(9,text.size()-10),source,depth+1))return false;
+            std::unordered_map<std::string,std::string> seen;
+            std::function<bool(const json::Document&,json::Document&)> clone;
+            clone=[&](const json::Document& in,json::Document& dst)->bool{
+                if(in.is_string()&&in.string.rfind("\x1fnift:struct:",0)==0){const std::string old=in.string.substr(13);auto sit=seen.find(old);if(sit!=seen.end()){dst=json::Document(std::string("\x1fnift:struct:")+sit->second);return true;}auto it=struct_instances_.find(old);if(it==struct_instances_.end()){error="deepcopy: invalid struct instance";return false;}auto ni=std::make_shared<StructInstance>();ni->type_name=it->second->type_name;const std::string id=std::to_string(next_struct_instance_id_++);seen[old]=id;struct_instances_[id]=ni;for(const auto& f:it->second->fields){json::Document cv;if(!clone(*f.second.value,cv))return false;auto sp=std::make_shared<json::Document>(std::move(cv));ni->fields.emplace(f.first,VariableBinding{sp,f.second.type,f.second.mutable_binding,f.second.deep_readonly});}dst=json::Document(std::string("\x1fnift:struct:")+id);return true;}
+                dst=in;if(in.is_array()){dst.array.clear();for(const auto& v:in.array){json::Document cv;if(!clone(v,cv))return false;dst.array.push_back(std::move(cv));}}else if(in.is_object()){dst.object.clear();for(const auto& e:in.object){json::Document cv;if(!clone(e.second,cv))return false;dst.object.emplace_back(e.first,std::move(cv));}}return true;
+            };
+            return clone(source,out);
+        }
+
         if (text.rfind("validate(", 0) == 0 && text.back() == ')') {
             bool ok_params = false; auto args = parse_parameters(text.substr(9, text.size() - 10), ok_params);
             if (!ok_params || args.size() != 2) { error = "validate: expected schema and value"; return false; }
@@ -1325,15 +1335,13 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             const std::string name = trim_copy(text.substr(0, p));
             const auto dot=name.find('.');
             if(dot!=std::string::npos){
-                const std::string root=name.substr(0,dot), member=name.substr(dot+1); VariableBinding* rb=nullptr;
+                const std::string root=name.substr(0,dot); VariableBinding* rb=nullptr;
                 for(auto scope=variable_scopes_.rbegin();scope!=variable_scopes_.rend();++scope){auto it=scope->find(root);if(it!=scope->end()){rb=&it->second;break;}}
                 if(!rb||!rb->value->is_string()||rb->value->string.rfind("\x1fnift:struct:",0)!=0){error="member assignment requires a struct instance: "+root;return false;}
-                auto inst=struct_instances_.find(rb->value->string.substr(13)); if(inst==struct_instances_.end()){error="invalid struct instance";return false;}
-                auto fit=inst->second->fields.find(member); if(fit==inst->second->fields.end()){error="struct has no field: "+member;return false;}
-                auto sd=structs_.find(inst->second->type_name);bool priv=false;if(sd!=structs_.end())for(const auto& f:sd->second.fields)if(f.name==member)priv=f.private_member;if(priv&&(receiver_stack_.empty()||receiver_stack_.back()!=inst->second)){error="private struct field: "+member;return false;}
-                json::Document assigned; if(!eval(text.substr(p+1),assigned,depth+1))return false; const int at=nift_binding_type(assigned);
-                if(at!=fit->second.type){error="cannot change struct field type: "+member;return false;}
-                fit->second.value=std::make_shared<json::Document>(std::move(assigned)); out=*fit->second.value; if(depth==0)last_expression_mutation_=true; return true;
+                json::Document current=*rb->value;std::size_t mp=dot+1;std::shared_ptr<StructInstance> parent;std::string member;
+                while(mp<name.size()){std::size_t me=name.find('.',mp);member=name.substr(mp,me==std::string::npos?std::string::npos:me-mp);auto ii=struct_instances_.find(current.string.substr(13));if(ii==struct_instances_.end()){error="invalid struct instance";return false;}parent=ii->second;auto fit=parent->fields.find(member);if(fit==parent->fields.end()){error="struct has no field: "+member;return false;}if(me==std::string::npos)break;current=*fit->second.value;if(!current.is_string()||current.string.rfind("\x1fnift:struct:",0)!=0){error="member path is not a struct: "+member;return false;}mp=me+1;}
+                auto fit=parent->fields.find(member);auto sd=structs_.find(parent->type_name);bool priv=false;if(sd!=structs_.end())for(const auto& f:sd->second.fields)if(f.name==member)priv=f.private_member;if(priv&&(receiver_stack_.empty()||receiver_stack_.back()!=parent)){error="private struct field: "+member;return false;}
+                json::Document assigned;if(!eval(text.substr(p+1),assigned,depth+1))return false;const int at=nift_binding_type(assigned);if(at!=fit->second.type){error="cannot change struct field type: "+member;return false;}fit->second.value=std::make_shared<json::Document>(std::move(assigned));out=*fit->second.value;if(depth==0)last_expression_mutation_=true;return true;
             }
             if (!valid_binding_identifier(name)) { error = "assignment requires an identifier before '='"; return false; }
             VariableBinding* binding = nullptr;
