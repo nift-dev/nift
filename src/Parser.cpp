@@ -1228,7 +1228,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                     if(priv&&(receiver_stack_.empty()||receiver_stack_.back()!=inst->second)){error="private struct field: "+member;return false;}
                     current=*fit->second.value;
                     if(me==text.size()){out=current;return true;}
-                    if(text[me]!='.'){error="invalid struct member path: "+text;return false;}
+                    if(text[me]!='.'){break;}
                     mp=me+1;
                 }
             }

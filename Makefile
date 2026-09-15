@@ -505,6 +505,7 @@ test-v42-struct: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v42_struct_private_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v42_struct_copy_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v42_struct_deepcopy_smoke.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v42_struct_member_expression_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v42_struct_adversarial.sh
 
 # Fail-closed guard: every maintained workflow's official macOS matrix entry
