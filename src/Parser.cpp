@@ -1183,6 +1183,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                     out=json::Document(std::string("\x1fnift:struct:")+id); return true;
                 }
                 auto ci = callables_.find(call_name);
+                if(ci==callables_.end()&&!receiver_stack_.empty()){auto sd=structs_.find(receiver_stack_.back()->type_name);if(sd!=structs_.end()){auto mi=sd->second.methods.find(call_name);if(mi!=sd->second.methods.end()&&!mi->second.constructor){bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(!aok){error="malformed method arguments";return false;}std::vector<json::Document> av;for(std::size_t ai=0;ai<ar.size();++ai){json::Document v;if(ai<aq.size()&&aq[ai])v=json::Document(ar[ai]);else if(!eval(ar[ai],v,depth+1))return false;av.push_back(std::move(v));}return invoke_struct_method(receiver_stack_.back(),mi->second,av,out,error);}}}
                 if (ci != callables_.end()) {
                     if (callable_call_depth_ >= kMaxCallableDepth) { error = "callable recursion depth exceeded: " + call_name; return false; }
                     bool args_ok=false; std::vector<bool> quoted_args; auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),args_ok,&quoted_args); if(!args_ok||args.size()!=ci->second.params.size()){error="callable argument count mismatch: "+call_name;return false;}
@@ -3515,7 +3516,7 @@ RenderResult Parser::render() {
     return result_;
 }
 
-bool Parser::invoke_struct_method(const std::shared_ptr<StructInstance>& instance,
+bool Parser::invoke_struct_method(std::shared_ptr<StructInstance> instance,
                                   const StructMethod& method,
                                   const std::vector<json::Document>& args,
                                   json::Document& out,
@@ -3524,17 +3525,17 @@ bool Parser::invoke_struct_method(const std::shared_ptr<StructInstance>& instanc
     if (callable_call_depth_ >= kMaxCallableDepth) { error = "callable recursion depth exceeded"; return false; }
     ++callable_call_depth_;
     const int caller_loop_depth = loop_depth_; loop_depth_ = 0;
-    push_variable_scope(); auto& scope=variable_scopes_.back();
-    for(auto& f:instance->fields) scope.emplace(f.first,f.second);
-    for(std::size_t i=0;i<args.size();++i){auto sp=std::make_shared<json::Document>(args[i]);scope[method.callable.params[i]]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
+    push_variable_scope(); const std::size_t scope_index=variable_scopes_.size()-1;
+    for(auto& f:instance->fields) variable_scopes_[scope_index].emplace(f.first,f.second);
+    for(std::size_t i=0;i<args.size();++i){auto sp=std::make_shared<json::Document>(args[i]);variable_scopes_[scope_index][method.callable.params[i]]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
     std::string id;
     for(const auto& e:struct_instances_) if(e.second==instance){id=e.first;break;}
-    auto thisv=std::make_shared<json::Document>(std::string("\x1fnift:struct:")+id); scope["this"]=VariableBinding{thisv,nift_binding_type(*thisv),false,false};
+    auto thisv=std::make_shared<json::Document>(std::string("\x1fnift:struct:")+id); variable_scopes_[scope_index]["this"]=VariableBinding{thisv,nift_binding_type(*thisv),false,false};
     receiver_stack_.push_back(instance); ++function_call_depth_; pending_control_={};
     std::string program, pe; bool ok=translate_function_program(method.callable.body,program,pe); RenderResult rr;
     if(ok) rr=parse(program,method.callable.source_path,1); else {rr.ok=false; rr.error.message=pe;}
     --function_call_depth_; receiver_stack_.pop_back();
-    for(auto& f:instance->fields){auto it=scope.find(f.first);if(it!=scope.end())f.second=it->second;}
+    for(auto& f:instance->fields){auto it=variable_scopes_[scope_index].find(f.first);if(it!=variable_scopes_[scope_index].end())f.second=it->second;}
     pop_variable_scope(); loop_depth_=caller_loop_depth; --callable_call_depth_;
     if(!rr.ok){error=rr.error.message;pending_control_={};return false;}
     if(method.constructor && pending_control_.kind==ControlFlow::Return && pending_control_.value && !pending_control_.value->is_null()){error="constructor cannot return a value";pending_control_={};return false;}
