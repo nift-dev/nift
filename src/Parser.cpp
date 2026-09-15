@@ -1220,8 +1220,14 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                     if (!call_ok) { error = call_error; return false; }
                     return true;
                 }
-                if (call_name != "inject" && call_name != "validate") { error = "undefined callable: " + call_name; return false; }
+                if (call_name != "inject" && call_name != "validate" && call_name != "copy" && call_name != "deepcopy") { error = "undefined callable: " + call_name; return false; }
             }
+        }
+
+        if (text.rfind("copy(",0)==0 && text.back()==')') {
+            json::Document source; if(!eval(text.substr(5,text.size()-6),source,depth+1))return false;
+            if(source.is_string()&&source.string.rfind("\x1fnift:struct:",0)==0){auto it=struct_instances_.find(source.string.substr(13));if(it==struct_instances_.end()){error="copy: invalid struct instance";return false;}auto clone=std::make_shared<StructInstance>();clone->type_name=it->second->type_name;for(const auto& f:it->second->fields){auto sp=std::make_shared<json::Document>(*f.second.value);clone->fields.emplace(f.first,VariableBinding{sp,f.second.type,f.second.mutable_binding,f.second.deep_readonly});}const std::string id=std::to_string(next_struct_instance_id_++);struct_instances_[id]=clone;out=json::Document(std::string("\x1fnift:struct:")+id);return true;}
+            out=source; return true;
         }
 
         if (text.rfind("validate(", 0) == 0 && text.back() == ')') {
