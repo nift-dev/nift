@@ -181,9 +181,11 @@ Small final evidence/regression-hardening pass after the campaign was accepted.
   literals, inline `@json`, engine/context). No unprotected entry point found;
   vendored Jsonic++/Minify++ were not modified.
 - **Dependency-sync evidence** — vendored trees verified byte-identical to the
-  actual release tags (`v1.0.0` = `88e4736`; `v1.1.3` = `43288d1`), recorded
-  separately from the current sibling-head sync check, which is intentionally
-  mismatched because the siblings are on post-release development heads.
+  actual release tags (`v1.0.0` = `88e4736`; `v1.1.3` = `43288d1`). This was
+  later superseded by the release-tag synchronization repair (see "Release
+  candidate sync-check correction" below): the check now compares against the
+  declared-version release tag and passes normally, so sibling development
+  heads are no longer an integrity reference point.
 - **`immut` wording** — refined from "cosmetic"/"observably a non-rebindable
   readonly view" to: `const` prevents rebinding; `immut` establishes a
   recursively read-only binding/view contract whose distinction is currently
