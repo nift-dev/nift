@@ -1767,6 +1767,44 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             continue;
         }
 
+        if (source.compare(i, 8, "@struct(") == 0) {
+            std::size_t hc = 0;
+            if (!find_balanced(source, i + 7, '(', ')', hc)) { fail(source_path, source, i, "struct definition has no matching ')'"); break; }
+            const std::string struct_name = trim_copy(source.substr(i + 8, hc - (i + 8)));
+            if (!valid_binding_identifier(struct_name)) { fail(source_path, source, i, "invalid struct name"); break; }
+            std::size_t bo = hc + 1; while (bo < source.size() && std::isspace(static_cast<unsigned char>(source[bo]))) ++bo;
+            std::size_t bc = 0;
+            if (bo >= source.size() || source[bo] != '{' || !find_balanced(source, bo, '{', '}', bc)) { fail(source_path, source, i, "struct definition requires a block"); break; }
+            StructDefinition def; def.name = struct_name;
+            const std::string body = source.substr(bo + 1, bc - bo - 1);
+            std::size_t p = 0; bool struct_ok = true;
+            while (p < body.size()) {
+                while (p < body.size() && std::isspace(static_cast<unsigned char>(body[p]))) ++p;
+                if (p >= body.size()) break;
+                bool priv = false;
+                if (body.compare(p, 8, "private ") == 0) { priv = true; p += 8; while (p < body.size() && std::isspace(static_cast<unsigned char>(body[p]))) ++p; }
+                if (body.compare(p, 3, "fn(") == 0) {
+                    std::size_t mhc = 0; if (!find_balanced(body, p + 2, '(', ')', mhc)) { fail(source_path, source, i, "struct method has malformed signature"); struct_ok=false; break; }
+                    const std::string sig = trim_copy(body.substr(p + 3, mhc - (p + 3))); const auto lp=sig.find('(');
+                    if(lp==std::string::npos||sig.back()!=')'){fail(source_path,source,i,"struct method signature must be name(args)");struct_ok=false;break;}
+                    const std::string mn=trim_copy(sig.substr(0,lp)); bool pok=false; auto ps=parse_parameters(sig.substr(lp+1,sig.size()-lp-2),pok);
+                    std::size_t mbo=mhc+1; while(mbo<body.size()&&std::isspace(static_cast<unsigned char>(body[mbo])))++mbo; std::size_t mbc=0;
+                    if(!valid_binding_identifier(mn)||!pok||mbo>=body.size()||body[mbo]!='{'||!find_balanced(body,mbo,'{','}',mbc)){fail(source_path,source,i,"invalid struct method");struct_ok=false;break;}
+                    const bool ctor=mn==struct_name; if(ctor && def.methods.find(struct_name)!=def.methods.end()){fail(source_path,source,i,"struct may define at most one constructor");struct_ok=false;break;}
+                    const auto mb=normalize_control_block_body(body.substr(mbo+1,mbc-mbo-1));
+                    def.methods[mn]=StructMethod{Callable{ps,mb.text,source_path,false},priv,ctor}; p=mbc+1; continue;
+                }
+                std::size_t eol=body.find_first_of("\n;",p); if(eol==std::string::npos)eol=body.size();
+                std::string line=trim_copy(body.substr(p,eol-p)); const auto dp=line.find(":=");
+                if(dp==std::string::npos){fail(source_path,source,i,"struct fields require 'name := initializer'");struct_ok=false;break;}
+                std::string fn=trim_copy(line.substr(0,dp)), init=trim_copy(line.substr(dp+2));
+                if(!valid_binding_identifier(fn)||init.empty()){fail(source_path,source,i,"invalid struct field declaration");struct_ok=false;break;}
+                for(const auto& f:def.fields)if(f.name==fn){fail(source_path,source,i,"duplicate struct field: "+fn);struct_ok=false;break;}
+                if(!struct_ok)break; def.fields.push_back(StructField{fn,init,priv}); p=eol<body.size()?eol+1:eol;
+            }
+            if(!struct_ok) break; structs_[struct_name]=std::move(def); i=bc+1; continue;
+        }
+
         if (source.compare(i, 4, "@fn(") == 0 || source.compare(i, 10, "@fragment(") == 0) {
             const bool fragment = source.compare(i, 10, "@fragment(") == 0; const std::size_t open = i + (fragment ? 9 : 3);
             std::size_t header_close = 0; if (!find_balanced(source, open, '(', ')', header_close)) { fail(source_path, source, i, "callable definition has no matching ')'"); break; }

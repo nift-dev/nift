@@ -54,6 +54,14 @@ private:
     std::vector<std::unordered_map<std::string, VariableBinding>> variable_scopes_;
     struct Callable { std::vector<std::string> params; std::string body; std::filesystem::path source_path; bool fragment = false; };
     std::unordered_map<std::string, Callable> callables_;
+    struct StructField { std::string name; std::string initializer; bool private_member = false; };
+    struct StructMethod { Callable callable; bool private_member = false; bool constructor = false; };
+    struct StructDefinition { std::string name; std::vector<StructField> fields; std::unordered_map<std::string, StructMethod> methods; };
+    struct StructInstance { std::string type_name; std::unordered_map<std::string, VariableBinding> fields; };
+    std::unordered_map<std::string, StructDefinition> structs_;
+    std::unordered_map<std::string, std::shared_ptr<StructInstance>> struct_instances_;
+    std::uint64_t next_struct_instance_id_ = 1;
+    std::vector<std::shared_ptr<StructInstance>> receiver_stack_;
     bool last_expression_mutation_ = false;
     int function_call_depth_ = 0;
     bool in_fragment_body_ = false;
