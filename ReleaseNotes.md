@@ -1,8 +1,14 @@
 # Nift release notes
 
-## v4.1.0 (development)
+## v4.1.0
 
-Template-language expansion campaign; see `docs/handover/V4.1-TEMPLATE-LANGUAGE.md`.
+Adds the v4.1 template-language surface as optional advanced templating
+(lexical `:=` declarations and `=` assignment, `const`/`immut`, multiline
+`@:=`, `inject()`, `validate()`, `@fn`/`@fragment`, live loops and stable
+inferred types), embeds the released Jsonic++ v1.0.0 and Minify++ v1.1.3,
+restores Nift's historical duplicate-key strictness, and ships the
+independently certified v4.1 template-language campaign. Full notes:
+`docs/evidence/release-4.1.0/release-notes-4.1.0.md`.
 
 ## v4.0.13
 
