@@ -938,3 +938,90 @@ regression-suite or Nift corrective change was warranted.
   `snap/snapcraft.yaml`, release notes, and the guarantee registry baseline
   (released_version 4.0.11, release_commit 6c037cf, development_version 4.0.12).
 - Regression-suite version assertions advanced to v4.0.12.
+
+## v4.1.0 release report
+
+### Scope
+
+v4.1.0 adds the v4.1 template-language surface as optional advanced templating
+(lexical `:=` declarations and `=` assignment, `const`/`immut`, multiline
+`@:=`, `inject()`, `validate()`, `@fn`/`@fragment`, live loops and stable
+inferred types), embeds the released Jsonic++ v1.0.0 and Minify++ v1.1.3,
+restores Nift's historical duplicate-key strictness, and ships the
+independently certified v4.1 template-language campaign. The embedded engine,
+its language bindings, the shared corpus and the experimental Rust
+implementation remain in-tree but are not released, documented or promoted.
+
+### Source and workflow
+
+- Annotated tag `v4.1.0` (object `bf4490a9`), peels to `b499798`; pushed to
+  `origin`. The tag was corrected once during recovery (the initial annotated
+  tag pointed at the pre-repair candidate `1961b1a` before the macOS release
+  runner repair; no GitHub release or assets had been published at that point).
+- GitHub Actions run: `34957957021` — every job succeeded (validate version
+  consistency; unix linux-x86_64 / macos-arm64 on `macos-latest` / macos-x86_64
+  on `macos-26-intel`; windows; installer-preflight; public-installer-preflight;
+  publish; installer-public-smoke on linux-x86_64, macos-arm64 and macos-x86-64).
+- GitHub release: https://github.com/nift-dev/nift/releases/tag/v4.1.0 — public,
+  non-draft, non-prerelease; release body is the reviewed committed notes
+  (`docs/evidence/release-4.1.0/release-notes-4.1.0.md`, verbatim modulo a
+  trailing newline). Release display name empty by design.
+- Phase 1 validation (at final candidate `b499798`): full `make test`, external
+  contract 32/32 (remote contract CI at `34955262946`, tested Nift
+  `b499798`), dependency synchronization PASS, complete Deep guards
+  (`34955277986`, all five jobs PASS), packaging matrix PASS on every platform,
+  website built with the candidate with no changes.
+
+### macOS release-runner correction
+
+The initial Phase 2 release run (`34951661276`) failed pre-publication because
+the macOS arm64 archive build used the `macos-15` runner, whose older Apple
+libc++ lacks the floating-point `std::from_chars` overload used by the released
+Jsonic++ v1.0.0 payload. Commit `b499798` standardized every official macOS
+build/verify surface on the runners proven by the Phase 1 packaging matrix
+(macOS arm64 -> `macos-latest`, macOS x86-64 -> `macos-26-intel`) and added a
+fail-closed workflow-consistency guard
+(`tests/macos_runner_policy_test.py`, wired into `make test` and
+`test-integrity.yml`). Jsonic++ stays C++17; no parser fallback; macOS x86-64
+and arm64 both remain supported.
+
+### Archives and checksums (definitive, from the published release)
+
+- `nift-4.1.0-linux-x86_64.tar.gz` — `a3ce41547d7da4579a451d2f50eacbc7b479d5d94893bacdbcf269553abf0286`
+- `nift-4.1.0-macos-arm64.tar.gz` — `7753a161c095f2ece920ac05c742e87868f28b3a06b9c9b62c2d33670e001078`
+- `nift-4.1.0-macos-x86_64.tar.gz` — `7f152c83a3670af46f2f122c7c6ef35e401fba5bab4d90776e506056895dde23`
+- `nift-4.1.0-windows-x86_64.zip` — `61d262935607a4383e3480e2f1b5047bcb8e64e71fa927608210e9e6853c2571`
+- `SHA256SUMS` (386 bytes) — all four archives independently downloaded from the
+  public release and verified (`sha256sum -c` OK). Extracted Linux binary
+  reports `Nift v4.1.0`.
+
+### Installer verification
+
+`installer-public-smoke` PASS on linux-x86_64, macos-arm64 and macos-x86-64: the
+live `https://nift.dev/install` is byte-identical to `packaging/install.sh`, the
+v4.1.0 release is installed through the public script, and fresh
+init/build/status succeed.
+
+### Package publication state (recorded separately, not collapsed)
+
+- **Homebrew**: automatic downstream bump/update mechanism. Nift performs no
+  manual Homebrew publication; `homebrew.yml` is a validation/rehearsal
+  workflow only. Propagation through the canonical formula is pending external
+  Homebrew automation and must be verified when it completes.
+- **Snap**: the connected Snap Store/Launchpad build service automatically
+  built v4.1.0 to `latest/edge` (revision 902). `latest/stable` remains 4.0.13
+  (revision 888); promotion to stable is a separate manual `snap-promote.yml`
+  action after inspection and is not part of this record.
+- **Chocolatey**: `nift.4.1.0.nupkg` packed and pushed to
+  `push.chocolatey.org` (run `34963663669`), deriving the Windows ZIP checksum
+  from the immutable public release and verifying the contained `nift.exe`
+  reports `Nift v4.1.0`. The package page shows **submitted / under
+  moderation**; it is not yet approved or publicly installable. Workflow success
+  means submitted, not approved.
+- **Flathub**: external `flathub/cc.nift.nsm` manifest update required —
+  pending external PR (out of scope for the maintained release process).
+
+### Post-release
+
+- Development identity advanced locally to `Nift v4.2.0` (distinct post-release
+  commit; not pushed).
