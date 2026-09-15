@@ -216,7 +216,7 @@ fi
 grep -Fq 'minify requires at least one file' "$D/noargs.log"
 printf 'const  q =  1 ;\n' >"$D/inplace.js"
 "$NIFT_BIN" minify -i "$D/inplace.js" >/dev/null
-grep -Fq 'const q=1;' "$D/inplace.js"
+grep -Fq 'const q=1' "$D/inplace.js"
 test ! -e "$D/inplace.min.js"
 if "$NIFT_BIN" minify --wat "$D/inplace.js" >"$D/badopt.log" 2>&1; then
   echo "unknown minify option unexpectedly succeeded" >&2; exit 1
