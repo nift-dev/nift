@@ -1620,27 +1620,33 @@ std::string Parser::path_to(const std::string& argument, const std::string& dire
 }
 
 bool Parser::translate_function_program(const std::string& source, std::string& translated, std::string& error) const {
-    translated.clear();
-    std::size_t i = 0;
-    while (i < source.size()) {
-        while (i < source.size() && std::isspace(static_cast<unsigned char>(source[i]))) ++i;
-        if (i >= source.size()) break;
-        std::size_t start = i;
-        bool quoted=false; char quote=0; int parens=0, brackets=0, braces=0;
-        for (; i < source.size(); ++i) {
-            char c=source[i];
-            if (quoted) { if (c=='\\' && i+1<source.size()) ++i; else if (c==quote) quoted=false; continue; }
-            if (c=='\'' || c=='"') { quoted=true; quote=c; continue; }
-            if (c=='(') ++parens; else if(c==')') --parens;
-            else if(c=='[') ++brackets; else if(c==']') --brackets;
-            else if(c=='{') ++braces; else if(c=='}') { if(braces) --braces; }
-            if (!parens && !brackets && !braces && (c==';' || c=='\n')) break;
+    std::function<bool(const std::string&, std::string&)> convert;
+    convert = [&](const std::string& in, std::string& out) -> bool {
+        std::size_t i=0;
+        auto boundary=[&](std::size_t p,const std::string& kw){return in.compare(p,kw.size(),kw)==0 && (p+kw.size()==in.size() || !std::isalnum((unsigned char)in[p+kw.size()]) && in[p+kw.size()]!='_');};
+        while(i<in.size()) {
+            while(i<in.size() && std::isspace((unsigned char)in[i])) ++i;
+            if(i>=in.size()) break;
+            if(boundary(i,"if")) {
+                std::size_t p=i+2; while(p<in.size()&&std::isspace((unsigned char)in[p]))++p;
+                if(p>=in.size()||in[p]!='('){error="function if requires '(...)'";return false;}
+                std::size_t pc=0; if(!find_balanced(in,p,'(',')',pc)){error="function if has no matching ')'";return false;}
+                std::size_t bo=pc+1; while(bo<in.size()&&std::isspace((unsigned char)in[bo]))++bo;
+                std::size_t bc=0; if(bo>=in.size()||in[bo]!='{'||!find_balanced(in,bo,'{','}',bc)){error="function if requires a block";return false;}
+                std::string body; if(!convert(in.substr(bo+1,bc-bo-1),body))return false;
+                out += "@if("+in.substr(p+1,pc-p-1)+"){"+body+"}"; i=bc+1;
+                while(true){std::size_t e=i;while(e<in.size()&&std::isspace((unsigned char)in[e]))++e;if(!boundary(e,"else"))break;e+=4;while(e<in.size()&&std::isspace((unsigned char)in[e]))++e;
+                    if(boundary(e,"if")){std::size_t q=e+2;while(q<in.size()&&std::isspace((unsigned char)in[q]))++q;std::size_t qc=0;if(q>=in.size()||in[q]!='('||!find_balanced(in,q,'(',')',qc)){error="function else if malformed";return false;}std::size_t eb=qc+1;while(eb<in.size()&&std::isspace((unsigned char)in[eb]))++eb;std::size_t ec=0;if(eb>=in.size()||in[eb]!='{'||!find_balanced(in,eb,'{','}',ec)){error="function else if requires block";return false;}std::string body2;if(!convert(in.substr(eb+1,ec-eb-1),body2))return false;out+=" else if("+in.substr(q+1,qc-q-1)+"){"+body2+"}";i=ec+1;continue;}
+                    std::size_t ec=0;if(e>=in.size()||in[e]!='{'||!find_balanced(in,e,'{','}',ec)){error="function else requires block";return false;}std::string body2;if(!convert(in.substr(e+1,ec-e-1),body2))return false;out+=" else {"+body2+"}";i=ec+1;break;}
+                continue;
+            }
+            std::size_t start=i; bool quoted=false;char quote=0;int par=0,br=0;
+            for(;i<in.size();++i){char c=in[i];if(quoted){if(c=='\\'&&i+1<in.size())++i;else if(c==quote)quoted=false;continue;}if(c=='\''||c=='"'){quoted=true;quote=c;continue;}if(c=='(')++par;else if(c==')')--par;else if(c=='[')++br;else if(c==']')--br;if(!par&&!br&&(c==';'||c=='\n'))break;}
+            std::string stmt=trim_copy(in.substr(start,i-start)); if(!stmt.empty()) out+="$["+stmt+"]"; if(i<in.size())++i;
         }
-        std::string stmt=trim_copy(source.substr(start,i-start));
-        if (!stmt.empty()) translated += "$[" + stmt + "]";
-        if (i<source.size()) ++i;
-    }
-    return true;
+        return true;
+    };
+    translated.clear(); return convert(source,translated);
 }
 
 RenderResult Parser::parse(const std::string& source, const fs::path& source_path, int depth) {
