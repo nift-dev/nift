@@ -1090,6 +1090,27 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
         if (text.empty()) { error="expression cannot be empty"; return false; }
         while (encloses(text)) text=trim_copy(text.substr(1,text.size()-2));
 
+        if (text.rfind("inject(", 0) == 0 && text.back() == ')') {
+            const std::string arg = trim_copy(text.substr(7, text.size() - 8));
+            json::Document path_value; std::string lit_error;
+            if (!scalar_literal(arg, path_value, lit_error) || !path_value.is_string()) { error = "inject: path must be a string expression"; return false; }
+            fs::path path = path_value.string;
+            if (path.is_relative()) {
+                const fs::path base = input_stack_.empty() ? host_.root() : input_stack_.back().parent_path();
+                fs::path candidate = base / path;
+                path = host_.source_exists(candidate) ? candidate : host_.root() / path;
+            }
+            path = fs::absolute(path).lexically_normal();
+            if (!filesystem::path_within(fs::absolute(host_.root()).lexically_normal(), path)) { error = "inject: path must stay inside the Nift project"; return false; }
+            if (std::find(input_stack_.begin(), input_stack_.end(), path) != input_stack_.end()) { error = "inject: source cycle through " + path.generic_string(); return false; }
+            auto injected = host_.read_shared_source(path);
+            if (injected.status == nift::HostStatus::Error) { error = injected.error; return false; }
+            if (!injected.content) { error = "inject: source is not readable"; return false; }
+            result_.dependencies.insert(host_.relative(path)); input_stack_.push_back(path); push_variable_scope();
+            json::Document injected_value; const bool ok = eval(*injected.content, injected_value);
+            pop_variable_scope(); input_stack_.pop_back(); if (!ok) return false; out = std::move(injected_value); return true;
+        }
+
         // Preserve exact metadata/JSON names (notably built-ins such as output-path)
         // before interpreting punctuation as arithmetic.
         if (resolve_direct(text,out)) return true;
