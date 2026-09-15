@@ -10,7 +10,7 @@ bool load_json_file(const std::filesystem::path& path, json::Document& document,
         error = "file is not readable";
         return false;
     }
-    return json::Document::parse(filesystem::read_file(path), document, error);
+    return nift_json::parse(filesystem::read_file(path), document, error);
 }
 
 bool save_json_file(const std::filesystem::path& path, const json::Document& document) {

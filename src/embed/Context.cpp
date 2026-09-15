@@ -32,7 +32,7 @@ bool Context::set_json(std::string name, std::string_view json_text) {
     if (!detail::valid_binding_identifier(name) || detail::structural_builtin_name(name)) return false;
     Value value;
     std::string error;
-    if (!json::Document::parse(std::string(json_text), ValueAccess::doc(value), error)) return false;
+    if (!nift_json::parse(std::string(json_text), ValueAccess::doc(value), error)) return false;
     bindings_[std::move(name)] = std::move(value);
     return true;
 }

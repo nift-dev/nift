@@ -169,7 +169,7 @@ public:
             contents = filesystem::read_file(path);
         }
         auto document = std::make_shared<json::Document>();
-        if (!json::Document::parse(*contents, *document, error)) return {};
+        if (!nift_json::parse(*contents, *document, error)) return {};
         {
             std::lock_guard<std::mutex> lock(impl_.json_cache_mutex_);
             const auto [it, inserted] = impl_.json_cache_.emplace(key, document);
@@ -357,7 +357,7 @@ bool Engine::set_json(std::string name, std::string_view json_text) {
         return false;
     auto document = std::make_shared<json::Document>();
     std::string error;
-    if (!json::Document::parse(std::string(json_text), *document, error)) return false;
+    if (!nift_json::parse(std::string(json_text), *document, error)) return false;
     impl_->defaults[std::move(name)] = std::move(document);
     return true;
 }

@@ -126,7 +126,7 @@ std::shared_ptr<const json::Document> ProjectState::read_shared_json(const fs::p
 
     const std::string source = filesystem::read_file(normalized);
     auto document = std::make_shared<json::Document>();
-    if (!json::Document::parse(source, *document, error)) return {};
+    if (!nift_json::parse(source, *document, error)) return {};
 
     std::shared_ptr<const json::Document> immutable = document;
     shared_json_cache_.emplace(key, immutable);

@@ -36,6 +36,31 @@ static const int kMaxCallableDepth = 64;
 
 
 namespace {
+bool is_single_quoted_parameter(const std::string& text) {
+    if (text.size() < 2 || (text.front() != '\'' && text.front() != '"')) return false;
+    const char outer = text.front();
+    for (std::size_t i = 1; i < text.size(); ++i) {
+        if (text[i] == '\\' && i + 1 < text.size()) { ++i; continue; }
+        if (text[i] == outer) return i + 1 == text.size();
+    }
+    return false;
+}
+
+std::string unescape_parameter_string(const std::string& text) {
+    std::string result;
+    result.reserve(text.size());
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        if (text[i] == '\\' && i + 1 < text.size()) {
+            const char escaped = text[++i];
+            if (escaped == '$') result += '\\';
+            result += escaped;
+        } else {
+            result += text[i];
+        }
+    }
+    return result;
+}
+
 std::vector<std::string> parse_parameters(const std::string& text, bool& ok,
                                           std::vector<bool>* quoted = nullptr) {
     std::vector<std::string> result; std::string current; bool in_quotes=false; char quote=0;
@@ -43,21 +68,13 @@ std::vector<std::string> parse_parameters(const std::string& text, bool& ok,
     int parens=0, brackets=0, braces=0; std::size_t significant_end=0; ok=true;
     auto append_parameter=[&]{
         current.resize(significant_end);
-        // Only a parameter that is exactly one quoted string is a quoted
-        // parameter: strip its outer quotes and record it. Quotes inside
-        // structured literals (objects/arrays) are preserved so callables and
-        // validate() can accept {…}/[…] arguments.
-        const bool single_quoted = current.size() >= 2 &&
-            (current.front() == '\'' || current.front() == '"');
-        if (single_quoted) {
-            const char outer = current.front();
-            bool closes_at_end = false;
-            for (std::size_t q = 1; q < current.size(); ++q) {
-                if (current[q] == '\\' && q + 1 < current.size()) { ++q; continue; }
-                if (current[q] == outer) { closes_at_end = (q + 1 == current.size()); break; }
-            }
-            if (closes_at_end) current = current.substr(1, current.size() - 2);
-            else parameter_was_quoted = false;
+        // A parameter that is exactly one quoted string is a quoted parameter:
+        // strip its outer quotes (applying the legacy in-string escape rules)
+        // and record it. Quotes inside structured literals (objects/arrays)
+        // are preserved so callables and validate() can accept {…}/[…] args.
+        if (is_single_quoted_parameter(current)) {
+            current = unescape_parameter_string(current.substr(1, current.size() - 2));
+            parameter_was_quoted = true;
         } else {
             parameter_was_quoted = false;
         }
@@ -67,8 +84,8 @@ std::vector<std::string> parse_parameters(const std::string& text, bool& ok,
     for (std::size_t i=0;i<text.size();++i) {
         const char c=text[i];
         if (in_quotes) {
-            if (c=='\\' && i+1<text.size()) { const char escaped=text[++i]; if (escaped=='$') current+='\\'; current+=escaped; significant_end=current.size(); }
-            else if (c==quote) { in_quotes=false; current+=c; significant_end=current.size(); }
+            if (c=='\\' && i+1<text.size()) { current+=c; current+=text[++i]; significant_end=current.size(); continue; }
+            if (c==quote) { in_quotes=false; current+=c; significant_end=current.size(); }
             else { current+=c; significant_end=current.size(); }
             continue;
         }
@@ -1111,7 +1128,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
         json::Document literal;
         std::string literal_error;
         if (!text.empty() && (text.front() == '{' || text.front() == '[')) {
-            if (json::Document::parse(text, literal, literal_error)) { out = std::move(literal); return true; }
+            if (nift_json::parse(text, literal, literal_error)) { out = std::move(literal); return true; }
             error = "invalid structured literal: " + literal_error;
             return false;
         }
@@ -2922,7 +2939,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     if (!templated.ok) break;
                     json::Document parsed;
                     std::string parse_error;
-                    if (!json::Document::parse(templated.output, parsed, parse_error)) {
+                    if (!nift_json::parse(templated.output, parsed, parse_error)) {
                         fail(source_path, source, i, "json: failed to parse inline JSON (" + parse_error + ")");
                         break;
                     }
