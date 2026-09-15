@@ -1120,9 +1120,11 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             if (arg.size() >= 2 && ((arg.front() == '"' && arg.back() == '"') || (arg.front() == '\'' && arg.back() == '\''))) arg = arg.substr(1, arg.size() - 2);
             fs::path path = fs::absolute(host_.root() / arg).lexically_normal();
             if (!filesystem::path_within(fs::absolute(host_.root()).lexically_normal(), path)) { error = "inject: path must stay inside the Nift project"; return false; }
-            std::string injected_error; auto injected = host_.read_shared_json(path, injected_error);
-            if (!injected) { error = "inject: " + (injected_error.empty() ? std::string("source is not readable") : injected_error); return false; }
-            result_.dependencies.insert(host_.relative(path)); out = *injected; return true;
+            if (std::find(input_stack_.begin(), input_stack_.end(), path) != input_stack_.end()) { error = "inject: source cycle through " + path.generic_string(); return false; }
+            auto injected = filesystem::read_file_checked(path); if (!injected) { error = "inject: source is not readable"; return false; }
+            result_.dependencies.insert(host_.relative(path)); input_stack_.push_back(path); push_variable_scope();
+            json::Document injected_value; std::string nested_error; const bool ok = evaluate_expression(*injected, injected_value, nested_error);
+            pop_variable_scope(); input_stack_.pop_back(); if (!ok) { error = "inject: " + nested_error; return false; } out = std::move(injected_value); return true;
         }
 
         // Declarations/assignments must be parsed before direct JSON-path lookup;
@@ -1184,12 +1186,11 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             if (!valid_binding_identifier(name)) { error = "declaration requires an identifier before ':='"; return false; }
             if (reserved_binding_name(name) || host_.is_contract_name(name)) { error = "declaration name is reserved: " + name; return false; }
             if (variable_scopes_.empty()) variable_scopes_.emplace_back();
-            auto& scope = variable_scopes_.back();
-            if (scope.find(name) != scope.end()) { error = "binding already declared in this scope: " + name; return false; }
+            if (variable_scopes_.back().find(name) != variable_scopes_.back().end()) { error = "binding already declared in this scope: " + name; return false; }
             json::Document assigned;
             if (!eval(text.substr(p + 2), assigned)) return false;
             auto stored = std::make_shared<json::Document>(assigned);
-            scope.emplace(name, VariableBinding{stored, nift_binding_type(assigned), mutable_binding, deep_readonly});
+            variable_scopes_.back().emplace(name, VariableBinding{stored, nift_binding_type(assigned), mutable_binding, deep_readonly});
             last_expression_mutation_ = true;
             out = std::move(assigned);
             return true;
