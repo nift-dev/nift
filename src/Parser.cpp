@@ -1178,12 +1178,12 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                         else out = json::Document(nested.output);
                     } else {
                         ++function_call_depth_;
-                        if (pending_return_active_) { pending_return_active_ = false; pending_return_value_.reset(); }
+                        if (pending_control_.kind != ControlFlow::None) { pending_control_ = {}; }
                         auto body_result = parse(ci->second.body, ci->second.source_path, 1);
                         --function_call_depth_;
                         if (!body_result.ok) { call_ok = false; call_error = body_result.error.message; }
-                        else if (!pending_return_active_) { call_ok = false; call_error = "function requires @return(expr): " + call_name; }
-                        else { out = std::move(*pending_return_value_); pending_return_active_ = false; pending_return_value_.reset(); }
+                        else if (pending_control_.kind == ControlFlow::None) { call_ok = false; call_error = "function requires @return(expr): " + call_name; }
+                        else { out = std::move(*pending_control_.value); pending_control_ = {}; }
                     }
                     last_expression_mutation_ = saved_mutation;
                     pop_variable_scope();
@@ -1627,7 +1627,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
     output.reserve(source.size() + 64);
 
     for (std::size_t i = 0; i < source.size() && result_.ok;) {
-        if (pending_return_active_) break;
+        if (pending_control_.kind != ControlFlow::None) break;
         if (i + 1 < source.size() && source[i] == '\\' && (source[i + 1] == '@' || source[i + 1] == '$' || source[i + 1] == '#')) {
             output += source[i + 1];
             i += 2;
@@ -2438,8 +2438,8 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     fail(source_path, source, i, "return: " + return_error);
                     break;
                 }
-                pending_return_value_ = std::make_shared<json::Document>(std::move(return_value));
-                pending_return_active_ = true;
+                pending_control_.value = std::make_shared<json::Document>(std::move(return_value));
+                pending_control_.kind = ControlFlow::Return;
                 break;
             }
 
