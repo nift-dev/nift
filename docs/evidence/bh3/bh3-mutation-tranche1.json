@@ -2,7 +2,7 @@
   "schema_version": 1,
   "campaign": "bh3",
   "checkpoint": "guard-mutation-tranche-1",
-  "timestamp_utc": "2026-08-21T01:15:03.246402+00:00",
+  "timestamp_utc": "2026-09-15T22:52:22.110569+00:00",
   "platform": "Linux (BH3 tranche 1)",
   "nift": "/home/nick/Repositories/nift/nift/nift",
   "purpose": "BH3 curated guard mutation / test-of-test tranche 1: representative runtime (stub/sabotaged binary) and source mutations against exact guard copies, with the BH2 static scanner run over each mutant.",
@@ -22,10 +22,10 @@
           "binary": "stub",
           "expectation": "a stub nift (validates nothing) must not be accepted as a green run; if it is, the guard is LIVE_FALSE_GREEN",
           "expected": "GREEN",
-          "classification": "LIVE_FALSE_GREEN",
-          "exit": 0,
-          "outcome": "PASS",
-          "outcome_tail": "Pagination incremental equivalence passed: 18 comparisons",
+          "classification": "HYPOTHESIS_REJECTED",
+          "exit": 1,
+          "outcome": "FAIL",
+          "outcome_tail": "RuntimeError: modified:initial: expected page 'blog.html' missing or empty (items=5, items-per-page=2)",
           "bh2_scanner_findings": 0
         },
         {
@@ -72,7 +72,7 @@
           "classification": "ROBUST",
           "exit": 2,
           "outcome": "EXIT_2",
-          "outcome_tail": "grep: /tmp/nift-contracts.2tsVR5/happy/public/index.html: No such file or directory",
+          "outcome_tail": "grep: /tmp/nift-contracts.tI60jc/happy/public/index.html: No such file or directory",
           "bh2_scanner_findings": 0
         },
         {
@@ -84,7 +84,7 @@
           "classification": "ROBUST",
           "exit": 2,
           "outcome": "EXIT_2",
-          "outcome_tail": "/tmp/bh3-mutation.1addwfac/contracts_smoke.sh.m4-remove-expect-failure-probes-stub: line 26: syntax error near unexpected token `}'",
+          "outcome_tail": "/tmp/bh3-mutation.ijkynu9g/contracts_smoke.sh.m4-remove-expect-failure-probes-stub: line 26: syntax error near unexpected token `}'",
           "bh2_scanner_findings": 0
         }
       ]
