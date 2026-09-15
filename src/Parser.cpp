@@ -1558,6 +1558,18 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             continue;
         }
 
+        if (source.compare(i, 4, "@:=(") == 0) {
+            std::size_t header_close = 0;
+            if (!find_balanced(source, i + 3, '(', ')', header_close)) { fail(source_path, source, i, "@:= has no matching ')'"); break; }
+            const std::string name = trim_copy(source.substr(i + 4, header_close - (i + 4)));
+            std::size_t block_open = header_close + 1; while (block_open < source.size() && std::isspace(static_cast<unsigned char>(source[block_open]))) ++block_open;
+            std::size_t block_close = 0;
+            if (block_open >= source.size() || source[block_open] != '{' || !find_balanced(source, block_open, '{', '}', block_close)) { fail(source_path, source, i, "@:= requires a balanced '{...}' expression block"); break; }
+            json::Document declared; std::string declaration_error;
+            if (!evaluate_expression(name + " := " + source.substr(block_open + 1, block_close - block_open - 1), declared, declaration_error)) { fail(source_path, source, i, "@:= " + declaration_error); break; }
+            i = block_close + 1; continue;
+        }
+
         if (source.compare(i, 2, "$[") == 0) {
             std::size_t end = i + 2;
             std::size_t nested_brackets = 0;
