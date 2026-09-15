@@ -1039,8 +1039,8 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
     auto resolve_direct = [&](const std::string& raw, json::Document& out) -> bool {
         const std::string text = trim_copy(raw);
         for (auto scope = variable_scopes_.rbegin(); scope != variable_scopes_.rend(); ++scope) {
-            const auto it = scope->find(text);
-            if (it != scope->end()) { out = *it->second.value; return true; }
+            const auto it = scope->find(text); if (it != scope->end()) { out = *it->second.value; return true; }
+            const auto dot = text.find('.'); if (dot != std::string::npos) { auto root = scope->find(text.substr(0,dot)); if(root != scope->end()){ const json::Document* cur=root->second.value.get(); std::size_t pos=dot+1; while(pos<=text.size()){auto next=text.find('.',pos);std::string key=text.substr(pos,next==std::string::npos?std::string::npos:next-pos);if(!cur->is_object()||!cur->has(key))break;cur=&(*cur)[key];if(next==std::string::npos){out=*cur;return true;}pos=next+1;}} }
         }
         std::shared_ptr<const json::Document> document;
         if (resolve_pagination_value(text, document)) { out = *document; return true; }
@@ -1095,8 +1095,8 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             if (lp != std::string::npos && text.back() == ')' && valid_binding_identifier(trim_copy(text.substr(0, lp)))) {
                 const std::string call_name = trim_copy(text.substr(0, lp)); auto ci = callables_.find(call_name);
                 if (ci != callables_.end()) {
-                    bool args_ok=false; auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),args_ok); if(!args_ok||args.size()!=ci->second.params.size()){error="callable argument count mismatch: "+call_name;return false;}
-                    std::vector<json::Document> values; for(const auto& a:args){json::Document v;if(!eval(a,v))return false;values.push_back(std::move(v));}
+                    bool args_ok=false; std::vector<bool> quoted_args; auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),args_ok,&quoted_args); if(!args_ok||args.size()!=ci->second.params.size()){error="callable argument count mismatch: "+call_name;return false;}
+                    std::vector<json::Document> values; for(std::size_t ai=0;ai<args.size();++ai){json::Document v;if(ai<quoted_args.size()&&quoted_args[ai])v=json::Document(args[ai]);else if(!eval(args[ai],v))return false;values.push_back(std::move(v));}
                     push_variable_scope(); auto& scope=variable_scopes_.back(); for(std::size_t ai=0;ai<values.size();++ai){auto sp=std::make_shared<json::Document>(std::move(values[ai]));scope.emplace(ci->second.params[ai],VariableBinding{sp,nift_binding_type(*sp),true,false});}
                     if(ci->second.fragment){auto nested=parse(ci->second.body,ci->second.source_path,1);pop_variable_scope();if(!nested.ok){error=nested.error.message;return false;}out=json::Document(nested.output);return true;}
                     const auto rp=ci->second.body.rfind("@return("); if(rp==std::string::npos){pop_variable_scope();error="function requires @return(expr): "+call_name;return false;}
@@ -1116,30 +1116,20 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
         }
 
         if (text.rfind("inject(", 0) == 0 && text.back() == ')') {
-            const std::string arg = trim_copy(text.substr(7, text.size() - 8));
-            json::Document path_value; std::string lit_error;
-            if (!scalar_literal(arg, path_value, lit_error) || !path_value.is_string()) { error = "inject: path must be a string expression"; return false; }
-            fs::path path = path_value.string;
-            if (path.is_relative()) {
-                const fs::path base = input_stack_.empty() ? host_.root() : input_stack_.back().parent_path();
-                fs::path candidate = base / path;
-                path = host_.source_exists(candidate) ? candidate : host_.root() / path;
-            }
-            path = fs::absolute(path).lexically_normal();
+            std::string arg = trim_copy(text.substr(7, text.size() - 8));
+            if (arg.size() >= 2 && ((arg.front() == '"' && arg.back() == '"') || (arg.front() == '\'' && arg.back() == '\''))) arg = arg.substr(1, arg.size() - 2);
+            fs::path path = fs::absolute(host_.root() / arg).lexically_normal();
             if (!filesystem::path_within(fs::absolute(host_.root()).lexically_normal(), path)) { error = "inject: path must stay inside the Nift project"; return false; }
-            if (std::find(input_stack_.begin(), input_stack_.end(), path) != input_stack_.end()) { error = "inject: source cycle through " + path.generic_string(); return false; }
-            auto injected = host_.read_shared_source(path);
-            if (injected.status == nift::HostStatus::Error) { error = injected.error; return false; }
-            if (!injected.content) { error = "inject: source is not readable"; return false; }
-            result_.dependencies.insert(host_.relative(path)); input_stack_.push_back(path); push_variable_scope();
-            json::Document injected_value; const bool ok = eval(*injected.content, injected_value);
-            pop_variable_scope(); input_stack_.pop_back(); if (!ok) return false; out = std::move(injected_value); return true;
+            std::string injected_error; auto injected = host_.read_shared_json(path, injected_error);
+            if (!injected) { error = "inject: " + (injected_error.empty() ? std::string("source is not readable") : injected_error); return false; }
+            result_.dependencies.insert(host_.relative(path)); out = *injected; return true;
         }
 
-        // Preserve exact metadata/JSON names (notably built-ins such as output-path)
-        // before interpreting punctuation as arithmetic.
-        if (resolve_direct(text,out)) return true;
-        if (!error.empty()) return false;
+        // Declarations/assignments must be parsed before direct JSON-path lookup;
+        // structured RHS values can otherwise make the whole mutation look like an object expression.
+        const bool mutation_candidate = text.find(":=") != std::string::npos ||
+            (text.find('=') != std::string::npos && text.find("==") == std::string::npos && text.find("!=") == std::string::npos && text.find("<=") == std::string::npos && text.find(">=") == std::string::npos && text.find("=>") == std::string::npos);
+        if (!mutation_candidate) { if (resolve_direct(text,out)) return true; if (!error.empty()) return false; }
 
         auto truthy_value = [](const json::Document& document) {
             if (document.is_bool()) return document.boolean;
@@ -1741,6 +1731,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 json::Document expression_value;
                 std::string expression_error;
                 if (evaluate_expression(trim_copy(key), expression_value, expression_error)) {
+                    if (last_expression_mutation_) { i = end + 1; continue; }
                     if (expression_value.is_array()) {
                         fail(source_path, source, i, "cannot render JSON array $[" + key + "]; select an element first");
                         break;
@@ -1749,7 +1740,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                         fail(source_path, source, i, "cannot render JSON object $[" + key + "]; select a member first");
                         break;
                     }
-                    if (!last_expression_mutation_) output += render_expression_value(expression_value);
+                    output += render_expression_value(expression_value);
                     i = end + 1;
                     continue;
                 }
