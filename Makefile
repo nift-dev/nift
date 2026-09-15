@@ -441,7 +441,7 @@ test: test-content test-commands test-comments test-contracts test-json \
 	test-json-schema test-console test-diagnostics test-minify \
 	test-json-schema-integration test-markup-json-directives test-pagination test-pagination-ordering \
 	test-template-optional test-requirements test-path-alias test-path-safety test-metadata-safety \
-	test-init-targets test-init-lock test-control-flow test-template-variables test-cross-feature test-v41-certification test-config-validation \
+	test-init-targets test-init-lock test-control-flow test-template-variables test-cross-feature test-v41-certification test-v42-language test-config-validation \
 	test-zero-mutation test-repair-campaign test-ownership-concurrency \
 	test-macos-runner-policy \
 	test-progress-render $(PROGRESS_PTY_TARGET) test-snap-contract test-distribution-summary test-version-consistency test-unreadable-source
@@ -482,6 +482,16 @@ test-template-variables: $(TARGET)
 
 test-v41-certification: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v41_certification_adversarial.sh
+
+# Nift v4.2 structured-control/function-program language tranche.
+test-v42-language: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v42_null_smoke.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v42_while_smoke.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v42_continue_smoke.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v42_break_smoke.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v42_return_smoke.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v42_fragment_return_smoke.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v42_control_adversarial.sh
 
 # Fail-closed guard: every maintained workflow's official macOS matrix entry
 # (arm64 -> macos-latest, x86-64 -> macos-26-intel) must agree on the runner,
@@ -671,7 +681,7 @@ clean:
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
-.PHONY: embed go-binding csharp-binding node-binding python-binding bindings test-build-boundary test-embed test-go-binding test-csharp-binding test-node-binding test-python-binding test-bindings test-all test benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-markuppp-sync test-json test-json-schema test-console test-progress-render test-progress-pty test-snap-contract test-distribution-summary test-version-consistency test-diagnostics test-minify test-json-schema-integration test-markup-json-directives test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke test-host-seam benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-alias test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets test-init-lock test-unreadable-source test-v41-certification test-macos-runner-policy install uninstall
+.PHONY: embed go-binding csharp-binding node-binding python-binding bindings test-build-boundary test-embed test-go-binding test-csharp-binding test-node-binding test-python-binding test-bindings test-all test benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-markuppp-sync test-json test-json-schema test-console test-progress-render test-progress-pty test-snap-contract test-distribution-summary test-version-consistency test-diagnostics test-minify test-json-schema-integration test-markup-json-directives test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke test-host-seam benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-alias test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets test-init-lock test-unreadable-source test-v41-certification test-v42-language test-macos-runner-policy install uninstall
 
 
 test-cross-feature: $(TARGET)

@@ -24,8 +24,8 @@ expect() {
 P="$R/fn-local-decl"; newproj "$P"
 cat > "$P/content/index.html" <<'E'
 @fn(f()){
-    $[tmp := 10]
-    @return(tmp + 1)
+    tmp := 10
+    return tmp + 1
 }
 call=$[f()]
 E
@@ -36,8 +36,8 @@ expect "fn-local-decl renders" 'call=11' "$(grep -o 'call=.*' "$P/public/index.h
 P="$R/fn-outer-mutation"; newproj "$P"
 cat > "$P/content/index.html" <<'E'
 @fn(bump()){
-    $[counter = counter + 1]
-    @return(counter)
+    counter = counter + 1
+    return counter
 }
 $[counter := 0]
 b1=$[bump()] b2=$[bump()] final=$[counter]
@@ -78,26 +78,26 @@ E
 (cd "$P" && "$NIFT" build --all >/dev/null)
 expect "bare inject declaration suppressed" '' "$(tr -d '[:space:]' < "$P/public/index.html")"
 
-# --- @return must honour conditional branches, not always the last @return. ---
+# --- bare return must honour conditional branches. ---
 P="$R/conditional-returns"; newproj "$P"
 cat > "$P/content/index.html" <<'E'
 @fn(pick(c)){
-    @if(c){@return("yes")}
-    @return("no")
+    if(c){return "yes"}
+    return "no"
 }
 pick-t=$[pick(true)] pick-f=$[pick(false)]
 E
 (cd "$P" && "$NIFT" build --all >/dev/null)
 expect "conditional returns" 'pick-t=yes pick-f=no' "$(grep -o 'pick-t=[a-z]* pick-f=[a-z]*' "$P/public/index.html")"
 
-# Function with no reachable @return errors.
+# Function fallthrough is the first-class null value.
 P="$R/missing-return"; newproj "$P"
 cat > "$P/content/index.html" <<'E'
-@fn(noop()){ $[x := 1] }
-$[noop()]
+@fn(noop()){ x := 1 }
+noop-null=$[noop() == null]
 E
-if (cd "$P" && "$NIFT" build --all >/dev/null 2>err); then echo "FAIL [missing-return]: expected build failure" >&2; exit 1; fi
-grep -q 'function requires @return' "$P/err"
+(cd "$P" && "$NIFT" build --all >/dev/null)
+expect "function fallthrough null" 'noop-null=true' "$(grep -o 'noop-null=true' "$P/public/index.html")"
 
 # --- @for loop variables must shadow outer v4.1 bindings with the same name. ---
 P="$R/loop-shadowing"; newproj "$P"
@@ -134,9 +134,9 @@ cat > "$P/content/index.html" <<'E'
 $[schema := {"type":"object","properties":{"n":{"type":"integer"}}}]
 $[ok := validate(schema, {"n": 5})]
 ok=$[ok.n]
-@fn(pick(o)){@return(o.name)}
+@fn(pick(o)){return o.name}
 name=$[pick({"name": "zed"})]
-@fn(first(a)){@return(a[0])}
+@fn(first(a)){return a[0]}
 first=$[first([7,8])]
 E
 (cd "$P" && "$NIFT" build --all >/dev/null)
@@ -148,8 +148,8 @@ expect "callable array literal arg" 'first=7' "$(grep -o 'first=[0-9]*' "$P/publ
 P="$R/recursion-bound"; newproj "$P"
 cat > "$P/content/index.html" <<'E'
 @fn(down(n)){
-    @if(n > 0){ @return(down(n - 1)) }
-    @return(0)
+    if(n > 0){ return down(n - 1) }
+    return 0
 }
 r=$[down(200000)]
 E
@@ -159,4 +159,4 @@ if (cd "$P" && "$NIFT" build --all >/dev/null 2>err); then
 fi
 grep -q 'recursion' "$P/err"
 
-echo 'Nift v4.1 certification adversarial passed'
+echo 'Nift v4.2 certification adversarial passed'
