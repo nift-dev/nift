@@ -55,6 +55,11 @@ private:
     struct Callable { std::vector<std::string> params; std::string body; std::filesystem::path source_path; bool fragment = false; };
     std::unordered_map<std::string, Callable> callables_;
     bool last_expression_mutation_ = false;
+    int function_call_depth_ = 0;
+    bool in_fragment_body_ = false;
+    bool pending_return_active_ = false;
+    std::shared_ptr<json::Document> pending_return_value_;
+    int callable_call_depth_ = 0;
     bool pagination_collecting_ = false;
     bool pagination_context_active_ = false;
     std::size_t pagination_current_ = 1;

@@ -32,6 +32,8 @@ static const char* nift_binding_type_name(int type) {
     switch (type) { case 0:return "null"; case 1:return "bool"; case 2:return "int"; case 3:return "double"; case 4:return "string"; case 5:return "array"; case 6:return "json"; default:return "unknown"; }
 }
 
+static const int kMaxCallableDepth = 64;
+
 
 namespace {
 std::vector<std::string> parse_parameters(const std::string& text, bool& ok,
@@ -39,17 +41,38 @@ std::vector<std::string> parse_parameters(const std::string& text, bool& ok,
     std::vector<std::string> result; std::string current; bool in_quotes=false; char quote=0;
     bool parameter_was_quoted=false;
     int parens=0, brackets=0, braces=0; std::size_t significant_end=0; ok=true;
-    auto append_parameter=[&]{ current.resize(significant_end); result.push_back(current);
+    auto append_parameter=[&]{
+        current.resize(significant_end);
+        // Only a parameter that is exactly one quoted string is a quoted
+        // parameter: strip its outer quotes and record it. Quotes inside
+        // structured literals (objects/arrays) are preserved so callables and
+        // validate() can accept {…}/[…] arguments.
+        const bool single_quoted = current.size() >= 2 &&
+            (current.front() == '\'' || current.front() == '"');
+        if (single_quoted) {
+            const char outer = current.front();
+            bool closes_at_end = false;
+            for (std::size_t q = 1; q < current.size(); ++q) {
+                if (current[q] == '\\' && q + 1 < current.size()) { ++q; continue; }
+                if (current[q] == outer) { closes_at_end = (q + 1 == current.size()); break; }
+            }
+            if (closes_at_end) current = current.substr(1, current.size() - 2);
+            else parameter_was_quoted = false;
+        } else {
+            parameter_was_quoted = false;
+        }
+        result.push_back(current);
         if (quoted) quoted->push_back(parameter_was_quoted);
         current.clear(); significant_end=0; parameter_was_quoted=false; };
     for (std::size_t i=0;i<text.size();++i) {
         const char c=text[i];
         if (in_quotes) {
             if (c=='\\' && i+1<text.size()) { const char escaped=text[++i]; if (escaped=='$') current+='\\'; current+=escaped; significant_end=current.size(); }
-            else if (c==quote) in_quotes=false; else { current+=c; significant_end=current.size(); }
+            else if (c==quote) { in_quotes=false; current+=c; significant_end=current.size(); }
+            else { current+=c; significant_end=current.size(); }
             continue;
         }
-        if (c=='\'' || c=='"') { in_quotes=true; quote=c; parameter_was_quoted=true; continue; }
+        if (c=='\'' || c=='"') { in_quotes=true; quote=c; parameter_was_quoted=true; current+=c; significant_end=current.size(); continue; }
         if (c=='(') ++parens; else if (c==')') --parens; else if (c=='[') ++brackets; else if (c==']') --brackets; else if (c=='{') ++braces; else if (c=='}') --braces;
         if (parens<0 || brackets<0 || braces<0) { ok=false; return {}; }
         if (c==',' && parens==0 && brackets==0 && braces==0) { append_parameter(); continue; }
@@ -1040,7 +1063,35 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
         const std::string text = trim_copy(raw);
         for (auto scope = variable_scopes_.rbegin(); scope != variable_scopes_.rend(); ++scope) {
             const auto it = scope->find(text); if (it != scope->end()) { out = *it->second.value; return true; }
-            const auto dot = text.find('.'); if (dot != std::string::npos) { auto root = scope->find(text.substr(0,dot)); if(root != scope->end()){ const json::Document* cur=root->second.value.get(); std::size_t pos=dot+1; while(pos<=text.size()){auto next=text.find('.',pos);std::string key=text.substr(pos,next==std::string::npos?std::string::npos:next-pos);if(!cur->is_object()||!cur->has(key))break;cur=&(*cur)[key];if(next==std::string::npos){out=*cur;return true;}pos=next+1;}} }
+            std::size_t root_len = 0;
+            while (root_len < text.size() &&
+                   (std::isalnum(static_cast<unsigned char>(text[root_len])) || text[root_len] == '_')) ++root_len;
+            if (root_len == 0 || root_len == text.size()) continue;
+            auto root_it = scope->find(text.substr(0, root_len));
+            if (root_it == scope->end()) continue;
+            const json::Document* cur = root_it->second.value.get();
+            std::size_t pos = root_len;
+            bool walk_ok = true;
+            while (pos < text.size()) {
+                if (text[pos] == '.') {
+                    ++pos; const std::size_t member_start = pos;
+                    while (pos < text.size() &&
+                           (std::isalnum(static_cast<unsigned char>(text[pos])) || text[pos] == '_')) ++pos;
+                    if (member_start == pos || !cur->is_object() || !cur->has(text.substr(member_start, pos - member_start))) { walk_ok = false; break; }
+                    cur = &(*cur)[text.substr(member_start, pos - member_start)];
+                } else if (text[pos] == '[') {
+                    ++pos; const std::size_t index_start = pos;
+                    while (pos < text.size() && std::isdigit(static_cast<unsigned char>(text[pos]))) ++pos;
+                    if (index_start == pos || pos >= text.size() || text[pos] != ']') { walk_ok = false; break; }
+                    std::size_t index = 0;
+                    try { index = static_cast<std::size_t>(std::stoull(text.substr(index_start, pos - index_start))); }
+                    catch (...) { walk_ok = false; break; }
+                    ++pos;
+                    if (!cur->is_array() || index >= cur->array.size()) { walk_ok = false; break; }
+                    cur = &(*cur)[index];
+                } else { walk_ok = false; break; }
+            }
+            if (walk_ok) { out = *cur; return true; }
         }
         std::shared_ptr<const json::Document> document;
         if (resolve_pagination_value(text, document)) { out = *document; return true; }
@@ -1084,8 +1135,8 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
         return parens==0 && !quoted;
     };
 
-    std::function<bool(const std::string&, json::Document&)> eval;
-    eval = [&](const std::string& raw, json::Document& out) -> bool {
+    std::function<bool(const std::string&, json::Document&, int)> eval;
+    eval = [&](const std::string& raw, json::Document& out, int depth) -> bool {
         std::string text=trim_copy(raw);
         if (text.empty()) { error="expression cannot be empty"; return false; }
         while (encloses(text)) text=trim_copy(text.substr(1,text.size()-2));
@@ -1095,22 +1146,42 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             if (lp != std::string::npos && text.back() == ')' && valid_binding_identifier(trim_copy(text.substr(0, lp)))) {
                 const std::string call_name = trim_copy(text.substr(0, lp)); auto ci = callables_.find(call_name);
                 if (ci != callables_.end()) {
+                    if (callable_call_depth_ >= kMaxCallableDepth) { error = "callable recursion depth exceeded: " + call_name; return false; }
                     bool args_ok=false; std::vector<bool> quoted_args; auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),args_ok,&quoted_args); if(!args_ok||args.size()!=ci->second.params.size()){error="callable argument count mismatch: "+call_name;return false;}
-                    std::vector<json::Document> values; for(std::size_t ai=0;ai<args.size();++ai){json::Document v;if(ai<quoted_args.size()&&quoted_args[ai])v=json::Document(args[ai]);else if(!eval(args[ai],v))return false;values.push_back(std::move(v));}
+                    std::vector<json::Document> values; for(std::size_t ai=0;ai<args.size();++ai){json::Document v;if(ai<quoted_args.size()&&quoted_args[ai])v=json::Document(args[ai]);else if(!eval(args[ai],v,depth+1))return false;values.push_back(std::move(v));}
+                    ++callable_call_depth_;
                     push_variable_scope(); auto& scope=variable_scopes_.back(); for(std::size_t ai=0;ai<values.size();++ai){auto sp=std::make_shared<json::Document>(std::move(values[ai]));scope.emplace(ci->second.params[ai],VariableBinding{sp,nift_binding_type(*sp),true,false});}
-                    if(ci->second.fragment){auto nested=parse(ci->second.body,ci->second.source_path,1);pop_variable_scope();if(!nested.ok){error=nested.error.message;return false;}out=json::Document(nested.output);return true;}
-                    const auto rp=ci->second.body.rfind("@return("); if(rp==std::string::npos){pop_variable_scope();error="function requires @return(expr): "+call_name;return false;}
-                    std::size_t rc=0;if(!find_balanced(ci->second.body,rp+7,'(',')',rc)){pop_variable_scope();error="malformed @return";return false;}
-                    if(rp){auto prefix=parse(ci->second.body.substr(0,rp),ci->second.source_path,1);if(!prefix.ok){pop_variable_scope();error=prefix.error.message;return false;}}
-                    json::Document returned;const bool ok=eval(ci->second.body.substr(rp+8,rc-(rp+8)),returned);pop_variable_scope();if(!ok)return false;out=std::move(returned);return true;
+                    const bool saved_mutation = last_expression_mutation_;
+                    bool call_ok = true; std::string call_error;
+                    if (ci->second.fragment) {
+                        const bool saved_fragment = in_fragment_body_; in_fragment_body_ = true;
+                        auto nested = parse(ci->second.body, ci->second.source_path, 1);
+                        in_fragment_body_ = saved_fragment;
+                        if (!nested.ok) { call_ok = false; call_error = nested.error.message; }
+                        else out = json::Document(nested.output);
+                    } else {
+                        ++function_call_depth_;
+                        if (pending_return_active_) { pending_return_active_ = false; pending_return_value_.reset(); }
+                        auto body_result = parse(ci->second.body, ci->second.source_path, 1);
+                        --function_call_depth_;
+                        if (!body_result.ok) { call_ok = false; call_error = body_result.error.message; }
+                        else if (!pending_return_active_) { call_ok = false; call_error = "function requires @return(expr): " + call_name; }
+                        else { out = std::move(*pending_return_value_); pending_return_active_ = false; pending_return_value_.reset(); }
+                    }
+                    last_expression_mutation_ = saved_mutation;
+                    pop_variable_scope();
+                    --callable_call_depth_;
+                    if (!call_ok) { error = call_error; return false; }
+                    return true;
                 }
+                if (call_name != "inject" && call_name != "validate") { error = "undefined callable: " + call_name; return false; }
             }
         }
 
         if (text.rfind("validate(", 0) == 0 && text.back() == ')') {
             bool ok_params = false; auto args = parse_parameters(text.substr(9, text.size() - 10), ok_params);
             if (!ok_params || args.size() != 2) { error = "validate: expected schema and value"; return false; }
-            json::Document schema, candidate; if (!eval(args[0], schema) || !eval(args[1], candidate)) return false;
+            json::Document schema, candidate; if (!eval(args[0], schema, depth + 1) || !eval(args[1], candidate, depth + 1)) return false;
             std::string validation_error; if (!jsonschema::validate(candidate, schema, validation_error)) { error = "validate: " + validation_error; return false; }
             out = std::move(candidate); return true;
         }
@@ -1123,7 +1194,9 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             if (std::find(input_stack_.begin(), input_stack_.end(), path) != input_stack_.end()) { error = "inject: source cycle through " + path.generic_string(); return false; }
             auto injected = filesystem::read_file_checked(path); if (!injected) { error = "inject: source is not readable"; return false; }
             result_.dependencies.insert(host_.relative(path)); input_stack_.push_back(path); push_variable_scope();
+            const bool saved_mutation = last_expression_mutation_;
             json::Document injected_value; std::string nested_error; const bool ok = evaluate_expression(*injected, injected_value, nested_error);
+            last_expression_mutation_ = depth == 0 ? last_expression_mutation_ : saved_mutation;
             pop_variable_scope(); input_stack_.pop_back(); if (!ok) { error = "inject: " + nested_error; return false; } out = std::move(injected_value); return true;
         }
 
@@ -1188,10 +1261,10 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             if (variable_scopes_.empty()) variable_scopes_.emplace_back();
             if (variable_scopes_.back().find(name) != variable_scopes_.back().end()) { error = "binding already declared in this scope: " + name; return false; }
             json::Document assigned;
-            if (!eval(text.substr(p + 2), assigned)) return false;
+            if (!eval(text.substr(p + 2), assigned, depth + 1)) return false;
             auto stored = std::make_shared<json::Document>(assigned);
             variable_scopes_.back().emplace(name, VariableBinding{stored, nift_binding_type(assigned), mutable_binding, deep_readonly});
-            last_expression_mutation_ = true;
+            if (depth == 0) last_expression_mutation_ = true;
             out = std::move(assigned);
             return true;
         }
@@ -1207,7 +1280,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             if (!binding) { error = "assignment to undefined binding: " + name; return false; }
             if (!binding->mutable_binding) { error = "cannot assign to const binding: " + name; return false; }
             json::Document assigned;
-            if (!eval(text.substr(p + 1), assigned)) return false;
+            if (!eval(text.substr(p + 1), assigned, depth + 1)) return false;
             const int assigned_type = nift_binding_type(assigned);
             if (assigned_type != binding->type) {
                 error = "cannot assign " + std::string(nift_binding_type_name(assigned_type)) +
@@ -1216,30 +1289,30 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             }
             auto rebound = std::make_shared<json::Document>(std::move(assigned));
             binding->value = rebound;
-            last_expression_mutation_ = true;
+            if (depth == 0) last_expression_mutation_ = true;
             out = *rebound;
             return true;
         }
 
         if (const auto p=find_top_level_op("||"); p!=std::string::npos) {
             json::Document left;
-            if (!eval(text.substr(0,p),left)) return false;
+            if (!eval(text.substr(0,p),left,depth+1)) return false;
             if (truthy_value(left)) { out=json::Document(true); return true; }
-            json::Document right; if (!eval(text.substr(p+2),right)) return false;
+            json::Document right; if (!eval(text.substr(p+2),right,depth+1)) return false;
             out=json::Document(truthy_value(right)); return true;
         }
         if (const auto p=find_top_level_op("&&"); p!=std::string::npos) {
             json::Document left;
-            if (!eval(text.substr(0,p),left)) return false;
+            if (!eval(text.substr(0,p),left,depth+1)) return false;
             if (!truthy_value(left)) { out=json::Document(false); return true; }
-            json::Document right; if (!eval(text.substr(p+2),right)) return false;
+            json::Document right; if (!eval(text.substr(p+2),right,depth+1)) return false;
             out=json::Document(truthy_value(right)); return true;
         }
         for (const std::string op : {"==","!=","<=",">=","<",">"}) {
             const auto p=find_top_level_op(op);
             if (p==std::string::npos) continue;
             json::Document left,right;
-            if (!eval(text.substr(0,p),left) || !eval(text.substr(p+op.size()),right)) return false;
+            if (!eval(text.substr(0,p),left,depth+1) || !eval(text.substr(p+op.size()),right,depth+1)) return false;
             bool result=false;
             if (op=="==" || op=="!=") {
                 bool equal=false;
@@ -1261,7 +1334,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             out=json::Document(result); return true;
         }
         if (text.front()=='!' && (text.size()<2 || text[1]!='=')) {
-            json::Document operand; if (!eval(text.substr(1),operand)) return false;
+            json::Document operand; if (!eval(text.substr(1),operand,depth+1)) return false;
             out=json::Document(!truthy_value(operand)); return true;
         }
 
@@ -1287,7 +1360,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
         if (pos==std::string::npos) pos=find_binary("*/%");
         if (pos!=std::string::npos) {
             json::Document left,right;
-            if (!eval(text.substr(0,pos),left) || !eval(text.substr(pos+1),right)) return false;
+            if (!eval(text.substr(0,pos),left,depth+1) || !eval(text.substr(pos+1),right,depth+1)) return false;
             if (!left.is_number() || !right.is_number()) { error="arithmetic operators require numeric operands"; return false; }
             const char op=text[pos];
             double result=0.0;
@@ -1306,7 +1379,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
 
         if ((text.front()=='+' || text.front()=='-') && text.size()>1) {
             json::Document operand;
-            if (!eval(text.substr(1),operand)) return false;
+            if (!eval(text.substr(1),operand,depth+1)) return false;
             if (!operand.is_number()) { error="unary arithmetic operators require a numeric operand"; return false; }
             out=json::Document(text.front()=='-' ? -operand.num : operand.num); return true;
         }
@@ -1314,7 +1387,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
         error="unknown value or malformed expression: " + text;
         return false;
     };
-    return eval(expression,value);
+    return eval(expression,value,0);
 }
 
 bool Parser::evaluate_condition(const std::string& expression, bool& value, std::string& error) {
@@ -1537,6 +1610,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
     output.reserve(source.size() + 64);
 
     for (std::size_t i = 0; i < source.size() && result_.ok;) {
+        if (pending_return_active_) break;
         if (i + 1 < source.size() && source[i] == '\\' && (source[i + 1] == '@' || source[i + 1] == '$' || source[i + 1] == '#')) {
             output += source[i + 1];
             i += 2;
@@ -1605,7 +1679,8 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             if (!valid_binding_identifier(name) || !params_ok) { fail(source_path, source, i, "invalid callable signature"); break; }
             std::size_t bo=header_close+1; while(bo<source.size()&&std::isspace(static_cast<unsigned char>(source[bo])))++bo; std::size_t bc=0;
             if(bo>=source.size()||source[bo]!='{'||!find_balanced(source,bo,'{','}',bc)){fail(source_path,source,i,"callable definition requires a block");break;}
-            callables_[name]=Callable{params,source.substr(bo+1,bc-bo-1),source_path,fragment}; i=bc+1; continue;
+            const auto def_body = normalize_control_block_body(source.substr(bo+1,bc-bo-1));
+            callables_[name]=Callable{params,def_body.text,source_path,fragment}; i=bc+1; continue;
         }
 
         if (source.compare(i, 4, "@:=(") == 0) {
@@ -2140,6 +2215,10 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     json_bindings_["loop"] = make_loop_metadata(position, order.size());
 
                     push_json_scope();
+                    variable_scopes_.back().emplace(binding_part, VariableBinding{
+                        std::const_pointer_cast<json::Document>(
+                            std::shared_ptr<const json::Document>(collection, element)),
+                        nift_binding_type(*element), true, false});
                     const auto nested = parse(body.text, source_path, depth + 1);
                     pop_json_scope();
                     if (!nested.ok) break;
@@ -2267,6 +2346,13 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     json_bindings_["loop"] = make_loop_metadata(position, order.size());
 
                     push_json_scope();
+                    variable_scopes_.back().emplace(key_name, VariableBinding{
+                        std::make_shared<json::Document>(entry.first),
+                        nift_binding_type(json::Document(entry.first)), true, false});
+                    variable_scopes_.back().emplace(value_name, VariableBinding{
+                        std::const_pointer_cast<json::Document>(
+                            std::shared_ptr<const json::Document>(collection, &entry.second)),
+                        nift_binding_type(entry.second), true, false});
                     const auto nested = parse(body.text, source_path, depth + 1);
                     pop_json_scope();
                     if (!nested.ok) break;
@@ -2312,6 +2398,32 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 if (!parameters_ok) { fail(source_path, source, i, function + ": malformed parameters"); break; }
                 end = close + 1;
                 if (end < source.size() && source[end] == ';') ++end;
+            }
+
+            // Inside @fn bodies, @return(expr) captures the function result and
+            // stops the current parse level; enclosing constructs unwind when
+            // the pending return is set. Outside function bodies it remains a
+            // passthrough so existing literal "@return(...)" text is preserved.
+            if (function == "return" && function_call_depth_ > 0 && !in_fragment_body_) {
+                if (!has_parameters) {
+                    fail(source_path, source, i, "return requires an argument expression");
+                    break;
+                }
+                std::size_t return_close = 0;
+                if (!find_balanced(source, call_start, '(', ')', return_close)) {
+                    fail(source_path, source, i, "return: malformed expression");
+                    break;
+                }
+                const std::string return_expr = source.substr(call_start + 1, return_close - call_start - 1);
+                json::Document return_value;
+                std::string return_error;
+                if (!evaluate_expression(return_expr, return_value, return_error)) {
+                    fail(source_path, source, i, "return: " + return_error);
+                    break;
+                }
+                pending_return_value_ = std::make_shared<json::Document>(std::move(return_value));
+                pending_return_active_ = true;
+                break;
             }
 
             // Parameterised functions are only calls when followed by (...).
