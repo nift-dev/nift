@@ -52,6 +52,8 @@ private:
         bool deep_readonly = false;
     };
     std::vector<std::unordered_map<std::string, VariableBinding>> variable_scopes_;
+    struct Callable { std::vector<std::string> params; std::string body; std::filesystem::path source_path; bool fragment = false; };
+    std::unordered_map<std::string, Callable> callables_;
     bool last_expression_mutation_ = false;
     bool pagination_collecting_ = false;
     bool pagination_context_active_ = false;

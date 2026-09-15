@@ -1090,6 +1090,23 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
         if (text.empty()) { error="expression cannot be empty"; return false; }
         while (encloses(text)) text=trim_copy(text.substr(1,text.size()-2));
 
+        {
+            const auto lp = text.find('(');
+            if (lp != std::string::npos && text.back() == ')' && valid_binding_identifier(trim_copy(text.substr(0, lp)))) {
+                const std::string call_name = trim_copy(text.substr(0, lp)); auto ci = callables_.find(call_name);
+                if (ci != callables_.end()) {
+                    bool args_ok=false; auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),args_ok); if(!args_ok||args.size()!=ci->second.params.size()){error="callable argument count mismatch: "+call_name;return false;}
+                    std::vector<json::Document> values; for(const auto& a:args){json::Document v;if(!eval(a,v))return false;values.push_back(std::move(v));}
+                    push_variable_scope(); auto& scope=variable_scopes_.back(); for(std::size_t ai=0;ai<values.size();++ai){auto sp=std::make_shared<json::Document>(std::move(values[ai]));scope.emplace(ci->second.params[ai],VariableBinding{sp,nift_binding_type(*sp),true,false});}
+                    if(ci->second.fragment){auto nested=parse(ci->second.body,ci->second.source_path,1);pop_variable_scope();if(!nested.ok){error=nested.error.message;return false;}out=json::Document(nested.output);return true;}
+                    const auto rp=ci->second.body.rfind("@return("); if(rp==std::string::npos){pop_variable_scope();error="function requires @return(expr): "+call_name;return false;}
+                    std::size_t rc=0;if(!find_balanced(ci->second.body,rp+7,'(',')',rc)){pop_variable_scope();error="malformed @return";return false;}
+                    if(rp){auto prefix=parse(ci->second.body.substr(0,rp),ci->second.source_path,1);if(!prefix.ok){pop_variable_scope();error=prefix.error.message;return false;}}
+                    json::Document returned;const bool ok=eval(ci->second.body.substr(rp+8,rc-(rp+8)),returned);pop_variable_scope();if(!ok)return false;out=std::move(returned);return true;
+                }
+            }
+        }
+
         if (text.rfind("validate(", 0) == 0 && text.back() == ')') {
             bool ok_params = false; auto args = parse_parameters(text.substr(9, text.size() - 10), ok_params);
             if (!ok_params || args.size() != 2) { error = "validate: expected schema and value"; return false; }
@@ -1586,6 +1603,18 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             }
             ++i;
             continue;
+        }
+
+        if (source.compare(i, 4, "@fn(") == 0 || source.compare(i, 10, "@fragment(") == 0) {
+            const bool fragment = source.compare(i, 10, "@fragment(") == 0; const std::size_t open = i + (fragment ? 9 : 3);
+            std::size_t header_close = 0; if (!find_balanced(source, open, '(', ')', header_close)) { fail(source_path, source, i, "callable definition has no matching ')'"); break; }
+            const std::string signature = trim_copy(source.substr(open + 1, header_close - open - 1)); const auto lp = signature.find('(');
+            if (lp == std::string::npos || signature.back() != ')') { fail(source_path, source, i, "callable signature must be name(args)"); break; }
+            const std::string name = trim_copy(signature.substr(0, lp)); bool params_ok=false; auto params=parse_parameters(signature.substr(lp+1, signature.size()-lp-2), params_ok);
+            if (!valid_binding_identifier(name) || !params_ok) { fail(source_path, source, i, "invalid callable signature"); break; }
+            std::size_t bo=header_close+1; while(bo<source.size()&&std::isspace(static_cast<unsigned char>(source[bo])))++bo; std::size_t bc=0;
+            if(bo>=source.size()||source[bo]!='{'||!find_balanced(source,bo,'{','}',bc)){fail(source_path,source,i,"callable definition requires a block");break;}
+            callables_[name]=Callable{params,source.substr(bo+1,bc-bo-1),source_path,fragment}; i=bc+1; continue;
         }
 
         if (source.compare(i, 4, "@:=(") == 0) {
