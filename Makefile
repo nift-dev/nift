@@ -444,7 +444,7 @@ test: test-content test-commands test-comments test-contracts test-json \
 	test-init-targets test-init-lock test-control-flow test-template-variables test-cross-feature test-v41-certification test-v42-language test-v42-struct test-config-validation \
 	test-zero-mutation test-repair-campaign test-ownership-concurrency \
 	test-macos-runner-policy \
-	test-progress-render $(PROGRESS_PTY_TARGET) test-snap-contract test-distribution-summary test-version-consistency test-unreadable-source
+	test-progress-render $(PROGRESS_PTY_TARGET) test-snap-contract test-distribution-summary test-version-consistency test-unreadable-source test-incremental-modified-immediate
 
 # CP10.2: Embed host-seam failure contract (C++ Engine level).
 HOST_SEAM_TEST := $(TEST_DIR)/host-seam$(EXEEXT)
@@ -594,6 +594,12 @@ test-output-permissions: $(TARGET)
 test-unreadable-source: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/unreadable_source_smoke.sh
 
+# Modified-mode staleness must never return success for an immediate source
+# edit: equal content/page-info mtimes (coarse filesystem timestamp resolution)
+# are treated as potentially stale so the rebuild is always attempted.
+test-incremental-modified-immediate: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/incremental_modified_immediate.sh
+
 # `nift init --handover` writes a project-root HANDOVER.md byte-for-byte
 # identical to the canonical copy (tests/fixtures/HANDOVER.md). Plain init
 # must not create it, and it must never land under the output directory.
@@ -695,7 +701,7 @@ clean:
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
-.PHONY: embed go-binding csharp-binding node-binding python-binding bindings test-build-boundary test-embed test-go-binding test-csharp-binding test-node-binding test-python-binding test-bindings test-all test benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-markuppp-sync test-json test-json-schema test-console test-progress-render test-progress-pty test-snap-contract test-distribution-summary test-version-consistency test-diagnostics test-minify test-json-schema-integration test-markup-json-directives test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke test-host-seam benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-alias test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets test-init-lock test-unreadable-source test-v41-certification test-v42-language test-v42-struct test-macos-runner-policy install uninstall
+.PHONY: embed go-binding csharp-binding node-binding python-binding bindings test-build-boundary test-embed test-go-binding test-csharp-binding test-node-binding test-python-binding test-bindings test-all test benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-markuppp-sync test-json test-json-schema test-console test-progress-render test-progress-pty test-snap-contract test-distribution-summary test-version-consistency test-diagnostics test-minify test-json-schema-integration test-markup-json-directives test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke test-host-seam benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-alias test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets test-init-lock test-unreadable-source test-incremental-modified-immediate test-v41-certification test-v42-language test-v42-struct test-macos-runner-policy install uninstall
 
 
 test-cross-feature: $(TARGET)

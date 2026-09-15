@@ -359,11 +359,18 @@ bool ProjectInfo::metadata_path_is_safe(const fs::path& path) const {
 
 bool ProjectInfo::dependency_changed(const fs::path& dependency, fs::file_time_type page_info_mtime) const {
     if (!filesystem::path_exists(dependency)) return true;
+    // Strictly-greater comparison misses edits whose mtime lands in the same
+    // filesystem timestamp quantum as the page-info write (equal timestamps
+    // are common on coarse-resolution or batched-update filesystems). An equal
+    // timestamp is indistinguishable from "edited right at the last build", so
+    // modified mode treats it as potentially stale and rebuilds: a build must
+    // never report success while a source change went unnoticed. Hash mode is
+    // unaffected (content hashing, no timestamps); hybrid keeps both signals.
     if (config.incremental_mode == "modified")
-        return filesystem::modified_time(dependency) > page_info_mtime;
+        return filesystem::modified_time(dependency) >= page_info_mtime;
     if (config.incremental_mode == "hash")
         return hash_changed_cached(dependency);
-    return filesystem::modified_time(dependency) > page_info_mtime ||
+    return filesystem::modified_time(dependency) >= page_info_mtime ||
            hash_changed_cached(dependency);
 }
 

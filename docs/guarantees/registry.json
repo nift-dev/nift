@@ -521,7 +521,7 @@
       "id": "performance.change-proportional-incremental",
       "known_limits": [
         "Structural change-proportionality only; wall-clock scaling remains covered by the near-linear benchmarks",
-        "Filesystem timestamp granularity makes sub-millisecond rewrites undetectable"
+        "modified-mode timestamp comparisons treat an equal dependency/metadata mtime as potentially stale and rebuild (conservative, closes the false-green where an immediate edit shares the metadata write's timestamp quantum); content changes whose mtime still appears earlier than the build metadata can only be caught by hash/hybrid content hashing"
       ],
       "platforms": [
         "linux"
