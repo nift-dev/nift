@@ -62,6 +62,7 @@ private:
     std::unordered_map<std::string, std::shared_ptr<StructInstance>> struct_instances_;
     std::uint64_t next_struct_instance_id_ = 1;
     std::vector<std::shared_ptr<StructInstance>> receiver_stack_;
+    bool invoke_struct_method(const std::shared_ptr<StructInstance>& instance, const StructMethod& method, const std::vector<json::Document>& args, json::Document& out, std::string& error);
     bool last_expression_mutation_ = false;
     int function_call_depth_ = 0;
     bool in_fragment_body_ = false;

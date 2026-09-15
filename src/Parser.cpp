@@ -1165,6 +1165,11 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
 
         {
             const auto lp = text.find('(');
+            if (lp != std::string::npos && text.back() == ')' && text.substr(0,lp).find('.') != std::string::npos) {
+                const std::string target=trim_copy(text.substr(0,lp)); const auto dot=target.rfind('.'); const std::string root=target.substr(0,dot), mn=target.substr(dot+1);
+                VariableBinding* rb=nullptr;for(auto scope=variable_scopes_.rbegin();scope!=variable_scopes_.rend();++scope){auto it=scope->find(root);if(it!=scope->end()){rb=&it->second;break;}}
+                if(rb&&rb->value->is_string()&&rb->value->string.rfind("\x1fnift:struct:",0)==0){auto inst=struct_instances_.find(rb->value->string.substr(13));if(inst==struct_instances_.end()){error="invalid struct instance";return false;}auto sd=structs_.find(inst->second->type_name);auto mi=sd->second.methods.find(mn);if(mi==sd->second.methods.end()||mi->second.constructor){error="struct has no method: "+mn;return false;}bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(!aok){error="malformed method arguments";return false;}std::vector<json::Document> av;for(std::size_t ai=0;ai<ar.size();++ai){json::Document v;if(ai<aq.size()&&aq[ai])v=json::Document(ar[ai]);else if(!eval(ar[ai],v,depth+1))return false;av.push_back(std::move(v));}return invoke_struct_method(inst->second,mi->second,av,out,error);}
+            }
             if (lp != std::string::npos && text.back() == ')' && valid_binding_identifier(trim_copy(text.substr(0, lp)))) {
                 const std::string call_name = trim_copy(text.substr(0, lp));
                 auto si = structs_.find(call_name);
@@ -1175,6 +1180,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                     auto instance=std::make_shared<StructInstance>(); instance->type_name=call_name;
                     for(const auto& field:si->second.fields){ json::Document fv; if(!eval(field.initializer,fv,depth+1))return false; auto sp=std::make_shared<json::Document>(std::move(fv)); instance->fields.emplace(field.name,VariableBinding{sp,nift_binding_type(*sp),true,false}); }
                     const std::string id=std::to_string(next_struct_instance_id_++); struct_instances_[id]=instance;
+                    if(ctor!=si->second.methods.end()){std::vector<json::Document> av;for(std::size_t ai=0;ai<args.size();++ai){json::Document v;if(ai<q.size()&&q[ai])v=json::Document(args[ai]);else if(!eval(args[ai],v,depth+1))return false;av.push_back(std::move(v));}json::Document ignored;if(!invoke_struct_method(instance,ctor->second,av,ignored,error))return false;}
                     out=json::Document(std::string("\x1fnift:struct:")+id); return true;
                 }
                 auto ci = callables_.find(call_name);
@@ -3492,4 +3498,30 @@ RenderResult Parser::render() {
     }
     result_.output = result_.pagination_outputs.front();
     return result_;
+}
+
+bool Parser::invoke_struct_method(const std::shared_ptr<StructInstance>& instance,
+                                  const StructMethod& method,
+                                  const std::vector<json::Document>& args,
+                                  json::Document& out,
+                                  std::string& error) {
+    if (args.size() != method.callable.params.size()) { error = "struct method argument count mismatch"; return false; }
+    if (callable_call_depth_ >= kMaxCallableDepth) { error = "callable recursion depth exceeded"; return false; }
+    ++callable_call_depth_;
+    const int caller_loop_depth = loop_depth_; loop_depth_ = 0;
+    push_variable_scope(); auto& scope=variable_scopes_.back();
+    for(auto& f:instance->fields) scope.emplace(f.first,f.second);
+    for(std::size_t i=0;i<args.size();++i){auto sp=std::make_shared<json::Document>(args[i]);scope[method.callable.params[i]]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
+    std::string id;
+    for(const auto& e:struct_instances_) if(e.second==instance){id=e.first;break;}
+    auto thisv=std::make_shared<json::Document>(std::string("\x1fnift:struct:")+id); scope["this"]=VariableBinding{thisv,nift_binding_type(*thisv),false,false};
+    receiver_stack_.push_back(instance); ++function_call_depth_; pending_control_={};
+    std::string program, pe; bool ok=translate_function_program(method.callable.body,program,pe); RenderResult rr;
+    if(ok) rr=parse(program,method.callable.source_path,1); else {rr.ok=false; rr.error.message=pe;}
+    --function_call_depth_; receiver_stack_.pop_back();
+    for(auto& f:instance->fields){auto it=scope.find(f.first);if(it!=scope.end())f.second=it->second;}
+    pop_variable_scope(); loop_depth_=caller_loop_depth; --callable_call_depth_;
+    if(!rr.ok){error=rr.error.message;pending_control_={};return false;}
+    if(method.constructor && pending_control_.kind==ControlFlow::Return && pending_control_.value && !pending_control_.value->is_null()){error="constructor cannot return a value";pending_control_={};return false;}
+    out=pending_control_.value?*pending_control_.value:json::Document(nullptr); pending_control_={}; return true;
 }
