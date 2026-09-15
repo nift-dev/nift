@@ -1658,6 +1658,7 @@ bool Parser::translate_function_program(const std::string& source, std::string& 
                     std::size_t ec=0;if(e>=in.size()||in[e]!='{'||!find_balanced(in,e,'{','}',ec)){error="function else requires block";return false;}std::string body2;if(!convert(in.substr(e+1,ec-e-1),body2))return false;out+=" else {"+body2+"}";i=ec+1;break;}
                 continue;
             }
+            if(boundary(i,"break")) { std::size_t e=i+5; while(e<in.size()&&std::isspace((unsigned char)in[e])&&in[e]!='\n')++e; if(e==in.size()||in[e]==';'||in[e]=='\n') { out += "break"; i=e<in.size()?e+1:e; continue; } }
             if(boundary(i,"continue")) { std::size_t e=i+8; while(e<in.size()&&std::isspace((unsigned char)in[e])&&in[e]!='\n')++e; if(e==in.size()||in[e]==';'||in[e]=='\n') { out += "continue"; i=e<in.size()?e+1:e; continue; } }
             std::size_t start=i; bool quoted=false;char quote=0;int par=0,br=0;
             for(;i<in.size();++i){char c=in[i];if(quoted){if(c=='\\'&&i+1<in.size())++i;else if(c==quote)quoted=false;continue;}if(c=='\''||c=='"'){quoted=true;quote=c;continue;}if(c=='(')++par;else if(c==')')--par;else if(c=='[')++br;else if(c==']')--br;if(!par&&!br&&(c==';'||c=='\n'))break;}
@@ -1681,6 +1682,12 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
 
     for (std::size_t i = 0; i < source.size() && result_.ok;) {
         if (pending_control_.kind != ControlFlow::None) break;
+        if (source.compare(i, 5, "break") == 0 &&
+            (i + 5 == source.size() || source[i + 5] == ';' || source[i + 5] == '\n' || source[i + 5] == '\r')) {
+            if (loop_depth_ <= 0) { fail(source_path, source, i, "break is only valid inside a loop"); break; }
+            pending_control_.kind = ControlFlow::Break;
+            break;
+        }
         if (source.compare(i, 8, "continue") == 0 &&
             (i + 8 == source.size() || source[i + 8] == ';' || source[i + 8] == '\n' || source[i + 8] == '\r')) {
             if (loop_depth_ <= 0) { fail(source_path, source, i, "continue is only valid inside a loop"); break; }
@@ -2096,6 +2103,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     if (!nested.ok) break;
                     append_indented(output, nested.output, control_indent, insertion_code_block_depth);
                     if (pending_control_.kind == ControlFlow::Continue) { pending_control_ = {}; continue; }
+                    if (pending_control_.kind == ControlFlow::Break) { pending_control_ = {}; break; }
                     selected = true;
                 }
 
@@ -2132,6 +2140,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             while(result_.ok){bool yes=false;std::string e;if(!evaluate_condition(condition,yes,e)){fail(source_path,source,i,e);break;}if(!yes)break;
                 push_json_scope(); ++loop_depth_; auto nested=parse(body.text,source_path,depth+1); --loop_depth_; pop_json_scope();if(!nested.ok)break;append_indented(output,nested.output,"",code_block_depth_);
                 if (pending_control_.kind == ControlFlow::Continue) { pending_control_ = {}; continue; }
+                if (pending_control_.kind == ControlFlow::Break) { pending_control_ = {}; break; }
                 if(pending_control_.kind!=ControlFlow::None)break;
             }
             if(!result_.ok)break;i=bc+1;continue;
@@ -2319,6 +2328,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     if (!nested.ok) break;
                     append_indented(output, nested.output, control_indent, insertion_code_block_depth);
                     if (pending_control_.kind == ControlFlow::Continue) { pending_control_ = {}; continue; }
+                    if (pending_control_.kind == ControlFlow::Break) { pending_control_ = {}; break; }
                     if (body.multiline && position + 1 < order.size())
                         output += "\n" + control_indent;
                 }
@@ -2456,6 +2466,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     if (!nested.ok) break;
                     append_indented(output, nested.output, control_indent, insertion_code_block_depth);
                     if (pending_control_.kind == ControlFlow::Continue) { pending_control_ = {}; continue; }
+                    if (pending_control_.kind == ControlFlow::Break) { pending_control_ = {}; break; }
                     if (body.multiline && position + 1 < order.size())
                         output += "\n" + control_indent;
                 }
