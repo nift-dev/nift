@@ -1627,6 +1627,14 @@ bool Parser::translate_function_program(const std::string& source, std::string& 
         while(i<in.size()) {
             while(i<in.size() && std::isspace((unsigned char)in[i])) ++i;
             if(i>=in.size()) break;
+            if(boundary(i,"for")) {
+                std::size_t p=i+3; while(p<in.size()&&std::isspace((unsigned char)in[p]))++p;
+                std::size_t pc=0; if(p>=in.size()||in[p]!='('||!find_balanced(in,p,'(',')',pc)){error="function for requires '(...)'";return false;}
+                std::size_t bo=pc+1;while(bo<in.size()&&std::isspace((unsigned char)in[bo]))++bo;std::size_t bc=0;
+                if(bo>=in.size()||in[bo]!='{'||!find_balanced(in,bo,'{','}',bc)){error="function for requires a block";return false;}
+                std::string body;if(!convert(in.substr(bo+1,bc-bo-1),body))return false;
+                out += "@for("+in.substr(p+1,pc-p-1)+"){"+body+"}";i=bc+1;continue;
+            }
             if(boundary(i,"if")) {
                 std::size_t p=i+2; while(p<in.size()&&std::isspace((unsigned char)in[p]))++p;
                 if(p>=in.size()||in[p]!='('){error="function if requires '(...)'";return false;}
