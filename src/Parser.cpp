@@ -1936,7 +1936,17 @@ bool Parser::translate_function_program(const std::string& source, std::string& 
             if(boundary(i,"continue")) { std::size_t e=i+8; while(e<in.size()&&std::isspace((unsigned char)in[e])&&in[e]!='\n')++e; if(e==in.size()||in[e]==';'||in[e]=='\n') { out += "continue"; i=e<in.size()?e+1:e; continue; } }
             std::size_t start=i; bool quoted=false;char quote=0;int par=0,br=0;
             for(;i<in.size();++i){char c=in[i];if(quoted){if(c=='\\'&&i+1<in.size())++i;else if(c==quote)quoted=false;continue;}if(c=='\''||c=='"'){quoted=true;quote=c;continue;}if(c=='(')++par;else if(c==')')--par;else if(c=='[')++br;else if(c==']')--br;if(!par&&!br&&(c==';'||c=='\n'))break;}
-            std::string stmt=trim_copy(in.substr(start,i-start)); if(!stmt.empty()) out+="$["+stmt+"]"; if(i<in.size())++i;
+            std::string stmt=trim_copy(in.substr(start,i-start));
+            if(!stmt.empty()){
+                // Template-grammar statements (legacy @-directives and $[...]
+                // values) are already parseable directly and would otherwise be
+                // double-wrapped as $[@...]/$[$...] and routed through the full
+                // expression evaluator. Pass them through verbatim; only bare
+                // v4.2 function-program statements need the $[...] wrapper.
+                if(stmt[0]=='@'||stmt[0]=='$') out+=stmt;
+                else out+="$["+stmt+"]";
+            }
+            if(i<in.size())++i;
         }
         return true;
     };
