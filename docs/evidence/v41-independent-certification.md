@@ -18,12 +18,24 @@ No history was rewritten; the checkpoint series is preserved.
 
 ## Dependency import verification
 
-- Jsonic++ embedded source is the pinned **v1.0.0** release state (`88e4736`).
-  The only difference vs the upstream 1.0.1-dev head is the absence of the
-  `json::version` constant (added post-release), so no 1.0.1-dev code leaked.
-- Minify++ embedded source is the pinned **v1.1.3** release. The only
-  1.1.4-dev change (executable identity `1.1.4`) is absent; `Minify.h` and
-  `Minify.cpp` are byte-identical to the 1.1.4-dev head.
+Verification against the **actual tagged release revisions** (not the current
+sibling working trees):
+
+- **Vendored Jsonic++ v1.0.0 release-content verification — PASS.** The
+  vendored tree (`nift/jsonic/`) is byte-for-byte identical to tag `v1.0.0`
+  (`88e4736`), including `include/json.h` and all vendored tests/docs. The
+  only Nift integration material is `src/Json.h`, which is a wrapper outside
+  the vendored tree; there are no Nift edits inside `nift/jsonic/`.
+- **Vendored Minify++ v1.1.3 release-content verification — PASS.** Every
+  file in the sync list (`Minify.h`, `Minify.cpp`, `cli/main.cpp`,
+  `ReleaseNotes.md`, tests, scripts) is byte-for-byte identical to tag
+  `v1.1.3` (`43288d1`).
+- **Current sibling-head sync check — intentionally mismatched.** The sibling
+  repositories are on their post-release development heads (Jsonic++ 1.0.1-dev
+  `fdc434b`, Minify++ 1.1.4-dev `04af95e`), so `memory-safety-checkpoint-6-sync`
+  and the `check-nift-sync.sh` gates necessarily report divergence. That is an
+  expected development-checkout divergence, not a Nift release defect; it does
+  not require any change to Nift's vendored copies.
 - Embedded test walls: `make test-jsonic` PASS, `make test-minify` PASS,
   `make test-json` / `test-json-schema` PASS.
 
@@ -81,14 +93,44 @@ Also fixed: a stale v4.1 version-consistency fixture (assertions advanced to
 | Valgrind (watch endurance + full v4.1 adversarial wall) | clean, no leaks |
 | parser fuzz gate (checkpoint 9, 1217 cases) + v4.1 feature fuzz (1300 cases, 3 seeds) | PASS |
 | website dogfood (75 pages) and benchmark-site (3 pages) | byte-identical vs v4.0.13; no-op = no-op; single-edit rebuild = 1 file |
-| performance (v4.0.13 vs v4.1, 7 rounds each) | plain 1.005, nested-scopes 0.736, large-loop 0.975, assign 0.689, rebind 0.781, fragment 0.896, validate 0.620; geometric mean 0.898 |
+| performance (v4.0.13 vs v4.1, 7 rounds each, same machine) | see "Performance conclusion" below |
 | website audit | stale v4.0.x statements fixed; all v4.1 doc examples verified against the executable; internal links/assets validated |
+
+## Performance conclusion
+
+Raw measurements (v4.0.13 vs v4.1, 7 rounds each, same machine, median wall time ratio v4.1/v4.0.13):
+
+| workload | ratio | interpretation |
+|---|---|---|
+| plain `@input`/`@content` site | **1.005** | release-relevant common path — effectively unchanged |
+| nested `@if` scopes | 0.736 | faster |
+| large `@json` + `@for` loop | 0.975 | effectively unchanged |
+| declaration/assignment heavy | 0.689 | v4.1 feature — diagnostic only |
+| structured rebinding | 0.781 | v4.1 feature — diagnostic only |
+| fragment heavy | 0.896 | v4.1 feature — diagnostic only |
+| schema validation | 0.620 | v4.1 feature — diagnostic only |
+| `inject()` heavy | 1.603 | v4.1 feature — diagnostic only (v4.0.13 lacks `inject`; it only rendered literal text) |
+| function heavy | 1.100 | v4.1 feature — diagnostic only (v4.0.13 lacks callables) |
+
+**Release-relevant conclusion: no material common-path performance regression**
+(`plain` v4.1/v4.0.13 ≈ 1.005×). The workloads above the separator all involve
+v4.1 features that v4.0.13 does not implement with equivalent semantics, so
+they are reported only as diagnostics and are **not** aggregated into a
+headline. The geometric mean across old/new-feature workloads (≈0.898) must
+not be read as "v4.1 is ~10% faster overall".
+
+Standing Nift development rule (unchanged): performance regressions are checked
+during development; meaningful common-path regressions are investigated and
+normally rejected before a checkpoint is accepted.
 
 ## Environment limitations
 
-- `memory-safety-checkpoint-6-sync` cannot run: sibling `jsonic`/`minify`
-  checkouts are at development heads (1.0.1-dev / 1.1.4-dev), not the pinned
-  release states. The run portion (`memory-safety-checkpoint-6-run`) passes.
+- `memory-safety-checkpoint-6-sync` cannot pass in this workspace because the
+  sibling `jsonic`/`minify` checkouts are on their post-release development
+  heads (1.0.1-dev / 1.1.4-dev). This is an expected development-checkout
+  divergence, not a Nift release defect; the Nift-vendored trees are verified
+  byte-identical to the actual release tags (see "Dependency import
+  verification"). The run portion (`memory-safety-checkpoint-6-run`) passes.
 - No other gate was unavailable; `strace` and `valgrind` were present.
 
 ## Release readiness
@@ -97,7 +139,48 @@ Existing v4.0.13 sites behave correctly (byte-identical website dogfood).
 The common existing-template path does not materially regress. No memory-safety
 finding, no known open correctness defect in the claimed v4.1 surface, and
 dependency tracking for `@input`, `inject()`, schemas and computed outputs was
-verified. The one documentation nuance is that `immut` is observably a
-non-rebindable readonly view (no member-level mutation syntax exists), so the
-website's "deeply read-only through that binding" wording is descriptive rather
-than a separately enforceable guarantee.
+verified. One wording nuance: `const` prevents rebinding while `immut`
+establishes a recursively read-only binding/view contract; because v4.1 does
+not yet expose member/container mutation syntax, much of that distinction is
+currently **latent rather than cosmetic** — it is a deliberate language
+contract for what must be rejected once member/container mutation arrives.
+Alias behaviour is verified: an `immut` view does not globally freeze storage
+reachable through a separate mutable binding (`immut frozen` stays unchanged
+when a mutable alias is rebound; the same holds for nested views).
+## Follow-up hardening pass (2026-09-15)
+
+Small final evidence/regression-hardening pass after the campaign was accepted.
+
+- **Duplicate-key regression coverage** — added the independent black-box module
+  `v41_duplicate_key_smoke.sh` (regression suite) proving Nift rejects duplicate
+  object keys in `.nift/config.json`, `@json`-loaded data, `$[x := {...}]`
+  expression literals, inline `@json(name){...}` blocks and schema JSON. This
+  makes the Jsonic++ integration regression impossible to reintroduce silently.
+- **Parse entry-point audit** — re-searched the complete Nift source for direct
+  `json::Document::parse` and equivalent parser entry points (including the
+  `ParseDiagnostic` overload and any streaming/named-array parse). The only
+  direct `json::Document::parse` in Nift-owned source is the `nift_json::parse`
+  policy wrapper itself; all eight product parse sites route through the
+  Reject-policy wrapper (`load_json_file`, `read_shared_json`, expression
+  literals, inline `@json`, engine/context). No unprotected entry point found;
+  vendored Jsonic++/Minify++ were not modified.
+- **Dependency-sync evidence** — vendored trees verified byte-identical to the
+  actual release tags (`v1.0.0` = `88e4736`; `v1.1.3` = `43288d1`), recorded
+  separately from the current sibling-head sync check, which is intentionally
+  mismatched because the siblings are on post-release development heads.
+- **`immut` wording** — refined from "cosmetic"/"observably a non-rebindable
+  readonly view" to: `const` prevents rebinding; `immut` establishes a
+  recursively read-only binding/view contract whose distinction is currently
+  **latent** (no member/container mutation syntax yet) rather than cosmetic.
+  Alias behaviour re-verified: an `immut` view does not globally freeze storage
+  reachable through a separate mutable binding (top-level and nested views).
+- **Performance wording** — release-relevant conclusion is now stated as "no
+  material common-path regression" (`plain` ≈ 1.005×); new-feature workloads
+  are reported separately as diagnostics and the geometric mean is not used as
+  a headline.
+
+Walls rerun after this pass: full independent regression suite (32/32 modules),
+duplicate-key module, v4.1 adversarial module, `make test-jsonic`,
+`make test-json`, `make test-json-schema`, `make test-json-schema-integration`,
+`make test`, and `git diff --check` (all clean). No executable code changed in
+this pass (docs/tests only), so the ASan/UBSan/Valgrind walls were not rerun.
