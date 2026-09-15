@@ -1161,7 +1161,18 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
         {
             const auto lp = text.find('(');
             if (lp != std::string::npos && text.back() == ')' && valid_binding_identifier(trim_copy(text.substr(0, lp)))) {
-                const std::string call_name = trim_copy(text.substr(0, lp)); auto ci = callables_.find(call_name);
+                const std::string call_name = trim_copy(text.substr(0, lp));
+                auto si = structs_.find(call_name);
+                if (si != structs_.end()) {
+                    bool args_ok=false; std::vector<bool> q; auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),args_ok,&q);
+                    auto ctor=si->second.methods.find(call_name); const std::size_t expected=ctor==si->second.methods.end()?0:ctor->second.callable.params.size();
+                    if(!args_ok||args.size()!=expected){error="struct constructor argument count mismatch: "+call_name;return false;}
+                    auto instance=std::make_shared<StructInstance>(); instance->type_name=call_name;
+                    for(const auto& field:si->second.fields){ json::Document fv; if(!eval(field.initializer,fv,depth+1))return false; auto sp=std::make_shared<json::Document>(std::move(fv)); instance->fields.emplace(field.name,VariableBinding{sp,nift_binding_type(*sp),true,false}); }
+                    const std::string id=std::to_string(next_struct_instance_id_++); struct_instances_[id]=instance;
+                    out=json::Document(std::string("\x1fnift:struct:")+id); return true;
+                }
+                auto ci = callables_.find(call_name);
                 if (ci != callables_.end()) {
                     if (callable_call_depth_ >= kMaxCallableDepth) { error = "callable recursion depth exceeded: " + call_name; return false; }
                     bool args_ok=false; std::vector<bool> quoted_args; auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),args_ok,&quoted_args); if(!args_ok||args.size()!=ci->second.params.size()){error="callable argument count mismatch: "+call_name;return false;}
