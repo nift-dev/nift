@@ -1141,10 +1141,9 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
         if (const auto p=find_top_level_op(":="); p!=std::string::npos) {
             std::string declaration = trim_copy(text.substr(0, p));
             bool mutable_binding = true;
-            if (declaration.rfind("const ", 0) == 0) {
-                mutable_binding = false;
-                declaration = trim_copy(declaration.substr(6));
-            }
+            bool deep_readonly = false;
+            if (declaration.rfind("const ", 0) == 0) { mutable_binding = false; declaration = trim_copy(declaration.substr(6)); }
+            else if (declaration.rfind("immut ", 0) == 0) { mutable_binding = false; deep_readonly = true; declaration = trim_copy(declaration.substr(6)); }
             const std::string name = declaration;
             if (!valid_binding_identifier(name)) { error = "declaration requires an identifier before ':='"; return false; }
             if (reserved_binding_name(name) || host_.is_contract_name(name)) { error = "declaration name is reserved: " + name; return false; }
@@ -1154,7 +1153,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             json::Document assigned;
             if (!eval(text.substr(p + 2), assigned)) return false;
             auto stored = std::make_shared<json::Document>(assigned);
-            scope.emplace(name, VariableBinding{stored, nift_binding_type(assigned), mutable_binding, false});
+            scope.emplace(name, VariableBinding{stored, nift_binding_type(assigned), mutable_binding, deep_readonly});
             last_expression_mutation_ = true;
             out = std::move(assigned);
             return true;

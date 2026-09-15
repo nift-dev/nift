@@ -42,3 +42,4 @@ SRC
 if "$NIFT" build --all >/dev/null 2>err; then echo 'undefined assignment unexpectedly succeeded' >&2; exit 1; fi
 grep -q 'assignment to undefined binding' err
 echo 'Nift v4.1 template variable smoke passed'
+# v4.1 immut binding is non-rebindable (deep mutation operations are not yet exposed).
