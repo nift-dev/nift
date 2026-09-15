@@ -1206,9 +1206,10 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                         " to " + nift_binding_type_name(binding->type) + " binding '" + name + "'";
                 return false;
             }
-            *binding->value = assigned;
+            auto rebound = std::make_shared<json::Document>(std::move(assigned));
+            binding->value = rebound;
             last_expression_mutation_ = true;
-            out = std::move(assigned);
+            out = *rebound;
             return true;
         }
 
@@ -2015,13 +2016,18 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 break;
             }
 
-            json::Document collection_value;
-            std::string collection_error;
-            if (!evaluate_collection_value(collection_expression, collection_value, collection_error)) {
-                fail(source_path, source, i, "@for collection: " + collection_error);
-                break;
+            std::shared_ptr<const json::Document> collection;
+            if (sort_expression.empty() && valid_binding_identifier(collection_expression)) {
+                for (auto scope = variable_scopes_.rbegin(); scope != variable_scopes_.rend(); ++scope) {
+                    auto found = scope->find(collection_expression);
+                    if (found != scope->end()) { collection = found->second.value; break; }
+                }
             }
-            auto collection = std::make_shared<const json::Document>(std::move(collection_value));
+            if (!collection) {
+                json::Document collection_value; std::string collection_error;
+                if (!evaluate_collection_value(collection_expression, collection_value, collection_error)) { fail(source_path, source, i, "@for collection: " + collection_error); break; }
+                collection = std::make_shared<const json::Document>(std::move(collection_value));
+            }
 
             const auto body = normalize_control_block_body(
                 source.substr(block_open + 1, block_close - block_open - 1));
