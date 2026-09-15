@@ -766,6 +766,13 @@ benchmark-10k: $(TARGET)
 benchmark-memory-10k: $(TARGET)
 	python3 tests/memory_10k_benchmark.py --nift "$(CURDIR)/$(TARGET)"
 
+# CP28 v4.2 performance/memory certification: per-workload build timings and
+# peak RSS (baseline/current interleaved for v4.1-only workloads) plus the
+# 10k-page ordinary-project A/B audit. Requires --baseline and --current.
+benchmark-cp28: $(TARGET)
+	python3 benchmarks/cp28_bench.py --baseline "$(CP28_BASELINE)" --current "$(CURDIR)/$(TARGET)" --samples "$(CP28_SAMPLES:%=%)"
+	python3 benchmarks/perf_regression_audit.py --baseline "$(CP28_BASELINE)" --current "$(CURDIR)/$(TARGET)" --pages 10000 --samples 20
+
 
 $(TEST_DIR)/san/%.o: %.cpp
 	mkdir -p "$(dir $@)"
