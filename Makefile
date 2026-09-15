@@ -795,7 +795,9 @@ valgrind-memory-safety-checkpoint-4: $(TARGET)
 
 memory-safety-checkpoint-6-sync:
 	bash "$(CURDIR)/../jsonic/jsonic/scripts/check-nift-sync.sh" "$(CURDIR)"
+	bash "$(CURDIR)/../jsonic/jsonic/tests/check_nift_sync_test.sh"
 	bash "$(CURDIR)/../minify/minify/scripts/check-nift-sync.sh" "$(CURDIR)/minifypp"
+	bash "$(CURDIR)/../minify/minify/tests/check_nift_sync_test.sh"
 
 memory-safety-checkpoint-6-run: $(TARGET)
 	mkdir -p .build/memory-safety

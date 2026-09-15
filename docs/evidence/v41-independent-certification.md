@@ -19,23 +19,40 @@ No history was rewritten; the checkpoint series is preserved.
 ## Dependency import verification
 
 Verification against the **actual tagged release revisions** (not the current
-sibling working trees):
+sibling working trees), enforced by the corrected release-tag synchronization
+check:
 
 - **Vendored Jsonic++ v1.0.0 release-content verification — PASS.** The
   vendored tree (`nift/jsonic/`) is byte-for-byte identical to tag `v1.0.0`
-  (`88e4736`), including `include/json.h` and all vendored tests/docs. The
-  only Nift integration material is `src/Json.h`, which is a wrapper outside
-  the vendored tree; there are no Nift edits inside `nift/jsonic/`.
-- **Vendored Minify++ v1.1.3 release-content verification — PASS.** Every
-  file in the sync list (`Minify.h`, `Minify.cpp`, `cli/main.cpp`,
+  (`88e4736`), including `include/json.h` and all vendored tests/docs, subject
+  only to the documented Nift integration machinery exclusion below. The only
+  Nift integration material is `src/Json.h` (a wrapper outside the vendored
+  tree) and the sync checker script itself.
+- **Vendored Minify++ v1.1.3 release-content verification — PASS.** Every file
+  in the sync list (`Minify.h`, `Minify.cpp`, `cli/main.cpp`,
   `ReleaseNotes.md`, tests, scripts) is byte-for-byte identical to tag
   `v1.1.3` (`43288d1`).
-- **Current sibling-head sync check — intentionally mismatched.** The sibling
-  repositories are on their post-release development heads (Jsonic++ 1.0.1-dev
-  `fdc434b`, Minify++ 1.1.4-dev `04af95e`), so `memory-safety-checkpoint-6-sync`
-  and the `check-nift-sync.sh` gates necessarily report divergence. That is an
-  expected development-checkout divergence, not a Nift release defect; it does
-  not require any change to Nift's vendored copies.
+- **Release-tag synchronization contract (corrected).** The dependency sync
+  check previously compared Nift's vendored payload against the sibling
+  working tree / HEAD, which is the wrong reference point for a released
+  dependency: a sibling normally moves to development work (Jsonic++ 1.0.1-dev,
+  Minify++ 1.1.4-dev) immediately after a release. The check now resolves the
+  release tag for the version Nift declares it vendors and verifies the payload
+  against that tagged content; sibling HEAD/working-tree state is irrelevant,
+  and the check never resets, checks out or modifies either repository.
+  `scripts/check-nift-sync.sh` itself is documented Nift integration machinery
+  (not released dependency content), so it is excluded from the payload-vs-tag
+  comparison and instead verified to match between sibling and vendored trees.
+  The latest sibling release tag is additionally reported to say whether an
+  update is available.
+- **Sync/checkpoint result:** `memory-safety-checkpoint-6-sync` is **PASS**
+  with sibling checkouts at development heads, reporting:
+  `vendored version v1.0.0 / matching tag v1.0.0 / latest v1.0.0 / payload
+  matches yes / update no` (Jsonic++) and `v1.1.3 / v1.1.3 / v1.1.3 / yes / no`
+  (Minify++). The checker self-test (`tests/check_nift_sync_test.sh` in each
+  sibling, wired into the gate) covers HEAD-at-tag, HEAD-ahead-with-dev,
+  dirty working tree, payload-differs-from-tag, declared-tag-missing, a newer
+  sibling release than the vendored version, and checker-machinery desync.
 - Embedded test walls: `make test-jsonic` PASS, `make test-minify` PASS,
   `make test-json` / `test-json-schema` PASS.
 
@@ -125,12 +142,11 @@ normally rejected before a checkpoint is accepted.
 
 ## Environment limitations
 
-- `memory-safety-checkpoint-6-sync` cannot pass in this workspace because the
-  sibling `jsonic`/`minify` checkouts are on their post-release development
-  heads (1.0.1-dev / 1.1.4-dev). This is an expected development-checkout
-  divergence, not a Nift release defect; the Nift-vendored trees are verified
-  byte-identical to the actual release tags (see "Dependency import
-  verification"). The run portion (`memory-safety-checkpoint-6-run`) passes.
+- No dependency-sync limitation remains: `memory-safety-checkpoint-6-sync` is
+  green against sibling development heads because the sync check compares
+  against the declared-version release tag, not sibling HEAD (see "Dependency
+  import verification"). The run portion (`memory-safety-checkpoint-6-run`)
+  passes.
 - No other gate was unavailable; `strace` and `valgrind` were present.
 
 ## Release readiness
@@ -184,3 +200,26 @@ duplicate-key module, v4.1 adversarial module, `make test-jsonic`,
 `make test-json`, `make test-json-schema`, `make test-json-schema-integration`,
 `make test`, and `git diff --check` (all clean). No executable code changed in
 this pass (docs/tests only), so the ASan/UBSan/Valgrind walls were not rerun.
+
+## Release-candidate sync-check correction (2026-09-15)
+
+Final narrow repair before freezing the v4.1.0 release candidate: the sibling
+dependency sync check compared Nift's vendored payload against sibling `HEAD`,
+which is wrong for a released/versioned dependency. The comparison target is
+now the sibling release tag for the version Nift declares it vendors, resolved
+through Git tags with semantic ordering and stable-release filtering; the
+latest sibling release is reported separately for update availability. The
+check never resets/checks out/modifies either repository, never falls back to
+sibling `HEAD`, and fails clearly and distinctly for "declared tag unavailable"
+vs "payload differs from tag". The checker script itself is a documented Nift
+integration exclusion from the payload-vs-tag comparison (verified to match
+between sibling and vendored trees instead). Regression coverage (per sibling,
+wired into `memory-safety-checkpoint-6-sync`) exercises sibling-HEAD-at-tag,
+HEAD-ahead-with-development, dirty working tree, payload-differs-from-tag,
+declared-tag-missing, newer-sibling-release-than-vendored, and checker desync.
+Markup++ keeps its candidate-based HEAD sync (its documented contract); it is
+not a released dependency Nift pins in the same way and currently matches its
+v0.1.0 release tag. Walls rerun after this change: `memory-safety-checkpoint-6-sync`
+PASS (checks + self-tests), `make test-jsonic` / `test-minify` PASS, `make test`
+PASS, independent regression suite 32/32 PASS. The sibling repositories
+themselves were not reset or moved to make the check pass.
