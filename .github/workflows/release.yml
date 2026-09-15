@@ -40,7 +40,7 @@ jobs:
         include:
           - runner: ubuntu-latest
             platform: linux-x86_64
-          - runner: macos-15
+          - runner: macos-latest
             platform: macos-arm64
           - runner: macos-26-intel
             platform: macos-x86_64
@@ -279,7 +279,7 @@ jobs:
         include:
           - runner: ubuntu-latest
             platform: linux-x86_64
-          - runner: macos-15
+          - runner: macos-latest
             platform: macos-arm64
           - runner: macos-26-intel
             platform: macos-x86_64

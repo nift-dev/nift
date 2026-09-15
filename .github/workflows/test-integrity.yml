@@ -54,6 +54,8 @@ jobs:
             --output .build/bh2/test-integrity-report.json
       - name: Validate guarantee registry structurally (repository-local)
         run: make test-guarantee-registry-ci
+      - name: macOS runner-policy consistency guard
+        run: make test-macos-runner-policy
 
   fast-suites:
     name: Fast deterministic contract suites
