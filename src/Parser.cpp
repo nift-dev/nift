@@ -1177,7 +1177,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                         auto nested = parse(ci->second.body, ci->second.source_path, 1);
                         in_fragment_body_ = saved_fragment;
                         if (!nested.ok) { call_ok = false; call_error = nested.error.message; }
-                        else out = json::Document(nested.output);
+                        else { out = json::Document(nested.output); if (pending_control_.kind == ControlFlow::Return) pending_control_ = {}; }
                     } else {
                         ++function_call_depth_;
                         if (pending_control_.kind != ControlFlow::None) { pending_control_ = {}; }
@@ -1687,6 +1687,15 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
 
     for (std::size_t i = 0; i < source.size() && result_.ok;) {
         if (pending_control_.kind != ControlFlow::None) break;
+        if (in_fragment_body_ && source.compare(i, 6, "return") == 0 &&
+            (i + 6 == source.size() || source[i + 6] == ';' || source[i + 6] == '\n' || source[i + 6] == '\r' || std::isspace(static_cast<unsigned char>(source[i + 6])))) {
+            std::size_t e = i + 6;
+            while (e < source.size() && (source[e] == ' ' || source[e] == '\t')) ++e;
+            if (e < source.size() && source[e] != ';' && source[e] != '\n' && source[e] != '\r') {
+                fail(source_path, source, i, "fragment return cannot have a value"); break;
+            }
+            pending_control_.kind = ControlFlow::Return; pending_control_.value.reset(); break;
+        }
         if (source.compare(i, 5, "break") == 0 &&
             (i + 5 == source.size() || source[i + 5] == ';' || source[i + 5] == '\n' || source[i + 5] == '\r')) {
             if (loop_depth_ <= 0) { fail(source_path, source, i, "break is only valid inside a loop"); break; }
