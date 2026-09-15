@@ -1849,9 +1849,11 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 std::string fn=trim_copy(line.substr(0,dp)), init=trim_copy(line.substr(dp+2));
                 if(!valid_binding_identifier(fn)||init.empty()){fail(source_path,source,i,"invalid struct field declaration");struct_ok=false;break;}
                 for(const auto& f:def.fields)if(f.name==fn){fail(source_path,source,i,"duplicate struct field: "+fn);struct_ok=false;break;}
-                if(!struct_ok)break; def.fields.push_back(StructField{fn,init,priv}); p=eol<body.size()?eol+1:eol;
+                if(!struct_ok) break;
+                def.fields.push_back(StructField{fn,init,priv}); p=eol<body.size()?eol+1:eol;
             }
-            if(!struct_ok) break; structs_[struct_name]=std::move(def); i=bc+1; continue;
+            if(!struct_ok) break;
+            structs_[struct_name]=std::move(def); i=bc+1; continue;
         }
 
         if (source.compare(i, 4, "@fn(") == 0 || source.compare(i, 10, "@fragment(") == 0) {

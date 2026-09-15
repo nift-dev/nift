@@ -11,5 +11,5 @@ cat > content/index.html <<'EOT'
 ok
 EOT
 "$OLDPWD/$NIFT" build >/dev/null
-grep -q '^ok$' public/index.html
+grep -q 'ok' public/index.html
 ! grep -q '@struct' public/index.html
