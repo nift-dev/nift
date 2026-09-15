@@ -7,11 +7,12 @@ approved release is packaged and published.
 
 ## Authority and current state
 
-The development executable currently reports `Nift v4.0.13`, following the
-public v4.0.12 release. The exact executable identity remains documented in
-project history and release notes, but it is not part of the public product
-version. Exact tag, artifact, and public release conventions must follow
-`PACKAGING.md` and actual Git/release evidence.
+The development executable currently reports `Nift v4.2.0` (the v4.2
+template-language campaign), following the public v4.1.0 release. The exact
+executable identity remains documented in project history and release notes,
+but it is not part of the public product version. Exact tag, artifact, and
+public release conventions must follow `PACKAGING.md` and actual Git/release
+evidence.
 
 ## v4.0.12 release status and Snap decision
 

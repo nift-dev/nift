@@ -1,10 +1,44 @@
 # Nift release notes
 
-## v4.2.0 (development)
+## v4.2.0
 
-Next development line following the v4.1.0 release. Feature direction is not
-finalized yet; see the v4.1 baseline and post-release direction in
-`docs/handover/V4.1-TEMPLATE-LANGUAGE.md`.
+The v4.2 template-language campaign, following the v4.1.0 release. It separates
+template grammar from a dedicated `@fn` function-program grammar and adds
+first-class `null`, while preserving v4.1 compatibility.
+
+- First-class `null`: equality/inequality with `null` are valid; ordering is
+  rejected. No-value function returns and function fallthrough produce `null`.
+- `@fn` function-program grammar: declarations, assignments, function calls,
+  `if` / `else if` / `else`, `for`, `while`, `break`, `continue`, and
+  `return` / bare `return`. `return expr` is the canonical v4.2 return form;
+  legacy `@return(...)` remains accepted inside `@fn` for v4.1 compatibility
+  and is not the recommended new syntax.
+- Template control flow gains `@while`, and fragments gain a bare value-less
+  `return` (early return without rollback).
+- `break` and `continue` target the innermost `@for`/`@while` within the
+  current callable boundary and cannot escape a function/fragment call.
+- Structs: fixed stable fields, construction, methods, `this`, private
+  fields/methods, reference semantics (aliasing), `copy()` (shallow) and
+  `deepcopy()` (recursive, graph-sharing preserving). Struct member paths
+  compose with the expression evaluator (`a.v + 1`, member assignment
+  arithmetic).
+- Numeric source literals are typed by lexical form: integer spellings
+  (`0`, `8`) infer `int`; fractional/exponent spellings (`0.0`, `8.0`, `8.5`,
+  `1e3`) infer `double` even when integral. An arithmetic expression with any
+  `double` operand is `double`. Parsed JSON numbers retain their established
+  Jsonic++ representation.
+- Incremental builds treat an equal dependency/metadata timestamp as
+  potentially stale, so an immediate source edit is never silently skipped.
+- Correctness improvements from the certification campaign: unknown struct
+  field reads fail rather than rendering literally, struct reference values
+  never leak into output, and legacy v4.1 function bodies parse directly
+  (template-grammar statements pass through function-program translation).
+
+Deferred (not in this release): general collection mutation
+(`push`/`pop`/`append`/`remove`, array/object element or member assignment),
+structs stored in arrays/objects, struct array-field indexing (`a.v[0]`),
+nullable typed struct fields, inheritance/interfaces/generics, dynamic struct
+fields, and new `copy`/`deepcopy` semantics.
 
 ## v4.1.0
 
