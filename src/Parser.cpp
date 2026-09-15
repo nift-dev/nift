@@ -1087,8 +1087,23 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             auto root_it = scope->find(text.substr(0, root_len));
             if (root_it == scope->end()) continue;
             if (root_it->second.value && root_it->second.value->is_string() && root_it->second.value->string.rfind("\x1fnift:struct:",0)==0 && text[root_len]=='.') {
-                json::Document current=*root_it->second.value; std::size_t mp=root_len+1; bool ok=true;
-                while(mp<text.size()){std::size_t me=mp;while(me<text.size()&&(std::isalnum((unsigned char)text[me])||text[me]=='_'))++me;const std::string member=text.substr(mp,me-mp);if(member.empty()||!current.is_string()||current.string.rfind("\x1fnift:struct:",0)!=0){ok=false;break;}auto inst=struct_instances_.find(current.string.substr(13));if(inst==struct_instances_.end()){ok=false;break;}auto fit=inst->second->fields.find(member);if(fit==inst->second->fields.end()){ok=false;break;}auto sd=structs_.find(inst->second->type_name);bool priv=false;if(sd!=structs_.end())for(const auto& f:sd->second.fields)if(f.name==member)priv=f.private_member;if(priv&&(receiver_stack_.empty()||receiver_stack_.back()!=inst->second)){error="private struct field: "+member;return false;}current=*fit->second.value;if(me==text.size()){out=current;return true;}if(text[me]!='.'){ok=false;break;}mp=me+1;} (void)ok;
+                json::Document current=*root_it->second.value; std::size_t mp=root_len+1;
+                while(mp<text.size()){
+                    std::size_t me=mp;while(me<text.size()&&(std::isalnum((unsigned char)text[me])||text[me]=='_'))++me;
+                    const std::string member=text.substr(mp,me-mp);
+                    if(member.empty()||!current.is_string()||current.string.rfind("\x1fnift:struct:",0)!=0){error="invalid struct member path: "+text;return false;}
+                    auto inst=struct_instances_.find(current.string.substr(13));
+                    if(inst==struct_instances_.end()){error="invalid struct instance";return false;}
+                    auto fit=inst->second->fields.find(member);
+                    if(fit==inst->second->fields.end()){error="struct has no field: "+member;return false;}
+                    auto sd=structs_.find(inst->second->type_name);bool priv=false;
+                    if(sd!=structs_.end())for(const auto& f:sd->second.fields)if(f.name==member)priv=f.private_member;
+                    if(priv&&(receiver_stack_.empty()||receiver_stack_.back()!=inst->second)){error="private struct field: "+member;return false;}
+                    current=*fit->second.value;
+                    if(me==text.size()){out=current;return true;}
+                    if(text[me]!='.'){error="invalid struct member path: "+text;return false;}
+                    mp=me+1;
+                }
             }
             const json::Document* cur = root_it->second.value.get();
             std::size_t pos = root_len;
@@ -1132,14 +1147,14 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                     while (pos < text.size()) {
                         if (current.is_string() && current.string.rfind("\x1fnift:struct:", 0) == 0) {
                             auto inst = struct_instances_.find(current.string.substr(13));
-                            if (inst == struct_instances_.end() || text[pos] != '.') { walk_ok = false; break; }
+                            if (inst == struct_instances_.end() || text[pos] != '.') { error = "invalid struct member path: " + text; return false; }
                             ++pos; const std::size_t member_start = pos;
                             while (pos < text.size() &&
                                    (std::isalnum(static_cast<unsigned char>(text[pos])) || text[pos] == '_')) ++pos;
                             const std::string member = text.substr(member_start, pos - member_start);
-                            if (member_start == pos) { walk_ok = false; break; }
+                            if (member_start == pos) { error = "invalid struct member path: " + text; return false; }
                             auto fit = inst->second->fields.find(member);
-                            if (fit == inst->second->fields.end()) { walk_ok = false; break; }
+                            if (fit == inst->second->fields.end()) { error = "struct has no field: " + member; return false; }
                             auto sd = structs_.find(inst->second->type_name);
                             bool priv = false;
                             if (sd != structs_.end())

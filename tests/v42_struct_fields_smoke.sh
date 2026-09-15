@@ -12,3 +12,10 @@ cat > content/index.html <<'EOT'
 $[p := point()]$[p.z = 2]
 EOT
 ! "$OLDPWD/$NIFT" build >/dev/null 2>&1
+
+# Unknown field reads must fail too, not render literally.
+cat > content/index.html <<'EOT'
+@struct(point) { x := 0 }
+$[p := point()]$[p.z]
+EOT
+! "$OLDPWD/$NIFT" build >/dev/null 2>&1
