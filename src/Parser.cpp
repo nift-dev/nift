@@ -1090,6 +1090,14 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
         if (text.empty()) { error="expression cannot be empty"; return false; }
         while (encloses(text)) text=trim_copy(text.substr(1,text.size()-2));
 
+        if (text.rfind("validate(", 0) == 0 && text.back() == ')') {
+            bool ok_params = false; auto args = parse_parameters(text.substr(9, text.size() - 10), ok_params);
+            if (!ok_params || args.size() != 2) { error = "validate: expected schema and value"; return false; }
+            json::Document schema, candidate; if (!eval(args[0], schema) || !eval(args[1], candidate)) return false;
+            std::string validation_error; if (!jsonschema::validate(candidate, schema, validation_error)) { error = "validate: " + validation_error; return false; }
+            out = std::move(candidate); return true;
+        }
+
         if (text.rfind("inject(", 0) == 0 && text.back() == ')') {
             const std::string arg = trim_copy(text.substr(7, text.size() - 8));
             json::Document path_value; std::string lit_error;
