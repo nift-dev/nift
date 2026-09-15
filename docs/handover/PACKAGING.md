@@ -480,9 +480,12 @@ channel.
 
 ## Phase 3 — packaging (manual, STOP after packaging verification)
 
-This phase is authorized only after Nick explicitly authorizes packaging. Each
-channel is processed and verified independently by its **manual
-`workflow_dispatch`** workflow. Flathub is out of scope.
+This phase is authorized only after Nick explicitly authorizes packaging. Snap
+and Chocolatey are processed and verified independently by their **manual
+`workflow_dispatch`** workflows. Homebrew is **automatic**: Nift publishes the
+GitHub release, Homebrew's bump/update mechanism advances the canonical formula
+on its own schedule, and Nift verifies propagation rather than performing a
+manual publication. Flathub is out of scope.
 
 ### 3a. Publish and verify Snap
 
@@ -526,22 +529,30 @@ channel is processed and verified independently by its **manual
 7. Declare Chocolatey availability only after approval and a fresh
    `choco install nift --version X.Y.Z` succeeds from the community repository.
 
-### 3c. Update Homebrew
+### 3c. Verify Homebrew (automatic downstream)
 
-1. Manually run `homebrew.yml` with `version: X.Y.Z`; download the resolved
-   formula artifact and confirm its URL and SHA-256 refer to the immutable
-   `nift-dev/nift` tagged source archive.
-2. Confirm the workflow tested the formula on both supported macOS and Linux
-   runners. Do not copy legacy LuaJIT, patch or `nsm` behavior into the formula.
-3. Wait for and monitor Homebrew's automatic bump service. Check existing pull
-   requests and formula history, but do not manually open a simple version-bump
-   pull request or duplicate the automated update.
-4. Prepare a manual `Homebrew/homebrew-core` change only if Homebrew maintainers
-   explicitly request it for a non-routine formula change; follow their requested
-   audit/test/submission process exactly. Homebrew CI and maintainers own official
-   bottles.
-5. After merge and bottle publication, run `brew update`, install/upgrade Nift
-   from Homebrew, verify `nift version`, and record the merged PR and formula URL.
+Homebrew publication is **automatic**: Homebrew's bump/update mechanism observes
+the Nift GitHub release and advances the canonical formula on its own schedule.
+There is **no Nift-side manual Homebrew release publication step**; do not
+manually dispatch `homebrew.yml` to publish a release. `homebrew.yml` exists as a
+validation/rehearsal workflow that builds and tests the formula against the
+immutable tagged source archive on macOS arm64 and Linux; it is not how the
+Homebrew release is published.
+
+Verification steps:
+
+1. Confirm the automatic Homebrew mechanism has observed `X.Y.Z` (check existing
+   update pull requests and formula history; do not open a simple version-bump
+   pull request or duplicate the automated update).
+2. Monitor the resulting update/PR/formula state.
+3. Verify the canonical Homebrew formula resolves to `X.Y.Z` when propagation
+   completes.
+4. Perform a fresh install/version check when publicly available.
+5. Record pending propagation honestly if it has not completed yet.
+6. Prepare a manual `Homebrew/homebrew-core` change only if Homebrew maintainers
+   explicitly request it for a non-routine formula change; follow their
+   requested audit/test/submission process exactly. Homebrew CI and maintainers
+   own official bottles.
 
 ### 3d. Close the release
 
