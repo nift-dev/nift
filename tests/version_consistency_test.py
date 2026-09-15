@@ -34,9 +34,9 @@ class VersionConsistencyTest(unittest.TestCase):
         vc = self.vc
         exe = vc.executable_version()
         snap = vc.snap_version()
-        self.assertEqual(exe, "4.1.0")
-        self.assertEqual(snap, "4.1.0")
-        self.assertEqual(vc.check(expected="4.1.0", tag="v4.1.0"), 0)
+        self.assertEqual(exe, "4.2.0")
+        self.assertEqual(snap, "4.2.0")
+        self.assertEqual(vc.check(expected="4.2.0", tag="v4.2.0"), 0)
 
     def test_exact_412_413_failure_rejected(self) -> None:
         vc = self.vc
@@ -148,11 +148,11 @@ class VersionConsistencyTest(unittest.TestCase):
         # release.yml passes github.ref_name (e.g. v4.0.13) to the reusable
         # Chocolatey/Homebrew workflows; the checker must accept both spellings.
         vc = self.vc
-        self.assertEqual(vc.check(expected="4.1.0"), 0)
-        self.assertEqual(vc.check(expected="v4.1.0"), 0)
-        self.assertEqual(vc.check(expected="v4.1.0", tag="v4.1.0"), 0)
+        self.assertEqual(vc.check(expected="4.2.0"), 0)
+        self.assertEqual(vc.check(expected="v4.2.0"), 0)
+        self.assertEqual(vc.check(expected="v4.2.0", tag="v4.2.0"), 0)
         # The exact value release.yml supplies (github.ref_name for a tag).
-        ref_name = "v4.1.0"
+        ref_name = "v4.2.0"
         self.assertEqual(vc.check(expected=ref_name, tag=ref_name), 0)
 
     def test_expected_rejects_malformed_prefixes(self) -> None:

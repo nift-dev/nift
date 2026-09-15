@@ -1,5 +1,11 @@
 # Nift release notes
 
+## v4.2.0 (development)
+
+Next development line following the v4.1.0 release. Feature direction is not
+finalized yet; see the v4.1 baseline and post-release direction in
+`docs/handover/V4.1-TEMPLATE-LANGUAGE.md`.
+
 ## v4.1.0
 
 Adds the v4.1 template-language surface as optional advanced templating
