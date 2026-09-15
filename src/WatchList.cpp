@@ -5,6 +5,7 @@
 #include "ProjectInfo.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <set>
 
 namespace fs = std::filesystem;
@@ -182,6 +183,9 @@ bool WatchList::reconcile(ProjectInfo& project) {
         json::Document current = json::Document::make_object();
         current["tracked"] = json::Document::make_array();
         for (const auto& name : seen_names) current["tracked"].push_back(name);
+        // Test-only failure seam for the post-deletion reconcile path. Unlike
+        // chmod-based injection, this is deterministic under root/capabilities.
+        if (std::getenv("NIFT_TEST_WATCH_STATE_SAVE_FAIL")) return false;
         if (!save_json_file(state_path, current)) return false;
     }
 

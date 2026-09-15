@@ -47,8 +47,11 @@ def scaffold(root, pages, broken_index=None, templates=None):
         (root / "content" / f"{stem}.html").write_text(f"<p>{name}</p>\n")
 
 
-def run(root, *args):
-    p = subprocess.run([NIFT, *args], cwd=root, capture_output=True, text=True)
+def run(root, *args, env=None):
+    run_env = os.environ.copy()
+    if env:
+        run_env.update(env)
+    p = subprocess.run([NIFT, *args], cwd=root, capture_output=True, text=True, env=run_env)
     return p.returncode, p.stderr
 
 
@@ -264,15 +267,15 @@ def main():
         state_dir = root / ".nift/.watch/content/posts"
         check("11 watch state dir created", state_dir.is_dir())
         (root / "content/posts/p1.html").rename(root / "content/posts/p1.bak")
-        os.chmod(state_dir, 0o555)          # make the watch-state save fail
-        rc, _ = run(root, "build", "--all")
+        # Deterministically fail the watch-state save. chmod(0555) is not a
+        # reliable failure injection when tests run as root or with DAC override.
+        rc, _ = run(root, "build", "--all", env={"NIFT_TEST_WATCH_STATE_SAVE_FAIL": "1"})
         check("11 failed-reconcile build returns nonzero", rc != 0)
         check("11 derived deletion happened (p1 output removed)",
               not (root / "public/posts/p1.html").exists())
         check("11 marker REMAINS (mutation_started true)", marker(root))
         rc, err = run(root, "build")
         check("11 ordinary build refuses", rc == 1 and "build --repair" in err)
-        os.chmod(state_dir, 0o755)          # restore watch-state writability
         (root / "content/posts/p1.bak").rename(root / "content/posts/p1.html")
         rc, _ = run(root, "build", "--repair")
         check("11 build --repair recovers", rc == 0)
