@@ -493,6 +493,7 @@ test-v42-language: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v42_fragment_return_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v42_control_adversarial.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v42_function_program_smoke.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v42_numeric_literals_smoke.sh
 
 test-v42-struct: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v42_struct_definition_smoke.sh

@@ -34,6 +34,133 @@ static const char* nift_binding_type_name(int type) {
 
 static const int kMaxCallableDepth = 64;
 
+// Nift source numeric literals preserve their lexical int/double form: 0, 8
+// are int; 0.0, 8.5, 1e3 are double even when the value is integral. An
+// arithmetic expression containing any double-typed operand is double; binding
+// references propagate their inferred type so `total = total + value` stays
+// double even when the accumulated value is integral. Everything else
+// (computed expressions, JSON, injection) keeps value-based classification; a
+// parsed JSON number keeps its established representation.
+int Parser::nift_binding_type_from_text(const std::string& source,
+                                        const json::Document& value) const {
+    const int t = expression_type(source);
+    if (t == 3) return 3;
+    if (t == 2) return nift_binding_type(value);
+    if (t >= 0 && t != 2 && t != 3) return t;
+    return nift_binding_type(value);
+}
+
+int Parser::expression_type(const std::string& source) const {
+    std::string t = [&]() {
+        const auto f = source.find_first_not_of(" \t\r\n");
+        if (f == std::string::npos) return std::string{};
+        const auto l = source.find_last_not_of(" \t\r\n");
+        return source.substr(f, l - f + 1);
+    }();
+    bool wrapped = true;
+    while (wrapped && t.size() >= 2 && t.front() == '(' && t.back() == ')') {
+        wrapped = false;
+        int depth = 0;
+        bool fully_enclosed = true;
+        for (std::size_t i = 0; i < t.size(); ++i) {
+            if (t[i] == '(') ++depth;
+            else if (t[i] == ')') {
+                --depth;
+                if (depth == 0 && i + 1 != t.size()) { fully_enclosed = false; break; }
+                if (depth < 0) { fully_enclosed = false; break; }
+            }
+        }
+        if (fully_enclosed && depth == 0) {
+            t = t.substr(1, t.size() - 2);
+            wrapped = true;
+        }
+    }
+    if (t.empty()) return -1;
+
+    char* end = nullptr;
+    std::strtod(t.c_str(), &end);
+    if (end && *end == '\0') {
+        if (t.find('.') != std::string::npos ||
+            t.find('e') != std::string::npos ||
+            t.find('E') != std::string::npos)
+            return 3;
+        return 2;
+    }
+
+    auto find_top_level_binary = [&](const std::string& ops) -> std::size_t {
+        bool quoted = false; char quote = 0; int parens = 0; int brackets = 0;
+        for (std::size_t i = t.size(); i-- > 0;) {
+            char c = t[i];
+            if (quoted) { if (c == quote && (i == 0 || t[i - 1] != '\\')) quoted = false; continue; }
+            if (c == '\'' || c == '"') { quoted = true; quote = c; continue; }
+            if (c == ']') { ++brackets; continue; }
+            if (c == '[') { if (brackets) --brackets; continue; }
+            if (brackets) continue;
+            if (c == ')') { ++parens; continue; }
+            if (c == '(') { if (parens) --parens; continue; }
+            if (parens || ops.find(c) == std::string::npos) continue;
+            if ((c == '+' || c == '-') && (i == 0 || std::string("+-*/%(<>=!&|?:,").find(t[i - 1]) != std::string::npos)) continue;
+            return i;
+        }
+        return std::string::npos;
+    };
+
+    std::size_t pos = find_top_level_binary("+-");
+    if (pos == std::string::npos) pos = find_top_level_binary("*/%");
+    if (pos != std::string::npos) {
+        const int lt = expression_type(t.substr(0, pos));
+        const int rt = expression_type(t.substr(pos + 1));
+        if (lt == 3 || rt == 3) return 3;
+        if (lt == 2 && rt == 2) return 2;
+        return -1;
+    }
+
+    std::size_t root_len = 0;
+    while (root_len < t.size() &&
+           (std::isalnum(static_cast<unsigned char>(t[root_len])) || t[root_len] == '_')) ++root_len;
+    if (root_len == 0) return -1;
+
+    auto binding_type_for = [&](const VariableBinding& b, const std::string& path) -> int {
+        if (path.empty()) return b.type;
+        if (!b.value || !b.value->is_string() ||
+            b.value->string.rfind("\x1fnift:struct:", 0) != 0 || path[0] != '.') return -1;
+        const auto it = struct_instances_.find(b.value->string.substr(13));
+        if (it == struct_instances_.end()) return -1;
+        std::shared_ptr<StructInstance> current = it->second;
+        std::size_t mp = 1;
+        int type = -1;
+        while (true) {
+            std::size_t me = mp;
+            while (me < path.size() &&
+                   (std::isalnum(static_cast<unsigned char>(path[me])) || path[me] == '_')) ++me;
+            const std::string member = path.substr(mp, me - mp);
+            if (member.empty()) return -1;
+            const auto fit = current->fields.find(member);
+            if (fit == current->fields.end()) return -1;
+            type = fit->second.type;
+            if (me == path.size()) return type;
+            if (path[me] != '.' || !fit->second.value || !fit->second.value->is_string() ||
+                fit->second.value->string.rfind("\x1fnift:struct:", 0) != 0) return -1;
+            const auto next = struct_instances_.find(fit->second.value->string.substr(13));
+            if (next == struct_instances_.end()) return -1;
+            current = next->second;
+            mp = me + 1;
+        }
+    };
+
+    for (auto scope = variable_scopes_.rbegin(); scope != variable_scopes_.rend(); ++scope) {
+        const auto it = scope->find(t.substr(0, root_len));
+        if (it != scope->end())
+            return binding_type_for(it->second, t.substr(root_len));
+    }
+    if (!receiver_stack_.empty()) {
+        const auto rf = receiver_stack_.back()->fields.find(t.substr(0, root_len));
+        if (rf != receiver_stack_.back()->fields.end())
+            return binding_type_for(rf->second, t.substr(root_len));
+    }
+    return -1;
+}
+
 
 namespace {
 bool is_single_quoted_parameter(const std::string& text) {
@@ -1241,7 +1368,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             if (lp != std::string::npos && text.back() == ')' && text.substr(0,lp).find('.') != std::string::npos) {
                 const std::string target=trim_copy(text.substr(0,lp)); const auto dot=target.rfind('.'); const std::string root=target.substr(0,dot), mn=target.substr(dot+1);
                 VariableBinding* rb=nullptr;for(auto scope=variable_scopes_.rbegin();scope!=variable_scopes_.rend();++scope){auto it=scope->find(root);if(it!=scope->end()){rb=&it->second;break;}}
-                if(rb&&rb->value->is_string()&&rb->value->string.rfind("\x1fnift:struct:",0)==0){auto inst=struct_instances_.find(rb->value->string.substr(13));if(inst==struct_instances_.end()){error="invalid struct instance";return false;}auto sd=structs_.find(inst->second->type_name);auto mi=sd->second.methods.find(mn);if(mi==sd->second.methods.end()||mi->second.constructor){error="struct has no method: "+mn;return false;}if(mi->second.private_member&&(receiver_stack_.empty()||receiver_stack_.back()!=inst->second)){error="private struct method: "+mn;return false;}bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(!aok){error="malformed method arguments";return false;}std::vector<json::Document> av;for(std::size_t ai=0;ai<ar.size();++ai){json::Document v;if(ai<aq.size()&&aq[ai])v=json::Document(ar[ai]);else if(!eval(ar[ai],v,depth+1))return false;av.push_back(std::move(v));}return invoke_struct_method(inst->second,mi->second,av,out,error);}
+                if(rb&&rb->value->is_string()&&rb->value->string.rfind("\x1fnift:struct:",0)==0){auto inst=struct_instances_.find(rb->value->string.substr(13));if(inst==struct_instances_.end()){error="invalid struct instance";return false;}auto sd=structs_.find(inst->second->type_name);auto mi=sd->second.methods.find(mn);if(mi==sd->second.methods.end()||mi->second.constructor){error="struct has no method: "+mn;return false;}if(mi->second.private_member&&(receiver_stack_.empty()||receiver_stack_.back()!=inst->second)){error="private struct method: "+mn;return false;}bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(!aok){error="malformed method arguments";return false;}std::vector<json::Document> av;for(std::size_t ai=0;ai<ar.size();++ai){json::Document v;if(ai<aq.size()&&aq[ai])v=json::Document(ar[ai]);else if(!eval(ar[ai],v,depth+1))return false;av.push_back(std::move(v));}return invoke_struct_method(inst->second,mi->second,av,ar,out,error);}
             }
             if (lp != std::string::npos && text.back() == ')' && valid_binding_identifier(trim_copy(text.substr(0, lp)))) {
                 const std::string call_name = trim_copy(text.substr(0, lp));
@@ -1251,13 +1378,13 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                     auto ctor=si->second.methods.find(call_name); const std::size_t expected=ctor==si->second.methods.end()?0:ctor->second.callable.params.size();
                     if(!args_ok||args.size()!=expected){error="struct constructor argument count mismatch: "+call_name;return false;}
                     auto instance=std::make_shared<StructInstance>(); instance->type_name=call_name;
-                    for(const auto& field:si->second.fields){ json::Document fv; if(!eval(field.initializer,fv,depth+1))return false; auto sp=std::make_shared<json::Document>(std::move(fv)); instance->fields.emplace(field.name,VariableBinding{sp,nift_binding_type(*sp),true,false}); }
+                    for(const auto& field:si->second.fields){ json::Document fv; if(!eval(field.initializer,fv,depth+1))return false; auto sp=std::make_shared<json::Document>(std::move(fv)); instance->fields.emplace(field.name,VariableBinding{sp,nift_binding_type_from_text(field.initializer,*sp),true,false}); }
                     const std::string id=std::to_string(next_struct_instance_id_++); struct_instances_[id]=instance;
-                    if(ctor!=si->second.methods.end()){std::vector<json::Document> av;for(std::size_t ai=0;ai<args.size();++ai){json::Document v;if(ai<q.size()&&q[ai])v=json::Document(args[ai]);else if(!eval(args[ai],v,depth+1))return false;av.push_back(std::move(v));}json::Document ignored;if(!invoke_struct_method(instance,ctor->second,av,ignored,error))return false;}
+                    if(ctor!=si->second.methods.end()){std::vector<json::Document> av;for(std::size_t ai=0;ai<args.size();++ai){json::Document v;if(ai<q.size()&&q[ai])v=json::Document(args[ai]);else if(!eval(args[ai],v,depth+1))return false;av.push_back(std::move(v));}json::Document ignored;if(!invoke_struct_method(instance,ctor->second,av,args,ignored,error))return false;}
                     out=json::Document(std::string("\x1fnift:struct:")+id); return true;
                 }
                 auto ci = callables_.find(call_name);
-                if(ci==callables_.end()&&!receiver_stack_.empty()){auto sd=structs_.find(receiver_stack_.back()->type_name);if(sd!=structs_.end()){auto mi=sd->second.methods.find(call_name);if(mi!=sd->second.methods.end()&&!mi->second.constructor){bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(!aok){error="malformed method arguments";return false;}std::vector<json::Document> av;for(std::size_t ai=0;ai<ar.size();++ai){json::Document v;if(ai<aq.size()&&aq[ai])v=json::Document(ar[ai]);else if(!eval(ar[ai],v,depth+1))return false;av.push_back(std::move(v));}return invoke_struct_method(receiver_stack_.back(),mi->second,av,out,error);}}}
+                if(ci==callables_.end()&&!receiver_stack_.empty()){auto sd=structs_.find(receiver_stack_.back()->type_name);if(sd!=structs_.end()){auto mi=sd->second.methods.find(call_name);if(mi!=sd->second.methods.end()&&!mi->second.constructor){bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(!aok){error="malformed method arguments";return false;}std::vector<json::Document> av;for(std::size_t ai=0;ai<ar.size();++ai){json::Document v;if(ai<aq.size()&&aq[ai])v=json::Document(ar[ai]);else if(!eval(ar[ai],v,depth+1))return false;av.push_back(std::move(v));}return invoke_struct_method(receiver_stack_.back(),mi->second,av,ar,out,error);}}}
                 if (ci != callables_.end()) {
                     if (callable_call_depth_ >= kMaxCallableDepth) { error = "callable recursion depth exceeded: " + call_name; return false; }
                     bool args_ok=false; std::vector<bool> quoted_args; auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),args_ok,&quoted_args); if(!args_ok||args.size()!=ci->second.params.size()){error="callable argument count mismatch: "+call_name;return false;}
@@ -1265,7 +1392,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                     ++callable_call_depth_;
                     const int caller_loop_depth = loop_depth_;
                     loop_depth_ = 0;
-                    push_variable_scope(); auto& scope=variable_scopes_.back(); for(std::size_t ai=0;ai<values.size();++ai){auto sp=std::make_shared<json::Document>(std::move(values[ai]));scope.emplace(ci->second.params[ai],VariableBinding{sp,nift_binding_type(*sp),true,false});}
+                    push_variable_scope(); auto& scope=variable_scopes_.back(); for(std::size_t ai=0;ai<values.size();++ai){auto sp=std::make_shared<json::Document>(std::move(values[ai]));scope.emplace(ci->second.params[ai],VariableBinding{sp,nift_binding_type_from_text(args[ai],*sp),true,false});}
                     const bool saved_mutation = last_expression_mutation_;
                     bool call_ok = true; std::string call_error;
                     if (ci->second.fragment) {
@@ -1400,7 +1527,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             json::Document assigned;
             if (!eval(text.substr(p + 2), assigned, depth + 1)) return false;
             auto stored = std::make_shared<json::Document>(assigned);
-            variable_scopes_.back().emplace(name, VariableBinding{stored, nift_binding_type(assigned), mutable_binding, deep_readonly});
+            variable_scopes_.back().emplace(name, VariableBinding{stored, nift_binding_type_from_text(text.substr(p + 2), assigned), mutable_binding, deep_readonly});
             if (depth == 0) last_expression_mutation_ = true;
             out = std::move(assigned);
             return true;
@@ -1417,7 +1544,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                 json::Document current=*rb->value;std::size_t mp=dot+1;std::shared_ptr<StructInstance> parent;std::string member;
                 while(mp<name.size()){std::size_t me=name.find('.',mp);member=name.substr(mp,me==std::string::npos?std::string::npos:me-mp);auto ii=struct_instances_.find(current.string.substr(13));if(ii==struct_instances_.end()){error="invalid struct instance";return false;}parent=ii->second;auto fit=parent->fields.find(member);if(fit==parent->fields.end()){error="struct has no field: "+member;return false;}if(me==std::string::npos)break;current=*fit->second.value;if(!current.is_string()||current.string.rfind("\x1fnift:struct:",0)!=0){error="member path is not a struct: "+member;return false;}mp=me+1;}
                 auto fit=parent->fields.find(member);auto sd=structs_.find(parent->type_name);bool priv=false;if(sd!=structs_.end())for(const auto& f:sd->second.fields)if(f.name==member)priv=f.private_member;if(priv&&(receiver_stack_.empty()||receiver_stack_.back()!=parent)){error="private struct field: "+member;return false;}
-                json::Document assigned;if(!eval(text.substr(p+1),assigned,depth+1))return false;const int at=nift_binding_type(assigned);if(at!=fit->second.type){error="cannot change struct field type: "+member;return false;}fit->second.value=std::make_shared<json::Document>(std::move(assigned));out=*fit->second.value;if(depth==0)last_expression_mutation_=true;return true;
+                json::Document assigned;if(!eval(text.substr(p+1),assigned,depth+1))return false;const int at=nift_binding_type_from_text(text.substr(p+1),assigned);if(at!=fit->second.type){error="cannot change struct field type: "+member;return false;}fit->second.value=std::make_shared<json::Document>(std::move(assigned));out=*fit->second.value;if(depth==0)last_expression_mutation_=true;return true;
             }
             if (!valid_binding_identifier(name)) { error = "assignment requires an identifier before '='"; return false; }
             VariableBinding* binding = nullptr;
@@ -1430,7 +1557,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                 if (rec != receiver_stack_.back()->fields.end()) {
                     json::Document assigned;
                     if (!eval(text.substr(p + 1), assigned, depth + 1)) return false;
-                    const int assigned_type = nift_binding_type(assigned);
+                    const int assigned_type = nift_binding_type_from_text(text.substr(p + 1), assigned);
                     if (assigned_type != rec->second.type) {
                         error = "cannot assign " + std::string(nift_binding_type_name(assigned_type)) +
                                 " to " + nift_binding_type_name(rec->second.type) + " struct field '" + name + "'";
@@ -1447,7 +1574,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             if (!binding->mutable_binding) { error = "cannot assign to const binding: " + name; return false; }
             json::Document assigned;
             if (!eval(text.substr(p + 1), assigned, depth + 1)) return false;
-            const int assigned_type = nift_binding_type(assigned);
+            const int assigned_type = nift_binding_type_from_text(text.substr(p + 1), assigned);
             if (assigned_type != binding->type) {
                 error = "cannot assign " + std::string(nift_binding_type_name(assigned_type)) +
                         " to " + nift_binding_type_name(binding->type) + " binding '" + name + "'";
@@ -3620,6 +3747,7 @@ RenderResult Parser::render() {
 bool Parser::invoke_struct_method(std::shared_ptr<StructInstance> instance,
                                   const StructMethod& method,
                                   const std::vector<json::Document>& args,
+                                  const std::vector<std::string>& arg_sources,
                                   json::Document& out,
                                   std::string& error) {
     if (args.size() != method.callable.params.size()) { error = "struct method argument count mismatch"; return false; }
@@ -3627,7 +3755,7 @@ bool Parser::invoke_struct_method(std::shared_ptr<StructInstance> instance,
     ++callable_call_depth_;
     const int caller_loop_depth = loop_depth_; loop_depth_ = 0;
     push_variable_scope(); const std::size_t scope_index=variable_scopes_.size()-1;
-    for(std::size_t i=0;i<args.size();++i){auto sp=std::make_shared<json::Document>(args[i]);variable_scopes_[scope_index][method.callable.params[i]]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
+    for(std::size_t i=0;i<args.size();++i){auto sp=std::make_shared<json::Document>(args[i]);variable_scopes_[scope_index][method.callable.params[i]]=VariableBinding{sp,nift_binding_type_from_text(arg_sources[i],*sp),true,false};}
     std::string id;
     for(const auto& e:struct_instances_) if(e.second==instance){id=e.first;break;}
     auto thisv=std::make_shared<json::Document>(std::string("\x1fnift:struct:")+id); variable_scopes_[scope_index]["this"]=VariableBinding{thisv,nift_binding_type(*thisv),false,false};

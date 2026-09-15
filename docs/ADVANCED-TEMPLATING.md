@@ -10,7 +10,7 @@ $[immut x := {...}] # deep-readonly view
 @:=(items){[1,2,3]} # multiline declaration
 ```
 
-Bindings have stable inferred types. Child scopes (`@if`, `@for`, `@input`, injection and callable calls) see caller-visible bindings and can mutate existing mutable outer bindings; declarations remain local.
+Bindings have stable inferred types. Child scopes (`@if`, `@for`, `@input`, injection and callable calls) see caller-visible bindings and can mutate existing mutable outer bindings; declarations remain local. Numeric literal typing is lexical: integer spellings (`0`, `8`) infer int, while fractional/exponent spellings (`0.0`, `8.0`, `8.5`, `1e3`) infer double even when the value is integral; an arithmetic expression is double when any operand is double.
 
 `inject(path)` supplies expression data from a tracked project file. `validate(schema, value)` validates and returns its value. Legacy `@json` remains supported during the v4.1 migration.
 
