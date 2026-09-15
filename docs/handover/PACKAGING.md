@@ -49,8 +49,16 @@ packaging/homebrew/                         upstream homebrew-core formula templ
 .github/workflows/release.yml               portable GitHub release archives
 .github/workflows/snap.yml                  Non-publishing Snap validation
 .github/workflows/chocolatey.yml            Chocolatey pack and optional push
-.github/workflows/homebrew.yml               Homebrew formula generation/testing
+.github/workflows/homebrew.yml              Homebrew formula generation/testing
+.github/workflows/packaging.yml             Build-only packaging matrix (non-publishing)
 ```
+
+The build-only `packaging.yml` matrix runs on push and dispatch: `native-matrix`
+builds the CLI and embed bundle through `packaging/matrix-build.sh` for
+linux-x86_64/arm64, macos-x86_64/arm64 and windows-x86_64 with the enforced
+clean-consumer smoke, and `language-packages` builds (never publishes) the
+Python wheel/sdist, NuGet RID asset, npm addon and a Go static consumer. Both
+jobs are non-publishing validation only; they never push to a registry.
 
 These definitions were consolidated here to keep packaging changes reviewable
 with source/build changes and to prevent version drift. The historical
