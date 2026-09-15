@@ -1658,6 +1658,11 @@ bool Parser::translate_function_program(const std::string& source, std::string& 
                     std::size_t ec=0;if(e>=in.size()||in[e]!='{'||!find_balanced(in,e,'{','}',ec)){error="function else requires block";return false;}std::string body2;if(!convert(in.substr(e+1,ec-e-1),body2))return false;out+=" else {"+body2+"}";i=ec+1;break;}
                 continue;
             }
+            if(boundary(i,"return")) {
+                std::size_t e=i+6; bool quoted=false;char quote=0;int par=0,br=0;
+                while(e<in.size()&&in[e]!='\n'&&in[e]!=';' ) { char c=in[e]; if(quoted){if(c=='\\'&&e+1<in.size())++e;else if(c==quote)quoted=false;}else if(c=='\''||c=='"'){quoted=true;quote=c;}else if(c=='(')++par;else if(c==')')--par;else if(c=='[')++br;else if(c==']')--br;++e; }
+                std::string expr=trim_copy(in.substr(i+6,e-(i+6))); out += "@return("+expr+")"; i=e<in.size()?e+1:e; continue;
+            }
             if(boundary(i,"break")) { std::size_t e=i+5; while(e<in.size()&&std::isspace((unsigned char)in[e])&&in[e]!='\n')++e; if(e==in.size()||in[e]==';'||in[e]=='\n') { out += "break"; i=e<in.size()?e+1:e; continue; } }
             if(boundary(i,"continue")) { std::size_t e=i+8; while(e<in.size()&&std::isspace((unsigned char)in[e])&&in[e]!='\n')++e; if(e==in.size()||in[e]==';'||in[e]=='\n') { out += "continue"; i=e<in.size()?e+1:e; continue; } }
             std::size_t start=i; bool quoted=false;char quote=0;int par=0,br=0;
