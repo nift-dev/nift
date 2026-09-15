@@ -1167,6 +1167,8 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                     bool args_ok=false; std::vector<bool> quoted_args; auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),args_ok,&quoted_args); if(!args_ok||args.size()!=ci->second.params.size()){error="callable argument count mismatch: "+call_name;return false;}
                     std::vector<json::Document> values; for(std::size_t ai=0;ai<args.size();++ai){json::Document v;if(ai<quoted_args.size()&&quoted_args[ai])v=json::Document(args[ai]);else if(!eval(args[ai],v,depth+1))return false;values.push_back(std::move(v));}
                     ++callable_call_depth_;
+                    const int caller_loop_depth = loop_depth_;
+                    loop_depth_ = 0;
                     push_variable_scope(); auto& scope=variable_scopes_.back(); for(std::size_t ai=0;ai<values.size();++ai){auto sp=std::make_shared<json::Document>(std::move(values[ai]));scope.emplace(ci->second.params[ai],VariableBinding{sp,nift_binding_type(*sp),true,false});}
                     const bool saved_mutation = last_expression_mutation_;
                     bool call_ok = true; std::string call_error;
@@ -1191,6 +1193,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                     }
                     last_expression_mutation_ = saved_mutation;
                     pop_variable_scope();
+                    loop_depth_ = caller_loop_depth;
                     --callable_call_depth_;
                     if (!call_ok) { error = call_error; return false; }
                     return true;
@@ -1655,6 +1658,7 @@ bool Parser::translate_function_program(const std::string& source, std::string& 
                     std::size_t ec=0;if(e>=in.size()||in[e]!='{'||!find_balanced(in,e,'{','}',ec)){error="function else requires block";return false;}std::string body2;if(!convert(in.substr(e+1,ec-e-1),body2))return false;out+=" else {"+body2+"}";i=ec+1;break;}
                 continue;
             }
+            if(boundary(i,"continue")) { std::size_t e=i+8; while(e<in.size()&&std::isspace((unsigned char)in[e])&&in[e]!='\n')++e; if(e==in.size()||in[e]==';'||in[e]=='\n') { out += "continue"; i=e<in.size()?e+1:e; continue; } }
             std::size_t start=i; bool quoted=false;char quote=0;int par=0,br=0;
             for(;i<in.size();++i){char c=in[i];if(quoted){if(c=='\\'&&i+1<in.size())++i;else if(c==quote)quoted=false;continue;}if(c=='\''||c=='"'){quoted=true;quote=c;continue;}if(c=='(')++par;else if(c==')')--par;else if(c=='[')++br;else if(c==']')--br;if(!par&&!br&&(c==';'||c=='\n'))break;}
             std::string stmt=trim_copy(in.substr(start,i-start)); if(!stmt.empty()) out+="$["+stmt+"]"; if(i<in.size())++i;
@@ -1677,6 +1681,12 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
 
     for (std::size_t i = 0; i < source.size() && result_.ok;) {
         if (pending_control_.kind != ControlFlow::None) break;
+        if (source.compare(i, 8, "continue") == 0 &&
+            (i + 8 == source.size() || source[i + 8] == ';' || source[i + 8] == '\n' || source[i + 8] == '\r')) {
+            if (loop_depth_ <= 0) { fail(source_path, source, i, "continue is only valid inside a loop"); break; }
+            pending_control_.kind = ControlFlow::Continue;
+            break;
+        }
         if (i + 1 < source.size() && source[i] == '\\' && (source[i + 1] == '@' || source[i + 1] == '$' || source[i + 1] == '#')) {
             output += source[i + 1];
             i += 2;
@@ -2079,10 +2089,13 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     const auto body = normalize_control_block_body(
                         source.substr(cursor + 1, else_block_close - cursor - 1));
                     push_json_scope();
+                    ++loop_depth_;
                     const auto nested = parse(body.text, source_path, depth + 1);
+                    --loop_depth_;
                     pop_json_scope();
                     if (!nested.ok) break;
                     append_indented(output, nested.output, control_indent, insertion_code_block_depth);
+                    if (pending_control_.kind == ControlFlow::Continue) { pending_control_ = {}; continue; }
                     selected = true;
                 }
 
@@ -2117,7 +2130,8 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             const std::string condition=source.substr(i+7,hc-(i+7));
             const auto body=normalize_control_block_body(source.substr(bo+1,bc-bo-1));
             while(result_.ok){bool yes=false;std::string e;if(!evaluate_condition(condition,yes,e)){fail(source_path,source,i,e);break;}if(!yes)break;
-                push_json_scope();auto nested=parse(body.text,source_path,depth+1);pop_json_scope();if(!nested.ok)break;append_indented(output,nested.output,"",code_block_depth_);
+                push_json_scope(); ++loop_depth_; auto nested=parse(body.text,source_path,depth+1); --loop_depth_; pop_json_scope();if(!nested.ok)break;append_indented(output,nested.output,"",code_block_depth_);
+                if (pending_control_.kind == ControlFlow::Continue) { pending_control_ = {}; continue; }
                 if(pending_control_.kind!=ControlFlow::None)break;
             }
             if(!result_.ok)break;i=bc+1;continue;
@@ -2298,10 +2312,13 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                         std::const_pointer_cast<json::Document>(
                             std::shared_ptr<const json::Document>(collection, element)),
                         nift_binding_type(*element), true, false});
+                    ++loop_depth_;
                     const auto nested = parse(body.text, source_path, depth + 1);
+                    --loop_depth_;
                     pop_json_scope();
                     if (!nested.ok) break;
                     append_indented(output, nested.output, control_indent, insertion_code_block_depth);
+                    if (pending_control_.kind == ControlFlow::Continue) { pending_control_ = {}; continue; }
                     if (body.multiline && position + 1 < order.size())
                         output += "\n" + control_indent;
                 }
@@ -2432,10 +2449,13 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                         std::const_pointer_cast<json::Document>(
                             std::shared_ptr<const json::Document>(collection, &entry.second)),
                         nift_binding_type(entry.second), true, false});
+                    ++loop_depth_;
                     const auto nested = parse(body.text, source_path, depth + 1);
+                    --loop_depth_;
                     pop_json_scope();
                     if (!nested.ok) break;
                     append_indented(output, nested.output, control_indent, insertion_code_block_depth);
+                    if (pending_control_.kind == ControlFlow::Continue) { pending_control_ = {}; continue; }
                     if (body.multiline && position + 1 < order.size())
                         output += "\n" + control_indent;
                 }

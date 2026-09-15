@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+NIFT_BIN="${NIFT_BIN:-./nift}";T=$(mktemp -d);trap 'rm -rf "$T"' EXIT;cd "$T";"$NIFT_BIN" init >/dev/null
+cat > content/index.html <<'EOT'
+@for(x : [1,2,3]){@if(x == 2){continue}[$[x]]}
+EOT
+"$NIFT_BIN" build --all >/dev/null
+grep -q '\[1\].*\[3\]' public/index.html
+! grep -q '\[2\]' public/index.html

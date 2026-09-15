@@ -64,6 +64,7 @@ private:
     };
     PendingControl pending_control_;
     int callable_call_depth_ = 0;
+    int loop_depth_ = 0;
     bool pagination_collecting_ = false;
     bool pagination_context_active_ = false;
     std::size_t pagination_current_ = 1;
