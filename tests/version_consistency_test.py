@@ -56,9 +56,9 @@ class VersionConsistencyTest(unittest.TestCase):
             old = vc.repo_root
             vc.repo_root = lambda: root
             try:
-                self.assertEqual(vc.executable_version(), "4.1.0")
+                self.assertEqual(vc.executable_version(), "4.0.13")
                 self.assertEqual(vc.snap_version(), "4.0.12")
-                self.assertEqual(vc.check(expected="4.1.0"), 1)
+                self.assertEqual(vc.check(expected="4.0.13"), 1)
                 self.assertEqual(vc.check(expected="4.0.12"), 1)
                 self.assertEqual(vc.check(), 1)
             finally:
@@ -71,7 +71,7 @@ class VersionConsistencyTest(unittest.TestCase):
             (root / "src").mkdir()
             (root / "snap").mkdir()
             (root / "src" / "CLI.cpp").write_text(
-                'constexpr const char* version_text = "Nift v4.0.13";\n',
+                'constexpr const char* version_text = "Nift v4.1.0";\n',
                 encoding="utf-8",
             )
             (root / "snap" / "snapcraft.yaml").write_text(
