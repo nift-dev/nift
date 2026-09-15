@@ -38,6 +38,17 @@ CP24 established that the same scenario-11 failure reproduces at v4.0.13, CP9, a
 - rejected alternatives: changing recovery behavior, weakening scenario 11, or classifying a privilege-dependent chmod test as a product defect
 - next checkpoint: campaign closed; return to normal v4.1 work/release certification
 
+## Independent verification (2026-09-15)
+
+The v4.1 independent certification campaign re-ran scenario 11 independently:
+`make test-zero-mutation` PASS (all 16 scenarios, including every scenario-11
+assertion), `make test-repair-campaign` PASS, `make test-ownership-concurrency`
+PASS. The `NIFT_TEST_WATCH_STATE_SAVE_FAIL` seam is confirmed narrow: a single
+`std::getenv` check immediately before the watched `tracked.json` save in
+`src/WatchList.cpp`, unreachable unless the environment variable is explicitly
+set, and absent from every production path. `.unfinished` retention and
+`build --repair` recovery semantics were not weakened.
+
 ## Root cause and resolution
 Scenario 11 was not a Nift recovery defect. Its test attempted to force a watched-state save failure with `chmod(0555)`. That assumption fails when the runner is root or has DAC-override capability, so the save succeeds, the build succeeds, and `.unfinished` is correctly cleared. This explains why the same failure reproduced at v4.0.13, CP9 and CP24.
 

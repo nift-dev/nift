@@ -20,7 +20,7 @@ whether it is a regression.
 ## Current identity
 
 - Product: **Nift**, a website generator and dependency-aware website build layer.
-- Current executable identity: `Nift v4.0.12` (development), following the public v4.0.11 release.
+- Current executable identity: `Nift v4.1.0` (development), the v4.1 template-language development version following the public v4.0.13 release.
 - Language/toolchain: C++17 and Make.
 - Output convention for modern projects: `public/`.
 - Current branch: `main` in this checkout.
@@ -444,3 +444,9 @@ ChatGPT owns the BH1 implementation; DeepSeek owns independent review and review
 ## Nift v4.1 template-language campaign
 
 The active v4.1 language campaign is specified and tracked in `docs/handover/V4.1-TEMPLATE-LANGUAGE.md`. Keep that ledger current at every checkpoint; do not silently change its frozen semantics during implementation.
+
+## Independent v4.1 certification review (2026-09-15)
+
+An independent review + adversarial certification campaign was run against the v4.1 implementation (review first, adversarial testing second, repair third, then rerun from scratch). The campaign treated the implementation as a candidate to challenge rather than something to approve. It found and fixed seven genuine v4.1 language defects (mutation-suppression scoping, conditional `@return`, `@for` loop-binding shadowing, undefined-callable errors, structured-binding array indexing, structured-literal callable/`validate()` arguments, and unbounded callable recursion), plus two historical JSON/minifier regressions introduced by the Jsonic++ v1.0.0 and Minify++ v1.1.3 imports (duplicate-key strictness and JS trailing-semicolon elision).
+
+All fixes are committed in small reviewable commits on `main` and protected by `tests/v41_certification_adversarial.sh` (mirrored in the independent regression suite). The complete native wall, the 31-module independent regression suite, ASan/UBSan/Valgrind walls, a 1300+ case v4.1 fuzz sweep, scenario 11, website dogfooding and the v4.1-vs-v4.0.13 performance comparison all pass; existing-template workloads show no material performance regression. See `docs/handover/V4.1-TEMPLATE-LANGUAGE.md` (CP25) and `docs/evidence/v41-independent-certification.md` for the full record.
