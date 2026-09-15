@@ -1114,6 +1114,65 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             }
             if (walk_ok) { out = *cur; return true; }
         }
+        // Inside a method, a bare name that matches a receiver field resolves to
+        // that field (live instance storage, not a snapshot), including member
+        // paths through struct/object/array field values.
+        if (!receiver_stack_.empty()) {
+            const auto rec = receiver_stack_.back()->fields.find(text);
+            if (rec != receiver_stack_.back()->fields.end()) { out = *rec->second.value; return true; }
+            std::size_t root_len = 0;
+            while (root_len < text.size() &&
+                   (std::isalnum(static_cast<unsigned char>(text[root_len])) || text[root_len] == '_')) ++root_len;
+            if (root_len > 0 && root_len < text.size()) {
+                auto rf = receiver_stack_.back()->fields.find(text.substr(0, root_len));
+                if (rf != receiver_stack_.back()->fields.end() && rf->second.value) {
+                    json::Document current = *rf->second.value;
+                    std::size_t pos = root_len;
+                    bool walk_ok = true;
+                    while (pos < text.size()) {
+                        if (current.is_string() && current.string.rfind("\x1fnift:struct:", 0) == 0) {
+                            auto inst = struct_instances_.find(current.string.substr(13));
+                            if (inst == struct_instances_.end() || text[pos] != '.') { walk_ok = false; break; }
+                            ++pos; const std::size_t member_start = pos;
+                            while (pos < text.size() &&
+                                   (std::isalnum(static_cast<unsigned char>(text[pos])) || text[pos] == '_')) ++pos;
+                            const std::string member = text.substr(member_start, pos - member_start);
+                            if (member_start == pos) { walk_ok = false; break; }
+                            auto fit = inst->second->fields.find(member);
+                            if (fit == inst->second->fields.end()) { walk_ok = false; break; }
+                            auto sd = structs_.find(inst->second->type_name);
+                            bool priv = false;
+                            if (sd != structs_.end())
+                                for (const auto& f : sd->second.fields)
+                                    if (f.name == member) priv = f.private_member;
+                            if (priv && (receiver_stack_.empty() || receiver_stack_.back() != inst->second)) {
+                                error = "private struct field: " + member;
+                                return false;
+                            }
+                            current = *fit->second.value;
+                        } else if (text[pos] == '.') {
+                            ++pos; const std::size_t member_start = pos;
+                            while (pos < text.size() &&
+                                   (std::isalnum(static_cast<unsigned char>(text[pos])) || text[pos] == '_')) ++pos;
+                            if (member_start == pos || !current.is_object() ||
+                                !current.has(text.substr(member_start, pos - member_start))) { walk_ok = false; break; }
+                            current = current[text.substr(member_start, pos - member_start)];
+                        } else if (text[pos] == '[') {
+                            ++pos; const std::size_t index_start = pos;
+                            while (pos < text.size() && std::isdigit(static_cast<unsigned char>(text[pos]))) ++pos;
+                            if (index_start == pos || pos >= text.size() || text[pos] != ']') { walk_ok = false; break; }
+                            std::size_t index = 0;
+                            try { index = static_cast<std::size_t>(std::stoull(text.substr(index_start, pos - index_start))); }
+                            catch (...) { walk_ok = false; break; }
+                            ++pos;
+                            if (!current.is_array() || index >= current.array.size()) { walk_ok = false; break; }
+                            current = current.array[index];
+                        } else { walk_ok = false; break; }
+                    }
+                    if (walk_ok) { out = current; return true; }
+                }
+            }
+        }
         std::shared_ptr<const json::Document> document;
         if (resolve_pagination_value(text, document)) { out = *document; return true; }
         std::string local_error;
@@ -1338,6 +1397,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             if(dot!=std::string::npos){
                 const std::string root=name.substr(0,dot); VariableBinding* rb=nullptr;
                 for(auto scope=variable_scopes_.rbegin();scope!=variable_scopes_.rend();++scope){auto it=scope->find(root);if(it!=scope->end()){rb=&it->second;break;}}
+                if(!rb&&!receiver_stack_.empty()){auto rf=receiver_stack_.back()->fields.find(root);if(rf!=receiver_stack_.back()->fields.end())rb=&rf->second;}
                 if(!rb||!rb->value->is_string()||rb->value->string.rfind("\x1fnift:struct:",0)!=0){error="member assignment requires a struct instance: "+root;return false;}
                 json::Document current=*rb->value;std::size_t mp=dot+1;std::shared_ptr<StructInstance> parent;std::string member;
                 while(mp<name.size()){std::size_t me=name.find('.',mp);member=name.substr(mp,me==std::string::npos?std::string::npos:me-mp);auto ii=struct_instances_.find(current.string.substr(13));if(ii==struct_instances_.end()){error="invalid struct instance";return false;}parent=ii->second;auto fit=parent->fields.find(member);if(fit==parent->fields.end()){error="struct has no field: "+member;return false;}if(me==std::string::npos)break;current=*fit->second.value;if(!current.is_string()||current.string.rfind("\x1fnift:struct:",0)!=0){error="member path is not a struct: "+member;return false;}mp=me+1;}
@@ -1349,6 +1409,24 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             for (auto scope = variable_scopes_.rbegin(); scope != variable_scopes_.rend(); ++scope) {
                 const auto it = scope->find(name);
                 if (it != scope->end()) { binding = &it->second; break; }
+            }
+            if (!binding && !receiver_stack_.empty()) {
+                auto rec = receiver_stack_.back()->fields.find(name);
+                if (rec != receiver_stack_.back()->fields.end()) {
+                    json::Document assigned;
+                    if (!eval(text.substr(p + 1), assigned, depth + 1)) return false;
+                    const int assigned_type = nift_binding_type(assigned);
+                    if (assigned_type != rec->second.type) {
+                        error = "cannot assign " + std::string(nift_binding_type_name(assigned_type)) +
+                                " to " + nift_binding_type_name(rec->second.type) + " struct field '" + name + "'";
+                        return false;
+                    }
+                    auto rebound = std::make_shared<json::Document>(std::move(assigned));
+                    rec->second.value = rebound;
+                    if (depth == 0) last_expression_mutation_ = true;
+                    out = *rebound;
+                    return true;
+                }
             }
             if (!binding) { error = "assignment to undefined binding: " + name; return false; }
             if (!binding->mutable_binding) { error = "cannot assign to const binding: " + name; return false; }
@@ -2000,6 +2078,12 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     }
                     if (expression_value.is_object()) {
                         fail(source_path, source, i, "cannot render JSON object $[" + key + "]; select a member first");
+                        break;
+                    }
+                    if (function_call_depth_ == 0 &&
+                        expression_value.is_string() &&
+                        expression_value.string.rfind("\x1fnift:struct:", 0) == 0) {
+                        fail(source_path, source, i, "cannot render a struct instance $[" + key + "]; select a member or value-returning method first");
                         break;
                     }
                     output += render_expression_value(expression_value);
@@ -3528,7 +3612,6 @@ bool Parser::invoke_struct_method(std::shared_ptr<StructInstance> instance,
     ++callable_call_depth_;
     const int caller_loop_depth = loop_depth_; loop_depth_ = 0;
     push_variable_scope(); const std::size_t scope_index=variable_scopes_.size()-1;
-    for(auto& f:instance->fields) variable_scopes_[scope_index].emplace(f.first,f.second);
     for(std::size_t i=0;i<args.size();++i){auto sp=std::make_shared<json::Document>(args[i]);variable_scopes_[scope_index][method.callable.params[i]]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
     std::string id;
     for(const auto& e:struct_instances_) if(e.second==instance){id=e.first;break;}
@@ -3537,7 +3620,6 @@ bool Parser::invoke_struct_method(std::shared_ptr<StructInstance> instance,
     std::string program, pe; bool ok=translate_function_program(method.callable.body,program,pe); RenderResult rr;
     if(ok) rr=parse(program,method.callable.source_path,1); else {rr.ok=false; rr.error.message=pe;}
     --function_call_depth_; receiver_stack_.pop_back();
-    for(auto& f:instance->fields){auto it=variable_scopes_[scope_index].find(f.first);if(it!=variable_scopes_[scope_index].end())f.second=it->second;}
     pop_variable_scope(); loop_depth_=caller_loop_depth; --callable_call_depth_;
     if(!rr.ok){error=rr.error.message;pending_control_={};return false;}
     if(method.constructor && pending_control_.kind==ControlFlow::Return && pending_control_.value && !pending_control_.value->is_null()){error="constructor cannot return a value";pending_control_={};return false;}
