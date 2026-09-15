@@ -1179,7 +1179,11 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                     } else {
                         ++function_call_depth_;
                         if (pending_control_.kind != ControlFlow::None) { pending_control_ = {}; }
-                        auto body_result = parse(ci->second.body, ci->second.source_path, 1);
+                        std::string program_body; std::string program_error;
+                        if (!translate_function_program(ci->second.body, program_body, program_error)) {
+                            call_ok = false; call_error = program_error;
+                        }
+                        auto body_result = call_ok ? parse(program_body, ci->second.source_path, 1) : RenderResult{};
                         --function_call_depth_;
                         if (!body_result.ok) { call_ok = false; call_error = body_result.error.message; }
                         else if (pending_control_.kind == ControlFlow::None) { call_ok = false; call_error = "function requires @return(expr): " + call_name; }
@@ -1613,6 +1617,30 @@ std::string Parser::path_to(const std::string& argument, const std::string& dire
     }
     if (relative.find('/') == std::string::npos && relative.rfind("..", 0) != 0) relative = "./" + relative;
     return relative;
+}
+
+bool Parser::translate_function_program(const std::string& source, std::string& translated, std::string& error) const {
+    translated.clear();
+    std::size_t i = 0;
+    while (i < source.size()) {
+        while (i < source.size() && std::isspace(static_cast<unsigned char>(source[i]))) ++i;
+        if (i >= source.size()) break;
+        std::size_t start = i;
+        bool quoted=false; char quote=0; int parens=0, brackets=0, braces=0;
+        for (; i < source.size(); ++i) {
+            char c=source[i];
+            if (quoted) { if (c=='\\' && i+1<source.size()) ++i; else if (c==quote) quoted=false; continue; }
+            if (c=='\'' || c=='"') { quoted=true; quote=c; continue; }
+            if (c=='(') ++parens; else if(c==')') --parens;
+            else if(c=='[') ++brackets; else if(c==']') --brackets;
+            else if(c=='{') ++braces; else if(c=='}') { if(braces) --braces; }
+            if (!parens && !brackets && !braces && (c==';' || c=='\n')) break;
+        }
+        std::string stmt=trim_copy(source.substr(start,i-start));
+        if (!stmt.empty()) translated += "$[" + stmt + "]";
+        if (i<source.size()) ++i;
+    }
+    return true;
 }
 
 RenderResult Parser::parse(const std::string& source, const fs::path& source_path, int depth) {
