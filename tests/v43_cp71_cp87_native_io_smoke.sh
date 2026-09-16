@@ -49,6 +49,19 @@ x := read()
 print("got: " + x)
 NIFT
 [[ "$(cd "$TMP"; printf 'abc\n' | "$NIFT" run read.nift)" == 'got: abc' ]]
+# print() interpolates quoted-string arguments (CP70/CP79) without re-parsing
+# non-literal values, and write() shares the same value semantics.
+cat > "$TMP/interp.nift" <<'NIFT'
+who := "Nift"
+print("hello, $[who]")
+print("hello, " + who)
+out := ofs("interp.txt")
+out.write("v=$[who]")
+close(out)
+NIFT
+expected=$'hello, Nift\nhello, Nift'
+[[ "$(cd "$TMP" && "$NIFT" run interp.nift)" == "$expected" ]]
+[[ "$(cd "$TMP" && cat interp.txt)" == 'v=Nift' ]]
 # REPL keeps bindings and recovers from an ordinary error.
 repl=$(cd "$TMP" && printf 'x := 4\nprint(x)\nprint(missing)\nprint(x + 1)\nquit\n' | "$NIFT" sh 2>&1 || true)
 grep -q '4' <<<"$repl"
