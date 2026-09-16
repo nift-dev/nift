@@ -1,5 +1,17 @@
 # Nift release notes
 
+## v4.3.0 (development)
+
+Nift v4.3 expands the native v4 language without restoring the v3 LuaJIT runtime.
+
+- Signed 64-bit integer semantics with `double` floating-point values and mixed numeric comparison.
+- Compound assignment (`+=`, `-=`, `*=`, `/=`, `%=`) and prefix/postfix `++` / `--`.
+- Mutable arrays with `push`, `pop`, `insert`, `remove`, `clear`, `first`, `last`, `indexOf`, `contains`, `size`, and `empty`.
+- Native `stack`, `queue`, `prique`, insertion-ordered `map`/`set`, and `sorted_map`/`sorted_set`.
+- Structural equality for data values, identity equality for callables and identity-bearing objects, plus explicit `same(a, b)`.
+- First-class named callables, expression/block lambdas, and lexical closures that capture bindings and can safely escape their declaring frame.
+- Higher-order collection operations: `map`, `filter`, `reduce`, `any`, `all`, `find`, `count`, plus stable mutable array `sort` with an optional comparator.
+
 ## v4.2.0
 
 The v4.2 template-language campaign, following the v4.1.0 release. It separates

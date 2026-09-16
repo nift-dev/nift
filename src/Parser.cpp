@@ -1421,7 +1421,8 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             return true;
         }
         {
-            const auto arrow = text.find("=>");
+            std::size_t arrow = std::string::npos; int pd=0, bd=0, cd=0; bool iq=false; char qc=0;
+            for(std::size_t ai=0;ai+1<text.size();++ai){char ch=text[ai];if(iq){if(ch=='\\')++ai;else if(ch==qc)iq=false;continue;}if(ch=='\"'||ch=='\''){iq=true;qc=ch;continue;}if(ch=='(')++pd;else if(ch==')')--pd;else if(ch=='[')++bd;else if(ch==']')--bd;else if(ch=='{')++cd;else if(ch=='}')--cd;else if(ch=='='&&text[ai+1]=='>'&&pd==0&&bd==0&&cd==0){arrow=ai;break;}}
             if (arrow != std::string::npos && text.substr(0, arrow).find(":=") == std::string::npos && text.substr(0, arrow).find(" = ") == std::string::npos) {
                 std::string lhs = trim_copy(text.substr(0, arrow));
                 std::string rhs = trim_copy(text.substr(arrow + 2));
@@ -1471,6 +1472,32 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                     bool ok=false;std::vector<bool> quoted_args;auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),ok,&quoted_args);if(!ok){error="malformed collection method arguments";return false;}
                     auto need_mut=[&](){if(!rb->mutable_binding){error="cannot mutate const collection: "+root;return false;}return true;};
                     auto scalar_order=[](const json::Document&a,const json::Document&b,int& cmp){if(a.is_number()&&b.is_number()){cmp=a.num<b.num?-1:a.num>b.num?1:0;return true;}if(a.is_string()&&b.is_string()){cmp=a.string<b.string?-1:a.string>b.string?1:0;return true;}return false;};
+                    auto invoke_callback=[&](const std::string& cbexpr,const std::vector<json::Document>& av,json::Document& result)->bool{
+                        json::Document cb;if(!eval(cbexpr,cb,depth+1))return false;
+                        if(!cb.is_string()||cb.string.rfind("\x1fnift:callable:",0)!=0){error="transformation: callback must be callable";return false;}
+                        push_variable_scope();auto& sc=variable_scopes_.back();
+                        auto csp=std::make_shared<json::Document>(cb);sc["__nift_cb"]=VariableBinding{csp,nift_binding_type(*csp),false,false};
+                        std::string call="__nift_cb(";
+                        for(size_t i=0;i<av.size();++i){if(i)call+=",";std::string n="__nift_arg"+std::to_string(i);auto sp=std::make_shared<json::Document>(av[i]);sc[n]=VariableBinding{sp,nift_binding_type(*sp),false,false};call+=n;}call+=")";
+                        bool r=eval(call,result,depth+1);pop_variable_scope();return r;
+                    };
+                    if(method=="map"||method=="filter"||method=="reduce"||method=="any"||method=="all"||method=="find"||method=="count"){
+                        if((method=="reduce"&&args.size()!=2)||(method!="reduce"&&args.size()!=1)){error=method+": invalid arguments";return false;}
+                        std::vector<std::vector<json::Document>> rows;
+                        if(c->kind==CollectionKind::Map||c->kind==CollectionKind::SortedMap){for(const auto&e:c->entries)rows.push_back({e.first,e.second});}
+                        else {auto vals=c->values;if(c->kind==CollectionKind::Stack)std::reverse(vals.begin(),vals.end());for(const auto&v:vals)rows.push_back({v});}
+                        json::Document arr=json::Document::make_array();json::Document acc;
+                        if(method=="reduce"&&!eval(args[1],acc,depth+1))return false;
+                        if(method=="all"&&rows.empty()){out=json::Document(true);return true;} if(method=="any"&&rows.empty()){out=json::Document(false);return true;}
+                        double cnt=0;
+                        for(const auto&row:rows){json::Document r;std::vector<json::Document> ca=row;if(method=="reduce")ca.insert(ca.begin(),acc);if(!invoke_callback(args[0],ca,r))return false;
+                            if(method=="map")arr.array.push_back(r);
+                            else if(method=="filter"){if(!r.is_bool()){error="filter: callback must return bool";return false;}if(r.boolean)arr.array.push_back(row.size()==1?row[0]:json::Document::make_array());if(r.boolean&&row.size()==2){arr.array.back().array=row;}}
+                            else if(method=="reduce")acc=r;
+                            else {if(!r.is_bool()){error=method+": callback must return bool";return false;}if(method=="any"&&r.boolean){out=json::Document(true);return true;}if(method=="all"&&!r.boolean){out=json::Document(false);return true;}if(method=="find"&&r.boolean){out=row.size()==1?row[0]:row[1];return true;}if(method=="count"&&r.boolean)cnt+=1;}
+                        }
+                        if(method=="map"||method=="filter")out=arr;else if(method=="reduce")out=acc;else if(method=="any")out=json::Document(false);else if(method=="all")out=json::Document(true);else if(method=="find")out=json::Document(nullptr);else out=json::Document(cnt);return true;
+                    }
                     if(method=="size"||method=="empty"||method=="clear"){if(!args.empty()){error=method+": expected no arguments";return false;}size_t n=(c->kind==CollectionKind::Map||c->kind==CollectionKind::SortedMap)?c->entries.size():c->values.size();if(method=="size")out=json::Document((double)n);else if(method=="empty")out=json::Document(n==0);else{if(!need_mut())return false;c->values.clear();c->entries.clear();out=json::Document(nullptr);last_expression_mutation_=true;}return true;}
                     if(c->kind==CollectionKind::Stack||c->kind==CollectionKind::Queue||c->kind==CollectionKind::PriQue){
                         if(method=="push"){if(args.size()!=1){error="push: expected one value";return false;}if(!need_mut())return false;json::Document v;if(quoted_args.size()>0&&quoted_args[0])v=json::Document(args[0]);else if(!eval(args[0],v,depth+1))return false;c->values.push_back(v);if(c->kind==CollectionKind::PriQue){std::stable_sort(c->values.begin(),c->values.end(),[&](const auto&a,const auto&b){int z=0;return scalar_order(a,b,z)&&z<0;});}out=v;last_expression_mutation_=true;return true;}
@@ -1493,6 +1520,17 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             if(lp!=std::string::npos&&text.back()==')'){const std::string target=trim_copy(text.substr(0,lp));const auto dot=target.rfind('.');if(dot!=std::string::npos){
                 const std::string root=target.substr(0,dot), method=target.substr(dot+1); VariableBinding* rb=find_binding(root);
                 if(rb&&rb->value&&rb->value->is_array()){bool ok=false;auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),ok);if(!ok){error="malformed array method arguments";return false;}auto& a=rb->value->array;
+                    auto invoke_callback=[&](const std::string& cbexpr,const std::vector<json::Document>& av,json::Document& result)->bool{
+                        json::Document cb;if(!eval(cbexpr,cb,depth+1))return false;if(!cb.is_string()||cb.string.rfind("\x1fnift:callable:",0)!=0){error="transformation: callback must be callable";return false;}
+                        push_variable_scope();auto& sc=variable_scopes_.back();auto csp=std::make_shared<json::Document>(cb);sc["__nift_cb"]=VariableBinding{csp,nift_binding_type(*csp),false,false};std::string call="__nift_cb(";
+                        for(size_t i=0;i<av.size();++i){if(i)call+=",";std::string n="__nift_arg"+std::to_string(i);auto sp=std::make_shared<json::Document>(av[i]);sc[n]=VariableBinding{sp,nift_binding_type(*sp),false,false};call+=n;}call+=")";bool r=eval(call,result,depth+1);pop_variable_scope();return r;};
+                    if(method=="map"||method=="filter"||method=="reduce"||method=="any"||method=="all"||method=="find"||method=="count"){
+                        if((method=="reduce"&&args.size()!=2)||(method!="reduce"&&args.size()!=1)){error=method+": invalid arguments";return false;}json::Document arr=json::Document::make_array(),acc;if(method=="reduce"&&!eval(args[1],acc,depth+1))return false;double cnt=0;
+                        for(const auto&v:a){json::Document r;if(!invoke_callback(args[0],method=="reduce"?std::vector<json::Document>{acc,v}:std::vector<json::Document>{v},r))return false;if(method=="map")arr.array.push_back(r);else if(method=="filter"){if(!r.is_bool()){error="filter: callback must return bool";return false;}if(r.boolean)arr.array.push_back(v);}else if(method=="reduce")acc=r;else{if(!r.is_bool()){error=method+": callback must return bool";return false;}if(method=="any"&&r.boolean){out=json::Document(true);return true;}if(method=="all"&&!r.boolean){out=json::Document(false);return true;}if(method=="find"&&r.boolean){out=v;return true;}if(method=="count"&&r.boolean)cnt+=1;}}
+                        if(method=="map"||method=="filter")out=arr;else if(method=="reduce")out=acc;else if(method=="any")out=json::Document(false);else if(method=="all")out=json::Document(true);else if(method=="find")out=json::Document(nullptr);else out=json::Document(cnt);return true;}
+                    if(method=="sort"){
+                        if(args.size()>1){error="sort: expected zero or one comparator";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}bool failed=false;std::string ferr;
+                        std::stable_sort(a.begin(),a.end(),[&](const auto&x,const auto&y){if(failed)return false;if(args.empty()){if(x.is_number()&&y.is_number())return x.num<y.num;if(x.is_string()&&y.is_string())return x.string<y.string;failed=true;ferr="sort: incomparable values";return false;}json::Document r;if(!invoke_callback(args[0],{x,y},r)){failed=true;ferr=error;return false;}if(!r.is_bool()){failed=true;ferr="sort: comparator must return bool";return false;}return r.boolean;});if(failed){error=ferr;return false;}out=*rb->value;last_expression_mutation_=true;return true;}
                     if(method=="size"||method=="empty"||method=="first"||method=="last"||method=="pop"||method=="clear"||method=="push"||method=="insert"||method=="remove"||method=="indexOf"||method=="contains"){
                         if((method=="size"||method=="empty"||method=="first"||method=="last"||method=="pop"||method=="clear")&&!args.empty()){error=method+": expected no arguments";return false;}
                         if(method=="size"){out=json::Document(static_cast<double>(a.size()));return true;} if(method=="empty"){out=json::Document(a.empty());return true;}

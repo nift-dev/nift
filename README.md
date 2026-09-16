@@ -143,6 +143,10 @@ Objects can be iterated with `@for((key, val) : object){...}`. Loops expose rese
 
 A tracked entry can also opt into pagination with a positive `items-per-page` value. `@item{...}` captures rendered items, exactly one `@paginate` inserts the paginated result, pagination templates receive `$[paginate.items]`, `$[paginate.current]`, `$[paginate.total]`, `$[paginate.first]`, `$[paginate.last]`, `$[paginate.previous]` and `$[paginate.next]`, and `@pathtopage(n)` resolves absolute generated page links. Signed forms such as `@pathtopage(+1)`, `@pathtopage(-1)` and `@pathtopage(+$[offset])` resolve relative to the current pagination page. The complete generated page set remains one tracked dependency/invalidation unit even though its pages may render concurrently.
 
+## v4.3 language development
+
+The current development line adds signed 64-bit integers, compound assignment and `++`/`--`, mutable arrays, native stack/queue/priority/map/set collections, first-class lambdas and lexical closures, and higher-order `map`/`filter`/`reduce`/`any`/`all`/`find`/`count`/`sort` operations. `map` and `set` preserve insertion order; sorted variants provide comparison order. See `docs/handover/V4.3-LANGUAGE-CAMPAIGN.md` for the frozen contract and checkpoint evidence.
+
 ## Documentation
 
 Full documentation is available at **[nift.dev](https://nift.dev)**.
