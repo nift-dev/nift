@@ -683,7 +683,11 @@ static int run_script_shell() {
         if(const char* home=std::getenv("HOME")){std::string h=fs::path(home).lexically_normal().generic_string();if(shown==h)shown="~";else if(!h.empty()&&shown.rfind(h+"/",0)==0)shown="~"+shown.substr(h.size());}
         std::cout << console::paint(shown, "1;32", console::stdout_colour_enabled()) << "$ ";
     }else{std::cout << "... ";}std::cout.flush();std::string line;if(!std::getline(std::cin,line))break;if(pending.empty()&&(line=="exit"||line=="quit"))break;pending+=line+"\n";
-        int braces=0;bool quote=false,esc=false;char qc=0;for(char c:pending){if(quote){if(esc)esc=false;else if(c=='\\')esc=true;else if(c==qc)quote=false;continue;}if(c=='\"'||c=='\''){quote=true;qc=c;}else if(c=='{')++braces;else if(c=='}')--braces;}if(braces>0)continue;
+        // CP85: the parser reports whether the accumulated input is complete,
+        // an incomplete prefix (keep reading), or invalid (balanced but
+        // malformed, executed so the canonical diagnostic is shown).
+        const Parser::StatementState st=parser.statement_state(pending);
+        if(st==Parser::StatementState::Incomplete)continue;
         auto rr=parser.run_statement(pending,"<nift-sh>");pending.clear();if(!rr.ok){console::error(rr.error.message);continue;}if(!rr.output.empty())std::cout<<rr.output<<'\n';
     }return 0;
 }

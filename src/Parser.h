@@ -32,6 +32,12 @@ public:
     RenderResult run_statement(const std::string& source, const std::filesystem::path& source_path);
     void reset_script_control();
 
+    // Parser-reported statement state for the interactive shell: the REPL asks
+    // the parser whether the accumulated input is a complete statement, an
+    // incomplete prefix that needs more input, or a balanced-but-invalid form.
+    enum class StatementState { Complete, Incomplete, Invalid };
+    StatementState statement_state(const std::string& source) const;
+
     // Shared template+page composition: parse template_source, let @content
     // pull page_source, and (when require_exactly_one_content) enforce the
     // exactly-one-@content rule. The CLI's render() and the embedded Engine
