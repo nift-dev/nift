@@ -118,6 +118,7 @@ themselves. Nift owns the small build-time job it can perform precisely.
 - `docs/handover/PENDING-WEBSITE.md`: internal queue of implementation-driven
   website changes that must be completed during release preparation.
 - `docs/handover/ROADMAP.md`: living production-readiness risk assessment.
+- `docs/handover/V4.3-LANGUAGE-CAMPAIGN.md`: agreed v4.3 operators, collections, first-class callables, closures, equality semantics, and checkpoint implementation plan.
 
 ### Detailed subject handovers
 

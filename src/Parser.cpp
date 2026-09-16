@@ -16,6 +16,8 @@
 #include <functional>
 #include <thread>
 #include <atomic>
+#include <charconv>
+#include <limits>
 
 namespace fs = std::filesystem;
 static int nift_binding_type(const json::Document& value) {
@@ -921,12 +923,23 @@ bool Parser::scalar_literal(const std::string& text, json::Document& value, std:
     if (trimmed == "false") { value = json::Document(false); return true; }
     if (trimmed == "null") { value = json::Document(nullptr); return true; }
 
+    const bool floating_literal = trimmed.find('.') != std::string::npos || trimmed.find('e') != std::string::npos || trimmed.find('E') != std::string::npos;
+    if (!floating_literal) {
+        std::int64_t integer = 0;
+        const auto parsed = std::from_chars(trimmed.data(), trimmed.data() + trimmed.size(), integer);
+        if (parsed.ec == std::errc() && parsed.ptr == trimmed.data() + trimmed.size()) {
+            value = json::Document(static_cast<double>(integer));
+            if (integer > 9007199254740992LL || integer < -9007199254740992LL) {
+                value.type = json::Type::StrNumber;
+                value.string = trimmed;
+            }
+            return true;
+        }
+        if (parsed.ec == std::errc::result_out_of_range) { error = "integer literal outside signed 64-bit range"; return false; }
+    }
     char* end = nullptr;
     const double number = std::strtod(trimmed.c_str(), &end);
-    if (end && *end == '\0') {
-        value = json::Document(number);
-        return true;
-    }
+    if (floating_literal && end && *end == '\0' && std::isfinite(number)) { value = json::Document(number); return true; }
 
     error = "expected JSON path or scalar literal in @if condition: " + trimmed;
     return false;
@@ -1363,6 +1376,61 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
         if (text.empty()) { error="expression cannot be empty"; return false; }
         while (encloses(text)) text=trim_copy(text.substr(1,text.size()-2));
 
+        auto find_binding = [&](const std::string& name) -> VariableBinding* {
+            for (auto scope=variable_scopes_.rbegin(); scope!=variable_scopes_.rend(); ++scope) { auto it=scope->find(name); if(it!=scope->end()) return &it->second; }
+            if(!receiver_stack_.empty()){auto it=receiver_stack_.back()->fields.find(name);if(it!=receiver_stack_.back()->fields.end())return &it->second;}
+            return nullptr;
+        };
+        auto structural_equal = [&](const json::Document& a, const json::Document& b) -> bool {
+            std::function<bool(const json::Document&,const json::Document&)> eq;
+            eq = [&](const json::Document& x,const json::Document& y)->bool {
+                if(x.is_number() && y.is_number()) {
+                    if(x.type==json::Type::StrNumber || y.type==json::Type::StrNumber) {
+                        auto exact_int=[](const json::Document& d,std::int64_t& v)->bool{if(d.type==json::Type::StrNumber){auto r=std::from_chars(d.string.data(),d.string.data()+d.string.size(),v);return r.ec==std::errc()&&r.ptr==d.string.data()+d.string.size();}if(d.type==json::Type::Number&&std::isfinite(d.num)&&std::trunc(d.num)==d.num&&d.num>=-9223372036854775808.0&&d.num<9223372036854775808.0){v=static_cast<std::int64_t>(d.num);return true;}return false;};
+                        std::int64_t xi=0,yi=0;if(exact_int(x,xi)&&exact_int(y,yi))return xi==yi;return false;
+                    }
+                    return x.num==y.num;
+                }
+                if(x.type!=y.type)return false;
+                if(x.is_null())return true; if(x.is_bool())return x.boolean==y.boolean;
+                if(x.is_string()){
+                    const bool xs=x.string.rfind("\x1fnift:struct:",0)==0, ys=y.string.rfind("\x1fnift:struct:",0)==0;
+                    return xs||ys ? (xs&&ys&&x.string==y.string) : x.string==y.string;
+                }
+                if(x.is_array()){if(x.array.size()!=y.array.size())return false;for(size_t i=0;i<x.array.size();++i)if(!eq(x.array[i],y.array[i]))return false;return true;}
+                if(x.is_object()){if(x.object.size()!=y.object.size())return false;for(const auto& e:x.object){auto it=std::find_if(y.object.begin(),y.object.end(),[&](const auto& z){return z.first==e.first;});if(it==y.object.end()||!eq(e.second,it->second))return false;}return true;}
+                return false;
+            }; return eq(a,b);
+        };
+
+        if (text.rfind("same(",0)==0 && text.back()==')') {
+            bool ok=false; auto args=parse_parameters(text.substr(5,text.size()-6),ok); if(!ok||args.size()!=2){error="same: expected two values";return false;}
+            const std::string an=trim_copy(args[0]),bn=trim_copy(args[1]); VariableBinding* ab=find_binding(an);VariableBinding* bb=find_binding(bn);
+            if(ab&&bb&&ab->value&&bb->value&&ab->value->is_array()&&bb->value->is_array()){out=json::Document(ab->value==bb->value);return true;}
+            json::Document a,b;if(!eval(args[0],a,depth+1)||!eval(args[1],b,depth+1))return false;
+            auto identity=[](const json::Document& v)->std::string{return v.is_string()&&v.string.rfind("\x1fnift:struct:",0)==0?v.string:std::string{};};
+            const auto ai=identity(a),bi=identity(b); if(ai.empty()||bi.empty()){error="same: operands must be identity-bearing values";return false;} out=json::Document(ai==bi);return true;
+        }
+
+        {
+            const auto lp=text.find('(');
+            if(lp!=std::string::npos&&text.back()==')'){const std::string target=trim_copy(text.substr(0,lp));const auto dot=target.rfind('.');if(dot!=std::string::npos){
+                const std::string root=target.substr(0,dot), method=target.substr(dot+1); VariableBinding* rb=find_binding(root);
+                if(rb&&rb->value&&rb->value->is_array()){bool ok=false;auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),ok);if(!ok){error="malformed array method arguments";return false;}auto& a=rb->value->array;
+                    if(method=="size"||method=="empty"||method=="first"||method=="last"||method=="pop"||method=="clear"||method=="push"||method=="insert"||method=="remove"||method=="indexOf"||method=="contains"){
+                        if((method=="size"||method=="empty"||method=="first"||method=="last"||method=="pop"||method=="clear")&&!args.empty()){error=method+": expected no arguments";return false;}
+                        if(method=="size"){out=json::Document(static_cast<double>(a.size()));return true;} if(method=="empty"){out=json::Document(a.empty());return true;}
+                        if(method=="first"||method=="last"||method=="pop"){if(a.empty()){error=method+": array is empty";return false;}out=method=="first"?a.front():a.back();if(method=="pop"){if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}a.pop_back();last_expression_mutation_=true;}return true;}
+                        if(method=="clear"){if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}a.clear();out=json::Document(nullptr);last_expression_mutation_=true;return true;}
+                        if(method=="push"){if(args.size()!=1){error="push: expected one argument";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}json::Document v;if(!eval(args[0],v,depth+1))return false;a.push_back(v);out=v;last_expression_mutation_=true;return true;}
+                        if(method=="insert"){if(args.size()!=2){error="insert: expected index and value";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}json::Document ix,v;if(!eval(args[0],ix,depth+1)||!eval(args[1],v,depth+1)||!ix.is_number()){error="insert: invalid index";return false;}size_t i=static_cast<size_t>(ix.num);if(i>a.size()){error="insert: index out of range";return false;}a.insert(a.begin()+i,v);out=v;last_expression_mutation_=true;return true;}
+                        if(method=="remove"){if(args.size()!=1){error="remove: expected index";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}json::Document ix;if(!eval(args[0],ix,depth+1)||!ix.is_number()){error="remove: invalid index";return false;}size_t i=static_cast<size_t>(ix.num);if(i>=a.size()){error="remove: index out of range";return false;}out=a[i];a.erase(a.begin()+i);last_expression_mutation_=true;return true;}
+                        if(method=="indexOf"||method=="contains"){if(args.size()!=1){error=method+": expected one value";return false;}json::Document v;if(!eval(args[0],v,depth+1))return false;std::size_t i=0;for(;i<a.size();++i)if(structural_equal(a[i],v))break;if(method=="contains")out=json::Document(i<a.size());else out=json::Document(i<a.size()?static_cast<double>(i):-1.0);return true;}
+                    }
+                }
+            }}
+        }
+
         {
             const auto lp = text.find('(');
             if (lp != std::string::npos && text.back() == ')' && text.substr(0,lp).find('.') != std::string::npos) {
@@ -1513,6 +1581,25 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             return std::string::npos;
         };
 
+        auto numeric_binary = [&](const json::Document& left, const json::Document& right, char op, json::Document& result)->bool {
+            auto as_i64=[](const json::Document& d,std::int64_t& v)->bool{
+                if(d.type==json::Type::StrNumber){auto r=std::from_chars(d.string.data(),d.string.data()+d.string.size(),v);return r.ec==std::errc()&&r.ptr==d.string.data()+d.string.size();}
+                if(d.is_number()&&std::trunc(d.num)==d.num&&d.num>=static_cast<double>(std::numeric_limits<std::int64_t>::min())&&d.num<=static_cast<double>(std::numeric_limits<std::int64_t>::max())){v=static_cast<std::int64_t>(d.num);return true;}return false;};
+            std::int64_t a=0,b=0; if(as_i64(left,a)&&as_i64(right,b)&&op!='/'){std::int64_t r=0;bool overflow=false;
+                if(op=='+')overflow=__builtin_add_overflow(a,b,&r);else if(op=='-')overflow=__builtin_sub_overflow(a,b,&r);else if(op=='*')overflow=__builtin_mul_overflow(a,b,&r);else if(op=='%'){if(b==0){error="modulo by zero";return false;}if(a==std::numeric_limits<std::int64_t>::min()&&b==-1)r=0;else r=a%b;}else return false;
+                if(overflow){error="signed 64-bit integer overflow";return false;}result=json::Document(static_cast<double>(r));if(r>9007199254740992LL||r<-9007199254740992LL){result.type=json::Type::StrNumber;result.string=std::to_string(r);}return true;}
+            if(!left.is_number()||!right.is_number()){error="arithmetic operators require numeric operands";return false;}double r=0;if(op=='+')r=left.num+right.num;else if(op=='-')r=left.num-right.num;else if(op=='*')r=left.num*right.num;else if(op=='/'){if(right.num==0){error="division by zero";return false;}r=left.num/right.num;}else if(op=='%'){if(right.num==0){error="modulo by zero";return false;}r=std::fmod(left.num,right.num);}if(!std::isfinite(r)){error="arithmetic result is not finite";return false;}result=json::Document(r);return true;
+        };
+
+        // Compound assignment is a true mutation expression. Current assignable
+        // paths are identifiers and struct member paths; both are side-effect-free
+        // to resolve, so the target is read once and written once.
+        for(const std::string cop:{"+=","-=","*=","/=","%="}){const auto p=find_top_level_op(cop);if(p!=std::string::npos){const std::string target=trim_copy(text.substr(0,p));json::Document oldv,rhs,next;if(!eval(target,oldv,depth+1)||!eval(text.substr(p+2),rhs,depth+1))return false;if(cop=="+="&&oldv.is_string()&&rhs.is_string())next=json::Document(oldv.string+rhs.string);else if(!numeric_binary(oldv,rhs,cop[0],next))return false;const std::string assignment=target+" = "+next.dump(0);if(!eval(assignment,out,depth+1))return false;if(depth==0)last_expression_mutation_=true;return true;}}
+
+        const bool prefix_inc=(text.rfind("++",0)==0||text.rfind("--",0)==0);
+        const bool postfix_inc=(text.size()>2&&(text.compare(text.size()-2,2,"++")==0||text.compare(text.size()-2,2,"--")==0) && find_top_level_op(":=")==std::string::npos && find_top_level_assignment()==std::string::npos);
+        if(prefix_inc||postfix_inc){const bool inc=prefix_inc?text[0]=='+':text[text.size()-2]=='+';const std::string target=trim_copy(prefix_inc?text.substr(2):text.substr(0,text.size()-2));json::Document oldv,one(1.0),next;if(!eval(target,oldv,depth+1))return false;if(!oldv.is_number()){error="increment/decrement requires a numeric lvalue";return false;}if(!numeric_binary(oldv,one,inc?'+':'-',next))return false;json::Document assigned;if(!eval(target+" = "+next.dump(0),assigned,depth+1))return false;out=prefix_inc?assigned:oldv;if(depth==0)last_expression_mutation_=true;return true;}
+
         if (const auto p=find_top_level_op(":="); p!=std::string::npos) {
             std::string declaration = trim_copy(text.substr(0, p));
             bool mutable_binding = true;
@@ -1526,7 +1613,9 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             if (variable_scopes_.back().find(name) != variable_scopes_.back().end()) { error = "binding already declared in this scope: " + name; return false; }
             json::Document assigned;
             if (!eval(text.substr(p + 2), assigned, depth + 1)) return false;
-            auto stored = std::make_shared<json::Document>(assigned);
+            std::shared_ptr<json::Document> stored;
+            const std::string rhs_name=trim_copy(text.substr(p+2)); VariableBinding* alias=find_binding(rhs_name);
+            if(alias&&alias->value&&alias->value->is_array()) stored=alias->value; else stored=std::make_shared<json::Document>(assigned);
             variable_scopes_.back().emplace(name, VariableBinding{stored, nift_binding_type_from_text(text.substr(p + 2), assigned), mutable_binding, deep_readonly});
             if (depth == 0) last_expression_mutation_ = true;
             out = std::move(assigned);
@@ -1609,19 +1698,15 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             bool result=false;
             if (op=="==" || op=="!=") {
                 bool equal=false;
-                if (left.type==right.type) {
-                    if (left.is_null()) equal=true;
-                    else if (left.is_bool()) equal=left.boolean==right.boolean;
-                    else if (left.is_number()) equal=left.num==right.num;
-                    else if (left.is_string()) equal=left.string==right.string;
-                    else { error="comparisons are only supported for scalar values"; return false; }
-                }
+                equal = structural_equal(left,right);
                 result = op=="==" ? equal : !equal;
             } else {
-                if (left.type!=right.type || (!left.is_number() && !left.is_string())) { error="ordering comparisons require two numbers or two strings of the same type"; return false; }
+                if ((!left.is_number() || !right.is_number()) && !(left.is_string() && right.is_string())) { error="ordering comparisons require two numbers or two strings"; return false; }
                 int ordering=0;
-                if (left.is_number()) ordering=left.num<right.num?-1:(left.num>right.num?1:0);
-                else ordering=left.string<right.string?-1:(left.string>right.string?1:0);
+                if (left.is_number() && right.is_number()) {
+                    if(left.type==json::Type::StrNumber||right.type==json::Type::StrNumber){std::int64_t li=0,ri=0;auto geti=[](const json::Document& d,std::int64_t& v){if(d.type==json::Type::StrNumber){auto r=std::from_chars(d.string.data(),d.string.data()+d.string.size(),v);return r.ec==std::errc()&&r.ptr==d.string.data()+d.string.size();}if(d.type==json::Type::Number&&std::trunc(d.num)==d.num&&d.num>=-9223372036854775808.0&&d.num<9223372036854775808.0){v=static_cast<std::int64_t>(d.num);return true;}return false;};if(geti(left,li)&&geti(right,ri))ordering=li<ri?-1:(li>ri?1:0);else {error="numeric comparison is outside exact signed 64-bit range";return false;}}
+                    else ordering=left.num<right.num?-1:(left.num>right.num?1:0);
+                } else ordering=left.string<right.string?-1:(left.string>right.string?1:0);
                 if (op=="<") result=ordering<0; else if (op=="<=") result=ordering<=0; else if (op==">") result=ordering>0; else result=ordering>=0;
             }
             out=json::Document(result); return true;
@@ -1656,18 +1741,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             if (!eval(text.substr(0,pos),left,depth+1) || !eval(text.substr(pos+1),right,depth+1)) return false;
             if (!left.is_number() || !right.is_number()) { error="arithmetic operators require numeric operands"; return false; }
             const char op=text[pos];
-            double result=0.0;
-            if (op=='+') result=left.num+right.num;
-            else if (op=='-') result=left.num-right.num;
-            else if (op=='*') result=left.num*right.num;
-            else if (op=='/') { if (right.num==0.0) { error="division by zero"; return false; } result=left.num/right.num; }
-            else {
-                if (right.num==0.0) { error="modulo by zero"; return false; }
-                if (std::trunc(left.num)!=left.num || std::trunc(right.num)!=right.num) { error="modulo requires integer-valued operands"; return false; }
-                result=std::fmod(left.num,right.num);
-            }
-            if (!std::isfinite(result)) { error="arithmetic result is not finite"; return false; }
-            out=json::Document(result); return true;
+            return numeric_binary(left,right,op,out);
         }
 
         if ((text.front()=='+' || text.front()=='-') && text.size()>1) {
