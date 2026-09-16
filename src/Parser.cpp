@@ -927,6 +927,20 @@ bool Parser::scalar_literal(const std::string& text, json::Document& value, std:
 
     if ((trimmed.front() == '"' && trimmed.back() == '"') ||
         (trimmed.front() == '\'' && trimmed.back() == '\'')) {
+        // The value is a single quoted string only when the first unescaped
+        // closing quote is the final character. Otherwise the surrounding quotes
+        // merely delimit the first of several tokens (for example a string
+        // concatenation such as "a" + "b") and must not be treated as one literal.
+        const char closing_quote = trimmed.front();
+        std::size_t closing = std::string::npos;
+        for (std::size_t probe = 1; probe < trimmed.size(); ++probe) {
+            if (trimmed[probe] == '\\' && probe + 1 < trimmed.size()) { ++probe; continue; }
+            if (trimmed[probe] == closing_quote) { closing = probe; break; }
+        }
+        if (closing == std::string::npos || closing != trimmed.size() - 1) {
+            error = "quoted literal contains trailing content or an unclosed quote";
+            return false;
+        }
         std::string result;
         for (std::size_t i = 1; i + 1 < trimmed.size(); ++i) {
             if (trimmed[i] == '\\' && i + 2 < trimmed.size()) {
@@ -1634,7 +1648,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                     if(method=="read_line"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Input){error="read_line: expected input stream and no arguments";return false;}std::string line;if(!std::getline(*st->input,line)){if(st->input->eof()){st->input->clear();out=json::Document(nullptr);return true;}error="read_line: input failure";return false;}out=json::Document(line);return true;}
                     if(method=="read_all"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Input){error="read_all: expected input stream and no arguments";return false;}std::ostringstream ss;ss<<st->input->rdbuf();out=json::Document(ss.str());return true;}
                     if(method=="read"){if(aa.size()!=1||st->kind!=StreamInstance::Kind::Input){error="read: expected byte count on input stream";return false;}json::Document n;if(!eval(aa[0],n,depth+1)||!n.is_number()||std::trunc(n.num)!=n.num||n.num<0){error="read: invalid byte count";return false;}std::string b((size_t)n.num,'\0');st->input->read(b.data(),(std::streamsize)b.size());b.resize((size_t)st->input->gcount());out=json::Document(b);return true;}
-                    if(method=="read_val"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Input){error="read_val: expected input stream and no arguments";return false;}*st->input>>std::ws;if(st->input->peek()==std::char_traits<char>::eof()){out=json::Document(nullptr);return true;}std::string token;char first=(char)st->input->peek();if(first=='"'||first=='['||first=='{'){char open=first,close=first=='['?']':first=='{'?'}':'"';int dep=0;bool quoted=false,esc=false;char c;while(st->input->get(c)){token+=c;if(open=='"'){if(esc){esc=false;continue;}if(c=='\\'){esc=true;continue;}if(token.size()>1&&c=='"')break;}else{if(quoted){if(esc)esc=false;else if(c=='\\')esc=true;else if(c=='"')quoted=false;}else if(c=='"')quoted=true;else if(c==open)++dep;else if(c==close&&--dep==0)break;}}}else{while(st->input->peek()!=std::char_traits<char>::eof()&&!std::isspace((unsigned char)st->input->peek()))token+=(char)st->input->get();}json::Document v;std::string ee;if(!eval(token,v,depth+1)){error="read_val: "+ee;return false;}out=v;return true;}
+                    if(method=="read_val"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Input){error="read_val: expected input stream and no arguments";return false;}*st->input>>std::ws;if(st->input->peek()==std::char_traits<char>::eof()){out=json::Document(nullptr);return true;}std::string token;char first=(char)st->input->peek();if(first=='"'||first=='['||first=='{'){char open=first,close=first=='['?']':first=='{'?'}':'"';int dep=0;bool quoted=false,esc=false;char c;while(st->input->get(c)){token+=c;if(open=='"'){if(esc){esc=false;continue;}if(c=='\\'){esc=true;continue;}if(token.size()>1&&c=='"')break;}else{if(quoted){if(esc)esc=false;else if(c=='\\')esc=true;else if(c=='"')quoted=false;}else if(c=='"')quoted=true;else if(c==open)++dep;else if(c==close&&--dep==0)break;}}}else{while(st->input->peek()!=std::char_traits<char>::eof()&&!std::isspace((unsigned char)st->input->peek()))token+=(char)st->input->get();}json::Document v;std::string ee;if(!eval(token,v,depth+1)){error=std::string("read_val: ")+(error.empty()?("cannot parse value '"+token+"'"):error);return false;}out=v;return true;}
                     if(method=="write"||method=="write_line"){if(aa.size()!=1||st->kind!=StreamInstance::Kind::Output){error=method+": expected one value on output stream";return false;}json::Document v;if(!((!qq.empty()&&qq[0])?(v=json::Document(aa[0]),true):eval(aa[0],v,depth+1)))return false;if(v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0)){error=method+": value is not directly renderable";return false;}*st->output<<render_expression_value(v);if(method=="write_line")*st->output<<'\n';if(!*st->output){error=method+": output failure";return false;}out=json::Document(nullptr);return true;}
                     if(method=="flush"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Output){error="flush: expected output stream and no arguments";return false;}st->output->flush();if(!*st->output){error="flush: output failure";return false;}out=json::Document(nullptr);return true;}
                 }
@@ -1949,7 +1963,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             out=json::Document(!truthy_value(operand)); return true;
         }
 
-        { std::size_t cp=std::string::npos;bool q=false;char qc=0;int pa=0,br=0,bc=0;for(size_t z=0;z<text.size();++z){char c=text[z];if(q){if(c=='\\'&&z+1<text.size())++z;else if(c==qc)q=false;continue;}if(c=='\''||c=='"'){q=true;qc=c;continue;}if(c=='(')++pa;else if(c==')')--pa;else if(c=='[')++br;else if(c==']')--br;else if(c=='{')++bc;else if(c=='}')--bc;else if(c=='+'&&!pa&&!br&&!bc){if(z>0&&std::string("+-*/%(<>=!&|?:,").find(text[z-1])!=std::string::npos)continue;cp=z;break;}}if(cp!=std::string::npos){json::Document l,r;if(!eval(text.substr(0,cp),l,depth+1)||!eval(text.substr(cp+1),r,depth+1))return false;if(l.is_string()||r.is_string()){auto safe=[&](const json::Document& v,std::string& z){if(v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0))return false;z=render_expression_value(v);return true;};std::string a,b;if(!safe(l,a)||!safe(r,b)){error="string concatenation requires renderable scalar values";return false;}out=json::Document(a+b);return true;}}}
+        { std::size_t cp=std::string::npos;bool q=false;char qc=0;int pa=0,br=0,bc=0;for(size_t z=text.size();z-- >0;){char c=text[z];if(q){if(c==qc&&(z==0||text[z-1]!='\\'))q=false;continue;}if(c=='\''||c=='"'){q=true;qc=c;continue;}if(c==')')++pa;else if(c=='(')--pa;else if(c==']')++br;else if(c=='[')--br;else if(c=='}')++bc;else if(c=='{')--bc;else if(c=='+'&&!pa&&!br&&!bc){if(z>0&&std::string("+-*/%(<>=!&|?:,").find(text[z-1])!=std::string::npos)continue;cp=z;break;}}if(cp!=std::string::npos){json::Document l,r;if(!eval(text.substr(0,cp),l,depth+1)||!eval(text.substr(cp+1),r,depth+1))return false;if(l.is_string()||r.is_string()){auto safe=[&](const json::Document& v,std::string& z){if(v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0))return false;z=render_expression_value(v);return true;};std::string a,b;if(!safe(l,a)||!safe(r,b)){error="string concatenation requires renderable scalar values";return false;}out=json::Document(a+b);return true;}return numeric_binary(l,r,'+',out);}}
 
         auto find_binary = [&](const std::string& ops) -> std::size_t {
             bool quoted=false; char quote=0; int parens=0; int brackets=0;
@@ -2286,9 +2300,9 @@ RenderResult Parser::run_script(const std::string& source, const fs::path& sourc
     result_ = RenderResult{};
     variable_scopes_.clear(); variable_scopes_.emplace_back();
     callables_.clear(); structs_.clear(); requested_exports_.clear(); pending_control_={};
-    in_import_program_=false; standalone_script_host_=true; function_call_depth_=1;
+    in_import_program_=false; standalone_script_host_=true; strict_script_mode_=true; function_call_depth_=1;
     auto rr=execute_native_program(source,source_path,0);
-    function_call_depth_=0;
+    function_call_depth_=0; strict_script_mode_=false;
     rr.output.clear();
     if(rr.ok && pending_control_.kind==ControlFlow::Return && pending_control_.value) {
         const auto& v=*pending_control_.value;
@@ -2301,8 +2315,8 @@ RenderResult Parser::run_script(const std::string& source, const fs::path& sourc
 
 RenderResult Parser::run_statement(const std::string& source, const fs::path& source_path) {
     if(variable_scopes_.empty()) variable_scopes_.emplace_back();
-    standalone_script_host_=true; result_ = RenderResult{}; pending_control_={}; function_call_depth_=1;
-    auto rr=execute_native_program(source,source_path,0); function_call_depth_=0; rr.output.clear(); pending_control_={}; return rr;
+    standalone_script_host_=true; strict_script_mode_=true; result_ = RenderResult{}; pending_control_={}; function_call_depth_=1;
+    auto rr=execute_native_program(source,source_path,0); function_call_depth_=0; strict_script_mode_=false; rr.output.clear(); pending_control_={}; return rr;
 }
 
 void Parser::reset_script_control() { pending_control_={}; result_=RenderResult{}; }
@@ -2329,13 +2343,13 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
     auto src=host_.read_shared_source(path); if(src.status==nift::HostStatus::Error||!src.content){error=src.error.empty()?"script is not readable":src.error;return false;}
 
     auto saved_scopes=std::move(variable_scopes_); auto saved_callables=std::move(callables_); auto saved_structs=std::move(structs_);
-    auto saved_exports=std::move(requested_exports_); const bool saved_import=in_import_program_; auto saved_control=pending_control_;
-    variable_scopes_.clear(); variable_scopes_.emplace_back(); callables_.clear(); structs_.clear(); requested_exports_.clear(); pending_control_={}; in_import_program_=true;
+    auto saved_exports=std::move(requested_exports_); const bool saved_import=in_import_program_; auto saved_control=pending_control_; const bool saved_strict=strict_script_mode_;
+    variable_scopes_.clear(); variable_scopes_.emplace_back(); callables_.clear(); structs_.clear(); requested_exports_.clear(); pending_control_={}; in_import_program_=true; strict_script_mode_=true;
     input_stack_.push_back(path); result_.dependencies.insert(host_.relative(path)); ++function_call_depth_;
     auto rr=execute_native_program(*src.content,path,depth+1);
     --function_call_depth_; input_stack_.pop_back();
     auto isolated_scope=std::move(variable_scopes_.back()); auto isolated_callables=std::move(callables_); auto isolated_structs=std::move(structs_); auto exports=requested_exports_; auto completion=pending_control_;
-    variable_scopes_=std::move(saved_scopes); callables_=std::move(saved_callables); structs_=std::move(saved_structs); requested_exports_=std::move(saved_exports); in_import_program_=saved_import; pending_control_=saved_control;
+    variable_scopes_=std::move(saved_scopes); callables_=std::move(saved_callables); structs_=std::move(saved_structs); requested_exports_=std::move(saved_exports); in_import_program_=saved_import; pending_control_=saved_control; strict_script_mode_=saved_strict;
     if(!rr.ok){error=rr.error.message;return false;}
     if(completion.kind==ControlFlow::Return && completion.value){error="return with a value is not allowed in @import";return false;}
 
@@ -2455,7 +2469,9 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             if(bo>=source.size()||source[bo]!='{'||!find_balanced(source,bo,'{','}',bc)){fail(source_path,source,i,"@script requires a balanced block");break;}
             if(pending_control_.kind!=ControlFlow::None) pending_control_={};
             ++function_call_depth_;
+            const bool saved_strict=strict_script_mode_; strict_script_mode_=true;
             auto nested=execute_native_program(source.substr(bo+1,bc-bo-1),source_path,depth+1);
+            strict_script_mode_=saved_strict;
             --function_call_depth_;
             if(!nested.ok){result_=nested;break;}
             if(pending_control_.kind==ControlFlow::Return){
@@ -2472,10 +2488,14 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
 
         if (source.compare(i, 10, "@__export(") == 0) {
             std::size_t ec=0; if(!find_balanced(source,i+9,'(',')',ec)){fail(source_path,source,i,"export has no matching ')'");break;}
-            if(!in_import_program_){fail(source_path,source,i,"export() is only valid in an imported/external script");break;}
+            if(!in_import_program_ && !standalone_script_host_){fail(source_path,source,i,"export() is only valid in an imported/external script");break;}
             const std::string name=trim_copy(source.substr(i+10,ec-(i+10)));
             if(!valid_binding_identifier(name)){fail(source_path,source,i,"export requires a binding name");break;}
             if(std::find(requested_exports_.begin(),requested_exports_.end(),name)!=requested_exports_.end()){fail(source_path,source,i,"duplicate export: "+name);break;}
+            bool export_found=false;
+            for(auto scope=variable_scopes_.rbegin();scope!=variable_scopes_.rend()&&!export_found;++scope) if(scope->count(name))export_found=true;
+            if(callables_.count(name)||structs_.count(name))export_found=true;
+            if(!export_found){fail(source_path,source,i,"export names no existing binding: "+name);break;}
             requested_exports_.push_back(name); i=ec+1; continue;
         }
 
@@ -2685,7 +2705,8 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     i = end + 1;
                     continue;
                 }
-                if (!expression_error.empty() && expression_error.rfind("unknown value or malformed expression:", 0) != 0) {
+                if (strict_script_mode_ || (!expression_error.empty() && expression_error.rfind("unknown value or malformed expression:", 0) != 0)) {
+                    if (expression_error.empty()) expression_error = "unknown value or malformed expression: " + trim_copy(key);
                     fail(source_path, source, i, expression_error);
                     break;
                 }

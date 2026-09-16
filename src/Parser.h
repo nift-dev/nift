@@ -110,6 +110,7 @@ private:
     bool in_fragment_body_ = false;
     bool in_import_program_ = false;
     bool standalone_script_host_ = false;
+    bool strict_script_mode_ = false;
     std::vector<std::string> requested_exports_;
     enum class ControlFlow { None, Return, Break, Continue };
     struct PendingControl {
