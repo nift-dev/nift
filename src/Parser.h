@@ -7,6 +7,7 @@
 #include <string>
 #include <memory>
 #include <unordered_map>
+#include <fstream>
 
 namespace json { class Document; }
 
@@ -25,6 +26,11 @@ class Parser {
 public:
     Parser(RenderHost& host, TrackedInfo& tracked_info);
     RenderResult render();
+
+    // Native script hosts used by `nift run` / `nift sh`.
+    RenderResult run_script(const std::string& source, const std::filesystem::path& source_path);
+    RenderResult run_statement(const std::string& source, const std::filesystem::path& source_path);
+    void reset_script_control();
 
     // Shared template+page composition: parse template_source, let @content
     // pull page_source, and (when require_exactly_one_content) enforce the
@@ -78,6 +84,15 @@ private:
     };
     std::unordered_map<std::string, std::shared_ptr<CollectionInstance>> collection_instances_;
     std::uint64_t next_collection_instance_id_ = 1;
+    struct StreamInstance {
+        enum class Kind { Input, Output };
+        Kind kind = Kind::Input;
+        std::shared_ptr<std::ifstream> input;
+        std::shared_ptr<std::ofstream> output;
+        bool closed = false;
+    };
+    std::unordered_map<std::string, std::shared_ptr<StreamInstance>> stream_instances_;
+    std::uint64_t next_stream_instance_id_ = 1;
     struct StructField { std::string name; std::string initializer; bool private_member = false; };
     struct StructMethod { Callable callable; bool private_member = false; bool constructor = false; };
     struct StructDefinition { std::string name; std::vector<StructField> fields; std::unordered_map<std::string, StructMethod> methods; };
@@ -94,6 +109,7 @@ private:
     int function_call_depth_ = 0;
     bool in_fragment_body_ = false;
     bool in_import_program_ = false;
+    bool standalone_script_host_ = false;
     std::vector<std::string> requested_exports_;
     enum class ControlFlow { None, Return, Break, Continue };
     struct PendingControl {

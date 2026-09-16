@@ -8,6 +8,9 @@
 #include "ProjectOwnership.h"
 #include "WatchList.h"
 #include "handover_content.h"
+#include "Parser.h"
+#include "RenderHost.h"
+#include "Json.h"
 
 #include <algorithm>
 #include <chrono>
@@ -295,6 +298,10 @@ void print_commands() {
     row("info --tracking", "", "Show tracking information");
     row("info --names", "", "List tracked names");
     row("status", "[-p]", "Show pages that need rebuilding and why");
+
+    std::cout << '\n' << console::dim("Scripting") << '\n';
+    row("run", "<path>", "Run a native Nift script");
+    row("sh", "", "Start the persistent native Nift shell");
 
     std::cout << '\n' << console::dim("General") << '\n';
     row("init", "[--target=platform] [--ext=.ext] [--handover]", "Create a Nift project");
@@ -635,6 +642,48 @@ bool initialise_project(const InitOptions& options) {
 }
 }
 
+class ScriptRenderHost final : public RenderHost {
+public:
+    explicit ScriptRenderHost(fs::path root) : root_(fs::absolute(std::move(root)).lexically_normal()) {}
+    const fs::path& root() const override { return root_; }
+    std::string relative(const fs::path& p) const override { std::error_code ec; auto r=fs::relative(p,root_,ec); return ec?p.generic_string():r.generic_string(); }
+    const std::string& output_dir() const override { static const std::string empty; return empty; }
+    int build_threads() const override { return 1; }
+    fs::path content_path(const TrackedInfo&) const override { return {}; }
+    fs::path output_path(const TrackedInfo&) const override { return {}; }
+    fs::path pagination_output_path(const TrackedInfo&,std::size_t) const override { return {}; }
+    bool has_output_context() const override { return false; }
+    std::optional<TrackedOutput> tracked_output_path(const std::string&) const override { return std::nullopt; }
+    const std::shared_ptr<const json::Document>* binding(const std::string&) const override { return nullptr; }
+    bool is_contract_name(const std::string&) const override { return false; }
+    const std::string* contract_source(const std::string&) const override { return nullptr; }
+    HostSource read_shared_source(const fs::path& p) const override { if(!filesystem::file_exists(p))return {}; cache_=filesystem::read_file(p); return {nift::HostStatus::Found,&cache_,{}}; }
+    std::shared_ptr<const json::Document> read_shared_json(const fs::path&,std::string& error) const override { error="JSON unavailable in script host"; return {}; }
+    bool source_exists(const fs::path& p) const override { return filesystem::file_exists(p); }
+    bool source_readable(const fs::path& p) const override { return filesystem::file_exists(p); }
+    nift::HostResult environment(const std::string& name) const override { const char* v=std::getenv(name.c_str()); return v?nift::HostResult{nift::HostStatus::Found,v,{}}:nift::HostResult{}; }
+private:
+    fs::path root_; mutable std::string cache_;
+};
+
+static int run_script_file(const fs::path& path) {
+    const fs::path absolute=fs::absolute(path).lexically_normal();
+    if(!filesystem::file_exists(absolute)){console::error("run: script does not exist: "+path.string());return 1;}
+    ScriptRenderHost host(absolute.parent_path()); TrackedInfo info; Parser parser(host,info);
+    auto rr=parser.run_script(filesystem::read_file(absolute),absolute);
+    if(!rr.ok){console::error(rr.error.message.empty()?"script failed":rr.error.message);return 1;}
+    if(!rr.output.empty())std::cout<<rr.output<<'\n';
+    return 0;
+}
+
+static int run_script_shell() {
+    ScriptRenderHost host(fs::current_path()); TrackedInfo info; Parser parser(host,info); std::string pending;
+    while(true){std::cout<<(pending.empty()?fs::current_path().generic_string()+"> ":"... ");std::cout.flush();std::string line;if(!std::getline(std::cin,line))break;if(pending.empty()&&(line=="exit"||line=="quit"))break;pending+=line+"\n";
+        int braces=0;bool quote=false,esc=false;char qc=0;for(char c:pending){if(quote){if(esc)esc=false;else if(c=='\\')esc=true;else if(c==qc)quote=false;continue;}if(c=='\"'||c=='\''){quote=true;qc=c;}else if(c=='{')++braces;else if(c=='}')--braces;}if(braces>0)continue;
+        auto rr=parser.run_statement(pending,"<nift-sh>");pending.clear();if(!rr.ok){console::error(rr.error.message);continue;}if(!rr.output.empty())std::cout<<rr.output<<'\n';
+    }return 0;
+}
+
 int run_cli(int argc, char** argv) {
     const std::string command = argc > 1 ? argv[1] : "";
     if (command.empty()) { print_commands(); return 0; }
@@ -661,6 +710,9 @@ int run_cli(int argc, char** argv) {
         std::cerr << "  use 'nift init' instead\n";
         return 1;
     }
+
+    if (command == "run") { if(argc!=3){console::error("run requires exactly one script path");return 1;} return run_script_file(argv[2]); }
+    if (command == "sh") { if(argc!=2){console::error("sh takes no arguments");return 1;} return run_script_shell(); }
 
     if (command == "minify") {
         bool in_place = false;

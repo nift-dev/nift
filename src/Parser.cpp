@@ -11,6 +11,9 @@
 #include <ctime>
 #include <cmath>
 #include <sstream>
+#include <fstream>
+#include <iostream>
+#include <mutex>
 #include <unordered_set>
 #include <vector>
 #include <functional>
@@ -1485,6 +1488,36 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             }
         }
 
+        // v4.3 native scripting filesystem, console and stream primitives.
+        {
+            auto call_args=[&](const std::string& name,std::vector<std::string>& args,std::vector<bool>& quoted)->bool{
+                if(text.rfind(name+"(",0)!=0||text.back()!=')')return false;
+                bool ok=false;args=parse_parameters(text.substr(name.size()+1,text.size()-name.size()-2),ok,&quoted);
+                if(!ok){error=name+": malformed arguments";}return ok;
+            };
+            auto arg_value=[&](const std::vector<std::string>& args,const std::vector<bool>& q,size_t i,json::Document& v)->bool{
+                if(i>=args.size())return false;if(i<q.size()&&q[i]){v=json::Document(args[i]);return true;}return eval(args[i],v,depth+1);
+            };
+            auto string_arg=[&](const std::string& name,const std::vector<std::string>& args,const std::vector<bool>& q,size_t i,std::string& v)->bool{
+                json::Document d;if(!arg_value(args,q,i,d)||!d.is_string()){error=name+": expected string path";return false;}v=d.string;return true;
+            };
+            auto resolve_path=[&](const std::string& raw)->fs::path{fs::path p(raw);if(p.is_relative())p=(standalone_script_host_?fs::current_path():host_.root())/p;return fs::absolute(p).lexically_normal();};
+            auto checked_path=[&](const std::string& name,const std::vector<std::string>& aa,const std::vector<bool>& qq,size_t i,fs::path& p)->bool{std::string raw;if(!string_arg(name,aa,qq,i,raw))return false;p=resolve_path(raw);if(!standalone_script_host_&&!host_.root().empty()&&!filesystem::path_within(fs::absolute(host_.root()).lexically_normal(),p)){error=name+": path must stay inside the Nift project";return false;}return true;};
+            std::vector<std::string> args;std::vector<bool> q;
+            if(call_args("pwd",args,q)){if(!args.empty()){error="pwd: expected no arguments";return false;}out=json::Document((standalone_script_host_?fs::current_path():host_.root()).generic_string());return true;}
+            if(call_args("cd",args,q)){if(!standalone_script_host_){error="cd: only available under nift run/nift sh";return false;}fs::path p;if(args.size()!=1||!checked_path("cd",args,q,0,p))return false;std::error_code ec;fs::current_path(p,ec);if(ec){error="cd: "+ec.message();return false;}out=json::Document(nullptr);return true;}
+            if(call_args("exists",args,q)){fs::path p;if(args.size()!=1||!checked_path("exists",args,q,0,p))return false;std::error_code ec;out=json::Document(fs::exists(p,ec)&&!ec);return true;}
+            if(call_args("make_dir",args,q)){fs::path p;if(args.size()!=1||!checked_path("make_dir",args,q,0,p))return false;std::error_code ec;fs::create_directories(p,ec);if(ec){error="make_dir: "+ec.message();return false;}out=json::Document(nullptr);return true;}
+            if(call_args("touch",args,q)){fs::path p;if(args.size()!=1||!checked_path("touch",args,q,0,p))return false;std::ofstream f(p,std::ios::app);if(!f){error="touch: cannot open path";return false;}out=json::Document(nullptr);return true;}
+            if(call_args("remove",args,q)){fs::path rp;if(args.size()!=1||!checked_path("remove",args,q,0,rp))return false;std::error_code ec;if(fs::is_directory(rp,ec)){error="remove: directories are not removed recursively";return false;}if(!fs::remove(rp,ec)&&ec){error="remove: "+ec.message();return false;}out=json::Document(nullptr);return true;}
+            if(text.find(',')!=std::string::npos && (call_args("copy",args,q)||call_args("move",args,q))){const bool mv=text.rfind("move(",0)==0;fs::path a,b;if(args.size()!=2||!checked_path(mv?"move":"copy",args,q,0,a)||!checked_path(mv?"move":"copy",args,q,1,b))return false;std::error_code ec;if(mv)fs::rename(a,b,ec);else fs::copy_file(a,b,fs::copy_options::overwrite_existing,ec);if(ec){error=std::string(mv?"move: ":"copy: ")+ec.message();return false;}out=json::Document(nullptr);return true;}
+            if(call_args("open",args,q)){fs::path p;if(args.size()!=1||!checked_path("open",args,q,0,p))return false;std::ifstream f(p,std::ios::binary);if(!f){error="open: cannot open path";return false;}std::ostringstream ss;ss<<f.rdbuf();out=json::Document(ss.str());return true;}
+            if(call_args("ifs",args,q)||call_args("ofs",args,q)){const bool output=text.rfind("ofs(",0)==0;fs::path p;if(args.size()!=1||!checked_path(output?"ofs":"ifs",args,q,0,p))return false;auto st=std::make_shared<StreamInstance>();st->kind=output?StreamInstance::Kind::Output:StreamInstance::Kind::Input;if(output){st->output=std::make_shared<std::ofstream>(p,std::ios::binary|std::ios::trunc);if(!*st->output){error="ofs: cannot open path";return false;}}else{st->input=std::make_shared<std::ifstream>(p,std::ios::binary);if(!*st->input){error="ifs: cannot open path";return false;}}auto id=std::to_string(next_stream_instance_id_++);stream_instances_[id]=st;out=json::Document(std::string("\x1fnift:stream:")+id);return true;}
+            if(call_args("close",args,q)){if(args.size()!=1){error="close: expected stream";return false;}json::Document d;if(!arg_value(args,q,0,d)||!d.is_string()||d.string.rfind("\x1fnift:stream:",0)!=0){error="close: expected stream";return false;}auto it=stream_instances_.find(d.string.substr(13));if(it==stream_instances_.end()){error="close: invalid stream";return false;}if(it->second->closed){error="close: stream already closed";return false;}if(it->second->input)it->second->input->close();if(it->second->output)it->second->output->close();it->second->closed=true;out=json::Document(nullptr);return true;}
+            if(call_args("print",args,q)){if(args.size()!=1){error="print: expected one value";return false;}json::Document d;if(!arg_value(args,q,0,d))return false;if(d.is_array()||d.is_object()||(d.is_string()&&d.string.rfind("\x1fnift:",0)==0)){error="print: value is not directly renderable";return false;}const std::string rendered=render_expression_value(d);{static std::mutex print_mutex;std::lock_guard<std::mutex> lock(print_mutex);std::cout<<rendered<<'\n';std::cout.flush();}out=json::Document(nullptr);return true;}
+            if(call_args("read",args,q)){if(!args.empty()){error="read: expected no arguments";return false;}if(!standalone_script_host_){error="read: interactive input is only available under nift run/nift sh";return false;}std::string line;if(!std::getline(std::cin,line)){if(std::cin.eof()){std::cin.clear();out=json::Document(nullptr);return true;}error="read: input failure";return false;}out=json::Document(line);return true;}
+        }
+
         // v4.3 collection constructors. Collections are identity-bearing runtime
         // objects while map/set logical equality is implemented by their methods/operators.
         for (const auto& ctor : {std::string("stack"),std::string("queue"),std::string("prique"),std::string("map"),std::string("sorted_map"),std::string("set"),std::string("sorted_set")}) {
@@ -1578,7 +1611,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                         if((method=="size"||method=="empty"||method=="first"||method=="last"||method=="pop"||method=="clear")&&!args.empty()){error=method+": expected no arguments";return false;}
                         if(method=="join"){if(args.size()!=1){error="join: expected separator";return false;}json::Document sep;if(!eval_arg(0,sep)||!sep.is_string()){error="join: separator must be a string";return false;}std::string joined;for(size_t j=0;j<a.size();++j){if(j)joined+=sep.string;if(a[j].is_array()||a[j].is_object()||(a[j].is_string()&&(a[j].string.rfind("\x1fnift:",0)==0))){error="join: elements must be renderable scalar values";return false;}joined+=render_expression_value(a[j]);}out=json::Document(joined);return true;}
                         if(method=="slice"){if(args.empty()||args.size()>2){error="slice: expected start and optional end";return false;}json::Document st,en;if(!eval(args[0],st,depth+1)||!st.is_number()||std::trunc(st.num)!=st.num||st.num<0){error="slice: invalid start";return false;}size_t b=(size_t)st.num,e=a.size();if(args.size()==2){if(!eval(args[1],en,depth+1)||!en.is_number()||std::trunc(en.num)!=en.num||en.num<0){error="slice: invalid end";return false;}e=(size_t)en.num;}if(b>a.size())b=a.size();if(e>a.size())e=a.size();if(e<b)e=b;out=json::Document::make_array();out.array.assign(a.begin()+b,a.begin()+e);return true;}
-                        if(method=="splice"){if(args.size()<2||args.size()>3){error="splice: expected start, deleteCount, optional replacement array";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}json::Document st,dc,repl;if(!eval(args[0],st,depth+1)||!eval(args[1],dc,depth+1)||!st.is_number()||!dc.is_number()||std::trunc(st.num)!=st.num||std::trunc(dc.num)!=dc.num||st.num<0||dc.num<0){error="splice: invalid index/count";return false;}size_t b=(size_t)st.num;if(b>a.size())b=a.size();size_t n=std::min((size_t)dc.num,a.size()-b);out=json::Document::make_array();out.array.assign(a.begin()+b,a.begin()+b+n);a.erase(a.begin()+b,a.begin()+b+n);if(args.size()==3){if(!eval(args[2],repl,depth+1)||!repl.is_array()){error="splice: replacements must be an array";return false;}a.insert(a.begin()+b,repl.array.begin(),repl.array.end());}last_expression_mutation_=true;return true;}
+                        if(method=="splice"){if(args.size()<2||args.size()>3){error="splice: expected start, delete_count, optional replacement array";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}json::Document st,dc,repl;if(!eval(args[0],st,depth+1)||!eval(args[1],dc,depth+1)||!st.is_number()||!dc.is_number()||std::trunc(st.num)!=st.num||std::trunc(dc.num)!=dc.num||st.num<0||dc.num<0){error="splice: invalid index/count";return false;}size_t b=(size_t)st.num;if(b>a.size())b=a.size();size_t n=std::min((size_t)dc.num,a.size()-b);out=json::Document::make_array();out.array.assign(a.begin()+b,a.begin()+b+n);a.erase(a.begin()+b,a.begin()+b+n);if(args.size()==3){if(!eval(args[2],repl,depth+1)||!repl.is_array()){error="splice: replacements must be an array";return false;}a.insert(a.begin()+b,repl.array.begin(),repl.array.end());}last_expression_mutation_=true;return true;}
                         if(method=="reverse"){if(!args.empty()){error="reverse: expected no arguments";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}std::reverse(a.begin(),a.end());out=*rb->value;last_expression_mutation_=true;return true;}
                         if(method=="size"){out=json::Document(static_cast<double>(a.size()));return true;} if(method=="empty"){out=json::Document(a.empty());return true;}
                         if(method=="first"||method=="last"||method=="pop"){if(a.empty()){error=method+": array is empty";return false;}out=method=="first"?a.front():a.back();if(method=="pop"){if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}a.pop_back();last_expression_mutation_=true;}return true;}
@@ -1594,6 +1627,18 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
 
         {
             const auto lp=text.find('(');
+            if(lp!=std::string::npos&&text.back()==')'){const std::string target=trim_copy(text.substr(0,lp));const auto dot=target.rfind('.');if(dot!=std::string::npos){
+                const std::string root=target.substr(0,dot),method=target.substr(dot+1);VariableBinding* rb=find_binding(root);
+                if(rb&&rb->value&&rb->value->is_string()&&rb->value->string.rfind("\x1fnift:stream:",0)==0){auto it=stream_instances_.find(rb->value->string.substr(13));if(it==stream_instances_.end()||it->second->closed){error="stream is closed or invalid";return false;}auto st=it->second;bool ok=false;std::vector<bool> qq;auto aa=parse_parameters(text.substr(lp+1,text.size()-lp-2),ok,&qq);if(!ok){error="malformed stream method arguments";return false;}
+                    if(method=="eof"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Input){error="eof: expected input stream and no arguments";return false;}out=json::Document(st->input->peek()==std::char_traits<char>::eof());return true;}
+                    if(method=="read_line"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Input){error="read_line: expected input stream and no arguments";return false;}std::string line;if(!std::getline(*st->input,line)){if(st->input->eof()){st->input->clear();out=json::Document(nullptr);return true;}error="read_line: input failure";return false;}out=json::Document(line);return true;}
+                    if(method=="read_all"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Input){error="read_all: expected input stream and no arguments";return false;}std::ostringstream ss;ss<<st->input->rdbuf();out=json::Document(ss.str());return true;}
+                    if(method=="read"){if(aa.size()!=1||st->kind!=StreamInstance::Kind::Input){error="read: expected byte count on input stream";return false;}json::Document n;if(!eval(aa[0],n,depth+1)||!n.is_number()||std::trunc(n.num)!=n.num||n.num<0){error="read: invalid byte count";return false;}std::string b((size_t)n.num,'\0');st->input->read(b.data(),(std::streamsize)b.size());b.resize((size_t)st->input->gcount());out=json::Document(b);return true;}
+                    if(method=="read_val"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Input){error="read_val: expected input stream and no arguments";return false;}*st->input>>std::ws;if(st->input->peek()==std::char_traits<char>::eof()){out=json::Document(nullptr);return true;}std::string token;char first=(char)st->input->peek();if(first=='"'||first=='['||first=='{'){char open=first,close=first=='['?']':first=='{'?'}':'"';int dep=0;bool quoted=false,esc=false;char c;while(st->input->get(c)){token+=c;if(open=='"'){if(esc){esc=false;continue;}if(c=='\\'){esc=true;continue;}if(token.size()>1&&c=='"')break;}else{if(quoted){if(esc)esc=false;else if(c=='\\')esc=true;else if(c=='"')quoted=false;}else if(c=='"')quoted=true;else if(c==open)++dep;else if(c==close&&--dep==0)break;}}}else{while(st->input->peek()!=std::char_traits<char>::eof()&&!std::isspace((unsigned char)st->input->peek()))token+=(char)st->input->get();}json::Document v;std::string ee;if(!eval(token,v,depth+1)){error="read_val: "+ee;return false;}out=v;return true;}
+                    if(method=="write"||method=="write_line"){if(aa.size()!=1||st->kind!=StreamInstance::Kind::Output){error=method+": expected one value on output stream";return false;}json::Document v;if(!((!qq.empty()&&qq[0])?(v=json::Document(aa[0]),true):eval(aa[0],v,depth+1)))return false;if(v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0)){error=method+": value is not directly renderable";return false;}*st->output<<render_expression_value(v);if(method=="write_line")*st->output<<'\n';if(!*st->output){error=method+": output failure";return false;}out=json::Document(nullptr);return true;}
+                    if(method=="flush"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Output){error="flush: expected output stream and no arguments";return false;}st->output->flush();if(!*st->output){error="flush: output failure";return false;}out=json::Document(nullptr);return true;}
+                }
+            }}
             if(lp!=std::string::npos&&text.back()==')'){const std::string target=trim_copy(text.substr(0,lp));const auto dot=target.rfind('.');if(dot!=std::string::npos){
                 const std::string root=target.substr(0,dot),method=target.substr(dot+1);VariableBinding* rb=find_binding(root);
                 if(rb&&rb->value&&rb->value->is_string()&&method=="substr") { bool ok=false;auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),ok);if(!ok||args.empty()||args.size()>2){error="substr: expected pos and optional length";return false;}json::Document pos,len;if(!eval(args[0],pos,depth+1)||!pos.is_number()||std::trunc(pos.num)!=pos.num||pos.num<0){error="substr: invalid pos";return false;}size_t p=(size_t)pos.num;if(p>rb->value->string.size())p=rb->value->string.size();size_t n=std::string::npos;if(args.size()==2){if(!eval(args[1],len,depth+1)||!len.is_number()||std::trunc(len.num)!=len.num||len.num<0){error="substr: invalid length";return false;}n=(size_t)len.num;}out=json::Document(rb->value->string.substr(p,n));return true;}
@@ -2237,6 +2282,31 @@ bool Parser::translate_function_program(const std::string& source, std::string& 
     translated.clear(); return convert(source,translated);
 }
 
+RenderResult Parser::run_script(const std::string& source, const fs::path& source_path) {
+    result_ = RenderResult{};
+    variable_scopes_.clear(); variable_scopes_.emplace_back();
+    callables_.clear(); structs_.clear(); requested_exports_.clear(); pending_control_={};
+    in_import_program_=false; standalone_script_host_=true; function_call_depth_=1;
+    auto rr=execute_native_program(source,source_path,0);
+    function_call_depth_=0;
+    rr.output.clear();
+    if(rr.ok && pending_control_.kind==ControlFlow::Return && pending_control_.value) {
+        const auto& v=*pending_control_.value;
+        if(v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0)) { rr.ok=false; rr.error.message="script return value is not directly renderable"; }
+        else rr.output=render_expression_value(v);
+    }
+    pending_control_={};
+    return rr;
+}
+
+RenderResult Parser::run_statement(const std::string& source, const fs::path& source_path) {
+    if(variable_scopes_.empty()) variable_scopes_.emplace_back();
+    standalone_script_host_=true; result_ = RenderResult{}; pending_control_={}; function_call_depth_=1;
+    auto rr=execute_native_program(source,source_path,0); function_call_depth_=0; rr.output.clear(); pending_control_={}; return rr;
+}
+
+void Parser::reset_script_control() { pending_control_={}; result_=RenderResult{}; }
+
 RenderResult Parser::execute_native_program(const std::string& source, const fs::path& source_path, int depth) {
     std::string program, error;
     if (!translate_function_program(source, program, error)) {
@@ -2248,12 +2318,13 @@ RenderResult Parser::execute_native_program(const std::string& source, const fs:
 bool Parser::execute_import_file(const std::string& argument, const fs::path& caller_path, int depth, std::string& error) {
     fs::path path=argument;
     if(path.is_relative()) {
+        if(standalone_script_host_ && caller_path == fs::path("<nift-sh>")) path=fs::current_path()/path;
         fs::path local=caller_path.parent_path()/path;
         if(!caller_path.parent_path().empty() && host_.source_exists(local)) path=local;
         else path=host_.root()/path;
     }
     path=fs::absolute(path).lexically_normal();
-    if(!host_.root().empty() && !filesystem::path_within(fs::absolute(host_.root()).lexically_normal(),path)){error="path must stay inside the Nift project";return false;}
+    if(!standalone_script_host_ && !host_.root().empty() && !filesystem::path_within(fs::absolute(host_.root()).lexically_normal(),path)){error="path must stay inside the Nift project";return false;}
     if(std::find(input_stack_.begin(),input_stack_.end(),path)!=input_stack_.end()){error="script import cycle through "+path.generic_string();return false;}
     auto src=host_.read_shared_source(path); if(src.status==nift::HostStatus::Error||!src.content){error=src.error.empty()?"script is not readable":src.error;return false;}
 
