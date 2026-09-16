@@ -2441,6 +2441,12 @@ RenderResult Parser::run_statement(const std::string& source, const fs::path& so
         json::Document v; std::string error;
         if(evaluate_expression(t,v,error)){
             RenderResult rr; std::string shown;
+            // REPL commands commonly return null (for example cd()) and an empty
+            // string has nothing useful to inspect. Keep both silent rather than
+            // displaying `null` or an empty quoted string.
+            if(v.is_null() || (v.is_string() && v.string.empty())) {
+                function_call_depth_=0; strict_script_mode_=false; return rr;
+            }
             const bool pretty=t.size()>=11&&t.compare(t.size()-11,11,".prettify()")==0;
             const bool highlight=t.size()>=12&&t.compare(t.size()-12,12,".highlight()")==0;
             if((pretty||highlight)&&v.is_string()) shown=v.string;
