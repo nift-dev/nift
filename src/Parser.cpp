@@ -1633,15 +1633,32 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             if(call_args("read",args,q)){if(!args.empty()){error="read: expected no arguments";return false;}if(!standalone_script_host_){error="read: interactive input is only available under nift run/nift sh";return false;}std::string line;if(!std::getline(std::cin,line)){if(std::cin.eof()){std::cin.clear();out=json::Document(nullptr);return true;}error="read: input failure";return false;}out=json::Document(line);return true;}
         }
 
-        // v4.3 canonical value formatting. The method target may itself be an expression,
-        // which intentionally enables composition such as ls().prettify().
-        for (const auto& method : {std::string("stringify"), std::string("prettify"), std::string("highlight")}) {
-            const std::string suffix = "." + method + "()";
-            if (text.size() > suffix.size() && text.compare(text.size()-suffix.size(), suffix.size(), suffix) == 0) {
-                const std::string target = trim_copy(text.substr(0,text.size()-suffix.size()));
-                json::Document v; if(!eval(target,v,depth+1)) return false;
-                std::string rendered; if(!serialize_value(v,method=="prettify",rendered,error)) return false;
-                out=json::Document(rendered); return true;
+        // v4.3 canonical value presentation. Presentation modifiers compose over the
+        // original value rather than serializing each other's string output. Thus
+        // x.prettify().highlight() and x.highlight().prettify() both mean
+        // "pretty + highlighted when directly inspected by the REPL". ANSI remains
+        // a presentation concern; expression evaluation always returns a plain string.
+        {
+            std::string target=text; bool matched=false, pretty=false;
+            for (;;) {
+                bool stripped=false;
+                for (const auto& method : {std::string("stringify"), std::string("prettify"), std::string("highlight")}) {
+                    const std::string suffix="."+method+"()";
+                    if(target.size()>suffix.size() && target.compare(target.size()-suffix.size(),suffix.size(),suffix)==0){
+                        target=trim_copy(target.substr(0,target.size()-suffix.size()));
+                        matched=true; stripped=true;
+                        if(method=="prettify") pretty=true;
+                        // stringify() selects compact formatting unless a prettify()
+                        // modifier is also present; highlight() only affects REPL display.
+                        break;
+                    }
+                }
+                if(!stripped) break;
+            }
+            if(matched){
+                json::Document v;if(!eval(target,v,depth+1))return false;
+                std::string rendered;if(!serialize_value(v,pretty,rendered,error))return false;
+                out=json::Document(rendered);return true;
             }
         }
 
@@ -2447,9 +2464,12 @@ RenderResult Parser::run_statement(const std::string& source, const fs::path& so
             if(v.is_null() || (v.is_string() && v.string.empty())) {
                 function_call_depth_=0; strict_script_mode_=false; return rr;
             }
-            const bool pretty=t.size()>=11&&t.compare(t.size()-11,11,".prettify()")==0;
-            const bool highlight=t.size()>=12&&t.compare(t.size()-12,12,".highlight()")==0;
-            if((pretty||highlight)&&v.is_string()) shown=v.string;
+            // Presentation modifiers are composable and order-independent. The evaluator
+            // has already serialized their original value into an ANSI-free string; here
+            // the REPL only decides whether that representation should be highlighted.
+            std::string presentation=t; bool presentation_method=false, highlight=false;
+            for(;;){bool stripped=false;for(const auto& method:{std::string("stringify"),std::string("prettify"),std::string("highlight")}){const std::string suffix="."+method+"()";if(presentation.size()>suffix.size()&&presentation.compare(presentation.size()-suffix.size(),suffix.size(),suffix)==0){presentation=trim_copy(presentation.substr(0,presentation.size()-suffix.size()));presentation_method=true;stripped=true;if(method=="highlight")highlight=true;break;}}if(!stripped)break;}
+            if(presentation_method&&v.is_string()) shown=v.string;
             else if(!serialize_value(v,false,shown,error)){rr.ok=false;rr.error.message=error;function_call_depth_=0;strict_script_mode_=false;return rr;}
             if(highlight && console::stdout_colour_enabled()) shown=console::highlight_nift_value(shown);
             rr.output=shown; function_call_depth_=0; strict_script_mode_=false; return rr;

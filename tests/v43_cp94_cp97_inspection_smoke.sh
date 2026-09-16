@@ -21,7 +21,7 @@ out="$(cd "$td" && "$NIFT" run check.nift)"
 # Deterministic ls ordering.
 [[ "$(printf '%s' "$out" | grep -bo '"a.txt"' | head -1 | cut -d: -f1)" -lt "$(printf '%s' "$out" | grep -bo '"z.txt"' | head -1 | cut -d: -f1)" ]]
 # REPL bare compound values are inspectable, and prettify remains ANSI-free.
-repl="$(cd "$td" && printf 'x := [1, 2]\nx\nx.prettify()\nx.highlight()\nnull\n""\ncd(".")\n' | HOME="$td" NO_COLOR=1 "$NIFT" sh)"
+repl="$(cd "$td" && printf 'x := [1, 2]\nx\nx.prettify()\nx.highlight()\nx.prettify().highlight()\nx.highlight().prettify()\nnull\n""\ncd(".")\n' | HOME="$td" NO_COLOR=1 "$NIFT" sh)"
 [[ "$repl" == *'[1,2]'* ]]
 [[ "$repl" == *$'[\n  1,\n  2\n]'* ]]
 [[ "$repl" == *'~$ '* ]]
