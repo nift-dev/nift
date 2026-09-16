@@ -62,4 +62,36 @@ NIFT
 if (cd "$TMP" && "$NIFT" run remove-dir.nift >/dev/null 2>&1); then
   echo 'remove(directory) unexpectedly succeeded' >&2; exit 1
 fi
+# CLI contract regressions: unknown script statements exit non-zero with a
+# diagnostic, and export() is validated-but-ignored under `run` (CP83) rather
+# than failing the runnable-and-importable file case.
+cat > "$TMP/undefined.nift" <<'NIFT'
+this_is_not_defined
+NIFT
+if (cd "$TMP" && "$NIFT" run undefined.nift >/dev/null 2>&1); then
+  echo 'undefined script statement exited zero' >&2; exit 1
+fi
+cat > "$TMP/exports.nift" <<'NIFT'
+value := 3
+export(value)
+print(value)
+NIFT
+[[ "$(cd "$TMP" && "$NIFT" run exports.nift)" == '3' ]]
+cat > "$TMP/badval.nift" <<'NIFT'
+s := ifs("vals")
+print(s.read_val())
+NIFT
+# 'vals' ends in "[1,2,3]" so read_val then reaches EOF: null is fine; use a
+# malformed trailing token to require a non-zero exit.
+cat > "$TMP/malformed" <<'EOFV'
+true broken
+EOFV
+cat > "$TMP/badval.nift" <<'NIFT'
+s := ifs("malformed")
+print(s.read_val())
+print(s.read_val())
+NIFT
+if (cd "$TMP" && "$NIFT" run badval.nift >/dev/null 2>&1); then
+  echo 'malformed read_val succeeded' >&2; exit 1
+fi
 echo 'v4.3 CP71-CP87 native I/O smoke: PASS'

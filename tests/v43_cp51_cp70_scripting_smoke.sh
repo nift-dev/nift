@@ -160,3 +160,32 @@ cat > content/index.html <<'EOT'
 $[1 == "1"]
 EOT
 "$NIFT_BIN" build --all >/dev/null; [[ "$(body)" == *"false"* ]]
+
+# String concatenation: quoted-left chains, left-associativity, precedence and
+# single evaluation of numeric '+' (regressions for the CP70 concat rewrite).
+cat > content/index.html <<'EOT'
+$["a" + "b"]$["a" + "b" + "c"]$[1 + 2 + "x"]$["x" + 1 + 2]$["a" + 2 * 3 + "b"]
+EOT
+"$NIFT_BIN" build --all >/dev/null
+[[ "$(body)" == *"ababc3xx12a6b"* ]]
+cat > content/index.html <<'EOT'
+$[(q := 5) + 1]$[q]
+EOT
+"$NIFT_BIN" build --all >/dev/null; [[ "$(body)" == *"65"* ]]
+cat > content/index.html <<'EOT'
+$["a" + -1]
+EOT
+"$NIFT_BIN" build --all >/dev/null; [[ "$(body)" == *"a-1"* ]]
+
+# Script-land statements that do not resolve are errors (strict script mode);
+# the same text remains the pre-existing lenient literal in ordinary templates.
+cat > content/index.html <<'EOT'
+@script { not_a_defined_binding }
+EOT
+if "$NIFT_BIN" build --all >/dev/null 2>&1; then echo 'unknown script statement succeeded' >&2; exit 1; fi
+cat > content/index.html <<'EOT'
+$[not_a_defined_binding]
+EOT
+"$NIFT_BIN" build --all >/dev/null
+
+echo 'v4.3 CP51-CP70 scripting smoke: PASS'
