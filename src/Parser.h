@@ -93,6 +93,8 @@ private:
     bool last_expression_mutation_ = false;
     int function_call_depth_ = 0;
     bool in_fragment_body_ = false;
+    bool in_import_program_ = false;
+    std::vector<std::string> requested_exports_;
     enum class ControlFlow { None, Return, Break, Continue };
     struct PendingControl {
         ControlFlow kind = ControlFlow::None;
@@ -110,6 +112,8 @@ private:
 
     RenderResult parse(const std::string& source, const std::filesystem::path& source_path, int depth);
     bool translate_function_program(const std::string& source, std::string& translated, std::string& error) const;
+    RenderResult execute_native_program(const std::string& source, const std::filesystem::path& source_path, int depth);
+    bool execute_import_file(const std::string& argument, const std::filesystem::path& caller_path, int depth, std::string& error);
     std::string metadata(const std::string& key) const;
     bool json_value(const std::string& expression, std::string& value, std::string& error);
     bool interpolate_parameter(const std::string& parameter,

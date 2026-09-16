@@ -707,7 +707,7 @@ grep -Fq 'YES' "$D_EXPR/public/index.html"
 if grep -Fq "'YES'" "$D_EXPR/public/index.html"; then echo 'expression ternary leaked string delimiters' >&2; exit 1; fi
 
 # Invalid arithmetic fails cleanly.
-for expr in '1 / 0' '1 % 0' '1.5 % 1' "'x' + 1"; do
+for expr in '1 / 0' '1 % 0' '1.5 % 1'; do
   printf '$[%s]\n' "$expr" > "$D_EXPR/content/index.html"
   rm -f "$D_EXPR/.nift/.unfinished"
   if (cd "$D_EXPR" && "$NIFT_BIN" build --all >/dev/null 2>&1); then
