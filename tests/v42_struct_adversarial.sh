@@ -30,7 +30,7 @@ cat > content/index.html <<'EOT'
 $[a := counter()]x=$[a]
 EOT
 if "$root/$NIFT" build >/dev/null 2>err; then echo 'struct instance rendering unexpectedly succeeded' >&2; exit 1; fi
-grep -q 'cannot render a struct instance' err
+grep -q 'cannot render a struct, callable or collection instance' err
 
 # A method may return the receiver, but the receiver reference must be usable
 # through a function boundary without leaking a private representation.
