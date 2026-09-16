@@ -117,6 +117,31 @@ inline std::string paint(const std::string& text, const char* code, bool enabled
     return enabled ? std::string("\033[") + code + "m" + text + "\033[0m" : text;
 }
 
+
+inline std::string highlight_nift_value(std::string_view text) {
+    if (!stdout_colour_enabled()) return std::string(text);
+    std::string out; out.reserve(text.size() + 32);
+    auto colour = [&](std::string_view token, const char* code) { out += "\033["; out += code; out += "m"; out.append(token); out += "\033[0m"; };
+    for (std::size_t i=0;i<text.size();) {
+        const char c=text[i];
+        if(c=='\"' || c=='\'') {
+            const char q=c; std::size_t j=i+1; bool esc=false;
+            for(;j<text.size();++j){char d=text[j];if(esc){esc=false;continue;}if(d=='\\'){esc=true;continue;}if(d==q){++j;break;}}
+            colour(text.substr(i,j-i), "33"); i=j; continue;
+        }
+        if((c>='0'&&c<='9') || (c=='-'&&i+1<text.size()&&text[i+1]>='0'&&text[i+1]<='9')) {
+            std::size_t j=i+1; while(j<text.size() && ((text[j]>='0'&&text[j]<='9')||text[j]=='.'||text[j]=='e'||text[j]=='E'||text[j]=='+'||text[j]=='-')) ++j;
+            colour(text.substr(i,j-i), "36"); i=j; continue;
+        }
+        auto word=[&](std::string_view w){return i+w.size()<=text.size()&&text.substr(i,w.size())==w&&(i+w.size()==text.size()||!(std::isalnum((unsigned char)text[i+w.size()])||text[i+w.size()]=='_'));};
+        if(word("true")){colour("true","35");i+=4;continue;}
+        if(word("false")){colour("false","35");i+=5;continue;}
+        if(word("null")){colour("null","90");i+=4;continue;}
+        out.push_back(c); ++i;
+    }
+    return out;
+}
+
 inline std::string path(const std::string& text, bool stderr_stream = false) {
     return paint(text, "36", stderr_stream ? stderr_colour_enabled() : stdout_colour_enabled());
 }

@@ -21,10 +21,12 @@ out="$(cd "$td" && "$NIFT" run check.nift)"
 # Deterministic ls ordering.
 [[ "$(printf '%s' "$out" | grep -bo '"a.txt"' | head -1 | cut -d: -f1)" -lt "$(printf '%s' "$out" | grep -bo '"z.txt"' | head -1 | cut -d: -f1)" ]]
 # REPL bare compound values are inspectable, and prettify remains ANSI-free.
-repl="$(cd "$td" && printf 'x := [1, 2]\nx\nx.prettify()\n' | NO_COLOR=1 "$NIFT" sh)"
+repl="$(cd "$td" && printf 'x := [1, 2]\nx\nx.prettify()\nx.highlight()\n' | HOME="$td" NO_COLOR=1 "$NIFT" sh)"
 [[ "$repl" == *'[1,2]'* ]]
 [[ "$repl" == *$'[\n  1,\n  2\n]'* ]]
+[[ "$repl" == *'~$ '* ]]
 [[ "$repl" != *$'\033'* ]]
+[[ "$repl" == *'[1,2]'* ]]
 # Opaque values must not leak internal reference tokens through formatting.
 printf 's := ifs("file.txt")\nprint(s.stringify())\n' > "$td/bad.nift"
 if (cd "$td" && "$NIFT" run bad.nift >"$td/bad.out" 2>"$td/bad.err"); then

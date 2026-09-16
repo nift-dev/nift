@@ -1,4 +1,5 @@
 #include "Parser.h"
+#include "Console.h"
 #include "FileSystem.h"
 #include "Json.h"
 #include "JsonSchema.h"
@@ -1634,7 +1635,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
 
         // v4.3 canonical value formatting. The method target may itself be an expression,
         // which intentionally enables composition such as ls().prettify().
-        for (const auto& method : {std::string("stringify"), std::string("prettify")}) {
+        for (const auto& method : {std::string("stringify"), std::string("prettify"), std::string("highlight")}) {
             const std::string suffix = "." + method + "()";
             if (text.size() > suffix.size() && text.compare(text.size()-suffix.size(), suffix.size(), suffix) == 0) {
                 const std::string target = trim_copy(text.substr(0,text.size()-suffix.size()));
@@ -2441,8 +2442,10 @@ RenderResult Parser::run_statement(const std::string& source, const fs::path& so
         if(evaluate_expression(t,v,error)){
             RenderResult rr; std::string shown;
             const bool pretty=t.size()>=11&&t.compare(t.size()-11,11,".prettify()")==0;
-            if(pretty&&v.is_string()) shown=v.string;
+            const bool highlight=t.size()>=12&&t.compare(t.size()-12,12,".highlight()")==0;
+            if((pretty||highlight)&&v.is_string()) shown=v.string;
             else if(!serialize_value(v,false,shown,error)){rr.ok=false;rr.error.message=error;function_call_depth_=0;strict_script_mode_=false;return rr;}
+            if(highlight && console::stdout_colour_enabled()) shown=console::highlight_nift_value(shown);
             rr.output=shown; function_call_depth_=0; strict_script_mode_=false; return rr;
         }
         // If direct evaluation fails, let the native statement path provide the
