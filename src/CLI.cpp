@@ -678,7 +678,7 @@ static int run_script_file(const fs::path& path) {
 
 static int run_script_shell() {
     ScriptRenderHost host(fs::current_path()); TrackedInfo info; Parser parser(host,info); std::string pending;
-    while(true){std::cout<<(pending.empty()?fs::current_path().generic_string()+"> ":"... ");std::cout.flush();std::string line;if(!std::getline(std::cin,line))break;if(pending.empty()&&(line=="exit"||line=="quit"))break;pending+=line+"\n";
+    while(true){if(pending.empty()){std::cout << console::paint(fs::current_path().generic_string(), "32", console::stdout_colour_enabled()) << ":" << console::paint("~", "34", console::stdout_colour_enabled()) << "? ";}else{std::cout << "... ";}std::cout.flush();std::string line;if(!std::getline(std::cin,line))break;if(pending.empty()&&(line=="exit"||line=="quit"))break;pending+=line+"\n";
         int braces=0;bool quote=false,esc=false;char qc=0;for(char c:pending){if(quote){if(esc)esc=false;else if(c=='\\')esc=true;else if(c==qc)quote=false;continue;}if(c=='\"'||c=='\''){quote=true;qc=c;}else if(c=='{')++braces;else if(c=='}')--braces;}if(braces>0)continue;
         auto rr=parser.run_statement(pending,"<nift-sh>");pending.clear();if(!rr.ok){console::error(rr.error.message);continue;}if(!rr.output.empty())std::cout<<rr.output<<'\n';
     }return 0;
