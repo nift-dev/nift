@@ -40,6 +40,66 @@ static const char* nift_binding_type_name(int type) {
 
 static const int kMaxCallableDepth = 64;
 
+namespace {
+
+// Presentation-method chain recognizer (.stringify()/.prettify()/.highlight()).
+// It only strips a trailing chain when the dots sit at bracket/paren/quote
+// depth 0 and the remaining base is a single value expression with no
+// top-level operator. Larger compound expressions such as
+// `a == b.prettify()` or `"x" + a.prettify()` are therefore left to the
+// ordinary evaluator, and a string literal like "a.prettify()" is never
+// mistaken for a presentation call.
+bool strip_presentation_chain(const std::string& text, std::string& base, bool& pretty, bool& highlight) {
+    pretty = highlight = false;
+    std::size_t end = text.size();
+    auto balanced_prefix = [&](std::size_t cut) {
+        bool quoted = false; char qc = 0; int par = 0, br = 0, bc = 0;
+        for (std::size_t i = 0; i < cut; ++i) {
+            const char c = text[i];
+            if (quoted) { if (c == '\\' && i + 1 < cut) ++i; else if (c == qc) quoted = false; continue; }
+            if (c == '\'' || c == '"') { quoted = true; qc = c; continue; }
+            if (c == '(') ++par; else if (c == ')') { if (--par < 0) return false; }
+            else if (c == '[') ++br; else if (c == ']') { if (--br < 0) return false; }
+            else if (c == '{') ++bc; else if (c == '}') { if (--bc < 0) return false; }
+        }
+        return !quoted && par == 0 && br == 0 && bc == 0;
+    };
+    bool matched = false;
+    for (;;) {
+        bool stripped = false;
+        for (const auto& method : {std::string("stringify"), std::string("prettify"), std::string("highlight")}) {
+            const std::string suffix = "." + method + "()";
+            if (end >= suffix.size() && text.compare(end - suffix.size(), suffix.size(), suffix) == 0) {
+                const std::size_t cut = end - suffix.size();
+                if (!balanced_prefix(cut)) return false;
+                end = cut; matched = true; stripped = true;
+                if (method == "prettify") pretty = true;
+                if (method == "highlight") highlight = true;
+                break;
+            }
+        }
+        if (!stripped) break;
+    }
+    if (!matched) return false;
+    std::string raw = text.substr(0, end);
+    std::size_t first = raw.find_first_not_of(" \t\r\n"); std::size_t last = raw.find_last_not_of(" \t\r\n");
+    base = (first == std::string::npos) ? std::string() : raw.substr(first, last - first + 1);
+    bool quoted = false; char qc = 0; int par = 0, br = 0, bc = 0;
+    for (std::size_t i = 0; i < base.size(); ++i) {
+        const char c = base[i];
+        if (quoted) { if (c == '\\' && i + 1 < base.size()) ++i; else if (c == qc) quoted = false; continue; }
+        if (c == '\'' || c == '"') { quoted = true; qc = c; continue; }
+        if (c == '(') ++par; else if (c == ')') --par; else if (c == '[') ++br; else if (c == ']') --br; else if (c == '{') ++bc; else if (c == '}') --bc;
+        if (quoted || par || br || bc) continue;
+        if (std::string("=<>+-*/%?:,").find(c) != std::string::npos) return false;
+        if (c == '&' && i + 1 < base.size() && base[i + 1] == '&') return false;
+        if (c == '|' && i + 1 < base.size() && base[i + 1] == '|') return false;
+    }
+    return true;
+}
+
+}  // namespace
+
 // Nift source numeric literals preserve their lexical int/double form: 0, 8
 // are int; 0.0, 8.5, 1e3 are double even when the value is integral. An
 // arithmetic expression containing any double-typed operand is double; binding
@@ -1377,7 +1437,11 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                     auto inst=struct_instances_.find(current.string.substr(13));
                     if(inst==struct_instances_.end()){error="invalid struct instance";return false;}
                     auto fit=inst->second->fields.find(member);
-                    if(fit==inst->second->fields.end()){error="struct has no field: "+member;return false;}
+                    if(fit==inst->second->fields.end()){
+                        auto sd2=structs_.find(inst->second->type_name);
+                        if(sd2!=structs_.end()&&sd2->second.methods.count(member)) return false;
+                        error="struct has no field: "+member;return false;
+                    }
                     auto sd=structs_.find(inst->second->type_name);bool priv=false;
                     if(sd!=structs_.end())for(const auto& f:sd->second.fields)if(f.name==member)priv=f.private_member;
                     if(priv&&(receiver_stack_.empty()||receiver_stack_.back()!=inst->second)){error="private struct field: "+member;return false;}
@@ -1624,9 +1688,9 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             if(call_args("touch",args,q)){fs::path p;if(args.size()!=1||!checked_path("touch",args,q,0,p))return false;std::ofstream f(p,std::ios::app);if(!f){error="touch: cannot open path";return false;}out=json::Document(nullptr);return true;}
             if(call_args("remove",args,q)){fs::path rp;if(args.size()!=1||!checked_path("remove",args,q,0,rp))return false;std::error_code ec;if(fs::is_directory(rp,ec)){error="remove: directories are not removed recursively";return false;}if(!fs::remove(rp,ec)&&ec){error="remove: "+ec.message();return false;}out=json::Document(nullptr);return true;}
             if(text.find(',')!=std::string::npos && (call_args("copy",args,q)||call_args("move",args,q))){const bool mv=text.rfind("move(",0)==0;fs::path a,b;if(args.size()!=2||!checked_path(mv?"move":"copy",args,q,0,a)||!checked_path(mv?"move":"copy",args,q,1,b))return false;std::error_code ec;if(mv)fs::rename(a,b,ec);else fs::copy_file(a,b,fs::copy_options::overwrite_existing,ec);if(ec){error=std::string(mv?"move: ":"copy: ")+ec.message();return false;}out=json::Document(nullptr);return true;}
-            if(call_args("cat",args,q)){fs::path p;if(args.size()!=1||!checked_path("cat",args,q,0,p))return false;std::ifstream f(p,std::ios::binary);if(!f){error="cat: cannot open path";return false;}std::ostringstream ss;ss<<f.rdbuf();{static std::mutex cat_mutex;std::lock_guard<std::mutex> lock(cat_mutex);std::cout<<ss.str();std::cout.flush();}out=json::Document(nullptr);return true;}
+            if(call_args("cat",args,q)){fs::path p;if(args.size()!=1||!checked_path("cat",args,q,0,p))return false;std::error_code ec;if(fs::is_directory(p,ec)){error="cat: path is a directory";return false;}std::ifstream f(p,std::ios::binary);if(!f){error="cat: cannot open path";return false;}std::ostringstream ss;ss<<f.rdbuf();{static std::mutex cat_mutex;std::lock_guard<std::mutex> lock(cat_mutex);std::cout<<ss.str();std::cout.flush();}out=json::Document(nullptr);return true;}
             if(call_args("ls",args,q)){if(args.size()>1){error="ls: expected zero or one path";return false;}fs::path p;if(args.empty())p=standalone_script_host_?fs::current_path():host_.root();else if(!checked_path("ls",args,q,0,p))return false;std::error_code ec;if(!fs::is_directory(p,ec)||ec){error="ls: path is not a readable directory";return false;}std::vector<std::string> names;for(fs::directory_iterator it(p,ec),end;!ec&&it!=end;it.increment(ec))names.push_back(it->path().filename().generic_string());if(ec){error="ls: "+ec.message();return false;}std::sort(names.begin(),names.end());out=json::Document::make_array();for(const auto& n:names)out.array.emplace_back(n);return true;}
-            if(call_args("open",args,q)){fs::path p;if(args.size()!=1||!checked_path("open",args,q,0,p))return false;std::ifstream f(p,std::ios::binary);if(!f){error="open: cannot open path";return false;}std::ostringstream ss;ss<<f.rdbuf();out=json::Document(ss.str());return true;}
+            if(call_args("open",args,q)){fs::path p;if(args.size()!=1||!checked_path("open",args,q,0,p))return false;std::error_code ec;if(fs::is_directory(p,ec)){error="open: path is a directory";return false;}std::ifstream f(p,std::ios::binary);if(!f){error="open: cannot open path";return false;}std::ostringstream ss;ss<<f.rdbuf();out=json::Document(ss.str());return true;}
             if(call_args("ifs",args,q)||call_args("ofs",args,q)){const bool output=text.rfind("ofs(",0)==0;fs::path p;if(args.size()!=1||!checked_path(output?"ofs":"ifs",args,q,0,p))return false;auto st=std::make_shared<StreamInstance>();st->kind=output?StreamInstance::Kind::Output:StreamInstance::Kind::Input;if(output){st->output=std::make_shared<std::ofstream>(p,std::ios::binary|std::ios::trunc);if(!*st->output){error="ofs: cannot open path";return false;}}else{st->input=std::make_shared<std::ifstream>(p,std::ios::binary);if(!*st->input){error="ifs: cannot open path";return false;}}auto id=std::to_string(next_stream_instance_id_++);stream_instances_[id]=st;out=json::Document(std::string("\x1fnift:stream:")+id);return true;}
             if(call_args("close",args,q)){if(args.size()!=1){error="close: expected stream";return false;}json::Document d;if(!arg_value(args,q,0,d)||!d.is_string()||d.string.rfind("\x1fnift:stream:",0)!=0){error="close: expected stream";return false;}auto it=stream_instances_.find(d.string.substr(13));if(it==stream_instances_.end()){error="close: invalid stream";return false;}if(it->second->closed){error="close: stream already closed";return false;}if(it->second->input)it->second->input->close();if(it->second->output)it->second->output->close();it->second->closed=true;out=json::Document(nullptr);return true;}
             if(call_args("print",args,q)){if(args.size()!=1){error="print: expected one value";return false;}json::Document d;if(!arg_value(args,q,0,d))return false;if(d.is_string()&&q.size()>0&&q[0]&&d.string.find("$[")!=std::string::npos){std::string r,e;if(!interpolate_parameter(d.string,r,e)){error="print: "+e;return false;}d=json::Document(r);}if(d.is_array()||d.is_object()||(d.is_string()&&d.string.rfind("\x1fnift:",0)==0)){error="print: value is not directly renderable";return false;}const std::string rendered=render_expression_value(d);{static std::mutex print_mutex;std::lock_guard<std::mutex> lock(print_mutex);std::cout<<rendered<<'\n';std::cout.flush();}out=json::Document(nullptr);return true;}
@@ -1639,23 +1703,8 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
         // "pretty + highlighted when directly inspected by the REPL". ANSI remains
         // a presentation concern; expression evaluation always returns a plain string.
         {
-            std::string target=text; bool matched=false, pretty=false;
-            for (;;) {
-                bool stripped=false;
-                for (const auto& method : {std::string("stringify"), std::string("prettify"), std::string("highlight")}) {
-                    const std::string suffix="."+method+"()";
-                    if(target.size()>suffix.size() && target.compare(target.size()-suffix.size(),suffix.size(),suffix)==0){
-                        target=trim_copy(target.substr(0,target.size()-suffix.size()));
-                        matched=true; stripped=true;
-                        if(method=="prettify") pretty=true;
-                        // stringify() selects compact formatting unless a prettify()
-                        // modifier is also present; highlight() only affects REPL display.
-                        break;
-                    }
-                }
-                if(!stripped) break;
-            }
-            if(matched){
+            std::string target; bool pretty=false, highlight=false;
+            if (strip_presentation_chain(text, target, pretty, highlight)) {
                 json::Document v;if(!eval(target,v,depth+1))return false;
                 std::string rendered;if(!serialize_value(v,pretty,rendered,error))return false;
                 out=json::Document(rendered);return true;
@@ -1685,7 +1734,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
 
         {
             const auto lp=text.find('(');
-            if(lp!=std::string::npos&&text.back()==')'){const std::string target=trim_copy(text.substr(0,lp));const auto dot=target.rfind('.');if(dot!=std::string::npos){
+            if(lp!=std::string::npos&&text.back()==')'){std::size_t call_close=0;const std::string target=trim_copy(text.substr(0,lp));const auto dot=target.rfind('.');if(dot!=std::string::npos&&find_balanced(text,lp,'(',')',call_close)&&call_close==text.size()-1){
                 const std::string root=target.substr(0,dot), method=target.substr(dot+1); VariableBinding* rb=find_binding(root);
                 if(rb&&rb->value&&rb->value->is_string()&&rb->value->string.rfind("\x1fnift:collection:",0)==0){
                     auto ci=collection_instances_.find(rb->value->string.substr(17));if(ci==collection_instances_.end()){error="invalid collection";return false;}auto c=ci->second;
@@ -1737,7 +1786,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
 
         {
             const auto lp=text.find('(');
-            if(lp!=std::string::npos&&text.back()==')'){const std::string target=trim_copy(text.substr(0,lp));const auto dot=target.rfind('.');if(dot!=std::string::npos){
+            if(lp!=std::string::npos&&text.back()==')'){std::size_t call_close=0;const std::string target=trim_copy(text.substr(0,lp));const auto dot=target.rfind('.');if(dot!=std::string::npos&&find_balanced(text,lp,'(',')',call_close)&&call_close==text.size()-1){
                 const std::string root=target.substr(0,dot), method=target.substr(dot+1); VariableBinding* rb=find_binding(root);
                 if(rb&&rb->value&&rb->value->is_array()){bool ok=false;std::vector<bool> quoted_args;auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),ok,&quoted_args);if(!ok){error="malformed array method arguments";return false;}auto eval_arg=[&](size_t n,json::Document& v){if(n<quoted_args.size()&&quoted_args[n]){v=json::Document(args[n]);return true;}return eval(args[n],v,depth+1);};auto& a=rb->value->array;
                     auto invoke_callback=[&](const std::string& cbexpr,const std::vector<json::Document>& av,json::Document& result)->bool{
@@ -1771,7 +1820,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
 
         {
             const auto lp=text.find('(');
-            if(lp!=std::string::npos&&text.back()==')'){const std::string target=trim_copy(text.substr(0,lp));const auto dot=target.rfind('.');if(dot!=std::string::npos){
+            if(lp!=std::string::npos&&text.back()==')'){std::size_t call_close=0;const std::string target=trim_copy(text.substr(0,lp));const auto dot=target.rfind('.');if(dot!=std::string::npos&&find_balanced(text,lp,'(',')',call_close)&&call_close==text.size()-1){
                 const std::string root=target.substr(0,dot),method=target.substr(dot+1);VariableBinding* rb=find_binding(root);
                 if(rb&&rb->value&&rb->value->is_string()&&rb->value->string.rfind("\x1fnift:stream:",0)==0){auto it=stream_instances_.find(rb->value->string.substr(13));if(it==stream_instances_.end()||it->second->closed){error="stream is closed or invalid";return false;}auto st=it->second;bool ok=false;std::vector<bool> qq;auto aa=parse_parameters(text.substr(lp+1,text.size()-lp-2),ok,&qq);if(!ok){error="malformed stream method arguments";return false;}
                     if(method=="eof"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Input){error="eof: expected input stream and no arguments";return false;}out=json::Document(st->input->peek()==std::char_traits<char>::eof());return true;}
@@ -1783,7 +1832,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                     if(method=="flush"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Output){error="flush: expected output stream and no arguments";return false;}st->output->flush();if(!*st->output){error="flush: output failure";return false;}out=json::Document(nullptr);return true;}
                 }
             }}
-            if(lp!=std::string::npos&&text.back()==')'){const std::string target=trim_copy(text.substr(0,lp));const auto dot=target.rfind('.');if(dot!=std::string::npos){
+            if(lp!=std::string::npos&&text.back()==')'){std::size_t call_close=0;const std::string target=trim_copy(text.substr(0,lp));const auto dot=target.rfind('.');if(dot!=std::string::npos&&find_balanced(text,lp,'(',')',call_close)&&call_close==text.size()-1){
                 const std::string root=target.substr(0,dot),method=target.substr(dot+1);VariableBinding* rb=find_binding(root);
                 if(rb&&rb->value&&rb->value->is_string()&&method=="substr") { bool ok=false;auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),ok);if(!ok||args.empty()||args.size()>2){error="substr: expected pos and optional length";return false;}json::Document pos,len;if(!eval(args[0],pos,depth+1)||!pos.is_number()||std::trunc(pos.num)!=pos.num||pos.num<0){error="substr: invalid pos";return false;}size_t p=(size_t)pos.num;if(p>rb->value->string.size())p=rb->value->string.size();size_t n=std::string::npos;if(args.size()==2){if(!eval(args[1],len,depth+1)||!len.is_number()||std::trunc(len.num)!=len.num||len.num<0){error="substr: invalid length";return false;}n=(size_t)len.num;}out=json::Document(rb->value->string.substr(p,n));return true;}
             }}
@@ -1791,12 +1840,15 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
 
         {
             const auto lp = text.find('(');
-            if (lp != std::string::npos && text.back() == ')' && text.substr(0,lp).find('.') != std::string::npos) {
+            std::size_t call_close = 0;
+            const bool terminal_call = lp != std::string::npos && text.back() == ')' &&
+                find_balanced(text, lp, '(', ')', call_close) && call_close == text.size() - 1;
+            if (terminal_call && text.substr(0,lp).find('.') != std::string::npos) {
                 const std::string target=trim_copy(text.substr(0,lp)); const auto dot=target.rfind('.'); const std::string root=target.substr(0,dot), mn=target.substr(dot+1);
                 VariableBinding* rb=nullptr;for(auto scope=variable_scopes_.rbegin();scope!=variable_scopes_.rend();++scope){auto it=scope->find(root);if(it!=scope->end()){rb=&it->second;break;}}
                 if(rb&&rb->value->is_string()&&rb->value->string.rfind("\x1fnift:struct:",0)==0){auto inst=struct_instances_.find(rb->value->string.substr(13));if(inst==struct_instances_.end()){error="invalid struct instance";return false;}auto sd=structs_.find(inst->second->type_name);auto mi=sd->second.methods.find(mn);if(mi==sd->second.methods.end()||mi->second.constructor){error="struct has no method: "+mn;return false;}if(mi->second.private_member&&(receiver_stack_.empty()||receiver_stack_.back()!=inst->second)){error="private struct method: "+mn;return false;}bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(!aok){error="malformed method arguments";return false;}std::vector<json::Document> av;for(std::size_t ai=0;ai<ar.size();++ai){json::Document v;if(ai<aq.size()&&aq[ai])v=json::Document(ar[ai]);else if(!eval(ar[ai],v,depth+1))return false;av.push_back(std::move(v));}return invoke_struct_method(inst->second,mi->second,av,ar,out,error);}
             }
-            if (lp != std::string::npos && text.back() == ')' && valid_binding_identifier(trim_copy(text.substr(0, lp)))) {
+            if (terminal_call && valid_binding_identifier(trim_copy(text.substr(0, lp)))) {
                 const std::string call_name = trim_copy(text.substr(0, lp));
                 auto si = structs_.find(call_name);
                 if (si != structs_.end()) {
@@ -2467,8 +2519,8 @@ RenderResult Parser::run_statement(const std::string& source, const fs::path& so
             // Presentation modifiers are composable and order-independent. The evaluator
             // has already serialized their original value into an ANSI-free string; here
             // the REPL only decides whether that representation should be highlighted.
-            std::string presentation=t; bool presentation_method=false, highlight=false;
-            for(;;){bool stripped=false;for(const auto& method:{std::string("stringify"),std::string("prettify"),std::string("highlight")}){const std::string suffix="."+method+"()";if(presentation.size()>suffix.size()&&presentation.compare(presentation.size()-suffix.size(),suffix.size(),suffix)==0){presentation=trim_copy(presentation.substr(0,presentation.size()-suffix.size()));presentation_method=true;stripped=true;if(method=="highlight")highlight=true;break;}}if(!stripped)break;}
+            std::string presentation; bool presentation_method=false, highlight=false;
+            { bool p=false,h=false; if(strip_presentation_chain(t,presentation,p,h)){presentation_method=true;highlight=h;} }
             if(presentation_method&&v.is_string()) shown=v.string;
             else if(!serialize_value(v,false,shown,error)){rr.ok=false;rr.error.message=error;function_call_depth_=0;strict_script_mode_=false;return rr;}
             if(highlight && console::stdout_colour_enabled()) shown=console::highlight_nift_value(shown);
