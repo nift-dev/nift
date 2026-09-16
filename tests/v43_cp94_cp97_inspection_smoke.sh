@@ -36,4 +36,50 @@ if (cd "$td" && "$NIFT" run bad.nift >"$td/bad.out" 2>"$td/bad.err"); then
   echo 'expected stream stringify failure' >&2; exit 1
 fi
 ! grep -q 'nift:stream:' "$td/bad.out" "$td/bad.err"
+
+# Presentation modifiers compose over the ORIGINAL value: the two orders are
+# equal, repeated modifiers are idempotent, and a compound expression ending in
+# a modifier (equality/concat operand) is not hijacked by the presentation
+# matcher.
+cat > "$td/comp.nift" <<'NIFT'
+x := [1, 2]
+print(x.prettify() == x.prettify())
+print(x.highlight() == x.stringify())
+print(x.prettify() == x.stringify())
+print(x.prettify().prettify() == x.prettify())
+print(x.highlight().highlight() == x.highlight())
+print(x.prettify().highlight() == x.highlight().prettify())
+print(x.stringify().prettify() == x.prettify())
+print("got=" + x.prettify())
+NIFT
+[[ "$(cd "$td" && "$NIFT" run comp.nift)" == $'true\ntrue\nfalse\ntrue\ntrue\ntrue\ntrue\ngot=[\n  1,\n  2\n]' ]]
+
+# Method calls participate in ordinary compound expressions: array/lambda/struct
+# method results compare and combine like any other value.
+cat > "$td/methods.nift" <<'NIFT'
+x := [1, 2]
+print(x.size() == x.size())
+print(x.size() + x.size())
+f := (a) => a + 1
+print(f(1) == f(1))
+struct(counter) {
+  count := 0
+  fn(value()) { return count }
+}
+c := counter()
+print(c.value() == c.value())
+print(c.value() + 1)
+NIFT
+[[ "$(cd "$td" && "$NIFT" run methods.nift)" == $'true\n4\ntrue\ntrue\n1' ]]
+
+# cat is byte-exact (no implicit newline) and rejects directories; stringify of
+# a quoted string escapes correctly; callables are opaque and rejected.
+mkdir -p "$td/adir"
+printf 'cat("adir")\n' > "$td/dir.nift"
+if (cd "$td" && "$NIFT" run dir.nift >/dev/null 2>&1); then
+  echo 'cat(directory) unexpectedly succeeded' >&2; exit 1
+fi
+printf 'print("q\\"w\\nc".stringify())\n' > "$td/esc.nift"
+[[ "$(cd "$td" && "$NIFT" run esc.nift)" == '"q\"w\nc"' ]]
+
 echo 'CP94-CP97 inspection smoke: PASS'
