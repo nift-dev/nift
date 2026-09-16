@@ -1580,7 +1580,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                             push_variable_scope();auto& sc=variable_scopes_.back();for(const auto& kv:fn->captures)sc[kv.first]=kv.second;for(size_t ai=0;ai<av.size();++ai){auto sp=std::make_shared<json::Document>(std::move(av[ai]));sc[fn->params[ai]]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
                             bool okcall=true;
                             if(fn->block){++function_call_depth_;std::string program,pe;if(!translate_function_program(fn->body,program,pe)){error=pe;okcall=false;}auto nested=okcall?parse(program,fn->source_path,1):RenderResult{};--function_call_depth_;if(okcall&&!nested.ok){error=nested.error.message;okcall=false;}else if(okcall&&pending_control_.kind==ControlFlow::Return){out=pending_control_.value?*pending_control_.value:json::Document(nullptr);pending_control_={};}else if(okcall)out=json::Document(nullptr);}
-                            else okcall=eval(fn->body,out,depth+1);
+                            else { okcall=eval(fn->body,out,depth+1); if(!okcall) error="lambda body error: "+error; }
                             pop_variable_scope();return okcall;
                         }
                     }
@@ -1637,6 +1637,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             std::unordered_map<std::string,std::string> seen;
             std::function<bool(const json::Document&,json::Document&)> clone;
             clone=[&](const json::Document& in,json::Document& dst)->bool{
+                if(in.is_string()&&in.string.rfind("\x1fnift:collection:",0)==0){auto it=collection_instances_.find(in.string.substr(17));if(it==collection_instances_.end()){error="deepcopy: invalid collection";return false;}auto nc=std::make_shared<CollectionInstance>();nc->kind=it->second->kind;for(const auto& v:it->second->values){json::Document cv;if(!clone(v,cv))return false;nc->values.push_back(std::move(cv));}for(const auto& e:it->second->entries){json::Document ck,cv;if(!clone(e.first,ck)||!clone(e.second,cv))return false;nc->entries.push_back({std::move(ck),std::move(cv)});}const std::string id=std::to_string(next_collection_instance_id_++);collection_instances_[id]=nc;dst=json::Document(std::string("\x1fnift:collection:")+id);return true;}
                 if(in.is_string()&&in.string.rfind("\x1fnift:struct:",0)==0){const std::string old=in.string.substr(13);auto sit=seen.find(old);if(sit!=seen.end()){dst=json::Document(std::string("\x1fnift:struct:")+sit->second);return true;}auto it=struct_instances_.find(old);if(it==struct_instances_.end()){error="deepcopy: invalid struct instance";return false;}auto ni=std::make_shared<StructInstance>();ni->type_name=it->second->type_name;const std::string id=std::to_string(next_struct_instance_id_++);seen[old]=id;struct_instances_[id]=ni;for(const auto& f:it->second->fields){json::Document cv;if(!clone(*f.second.value,cv))return false;auto sp=std::make_shared<json::Document>(std::move(cv));ni->fields.emplace(f.first,VariableBinding{sp,f.second.type,f.second.mutable_binding,f.second.deep_readonly});}dst=json::Document(std::string("\x1fnift:struct:")+id);return true;}
                 dst=in;if(in.is_array()){dst.array.clear();for(const auto& v:in.array){json::Document cv;if(!clone(v,cv))return false;dst.array.push_back(std::move(cv));}}else if(in.is_object()){dst.object.clear();for(const auto& e:in.object){json::Document cv;if(!clone(e.second,cv))return false;dst.object.emplace_back(e.first,std::move(cv));}}return true;
             };
@@ -1717,11 +1718,11 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
         auto numeric_binary = [&](const json::Document& left, const json::Document& right, char op, json::Document& result)->bool {
             auto as_i64=[](const json::Document& d,std::int64_t& v)->bool{
                 if(d.type==json::Type::StrNumber){auto r=std::from_chars(d.string.data(),d.string.data()+d.string.size(),v);return r.ec==std::errc()&&r.ptr==d.string.data()+d.string.size();}
-                if(d.is_number()&&std::trunc(d.num)==d.num&&d.num>=static_cast<double>(std::numeric_limits<std::int64_t>::min())&&d.num<=static_cast<double>(std::numeric_limits<std::int64_t>::max())){v=static_cast<std::int64_t>(d.num);return true;}return false;};
+                if(d.is_number()&&std::trunc(d.num)==d.num&&d.num>=static_cast<double>(std::numeric_limits<std::int64_t>::min())&&d.num<9223372036854775808.0){v=static_cast<std::int64_t>(d.num);return true;}return false;};
             std::int64_t a=0,b=0; if(as_i64(left,a)&&as_i64(right,b)&&op!='/'){std::int64_t r=0;bool overflow=false;
                 if(op=='+')overflow=__builtin_add_overflow(a,b,&r);else if(op=='-')overflow=__builtin_sub_overflow(a,b,&r);else if(op=='*')overflow=__builtin_mul_overflow(a,b,&r);else if(op=='%'){if(b==0){error="modulo by zero";return false;}if(a==std::numeric_limits<std::int64_t>::min()&&b==-1)r=0;else r=a%b;}else return false;
                 if(overflow){error="signed 64-bit integer overflow";return false;}result=json::Document(static_cast<double>(r));if(r>9007199254740992LL||r<-9007199254740992LL){result.type=json::Type::StrNumber;result.string=std::to_string(r);}return true;}
-            if(!left.is_number()||!right.is_number()){error="arithmetic operators require numeric operands";return false;}double r=0;if(op=='+')r=left.num+right.num;else if(op=='-')r=left.num-right.num;else if(op=='*')r=left.num*right.num;else if(op=='/'){if(right.num==0){error="division by zero";return false;}r=left.num/right.num;}else if(op=='%'){if(right.num==0){error="modulo by zero";return false;}r=std::fmod(left.num,right.num);}if(!std::isfinite(r)){error="arithmetic result is not finite";return false;}result=json::Document(r);return true;
+            if(!left.is_number()||!right.is_number()){error="arithmetic operators require numeric operands";return false;}double r=0;if(op=='+')r=left.num+right.num;else if(op=='-')r=left.num-right.num;else if(op=='*')r=left.num*right.num;else if(op=='/'){if(right.num==0){error="division by zero";return false;}r=left.num/right.num;}else if(op=='%'){if(right.num==0){error="modulo by zero";return false;}if(std::trunc(left.num)!=left.num||std::trunc(right.num)!=right.num){error="modulo requires integer-valued operands";return false;}r=std::fmod(left.num,right.num);}if(!std::isfinite(r)){error="arithmetic result is not finite";return false;}result=json::Document(r);return true;
         };
 
         // Compound assignment is a true mutation expression. Current assignable
@@ -2441,8 +2442,10 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     }
                     if (function_call_depth_ == 0 &&
                         expression_value.is_string() &&
-                        expression_value.string.rfind("\x1fnift:struct:", 0) == 0) {
-                        fail(source_path, source, i, "cannot render a struct instance $[" + key + "]; select a member or value-returning method first");
+                        (expression_value.string.rfind("\x1fnift:struct:", 0) == 0 ||
+                         expression_value.string.rfind("\x1fnift:callable:", 0) == 0 ||
+                         expression_value.string.rfind("\x1fnift:collection:", 0) == 0)) {
+                        fail(source_path, source, i, "cannot render a struct, callable or collection instance $[" + key + "]; select a member or a value-returning call first");
                         break;
                     }
                     output += render_expression_value(expression_value);
