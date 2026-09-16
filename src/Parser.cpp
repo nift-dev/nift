@@ -189,7 +189,6 @@ std::string unescape_parameter_string(const std::string& text) {
     }
     return result;
 }
-
 std::vector<std::string> parse_parameters(const std::string& text, bool& ok,
                                           std::vector<bool>* quoted = nullptr) {
     std::vector<std::string> result; std::string current; bool in_quotes=false; char quote=0;
@@ -444,6 +443,33 @@ std::string entity(const std::string& value, bool& ok) {
     ok = false;
     return {};
 }
+}
+
+// Rejects mutations that would create a direct or indirect cycle through
+// user-visible reference graphs. Adding an edge container->target creates a
+// cycle iff target can already reach container through existing struct-field
+// and collection-value references. Callable references are leaves (their
+// captured lexical environments are internal, not user-visible graph edges),
+// and array values are plain copies, so neither participates in the walk.
+bool Parser::reference_would_cycle(const std::string& target_ref, const std::string& container_ref) const {
+    std::unordered_set<std::string> visited;
+    std::function<bool(const std::string&)> reach;
+    reach = [&](const std::string& ref)->bool {
+        if (ref == container_ref) return true;
+        if (!visited.insert(ref).second) return false;
+        if (ref.rfind("\x1fnift:struct:", 0) == 0) {
+            auto si = struct_instances_.find(ref.substr(13));
+            if (si != struct_instances_.end()) for (const auto& f : si->second->fields) { const auto& v = f.second.value; if (v && v->is_string() && (v->string.rfind("\x1fnift:struct:", 0) == 0 || v->string.rfind("\x1fnift:collection:", 0) == 0)) if (reach(v->string)) return true; }
+        } else if (ref.rfind("\x1fnift:collection:", 0) == 0) {
+            auto ci = collection_instances_.find(ref.substr(17));
+            if (ci != collection_instances_.end()) {
+                for (const auto& val : ci->second->values) if (val.is_string() && (val.string.rfind("\x1fnift:struct:", 0) == 0 || val.string.rfind("\x1fnift:collection:", 0) == 0)) if (reach(val.string)) return true;
+                for (const auto& e : ci->second->entries) if (e.second.is_string() && (e.second.string.rfind("\x1fnift:struct:", 0) == 0 || e.second.string.rfind("\x1fnift:collection:", 0) == 0)) if (reach(e.second.string)) return true;
+            }
+        }
+        return false;
+    };
+    return reach(target_ref);
 }
 
 Parser::Parser(RenderHost& host, TrackedInfo& tracked_info)
@@ -1381,15 +1407,32 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             if(!receiver_stack_.empty()){auto it=receiver_stack_.back()->fields.find(name);if(it!=receiver_stack_.back()->fields.end())return &it->second;}
             return nullptr;
         };
+        // Exact int64-vs-double comparison across the complete supported range.
+        // An integer is compared without converting it to a lossy double; a
+        // fractional or out-of-int64 double is compared by magnitude so no pair
+        // can report contradictory equality and ordering relationships.
+        auto exact_i64 = [](const json::Document& d, std::int64_t& v)->bool {
+            if(d.type==json::Type::StrNumber){auto r=std::from_chars(d.string.data(),d.string.data()+d.string.size(),v);return r.ec==std::errc()&&r.ptr==d.string.data()+d.string.size();}
+            if(d.is_number()&&std::isfinite(d.num)&&std::trunc(d.num)==d.num&&d.num>=-9223372036854775808.0&&d.num<9223372036854775808.0){v=static_cast<std::int64_t>(d.num);return true;}return false;};
+        auto compare_i64_double = [](std::int64_t i, double d)->int {
+            if(d>=9223372036854775808.0) return -1;      // d >= 2^63 > any int64
+            if(d<-9223372036854775808.0) return 1;       // d < -2^63 < any int64
+            if(std::trunc(d)==d){std::int64_t di=static_cast<std::int64_t>(d);return i<di?-1:(i>di?1:0);}
+            std::int64_t fl=static_cast<std::int64_t>(std::floor(d));
+            if(i<fl)return -1; if(i>fl)return 1; return -1;  // i==floor(d) < d (d fractional)
+        };
+        auto numeric_compare = [&](const json::Document& a, const json::Document& b)->int {
+            std::int64_t ai=0,bi=0; const bool a_i=exact_i64(a,ai), b_i=exact_i64(b,bi);
+            if(a_i&&b_i)return ai<bi?-1:(ai>bi?1:0);
+            if(a_i)return compare_i64_double(ai,b.num);
+            if(b_i)return -compare_i64_double(bi,a.num);
+            return a.num<b.num?-1:(a.num>b.num?1:0);
+        };
         auto structural_equal = [&](const json::Document& a, const json::Document& b) -> bool {
             std::function<bool(const json::Document&,const json::Document&)> eq;
             eq = [&](const json::Document& x,const json::Document& y)->bool {
                 if(x.is_number() && y.is_number()) {
-                    if(x.type==json::Type::StrNumber || y.type==json::Type::StrNumber) {
-                        auto exact_int=[](const json::Document& d,std::int64_t& v)->bool{if(d.type==json::Type::StrNumber){auto r=std::from_chars(d.string.data(),d.string.data()+d.string.size(),v);return r.ec==std::errc()&&r.ptr==d.string.data()+d.string.size();}if(d.type==json::Type::Number&&std::isfinite(d.num)&&std::trunc(d.num)==d.num&&d.num>=-9223372036854775808.0&&d.num<9223372036854775808.0){v=static_cast<std::int64_t>(d.num);return true;}return false;};
-                        std::int64_t xi=0,yi=0;if(exact_int(x,xi)&&exact_int(y,yi))return xi==yi;return false;
-                    }
-                    return x.num==y.num;
+                    return numeric_compare(x,y)==0;
                 }
                 if(x.type!=y.type)return false;
                 if(x.is_null())return true; if(x.is_bool())return x.boolean==y.boolean;
@@ -1500,7 +1543,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                     }
                     if(method=="size"||method=="empty"||method=="clear"){if(!args.empty()){error=method+": expected no arguments";return false;}size_t n=(c->kind==CollectionKind::Map||c->kind==CollectionKind::SortedMap)?c->entries.size():c->values.size();if(method=="size")out=json::Document((double)n);else if(method=="empty")out=json::Document(n==0);else{if(!need_mut())return false;c->values.clear();c->entries.clear();out=json::Document(nullptr);last_expression_mutation_=true;}return true;}
                     if(c->kind==CollectionKind::Stack||c->kind==CollectionKind::Queue||c->kind==CollectionKind::PriQue){
-                        if(method=="push"){if(args.size()!=1){error="push: expected one value";return false;}if(!need_mut())return false;json::Document v;if(quoted_args.size()>0&&quoted_args[0])v=json::Document(args[0]);else if(!eval(args[0],v,depth+1))return false;c->values.push_back(v);if(c->kind==CollectionKind::PriQue){std::stable_sort(c->values.begin(),c->values.end(),[&](const auto&a,const auto&b){int z=0;return scalar_order(a,b,z)&&z<0;});}out=v;last_expression_mutation_=true;return true;}
+                        if(method=="push"){if(args.size()!=1){error="push: expected one value";return false;}if(!need_mut())return false;json::Document v;if(quoted_args.size()>0&&quoted_args[0])v=json::Document(args[0]);else if(!eval(args[0],v,depth+1))return false;if(v.is_string()&&(v.string.rfind("\x1fnift:struct:",0)==0||v.string.rfind("\x1fnift:collection:",0)==0)){const std::string c_id=rb->value->string.substr(17);const std::string v_id=v.string.rfind("\x1fnift:struct:",0)==0?v.string.substr(13):v.string.substr(17);if(reference_would_cycle(v.string,rb->value->string)){error="push would create a cyclic reference";return false;}}c->values.push_back(v);if(c->kind==CollectionKind::PriQue){std::stable_sort(c->values.begin(),c->values.end(),[&](const auto&a,const auto&b){int z=0;return scalar_order(a,b,z)&&z<0;});}out=v;last_expression_mutation_=true;return true;}
                         if(method=="pop"||method=="top"||method=="front"){if(!args.empty()){error=method+": expected no arguments";return false;}if(c->values.empty()){error=method+": collection is empty";return false;}size_t i=(c->kind==CollectionKind::Stack&&(method=="pop"||method=="top"))?c->values.size()-1:0;out=c->values[i];if(method=="pop"){if(!need_mut())return false;c->values.erase(c->values.begin()+i);last_expression_mutation_=true;}return true;}
                         if(method=="contains"){if(args.size()!=1){error="contains: expected one value";return false;}json::Document v;if(quoted_args.size()>0&&quoted_args[0])v=json::Document(args[0]);else if(!eval(args[0],v,depth+1))return false;bool f=false;for(auto&w:c->values)if(structural_equal(v,w)){f=true;break;}out=json::Document(f);return true;}
                     }
@@ -1508,7 +1551,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                         if(method=="add"||method=="contains"||method=="remove"){if(args.size()!=1){error=method+": expected one value";return false;}json::Document v;if(quoted_args.size()>0&&quoted_args[0])v=json::Document(args[0]);else if(!eval(args[0],v,depth+1))return false;if(!(v.is_bool()||v.is_number()||v.is_string())){error=method+": set values must be bool, number, or string";return false;}size_t i=0;for(;i<c->values.size();++i)if(structural_equal(c->values[i],v))break;if(method=="contains"){out=json::Document(i<c->values.size());return true;}if(!need_mut())return false;if(method=="add"&&i==c->values.size()){c->values.push_back(v);if(c->kind==CollectionKind::SortedSet)std::stable_sort(c->values.begin(),c->values.end(),[&](const auto&a,const auto&b){int z=0;if(!scalar_order(a,b,z)){error="sorted_set: incomparable values";return false;}return z<0;});}else if(method=="remove"&&i<c->values.size())c->values.erase(c->values.begin()+i);out=v;last_expression_mutation_=true;return true;}
                     }
                     if(c->kind==CollectionKind::Map||c->kind==CollectionKind::SortedMap){
-                        if(method=="set"){if(args.size()!=2){error="set: expected key and value";return false;}if(!need_mut())return false;json::Document k,v;if(quoted_args.size()>0&&quoted_args[0])k=json::Document(args[0]);else if(!eval(args[0],k,depth+1))return false;if(quoted_args.size()>1&&quoted_args[1])v=json::Document(args[1]);else if(!eval(args[1],v,depth+1))return false;if(!(k.is_bool()||k.is_number()||k.is_string())){error="map: key must be bool, number, or string";return false;}size_t i=0;for(;i<c->entries.size();++i)if(structural_equal(c->entries[i].first,k))break;if(i<c->entries.size())c->entries[i].second=v;else c->entries.push_back({k,v});if(c->kind==CollectionKind::SortedMap)std::stable_sort(c->entries.begin(),c->entries.end(),[&](const auto&a,const auto&b){int z=0;if(!scalar_order(a.first,b.first,z)){error="sorted_map: incomparable keys";return false;}return z<0;});out=v;last_expression_mutation_=true;return true;}
+                        if(method=="set"){if(args.size()!=2){error="set: expected key and value";return false;}if(!need_mut())return false;json::Document k,v;if(quoted_args.size()>0&&quoted_args[0])k=json::Document(args[0]);else if(!eval(args[0],k,depth+1))return false;if(quoted_args.size()>1&&quoted_args[1])v=json::Document(args[1]);else if(!eval(args[1],v,depth+1))return false;if(!(k.is_bool()||k.is_number()||k.is_string())){error="map: key must be bool, number, or string";return false;}if(v.is_string()&&(v.string.rfind("\x1fnift:struct:",0)==0||v.string.rfind("\x1fnift:collection:",0)==0)){const std::string c_id=rb->value->string.substr(17);const std::string v_id=v.string.rfind("\x1fnift:struct:",0)==0?v.string.substr(13):v.string.substr(17);if(reference_would_cycle(v.string,rb->value->string)){error="set would create a cyclic reference";return false;}}size_t i=0;for(;i<c->entries.size();++i)if(structural_equal(c->entries[i].first,k))break;if(i<c->entries.size())c->entries[i].second=v;else c->entries.push_back({k,v});if(c->kind==CollectionKind::SortedMap)std::stable_sort(c->entries.begin(),c->entries.end(),[&](const auto&a,const auto&b){int z=0;if(!scalar_order(a.first,b.first,z)){error="sorted_map: incomparable keys";return false;}return z<0;});out=v;last_expression_mutation_=true;return true;}
                         if(method=="contains"||method=="get"||method=="remove"){if(args.size()!=1){error=method+": expected one key";return false;}json::Document k;if(quoted_args.size()>0&&quoted_args[0])k=json::Document(args[0]);else if(!eval(args[0],k,depth+1))return false;size_t i=0;for(;i<c->entries.size();++i)if(structural_equal(c->entries[i].first,k))break;if(method=="contains"){out=json::Document(i<c->entries.size());return true;}if(i==c->entries.size()){error=method+": key not found";return false;}out=c->entries[i].second;if(method=="remove"){if(!need_mut())return false;c->entries.erase(c->entries.begin()+i);last_expression_mutation_=true;}return true;}
                     }
                 }
@@ -1767,7 +1810,9 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                 json::Document current=*rb->value;std::size_t mp=dot+1;std::shared_ptr<StructInstance> parent;std::string member;
                 while(mp<name.size()){std::size_t me=name.find('.',mp);member=name.substr(mp,me==std::string::npos?std::string::npos:me-mp);auto ii=struct_instances_.find(current.string.substr(13));if(ii==struct_instances_.end()){error="invalid struct instance";return false;}parent=ii->second;auto fit=parent->fields.find(member);if(fit==parent->fields.end()){error="struct has no field: "+member;return false;}if(me==std::string::npos)break;current=*fit->second.value;if(!current.is_string()||current.string.rfind("\x1fnift:struct:",0)!=0){error="member path is not a struct: "+member;return false;}mp=me+1;}
                 auto fit=parent->fields.find(member);auto sd=structs_.find(parent->type_name);bool priv=false;if(sd!=structs_.end())for(const auto& f:sd->second.fields)if(f.name==member)priv=f.private_member;if(priv&&(receiver_stack_.empty()||receiver_stack_.back()!=parent)){error="private struct field: "+member;return false;}
-                json::Document assigned;if(!eval(text.substr(p+1),assigned,depth+1))return false;const int at=nift_binding_type_from_text(text.substr(p+1),assigned);if(at!=fit->second.type){error="cannot change struct field type: "+member;return false;}fit->second.value=std::make_shared<json::Document>(std::move(assigned));out=*fit->second.value;if(depth==0)last_expression_mutation_=true;return true;
+                json::Document assigned;if(!eval(text.substr(p+1),assigned,depth+1))return false;const int at=nift_binding_type_from_text(text.substr(p+1),assigned);if(at!=fit->second.type){error="cannot change struct field type: "+member;return false;}
+                if(assigned.is_string()&&(assigned.string.rfind("\x1fnift:struct:",0)==0||assigned.string.rfind("\x1fnift:collection:",0)==0)){std::string parent_id;for(const auto& e:struct_instances_)if(e.second==parent){parent_id=e.first;break;}if(reference_would_cycle(assigned.string,std::string("\x1fnift:struct:")+parent_id)){error="assignment would create a cyclic reference: "+member;return false;}}
+                fit->second.value=std::make_shared<json::Document>(std::move(assigned));out=*fit->second.value;if(depth==0)last_expression_mutation_=true;return true;
             }
             if (!valid_binding_identifier(name)) { error = "assignment requires an identifier before '='"; return false; }
             VariableBinding* binding = nullptr;
@@ -1786,6 +1831,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                                 " to " + nift_binding_type_name(rec->second.type) + " struct field '" + name + "'";
                         return false;
                     }
+                    if (assigned.is_string()&&(assigned.string.rfind("\x1fnift:struct:",0)==0||assigned.string.rfind("\x1fnift:collection:",0)==0)){std::string recv_id;for(const auto& e:struct_instances_)if(e.second==receiver_stack_.back()){recv_id=e.first;break;}if(reference_would_cycle(assigned.string,std::string("\x1fnift:struct:")+recv_id)){error="assignment would create a cyclic reference: "+name;return false;}}
                     auto rebound = std::make_shared<json::Document>(std::move(assigned));
                     rec->second.value = rebound;
                     if (depth == 0) last_expression_mutation_ = true;
@@ -1838,8 +1884,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                 if ((!left.is_number() || !right.is_number()) && !(left.is_string() && right.is_string())) { error="ordering comparisons require two numbers or two strings"; return false; }
                 int ordering=0;
                 if (left.is_number() && right.is_number()) {
-                    if(left.type==json::Type::StrNumber||right.type==json::Type::StrNumber){std::int64_t li=0,ri=0;auto geti=[](const json::Document& d,std::int64_t& v){if(d.type==json::Type::StrNumber){auto r=std::from_chars(d.string.data(),d.string.data()+d.string.size(),v);return r.ec==std::errc()&&r.ptr==d.string.data()+d.string.size();}if(d.type==json::Type::Number&&std::trunc(d.num)==d.num&&d.num>=-9223372036854775808.0&&d.num<9223372036854775808.0){v=static_cast<std::int64_t>(d.num);return true;}return false;};if(geti(left,li)&&geti(right,ri))ordering=li<ri?-1:(li>ri?1:0);else {error="numeric comparison is outside exact signed 64-bit range";return false;}}
-                    else ordering=left.num<right.num?-1:(left.num>right.num?1:0);
+                    ordering=numeric_compare(left,right);
                 } else ordering=left.string<right.string?-1:(left.string>right.string?1:0);
                 if (op=="<") result=ordering<0; else if (op=="<=") result=ordering<=0; else if (op==">") result=ordering>0; else result=ordering>=0;
             }
@@ -2784,7 +2829,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 json::Document materialized;
                 if(ci->second->kind==CollectionKind::Map||ci->second->kind==CollectionKind::SortedMap){
                     materialized=json::Document::make_object();
-                    for(const auto& e:ci->second->entries){if(!e.first.is_string()){fail(source_path,source,i,"@for map currently requires string keys");break;}materialized.object.push_back({e.first.string,e.second});}
+                    for(const auto& e:ci->second->entries){const std::string key_name=e.first.is_string()?e.first.string:e.first.dump(0);materialized.object.push_back({key_name,e.second});}
                 }else{materialized=json::Document::make_array();materialized.array=ci->second->values;if(ci->second->kind==CollectionKind::Stack)std::reverse(materialized.array.begin(),materialized.array.end());}
                 if(!result_.ok)break;collection=std::make_shared<const json::Document>(std::move(materialized));
             }

@@ -89,6 +89,7 @@ private:
     bool invoke_struct_method(std::shared_ptr<StructInstance> instance, const StructMethod& method, const std::vector<json::Document>& args, const std::vector<std::string>& arg_sources, json::Document& out, std::string& error);
     int nift_binding_type_from_text(const std::string& source, const json::Document& value) const;
     int expression_type(const std::string& source) const;
+    bool reference_would_cycle(const std::string& target_id, const std::string& container_id) const;
     bool last_expression_mutation_ = false;
     int function_call_depth_ = 0;
     bool in_fragment_body_ = false;
