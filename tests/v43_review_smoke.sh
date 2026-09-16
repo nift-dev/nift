@@ -126,3 +126,20 @@ run '@struct(o){x:=0}@struct(n){next:=o()}$[a:=n()]$[d:=a]$[d==a]'
 o=$(body); [[ "$o" == *"true"* ]]
 # Callables are leaves: storing a lambda in a collection is not a user cycle.
 run '$[xs:=[]]$[xs.push(() => 7)]$[f:=xs[0]]$[f()]'; o=$(body); [[ "$o" == *"7"* ]]
+
+# --- Map @for preserves typed keys: no int/string or bool/string collision,
+# and the iterated key round-trips through lookup. ---
+run '$[m := map()]$[m.set(1,"int")]$[m.set("1","string")]@for((k,v) : m){$[k]=$[v]}|$[m.size()]'
+o=$(body); [[ "$o" == *"1=int1=string|2"* ]]
+run '$[m := map()]$[m.set(true,"bool")]$[m.set("true","string")]@for((k,v) : m){$[k]=$[v]}|$[m.size()]'
+o=$(body); [[ "$o" == *"true=booltrue=string|2"* ]]
+run '$[m := map()]$[m.set(1,"int")]$[m.set("1","string")]@for((k,v) : m){$[m.get(k)]}|'
+o=$(body); [[ "$o" == *"intstring"* ]]
+# 1 and 1.0 remain one logical numeric key (numeric equality).
+run '$[m := map()]$[m.set(1,"a")]$[m.set(1.0,"b")]$[m.size()],$[m.get(1)],$[m.get(1.0)]'
+o=$(body); [[ "$o" == *"1,b,b"* ]]
+# map insertion order and sorted_map order are preserved.
+run '$[m := map()]$[m.set(2,"two")]$[m.set(1,"one")]@for((k,v) : m){$[k]}|'
+[[ "$(body)" == *"21|"* ]]
+run '$[sm := sorted_map()]$[sm.set("b",2)]$[sm.set("a",1)]@for((k,v) : sm){$[k]}|'
+[[ "$(body)" == *"ab|"* ]]

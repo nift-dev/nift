@@ -2821,23 +2821,106 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 collection = std::make_shared<const json::Document>(std::move(collection_value));
             }
 
-            // Materialize internal v4.3 collections for the existing @for engine;
-            // iterators remain an implementation detail.
+            // Materialize internal v4.3 sequential/set collections for the
+            // existing @for engine; maps/sorted_maps are iterated directly so
+            // typed keys are preserved (no JSON-object stringification).
             if(collection->is_string()&&collection->string.rfind("\x1fnift:collection:",0)==0){
                 auto ci=collection_instances_.find(collection->string.substr(17));
                 if(ci==collection_instances_.end()){fail(source_path,source,i,"@for collection: invalid collection");break;}
-                json::Document materialized;
                 if(ci->second->kind==CollectionKind::Map||ci->second->kind==CollectionKind::SortedMap){
-                    materialized=json::Document::make_object();
-                    for(const auto& e:ci->second->entries){const std::string key_name=e.first.is_string()?e.first.string:e.first.dump(0);materialized.object.push_back({key_name,e.second});}
-                }else{materialized=json::Document::make_array();materialized.array=ci->second->values;if(ci->second->kind==CollectionKind::Stack)std::reverse(materialized.array.begin(),materialized.array.end());}
-                if(!result_.ok)break;collection=std::make_shared<const json::Document>(std::move(materialized));
+                    // keep the collection reference; the dedicated map branch below iterates entries.
+                }else{
+                    json::Document materialized=json::Document::make_array();materialized.array=ci->second->values;if(ci->second->kind==CollectionKind::Stack)std::reverse(materialized.array.begin(),materialized.array.end());
+                    collection=std::make_shared<const json::Document>(std::move(materialized));
+                }
             }
 
             const auto body = normalize_control_block_body(
                 source.substr(block_open + 1, block_close - block_open - 1));
             const std::string control_indent = insertion_indent(output);
             const int insertion_code_block_depth = code_block_depth_;
+
+            // Direct typed-entry iteration for v4.3 maps/sorted_maps: bind the
+            // original typed key and value, preserving the map's key domain and
+            // ordering (insertion for map, sorted for sorted_map) without an
+            // intermediate JSON-object representation.
+            if (collection->is_string() && collection->string.rfind("\x1fnift:collection:",0)==0) {
+                auto mci=collection_instances_.find(collection->string.substr(17));
+                if(mci==collection_instances_.end()||(mci->second->kind!=CollectionKind::Map&&mci->second->kind!=CollectionKind::SortedMap)){fail(source_path,source,i,"@for collection: invalid map");break;}
+                const auto& entries=mci->second->entries;
+                if(binding_part.size()<5||binding_part.front()!='('||binding_part.back()!=')'){
+                    fail(source_path,source,i,"map @for syntax is @for((key, val) : map){...}");break;
+                }
+                const std::string pair=binding_part.substr(1,binding_part.size()-2);
+                const auto comma=pair.find(',');
+                if(comma==std::string::npos||pair.find(',',comma+1)!=std::string::npos){fail(source_path,source,i,"map @for requires exactly two bindings: (key, val)");break;}
+                const std::string key_name=trim_copy(pair.substr(0,comma));
+                const std::string value_name=trim_copy(pair.substr(comma+1));
+                if(!valid_binding_identifier(key_name)||!valid_binding_identifier(value_name)||key_name==value_name){fail(source_path,source,i,"map @for key and value bindings must be distinct identifiers");break;}
+                if(reserved_binding_name(key_name)||reserved_binding_name(value_name)){fail(source_path,source,i,"@for bindings cannot conflict with built-in metadata");break;}
+                if(host_.is_contract_name(key_name)||host_.is_contract_name(value_name)){fail(source_path,source,i,"@for bindings cannot conflict with configured contract namespaces");break;}
+                const bool valid_map_sort_root=sort_expression.empty()||sort_expression==key_name||sort_expression==value_name||
+                    sort_expression.rfind(key_name+".",0)==0||sort_expression.rfind(key_name+"[",0)==0||
+                    sort_expression.rfind(value_name+".",0)==0||sort_expression.rfind(value_name+"[",0)==0;
+                if(!valid_map_sort_root){fail(source_path,source,i,"@for map sort key must begin with key/value binding '"+key_name+"' or '"+value_name+"'");break;}
+
+                const auto old_key_it=json_bindings_.find(key_name);
+                const auto old_value_it=json_bindings_.find(value_name);
+                const bool had_old_key=old_key_it!=json_bindings_.end();
+                const bool had_old_value=old_value_it!=json_bindings_.end();
+                std::shared_ptr<const json::Document> old_key,old_value;
+                if(had_old_key)old_key=old_key_it->second;
+                if(had_old_value)old_value=old_value_it->second;
+                const auto previous_loop=json_bindings_.find("loop");
+                const bool had_previous_loop=previous_loop!=json_bindings_.end();
+                std::shared_ptr<const json::Document> previous_loop_value;
+                if(had_previous_loop)previous_loop_value=previous_loop->second;
+
+                std::vector<std::size_t> order(entries.size());
+                for(std::size_t n=0;n<order.size();++n)order[n]=n;
+                std::vector<json::Document> sort_keys;
+                if(!sort_expression.empty()){
+                    sort_keys.reserve(entries.size());
+                    json::Type key_type=json::Type::Null;bool have_key_type=false;
+                    for(std::size_t n=0;n<entries.size();++n){
+                        json_bindings_[key_name]=std::make_shared<const json::Document>(entries[n].first);
+                        json_bindings_[value_name]=std::make_shared<const json::Document>(entries[n].second);
+                        std::shared_ptr<const json::Document> key;std::string key_error;
+                        if(!resolve_json_value(sort_expression,key,key_error)||!key_error.empty()){fail(source_path,source,i,key_error.empty()?"@for sort key is not a bound JSON path: "+sort_expression:key_error);break;}
+                        if(!sortable_scalar(*key)){fail(source_path,source,i,"@for sort keys must all be numbers or all be strings: "+sort_expression);break;}
+                        if(!have_key_type){key_type=key->type;have_key_type=true;}
+                        else if(key->type!=key_type){fail(source_path,source,i,"@for sort keys must have the same type: "+sort_expression);break;}
+                        sort_keys.push_back(*key);
+                    }
+                    if(!result_.ok){if(had_old_key)json_bindings_[key_name]=old_key;else json_bindings_.erase(key_name);if(had_old_value)json_bindings_[value_name]=old_value;else json_bindings_.erase(value_name);break;}
+                    std::stable_sort(order.begin(),order.end(),[&](std::size_t a,std::size_t b){const int comparison=compare_sort_keys(sort_keys[a],sort_keys[b]);return sort_descending?comparison>0:comparison<0;});
+                }
+
+                for(std::size_t position=0;position<order.size()&&result_.ok;++position){
+                    const auto& entry=entries[order[position]];
+                    json_bindings_[key_name]=std::make_shared<const json::Document>(entry.first);
+                    json_bindings_[value_name]=std::make_shared<const json::Document>(entry.second);
+                    json_bindings_["loop"]=make_loop_metadata(position,order.size());
+                    push_json_scope();
+                    variable_scopes_.back().emplace(key_name,VariableBinding{std::make_shared<json::Document>(entry.first),nift_binding_type(entry.first),true,false});
+                    variable_scopes_.back().emplace(value_name,VariableBinding{std::make_shared<json::Document>(entry.second),nift_binding_type(entry.second),true,false});
+                    ++loop_depth_;
+                    const auto nested=parse(body.text,source_path,depth+1);
+                    --loop_depth_;
+                    pop_json_scope();
+                    if(!nested.ok)break;
+                    append_indented(output,nested.output,control_indent,insertion_code_block_depth);
+                    if(pending_control_.kind==ControlFlow::Continue){pending_control_={};continue;}
+                    if(pending_control_.kind==ControlFlow::Break){pending_control_={};break;}
+                    if(body.multiline&&position+1<order.size())output+="\n"+control_indent;
+                }
+                if(had_old_key)json_bindings_[key_name]=std::move(old_key);else json_bindings_.erase(key_name);
+                if(had_old_value)json_bindings_[value_name]=std::move(old_value);else json_bindings_.erase(value_name);
+                if(had_previous_loop)json_bindings_["loop"]=std::move(previous_loop_value);else json_bindings_.erase("loop");
+                if(!result_.ok)break;
+                i=block_close+1;
+                continue;
+            }
 
             if (collection->is_array()) {
                 if (!valid_binding_identifier(binding_part)) {
