@@ -50,10 +50,34 @@ private:
         int type = 0;
         bool mutable_binding = true;
         bool deep_readonly = false;
+        std::shared_ptr<std::shared_ptr<json::Document>> slot;
+        VariableBinding() : slot(std::make_shared<std::shared_ptr<json::Document>>(value)) {}
+        VariableBinding(std::shared_ptr<json::Document> v, int t, bool m, bool d)
+            : value(std::move(v)), type(t), mutable_binding(m), deep_readonly(d), slot(std::make_shared<std::shared_ptr<json::Document>>(value)) {}
+        void sync() { if (slot) value = *slot; }
+        void rebind(std::shared_ptr<json::Document> v) { value=std::move(v); if(slot)*slot=value; }
     };
     std::vector<std::unordered_map<std::string, VariableBinding>> variable_scopes_;
     struct Callable { std::vector<std::string> params; std::string body; std::filesystem::path source_path; bool fragment = false; };
     std::unordered_map<std::string, Callable> callables_;
+    struct LambdaInstance {
+        std::vector<std::string> params;
+        std::string body;
+        bool block = false;
+        std::filesystem::path source_path;
+        std::unordered_map<std::string, VariableBinding> captures;
+    };
+    std::unordered_map<std::string, std::shared_ptr<LambdaInstance>> lambda_instances_;
+    std::uint64_t next_lambda_instance_id_ = 1;
+
+    enum class CollectionKind { Stack, Queue, PriQue, Map, SortedMap, Set, SortedSet };
+    struct CollectionInstance {
+        CollectionKind kind = CollectionKind::Stack;
+        std::vector<json::Document> values;
+        std::vector<std::pair<json::Document, json::Document>> entries;
+    };
+    std::unordered_map<std::string, std::shared_ptr<CollectionInstance>> collection_instances_;
+    std::uint64_t next_collection_instance_id_ = 1;
     struct StructField { std::string name; std::string initializer; bool private_member = false; };
     struct StructMethod { Callable callable; bool private_member = false; bool constructor = false; };
     struct StructDefinition { std::string name; std::vector<StructField> fields; std::unordered_map<std::string, StructMethod> methods; };

@@ -1219,7 +1219,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
     auto resolve_direct = [&](const std::string& raw, json::Document& out) -> bool {
         const std::string text = trim_copy(raw);
         for (auto scope = variable_scopes_.rbegin(); scope != variable_scopes_.rend(); ++scope) {
-            const auto it = scope->find(text); if (it != scope->end()) { out = *it->second.value; return true; }
+            const auto it = scope->find(text); if (it != scope->end()) { it->second.sync(); out = *it->second.value; return true; }
             std::size_t root_len = 0;
             while (root_len < text.size() &&
                    (std::isalnum(static_cast<unsigned char>(text[root_len])) || text[root_len] == '_')) ++root_len;
@@ -1377,7 +1377,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
         while (encloses(text)) text=trim_copy(text.substr(1,text.size()-2));
 
         auto find_binding = [&](const std::string& name) -> VariableBinding* {
-            for (auto scope=variable_scopes_.rbegin(); scope!=variable_scopes_.rend(); ++scope) { auto it=scope->find(name); if(it!=scope->end()) return &it->second; }
+            for (auto scope=variable_scopes_.rbegin(); scope!=variable_scopes_.rend(); ++scope) { auto it=scope->find(name); if(it!=scope->end()) { it->second.sync(); return &it->second; } }
             if(!receiver_stack_.empty()){auto it=receiver_stack_.back()->fields.find(name);if(it!=receiver_stack_.back()->fields.end())return &it->second;}
             return nullptr;
         };
@@ -1395,7 +1395,18 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                 if(x.is_null())return true; if(x.is_bool())return x.boolean==y.boolean;
                 if(x.is_string()){
                     const bool xs=x.string.rfind("\x1fnift:struct:",0)==0, ys=y.string.rfind("\x1fnift:struct:",0)==0;
-                    return xs||ys ? (xs&&ys&&x.string==y.string) : x.string==y.string;
+                    const bool xc=x.string.rfind("\x1fnift:callable:",0)==0, yc=y.string.rfind("\x1fnift:callable:",0)==0;
+                    const bool xk=x.string.rfind("\x1fnift:collection:",0)==0, yk=y.string.rfind("\x1fnift:collection:",0)==0;
+                    if(xs||ys||xc||yc) return (xs&&ys)||(xc&&yc) ? x.string==y.string : false;
+                    if(xk||yk){
+                        if(!(xk&&yk))return false; auto xi=collection_instances_.find(x.string.substr(17)), yi=collection_instances_.find(y.string.substr(17));
+                        if(xi==collection_instances_.end()||yi==collection_instances_.end()||xi->second->kind!=yi->second->kind)return false;
+                        auto a=xi->second,b=yi->second; if(a->kind==CollectionKind::PriQue)return x.string==y.string;
+                        if(a->kind==CollectionKind::Stack||a->kind==CollectionKind::Queue){if(a->values.size()!=b->values.size())return false;for(size_t i=0;i<a->values.size();++i)if(!eq(a->values[i],b->values[i]))return false;return true;}
+                        if(a->kind==CollectionKind::Set||a->kind==CollectionKind::SortedSet){if(a->values.size()!=b->values.size())return false;for(const auto& v:a->values){bool found=false;for(const auto& w:b->values)if(eq(v,w)){found=true;break;}if(!found)return false;}return true;}
+                        if(a->entries.size()!=b->entries.size())return false;for(const auto& e:a->entries){bool found=false;for(const auto& f:b->entries)if(eq(e.first,f.first)&&eq(e.second,f.second)){found=true;break;}if(!found)return false;}return true;
+                    }
+                    return x.string==y.string;
                 }
                 if(x.is_array()){if(x.array.size()!=y.array.size())return false;for(size_t i=0;i<x.array.size();++i)if(!eq(x.array[i],y.array[i]))return false;return true;}
                 if(x.is_object()){if(x.object.size()!=y.object.size())return false;for(const auto& e:x.object){auto it=std::find_if(y.object.begin(),y.object.end(),[&](const auto& z){return z.first==e.first;});if(it==y.object.end()||!eq(e.second,it->second))return false;}return true;}
@@ -1403,13 +1414,78 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             }; return eq(a,b);
         };
 
+
+        // v4.3 first-class callable values and lambda expressions.
+        if (auto ci = callables_.find(text); ci != callables_.end()) {
+            out = json::Document(std::string("\x1fnift:callable:named:") + text);
+            return true;
+        }
+        {
+            const auto arrow = text.find("=>");
+            if (arrow != std::string::npos && text.substr(0, arrow).find(":=") == std::string::npos && text.substr(0, arrow).find(" = ") == std::string::npos) {
+                std::string lhs = trim_copy(text.substr(0, arrow));
+                std::string rhs = trim_copy(text.substr(arrow + 2));
+                std::vector<std::string> params;
+                if (!lhs.empty() && lhs.front() == '(' && lhs.back() == ')') {
+                    bool pok=false; params=parse_parameters(lhs.substr(1,lhs.size()-2),pok);
+                    if(!pok){error="lambda: malformed parameter list";return false;}
+                } else if (valid_binding_identifier(lhs)) params.push_back(lhs);
+                else { error="lambda: expected identifier or parenthesized parameter list"; return false; }
+                for(auto& p:params){p=trim_copy(p);if(!valid_binding_identifier(p)){error="lambda: invalid parameter";return false;}}
+                auto li=std::make_shared<LambdaInstance>(); li->params=params;
+                li->block=rhs.size()>=2&&rhs.front()=='{'&&rhs.back()=='}';
+                li->body=li->block?rhs.substr(1,rhs.size()-2):rhs;
+                for(const auto& scope:variable_scopes_) for(const auto& kv:scope) li->captures[kv.first]=kv.second;
+                const std::string id=std::to_string(next_lambda_instance_id_++); lambda_instances_[id]=li;
+                out=json::Document(std::string("\x1fnift:callable:lambda:")+id); return true;
+            }
+        }
+
+        // v4.3 collection constructors. Collections are identity-bearing runtime
+        // objects while map/set logical equality is implemented by their methods/operators.
+        for (const auto& ctor : {std::string("stack"),std::string("queue"),std::string("prique"),std::string("map"),std::string("sorted_map"),std::string("set"),std::string("sorted_set")}) {
+            if (text == ctor + "()") {
+                auto c=std::make_shared<CollectionInstance>();
+                if(ctor=="stack")c->kind=CollectionKind::Stack; else if(ctor=="queue")c->kind=CollectionKind::Queue;
+                else if(ctor=="prique")c->kind=CollectionKind::PriQue; else if(ctor=="map")c->kind=CollectionKind::Map;
+                else if(ctor=="sorted_map")c->kind=CollectionKind::SortedMap; else if(ctor=="set")c->kind=CollectionKind::Set; else c->kind=CollectionKind::SortedSet;
+                const std::string id=std::to_string(next_collection_instance_id_++);collection_instances_[id]=c;
+                out=json::Document(std::string("\x1fnift:collection:")+id);return true;
+            }
+        }
         if (text.rfind("same(",0)==0 && text.back()==')') {
             bool ok=false; auto args=parse_parameters(text.substr(5,text.size()-6),ok); if(!ok||args.size()!=2){error="same: expected two values";return false;}
             const std::string an=trim_copy(args[0]),bn=trim_copy(args[1]); VariableBinding* ab=find_binding(an);VariableBinding* bb=find_binding(bn);
             if(ab&&bb&&ab->value&&bb->value&&ab->value->is_array()&&bb->value->is_array()){out=json::Document(ab->value==bb->value);return true;}
             json::Document a,b;if(!eval(args[0],a,depth+1)||!eval(args[1],b,depth+1))return false;
-            auto identity=[](const json::Document& v)->std::string{return v.is_string()&&v.string.rfind("\x1fnift:struct:",0)==0?v.string:std::string{};};
+            auto identity=[](const json::Document& v)->std::string{if(!v.is_string())return {}; if(v.string.rfind("\x1fnift:struct:",0)==0||v.string.rfind("\x1fnift:callable:",0)==0||v.string.rfind("\x1fnift:collection:",0)==0)return v.string;return {};};
             const auto ai=identity(a),bi=identity(b); if(ai.empty()||bi.empty()){error="same: operands must be identity-bearing values";return false;} out=json::Document(ai==bi);return true;
+        }
+
+        {
+            const auto lp=text.find('(');
+            if(lp!=std::string::npos&&text.back()==')'){const std::string target=trim_copy(text.substr(0,lp));const auto dot=target.rfind('.');if(dot!=std::string::npos){
+                const std::string root=target.substr(0,dot), method=target.substr(dot+1); VariableBinding* rb=find_binding(root);
+                if(rb&&rb->value&&rb->value->is_string()&&rb->value->string.rfind("\x1fnift:collection:",0)==0){
+                    auto ci=collection_instances_.find(rb->value->string.substr(17));if(ci==collection_instances_.end()){error="invalid collection";return false;}auto c=ci->second;
+                    bool ok=false;std::vector<bool> quoted_args;auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),ok,&quoted_args);if(!ok){error="malformed collection method arguments";return false;}
+                    auto need_mut=[&](){if(!rb->mutable_binding){error="cannot mutate const collection: "+root;return false;}return true;};
+                    auto scalar_order=[](const json::Document&a,const json::Document&b,int& cmp){if(a.is_number()&&b.is_number()){cmp=a.num<b.num?-1:a.num>b.num?1:0;return true;}if(a.is_string()&&b.is_string()){cmp=a.string<b.string?-1:a.string>b.string?1:0;return true;}return false;};
+                    if(method=="size"||method=="empty"||method=="clear"){if(!args.empty()){error=method+": expected no arguments";return false;}size_t n=(c->kind==CollectionKind::Map||c->kind==CollectionKind::SortedMap)?c->entries.size():c->values.size();if(method=="size")out=json::Document((double)n);else if(method=="empty")out=json::Document(n==0);else{if(!need_mut())return false;c->values.clear();c->entries.clear();out=json::Document(nullptr);last_expression_mutation_=true;}return true;}
+                    if(c->kind==CollectionKind::Stack||c->kind==CollectionKind::Queue||c->kind==CollectionKind::PriQue){
+                        if(method=="push"){if(args.size()!=1){error="push: expected one value";return false;}if(!need_mut())return false;json::Document v;if(quoted_args.size()>0&&quoted_args[0])v=json::Document(args[0]);else if(!eval(args[0],v,depth+1))return false;c->values.push_back(v);if(c->kind==CollectionKind::PriQue){std::stable_sort(c->values.begin(),c->values.end(),[&](const auto&a,const auto&b){int z=0;return scalar_order(a,b,z)&&z<0;});}out=v;last_expression_mutation_=true;return true;}
+                        if(method=="pop"||method=="top"||method=="front"){if(!args.empty()){error=method+": expected no arguments";return false;}if(c->values.empty()){error=method+": collection is empty";return false;}size_t i=(c->kind==CollectionKind::Stack&&(method=="pop"||method=="top"))?c->values.size()-1:0;out=c->values[i];if(method=="pop"){if(!need_mut())return false;c->values.erase(c->values.begin()+i);last_expression_mutation_=true;}return true;}
+                        if(method=="contains"){if(args.size()!=1){error="contains: expected one value";return false;}json::Document v;if(quoted_args.size()>0&&quoted_args[0])v=json::Document(args[0]);else if(!eval(args[0],v,depth+1))return false;bool f=false;for(auto&w:c->values)if(structural_equal(v,w)){f=true;break;}out=json::Document(f);return true;}
+                    }
+                    if(c->kind==CollectionKind::Set||c->kind==CollectionKind::SortedSet){
+                        if(method=="add"||method=="contains"||method=="remove"){if(args.size()!=1){error=method+": expected one value";return false;}json::Document v;if(quoted_args.size()>0&&quoted_args[0])v=json::Document(args[0]);else if(!eval(args[0],v,depth+1))return false;if(!(v.is_bool()||v.is_number()||v.is_string())){error=method+": set values must be bool, number, or string";return false;}size_t i=0;for(;i<c->values.size();++i)if(structural_equal(c->values[i],v))break;if(method=="contains"){out=json::Document(i<c->values.size());return true;}if(!need_mut())return false;if(method=="add"&&i==c->values.size()){c->values.push_back(v);if(c->kind==CollectionKind::SortedSet)std::stable_sort(c->values.begin(),c->values.end(),[&](const auto&a,const auto&b){int z=0;if(!scalar_order(a,b,z)){error="sorted_set: incomparable values";return false;}return z<0;});}else if(method=="remove"&&i<c->values.size())c->values.erase(c->values.begin()+i);out=v;last_expression_mutation_=true;return true;}
+                    }
+                    if(c->kind==CollectionKind::Map||c->kind==CollectionKind::SortedMap){
+                        if(method=="set"){if(args.size()!=2){error="set: expected key and value";return false;}if(!need_mut())return false;json::Document k,v;if(quoted_args.size()>0&&quoted_args[0])k=json::Document(args[0]);else if(!eval(args[0],k,depth+1))return false;if(quoted_args.size()>1&&quoted_args[1])v=json::Document(args[1]);else if(!eval(args[1],v,depth+1))return false;if(!(k.is_bool()||k.is_number()||k.is_string())){error="map: key must be bool, number, or string";return false;}size_t i=0;for(;i<c->entries.size();++i)if(structural_equal(c->entries[i].first,k))break;if(i<c->entries.size())c->entries[i].second=v;else c->entries.push_back({k,v});if(c->kind==CollectionKind::SortedMap)std::stable_sort(c->entries.begin(),c->entries.end(),[&](const auto&a,const auto&b){int z=0;if(!scalar_order(a.first,b.first,z)){error="sorted_map: incomparable keys";return false;}return z<0;});out=v;last_expression_mutation_=true;return true;}
+                        if(method=="contains"||method=="get"||method=="remove"){if(args.size()!=1){error=method+": expected one key";return false;}json::Document k;if(quoted_args.size()>0&&quoted_args[0])k=json::Document(args[0]);else if(!eval(args[0],k,depth+1))return false;size_t i=0;for(;i<c->entries.size();++i)if(structural_equal(c->entries[i].first,k))break;if(method=="contains"){out=json::Document(i<c->entries.size());return true;}if(i==c->entries.size()){error=method+": key not found";return false;}out=c->entries[i].second;if(method=="remove"){if(!need_mut())return false;c->entries.erase(c->entries.begin()+i);last_expression_mutation_=true;}return true;}
+                    }
+                }
+            }}
         }
 
         {
@@ -1453,6 +1529,24 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                 }
                 auto ci = callables_.find(call_name);
                 if(ci==callables_.end()&&!receiver_stack_.empty()){auto sd=structs_.find(receiver_stack_.back()->type_name);if(sd!=structs_.end()){auto mi=sd->second.methods.find(call_name);if(mi!=sd->second.methods.end()&&!mi->second.constructor){bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(!aok){error="malformed method arguments";return false;}std::vector<json::Document> av;for(std::size_t ai=0;ai<ar.size();++ai){json::Document v;if(ai<aq.size()&&aq[ai])v=json::Document(ar[ai]);else if(!eval(ar[ai],v,depth+1))return false;av.push_back(std::move(v));}return invoke_struct_method(receiver_stack_.back(),mi->second,av,ar,out,error);}}}
+                // Indirect first-class callable invocation.
+                if (ci == callables_.end()) {
+                    VariableBinding* cb=find_binding(call_name);
+                    if(cb&&cb->value&&cb->value->is_string()&&cb->value->string.rfind("\x1fnift:callable:",0)==0){
+                        const std::string tag=cb->value->string;
+                        if(tag.rfind("\x1fnift:callable:named:",0)==0){ci=callables_.find(tag.substr(21));}
+                        else if(tag.rfind("\x1fnift:callable:lambda:",0)==0){
+                            auto li=lambda_instances_.find(tag.substr(22));if(li==lambda_instances_.end()){error="invalid lambda";return false;}auto fn=li->second;
+                            bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(!aok||ar.size()!=fn->params.size()){error="lambda argument count mismatch";return false;}
+                            std::vector<json::Document> av;for(size_t ai=0;ai<ar.size();++ai){json::Document v;if(!eval(ar[ai],v,depth+1))return false;av.push_back(std::move(v));}
+                            push_variable_scope();auto& sc=variable_scopes_.back();for(const auto& kv:fn->captures)sc[kv.first]=kv.second;for(size_t ai=0;ai<av.size();++ai){auto sp=std::make_shared<json::Document>(std::move(av[ai]));sc[fn->params[ai]]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
+                            bool okcall=true;
+                            if(fn->block){++function_call_depth_;std::string program,pe;if(!translate_function_program(fn->body,program,pe)){error=pe;okcall=false;}auto nested=okcall?parse(program,fn->source_path,1):RenderResult{};--function_call_depth_;if(okcall&&!nested.ok){error=nested.error.message;okcall=false;}else if(okcall&&pending_control_.kind==ControlFlow::Return){out=pending_control_.value?*pending_control_.value:json::Document(nullptr);pending_control_={};}else if(okcall)out=json::Document(nullptr);}
+                            else okcall=eval(fn->body,out,depth+1);
+                            pop_variable_scope();return okcall;
+                        }
+                    }
+                }
                 if (ci != callables_.end()) {
                     if (callable_call_depth_ >= kMaxCallableDepth) { error = "callable recursion depth exceeded: " + call_name; return false; }
                     bool args_ok=false; std::vector<bool> quoted_args; auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),args_ok,&quoted_args); if(!args_ok||args.size()!=ci->second.params.size()){error="callable argument count mismatch: "+call_name;return false;}
@@ -1495,6 +1589,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
 
         if (text.rfind("copy(",0)==0 && text.back()==')') {
             json::Document source; if(!eval(text.substr(5,text.size()-6),source,depth+1))return false;
+            if(source.is_string()&&source.string.rfind("\x1fnift:collection:",0)==0){auto it=collection_instances_.find(source.string.substr(17));if(it==collection_instances_.end()){error="copy: invalid collection";return false;}auto clone=std::make_shared<CollectionInstance>(*it->second);const std::string id=std::to_string(next_collection_instance_id_++);collection_instances_[id]=clone;out=json::Document(std::string("\x1fnift:collection:")+id);return true;}
             if(source.is_string()&&source.string.rfind("\x1fnift:struct:",0)==0){auto it=struct_instances_.find(source.string.substr(13));if(it==struct_instances_.end()){error="copy: invalid struct instance";return false;}auto clone=std::make_shared<StructInstance>();clone->type_name=it->second->type_name;for(const auto& f:it->second->fields){auto sp=std::make_shared<json::Document>(*f.second.value);clone->fields.emplace(f.first,VariableBinding{sp,f.second.type,f.second.mutable_binding,f.second.deep_readonly});}const std::string id=std::to_string(next_struct_instance_id_++);struct_instances_[id]=clone;out=json::Document(std::string("\x1fnift:struct:")+id);return true;}
             out=source; return true;
         }
@@ -1670,7 +1765,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                 return false;
             }
             auto rebound = std::make_shared<json::Document>(std::move(assigned));
-            binding->value = rebound;
+            binding->rebind(rebound);
             if (depth == 0) last_expression_mutation_ = true;
             out = *rebound;
             return true;
@@ -2638,6 +2733,19 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 json::Document collection_value; std::string collection_error;
                 if (!evaluate_collection_value(collection_expression, collection_value, collection_error)) { fail(source_path, source, i, "@for collection: " + collection_error); break; }
                 collection = std::make_shared<const json::Document>(std::move(collection_value));
+            }
+
+            // Materialize internal v4.3 collections for the existing @for engine;
+            // iterators remain an implementation detail.
+            if(collection->is_string()&&collection->string.rfind("\x1fnift:collection:",0)==0){
+                auto ci=collection_instances_.find(collection->string.substr(17));
+                if(ci==collection_instances_.end()){fail(source_path,source,i,"@for collection: invalid collection");break;}
+                json::Document materialized;
+                if(ci->second->kind==CollectionKind::Map||ci->second->kind==CollectionKind::SortedMap){
+                    materialized=json::Document::make_object();
+                    for(const auto& e:ci->second->entries){if(!e.first.is_string()){fail(source_path,source,i,"@for map currently requires string keys");break;}materialized.object.push_back({e.first.string,e.second});}
+                }else{materialized=json::Document::make_array();materialized.array=ci->second->values;if(ci->second->kind==CollectionKind::Stack)std::reverse(materialized.array.begin(),materialized.array.end());}
+                if(!result_.ok)break;collection=std::make_shared<const json::Document>(std::move(materialized));
             }
 
             const auto body = normalize_control_block_body(
