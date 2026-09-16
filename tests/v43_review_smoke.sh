@@ -88,17 +88,41 @@ run '$[u := [3,1,2,1]]$[u.sort()]@for(x : u){$[x]}|'
 run '$[v := [3,1,2]]$[v.sort((x,y) => x > y)]@for(x : v){$[x]}|'
 [[ "$(body)" == *"321|"* ]]
 
-# --- @for over a map uses object tuple syntax; numeric map keys are not @for-iterable. ---
+# --- @for over a map uses object tuple syntax; numeric/bool keys are iterable
+# (stringified in the object @for binding) and lookup keeps the typed key. ---
 run '$[m := map()]$[m.set("a",1)]$[m.set("b",2)]@for((k,v) : m){$[k]=$[v]}|'
 [[ "$(body)" == *"a=1b=2|"* ]]
-run '$[m := map()]$[m.set(1,"a")]@for((k,v) : m){$[k]}$[m.get(1)]'
-! "$NIFT_BIN" build --all >/dev/null 2>&1
+run '$[m := map()]$[m.set(1,"one")]$[m.set(2,"two")]@for((k,v) : m){$[k]=$[v]}|$[m.get(1)]'
+[[ "$(body)" == *"1=one2=two|one"* ]]
 
-# --- Struct self-reference cycles are currently permitted (contract gap, no crash). ---
+# --- Forbidden struct self-reference cycle is now rejected deterministically. ---
 cat > content/index.html <<'EOT'
 @struct(other) { x := 0 }
 @struct(node) { next := other() }
-$[a := node()]$[a.next = a]$[a.next == a]
+$[a := node()]$[a.next = a]
 EOT
-"$NIFT_BIN" build --all >/dev/null
+! "$NIFT_BIN" build --all >/dev/null 2>&1
+
+# --- Mixed int64/double comparison across the full range (CP5 contract). ---
+run '$[9223372036854775807 < 1e19],$[9223372036854775807 < 9223372036854775808.0],$[-9223372036854775808 > -1e19]'
+o=$(body); [[ "$o" == *"true,true,true"* ]]
+run '$[9007199254740992 == 9007199254740992.0],$[9007199254740993 == 9007199254740992.0],$[9007199254740993 > 9007199254740992.0]'
+o=$(body); [[ "$o" == *"true,false,true"* ]]
+# Equality and ordering must agree.
+run '$[x := 9007199254740992]$[y := 9007199254740992.0]$[x==y],$[x<y],$[x>y]'
+o=$(body); [[ "$o" == *"true,false,false"* ]]
+
+# --- Forbidden user-visible cycles must be rejected deterministically (CP8/CP20/CP25). ---
+run '@struct(o){x:=0}@struct(n){next:=o()}$[a:=n()]$[a.next=a]'; ! "$NIFT_BIN" build --all >/dev/null 2>&1
+run '@struct(o){x:=0}@struct(n){next:=o()}$[a:=n()]$[b:=n()]$[a.next=b]$[b.next=a]'; ! "$NIFT_BIN" build --all >/dev/null 2>&1
+# Longer cycle a->b->c->a.
+run '@struct(o){x:=0}@struct(n){next:=o()}$[a:=n()]$[b:=n()]$[c:=n()]$[a.next=b]$[b.next=c]$[c.next=a]'; ! "$NIFT_BIN" build --all >/dev/null 2>&1
+# Collection cycle: q holds a, then a.next = q.
+run '@struct(n){next:=stack()}$[a:=n()]$[q:=stack()]$[q.push(a)]$[a.next=q]'; ! "$NIFT_BIN" build --all >/dev/null 2>&1
+# Acyclic sharing and aliases remain legal.
+run '@struct(o){x:=0}@struct(n){next:=o()}$[a:=n()]$[b:=n()]$[c:=n()]$[a.next=b]$[b.next=c]$[a.next.next==c]'
 o=$(body); [[ "$o" == *"true"* ]]
+run '@struct(o){x:=0}@struct(n){next:=o()}$[a:=n()]$[d:=a]$[d==a]'
+o=$(body); [[ "$o" == *"true"* ]]
+# Callables are leaves: storing a lambda in a collection is not a user cycle.
+run '$[xs:=[]]$[xs.push(() => 7)]$[f:=xs[0]]$[f()]'; o=$(body); [[ "$o" == *"7"* ]]
