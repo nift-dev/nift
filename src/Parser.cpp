@@ -1669,6 +1669,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
         {
             auto call_args=[&](const std::string& name,std::vector<std::string>& args,std::vector<bool>& quoted)->bool{
                 if(text.rfind(name+"(",0)!=0||text.back()!=')')return false;
+                std::size_t close=0;if(!find_balanced(text,name.size(),'(',')',close)||close!=text.size()-1)return false;
                 bool ok=false;args=parse_parameters(text.substr(name.size()+1,text.size()-name.size()-2),ok,&quoted);
                 if(!ok){error=name+": malformed arguments";}return ok;
             };

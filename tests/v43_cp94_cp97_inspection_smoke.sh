@@ -82,4 +82,15 @@ fi
 printf 'print("q\\"w\\nc".stringify())\n' > "$td/esc.nift"
 [[ "$(cd "$td" && "$NIFT" run esc.nift)" == '"q\"w\nc"' ]]
 
+# A filesystem primitive whose call is not terminal (embedded in a larger
+# expression) falls through to the ordinary machinery instead of reporting a
+# misleading "malformed arguments" error, and presentation composition over
+# ls() still works.
+printf 'x := ls()\nprint(x.prettify() == ls().prettify())\nprint(x.size())\n' > "$td/prim.nift"
+prim="$(cd "$td" && "$NIFT" run prim.nift)"
+[[ "$(echo "$prim" | sed -n 1p)" == 'true' ]]
+[[ "$(echo "$prim" | sed -n 2p)" -ge 1 ]]
+printf 'print(exists(".") == true)\nprint(ls().highlight() == ls().stringify())\n' > "$td/prim2.nift"
+[[ "$(cd "$td" && "$NIFT" run prim2.nift)" == $'true\ntrue' ]]
+
 echo 'CP94-CP97 inspection smoke: PASS'
