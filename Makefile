@@ -516,6 +516,7 @@ test-v43-language: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_review_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp51_cp70_scripting_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp71_cp87_native_io_smoke.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp94_cp97_inspection_smoke.sh
 
 # Fail-closed guard: every maintained workflow's official macOS matrix entry
 # (arm64 -> macos-latest, x86-64 -> macos-26-intel) must agree on the runner,

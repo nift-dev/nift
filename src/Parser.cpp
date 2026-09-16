@@ -993,6 +993,104 @@ std::string Parser::render_expression_value(const json::Document& value) const {
     return value.dump(0);
 }
 
+bool Parser::serialize_value(const json::Document& value, bool pretty, std::string& output, std::string& error, int depth) const {
+    if (depth > 128) { error = "value serialization depth exceeded"; return false; }
+    const std::string pad(pretty ? static_cast<std::size_t>(depth * 2) : 0, ' ');
+    const std::string child_pad(pretty ? static_cast<std::size_t>((depth + 1) * 2) : 0, ' ');
+    auto append_sequence = [&](const std::vector<json::Document>& values, const std::string& open, const std::string& close, std::string& dst)->bool {
+        dst += open;
+        if (pretty && !values.empty()) dst += "\n";
+        for (std::size_t i = 0; i < values.size(); ++i) {
+            if (pretty) dst += child_pad;
+            std::string item;
+            if (!serialize_value(values[i], pretty, item, error, depth + 1)) return false;
+            dst += item;
+            if (i + 1 < values.size()) dst += ",";
+            if (pretty) dst += "\n";
+        }
+        if (pretty && !values.empty()) dst += pad;
+        dst += close;
+        return true;
+    };
+    if (value.is_null() || value.is_bool() || value.is_number()) { output += value.dump(0); return true; }
+    if (value.is_array()) return append_sequence(value.array, "[", "]", output);
+    if (value.is_object()) {
+        output += "{";
+        if (pretty && !value.object.empty()) output += "\n";
+        for (std::size_t i = 0; i < value.object.size(); ++i) {
+            if (pretty) output += child_pad;
+            output += json::Document(value.object[i].first).dump(0);
+            output += pretty ? ": " : ":";
+            std::string item;
+            if (!serialize_value(value.object[i].second, pretty, item, error, depth + 1)) return false;
+            output += item;
+            if (i + 1 < value.object.size()) output += ",";
+            if (pretty) output += "\n";
+        }
+        if (pretty && !value.object.empty()) output += pad;
+        output += "}";
+        return true;
+    }
+    if (!value.is_string()) { error = "value is not serializable"; return false; }
+    const std::string& ref = value.string;
+    if (ref.rfind("\x1fnift:stream:", 0) == 0 || ref.rfind("\x1fnift:callable:", 0) == 0) {
+        error = "opaque runtime value is not serializable"; return false;
+    }
+    if (ref.rfind("\x1fnift:collection:", 0) == 0) {
+        auto it = collection_instances_.find(ref.substr(17));
+        if (it == collection_instances_.end()) { error = "invalid collection value"; return false; }
+        const auto& c = *it->second;
+        std::string name;
+        switch (c.kind) {
+            case CollectionKind::Stack: name="stack"; break; case CollectionKind::Queue: name="queue"; break;
+            case CollectionKind::PriQue: name="prique"; break; case CollectionKind::Map: name="map"; break;
+            case CollectionKind::SortedMap: name="sorted_map"; break; case CollectionKind::Set: name="set"; break;
+            case CollectionKind::SortedSet: name="sorted_set"; break;
+        }
+        output += name + "(";
+        if (c.kind == CollectionKind::Map || c.kind == CollectionKind::SortedMap) {
+            output += "[";
+            if (pretty && !c.entries.empty()) output += "\n";
+            for (std::size_t i=0;i<c.entries.size();++i) {
+                if (pretty) output += child_pad;
+                output += "[";
+                std::string k,v;
+                if (!serialize_value(c.entries[i].first, pretty, k, error, depth+1) || !serialize_value(c.entries[i].second, pretty, v, error, depth+1)) return false;
+                output += k + (pretty ? ", " : ",") + v + "]";
+                if (i+1<c.entries.size()) output += ",";
+                if (pretty) output += "\n";
+            }
+            if (pretty && !c.entries.empty()) output += pad;
+            output += "]";
+        } else {
+            if (!append_sequence(c.values, "[", "]", output)) return false;
+        }
+        output += ")";
+        return true;
+    }
+    if (ref.rfind("\x1fnift:struct:", 0) == 0) {
+        auto it=struct_instances_.find(ref.substr(13));
+        if(it==struct_instances_.end()){error="invalid struct value";return false;}
+        auto sd=structs_.find(it->second->type_name);
+        output += it->second->type_name + "{";
+        bool first=true;
+        for(const auto& field : sd->second.fields){
+            if(field.private_member) continue;
+            auto fv=it->second->fields.find(field.name); if(fv==it->second->fields.end()) continue;
+            if(pretty){output += first?"\n":""; output += child_pad;} else if(!first) output += ",";
+            output += field.name + (pretty?": ":":");
+            std::string item; if(!serialize_value(*fv->second.value,pretty,item,error,depth+1))return false; output += item;
+            if(pretty) output += ",\n";
+            first=false;
+        }
+        if(pretty&&!first) output += pad;
+        output += "}";
+        return true;
+    }
+    output += value.dump(0);
+    return true;
+}
+
 bool Parser::evaluate_collection_value(const std::string& expression, json::Document& value, std::string& error) {
     const std::string text = trim_copy(expression);
     if (text.empty()) { error = "collection expression cannot be empty"; return false; }
@@ -1525,11 +1623,25 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             if(call_args("touch",args,q)){fs::path p;if(args.size()!=1||!checked_path("touch",args,q,0,p))return false;std::ofstream f(p,std::ios::app);if(!f){error="touch: cannot open path";return false;}out=json::Document(nullptr);return true;}
             if(call_args("remove",args,q)){fs::path rp;if(args.size()!=1||!checked_path("remove",args,q,0,rp))return false;std::error_code ec;if(fs::is_directory(rp,ec)){error="remove: directories are not removed recursively";return false;}if(!fs::remove(rp,ec)&&ec){error="remove: "+ec.message();return false;}out=json::Document(nullptr);return true;}
             if(text.find(',')!=std::string::npos && (call_args("copy",args,q)||call_args("move",args,q))){const bool mv=text.rfind("move(",0)==0;fs::path a,b;if(args.size()!=2||!checked_path(mv?"move":"copy",args,q,0,a)||!checked_path(mv?"move":"copy",args,q,1,b))return false;std::error_code ec;if(mv)fs::rename(a,b,ec);else fs::copy_file(a,b,fs::copy_options::overwrite_existing,ec);if(ec){error=std::string(mv?"move: ":"copy: ")+ec.message();return false;}out=json::Document(nullptr);return true;}
+            if(call_args("cat",args,q)){fs::path p;if(args.size()!=1||!checked_path("cat",args,q,0,p))return false;std::ifstream f(p,std::ios::binary);if(!f){error="cat: cannot open path";return false;}std::ostringstream ss;ss<<f.rdbuf();{static std::mutex cat_mutex;std::lock_guard<std::mutex> lock(cat_mutex);std::cout<<ss.str();std::cout.flush();}out=json::Document(nullptr);return true;}
+            if(call_args("ls",args,q)){if(args.size()>1){error="ls: expected zero or one path";return false;}fs::path p;if(args.empty())p=standalone_script_host_?fs::current_path():host_.root();else if(!checked_path("ls",args,q,0,p))return false;std::error_code ec;if(!fs::is_directory(p,ec)||ec){error="ls: path is not a readable directory";return false;}std::vector<std::string> names;for(fs::directory_iterator it(p,ec),end;!ec&&it!=end;it.increment(ec))names.push_back(it->path().filename().generic_string());if(ec){error="ls: "+ec.message();return false;}std::sort(names.begin(),names.end());out=json::Document::make_array();for(const auto& n:names)out.array.emplace_back(n);return true;}
             if(call_args("open",args,q)){fs::path p;if(args.size()!=1||!checked_path("open",args,q,0,p))return false;std::ifstream f(p,std::ios::binary);if(!f){error="open: cannot open path";return false;}std::ostringstream ss;ss<<f.rdbuf();out=json::Document(ss.str());return true;}
             if(call_args("ifs",args,q)||call_args("ofs",args,q)){const bool output=text.rfind("ofs(",0)==0;fs::path p;if(args.size()!=1||!checked_path(output?"ofs":"ifs",args,q,0,p))return false;auto st=std::make_shared<StreamInstance>();st->kind=output?StreamInstance::Kind::Output:StreamInstance::Kind::Input;if(output){st->output=std::make_shared<std::ofstream>(p,std::ios::binary|std::ios::trunc);if(!*st->output){error="ofs: cannot open path";return false;}}else{st->input=std::make_shared<std::ifstream>(p,std::ios::binary);if(!*st->input){error="ifs: cannot open path";return false;}}auto id=std::to_string(next_stream_instance_id_++);stream_instances_[id]=st;out=json::Document(std::string("\x1fnift:stream:")+id);return true;}
             if(call_args("close",args,q)){if(args.size()!=1){error="close: expected stream";return false;}json::Document d;if(!arg_value(args,q,0,d)||!d.is_string()||d.string.rfind("\x1fnift:stream:",0)!=0){error="close: expected stream";return false;}auto it=stream_instances_.find(d.string.substr(13));if(it==stream_instances_.end()){error="close: invalid stream";return false;}if(it->second->closed){error="close: stream already closed";return false;}if(it->second->input)it->second->input->close();if(it->second->output)it->second->output->close();it->second->closed=true;out=json::Document(nullptr);return true;}
             if(call_args("print",args,q)){if(args.size()!=1){error="print: expected one value";return false;}json::Document d;if(!arg_value(args,q,0,d))return false;if(d.is_string()&&q.size()>0&&q[0]&&d.string.find("$[")!=std::string::npos){std::string r,e;if(!interpolate_parameter(d.string,r,e)){error="print: "+e;return false;}d=json::Document(r);}if(d.is_array()||d.is_object()||(d.is_string()&&d.string.rfind("\x1fnift:",0)==0)){error="print: value is not directly renderable";return false;}const std::string rendered=render_expression_value(d);{static std::mutex print_mutex;std::lock_guard<std::mutex> lock(print_mutex);std::cout<<rendered<<'\n';std::cout.flush();}out=json::Document(nullptr);return true;}
             if(call_args("read",args,q)){if(!args.empty()){error="read: expected no arguments";return false;}if(!standalone_script_host_){error="read: interactive input is only available under nift run/nift sh";return false;}std::string line;if(!std::getline(std::cin,line)){if(std::cin.eof()){std::cin.clear();out=json::Document(nullptr);return true;}error="read: input failure";return false;}out=json::Document(line);return true;}
+        }
+
+        // v4.3 canonical value formatting. The method target may itself be an expression,
+        // which intentionally enables composition such as ls().prettify().
+        for (const auto& method : {std::string("stringify"), std::string("prettify")}) {
+            const std::string suffix = "." + method + "()";
+            if (text.size() > suffix.size() && text.compare(text.size()-suffix.size(), suffix.size(), suffix) == 0) {
+                const std::string target = trim_copy(text.substr(0,text.size()-suffix.size()));
+                json::Document v; if(!eval(target,v,depth+1)) return false;
+                std::string rendered; if(!serialize_value(v,method=="prettify",rendered,error)) return false;
+                out=json::Document(rendered); return true;
+            }
         }
 
         // v4.3 collection constructors. Collections are identity-bearing runtime
@@ -2316,7 +2428,27 @@ RenderResult Parser::run_script(const std::string& source, const fs::path& sourc
 RenderResult Parser::run_statement(const std::string& source, const fs::path& source_path) {
     if(variable_scopes_.empty()) variable_scopes_.emplace_back();
     standalone_script_host_=true; strict_script_mode_=true; result_ = RenderResult{}; pending_control_={}; function_call_depth_=1;
-    auto rr=execute_native_program(source,source_path,0); function_call_depth_=0; strict_script_mode_=false; rr.output.clear(); pending_control_={}; return rr;
+    const std::string t=trim_copy(source);
+    // A REPL is also an inspector: a single expression is evaluated directly so
+    // arrays/collections/structs can be safely displayed without routing through
+    // template rendering (which intentionally rejects compound values).
+    const bool declaration = t.rfind("fn(",0)==0 || t.rfind("struct(",0)==0 || t.rfind("if(",0)==0 ||
+        t.rfind("for(",0)==0 || t.rfind("while(",0)==0 || t.rfind("return",0)==0 || t.rfind("export(",0)==0;
+    bool assignment=false; bool quoted=false; char qc=0; int par=0,br=0,bc=0;
+    for(std::size_t i=0;i<t.size();++i){char c=t[i];if(quoted){if(c=='\\')++i;else if(c==qc)quoted=false;continue;}if(c=='\''||c=='"'){quoted=true;qc=c;continue;}if(c=='(')++par;else if(c==')')--par;else if(c=='[')++br;else if(c==']')--br;else if(c=='{')++bc;else if(c=='}')--bc;else if(!par&&!br&&!bc&&c=='='){char a=i?t[i-1]:0,b=i+1<t.size()?t[i+1]:0;if(a!='='&&a!='!'&&a!='<'&&a!='>'&&b!='='){assignment=true;break;}}}
+    if(!declaration&&!assignment&&!t.empty()){
+        json::Document v; std::string error;
+        if(evaluate_expression(t,v,error)){
+            RenderResult rr; std::string shown;
+            const bool pretty=t.size()>=11&&t.compare(t.size()-11,11,".prettify()")==0;
+            if(pretty&&v.is_string()) shown=v.string;
+            else if(!serialize_value(v,false,shown,error)){rr.ok=false;rr.error.message=error;function_call_depth_=0;strict_script_mode_=false;return rr;}
+            rr.output=shown; function_call_depth_=0; strict_script_mode_=false; return rr;
+        }
+        // If direct evaluation fails, let the native statement path provide the
+        // canonical diagnostic; it may be a valid statement form not recognized above.
+    }
+    auto rr=execute_native_program(source,source_path,0); function_call_depth_=0; strict_script_mode_=false; pending_control_={}; return rr;
 }
 
 void Parser::reset_script_control() { pending_control_={}; result_=RenderResult{}; }
