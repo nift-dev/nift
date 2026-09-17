@@ -1794,7 +1794,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                     method=="insert"||method=="insert_before"||method=="insert_after"||method=="prepend"||method=="append"||
                     method=="copy"||method=="move"||method=="remove"||method=="cat"||
                     method=="keys"||method=="values"||method=="entries"||method=="has"||method=="get"||method=="merge"||
-                    method=="map"||method=="filter"||method=="reduce"||method=="any"||method=="all"||method=="find"||method=="find_index"||method=="count"||method=="sort_by"||method=="group_by"||method=="unique"||method=="flatten"||method=="sum"||method=="min"||method=="max";
+                    method=="map"||method=="filter"||method=="reduce"||method=="any"||method=="all"||method=="find"||method=="find_index"||method=="count"||method=="sort_by"||method=="group_by"||method=="unique"||method=="flatten"||method=="sum"||method=="min"||method=="max"||method=="from_entries"||method=="index_by"||method=="pick"||method=="omit"||method=="merge_deep";
                 if (known) {
                     // Fast path: read-only container methods on a pure JSON-path
                     // receiver (e.g. project.files.size()) resolve through the
@@ -1923,6 +1923,16 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                             }
                             return true;
                         }
+                        if(method=="pick"||method=="omit") {
+                            if(args.size()!=1){error=method+": expected one array of keys";return false;}
+                            json::Document keys;if(!eval_arg(0,keys)||!keys.is_array()){error=method+": keys must be an array";return false;}
+                            std::vector<std::string> wanted;
+                            for(const auto& k:keys.array){if(!k.is_string()){error=method+": keys must be strings";return false;}if(std::find(wanted.begin(),wanted.end(),k.string)==wanted.end())wanted.push_back(k.string);}
+                            json::Document result=json::Document::make_object();
+                            if(method=="pick"){for(const auto& k:wanted){auto it=std::find_if(base.object.begin(),base.object.end(),[&](const auto& kv){return kv.first==k;});if(it!=base.object.end())result[it->first]=it->second;}}
+                            else {for(const auto& kv:base.object)if(std::find(wanted.begin(),wanted.end(),kv.first)==wanted.end())result[kv.first]=kv.second;}
+                            out=std::move(result);return true;
+                        }
                         if(method=="has"||method=="get") {
                             if((method=="has"&&args.size()!=1)||(method=="get"&&(args.empty()||args.size()>2))){error=method+": expected key"+(method=="get"?" and optional default":"");return false;}
                             json::Document k;if(!eval_arg(0,k)||!k.is_string()){error=method+": key must be a string";return false;}
@@ -1932,6 +1942,23 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                             if(args.size()==2)return eval_arg(1,out);
                             out=json::Document(nullptr);return true;
                         }
+                        if(method=="merge_deep") {
+                            if(args.size()!=1){error="merge_deep: expected one object";return false;}
+                            json::Document rhs;if(!eval_arg(0,rhs)||!rhs.is_object()){error="merge_deep: argument must be an object";return false;}
+                            std::function<bool(const json::Document&,const json::Document&,json::Document&,int)> merge_rec;
+                            merge_rec=[&](const json::Document& lhs,const json::Document& r,json::Document& result,int level)->bool{
+                                if(level>64){error="merge_deep: maximum merge depth exceeded";return false;}
+                                if(!(lhs.is_object()&&r.is_object())){result=r;return true;}
+                                result=lhs;
+                                for(const auto& kv:r.object){
+                                    auto it=std::find_if(result.object.begin(),result.object.end(),[&](const auto& x){return x.first==kv.first;});
+                                    if(it!=result.object.end()&&it->second.is_object()&&kv.second.is_object()){json::Document merged;if(!merge_rec(it->second,kv.second,merged,level+1))return false;it->second=std::move(merged);}
+                                    else result[kv.first]=kv.second;
+                                }
+                                return true;
+                            };
+                            json::Document result;if(!merge_rec(base,rhs,result,0))return false;out=std::move(result);return true;
+                        }
                         if(method=="merge") {
                             if(args.size()!=1){error="merge: expected one object";return false;}json::Document rhs;if(!eval_arg(0,rhs)||!rhs.is_object()){error="merge: argument must be an object";return false;}
                             out=base;for(const auto& kv:rhs.object)out[kv.first]=kv.second;return true;
@@ -1939,10 +1966,34 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                     }
                     if(base.is_array()) {
                         const auto& a=base.array;
+                        if(method=="from_entries"){
+                            if(!no_args())return false;
+                            json::Document result=json::Document::make_object();
+                            for(const auto& entry:a){
+                                if(!entry.is_object()||entry.object.size()!=2||!entry.has("key")||!entry.has("value")){error="from_entries: each entry must be an object containing exactly key and value";return false;}
+                                const json::Document *key=nullptr,*value=nullptr;
+                                for(const auto& kv:entry.object){if(kv.first=="key")key=&kv.second;else if(kv.first=="value")value=&kv.second;}
+                                std::string rendered;if(!key||!value||!generated_object_key(*key,rendered))return false;
+                                if(result.has(rendered)){error="from_entries: duplicate generated key '"+rendered+"'";return false;}
+                                result[rendered]=*value;
+                            }
+                            out=std::move(result);return true;
+                        }
                         auto invoke_value_callback=[&](const std::string& cbexpr,const std::vector<json::Document>& av,json::Document& result)->bool{
                             json::Document cb;if(!eval(cbexpr,cb,depth+1))return false;if(!cb.is_string()||cb.string.rfind("\x1fnift:callable:",0)!=0){error="transformation: callback must be callable";return false;}
                             push_variable_scope();auto& sc=variable_scopes_.back();auto csp=std::make_shared<json::Document>(cb);sc["__nift_cb"]=VariableBinding{csp,nift_binding_type(*csp),false,false};std::string call="__nift_cb(";
                             for(size_t ai=0;ai<av.size();++ai){if(ai)call+=",";std::string n="__nift_arg"+std::to_string(ai);auto sp=std::make_shared<json::Document>(av[ai]);sc[n]=VariableBinding{sp,nift_binding_type(*sp),false,false};call+=n;}call+=")";bool r=eval(call,result,depth+1);pop_variable_scope();return r;};
+                        if(method=="index_by"){
+                            if(args.size()!=1){error="index_by: expected one selector";return false;}
+                            json::Document result=json::Document::make_object();
+                            for(const auto& v:a){
+                                json::Document key;if(!invoke_value_callback(args[0],{v},key))return false;
+                                std::string rendered;if(!generated_object_key(key,rendered))return false;
+                                if(result.has(rendered)){error="index_by: duplicate generated key '"+rendered+"'";return false;}
+                                result[rendered]=v;
+                            }
+                            out=std::move(result);return true;
+                        }
                         if(method=="map"||method=="filter"||method=="reduce"||method=="any"||method=="all"||method=="find"||method=="find_index"||method=="count"||method=="sort_by"||method=="group_by"){
                             if((method=="reduce"&&args.size()!=2)||(method!="reduce"&&args.size()!=1)){error=method+": invalid arguments";return false;}json::Document arr=json::Document::make_array(),acc;if(method=="reduce"&&!eval_arg(1,acc))return false;double cnt=0;std::vector<std::pair<json::Document,json::Document>> keyed;
                             for(size_t vi=0;vi<a.size();++vi){const auto&v=a[vi];json::Document r;if(!invoke_value_callback(args[0],method=="reduce"?std::vector<json::Document>{acc,v}:std::vector<json::Document>{v},r))return false;if(method=="map")arr.array.push_back(r);else if(method=="filter"){if(!r.is_bool()){error="filter: callback must return bool";return false;}if(r.boolean)arr.array.push_back(v);}else if(method=="reduce")acc=r;else if(method=="sort_by"||method=="group_by"){if(!(r.is_string()||r.is_number()||r.is_bool())){error=method+": key must be scalar";return false;}keyed.push_back({r,v});}else{if(!r.is_bool()){error=method+": callback must return bool";return false;}if(method=="any"&&r.boolean){out=json::Document(true);return true;}if(method=="all"&&!r.boolean){out=json::Document(false);return true;}if(method=="find"&&r.boolean){out=v;return true;}if(method=="find_index"&&r.boolean){out=json::Document((double)vi);return true;}if(method=="count"&&r.boolean)cnt+=1;}}
