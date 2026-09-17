@@ -527,6 +527,7 @@ test-v43-language: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_pay_for_use_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_readval_writeval_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_collection_ops_smoke.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_postfix_composition_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 benchmarks/typed_content_scaling.py
 	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 benchmarks/project_dependency_scaling.py
 

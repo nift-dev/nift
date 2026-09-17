@@ -2233,7 +2233,117 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
         const bool whole_quoted=text.size()>=2&&((text.front()=='"'&&text.back()=='"')||(text.front()=='\''&&text.back()=='\''));
         const bool mutation_candidate = !whole_quoted && (text.find(":=") != std::string::npos ||
             (text.find('=') != std::string::npos && text.find("==") == std::string::npos && text.find("!=") == std::string::npos && text.find("<=") == std::string::npos && text.find(">=") == std::string::npos && text.find("=>") == std::string::npos));
-        if (!mutation_candidate) { if (resolve_direct(text,out)) return true; if (!error.empty()) return false; }
+        if (!mutation_candidate) {
+            // General postfix composition: any value-producing expression can
+            // feed the next postfix operator. final_postfix already chains
+            // `.method(...)` calls by recursively evaluating the receiver; this
+            // resolver extends the same composition to trailing `.member` and
+            // `[index]` postfixes on call results (and parenthesized primaries),
+            // so e.g. posts.filter(...).first().title composes naturally instead
+            // of stopping at an artificial parser boundary.
+            auto compose_postfix = [&](const std::string& raw, json::Document& out) -> bool {
+                const std::string text = trim_copy(raw);
+                if (text.size() < 2) return false;
+                char last = text.back();
+                if (last == '"' || last == '\'') return false;
+                std::string receiver;
+                int kind = 0; // 1=member, 2=index, 3=paren-unwrap
+                std::string operand;
+                if (last == ']') {
+                    int dep = 0;
+                    std::size_t k = text.size();
+                    while (k-- > 0) {
+                        const char c = text[k];
+                        if (c == ']') ++dep;
+                        else if (c == '[') { --dep; if (dep == 0) { receiver = text.substr(0, k); operand = text.substr(k); kind = 2; break; } }
+                    }
+                    if (kind != 2) return false;
+                } else if (last == ')') {
+                    int dep = 0;
+                    std::size_t k = text.size();
+                    while (k-- > 0) {
+                        const char c = text[k];
+                        if (c == ')') ++dep;
+                        else if (c == '(') { --dep; if (dep == 0) {
+                            if (k == 0) { receiver = text.substr(1, text.size() - 2); kind = 3; }
+                            break;
+                        } }
+                    }
+                    if (kind != 3) return false;
+                } else if (std::isalnum(static_cast<unsigned char>(last)) || last == '_') {
+                    std::size_t id_start = text.size();
+                    while (id_start > 0 && (std::isalnum(static_cast<unsigned char>(text[id_start - 1])) || text[id_start - 1] == '_')) --id_start;
+                    if (id_start == 0 || id_start == text.size() || text[id_start - 1] != '.') return false;
+                    receiver = text.substr(0, id_start - 1);
+                    operand = text.substr(id_start);
+                    kind = 1;
+                } else {
+                    return false;
+                }
+                if (receiver.empty()) return false;
+                // Only engage for receivers that require evaluation (method
+                // calls or parenthesized/indexed expressions); pure binding
+                // paths stay on the efficient resolve_direct path.
+                if (kind != 3 && receiver.find('(') == std::string::npos) return false;
+                json::Document base;
+                if (!eval(receiver, base, depth + 1)) { error = "postfix: " + error; return false; }
+                if (kind == 1) {
+                    if (!base.is_object()) {
+                        error = "cannot access member '" + operand + "' because the current JSON value is not an object";
+                        return false;
+                    }
+                    if (!base.has(operand)) {
+                        error = "JSON value '" + receiver + "' has no member '" + operand + "'";
+                        return false;
+                    }
+                    out = base[operand];
+                    return true;
+                } else if (kind == 2) {
+                    std::string token = trim_copy(operand.substr(1, operand.size() - 2));
+                    if (base.is_array()) {
+                        if (token.empty() || !std::all_of(token.begin(), token.end(), [](unsigned char c) { return std::isdigit(c); })) {
+                            error = "JSON array indices must be non-negative integers in '" + text + "'";
+                            return false;
+                        }
+                        std::size_t index = 0;
+                        try { index = static_cast<std::size_t>(std::stoull(token)); }
+                        catch (...) { error = "JSON array index is out of range in '" + text + "'"; return false; }
+                        if (index >= base.array.size()) {
+                            error = "JSON array index " + std::to_string(index) + " is out of range in '" + text + "'";
+                            return false;
+                        }
+                        out = base.array[index];
+                        return true;
+                    }
+                    if (base.is_object()) {
+                        std::string key;
+                        if (token.size() >= 2 && (token.front() == '"' || token.front() == '\'')) key = token.substr(1, token.size() - 2);
+                        else {
+                            VariableBinding* kb = nullptr;
+                            for (auto scope = variable_scopes_.rbegin(); scope != variable_scopes_.rend(); ++scope) {
+                                auto it = scope->find(token);
+                                if (it != scope->end()) { kb = &it->second; break; }
+                            }
+                            if (!kb || !kb->value || !kb->value->is_string()) {
+                                error = "JSON object index must be a quoted string or string binding in '" + text + "'";
+                                return false;
+                            }
+                            key = kb->value->string;
+                        }
+                        if (!base.has(key)) { error = "JSON object has no key '" + key + "'"; return false; }
+                        out = base[key];
+                        return true;
+                    }
+                    error = "cannot index JSON value in '" + text + "'";
+                    return false;
+                }
+                out = base;
+                return true;
+            };
+            if (compose_postfix(text, out)) return true;
+            if (!error.empty()) return false;
+            if (resolve_direct(text,out)) return true; if (!error.empty()) return false;
+        }
 
         auto truthy_value = [](const json::Document& document) {
             if (document.is_bool()) return document.boolean;
