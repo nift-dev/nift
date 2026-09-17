@@ -1787,7 +1787,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                     method=="trim_start"||method=="trim_end"||method=="to_lower"||method=="to_upper"||
                     method=="replace"||method=="to_int"||method=="to_double"||method=="to_string"||
                     method=="substr"||method=="size"||method=="empty"||method=="first"||method=="last"||
-                    method=="join"||method=="slice"||method=="path"||method=="exists"||method=="open"||
+                    method=="join"||method=="slice"||method=="indexOf"||method=="path"||method=="exists"||method=="open"||
                     method=="close"||method=="read"||method=="read_line"||method=="read_all"||method=="read_val"||
                     method=="eof"||method=="write"||method=="write_line"||method=="write_val"||method=="flush"||method=="tell"||
                     method=="seek"||method=="modified"||method=="save"||method=="revert"||method=="replace_once"||
@@ -1944,6 +1944,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                         if(method=="size"||method=="length"){if(!no_args())return false;out=json::Document((double)a.size());return true;}
                         if(method=="empty"){if(!no_args())return false;out=json::Document(a.empty());return true;}
                         if(method=="first"||method=="last"){if(!no_args())return false;if(a.empty()){error=method+": array is empty";return false;}out=method=="first"?a.front():a.back();return true;}
+                        if(method=="indexOf"){if(args.size()!=1){error="indexOf: expected one value";return false;}json::Document v;if(!eval_arg(0,v))return false;std::size_t i=0;for(;i<a.size();++i)if(structural_equal(a[i],v))break;out=json::Document(i<a.size()?static_cast<double>(i):-1.0);return true;}
                         if(method=="contains"){if(args.size()!=1){error="contains: expected one value";return false;}json::Document v;if(!eval_arg(0,v))return false;for(const auto& x:a)if(structural_equal(x,v)){out=json::Document(true);return true;}out=json::Document(false);return true;}
                         if(method=="join"){if(args.size()!=1){error="join: expected separator";return false;}json::Document sep;if(!eval_arg(0,sep)||!sep.is_string()){error="join: separator must be a string";return false;}std::string r;for(std::size_t i=0;i<a.size();++i){if(i)r+=sep.string;if(a[i].is_array()||a[i].is_object()||(a[i].is_string()&&a[i].string.rfind("\x1fnift:",0)==0)){error="join: elements must be renderable scalar values";return false;}r+=render_expression_value(a[i]);}out=json::Document(r);return true;}
                         if(method=="slice"){if(args.empty()||args.size()>2){error="slice: expected start and optional end";return false;}json::Document st,en;if(!eval_arg(0,st)||!st.is_number()||std::trunc(st.num)!=st.num||st.num<0){error="slice: invalid start";return false;}std::size_t b=(std::size_t)st.num,e=a.size();if(args.size()==2){if(!eval_arg(1,en)||!en.is_number()||std::trunc(en.num)!=en.num||en.num<0){error="slice: invalid end";return false;}e=(std::size_t)en.num;}b=std::min(b,a.size());e=std::min(e,a.size());if(e<b)e=b;out=json::Document::make_array();out.array.assign(a.begin()+b,a.begin()+e);return true;}
