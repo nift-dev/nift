@@ -142,9 +142,41 @@ const TrackedInfo* ProjectInfo::find(const std::string& name) const {
     return it == tracked_index_.end() ? nullptr : &tracked[it->second];
 }
 
+std::optional<std::size_t> ProjectInfo::tracked_index_of(const std::string& name) const {
+    if (tracked_index_size_ != tracked.size()) rebuild_tracked_index();
+    const auto it = tracked_index_.find(name);
+    return it == tracked_index_.end() ? std::nullopt : std::optional<std::size_t>(it->second);
+}
+
 std::shared_ptr<const json::Document> ProjectInfo::project_value() const {
-    std::call_once(project_value_flag_, [this] { project_value_ = make_project_value(root, config, tracked); });
+    std::call_once(project_value_flag_, [this] {
+        project_value_ = make_project_value(root, config, tracked);
+        if (project_value_) write_project_fingerprint(project_fingerprint_of(*project_value_));
+    });
     return project_value_;
+}
+
+std::string ProjectInfo::project_fingerprint_of(const json::Document& model) {
+    const std::string serialized = model.dump(0);
+    std::uint64_t hash = 1469598103934665603ull;
+    for (unsigned char byte : serialized) {
+        hash ^= byte;
+        hash *= 1099511628211ull;
+    }
+    char buffer[32];
+    std::snprintf(buffer, sizeof(buffer), "%016llx", static_cast<unsigned long long>(hash));
+    return std::string(buffer);
+}
+
+void ProjectInfo::refresh_project_fingerprint() const {
+    project_value();
+}
+
+void ProjectInfo::write_project_fingerprint(const std::string& fingerprint) const {
+    const fs::path path = root / ".nift/project.fingerprint";
+    if (auto existing = filesystem::read_file_checked(path); existing && *existing == fingerprint)
+        return;
+    filesystem::write_file(path, fingerprint);
 }
 
 bool ProjectInfo::conflicts_with_tracked_path(const TrackedInfo& candidate, const std::string& ignored_name) const {
@@ -475,6 +507,21 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
             reasons.push_back("page build metadata has an invalid dependency");
             continue;
         }
+        if (value.string == ".nift/project.fingerprint") {
+            // Value-based project dependency: the fingerprint file is rewritten
+            // only when the shared project model changes, and the page records
+            // the value it was built against, so staleness is decided by
+            // comparing values instead of mtimes (which can collide between the
+            // fingerprint write and the page-info write within one fast build).
+            refresh_project_fingerprint();
+            const std::string current = filesystem::read_file_checked(root / ".nift/project.fingerprint").value_or(std::string{});
+            std::string stored;
+            if (document.has("project-fingerprint") && document["project-fingerprint"].is_string())
+                stored = document["project-fingerprint"].string;
+            if (current != stored)
+                reasons.push_back("project model changed");
+            continue;
+        }
         if (!filesystem::path_exists(dependency))
             reasons.push_back("dependency removed: " + value.string);
         else if (dependency_changed(dependency, page_info_mtime))
@@ -629,7 +676,11 @@ bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::s
     json::Document::append_escaped_string(output, pagination_separator);
     output += "\",\n  \"pagination-pages\": ";
     output += std::to_string(pagination_pages);
-    output += ",\n  \"dependencies\": [";
+    output += ",\n  \"project-fingerprint\": \"";
+    if (dependencies.count(".nift/project.fingerprint") != 0)
+        json::Document::append_escaped_string(output,
+            filesystem::read_file_checked(root / ".nift/project.fingerprint").value_or(std::string{}));
+    output += "\",\n  \"dependencies\": [";
 
     if (!dependencies.empty()) output.push_back('\n');
     std::size_t index = 0;

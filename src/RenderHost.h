@@ -58,6 +58,11 @@ public:
     // pre-supplied bindings), so CLI resolution is unchanged.
     virtual const std::shared_ptr<const json::Document>* binding(const std::string& name) const = 0;
 
+    // O(1) access to one page's own project-model file entry (metadata), so a
+    // page render does not have to scan the whole project file collection to
+    // find itself. Hosts without a project model return nullptr.
+    virtual const json::Document* project_file_value(const std::string& name) const { return nullptr; }
+
     // Project-contract namespaces (config.contracts): the parser needs to
     // refuse bindings that collide with a configured contract name, and to
     // resolve a contract name to its configured source path.

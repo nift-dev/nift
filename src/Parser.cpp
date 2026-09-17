@@ -559,7 +559,10 @@ Parser::Parser(RenderHost& host, TrackedInfo& tracked_info)
     if (!tracked_info_.name.empty()) {
         json::Document m=json::Document::make_object(); bool from_project=false;
         if (const auto* pb=host_.binding("project"); pb && *pb && (*pb)->is_object() && (*pb)->has("files")) {
-            const auto& files=(**pb)["files"]; if(files.is_array()) for(const auto& f:files.array) if(f.is_object()&&f.has("name")&&f["name"].is_string()&&f["name"].string==tracked_info_.name&&f.has("metadata")){m=f["metadata"];from_project=true;break;}
+            // O(1) lookup of this page's own file entry via the tracked index
+            // instead of scanning the whole project file collection per page
+            // (which was quadratic once a project reached thousands of files).
+            if (const json::Document* own = host_.project_file_value(tracked_info_.name); own && own->is_object() && own->has("metadata")) { m = (*own)["metadata"]; from_project = true; }
             if ((*pb)->has("errors") && (**pb)["errors"].is_array() && !(**pb)["errors"].array.empty()) m["_error"]=json::Document((**pb)["errors"].array.front().string);
         }
         if(!from_project){std::string e;auto cp=host_.content_path(tracked_info_);if(filesystem::file_exists(cp)){auto parsed=frontmatter::parse_inline(filesystem::read_file(cp));if(tracked_info_.frontmatter&&parsed.present)m["_error"]=json::Document("multiple front matter sources");else if(tracked_info_.frontmatter){frontmatter::load_external(host_.root(),*tracked_info_.frontmatter,m,e);if(!e.empty())m["_error"]=json::Document(e);}else if(parsed.present&&!parsed.error.empty())m["_error"]=json::Document(parsed.error);else if(parsed.present)m=parsed.value;}}
@@ -793,8 +796,11 @@ bool Parser::resolve_json_value(const std::string& expression,
         if (root_name == "project") {
             result_.dependencies.insert(host_.relative(host_.root() / ".nift/config.json"));
             result_.dependencies.insert(host_.relative(host_.root() / ".nift/tracked.json"));
-            if (current && current->is_object() && current->has("files") && (*current)["files"].is_array()) for (const auto& f : (*current)["files"].array) if (f.is_object() && f.has("path") && f["path"].is_string()) { result_.dependencies.insert(f["path"].string); if(f.has("frontmatter_source")&&f["frontmatter_source"].is_string())result_.dependencies.insert(f["frontmatter_source"].string); }
-            if (current && current->is_object()) for (const char* key : {"schemas","taxonomies"}) if (current->has(key) && (*current)[key].is_object()) for (const auto& kv : (*current)[key].object) if (kv.second.is_object() && kv.second.has("source") && kv.second["source"].is_string()) result_.dependencies.insert(kv.second["source"].string);
+            // Compact semantic project dependency: the whole project model is
+            // captured by a single fingerprint file that is rewritten only when
+            // the model changes, so a project-using page records O(1) deps
+            // instead of one entry per tracked file.
+            result_.dependencies.insert(host_.relative(host_.root() / ".nift/project.fingerprint"));
         }
     } else {
         const auto binding = json_bindings_.find(root_name);
@@ -1792,6 +1798,27 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                     method=="keys"||method=="values"||method=="entries"||method=="has"||method=="get"||method=="merge"||
                     method=="map"||method=="filter"||method=="reduce"||method=="any"||method=="all"||method=="find"||method=="find_index"||method=="count"||method=="sort_by"||method=="group_by"||method=="unique"||method=="flatten"||method=="sum"||method=="min"||method=="max";
                 if (known) {
+                    // Fast path: read-only container methods on a pure JSON-path
+                    // receiver (e.g. project.files.size()) resolve through the
+                    // aliasing JSON walker instead of deep-copying the receiver,
+                    // so large host-binding collections are not copied per page.
+                    if (method=="size"||method=="length"||method=="empty"||method=="first"||method=="last"||
+                        method=="keys"||method=="values"||method=="entries") {
+                        std::shared_ptr<const json::Document> path_value;
+                        std::string path_error;
+                        if (resolve_json_value(receiver, path_value, path_error) && path_error.empty() && path_value) {
+                            const json::Document& pv = *path_value;
+                            if (pv.is_array()) {
+                                if (method=="size"||method=="length"){out=json::Document((double)pv.array.size());return true;}
+                                if (method=="empty"){out=json::Document(pv.array.empty());return true;}
+                                if (method=="first"||method=="last"){if(pv.array.empty()){error=method+": array is empty";return false;}out=method=="first"?pv.array.front():pv.array.back();return true;}
+                            } else if (pv.is_object()) {
+                                if (method=="size"){out=json::Document((double)pv.object.size());return true;}
+                                if (method=="empty"){out=json::Document(pv.object.empty());return true;}
+                                if (method=="keys"||method=="values"||method=="entries"){out=json::Document::make_array();for(const auto&kv:pv.object){if(method=="keys")out.array.emplace_back(kv.first);else if(method=="values")out.array.push_back(kv.second);else{json::Document e=json::Document::make_object();e["key"]=json::Document(kv.first);e["value"]=kv.second;out.array.push_back(std::move(e));}}return true;}
+                            }
+                        }
+                    }
                     json::Document base;
                     if (!eval(receiver,base,depth+1)) return false;
                     bool aok=false; std::vector<bool> aq;

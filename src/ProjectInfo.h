@@ -33,9 +33,11 @@ public:
     // build and shared by every page render instead of being reconstructed per
     // page (which was quadratic in the number of tracked files).
     std::shared_ptr<const json::Document> project_value() const;
+    void refresh_project_fingerprint() const;
 
     TrackedInfo* find(const std::string& name);
     const TrackedInfo* find(const std::string& name) const;
+    std::optional<std::size_t> tracked_index_of(const std::string& name) const;
     bool conflicts_with_tracked_path(const TrackedInfo& candidate, const std::string& ignored_name = {}) const;
     void invalidate_tracked_index();
 
@@ -82,6 +84,9 @@ public:
     WatchList& watch_list();
 
 private:
+    static std::string project_fingerprint_of(const json::Document& model);
+    void write_project_fingerprint(const std::string& fingerprint) const;
+
     WatchList* watch_ = nullptr;
     mutable std::once_flag project_value_flag_;
     mutable std::shared_ptr<const json::Document> project_value_;
