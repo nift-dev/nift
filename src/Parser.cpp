@@ -16,6 +16,7 @@
 #include <fstream>
 #include <iostream>
 #include <mutex>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 #include <functional>
@@ -1969,13 +1970,16 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                         if(method=="from_entries"){
                             if(!no_args())return false;
                             json::Document result=json::Document::make_object();
+                            // O(n) construction: order-preserving vector plus a hash map
+                            // for duplicate detection instead of linear object scans.
+                            std::unordered_map<std::string,std::size_t> seen_keys; result.object.reserve(a.size());
                             for(const auto& entry:a){
                                 if(!entry.is_object()||entry.object.size()!=2||!entry.has("key")||!entry.has("value")){error="from_entries: each entry must be an object containing exactly key and value";return false;}
                                 const json::Document *key=nullptr,*value=nullptr;
                                 for(const auto& kv:entry.object){if(kv.first=="key")key=&kv.second;else if(kv.first=="value")value=&kv.second;}
                                 std::string rendered;if(!key||!value||!generated_object_key(*key,rendered))return false;
-                                if(result.has(rendered)){error="from_entries: duplicate generated key '"+rendered+"'";return false;}
-                                result[rendered]=*value;
+                                if(seen_keys.count(rendered)){error="from_entries: duplicate generated key '"+rendered+"'";return false;}
+                                seen_keys[rendered]=result.object.size(); result.object.emplace_back(rendered,*value);
                             }
                             out=std::move(result);return true;
                         }
@@ -1986,11 +1990,12 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                         if(method=="index_by"){
                             if(args.size()!=1){error="index_by: expected one selector";return false;}
                             json::Document result=json::Document::make_object();
+                            std::unordered_map<std::string,std::size_t> seen_keys; result.object.reserve(a.size());
                             for(const auto& v:a){
                                 json::Document key;if(!invoke_value_callback(args[0],{v},key))return false;
                                 std::string rendered;if(!generated_object_key(key,rendered))return false;
-                                if(result.has(rendered)){error="index_by: duplicate generated key '"+rendered+"'";return false;}
-                                result[rendered]=v;
+                                if(seen_keys.count(rendered)){error="index_by: duplicate generated key '"+rendered+"'";return false;}
+                                seen_keys[rendered]=result.object.size(); result.object.emplace_back(rendered,v);
                             }
                             out=std::move(result);return true;
                         }
@@ -2000,21 +2005,47 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                             for(const auto& v:a){json::Document r;if(!invoke_value_callback(args[0],{v},r))return false;if(!r.is_bool()){error="partition: callback must return bool";return false;}(r.boolean?result["matched"]:result["unmatched"]).push_back(v);}out=std::move(result);return true;
                         }
                         if(method=="unique_by"){
-                            if(args.size()!=1){error="unique_by: expected one selector";return false;} out=json::Document::make_array(); std::vector<json::Document> seen;
-                            for(const auto& v:a){json::Document k;if(!invoke_value_callback(args[0],{v},k))return false;bool dup=false;for(const auto& x:seen)if(structural_equal(k,x)){dup=true;break;}if(!dup){seen.push_back(k);out.array.push_back(v);}}return true;
+                            if(args.size()!=1){error="unique_by: expected one selector";return false;} out=json::Document::make_array(); std::unordered_set<std::string> seen;
+                            // Canonical structural form exactly mirroring structural_equal,
+                            // so O(n) dedup preserves the same semantics as the previous
+                            // linear structural scan (numbers by exact double equality,
+                            // object keys order-insensitive, arrays order-sensitive).
+                            std::function<void(const json::Document&,std::string&)> canonical_key;
+                            canonical_key=[&](const json::Document& v,std::string& out){
+                                if(v.is_null()){out+="z";return;}
+                                if(v.is_bool()){out+=v.boolean?"bt":"bf";return;}
+                                if(v.is_number()){out+="n";char buf[64];auto r=std::to_chars(buf,buf+sizeof(buf),v.num);out.append(buf,r.ptr);return;}
+                                if(v.is_string()){if(v.string.rfind("\x1fnift:",0)==0){out+="i";out+=v.string;return;}out+="s";out+=std::to_string(v.string.size());out+=':';out+=v.string;return;}
+                                if(v.is_array()){out+="a(";for(const auto& e:v.array){canonical_key(e,out);out+=',';}out+=')';return;}
+                                if(v.is_object()){
+                                    out+="o(";std::vector<std::pair<std::string,const json::Document*>> pairs;
+                                    for(const auto& kv:v.object)pairs.push_back({kv.first,&kv.second});
+                                    std::sort(pairs.begin(),pairs.end(),[&](const auto& x,const auto& y){return x.first<y.first;});
+                                    for(const auto& p:pairs){out+=std::to_string(p.first.size());out+=':';out+=p.first;out+='=';canonical_key(*p.second,out);out+=',';}
+                                    out+=')';return;
+                                }
+                                out+='?';
+                            };
+                            for(const auto& v:a){json::Document k;if(!invoke_value_callback(args[0],{v},k))return false;std::string ck;canonical_key(k,ck);if(seen.insert(ck).second)out.array.push_back(v);}return true;
                         }
                         if(method=="min_by"||method=="max_by"){
                             if(args.size()!=1){error=method+": expected one selector";return false;}if(a.empty()){error=method+": cannot select from an empty array";return false;}json::Document best_key;if(!invoke_value_callback(args[0],{a.front()},best_key))return false;if(!(best_key.is_number()||best_key.is_string()||best_key.is_bool())){error=method+": key must be scalar";return false;}out=a.front();
                             for(size_t i=1;i<a.size();++i){json::Document k;if(!invoke_value_callback(args[0],{a[i]},k))return false;if(k.type!=best_key.type && !(k.is_number()&&best_key.is_number())){error=method+": keys must be comparable and homogeneous";return false;}bool take=false;if(k.is_number())take=method=="min_by"?k.num<best_key.num:k.num>best_key.num;else if(k.is_string())take=method=="min_by"?k.string<best_key.string:k.string>best_key.string;else if(k.is_bool())take=method=="min_by"?k.boolean<best_key.boolean:k.boolean>best_key.boolean;else{error=method+": key must be scalar";return false;}if(take){best_key=k;out=a[i];}}return true;
                         }
                         if(method=="count_by"){
-                            if(args.size()!=1){error="count_by: expected one selector";return false;}out=json::Document::make_object();for(const auto& v:a){json::Document k;if(!invoke_value_callback(args[0],{v},k))return false;std::string rendered;if(!generated_object_key(k,rendered))return false;if(!out.has(rendered))out[rendered]=json::Document(0.0);out[rendered].num+=1;}return true;
+                            if(args.size()!=1){error="count_by: expected one selector";return false;}json::Document result=json::Document::make_object();
+                            std::unordered_map<std::string,std::size_t> pos; result.object.reserve(a.size());
+                            for(const auto& v:a){json::Document k;if(!invoke_value_callback(args[0],{v},k))return false;std::string rendered;if(!generated_object_key(k,rendered))return false;auto it=pos.find(rendered);if(it==pos.end()){pos[rendered]=result.object.size();result.object.emplace_back(rendered,json::Document(0.0));result.object.back().second.num+=1;}else result.object[it->second].second.num+=1;}
+                            out=std::move(result);return true;
                         }
                         if(method=="take"||method=="drop"||method=="chunk"){
                             if(args.size()!=1){error=method+": expected one count";return false;}json::Document n;if(!eval_arg(0,n)||!n.is_number()||std::trunc(n.num)!=n.num||n.num<0||(method=="chunk"&&n.num==0)){error=method+": count must be "+std::string(method=="chunk"?"a positive":"a non-negative")+" integer";return false;}size_t z=(size_t)n.num;out=json::Document::make_array();if(method=="take"){size_t e=std::min(z,a.size());out.array.assign(a.begin(),a.begin()+e);}else if(method=="drop"){size_t b=std::min(z,a.size());out.array.assign(a.begin()+b,a.end());}else{for(size_t b=0;b<a.size();b+=z){json::Document c=json::Document::make_array();size_t e=std::min(b+z,a.size());c.array.assign(a.begin()+b,a.begin()+e);out.array.push_back(std::move(c));}}return true;
                         }
                         if(method=="group_by_each"){
-                            if(args.size()!=1){error="group_by_each: expected one selector";return false;}out=json::Document::make_object();for(const auto& v:a){json::Document ks;if(!invoke_value_callback(args[0],{v},ks))return false;if(!ks.is_array()){error="group_by_each: selector must return an array";return false;}std::vector<std::string> item_keys;for(const auto& k:ks.array){std::string rendered;if(!generated_object_key(k,rendered))return false;if(std::find(item_keys.begin(),item_keys.end(),rendered)!=item_keys.end())continue;item_keys.push_back(rendered);if(!out.has(rendered))out[rendered]=json::Document::make_array();out[rendered].push_back(v);}}return true;
+                            if(args.size()!=1){error="group_by_each: expected one selector";return false;}json::Document result=json::Document::make_object();
+                            std::unordered_map<std::string,std::size_t> pos;
+                            for(const auto& v:a){json::Document ks;if(!invoke_value_callback(args[0],{v},ks))return false;if(!ks.is_array()){error="group_by_each: selector must return an array";return false;}std::vector<std::string> item_keys;for(const auto& k:ks.array){std::string rendered;if(!generated_object_key(k,rendered))return false;if(std::find(item_keys.begin(),item_keys.end(),rendered)!=item_keys.end())continue;item_keys.push_back(rendered);auto it=pos.find(rendered);if(it==pos.end()){pos[rendered]=result.object.size();result.object.emplace_back(rendered,json::Document::make_array());result.object.back().second.array.push_back(v);}else result.object[it->second].second.array.push_back(v);}}
+                            out=std::move(result);return true;
                         }
                         if(method=="sort_by"){
                             if(args.empty() || (args.size()!=1 && args.size()%2!=0)){error="sort_by: expected selector or selector/direction pairs";return false;}
@@ -2378,7 +2409,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                 // paths stay on the efficient resolve_direct path.
                 if (kind != 3 && receiver.find('(') == std::string::npos) return false;
                 json::Document base;
-                if (!eval(receiver, base, depth + 1)) { error = "postfix: " + error; return false; }
+                if (!eval(receiver, base, depth + 1)) return false;
                 if (kind == 1) {
                     if (!base.is_object()) {
                         error = "cannot access member '" + operand + "' because the current JSON value is not an object";
