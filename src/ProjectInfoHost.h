@@ -44,19 +44,12 @@ public:
         return nullptr;
     }
 
-    const json::Document* project_file_value(const std::string& name) const override {
-        if (!project_value_) project_value_ = project_.project_value();
-        if (!project_value_ || !project_value_->is_object() || !project_value_->has("files"))
-            return nullptr;
-        const auto& files = (*project_value_)["files"];
-        if (!files.is_array()) return nullptr;
-        const auto index = project_.tracked_index_of(name);
-        if (!index || *index >= files.array.size()) return nullptr;
-        const json::Document& entry = files.array[*index];
-        if (!entry.is_object() || !entry.has("name") || !entry["name"].is_string() ||
-            entry["name"].string != name)
-            return nullptr;
-        return &entry;
+    bool page_project_metadata(const TrackedInfo& info, json::Document& out, std::string&) const override {
+        const content_model::Model* model = project_.content_model_value();
+        if (!model) return false;
+        out = compute_tracked_metadata(project_.root, project_.config, info, *model);
+        if (!model->errors.empty()) out["_error"] = json::Document(model->errors.front());
+        return true;
     }
 
     bool is_contract_name(const std::string& name) const override {

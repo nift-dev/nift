@@ -13,6 +13,7 @@
 
 class WatchList;
 namespace json { class Document; }
+namespace content_model { struct Model; }
 
 class ProjectInfo {
 public:
@@ -34,10 +35,10 @@ public:
     // page (which was quadratic in the number of tracked files).
     std::shared_ptr<const json::Document> project_value() const;
     void refresh_project_fingerprint() const;
+    const content_model::Model* content_model_value() const;
 
     TrackedInfo* find(const std::string& name);
     const TrackedInfo* find(const std::string& name) const;
-    std::optional<std::size_t> tracked_index_of(const std::string& name) const;
     bool conflicts_with_tracked_path(const TrackedInfo& candidate, const std::string& ignored_name = {}) const;
     void invalidate_tracked_index();
 
@@ -90,6 +91,8 @@ private:
     WatchList* watch_ = nullptr;
     mutable std::once_flag project_value_flag_;
     mutable std::shared_ptr<const json::Document> project_value_;
+    mutable std::once_flag content_model_flag_;
+    mutable std::shared_ptr<const content_model::Model> content_model_value_;
     std::atomic<bool> mutation_started_{false};
     mutable std::unordered_map<std::string, std::size_t> tracked_index_;
     mutable std::unordered_set<std::string> tracked_output_index_;

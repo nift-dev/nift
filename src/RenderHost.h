@@ -58,10 +58,12 @@ public:
     // pre-supplied bindings), so CLI resolution is unchanged.
     virtual const std::shared_ptr<const json::Document>* binding(const std::string& name) const = 0;
 
-    // O(1) access to one page's own project-model file entry (metadata), so a
-    // page render does not have to scan the whole project file collection to
-    // find itself. Hosts without a project model return nullptr.
-    virtual const json::Document* project_file_value(const std::string& name) const { return nullptr; }
+    // Per-page model-equivalent metadata (front matter, type resolution, schema
+    // validation) computed WITHOUT constructing the project-wide query model, so
+    // ordinary pages never force the project model to be built. Returns false on
+    // hosts that lack the project content model; callers fall back to direct
+    // front-matter parsing.
+    virtual bool page_project_metadata(const TrackedInfo& info, json::Document& out, std::string& error) const { return false; }
 
     // Project-contract namespaces (config.contracts): the parser needs to
     // refuse bindings that collide with a configured contract name, and to

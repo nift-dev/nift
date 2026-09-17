@@ -557,14 +557,12 @@ Parser::Parser(RenderHost& host, TrackedInfo& tracked_info)
     : host_(host), tracked_info_(tracked_info) {
     variable_scopes_.emplace_back();
     if (!tracked_info_.name.empty()) {
-        json::Document m=json::Document::make_object(); bool from_project=false;
-        if (const auto* pb=host_.binding("project"); pb && *pb && (*pb)->is_object() && (*pb)->has("files")) {
-            // O(1) lookup of this page's own file entry via the tracked index
-            // instead of scanning the whole project file collection per page
-            // (which was quadratic once a project reached thousands of files).
-            if (const json::Document* own = host_.project_file_value(tracked_info_.name); own && own->is_object() && own->has("metadata")) { m = (*own)["metadata"]; from_project = true; }
-            if ((*pb)->has("errors") && (**pb)["errors"].is_array() && !(**pb)["errors"].array.empty()) m["_error"]=json::Document((**pb)["errors"].array.front().string);
-        }
+        json::Document m=json::Document::make_object(); bool from_project=false; std::string page_metadata_error;
+        // Per-page model-equivalent metadata (front matter + type + schema
+        // validation) computed without constructing the project-wide query
+        // model, so an ordinary build never pays for project features it does
+        // not use. Hosts without the content model fall back to direct parsing.
+        if (host_.page_project_metadata(tracked_info_, m, page_metadata_error)) from_project = true;
         if(!from_project){std::string e;auto cp=host_.content_path(tracked_info_);if(filesystem::file_exists(cp)){auto parsed=frontmatter::parse_inline(filesystem::read_file(cp));if(tracked_info_.frontmatter&&parsed.present)m["_error"]=json::Document("multiple front matter sources");else if(tracked_info_.frontmatter){frontmatter::load_external(host_.root(),*tracked_info_.frontmatter,m,e);if(!e.empty())m["_error"]=json::Document(e);}else if(parsed.present&&!parsed.error.empty())m["_error"]=json::Document(parsed.error);else if(parsed.present)m=parsed.value;}}
         json_bindings_["frontmatter"]=std::make_shared<const json::Document>(std::move(m));
     }

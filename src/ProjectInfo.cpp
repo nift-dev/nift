@@ -142,15 +142,17 @@ const TrackedInfo* ProjectInfo::find(const std::string& name) const {
     return it == tracked_index_.end() ? nullptr : &tracked[it->second];
 }
 
-std::optional<std::size_t> ProjectInfo::tracked_index_of(const std::string& name) const {
-    if (tracked_index_size_ != tracked.size()) rebuild_tracked_index();
-    const auto it = tracked_index_.find(name);
-    return it == tracked_index_.end() ? std::nullopt : std::optional<std::size_t>(it->second);
+const content_model::Model* ProjectInfo::content_model_value() const {
+    std::call_once(content_model_flag_, [this] {
+        content_model_value_ = std::make_shared<const content_model::Model>(
+            content_model::load(root, config.schema_files, config.taxonomy_files));
+    });
+    return content_model_value_.get();
 }
 
 std::shared_ptr<const json::Document> ProjectInfo::project_value() const {
     std::call_once(project_value_flag_, [this] {
-        project_value_ = make_project_value(root, config, tracked);
+        project_value_ = make_project_value(root, config, tracked, content_model_value());
         if (project_value_) write_project_fingerprint(project_fingerprint_of(*project_value_));
     });
     return project_value_;
