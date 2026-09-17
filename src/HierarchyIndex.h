@@ -20,10 +20,32 @@ struct HierarchyIndex {
 
     // tracked name -> tracked index
     std::unordered_map<std::string, std::size_t> name_index;
+    // per tracked index, the page's tracked name (tracked order)
+    std::vector<std::string> names;
     // per tracked index, the parent's tracked index or NO_PARENT
     std::vector<std::size_t> parent_of;
     // per tracked index, tracked-ordered direct child indices
     std::vector<std::vector<std::size_t>> children_of;
+
+    // Deterministic fingerprint of the hierarchy structure (name + parent per
+    // tracked index in tracked order), so any add/remove/rename/reparent
+    // changes it. Used for a compact semantic dependency: hierarchy consumers
+    // depend on this one value rather than every tracked item.
+    std::string fingerprint() const {
+        std::string canon;
+        for (std::size_t i = 0; i < names.size(); ++i) {
+            canon += names[i];
+            canon += '|';
+            const std::size_t p = parent_of[i];
+            canon += p == NO_PARENT ? std::string("null") : names[p];
+            canon += '\n';
+        }
+        std::uint64_t hash = 1469598103934665603ull;
+        for (unsigned char c : canon) { hash ^= c; hash *= 1099511628211ull; }
+        char buffer[32];
+        std::snprintf(buffer, sizeof(buffer), "%016llx", static_cast<unsigned long long>(hash));
+        return std::string(buffer);
+    }
 
     std::size_t index_of(const std::string& name) const {
         const auto it = name_index.find(name);
@@ -49,8 +71,10 @@ struct HierarchyIndex {
         HierarchyIndex h;
         const std::size_t n = tracked.size();
         h.name_index.reserve(n);
+        h.names.assign(n, {});
         h.parent_of.assign(n, NO_PARENT);
         h.children_of.assign(n, {});
+        for (std::size_t i = 0; i < n; ++i) h.names[i] = tracked[i].name;
 
         // Top-down processing order: pages with fewer name segments first so an
         // existing ancestor is always indexed before its descendants.

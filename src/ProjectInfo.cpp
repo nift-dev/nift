@@ -153,8 +153,24 @@ const content_model::Model* ProjectInfo::content_model_value() const {
 const HierarchyIndex* ProjectInfo::hierarchy_index() const {
     std::call_once(hierarchy_flag_, [this] {
         hierarchy_ = std::make_shared<const HierarchyIndex>(HierarchyIndex::build(tracked));
+        // Publish the compact structural fingerprint when the index is built so
+        // hierarchy consumers that render during this build record the value.
+        const fs::path path = root / ".nift/hierarchy.fingerprint";
+        const std::string fingerprint = hierarchy_->fingerprint();
+        if (!filesystem::read_file_checked(path) || *filesystem::read_file_checked(path) != fingerprint)
+            filesystem::write_file(path, fingerprint);
     });
     return hierarchy_.get();
+}
+
+void ProjectInfo::refresh_hierarchy_fingerprint() const {
+    const HierarchyIndex* hi = hierarchy_index();
+    if (!hi) return;
+    const std::string fingerprint = hi->fingerprint();
+    const fs::path path = root / ".nift/hierarchy.fingerprint";
+    if (auto existing = filesystem::read_file_checked(path); existing && *existing == fingerprint)
+        return;
+    filesystem::write_file(path, fingerprint);
 }
 
 std::shared_ptr<const json::Document> ProjectInfo::project_value() const {
@@ -531,6 +547,20 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
                 reasons.push_back("project model changed");
             continue;
         }
+        if (value.string == ".nift/hierarchy.fingerprint") {
+            // Compact structural hierarchy dependency: one fingerprint value
+            // covering the page name/parentage structure, so add/remove/rename/
+            // reparent invalidates hierarchy consumers without a per-page x
+            // project-size dependency list.
+            refresh_hierarchy_fingerprint();
+            const std::string current = filesystem::read_file_checked(root / ".nift/hierarchy.fingerprint").value_or(std::string{});
+            std::string stored;
+            if (document.has("hierarchy-fingerprint") && document["hierarchy-fingerprint"].is_string())
+                stored = document["hierarchy-fingerprint"].string;
+            if (current != stored)
+                reasons.push_back("hierarchy structure changed");
+            continue;
+        }
         if (!filesystem::path_exists(dependency))
             reasons.push_back("dependency removed: " + value.string);
         else if (dependency_changed(dependency, page_info_mtime))
@@ -689,6 +719,10 @@ bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::s
     if (dependencies.count(".nift/project.fingerprint") != 0)
         json::Document::append_escaped_string(output,
             filesystem::read_file_checked(root / ".nift/project.fingerprint").value_or(std::string{}));
+    output += "\",\n  \"hierarchy-fingerprint\": \"";
+    if (dependencies.count(".nift/hierarchy.fingerprint") != 0)
+        json::Document::append_escaped_string(output,
+            filesystem::read_file_checked(root / ".nift/hierarchy.fingerprint").value_or(std::string{}));
     output += "\",\n  \"dependencies\": [";
 
     if (!dependencies.empty()) output.push_back('\n');

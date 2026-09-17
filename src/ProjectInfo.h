@@ -38,6 +38,7 @@ public:
     void refresh_project_fingerprint() const;
     const content_model::Model* content_model_value() const;
     const HierarchyIndex* hierarchy_index() const;
+    void refresh_hierarchy_fingerprint() const;
 
     TrackedInfo* find(const std::string& name);
     const TrackedInfo* find(const std::string& name) const;

@@ -859,6 +859,7 @@ bool Parser::resolve_json_value(const std::string& expression,
                 return true;
             }
             if (current->is_string() && current->string.rfind("\x1fnift:page:",0)==0) {
+                result_.dependencies.insert(host_.relative(host_.root() / ".nift/hierarchy.fingerprint"));
                 json::Document resolved; std::string perr;
                 if (!host_.resolve_page_member(current->string.substr(11), member, resolved, perr)) {
                     error = perr.empty() ? ("page has no member: " + member) : perr;
@@ -1518,6 +1519,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                     if(me==mp){ if(text[mp]=='.'||text[mp]=='['){break;} error="invalid page member path: "+text;return false; }
                     const std::string member=text.substr(mp,me-mp);
                     if(current.is_string()&&current.string.rfind("\x1fnift:page:",0)==0){
+                        result_.dependencies.insert(host_.relative(host_.root() / ".nift/hierarchy.fingerprint"));
                         json::Document resolved; std::string perr;
                         if(!host_.resolve_page_member(current.string.substr(11),member,resolved,perr)){error=perr.empty()?("page has no member: "+member):perr;return false;}
                         current=std::move(resolved);
@@ -2478,6 +2480,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                 if (!eval(receiver, base, depth + 1)) return false;
                 if (kind == 1) {
                     if (base.is_string() && base.string.rfind("\x1fnift:page:", 0) == 0) {
+                        result_.dependencies.insert(host_.relative(host_.root() / ".nift/hierarchy.fingerprint"));
                         json::Document resolved; std::string perr;
                         if (!host_.resolve_page_member(base.string.substr(11), operand, resolved, perr)) {
                             error = perr.empty() ? ("page has no member: " + operand) : perr;
