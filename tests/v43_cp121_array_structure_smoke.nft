@@ -1,0 +1,6 @@
+$a := [3,1,2,1]
+$id := fn(x) => x
+$a.sort_by(id).stringify()
+$a.unique().stringify()
+$b := [[1,2],[3],4]
+$b.flatten().stringify()
