@@ -533,6 +533,7 @@ test-v43-language: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp174_pick_omit_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp175_merge_deep_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp176_cp182_collection_algebra_smoke.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp183_collection_composition_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 benchmarks/typed_content_scaling.py
 	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 benchmarks/project_dependency_scaling.py
 
