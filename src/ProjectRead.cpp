@@ -234,8 +234,10 @@ bool load_tracking(const fs::path& root, const Config& config, std::vector<Track
                 std::move(entry["name"].string),
                 std::move(entry["title"].string),
                 entry.has("template") ? std::move(entry["template"].string) : std::string{},
-                "", "", std::nullopt, std::nullopt
+                "", "", std::nullopt, std::nullopt, std::nullopt, std::nullopt
             };
+            if (entry.has("type")) { if(!entry["type"].is_string()){entries_valid=false;entry_error="tracked type must be a string";return false;} info.type=entry["type"].string; }
+            if (entry.has("frontmatter")) { if(!entry["frontmatter"].is_string()){entries_valid=false;entry_error="tracked frontmatter must be a string";return false;} info.frontmatter=entry["frontmatter"].string; }
             if (entry.has("content-ext")) {
                 if (!entry["content-ext"].is_string()) {
                     entries_valid = false;

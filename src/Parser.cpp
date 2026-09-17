@@ -1,4 +1,5 @@
 #include "Parser.h"
+#include "FrontMatter.h"
 #include "Console.h"
 #include "FileSystem.h"
 #include "Json.h"
@@ -553,7 +554,7 @@ bool Parser::reference_would_cycle(const std::string& target_ref, const std::str
 }
 
 Parser::Parser(RenderHost& host, TrackedInfo& tracked_info)
-    : host_(host), tracked_info_(tracked_info) { variable_scopes_.emplace_back(); }
+    : host_(host), tracked_info_(tracked_info) { variable_scopes_.emplace_back(); if(!tracked_info_.name.empty()){ json::Document m=json::Document::make_object(); std::string e; auto cp=host_.content_path(tracked_info_); if(filesystem::file_exists(cp)){auto parsed=frontmatter::parse_inline(filesystem::read_file(cp)); if(tracked_info_.frontmatter && parsed.present){ m["_error"]=json::Document("multiple front matter sources"); } else if(tracked_info_.frontmatter){frontmatter::load_external(host_.root(),*tracked_info_.frontmatter,m,e); if(!e.empty())m["_error"]=json::Document(e);} else if(parsed.present&&!parsed.error.empty())m["_error"]=json::Document(parsed.error); else if(parsed.present)m=parsed.value;} json_bindings_["frontmatter"]=std::make_shared<const json::Document>(std::move(m)); } }
 
 bool Parser::eval_expression(const std::string& expression, json::Document& value, std::string& error) {
     standalone_script_host_ = true;
@@ -3962,7 +3963,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     const auto cached = host_.read_shared_source(content_path);
                     if (cached.status == nift::HostStatus::Error) { fail(source_path, source, i, cached.error); break; }
                     if (!cached.content) { fail(source_path, source, i, "content file is not readable"); break; }
-                    content_source = *cached.content;
+                    content_source = frontmatter::parse_inline(*cached.content).body;
                     result_.dependencies.insert(page_source_->dependency.empty() ? host_.relative(content_path) : page_source_->dependency);
                 } else {
                     content_identity = fs::path(page_source_->logical_name);
@@ -4609,6 +4610,7 @@ RenderResult Parser::render_composed(const RenderSource& template_source,
 }
 
 RenderResult Parser::render() {
+    if (auto it=json_bindings_.find("frontmatter"); it!=json_bindings_.end() && it->second && it->second->is_object() && it->second->has("_error")) { result_.ok=false; result_.error={tracked_info_.name,host_.content_path(tracked_info_),0,(*it->second)["_error"].string}; return result_; }
     const fs::path content_path = host_.content_path(tracked_info_);
     if (tracked_info_.template_path.empty()) {
         // The read is the authority: missing/unreadable content yields nullptr
@@ -4624,7 +4626,10 @@ RenderResult Parser::render() {
             result_.error = {tracked_info_.name, content_path, 0, "content file is not readable"};
             return result_;
         }
-        auto result = parse(*content_source.content, content_path, 0);
+        auto fm = frontmatter::parse_inline(*content_source.content);
+        if (!fm.error.empty()) { result_.ok=false; result_.error={tracked_info_.name,content_path,0,fm.error}; return result_; }
+        if (tracked_info_.frontmatter && fm.present) { result_.ok=false; result_.error={tracked_info_.name,content_path,0,"multiple front matter sources are not allowed"}; return result_; }
+        auto result = parse(fm.body, content_path, 0);
         result.content_used = true;
         result.dependencies.insert(host_.relative(content_path));
         return result;

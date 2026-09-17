@@ -35,6 +35,8 @@ struct TrackedInfo {
     std::string output_ext;
     std::optional<bool> minify;
     std::optional<PaginationConfig> paginate;
+    std::optional<std::string> type;
+    std::optional<std::string> frontmatter;
 };
 
 struct BuildError {
