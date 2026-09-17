@@ -1800,6 +1800,34 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             if(call_args("open",args,q)){fs::path p;if(args.size()!=1||!checked_path("open",args,q,0,p))return false;std::error_code ec;if(fs::is_directory(p,ec)){error="open: path is a directory";return false;}std::ifstream f(p,std::ios::binary);if(!f){error="open: cannot open path";return false;}std::ostringstream ss;ss<<f.rdbuf();out=json::Document(ss.str());return true;}
             if(call_args("file",args,q)){fs::path p;if(args.size()!=1||!checked_path("file",args,q,0,p))return false;auto f=std::make_shared<FileInstance>();f->path=p;auto id=std::to_string(next_file_instance_id_++);file_instances_[id]=f;out=json::Document(std::string("\x1fnift:file:")+id);return true;}
             if(call_args("page",args,q)){if(args.size()!=1){error="page: expected one page name";return false;}json::Document d;if(!arg_value(args,q,0,d)||!d.is_string()){error="page: name must be a string";return false;}std::string ref;if(!host_.page_ref_for(d.string,ref)){error="page: unknown tracked page '"+d.string+"'";return false;}out=json::Document(ref);return true;}
+            if(call_args("html_escape",args,q)||call_args("attr_escape",args,q)||call_args("url_encode",args,q)){
+                const bool is_attr=text.rfind("attr_escape(",0)==0; const bool is_url=text.rfind("url_encode(",0)==0; const char* fname=is_attr?"attr_escape":(is_url?"url_encode":"html_escape");
+                if(args.size()!=1){error=std::string(fname)+": expected one value";return false;}
+                json::Document v;if(!arg_value(args,q,0,v))return false;
+                std::string s;
+                if(v.is_string())s=v.string;
+                else if(v.is_number()||v.is_bool())s=render_expression_value(v);
+                else if(v.is_null())s="null";
+                else{error=std::string(fname)+": value must be a string or scalar";return false;}
+                std::string r; r.reserve(s.size()+8);
+                if(is_url){
+                    // RFC 3986 unreserved characters pass through; everything else is
+                    // percent-encoded byte-wise (URL component encoding, not
+                    // application/x-www-form-urlencoded: space -> %20).
+                    static const char* hex="0123456789ABCDEF";
+                    for(unsigned char c : s){
+                        if((c>='A'&&c<='Z')||(c>='a'&&c<='z')||(c>='0'&&c<='9')||c=='-'||c=='_'||c=='.'||c=='~'){r+=(char)c;}
+                        else{r+='%';r+=hex[c>>4];r+=hex[c&0xF];}
+                    }
+                } else {
+                    for(char c : s){
+                        if(c=='&')r+="&amp;"; else if(c=='<')r+="&lt;"; else if(c=='>')r+="&gt;";
+                        else if(is_attr && c=='"')r+="&quot;"; else if(is_attr && c=='\'')r+="&#39;";
+                        else r+=c;
+                    }
+                }
+                out=json::Document(std::move(r));return true;
+            }
             if(call_args("ifstream",args,q)||call_args("ofstream",args,q)){const bool output=text.rfind("ofstream(",0)==0;fs::path p;if(args.size()!=1||!checked_path(output?"ofstream":"ifstream",args,q,0,p))return false;auto st=std::make_shared<StreamInstance>();st->kind=output?StreamInstance::Kind::Output:StreamInstance::Kind::Input;if(output){st->output=std::make_shared<std::ofstream>(p,std::ios::binary|std::ios::trunc);if(!*st->output){error="ofstream: cannot open path";return false;}}else{st->input=std::make_shared<std::ifstream>(p,std::ios::binary);if(!*st->input){error="ifstream: cannot open path";return false;}}auto id=std::to_string(next_stream_instance_id_++);stream_instances_[id]=st;out=json::Document(std::string("\x1fnift:stream:")+id);return true;}
             if(call_args("close",args,q)){if(args.size()!=1){error="close: expected stream";return false;}json::Document d;if(!arg_value(args,q,0,d)||!d.is_string()||d.string.rfind("\x1fnift:stream:",0)!=0){error="close: expected stream";return false;}auto it=stream_instances_.find(d.string.substr(13));if(it==stream_instances_.end()){error="close: invalid stream";return false;}if(it->second->closed){error="close: stream already closed";return false;}if(it->second->input)it->second->input->close();if(it->second->output)it->second->output->close();it->second->closed=true;out=json::Document(nullptr);return true;}
             if(call_args("print",args,q)){if(args.size()!=1){error="print: expected one value";return false;}json::Document d;if(!arg_value(args,q,0,d))return false;if(d.is_string()&&q.size()>0&&q[0]&&d.string.find("$[")!=std::string::npos){std::string r,e;if(!interpolate_parameter(d.string,r,e)){error="print: "+e;return false;}d=json::Document(r);}if(d.is_array()||d.is_object()||(d.is_string()&&d.string.rfind("\x1fnift:",0)==0)){error="print: value is not directly renderable";return false;}const std::string rendered=render_expression_value(d);{static std::mutex print_mutex;std::lock_guard<std::mutex> lock(print_mutex);std::cout<<rendered<<'\n';std::cout.flush();}out=json::Document(nullptr);return true;}
@@ -1854,7 +1882,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                 const bool known = method=="length"||method=="split"||method=="index_of"||method=="last_index_of"||
                     method=="contains"||method=="starts_with"||method=="ends_with"||method=="trim"||
                     method=="trim_start"||method=="trim_end"||method=="to_lower"||method=="to_upper"||
-                    method=="replace"||method=="to_int"||method=="to_double"||method=="to_string"||
+                    method=="replace"||method=="to_int"||method=="to_double"||method=="to_string"||method=="abs"||method=="floor"||method=="ceil"||method=="round"||
                     method=="substr"||method=="size"||method=="empty"||method=="first"||method=="last"||
                     method=="join"||method=="slice"||method=="indexOf"||method=="path"||method=="exists"||method=="open"||
                     method=="close"||method=="read"||method=="read_line"||method=="read_all"||method=="read_val"||
@@ -1947,6 +1975,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                             for(std::size_t i=0;i<str.size();){unsigned char c=(unsigned char)str[i];std::size_t n=c<0x80?1:(c>=0xC2&&c<=0xDF?2:(c>=0xE0&&c<=0xEF?3:(c>=0xF0&&c<=0xF4?4:0)));if(!n||i+n>str.size()){error="split: invalid UTF-8";return false;}for(std::size_t j=1;j<n;++j)if(((unsigned char)str[i+j]&0xC0)!=0x80){error="split: invalid UTF-8";return false;}parts.push_back(str.substr(i,n));i+=n;}return true;};
                         auto utf8_length=[&](std::size_t& count)->bool{std::vector<std::string> p;if(!utf8_parts(p))return false;count=p.size();return true;};
                         if(method=="length"){if(!no_args())return false;std::size_t n=0;if(!utf8_length(n))return false;out=json::Document((double)n);return true;}
+                        if(method=="empty"){if(!no_args())return false;out=json::Document(str.empty());return true;}
                         if(method=="split"){
                             if(args.size()!=1){error="split: expected one delimiter";return false;}json::Document d;if(!eval_arg(0,d)||!d.is_string()){error="split: delimiter must be a string";return false;}out=json::Document::make_array();
                             if(d.string.empty()){std::vector<std::string> parts;if(!utf8_parts(parts))return false;for(auto& x:parts)out.array.emplace_back(x);return true;}
@@ -1979,6 +2008,12 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                         }
                     }
                     if(method=="to_string" && base.is_number()) { if(!no_args())return false;out=json::Document(render_expression_value(base));return true; }
+                    if(base.is_number()) {
+                        if(method=="abs"){if(!no_args())return false;out=json::Document(std::fabs(base.num));return true;}
+                        if(method=="floor"){if(!no_args())return false;out=json::Document(std::floor(base.num));return true;}
+                        if(method=="ceil"){if(!no_args())return false;out=json::Document(std::ceil(base.num));return true;}
+                        if(method=="round"){if(!no_args())return false;out=json::Document(std::round(base.num));return true;}
+                    }
                     if(base.is_object()) {
                         if(method=="size"||method=="empty"||method=="keys"||method=="values"||method=="entries") {
                             if(!no_args())return false;
@@ -2475,7 +2510,12 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                 // Only engage for receivers that require evaluation (method
                 // calls or parenthesized/indexed expressions); pure binding
                 // paths stay on the efficient resolve_direct path.
-                if (kind != 3 && receiver.find('(') == std::string::npos) return false;
+                // Engage for receivers that require evaluation: method calls,
+                // parenthesized/indexed expressions, or structured literals
+                // (e.g. [1,2,3][0], {"a":1}["a"]). Pure binding paths stay on
+                // the efficient resolve_direct path.
+                const bool literal_receiver = !receiver.empty() && (receiver[0] == '[' || receiver[0] == '{');
+                if (kind != 3 && receiver.find('(') == std::string::npos && !literal_receiver) return false;
                 json::Document base;
                 if (!eval(receiver, base, depth + 1)) return false;
                 if (kind == 1) {
