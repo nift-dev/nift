@@ -1712,6 +1712,108 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             }
         }
 
+        // v4.3 CP100/CP102 scalar/string and read-only postfix ergonomics.
+        // Parse only the final .method(...) postfix here; recursively evaluating the
+        // receiver makes literals and call/expression results chain naturally without
+        // teaching each primitive about every possible trailing method.
+        {
+            auto final_postfix = [&](std::string& receiver, std::string& method, std::string& arg_text)->bool {
+                if (text.empty() || text.back() != ')') return false;
+                bool quoted=false; char quote=0; int parens=0, brackets=0, braces=0;
+                std::size_t lp=std::string::npos;
+                for (std::size_t i=text.size(); i-- > 0;) {
+                    const char c=text[i];
+                    if (quoted) { if (c==quote && (i==0 || text[i-1]!='\\')) quoted=false; continue; }
+                    if (c=='\'' || c=='"') { quoted=true; quote=c; continue; }
+                    if (c==')') { ++parens; continue; }
+                    if (c=='(') { if (--parens==0) { lp=i; break; } continue; }
+                }
+                if (lp==std::string::npos) return false;
+                std::size_t end=lp;
+                while (end>0 && std::isspace((unsigned char)text[end-1])) --end;
+                std::size_t begin=end;
+                while (begin>0 && (std::isalnum((unsigned char)text[begin-1]) || text[begin-1]=='_')) --begin;
+                if (begin==end || begin==0 || text[begin-1]!='.') return false;
+                receiver=trim_copy(text.substr(0,begin-1));
+                method=text.substr(begin,end-begin);
+                arg_text=text.substr(lp+1,text.size()-lp-2);
+                if(receiver.find(":=")!=std::string::npos) return false;
+                { bool q=false; char qc=0; int pa=0,br=0,bc=0; for(std::size_t j=0;j<receiver.size();++j){ char c=receiver[j]; if(q){ if(c=='\\') ++j; else if(c==qc) q=false; continue; } if(c=='\'' || c=='"'){ q=true; qc=c; continue; } if(c=='(')++pa; else if(c==')')--pa; else if(c=='[')++br; else if(c==']')--br; else if(c=='{')++bc; else if(c=='}')--bc; else if(!pa&&!br&&!bc&&std::string("+-*/%<>=!&|?:,").find(c)!=std::string::npos) return false; } }
+                return !receiver.empty();
+            };
+            std::string receiver, method, arg_text;
+            if (final_postfix(receiver,method,arg_text)) {
+                const bool known = method=="length"||method=="split"||method=="index_of"||method=="last_index_of"||
+                    method=="contains"||method=="starts_with"||method=="ends_with"||method=="trim"||
+                    method=="trim_start"||method=="trim_end"||method=="to_lower"||method=="to_upper"||
+                    method=="replace"||method=="to_int"||method=="to_double"||method=="to_string"||
+                    method=="substr"||method=="size"||method=="empty"||method=="first"||method=="last"||
+                    method=="join"||method=="slice";
+                if (known) {
+                    json::Document base;
+                    if (!eval(receiver,base,depth+1)) return false;
+                    bool aok=false; std::vector<bool> aq;
+                    auto args=parse_parameters(arg_text,aok,&aq);
+                    if(!aok){error=method+": malformed arguments";return false;}
+                    auto eval_arg=[&](std::size_t i,json::Document& v)->bool{
+                        if(i>=args.size())return false;
+                        if(i<aq.size()&&aq[i]){v=json::Document(args[i]);return true;}
+                        return eval(args[i],v,depth+1);
+                    };
+                    auto no_args=[&]()->bool{if(!args.empty()){error=method+": expected no arguments";return false;}return true;};
+                    if(base.is_string() && base.string.rfind("\x1fnift:",0)!=0) {
+                        const std::string& str=base.string;
+                        auto utf8_parts=[&](std::vector<std::string>& parts)->bool{
+                            for(std::size_t i=0;i<str.size();){unsigned char c=(unsigned char)str[i];std::size_t n=c<0x80?1:(c>=0xC2&&c<=0xDF?2:(c>=0xE0&&c<=0xEF?3:(c>=0xF0&&c<=0xF4?4:0)));if(!n||i+n>str.size()){error="split: invalid UTF-8";return false;}for(std::size_t j=1;j<n;++j)if(((unsigned char)str[i+j]&0xC0)!=0x80){error="split: invalid UTF-8";return false;}parts.push_back(str.substr(i,n));i+=n;}return true;};
+                        auto utf8_length=[&](std::size_t& count)->bool{std::vector<std::string> p;if(!utf8_parts(p))return false;count=p.size();return true;};
+                        if(method=="length"){if(!no_args())return false;std::size_t n=0;if(!utf8_length(n))return false;out=json::Document((double)n);return true;}
+                        if(method=="split"){
+                            if(args.size()!=1){error="split: expected one delimiter";return false;}json::Document d;if(!eval_arg(0,d)||!d.is_string()){error="split: delimiter must be a string";return false;}out=json::Document::make_array();
+                            if(d.string.empty()){std::vector<std::string> parts;if(!utf8_parts(parts))return false;for(auto& x:parts)out.array.emplace_back(x);return true;}
+                            std::size_t pos=0;while(true){auto at=str.find(d.string,pos);if(at==std::string::npos){out.array.emplace_back(str.substr(pos));break;}out.array.emplace_back(str.substr(pos,at-pos));pos=at+d.string.size();}return true;
+                        }
+                        if(method=="index_of"||method=="last_index_of"||method=="contains"||method=="starts_with"||method=="ends_with"){
+                            if(args.size()!=1){error=method+": expected one string";return false;}json::Document n;if(!eval_arg(0,n)||!n.is_string()){error=method+": argument must be a string";return false;}
+                            if(method=="contains"){out=json::Document(str.find(n.string)!=std::string::npos);return true;}
+                            if(method=="starts_with"){out=json::Document(str.rfind(n.string,0)==0);return true;}
+                            if(method=="ends_with"){out=json::Document(n.string.size()<=str.size()&&str.compare(str.size()-n.string.size(),n.string.size(),n.string)==0);return true;}
+                            auto at=method=="index_of"?str.find(n.string):str.rfind(n.string);out=json::Document(at==std::string::npos?-1.0:(double)at);return true;
+                        }
+                        if(method=="trim"||method=="trim_start"||method=="trim_end"){
+                            if(!no_args())return false;std::size_t a=0,b=str.size();if(method!="trim_end")while(a<b&&std::isspace((unsigned char)str[a]))++a;if(method!="trim_start")while(b>a&&std::isspace((unsigned char)str[b-1]))--b;out=json::Document(str.substr(a,b-a));return true;
+                        }
+                        if(method=="to_lower"||method=="to_upper"){
+                            if(!no_args())return false;std::string r=str;for(char& c:r)c=(char)(method=="to_lower"?std::tolower((unsigned char)c):std::toupper((unsigned char)c));out=json::Document(r);return true;
+                        }
+                        if(method=="replace"){
+                            if(args.size()!=2){error="replace: expected old and replacement strings";return false;}json::Document a,b;if(!eval_arg(0,a)||!eval_arg(1,b)||!a.is_string()||!b.is_string()){error="replace: arguments must be strings";return false;}if(a.string.empty()){error="replace: old string must not be empty";return false;}std::string r=str;std::size_t pos=0;while((pos=r.find(a.string,pos))!=std::string::npos){r.replace(pos,a.string.size(),b.string);pos+=b.string.size();}out=json::Document(r);return true;
+                        }
+                        if(method=="to_int"){
+                            if(!no_args())return false;if(str.empty()){error="to_int: invalid integer";return false;}std::int64_t v=0;auto pr=std::from_chars(str.data(),str.data()+str.size(),v);if(pr.ec!=std::errc()||pr.ptr!=str.data()+str.size()){error="to_int: invalid or out-of-range integer";return false;}out=json::Document((double)v);if(v>9007199254740992LL||v<-9007199254740992LL){out.type=json::Type::StrNumber;out.string=std::to_string(v);}return true;
+                        }
+                        if(method=="to_double"){
+                            if(!no_args())return false;if(str.empty()||std::isspace((unsigned char)str.front())||std::isspace((unsigned char)str.back())){error="to_double: invalid number";return false;}char* end=nullptr;errno=0;double v=std::strtod(str.c_str(),&end);if(errno==ERANGE||!end||end!=str.c_str()+str.size()||!std::isfinite(v)){error="to_double: invalid or out-of-range number";return false;}out=json::Document(v);return true;
+                        }
+                        if(method=="substr"){
+                            if(args.empty()||args.size()>2){error="substr: expected pos and optional length";return false;}json::Document p,n;if(!eval_arg(0,p)||!p.is_number()||std::trunc(p.num)!=p.num||p.num<0){error="substr: invalid pos";return false;}std::size_t at=(std::size_t)p.num;if(at>str.size())at=str.size();std::size_t len=std::string::npos;if(args.size()==2){if(!eval_arg(1,n)||!n.is_number()||std::trunc(n.num)!=n.num||n.num<0){error="substr: invalid length";return false;}len=(std::size_t)n.num;}out=json::Document(str.substr(at,len));return true;
+                        }
+                    }
+                    if(method=="to_string" && base.is_number()) { if(!no_args())return false;out=json::Document(render_expression_value(base));return true; }
+                    if(base.is_array()) {
+                        const auto& a=base.array;
+                        if(method=="size"||method=="length"){if(!no_args())return false;out=json::Document((double)a.size());return true;}
+                        if(method=="empty"){if(!no_args())return false;out=json::Document(a.empty());return true;}
+                        if(method=="first"||method=="last"){if(!no_args())return false;if(a.empty()){error=method+": array is empty";return false;}out=method=="first"?a.front():a.back();return true;}
+                        if(method=="contains"){if(args.size()!=1){error="contains: expected one value";return false;}json::Document v;if(!eval_arg(0,v))return false;for(const auto& x:a)if(structural_equal(x,v)){out=json::Document(true);return true;}out=json::Document(false);return true;}
+                        if(method=="join"){if(args.size()!=1){error="join: expected separator";return false;}json::Document sep;if(!eval_arg(0,sep)||!sep.is_string()){error="join: separator must be a string";return false;}std::string r;for(std::size_t i=0;i<a.size();++i){if(i)r+=sep.string;if(a[i].is_array()||a[i].is_object()||(a[i].is_string()&&a[i].string.rfind("\x1fnift:",0)==0)){error="join: elements must be renderable scalar values";return false;}r+=render_expression_value(a[i]);}out=json::Document(r);return true;}
+                        if(method=="slice"){if(args.empty()||args.size()>2){error="slice: expected start and optional end";return false;}json::Document st,en;if(!eval_arg(0,st)||!st.is_number()||std::trunc(st.num)!=st.num||st.num<0){error="slice: invalid start";return false;}std::size_t b=(std::size_t)st.num,e=a.size();if(args.size()==2){if(!eval_arg(1,en)||!en.is_number()||std::trunc(en.num)!=en.num||en.num<0){error="slice: invalid end";return false;}e=(std::size_t)en.num;}b=std::min(b,a.size());e=std::min(e,a.size());if(e<b)e=b;out=json::Document::make_array();out.array.assign(a.begin()+b,a.begin()+e);return true;}
+                    }
+                    if(method=="to_string" && !(base.is_string() && base.string.rfind("\x1fnift:",0)==0)){error="to_string: expected int or double";return false;}
+                    if((base.is_string() && base.string.rfind("\x1fnift:",0)!=0)||base.is_array()||base.is_number()){error=method+": unsupported for this value";return false;}
+                }
+            }
+        }
+
         // v4.3 collection constructors. Collections are identity-bearing runtime
         // objects while map/set logical equality is implemented by their methods/operators.
         for (const auto& ctor : {std::string("stack"),std::string("queue"),std::string("prique"),std::string("map"),std::string("sorted_map"),std::string("set"),std::string("sorted_set")}) {
@@ -1957,6 +2059,21 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             json::Document injected_value; std::string nested_error; const bool ok = evaluate_expression(*injected, injected_value, nested_error);
             last_expression_mutation_ = depth == 0 ? last_expression_mutation_ : saved_mutation;
             pop_variable_scope(); input_stack_.pop_back(); if (!ok) { error = "inject: " + nested_error; return false; } out = std::move(injected_value); return true;
+        }
+
+        // CP101 expression-valued array literals. Evaluate elements left-to-right,
+        // exactly once. Empty arrays and ordinary JSON-compatible arrays remain a subset.
+        if (text.size()>=2 && text.front()=='[' && text.back()==']') {
+            std::size_t close=0;
+            if(find_balanced(text,0,'[',']',close)&&close==text.size()-1){
+                const std::string inner=trim_copy(text.substr(1,text.size()-2));
+                out=json::Document::make_array();
+                if(inner.empty())return true;
+                bool ok=false;std::vector<bool> quoted;auto elements=parse_parameters(inner,ok,&quoted);
+                if(!ok){error="array literal: malformed elements";return false;}
+                for(std::size_t i=0;i<elements.size();++i){json::Document v;if(i<quoted.size()&&quoted[i])v=json::Document(elements[i]);else if(!eval(elements[i],v,depth+1))return false;out.array.push_back(std::move(v));}
+                return true;
+            }
         }
 
         // Declarations/assignments must be parsed before direct JSON-path lookup;
