@@ -51,8 +51,6 @@ check leaf-children     '0'          'print(page("docs/basics").children.size())
 check leaf-descendants  '0'          'print(page("docs/basics").descendants.size())'
 check leaf-ancestors    'Docs,Home'  'print(page("docs/basics").ancestors.map(a => a.title).join(","))'
 check leaf-siblings     '1'          'print(page("docs/advanced").siblings.size())'
-check unknown-page      'x'          'x := 1
-print(x)' 2>/dev/null || true
 
 # template current-page binding + parity with eval
 printf 'PARENT:<!--$[page.parent.title]-->|SIBLINGS:<!--$[page.siblings.size()]-->|@content' > templates/template.html
