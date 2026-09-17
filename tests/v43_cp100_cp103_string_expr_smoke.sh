@@ -39,4 +39,20 @@ for expr in '"x".split()' '"x".replace("", "y")' '" 42 ".to_int()' '"3.2x".to_do
   printf 'print(%s)\n' "$expr" > bad.nift
   if $NIFT_BIN run bad.nift >/dev/null 2>&1; then echo "expected failure: $expr"; exit 1; fi
 done
+# Strict numeric conversion: hex float forms are rejected (strtod permissiveness),
+# a leading '+' is accepted consistently by both to_int and to_double, and the
+# complete-input contract holds at the int64 boundaries.
+for expr in '"0x10".to_double()' '"0x1p3".to_double()' '"+9223372036854775808".to_int()' '"-9223372036854775809".to_int()' '"1e999".to_double()' '"nan".to_double()'; do
+  printf 'print(%s)\n' "$expr" > bad.nift
+  if $NIFT_BIN run bad.nift >/dev/null 2>&1; then echo "expected failure: $expr"; exit 1; fi
+done
+cat > num.nift <<'NIFT'
+print("+42".to_int())
+print("+42".to_double())
+print("9223372036854775807".to_int())
+print("-9223372036854775808".to_int())
+print("3.14".to_double())
+print("1e6".to_double())
+NIFT
+[[ "$($NIFT_BIN run num.nift)" == $'42\n42\n9223372036854775807\n-9223372036854775808\n3.14\n1000000' ]]
 printf 'CP100-CP103 string/expression ergonomics smoke: PASS\n'
