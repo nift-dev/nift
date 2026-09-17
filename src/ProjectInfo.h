@@ -1,6 +1,7 @@
 #pragma once
 #include "ProjectOwnership.h"
 #include "Types.h"
+#include "HierarchyIndex.h"
 #include <atomic>
 #include <filesystem>
 #include <mutex>
@@ -36,6 +37,7 @@ public:
     std::shared_ptr<const json::Document> project_value() const;
     void refresh_project_fingerprint() const;
     const content_model::Model* content_model_value() const;
+    const HierarchyIndex* hierarchy_index() const;
 
     TrackedInfo* find(const std::string& name);
     const TrackedInfo* find(const std::string& name) const;
@@ -93,6 +95,8 @@ private:
     mutable std::shared_ptr<const json::Document> project_value_;
     mutable std::once_flag content_model_flag_;
     mutable std::shared_ptr<const content_model::Model> content_model_value_;
+    mutable std::once_flag hierarchy_flag_;
+    mutable std::shared_ptr<const HierarchyIndex> hierarchy_;
     std::atomic<bool> mutation_started_{false};
     mutable std::unordered_map<std::string, std::size_t> tracked_index_;
     mutable std::unordered_set<std::string> tracked_output_index_;

@@ -65,6 +65,14 @@ public:
     // front-matter parsing.
     virtual bool page_project_metadata(const TrackedInfo& info, json::Document& out, std::string& error) const { return false; }
 
+    // Hierarchy: page references are opaque values (\x1fnift:page:<name>)
+    // resolved on member access. page_ref_for validates a tracked name and
+    // produces its reference; resolve_page_member resolves one hierarchy or
+    // data member of a page. Hosts without hierarchy return false.
+    virtual bool page_ref_for(const std::string& name, std::string& ref) const { return false; }
+    virtual bool resolve_page_member(const std::string& page_name, const std::string& member,
+                                     json::Document& out, std::string& error) const { return false; }
+
     // Project-contract namespaces (config.contracts): the parser needs to
     // refuse bindings that collide with a configured contract name, and to
     // resolve a contract name to its configured source path.

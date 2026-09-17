@@ -678,6 +678,60 @@ public:
 private:
     fs::path root_; mutable std::string cache_; mutable std::shared_ptr<const json::Document> project_value_;
     Config config_; std::vector<TrackedInfo> tracked_; bool project_found_ = false;
+    mutable std::once_flag hierarchy_flag_; mutable std::shared_ptr<const HierarchyIndex> hierarchy_;
+
+    const HierarchyIndex* hierarchy() const {
+        std::call_once(hierarchy_flag_, [this] {
+            hierarchy_ = std::make_shared<const HierarchyIndex>(HierarchyIndex::build(tracked_));
+        });
+        return hierarchy_.get();
+    }
+    static std::string page_ref_of(const std::string& name) { return std::string("\x1fnift:page:") + name; }
+public:
+    bool page_ref_for(const std::string& name, std::string& ref) const override {
+        const HierarchyIndex* hi = hierarchy();
+        if (!hi || hi->index_of(name) == HierarchyIndex::NO_PARENT) return false;
+        ref = page_ref_of(name);
+        return true;
+    }
+    bool resolve_page_member(const std::string& page_name, const std::string& member,
+                             json::Document& out, std::string& error) const override {
+        const HierarchyIndex* hi = hierarchy();
+        if (!hi) return false;
+        const std::size_t idx = hi->index_of(page_name);
+        if (idx == HierarchyIndex::NO_PARENT) return false;
+        const TrackedInfo& info = tracked_[idx];
+        if (member == "parent") {
+            const std::size_t p = hi->parent_index(idx);
+            out = p == HierarchyIndex::NO_PARENT ? json::Document(nullptr) : json::Document(page_ref_of(tracked_[p].name));
+            return true;
+        }
+        if (member == "children" || member == "ancestors" || member == "descendants" || member == "siblings") {
+            std::vector<std::size_t> list;
+            if (member == "children") { if (const auto* c = hi->children(idx)) list = *c; }
+            else if (member == "siblings") { const std::size_t p = hi->parent_index(idx); if (p != HierarchyIndex::NO_PARENT) if (const auto* c = hi->children(p)) for (const auto ch : *c) if (ch != idx) list.push_back(ch); }
+            else if (member == "ancestors") { std::size_t p = hi->parent_index(idx); while (p != HierarchyIndex::NO_PARENT) { list.push_back(p); p = hi->parent_index(p); } }
+            else { std::vector<std::size_t> stack; if (const auto* c = hi->children(idx)) stack.assign(c->rbegin(), c->rend()); while (!stack.empty()) { const std::size_t cur = stack.back(); stack.pop_back(); list.push_back(cur); if (const auto* cc = hi->children(cur)) for (auto it = cc->rbegin(); it != cc->rend(); ++it) stack.push_back(*it); } }
+            out = json::Document::make_array();
+            out.array.reserve(list.size());
+            for (const auto i : list) out.array.emplace_back(page_ref_of(tracked_[i].name));
+            return true;
+        }
+        if (member == "name") { out = json::Document(info.name); return true; }
+        if (member == "title") { out = json::Document(info.title); return true; }
+        if (member == "type") { out = info.type ? json::Document(*info.type) : json::Document(nullptr); return true; }
+        if (member == "path" || member == "output_path" || member == "url" || member == "content") {
+            const auto source = project_read::content_path_of(root_, config_, info);
+            const auto output = project_read::output_path_of(root_, config_, info);
+            if (member == "path") { out = json::Document(project_read::relative_of(root_, source)); return true; }
+            if (member == "output_path") { out = json::Document(project_read::relative_of(root_, output)); return true; }
+            if (member == "url") { out = json::Document("/" + project_read::relative_of(root_, output).substr(config_.output_dir.size())); return true; }
+            out = json::Document(filesystem::file_exists(source) ? filesystem::read_file(source) : std::string{});
+            return true;
+        }
+        if (member == "metadata") { out = json::Document::make_object(); return true; }
+        return false;
+    }
 };
 
 static int run_script_file(const fs::path& path) {

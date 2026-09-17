@@ -150,6 +150,13 @@ const content_model::Model* ProjectInfo::content_model_value() const {
     return content_model_value_.get();
 }
 
+const HierarchyIndex* ProjectInfo::hierarchy_index() const {
+    std::call_once(hierarchy_flag_, [this] {
+        hierarchy_ = std::make_shared<const HierarchyIndex>(HierarchyIndex::build(tracked));
+    });
+    return hierarchy_.get();
+}
+
 std::shared_ptr<const json::Document> ProjectInfo::project_value() const {
     std::call_once(project_value_flag_, [this] {
         project_value_ = make_project_value(root, config, tracked, content_model_value());

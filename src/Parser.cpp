@@ -566,6 +566,14 @@ Parser::Parser(RenderHost& host, TrackedInfo& tracked_info)
         if (host_.page_project_metadata(tracked_info_, m, page_metadata_error)) from_project = true;
         if(!from_project){std::string e;auto cp=host_.content_path(tracked_info_);if(filesystem::file_exists(cp)){auto parsed=frontmatter::parse_inline(filesystem::read_file(cp));if(tracked_info_.frontmatter&&parsed.present)m["_error"]=json::Document("multiple front matter sources");else if(tracked_info_.frontmatter){frontmatter::load_external(host_.root(),*tracked_info_.frontmatter,m,e);if(!e.empty())m["_error"]=json::Document(e);}else if(parsed.present&&!parsed.error.empty())m["_error"]=json::Document(parsed.error);else if(parsed.present)m=parsed.value;}}
         json_bindings_["frontmatter"]=std::make_shared<const json::Document>(std::move(m));
+        // Current page for hierarchy composition (page.parent etc.). The
+        // reference is constructed directly without touching the hierarchy
+        // index, which is built lazily only when a hierarchy member is
+        // actually accessed (pay-for-use).
+        if (!tracked_info_.name.empty()) {
+            auto page_sp=std::make_shared<json::Document>(json::Document(std::string("\x1fnift:page:")+tracked_info_.name));
+            variable_scopes_.back().emplace("page", VariableBinding{page_sp, nift_binding_type(*page_sp), false, false});
+        }
     }
 }
 
@@ -849,6 +857,15 @@ bool Parser::resolve_json_value(const std::string& expression,
             if (!identifier(member)) {
                 error = "invalid JSON member access in '" + expression + "'";
                 return true;
+            }
+            if (current->is_string() && current->string.rfind("\x1fnift:page:",0)==0) {
+                json::Document resolved; std::string perr;
+                if (!host_.resolve_page_member(current->string.substr(11), member, resolved, perr)) {
+                    error = perr.empty() ? ("page has no member: " + member) : perr;
+                    return true;
+                }
+                current = std::make_shared<const json::Document>(std::move(resolved));
+                continue;
             }
             if (!current->is_object()) {
                 error = "cannot access member '" + member + "' because the current JSON value is not an object";
@@ -1490,6 +1507,54 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                     mp=me+1;
                 }
             }
+            if (root_it->second.value && root_it->second.value->is_string() && root_it->second.value->string.rfind("\x1fnift:page:",0)==0 && text[root_len]=='.') {
+                // Hierarchy page-reference member path: page.parent,
+                // page.children[0].url, page.ancestors.map(...). Only the
+                // dot/index walk happens here; method calls on the resulting
+                // collections are dispatched by the postfix machinery.
+                json::Document current=*root_it->second.value; std::size_t mp=root_len+1;
+                while(mp<text.size()){
+                    std::size_t me=mp; while(me<text.size()&&(std::isalnum((unsigned char)text[me])||text[me]=='_'))++me;
+                    if(me==mp){ if(text[mp]=='.'||text[mp]=='['){break;} error="invalid page member path: "+text;return false; }
+                    const std::string member=text.substr(mp,me-mp);
+                    if(current.is_string()&&current.string.rfind("\x1fnift:page:",0)==0){
+                        json::Document resolved; std::string perr;
+                        if(!host_.resolve_page_member(current.string.substr(11),member,resolved,perr)){error=perr.empty()?("page has no member: "+member):perr;return false;}
+                        current=std::move(resolved);
+                    } else if(current.is_object()){
+                        if(!current.has(member)){error="page value '"+text+"' has no member '"+member+"'";return false;}
+                        current=current[member];
+                    } else if(current.is_array()){
+                        error="cannot access member '"+member+"' on a page collection; select an element first";return false;
+                    } else if(current.is_null()){
+                        error="cannot access member '"+member+"' on null (no parent/ancestors)";return false;
+                    } else {
+                        error="cannot access member '"+member+"' on this page value";return false;
+                    }
+                    if(me==text.size()){out=std::move(current);return true;}
+                    if(text[me]=='.'){mp=me+1;continue;}
+                    if(text[me]=='['){
+                        ++me; const std::size_t index_start=me;
+                        while(me<text.size()&&std::isdigit((unsigned char)text[me]))++me;
+                        if(index_start==me||me>=text.size()||text[me]!=']'){error="page index is malformed in '"+text+"'";return false;}
+                        std::size_t index=0;try{index=(std::size_t)std::stoull(text.substr(index_start,me-index_start));}catch(...){error="page index is out of range in '"+text+"'";return false;}
+                        ++me;
+                        if(!current.is_array()||index>=current.array.size()){error="page index "+std::to_string(index)+" is out of range in '"+text+"'";return false;}
+                        current=current.array[index];
+                        if(me==text.size()){out=std::move(current);return true;}
+                        if(text[me]=='.'){mp=me+1;continue;}
+                        // A following operator/expression makes this a compound
+                        // expression; fall through so the operator machinery
+                        // evaluates the member chain and the rest separately.
+                        return false;
+                    }
+                    // A following operator (e.g. `c.title != "x"`) makes this a
+                    // compound expression; fall through rather than claiming the
+                    // whole text as a page member path.
+                    return false;
+                }
+                break;
+            }
             const json::Document* cur = root_it->second.value.get();
             std::size_t pos = root_len;
             bool walk_ok = true;
@@ -1732,6 +1797,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             if(call_args("ls",args,q)){if(args.size()>1){error="ls: expected zero or one path";return false;}fs::path p;if(args.empty())p=standalone_script_host_?fs::current_path():host_.root();else if(!checked_path("ls",args,q,0,p))return false;std::error_code ec;if(!fs::is_directory(p,ec)||ec){error="ls: path is not a readable directory";return false;}std::vector<std::string> names;for(fs::directory_iterator it(p,ec),end;!ec&&it!=end;it.increment(ec))names.push_back(it->path().filename().generic_string());if(ec){error="ls: "+ec.message();return false;}std::sort(names.begin(),names.end());out=json::Document::make_array();for(const auto& n:names)out.array.emplace_back(n);return true;}
             if(call_args("open",args,q)){fs::path p;if(args.size()!=1||!checked_path("open",args,q,0,p))return false;std::error_code ec;if(fs::is_directory(p,ec)){error="open: path is a directory";return false;}std::ifstream f(p,std::ios::binary);if(!f){error="open: cannot open path";return false;}std::ostringstream ss;ss<<f.rdbuf();out=json::Document(ss.str());return true;}
             if(call_args("file",args,q)){fs::path p;if(args.size()!=1||!checked_path("file",args,q,0,p))return false;auto f=std::make_shared<FileInstance>();f->path=p;auto id=std::to_string(next_file_instance_id_++);file_instances_[id]=f;out=json::Document(std::string("\x1fnift:file:")+id);return true;}
+            if(call_args("page",args,q)){if(args.size()!=1){error="page: expected one page name";return false;}json::Document d;if(!arg_value(args,q,0,d)||!d.is_string()){error="page: name must be a string";return false;}std::string ref;if(!host_.page_ref_for(d.string,ref)){error="page: unknown tracked page '"+d.string+"'";return false;}out=json::Document(ref);return true;}
             if(call_args("ifstream",args,q)||call_args("ofstream",args,q)){const bool output=text.rfind("ofstream(",0)==0;fs::path p;if(args.size()!=1||!checked_path(output?"ofstream":"ifstream",args,q,0,p))return false;auto st=std::make_shared<StreamInstance>();st->kind=output?StreamInstance::Kind::Output:StreamInstance::Kind::Input;if(output){st->output=std::make_shared<std::ofstream>(p,std::ios::binary|std::ios::trunc);if(!*st->output){error="ofstream: cannot open path";return false;}}else{st->input=std::make_shared<std::ifstream>(p,std::ios::binary);if(!*st->input){error="ifstream: cannot open path";return false;}}auto id=std::to_string(next_stream_instance_id_++);stream_instances_[id]=st;out=json::Document(std::string("\x1fnift:stream:")+id);return true;}
             if(call_args("close",args,q)){if(args.size()!=1){error="close: expected stream";return false;}json::Document d;if(!arg_value(args,q,0,d)||!d.is_string()||d.string.rfind("\x1fnift:stream:",0)!=0){error="close: expected stream";return false;}auto it=stream_instances_.find(d.string.substr(13));if(it==stream_instances_.end()){error="close: invalid stream";return false;}if(it->second->closed){error="close: stream already closed";return false;}if(it->second->input)it->second->input->close();if(it->second->output)it->second->output->close();it->second->closed=true;out=json::Document(nullptr);return true;}
             if(call_args("print",args,q)){if(args.size()!=1){error="print: expected one value";return false;}json::Document d;if(!arg_value(args,q,0,d))return false;if(d.is_string()&&q.size()>0&&q[0]&&d.string.find("$[")!=std::string::npos){std::string r,e;if(!interpolate_parameter(d.string,r,e)){error="print: "+e;return false;}d=json::Document(r);}if(d.is_array()||d.is_object()||(d.is_string()&&d.string.rfind("\x1fnift:",0)==0)){error="print: value is not directly renderable";return false;}const std::string rendered=render_expression_value(d);{static std::mutex print_mutex;std::lock_guard<std::mutex> lock(print_mutex);std::cout<<rendered<<'\n';std::cout.flush();}out=json::Document(nullptr);return true;}
@@ -2411,6 +2477,15 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                 json::Document base;
                 if (!eval(receiver, base, depth + 1)) return false;
                 if (kind == 1) {
+                    if (base.is_string() && base.string.rfind("\x1fnift:page:", 0) == 0) {
+                        json::Document resolved; std::string perr;
+                        if (!host_.resolve_page_member(base.string.substr(11), operand, resolved, perr)) {
+                            error = perr.empty() ? ("page has no member: " + operand) : perr;
+                            return false;
+                        }
+                        out = std::move(resolved);
+                        return true;
+                    }
                     if (!base.is_object()) {
                         error = "cannot access member '" + operand + "' because the current JSON value is not an object";
                         return false;
