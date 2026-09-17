@@ -534,6 +534,7 @@ test-v43-language: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_hierarchy_pay_for_use_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_mundane_surface_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_frontend_surface_dogfood.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_surface_robustness_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 benchmarks/hierarchy_scaling.py
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp172_from_entries_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp173_index_by_smoke.sh
