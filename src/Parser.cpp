@@ -38,6 +38,14 @@ static const char* nift_binding_type_name(int type) {
     switch (type) { case 0:return "null"; case 1:return "bool"; case 2:return "int"; case 3:return "double"; case 4:return "string"; case 5:return "array"; case 6:return "json"; default:return "unknown"; }
 }
 
+// An int value may be assigned to a double binding (widening: a double binding
+// represents any numeric value under Nift's arithmetic model, which already
+// computes int + double as double). The reverse (double -> int) stays an error
+// because it is lossy.
+static bool nift_type_assignable(int from, int to) {
+    return from == to || (from == 2 && to == 3);
+}
+
 static const int kMaxCallableDepth = 64;
 
 namespace {
@@ -2243,7 +2251,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                 json::Document current=*rb->value;std::size_t mp=dot+1;std::shared_ptr<StructInstance> parent;std::string member;
                 while(mp<name.size()){std::size_t me=name.find('.',mp);member=name.substr(mp,me==std::string::npos?std::string::npos:me-mp);auto ii=struct_instances_.find(current.string.substr(13));if(ii==struct_instances_.end()){error="invalid struct instance";return false;}parent=ii->second;auto fit=parent->fields.find(member);if(fit==parent->fields.end()){error="struct has no field: "+member;return false;}if(me==std::string::npos)break;current=*fit->second.value;if(!current.is_string()||current.string.rfind("\x1fnift:struct:",0)!=0){error="member path is not a struct: "+member;return false;}mp=me+1;}
                 auto fit=parent->fields.find(member);auto sd=structs_.find(parent->type_name);bool priv=false;if(sd!=structs_.end())for(const auto& f:sd->second.fields)if(f.name==member)priv=f.private_member;if(priv&&(receiver_stack_.empty()||receiver_stack_.back()!=parent)){error="private struct field: "+member;return false;}
-                json::Document assigned;if(!eval(text.substr(p+1),assigned,depth+1))return false;const int at=nift_binding_type_from_text(text.substr(p+1),assigned);if(at!=fit->second.type){error="cannot change struct field type: "+member;return false;}
+                json::Document assigned;if(!eval(text.substr(p+1),assigned,depth+1))return false;const int at=nift_binding_type_from_text(text.substr(p+1),assigned);if(!nift_type_assignable(at,fit->second.type)){error="cannot change struct field type: "+member;return false;}
                 if(assigned.is_string()&&(assigned.string.rfind("\x1fnift:struct:",0)==0||assigned.string.rfind("\x1fnift:collection:",0)==0)){std::string parent_id;for(const auto& e:struct_instances_)if(e.second==parent){parent_id=e.first;break;}if(reference_would_cycle(assigned.string,std::string("\x1fnift:struct:")+parent_id)){error="assignment would create a cyclic reference: "+member;return false;}}
                 fit->second.value=std::make_shared<json::Document>(std::move(assigned));out=*fit->second.value;if(depth==0)last_expression_mutation_=true;return true;
             }
@@ -2259,7 +2267,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                     json::Document assigned;
                     if (!eval(text.substr(p + 1), assigned, depth + 1)) return false;
                     const int assigned_type = nift_binding_type_from_text(text.substr(p + 1), assigned);
-                    if (assigned_type != rec->second.type) {
+                    if (!nift_type_assignable(assigned_type, rec->second.type)) {
                         error = "cannot assign " + std::string(nift_binding_type_name(assigned_type)) +
                                 " to " + nift_binding_type_name(rec->second.type) + " struct field '" + name + "'";
                         return false;
@@ -2277,7 +2285,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             json::Document assigned;
             if (!eval(text.substr(p + 1), assigned, depth + 1)) return false;
             const int assigned_type = nift_binding_type_from_text(text.substr(p + 1), assigned);
-            if (assigned_type != binding->type) {
+            if (!nift_type_assignable(assigned_type, binding->type)) {
                 error = "cannot assign " + std::string(nift_binding_type_name(assigned_type)) +
                         " to " + nift_binding_type_name(binding->type) + " binding '" + name + "'";
                 return false;

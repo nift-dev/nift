@@ -55,4 +55,28 @@ print("3.14".to_double())
 print("1e6".to_double())
 NIFT
 [[ "$($NIFT_BIN run num.nift)" == $'42\n42\n9223372036854775807\n-9223372036854775808\n3.14\n1000000' ]]
+# int -> double widening assignment: a double binding accepts int values (the
+# arithmetic model already computes int + double as double), including through
+# a map retrieval and a struct double field; double -> int stays lossy/error.
+cat > widen.nift <<'NIFT'
+old := 0.0
+m := map()
+m.set("a", 0.0 + 45.0)
+old = m.get("a")
+print(old + 0.5)
+x := 0.0
+x = 5
+print(x + 0.5)
+struct(box) { v := 0.0 }
+b := box()
+b.v = 7
+print(b.v + 0.5)
+NIFT
+[[ "$($NIFT_BIN run widen.nift)" == $'45.5\n5.5\n7.5' ]]
+printf 'print(x := 5; x = 5.5)\n' > wbad.nift
+cat > wbad.nift <<'NIFT'
+x := 5
+x = 5.5
+NIFT
+if $NIFT_BIN run wbad.nift >/dev/null 2>&1; then echo "double->int widened unexpectedly" >&2; exit 1; fi
 printf 'CP100-CP103 string/expression ergonomics smoke: PASS\n'
