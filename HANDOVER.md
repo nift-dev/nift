@@ -20,15 +20,16 @@ whether it is a regression.
 ## Current identity
 
 - Product: **Nift**, a website generator and dependency-aware website build layer.
-- Current executable identity: `Nift v4.2.0` (development), the v4.2 template-language
+- Current executable identity: `Nift v4.3.0` (development), the v4.3 language/scripting/content
   development line following the public v4.1.0 release.
 - Language/toolchain: C++17 and Make.
 - Output convention for modern projects: `public/`.
 - Current branch: `main` in this checkout.
 - Current project phase: **post-release** — the public v4.1.0 release is
-  published (tag `v4.1.0` at `b499798`), and the v4.2 template-language
-  campaign (CP1–CP30) is development-frozen awaiting release authorization.
-  The embedded engine, its language
+  published (tag `v4.1.0` at `b499798`), and the v4.3 language/scripting
+  campaign has completed CP114 and now has an accepted CP115–CP167 structured-data,
+  agent-eval, project-model and typed-content/taxonomy plan before the held CP48–CP50
+  final release gates. The embedded engine, its language
   bindings, the shared corpus and the experimental Rust implementation remain
   in-tree but are not publicly released, documented or promoted; they are
   dogfooding/experimental work. Ordinary `make` builds only the CLI.
@@ -118,7 +119,7 @@ themselves. Nift owns the small build-time job it can perform precisely.
 - `docs/handover/PENDING-WEBSITE.md`: internal queue of implementation-driven
   website changes that must be completed during release preparation.
 - `docs/handover/ROADMAP.md`: living production-readiness risk assessment.
-- `docs/handover/V4.3-LANGUAGE-CAMPAIGN.md`: agreed v4.3 operators, collections, first-class callables, closures, equality semantics, and checkpoint implementation plan.
+- `docs/handover/V4.3-LANGUAGE-CAMPAIGN.md`: living v4.3 language/scripting campaign, including the accepted CP115–CP167 JSON/object, agent `nift eval`, project-model, front-matter, schema, typed-content and taxonomy implementation plan.
 
 ### Detailed subject handovers
 
