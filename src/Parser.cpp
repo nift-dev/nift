@@ -1785,7 +1785,8 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                     method=="eof"||method=="write"||method=="write_line"||method=="flush"||method=="tell"||
                     method=="seek"||method=="modified"||method=="save"||method=="revert"||method=="replace_once"||
                     method=="insert"||method=="insert_before"||method=="insert_after"||method=="prepend"||method=="append"||
-                    method=="copy"||method=="move"||method=="remove"||method=="cat";
+                    method=="copy"||method=="move"||method=="remove"||method=="cat"||
+                    method=="keys"||method=="values"||method=="entries"||method=="has"||method=="get"||method=="merge";
                 if (known) {
                     json::Document base;
                     if (!eval(receiver,base,depth+1)) return false;
@@ -1870,6 +1871,33 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                         }
                     }
                     if(method=="to_string" && base.is_number()) { if(!no_args())return false;out=json::Document(render_expression_value(base));return true; }
+                    if(base.is_object()) {
+                        if(method=="size"||method=="empty"||method=="keys"||method=="values"||method=="entries") {
+                            if(!no_args())return false;
+                            if(method=="size"){out=json::Document((double)base.object.size());return true;}
+                            if(method=="empty"){out=json::Document(base.object.empty());return true;}
+                            out=json::Document::make_array();
+                            for(const auto& kv:base.object){
+                                if(method=="keys")out.array.emplace_back(kv.first);
+                                else if(method=="values")out.array.push_back(kv.second);
+                                else { json::Document e=json::Document::make_object(); e["key"]=json::Document(kv.first); e["value"]=kv.second; out.array.push_back(std::move(e)); }
+                            }
+                            return true;
+                        }
+                        if(method=="has"||method=="get") {
+                            if((method=="has"&&args.size()!=1)||(method=="get"&&(args.empty()||args.size()>2))){error=method+": expected key"+(method=="get"?" and optional default":"");return false;}
+                            json::Document k;if(!eval_arg(0,k)||!k.is_string()){error=method+": key must be a string";return false;}
+                            auto it=std::find_if(base.object.begin(),base.object.end(),[&](const auto& kv){return kv.first==k.string;});
+                            if(method=="has"){out=json::Document(it!=base.object.end());return true;}
+                            if(it!=base.object.end()){out=it->second;return true;}
+                            if(args.size()==2)return eval_arg(1,out);
+                            out=json::Document(nullptr);return true;
+                        }
+                        if(method=="merge") {
+                            if(args.size()!=1){error="merge: expected one object";return false;}json::Document rhs;if(!eval_arg(0,rhs)||!rhs.is_object()){error="merge: argument must be an object";return false;}
+                            out=base;for(const auto& kv:rhs.object)out[kv.first]=kv.second;return true;
+                        }
+                    }
                     if(base.is_array()) {
                         const auto& a=base.array;
                         if(method=="size"||method=="length"){if(!no_args())return false;out=json::Document((double)a.size());return true;}
