@@ -1828,6 +1828,15 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                         return eval(args[i],v,depth+1);
                     };
                     auto no_args=[&]()->bool{if(!args.empty()){error=method+": expected no arguments";return false;}return true;};
+                    // CP171: all operations that construct object keys from values
+                    // share one conversion rule. JSON objects ultimately have string
+                    // keys, so Nift accepts only renderable scalar key values and
+                    // checks uniqueness after canonical rendering.
+                    auto generated_object_key=[&](const json::Document& key,std::string& rendered)->bool{
+                        if(!(key.is_string()||key.is_number()||key.is_bool())){error=method+": generated key must be string, number, or bool";return false;}
+                        rendered=key.is_string()?key.string:render_expression_value(key);
+                        return true;
+                    };
                     if(base.is_string() && base.string.rfind("\x1fnift:file:",0)==0) {
                         auto fit=file_instances_.find(base.string.substr(11)); if(fit==file_instances_.end()){error="file: invalid FileValue";return false;} auto f=fit->second;
                         auto can_read=[&](){return f->mode=="r"||f->mode=="rw";}; auto can_write=[&](){return f->mode=="w"||f->mode=="a"||f->mode=="rw";};
