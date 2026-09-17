@@ -142,6 +142,11 @@ const TrackedInfo* ProjectInfo::find(const std::string& name) const {
     return it == tracked_index_.end() ? nullptr : &tracked[it->second];
 }
 
+std::shared_ptr<const json::Document> ProjectInfo::project_value() const {
+    std::call_once(project_value_flag_, [this] { project_value_ = make_project_value(root, config, tracked); });
+    return project_value_;
+}
+
 bool ProjectInfo::conflicts_with_tracked_path(const TrackedInfo& candidate, const std::string& ignored_name) const {
     const fs::path candidate_content = content_path(candidate).lexically_normal();
     const fs::path candidate_output = output_path(candidate).lexically_normal();

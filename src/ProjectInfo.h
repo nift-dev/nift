@@ -28,6 +28,12 @@ public:
     bool load_tracking();
     bool save_tracking() const;
 
+    // Build-scoped, thread-safe lazy copy of the read-only project model
+    // (project.files / content / schemas / taxonomies). Built at most once per
+    // build and shared by every page render instead of being reconstructed per
+    // page (which was quadratic in the number of tracked files).
+    std::shared_ptr<const json::Document> project_value() const;
+
     TrackedInfo* find(const std::string& name);
     const TrackedInfo* find(const std::string& name) const;
     bool conflicts_with_tracked_path(const TrackedInfo& candidate, const std::string& ignored_name = {}) const;
@@ -77,6 +83,8 @@ public:
 
 private:
     WatchList* watch_ = nullptr;
+    mutable std::once_flag project_value_flag_;
+    mutable std::shared_ptr<const json::Document> project_value_;
     std::atomic<bool> mutation_started_{false};
     mutable std::unordered_map<std::string, std::size_t> tracked_index_;
     mutable std::unordered_set<std::string> tracked_output_index_;

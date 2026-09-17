@@ -12,7 +12,7 @@
 // exact pre-CP1 implementation, so rendering behaviour is unchanged.
 class ProjectInfoHost : public RenderHost {
 public:
-    explicit ProjectInfoHost(ProjectInfo& project) : project_(project), project_value_(make_project_value(project.root,project.config,project.tracked)) {}
+    explicit ProjectInfoHost(ProjectInfo& project) : project_(project) {}
 
     const std::filesystem::path& root() const override { return project_.root; }
     std::string relative(const std::filesystem::path& path) const override { return project_.relative(path); }
@@ -36,7 +36,13 @@ public:
         return std::nullopt;
     }
 
-    const std::shared_ptr<const json::Document>* binding(const std::string& name) const override { return name=="project" ? &project_value_ : nullptr; }
+    const std::shared_ptr<const json::Document>* binding(const std::string& name) const override {
+        if (name == "project") {
+            if (!project_value_) project_value_ = project_.project_value();
+            return project_value_ ? &project_value_ : nullptr;
+        }
+        return nullptr;
+    }
 
     bool is_contract_name(const std::string& name) const override {
         return project_.config.contracts.count(name) != 0;
@@ -67,5 +73,5 @@ public:
 
 private:
     ProjectInfo& project_;
-    std::shared_ptr<const json::Document> project_value_;
+    mutable std::shared_ptr<const json::Document> project_value_;
 };
