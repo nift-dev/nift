@@ -39,6 +39,9 @@ public:
     enum class StatementState { Complete, Incomplete, Invalid };
     StatementState statement_state(const std::string& source) const;
 
+    // Shared single-expression host used by `nift eval`; identical evaluator to templates/scripts.
+    bool eval_expression(const std::string& expression, json::Document& value, std::string& error);
+
     // Shared template+page composition: parse template_source, let @content
     // pull page_source, and (when require_exactly_one_content) enforce the
     // exactly-one-@content rule. The CLI's render() and the embedded Engine

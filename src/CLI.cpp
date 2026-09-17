@@ -658,7 +658,7 @@ public:
     bool is_contract_name(const std::string&) const override { return false; }
     const std::string* contract_source(const std::string&) const override { return nullptr; }
     HostSource read_shared_source(const fs::path& p) const override { if(!filesystem::file_exists(p))return {}; cache_=filesystem::read_file(p); return {nift::HostStatus::Found,&cache_,{}}; }
-    std::shared_ptr<const json::Document> read_shared_json(const fs::path&,std::string& error) const override { error="JSON unavailable in script host"; return {}; }
+    std::shared_ptr<const json::Document> read_shared_json(const fs::path& p,std::string& error) const override { if(!filesystem::file_exists(p)){error="JSON file does not exist";return {};} json::Document parsed; if(!json::Document::parse(filesystem::read_file(p),parsed,error))return {}; return std::make_shared<json::Document>(std::move(parsed)); }
     bool source_exists(const fs::path& p) const override { return filesystem::file_exists(p); }
     bool source_readable(const fs::path& p) const override { return filesystem::file_exists(p); }
     nift::HostResult environment(const std::string& name) const override { const char* v=std::getenv(name.c_str()); return v?nift::HostResult{nift::HostStatus::Found,v,{}}:nift::HostResult{}; }
@@ -673,6 +673,17 @@ static int run_script_file(const fs::path& path) {
     auto rr=parser.run_script(filesystem::read_file(absolute),absolute);
     if(!rr.ok){console::error(rr.error.message.empty()?"script failed":rr.error.message);return 1;}
     if(!rr.output.empty())std::cout<<rr.output<<'\n';
+    return 0;
+}
+
+static int run_eval(int argc, char** argv) {
+    bool json_output=false, capabilities=false; std::string expression;
+    for(int i=2;i<argc;++i){std::string a=argv[i];if(a=="--json")json_output=true;else if(a=="--capabilities")capabilities=true;else if(expression.empty())expression=a;else{std::cerr<<"eval: expected one expression\n";return 2;}}
+    if(capabilities){if(!expression.empty()){std::cerr<<"eval: --capabilities does not take an expression\n";return 2;}std::cout<<"{\"command\":\"eval\",\"contract\":1,\"json_output\":true,\"project_context\":true,\"value_methods\":[\"keys\",\"values\",\"entries\",\"has\",\"get\",\"merge\",\"map\",\"filter\",\"find\",\"find_index\",\"sort_by\",\"unique\",\"flatten\",\"sum\",\"min\",\"max\",\"group_by\"]}\n";return 0;}
+    if(expression.empty()){std::cerr<<"eval: expression required\n";return 2;}
+    ScriptRenderHost host(fs::current_path());TrackedInfo info;Parser parser(host,info);json::Document value;std::string error;
+    if(!parser.eval_expression(expression,value,error)){std::cerr<<"eval: "<<error<<'\n';return 2;}
+    if(json_output)std::cout<<value.dump()<<'\n';else if(value.is_string())std::cout<<value.string<<'\n';else std::cout<<value.dump()<<'\n';
     return 0;
 }
 
@@ -722,6 +733,7 @@ int run_cli(int argc, char** argv) {
         return 1;
     }
 
+    if (command == "eval") return run_eval(argc, argv);
     if (command == "run") { if(argc!=3){console::error("run requires exactly one script path");return 1;} return run_script_file(argv[2]); }
     if (command == "sh") { if(argc!=2){console::error("sh takes no arguments");return 1;} return run_script_shell(); }
 

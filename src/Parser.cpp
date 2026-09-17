@@ -555,6 +555,11 @@ bool Parser::reference_would_cycle(const std::string& target_ref, const std::str
 Parser::Parser(RenderHost& host, TrackedInfo& tracked_info)
     : host_(host), tracked_info_(tracked_info) { variable_scopes_.emplace_back(); }
 
+bool Parser::eval_expression(const std::string& expression, json::Document& value, std::string& error) {
+    standalone_script_host_ = true;
+    return evaluate_expression(expression, value, error);
+}
+
 bool Parser::finalize_script_resources(std::string& error) {
     std::vector<std::string> open_paths;
     for (auto& kv : file_instances_) {
