@@ -31,7 +31,7 @@ repl="$(cd "$td" && printf 'x := [1, 2]\nx\nx.prettify()\nx.highlight()\nx.prett
 ! printf '%s\n' "$repl" | grep -qx 'null'
 [[ "$repl" != *'""'* ]]
 # Opaque values must not leak internal reference tokens through formatting.
-printf 's := ifs("file.txt")\nprint(s.stringify())\n' > "$td/bad.nift"
+printf 's := ifstream("file.txt")\nprint(s.stringify())\n' > "$td/bad.nift"
 if (cd "$td" && "$NIFT" run bad.nift >"$td/bad.out" 2>"$td/bad.err"); then
   echo 'expected stream stringify failure' >&2; exit 1
 fi

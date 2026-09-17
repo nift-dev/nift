@@ -6,7 +6,7 @@ Each workload is timed over repeated samples (cold process per sample).
 Reports min/p25/median/p75/max, mean, stddev and raw samples.
 
 Surfaces: nift run startup, statement throughput, named-fn and lambda
-invocation, imports, filesystem primitives, whole-file open, ifs/ofs
+invocation, imports, filesystem primitives, whole-file open, ifstream/ofstream
 streaming and read_val, and nift sh piped-statement throughput.
 """
 import pathlib, shutil, statistics, subprocess, tempfile, time, json, os
@@ -71,17 +71,17 @@ def main():
     write(fs, "for(i : [1,2,3,4,5,6,7,8,9,10]) { touch(\"f\" + i) }\nprint(open(\"f5\") == \"\")\n")
     results["fs_10_touch_open"] = sample(lambda: subprocess.run([nift, "run", str(fs)], capture_output=True))
 
-    # ifs/ofs streaming: write 200 lines then read them all back.
+    # ifstream/ofstream streaming: write 200 lines then read them all back.
     big = root / "data.txt"; write(big, "".join("line-%d\n" % i for i in range(5000)))
     st = root / "stream.nift"
-    write(st, "i := ifs(\"data.txt\")\ncount := 0\nline := i.read_line()\nwhile(line != null) { count += 1\nline = i.read_line() }\nprint(count)\nclose(i)\n")
+    write(st, "i := ifstream(\"data.txt\")\ncount := 0\nline := i.read_line()\nwhile(line != null) { count += 1\nline = i.read_line() }\nprint(count)\nclose(i)\n")
     results["stream_read_5k_lines"] = sample(lambda: subprocess.run([nift, "run", str(st)], capture_output=True))
 
     # read_val: parse 500 values.
     vals = " ".join("true %d %d.5 \"s%d\"" % (i, i, i) for i in range(125))
     vf = root / "vals.txt"; write(vf, vals)
     rv = root / "readval.nift"
-    write(rv, "v := ifs(\"vals.txt\")\nn := 0\nval := v.read_val()\nwhile(val != null) { n += 1\nval = v.read_val() }\nprint(n)\nclose(v)\n")
+    write(rv, "v := ifstream(\"vals.txt\")\nn := 0\nval := v.read_val()\nwhile(val != null) { n += 1\nval = v.read_val() }\nprint(n)\nclose(v)\n")
     results["read_val_500"] = sample(lambda: subprocess.run([nift, "run", str(rv)], capture_output=True))
 
     # nift sh piped statement throughput: 500 REPL statements in one session.

@@ -118,7 +118,7 @@ NIFT
 [[ "$(cat v.txt)" == 'W5' ]]
 [[ -z "$(ls v.txt.nift-tmp-* 2>/dev/null || true)" ]]
 
-# read_val parity with ifs.
+# read_val parity with ifstream.
 printf 'true 42 3.5 "s" [1,2,3] null' > vals.txt
 cat > rv.nift <<'NIFT'
 f := file("vals.txt")
@@ -131,7 +131,7 @@ a := f.read_val()
 print(a.join(","))
 print(f.read_val() == null)
 f.close()
-s := ifs("vals.txt")
+s := ifstream("vals.txt")
 print(s.read_val())
 print(s.read_val())
 print(s.read_val())

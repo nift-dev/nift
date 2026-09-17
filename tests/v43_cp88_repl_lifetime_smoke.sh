@@ -13,7 +13,7 @@ inc := () => ++count
 struct(acc) { v := 0; fn(add(n)) { v += n } fn(get()) { return v } }
 a := acc()
 m := map()
-out := ofs("log.txt")
+out := ofstream("log.txt")
 out.write_line("L1")
 close(out)
 f := (x) => {
@@ -36,7 +36,7 @@ print(f(21))
 print(imported_val)
 print(double_it(5))
 print("still-alive")
-in := ifs("log.txt")
+in := ifstream("log.txt")
 print(in.read_line())
 close(in)
 quit

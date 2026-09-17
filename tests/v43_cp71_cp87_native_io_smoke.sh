@@ -10,12 +10,12 @@ touch("work/a.txt")
 print(exists("work/a.txt"))
 copy("work/a.txt", "work/b.txt")
 move("work/b.txt", "work/c.txt")
-out := ofs("work/data.txt")
+out := ofstream("work/data.txt")
 out.write_line("hello")
 out.write("world")
 out.flush()
 close(out)
-in := ifs("work/data.txt")
+in := ifstream("work/data.txt")
 print(in.read_line())
 print(in.read_all())
 close(in)
@@ -33,7 +33,7 @@ cat > "$TMP/vals" <<'EOFV'
 true 42 3.5 "hello" [1,2,3]
 EOFV
 cat > "$TMP/vals.nift" <<'NIFT'
-s := ifs("vals")
+s := ifstream("vals")
 print(s.read_val())
 print(s.read_val())
 print(s.read_val())
@@ -55,7 +55,7 @@ cat > "$TMP/interp.nift" <<'NIFT'
 who := "Nift"
 print("hello, $[who]")
 print("hello, " + who)
-out := ofs("interp.txt")
+out := ofstream("interp.txt")
 out.write("v=$[who]")
 close(out)
 NIFT
@@ -91,7 +91,7 @@ print(value)
 NIFT
 [[ "$(cd "$TMP" && "$NIFT" run exports.nift)" == '3' ]]
 cat > "$TMP/badval.nift" <<'NIFT'
-s := ifs("vals")
+s := ifstream("vals")
 print(s.read_val())
 NIFT
 # 'vals' ends in "[1,2,3]" so read_val then reaches EOF: null is fine; use a
@@ -100,7 +100,7 @@ cat > "$TMP/malformed" <<'EOFV'
 true broken
 EOFV
 cat > "$TMP/badval.nift" <<'NIFT'
-s := ifs("malformed")
+s := ifstream("malformed")
 print(s.read_val())
 print(s.read_val())
 NIFT
