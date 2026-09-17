@@ -596,7 +596,7 @@
       "platforms": [
         "linux"
       ],
-      "scope": "1,000\u21924,000 page changed-output scaling guard; identical-output fast path cannot hide the writer cost.",
+      "scope": "1,000→4,000 page changed-output scaling guard; identical-output fast path cannot hide the writer cost.",
       "state": "ESTABLISHED",
       "test_of_test": "UNPROVEN",
       "test_of_test_note": "The guard was demonstrated to fail the historical per-write stale-temp scan implementation. Historical red behavior was observed, but no dedicated retained red-run artifact is currently referenced; BH3 must promote this guard."
@@ -1121,7 +1121,7 @@
           "repo": "website"
         },
         {
-          "needle": "25 modules total",
+          "needle": "43 contract executions total",
           "path": "HANDOVER.md",
           "repo": "regression"
         }
@@ -1282,7 +1282,7 @@
       "id": "production.performance-scaling",
       "kind": "reliability",
       "source": {
-        "needle": "protected by a dedicated 1,000\u21924,000-page full-build scaling guard",
+        "needle": "protected by a dedicated 1,000→4,000-page full-build scaling guard",
         "path": "content/docs/production-readiness.html",
         "repo": "website"
       },
@@ -1441,7 +1441,7 @@
       "guarantee_id": "memory.nift-lifecycle",
       "id": "memory.watch-rss-band",
       "source": {
-        "needle": "RSS stayed within 5,976\u20136,356 KiB",
+        "needle": "RSS stayed within 5,976–6,356 KiB",
         "path": "content/docs/memory-safety.html",
         "repo": "website"
       },
