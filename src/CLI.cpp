@@ -5,6 +5,8 @@
 #include <minify/Minify.h>
 #include <map>
 #include "ProjectInfo.h"
+#include "ProjectRead.h"
+#include "ProjectModel.h"
 #include "ProjectOwnership.h"
 #include "WatchList.h"
 #include "handover_content.h"
@@ -644,7 +646,9 @@ bool initialise_project(const InitOptions& options) {
 
 class ScriptRenderHost final : public RenderHost {
 public:
-    explicit ScriptRenderHost(fs::path root) : root_(fs::absolute(std::move(root)).lexically_normal()) {}
+    explicit ScriptRenderHost(fs::path root) : root_(fs::absolute(std::move(root)).lexically_normal()) {
+        fs::path probe=root_; while(!probe.empty()){Config c;std::vector<TrackedInfo> t;std::string e;if(project_read::load_config(probe,c,e)&&project_read::load_tracking(probe,c,t,e)){root_=probe;project_value_=make_project_value(probe,c,t);break;}auto parent=probe.parent_path();if(parent==probe)break;probe=parent;}
+    }
     const fs::path& root() const override { return root_; }
     std::string relative(const fs::path& p) const override { std::error_code ec; auto r=fs::relative(p,root_,ec); return ec?p.generic_string():r.generic_string(); }
     const std::string& output_dir() const override { static const std::string empty; return empty; }
@@ -654,7 +658,7 @@ public:
     fs::path pagination_output_path(const TrackedInfo&,std::size_t) const override { return {}; }
     bool has_output_context() const override { return false; }
     std::optional<TrackedOutput> tracked_output_path(const std::string&) const override { return std::nullopt; }
-    const std::shared_ptr<const json::Document>* binding(const std::string&) const override { return nullptr; }
+    const std::shared_ptr<const json::Document>* binding(const std::string& name) const override { return name=="project"&&project_value_ ? &project_value_ : nullptr; }
     bool is_contract_name(const std::string&) const override { return false; }
     const std::string* contract_source(const std::string&) const override { return nullptr; }
     HostSource read_shared_source(const fs::path& p) const override { if(!filesystem::file_exists(p))return {}; cache_=filesystem::read_file(p); return {nift::HostStatus::Found,&cache_,{}}; }
@@ -663,7 +667,7 @@ public:
     bool source_readable(const fs::path& p) const override { return filesystem::file_exists(p); }
     nift::HostResult environment(const std::string& name) const override { const char* v=std::getenv(name.c_str()); return v?nift::HostResult{nift::HostStatus::Found,v,{}}:nift::HostResult{}; }
 private:
-    fs::path root_; mutable std::string cache_;
+    fs::path root_; mutable std::string cache_; std::shared_ptr<const json::Document> project_value_;
 };
 
 static int run_script_file(const fs::path& path) {
