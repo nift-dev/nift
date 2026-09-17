@@ -131,4 +131,19 @@ NIFT
 printf 'print(file("shrink.txt").stringify())\n' > "$td/leak.nift"
 if (cd "$td" && "$NIFT" run leak.nift >/dev/null 2>&1); then echo "FileValue stringify leaked" >&2; exit 1; fi
 
+# Review regression: standard escapes (\n, \t, \") in quoted string arguments
+# to FileValue (and other quoted-arg) operations apply the real control
+# character rather than dropping the backslash.
+cat > "$td/esc.nift" <<'NIFT'
+f := file("esc.txt")
+f.open("w")
+f.write("a\nb\tc")
+f.save()
+f.close()
+print(open("esc.txt").length())
+print(open("esc.txt").contains("\n"))
+print(open("esc.txt").contains("\t"))
+NIFT
+[[ "$(cd "$td" && "$NIFT" run esc.nift)" == $'5\ntrue\ntrue' ]]
+
 echo 'CP105-CP113 managed FileValue smoke: PASS'
