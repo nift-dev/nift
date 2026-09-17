@@ -82,8 +82,12 @@ public:
                 if (p != HierarchyIndex::NO_PARENT)
                     if (const auto* c = hi->children(p)) for (const auto ch : *c) if (ch != idx) list.push_back(ch);
             } else if (member == "ancestors") {
+                // Top-down (root first, immediate parent last): the natural
+                // breadcrumb order, excluding self.
+                std::vector<std::size_t> chain;
                 std::size_t p = hi->parent_index(idx);
-                while (p != HierarchyIndex::NO_PARENT) { list.push_back(p); p = hi->parent_index(p); }
+                while (p != HierarchyIndex::NO_PARENT) { chain.push_back(p); p = hi->parent_index(p); }
+                for (auto it = chain.rbegin(); it != chain.rend(); ++it) list.push_back(*it);
             } else { // descendants: pre-order DFS over tracked-ordered children
                 std::vector<std::size_t> stack;
                 if (const auto* c = hi->children(idx)) stack.assign(c->rbegin(), c->rend());

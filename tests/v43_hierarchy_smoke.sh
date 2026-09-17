@@ -35,7 +35,7 @@ print(p.parent.title)'
 check root-no-parent    'null'       'print(page("/").parent)'
 check top-level-parent  'Home'       'print(page("about").parent.title)'
 check children          'Advanced,Basics' 'print(page("docs").children.map(c => c.title).join(","))'
-check ancestors         'Advanced,Docs,Home' 'print(page("docs/advanced/guide").ancestors.map(a => a.title).join(","))'
+check ancestors         'Home,Docs,Advanced' 'print(page("docs/advanced/guide").ancestors.map(a => a.title).join(","))'
 check descendants       'Advanced,Guide,Basics' 'print(page("docs").descendants.map(d => d.title).join(","))'
 check siblings          'Advanced'   'print(page("docs/basics").siblings.map(s => s.title).join(","))'
 check root-children     'About,Docs' 'print(page("/").children.map(c => c.title).join(","))'
@@ -49,7 +49,7 @@ print(p.title)
 print(p.url)'
 check leaf-children     '0'          'print(page("docs/basics").children.size())'
 check leaf-descendants  '0'          'print(page("docs/basics").descendants.size())'
-check leaf-ancestors    'Docs,Home'  'print(page("docs/basics").ancestors.map(a => a.title).join(","))'
+check leaf-ancestors    'Home,Docs'  'print(page("docs/basics").ancestors.map(a => a.title).join(","))'
 check leaf-siblings     '1'          'print(page("docs/advanced").siblings.size())'
 
 # template current-page binding + parity with eval

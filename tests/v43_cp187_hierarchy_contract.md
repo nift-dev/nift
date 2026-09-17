@@ -40,7 +40,7 @@ before CP188+ implementation.
 
 ## Self inclusion / exclusion
 
-- `ancestors` and `descendants` **exclude** the page itself.
+- `ancestors` and `descendants` **exclude** the page itself. `ancestors` are returned top-down (root first, immediate parent last) — the natural breadcrumb order; `descendants` are returned in pre-order.
 - `siblings` **excludes** the page itself (if siblings is accepted).
 
 ## Siblings

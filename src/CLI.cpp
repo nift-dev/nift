@@ -710,7 +710,7 @@ public:
             std::vector<std::size_t> list;
             if (member == "children") { if (const auto* c = hi->children(idx)) list = *c; }
             else if (member == "siblings") { const std::size_t p = hi->parent_index(idx); if (p != HierarchyIndex::NO_PARENT) if (const auto* c = hi->children(p)) for (const auto ch : *c) if (ch != idx) list.push_back(ch); }
-            else if (member == "ancestors") { std::size_t p = hi->parent_index(idx); while (p != HierarchyIndex::NO_PARENT) { list.push_back(p); p = hi->parent_index(p); } }
+            else if (member == "ancestors") { std::vector<std::size_t> chain; std::size_t p = hi->parent_index(idx); while (p != HierarchyIndex::NO_PARENT) { chain.push_back(p); p = hi->parent_index(p); } for (auto it = chain.rbegin(); it != chain.rend(); ++it) list.push_back(*it); }
             else { std::vector<std::size_t> stack; if (const auto* c = hi->children(idx)) stack.assign(c->rbegin(), c->rend()); while (!stack.empty()) { const std::size_t cur = stack.back(); stack.pop_back(); list.push_back(cur); if (const auto* cc = hi->children(cur)) for (auto it = cc->rbegin(); it != cc->rend(); ++it) stack.push_back(*it); } }
             out = json::Document::make_array();
             out.array.reserve(list.size());
