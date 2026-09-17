@@ -689,7 +689,10 @@ static int run_script_shell() {
         const Parser::StatementState st=parser.statement_state(pending);
         if(st==Parser::StatementState::Incomplete)continue;
         auto rr=parser.run_statement(pending,"<nift-sh>");pending.clear();if(!rr.ok){console::error(rr.error.message);continue;}if(!rr.output.empty())std::cout<<rr.output<<'\n';
-    }return 0;
+    }
+    std::string resource_error;
+    if(!parser.finalize_script_resources(resource_error)){console::error(resource_error);return 1;}
+    return 0;
 }
 
 int run_cli(int argc, char** argv) {

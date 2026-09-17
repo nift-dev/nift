@@ -539,6 +539,21 @@ bool Parser::reference_would_cycle(const std::string& target_ref, const std::str
 Parser::Parser(RenderHost& host, TrackedInfo& tracked_info)
     : host_(host), tracked_info_(tracked_info) { variable_scopes_.emplace_back(); }
 
+bool Parser::finalize_script_resources(std::string& error) {
+    std::vector<std::string> open_paths;
+    for (auto& kv : file_instances_) {
+        auto& f = *kv.second;
+        if (!f.open) continue;
+        open_paths.push_back(f.path.generic_string() + (f.dirty ? " (unsaved changes discarded)" : ""));
+        f.open = false; f.dirty = false; f.mode.clear(); f.working.clear(); f.saved.clear(); f.cursor = 0;
+    }
+    if (open_paths.empty()) return true;
+    error = "managed file left open";
+    if (open_paths.size() > 1) error += " (" + std::to_string(open_paths.size()) + " files)";
+    error += ": " + open_paths.front();
+    return false;
+}
+
 void Parser::fail(const fs::path& source_path, const std::string& source, std::size_t offset, const std::string& message) {
     result_.ok = false;
     result_.error.tracked_name = tracked_info_.name;
@@ -1692,6 +1707,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             if(call_args("cat",args,q)){fs::path p;if(args.size()!=1||!checked_path("cat",args,q,0,p))return false;std::error_code ec;if(fs::is_directory(p,ec)){error="cat: path is a directory";return false;}std::ifstream f(p,std::ios::binary);if(!f){error="cat: cannot open path";return false;}std::ostringstream ss;ss<<f.rdbuf();{static std::mutex cat_mutex;std::lock_guard<std::mutex> lock(cat_mutex);std::cout<<ss.str();std::cout.flush();}out=json::Document(nullptr);return true;}
             if(call_args("ls",args,q)){if(args.size()>1){error="ls: expected zero or one path";return false;}fs::path p;if(args.empty())p=standalone_script_host_?fs::current_path():host_.root();else if(!checked_path("ls",args,q,0,p))return false;std::error_code ec;if(!fs::is_directory(p,ec)||ec){error="ls: path is not a readable directory";return false;}std::vector<std::string> names;for(fs::directory_iterator it(p,ec),end;!ec&&it!=end;it.increment(ec))names.push_back(it->path().filename().generic_string());if(ec){error="ls: "+ec.message();return false;}std::sort(names.begin(),names.end());out=json::Document::make_array();for(const auto& n:names)out.array.emplace_back(n);return true;}
             if(call_args("open",args,q)){fs::path p;if(args.size()!=1||!checked_path("open",args,q,0,p))return false;std::error_code ec;if(fs::is_directory(p,ec)){error="open: path is a directory";return false;}std::ifstream f(p,std::ios::binary);if(!f){error="open: cannot open path";return false;}std::ostringstream ss;ss<<f.rdbuf();out=json::Document(ss.str());return true;}
+            if(call_args("file",args,q)){fs::path p;if(args.size()!=1||!checked_path("file",args,q,0,p))return false;auto f=std::make_shared<FileInstance>();f->path=p;auto id=std::to_string(next_file_instance_id_++);file_instances_[id]=f;out=json::Document(std::string("\x1fnift:file:")+id);return true;}
             if(call_args("ifs",args,q)||call_args("ofs",args,q)){const bool output=text.rfind("ofs(",0)==0;fs::path p;if(args.size()!=1||!checked_path(output?"ofs":"ifs",args,q,0,p))return false;auto st=std::make_shared<StreamInstance>();st->kind=output?StreamInstance::Kind::Output:StreamInstance::Kind::Input;if(output){st->output=std::make_shared<std::ofstream>(p,std::ios::binary|std::ios::trunc);if(!*st->output){error="ofs: cannot open path";return false;}}else{st->input=std::make_shared<std::ifstream>(p,std::ios::binary);if(!*st->input){error="ifs: cannot open path";return false;}}auto id=std::to_string(next_stream_instance_id_++);stream_instances_[id]=st;out=json::Document(std::string("\x1fnift:stream:")+id);return true;}
             if(call_args("close",args,q)){if(args.size()!=1){error="close: expected stream";return false;}json::Document d;if(!arg_value(args,q,0,d)||!d.is_string()||d.string.rfind("\x1fnift:stream:",0)!=0){error="close: expected stream";return false;}auto it=stream_instances_.find(d.string.substr(13));if(it==stream_instances_.end()){error="close: invalid stream";return false;}if(it->second->closed){error="close: stream already closed";return false;}if(it->second->input)it->second->input->close();if(it->second->output)it->second->output->close();it->second->closed=true;out=json::Document(nullptr);return true;}
             if(call_args("print",args,q)){if(args.size()!=1){error="print: expected one value";return false;}json::Document d;if(!arg_value(args,q,0,d))return false;if(d.is_string()&&q.size()>0&&q[0]&&d.string.find("$[")!=std::string::npos){std::string r,e;if(!interpolate_parameter(d.string,r,e)){error="print: "+e;return false;}d=json::Document(r);}if(d.is_array()||d.is_object()||(d.is_string()&&d.string.rfind("\x1fnift:",0)==0)){error="print: value is not directly renderable";return false;}const std::string rendered=render_expression_value(d);{static std::mutex print_mutex;std::lock_guard<std::mutex> lock(print_mutex);std::cout<<rendered<<'\n';std::cout.flush();}out=json::Document(nullptr);return true;}
@@ -1748,7 +1764,12 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                     method=="trim_start"||method=="trim_end"||method=="to_lower"||method=="to_upper"||
                     method=="replace"||method=="to_int"||method=="to_double"||method=="to_string"||
                     method=="substr"||method=="size"||method=="empty"||method=="first"||method=="last"||
-                    method=="join"||method=="slice";
+                    method=="join"||method=="slice"||method=="path"||method=="exists"||method=="open"||
+                    method=="close"||method=="read"||method=="read_line"||method=="read_all"||method=="read_val"||
+                    method=="eof"||method=="write"||method=="write_line"||method=="flush"||method=="tell"||
+                    method=="seek"||method=="modified"||method=="save"||method=="revert"||method=="replace_once"||
+                    method=="insert"||method=="insert_before"||method=="insert_after"||method=="prepend"||method=="append"||
+                    method=="copy"||method=="move"||method=="remove"||method=="cat";
                 if (known) {
                     json::Document base;
                     if (!eval(receiver,base,depth+1)) return false;
@@ -1761,6 +1782,40 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                         return eval(args[i],v,depth+1);
                     };
                     auto no_args=[&]()->bool{if(!args.empty()){error=method+": expected no arguments";return false;}return true;};
+                    if(base.is_string() && base.string.rfind("\x1fnift:file:",0)==0) {
+                        auto fit=file_instances_.find(base.string.substr(11)); if(fit==file_instances_.end()){error="file: invalid FileValue";return false;} auto f=fit->second;
+                        auto can_read=[&](){return f->mode=="r"||f->mode=="rw";}; auto can_write=[&](){return f->mode=="w"||f->mode=="a"||f->mode=="rw";};
+                        auto need_open=[&](){if(!f->open){error=method+": file is not open";return false;}return true;};
+                        auto need_read=[&](){if(!need_open())return false;if(!can_read()){error=method+": file is not open for reading";return false;}return true;};
+                        auto need_write=[&](){if(!need_open())return false;if(!can_write()){error=method+": file is not open for writing";return false;}return true;};
+                        auto sarg=[&](size_t i,std::string& x){json::Document v;if(!eval_arg(i,v)||!v.is_string()){error=method+": expected string argument";return false;}x=v.string;return true;};
+                        auto dirty=[&](){f->dirty=f->working!=f->saved;};
+                        if(method=="path"){if(!no_args())return false;out=json::Document(f->path.generic_string());return true;}
+                        if(method=="exists"){if(!no_args())return false;std::error_code ec;out=json::Document(fs::exists(f->path,ec)&&!ec);return true;}
+                        if(method=="open"){
+                            if(f->open){error="open: file is already open";return false;}if(args.size()>1){error="open: expected zero or one mode";return false;}std::string m="r";if(args.size()==1&&!sarg(0,m))return false;
+                            if(m!="r"&&m!="w"&&m!="a"&&m!="rw"){error="open: mode must be r, w, a or rw";return false;}std::error_code ec;bool ex=fs::exists(f->path,ec)&&!ec;
+                            if((m=="r"||m=="rw")&&!ex){error="open: file does not exist";return false;}if(ex&&fs::is_directory(f->path,ec)){error="open: path is a directory";return false;}
+                            std::string data;if(ex){std::ifstream in(f->path,std::ios::binary);if(!in){error="open: cannot read path";return false;}std::ostringstream ss;ss<<in.rdbuf();data=ss.str();}
+                            f->mode=m;f->existed_at_open=ex;f->saved=data;f->working=m=="w"?std::string():data;f->cursor=m=="a"?f->working.size():0;f->dirty=(m=="w")||(m=="a"&&!ex);f->open=true;out=json::Document(nullptr);return true;
+                        }
+                        if(method=="close"){if(!no_args()||!need_open())return false;if(f->dirty){error="close: file has unsaved changes; save() or revert() first";return false;}f->open=false;f->mode.clear();f->working.clear();f->saved.clear();f->cursor=0;out=json::Document(nullptr);return true;}
+                        if(method=="modified"){if(!no_args()||!need_open())return false;out=json::Document(f->dirty);return true;}
+                        if(method=="tell"){if(!no_args()||!need_open())return false;out=json::Document((double)f->cursor);return true;}
+                        if(method=="seek"){if(args.size()!=1||!need_open()){if(args.size()!=1&&error.empty())error="seek: expected byte position";return false;}json::Document n;if(!eval_arg(0,n)||!n.is_number()||std::trunc(n.num)!=n.num||n.num<0||n.num>(double)f->working.size()){error="seek: byte position out of range";return false;}f->cursor=(size_t)n.num;out=json::Document(nullptr);return true;}
+                        if(method=="eof"){if(!no_args()||!need_read())return false;out=json::Document(f->cursor>=f->working.size());return true;}
+                        if(method=="read"||method=="read_all"){if(!need_read())return false;size_t n=f->working.size()-std::min(f->cursor,f->working.size());if(method=="read"&&!args.empty()){if(args.size()!=1){error="read: expected zero or one byte count";return false;}json::Document d;if(!eval_arg(0,d)||!d.is_number()||std::trunc(d.num)!=d.num||d.num<0){error="read: invalid byte count";return false;}n=std::min(n,(size_t)d.num);}else if(method=="read_all"&&!args.empty()){error="read_all: expected no arguments";return false;}out=json::Document(f->working.substr(f->cursor,n));f->cursor+=n;return true;}
+                        if(method=="read_line"){if(!no_args()||!need_read())return false;if(f->cursor>=f->working.size()){out=json::Document(nullptr);return true;}auto e=f->working.find('\n',f->cursor);size_t z=e==std::string::npos?f->working.size():e;std::string line=f->working.substr(f->cursor,z-f->cursor);if(!line.empty()&&line.back()=='\r')line.pop_back();f->cursor=e==std::string::npos?f->working.size():e+1;out=json::Document(line);return true;}
+                        if(method=="read_val"){if(!no_args()||!need_read())return false;while(f->cursor<f->working.size()&&std::isspace((unsigned char)f->working[f->cursor]))++f->cursor;if(f->cursor>=f->working.size()){out=json::Document(nullptr);return true;}size_t st=f->cursor;char first=f->working[f->cursor];if(first=='"'||first=='['||first=='{'){char op=first,cl=first=='['?']':first=='{'?'}':'"';int dep=0;bool qd=false,esc=false;while(f->cursor<f->working.size()){char c=f->working[f->cursor++];if(op=='"'){if(esc){esc=false;continue;}if(c=='\\'){esc=true;continue;}if(f->cursor>st+1&&c=='"')break;}else{if(qd){if(esc)esc=false;else if(c=='\\')esc=true;else if(c=='"')qd=false;}else if(c=='"')qd=true;else if(c==op)++dep;else if(c==cl&&--dep==0)break;}}}else while(f->cursor<f->working.size()&&!std::isspace((unsigned char)f->working[f->cursor]))++f->cursor;std::string tok=f->working.substr(st,f->cursor-st);json::Document v;if(!eval(tok,v,depth+1)){error="read_val: "+error;return false;}out=v;return true;}
+                        if(method=="write"||method=="write_line"){if(args.size()!=1||!need_write()){if(args.size()!=1&&error.empty())error=method+": expected one value";return false;}json::Document v;if(!eval_arg(0,v))return false;if(v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0)){error=method+": value is not directly renderable";return false;}std::string d=render_expression_value(v);if(method=="write_line")d+='\n';size_t ov=std::min(d.size(),f->working.size()-std::min(f->cursor,f->working.size()));f->working.replace(f->cursor,ov,d);f->cursor+=d.size();dirty();out=json::Document(nullptr);return true;}
+                        if(method=="flush"){if(!no_args()||!need_write())return false;out=json::Document(nullptr);return true;}
+                        if(method=="replace"||method=="replace_once"){if(args.size()!=2||!need_write()){if(args.size()!=2&&error.empty())error=method+": expected old and replacement strings";return false;}std::string a,b;if(!sarg(0,a)||!sarg(1,b))return false;if(a.empty()){error=method+": old string must not be empty";return false;}size_t count=0,pos=0;while((pos=f->working.find(a,pos))!=std::string::npos){++count;pos+=a.size();}if(method=="replace_once"&&count!=1){error="replace_once: expected exactly one match, found "+std::to_string(count);return false;}pos=0;while((pos=f->working.find(a,pos))!=std::string::npos){f->working.replace(pos,a.size(),b);pos+=b.size();if(method=="replace_once")break;}dirty();out=method=="replace"?json::Document((double)count):json::Document(nullptr);return true;}
+                        if(method=="insert"||method=="insert"||method=="insert_before"||method=="insert_after"||method=="prepend"||method=="append"){if(!need_write())return false;size_t pos=0;std::string d;if(method=="prepend"||method=="append"){if(args.size()!=1||!sarg(0,d)){if(args.size()!=1&&error.empty())error=method+": expected text";return false;}pos=method=="prepend"?0:f->working.size();}else if(method=="insert"){if(args.size()!=2){error="insert: expected byte position and text";return false;}json::Document n;if(!eval_arg(0,n)||!n.is_number()||std::trunc(n.num)!=n.num||n.num<0||n.num>(double)f->working.size()||!sarg(1,d)){error="insert: invalid byte position or text";return false;}pos=(size_t)n.num;}else{if(args.size()!=2){error=method+": expected anchor and text";return false;}std::string a;if(!sarg(0,a)||!sarg(1,d))return false;if(a.empty()){error=method+": anchor must not be empty";return false;}auto at=f->working.find(a);if(at==std::string::npos||f->working.find(a,at+a.size())!=std::string::npos){error=method+": expected exactly one anchor";return false;}pos=at+(method=="insert_after"?a.size():0);}f->working.insert(pos,d);dirty();out=json::Document(nullptr);return true;}
+                        if(method=="revert"){if(!no_args()||!need_write())return false;f->working=f->saved;f->cursor=std::min(f->cursor,f->working.size());f->dirty=false;out=json::Document(nullptr);return true;}
+                        if(method=="save"){if(!no_args()||!need_write())return false;if(!f->dirty){out=json::Document(nullptr);return true;}std::error_code ec;auto parent=f->path.parent_path();if(!parent.empty()&&!fs::exists(parent,ec)){error="save: parent directory does not exist";return false;}fs::perms perms=fs::perms::unknown;if(fs::exists(f->path,ec)&&!ec)perms=fs::status(f->path,ec).permissions();fs::path tmp=f->path;tmp+=".nift-tmp-"+std::to_string((unsigned long long)std::chrono::steady_clock::now().time_since_epoch().count());{std::ofstream o(tmp,std::ios::binary|std::ios::trunc);if(!o){error="save: cannot create temporary file";return false;}o.write(f->working.data(),(std::streamsize)f->working.size());o.flush();if(!o){o.close();fs::remove(tmp,ec);error="save: temporary write failed";return false;}}if(perms!=fs::perms::unknown)fs::permissions(tmp,perms,ec);ec.clear();fs::rename(tmp,f->path,ec);if(ec){fs::remove(tmp);error="save: atomic replace failed: "+ec.message();return false;}f->saved=f->working;f->dirty=false;f->existed_at_open=true;out=json::Document(nullptr);return true;}
+                        if(method=="cat"){if(!no_args()||!need_read())return false;{static std::mutex file_cat_mutex;std::lock_guard<std::mutex> lock(file_cat_mutex);std::cout<<f->working;std::cout.flush();}out=json::Document(nullptr);return true;}
+                        if(method=="copy"||method=="move"||method=="remove"){if(f->open){error=method+": file must be closed";return false;}if((method=="remove"&&!args.empty())||(method!="remove"&&args.size()!=1)){error=method+": invalid arguments";return false;}std::error_code ec;if(method=="remove"){if(fs::is_directory(f->path,ec)){error="remove: directories are not removed recursively";return false;}if(!fs::remove(f->path,ec)&&ec){error="remove: "+ec.message();return false;}out=json::Document(nullptr);return true;}std::string raw;if(!sarg(0,raw))return false;fs::path dest(raw);if(dest.is_relative())dest=(standalone_script_host_?fs::current_path():host_.root())/dest;dest=fs::absolute(dest).lexically_normal();if(!standalone_script_host_&&!host_.root().empty()&&!filesystem::path_within(fs::absolute(host_.root()).lexically_normal(),dest)){error=method+": path must stay inside the Nift project";return false;}if(method=="move")fs::rename(f->path,dest,ec);else fs::copy_file(f->path,dest,fs::copy_options::overwrite_existing,ec);if(ec){error=method+": "+ec.message();return false;}if(method=="move")f->path=dest;auto nf=std::make_shared<FileInstance>();nf->path=dest;auto id=std::to_string(next_file_instance_id_++);file_instances_[id]=nf;out=json::Document(std::string("\x1fnift:file:")+id);return true;}
+                    }
                     if(base.is_string() && base.string.rfind("\x1fnift:",0)!=0) {
                         const std::string& str=base.string;
                         auto utf8_parts=[&](std::vector<std::string>& parts)->bool{
@@ -1809,7 +1864,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                         if(method=="slice"){if(args.empty()||args.size()>2){error="slice: expected start and optional end";return false;}json::Document st,en;if(!eval_arg(0,st)||!st.is_number()||std::trunc(st.num)!=st.num||st.num<0){error="slice: invalid start";return false;}std::size_t b=(std::size_t)st.num,e=a.size();if(args.size()==2){if(!eval_arg(1,en)||!en.is_number()||std::trunc(en.num)!=en.num||en.num<0){error="slice: invalid end";return false;}e=(std::size_t)en.num;}b=std::min(b,a.size());e=std::min(e,a.size());if(e<b)e=b;out=json::Document::make_array();out.array.assign(a.begin()+b,a.begin()+e);return true;}
                     }
                     if(method=="to_string" && !(base.is_string() && base.string.rfind("\x1fnift:",0)==0)){error="to_string: expected int or double";return false;}
-                    if((base.is_string() && base.string.rfind("\x1fnift:",0)!=0)||base.is_array()||base.is_number()){error=method+": unsupported for this value";return false;}
+                    if((base.is_string() && base.string.rfind("\x1fnift:",0)!=0)||base.is_number()||(base.is_array()&&method!="insert"&&method!="remove")){error=method+": unsupported for this value";return false;}
                 }
             }
         }
@@ -2638,6 +2693,8 @@ RenderResult Parser::run_script(const std::string& source, const fs::path& sourc
         else rr.output=render_expression_value(v);
     }
     pending_control_={};
+    std::string resource_error;
+    if(!finalize_script_resources(resource_error) && rr.ok){rr.ok=false;rr.error.message=resource_error;}
     return rr;
 }
 
@@ -2704,9 +2761,11 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
     auto saved_scopes=std::move(variable_scopes_); auto saved_callables=std::move(callables_); auto saved_structs=std::move(structs_);
     auto saved_exports=std::move(requested_exports_); const bool saved_import=in_import_program_; auto saved_control=pending_control_; const bool saved_strict=strict_script_mode_;
     variable_scopes_.clear(); variable_scopes_.emplace_back(); callables_.clear(); structs_.clear(); requested_exports_.clear(); pending_control_={}; in_import_program_=true; strict_script_mode_=true;
+    std::unordered_set<std::string> pre_import_files; for(const auto& kv:file_instances_)pre_import_files.insert(kv.first);
     input_stack_.push_back(path); result_.dependencies.insert(host_.relative(path)); ++function_call_depth_;
     auto rr=execute_native_program(*src.content,path,depth+1);
     --function_call_depth_; input_stack_.pop_back();
+    if(rr.ok){for(auto& kv:file_instances_)if(!pre_import_files.count(kv.first)&&kv.second->open){auto f=kv.second;f->open=false;f->dirty=false;f->mode.clear();f->working.clear();f->saved.clear();f->cursor=0;rr.ok=false;rr.error.message="managed file left open at @import completion: "+f->path.generic_string();break;}}
     auto isolated_scope=std::move(variable_scopes_.back()); auto isolated_callables=std::move(callables_); auto isolated_structs=std::move(structs_); auto exports=requested_exports_; auto completion=pending_control_;
     variable_scopes_=std::move(saved_scopes); callables_=std::move(saved_callables); structs_=std::move(saved_structs); requested_exports_=std::move(saved_exports); in_import_program_=saved_import; pending_control_=saved_control; strict_script_mode_=saved_strict;
     if(!rr.ok){error=rr.error.message;return false;}
@@ -2827,11 +2886,13 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             std::size_t bo=i+7; while(bo<source.size()&&std::isspace(static_cast<unsigned char>(source[bo])))++bo; std::size_t bc=0;
             if(bo>=source.size()||source[bo]!='{'||!find_balanced(source,bo,'{','}',bc)){fail(source_path,source,i,"@script requires a balanced block");break;}
             if(pending_control_.kind!=ControlFlow::None) pending_control_={};
+            std::unordered_set<std::string> pre_script_files; for(const auto& kv:file_instances_)pre_script_files.insert(kv.first);
             ++function_call_depth_;
             const bool saved_strict=strict_script_mode_; strict_script_mode_=true;
             auto nested=execute_native_program(source.substr(bo+1,bc-bo-1),source_path,depth+1);
             strict_script_mode_=saved_strict;
             --function_call_depth_;
+            if(nested.ok){for(auto& kv:file_instances_)if(!pre_script_files.count(kv.first)&&kv.second->open){auto f=kv.second;f->open=false;f->dirty=false;f->mode.clear();f->working.clear();f->saved.clear();f->cursor=0;nested.ok=false;nested.error.message="managed file left open at @script completion: "+f->path.generic_string();break;}}
             if(!nested.ok){result_=nested;break;}
             if(pending_control_.kind==ControlFlow::Return){
                 if(pending_control_.value) { const auto& rv=*pending_control_.value;if(rv.is_array()||rv.is_object()||(rv.is_string()&&rv.string.rfind("\x1fnift:",0)==0)){pending_control_={};fail(source_path,source,i,"@script return value is not directly renderable");break;}output += render_expression_value(rv); }

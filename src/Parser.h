@@ -31,6 +31,7 @@ public:
     RenderResult run_script(const std::string& source, const std::filesystem::path& source_path);
     RenderResult run_statement(const std::string& source, const std::filesystem::path& source_path);
     void reset_script_control();
+    bool finalize_script_resources(std::string& error);
 
     // Parser-reported statement state for the interactive shell: the REPL asks
     // the parser whether the accumulated input is a complete statement, an
@@ -99,6 +100,14 @@ private:
     };
     std::unordered_map<std::string, std::shared_ptr<StreamInstance>> stream_instances_;
     std::uint64_t next_stream_instance_id_ = 1;
+    struct FileInstance {
+        std::filesystem::path path;
+        std::string mode, working, saved;
+        std::size_t cursor = 0;
+        bool open = false, dirty = false, existed_at_open = false;
+    };
+    std::unordered_map<std::string, std::shared_ptr<FileInstance>> file_instances_;
+    std::uint64_t next_file_instance_id_ = 1;
     struct StructField { std::string name; std::string initializer; bool private_member = false; };
     struct StructMethod { Callable callable; bool private_member = false; bool constructor = false; };
     struct StructDefinition { std::string name; std::vector<StructField> fields; std::unordered_map<std::string, StructMethod> methods; };
