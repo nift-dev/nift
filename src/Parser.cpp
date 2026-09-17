@@ -897,7 +897,11 @@ bool Parser::resolve_json_value(const std::string& expression,
                 if(quoted||token.empty()||!std::all_of(token.begin(),token.end(),[](unsigned char c){return std::isdigit(c); })){error="JSON array indices must be non-negative integers in '"+expression+"'";return true;}std::size_t index=0;try{index=(std::size_t)std::stoull(token);}catch(...){error="JSON array index is out of range in '"+expression+"'";return true;}if(index>=current->array.size()){error="JSON array index "+std::to_string(index)+" is out of range in '"+expression+"'";return true;}const json::Document* child=&(*current)[index];current=std::shared_ptr<const json::Document>(current,child);continue;
             }
             if(current->is_object()){
-                std::string key;if(quoted){if(token.size()<2){error="invalid JSON object key";return true;}key=token.substr(1,token.size()-2);}else{VariableBinding* kb=nullptr;for(auto scope=variable_scopes_.rbegin();scope!=variable_scopes_.rend();++scope){auto it=scope->find(token);if(it!=scope->end()){kb=&it->second;break;}}if(!kb||!kb->value||!kb->value->is_string()){error="JSON object index must be a quoted string or string binding in '"+expression+"'";return true;}key=kb->value->string;}if(!current->has(key)){error="JSON object has no key '"+key+"'";return true;}const json::Document* child=&(*current)[key];current=std::shared_ptr<const json::Document>(current,child);continue;
+                std::string key;if(quoted){if(token.size()<2){error="invalid JSON object key";return true;}key=token.substr(1,token.size()-2);}else{VariableBinding* kb=nullptr;for(auto scope=variable_scopes_.rbegin();scope!=variable_scopes_.rend();++scope){auto it=scope->find(token);if(it!=scope->end()){kb=&it->second;break;}}if(!kb||!kb->value||!kb->value->is_string()){
+                    json::Document computed;
+                    if(!evaluate_expression(token,computed,error)||!computed.is_string()){if(error.empty())error="JSON object index must be a quoted string, string binding, or string expression in '"+expression+"'";return true;}
+                    key=computed.string;
+                }else{key=kb->value->string;}}if(!current->has(key)){error="JSON object has no key '"+key+"'";return true;}const json::Document* child=&(*current)[key];current=std::shared_ptr<const json::Document>(current,child);continue;
             }
             error="cannot index JSON value in '"+expression+"'";return true;
         }
@@ -2565,11 +2569,17 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                                 auto it = scope->find(token);
                                 if (it != scope->end()) { kb = &it->second; break; }
                             }
-                            if (!kb || !kb->value || !kb->value->is_string()) {
-                                error = "JSON object index must be a quoted string or string binding in '" + text + "'";
-                                return false;
+                            if (kb && kb->value && kb->value->is_string()) key = kb->value->string;
+                            else {
+                                // Computed key from a resolvable expression
+                                // (e.g. info[page.name], obj[tag.to_lower()]).
+                                json::Document computed;
+                                if (!resolve_direct(token, computed) || !computed.is_string()) {
+                                    error = "JSON object index must be a quoted string, string binding, or string expression in '" + text + "'";
+                                    return false;
+                                }
+                                key = computed.string;
                             }
-                            key = kb->value->string;
                         }
                         if (!base.has(key)) { error = "JSON object has no key '" + key + "'"; return false; }
                         out = base[key];
