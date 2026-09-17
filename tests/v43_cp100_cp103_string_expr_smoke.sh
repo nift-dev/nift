@@ -18,6 +18,11 @@ print("3.5".to_double() + 1)
 print(42.to_string())
 print(3.5.to_string())
 print("abc".split("").join("-"))
+print("é🙂".length())
+print("é🙂".split("").size())
+fn(label()) { return "  hello  " }
+print(label().trim().to_upper())
+print((1 + 2).to_string())
 print("".split("").size())
 x := 2
 i := 0
@@ -28,7 +33,7 @@ print(["a", "b"].join(",").to_upper())
 print(ls().size() > 0)
 NIFT
 out="$($NIFT_BIN run ok.nift)"
-expected=$'["a","b","","c",""]\n5\n2\n3\ntrue\ntrue\ntrue\nx\nbar bar\n43\n4.5\n42\n3.5\na-b-c\n0\n[2,3,0,1,6]\n2\nA,B\ntrue'
+expected=$'["a","b","","c",""]\n5\n2\n3\ntrue\ntrue\ntrue\nx\nbar bar\n43\n4.5\n42\n3.5\na-b-c\n2\n2\nHELLO\n3\n0\n[2,3,0,1,6]\n2\nA,B\ntrue'
 [[ "$out" == "$expected" ]] || { printf 'unexpected output:\n%s\n' "$out"; exit 1; }
 for expr in '"x".split()' '"x".replace("", "y")' '" 42 ".to_int()' '"3.2x".to_double()' '"3.2".to_int()'; do
   printf 'print(%s)\n' "$expr" > bad.nift
