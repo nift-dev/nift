@@ -1,0 +1,4 @@
+$x := json_parse("{\"a\":1}")
+$x.get("a")
+$x.get("missing", 7)
+$x.get("missing")
