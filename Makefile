@@ -524,6 +524,7 @@ test-v43-language: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp100_cp103_string_expr_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp105_cp113_filevalue_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp112_filevalue_wall_smoke.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 benchmarks/typed_content_scaling.py
 
 # Fail-closed guard: every maintained workflow's official macOS matrix entry
 # (arm64 -> macos-latest, x86-64 -> macos-26-intel) must agree on the runner,
