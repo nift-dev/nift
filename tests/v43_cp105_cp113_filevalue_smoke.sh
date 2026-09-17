@@ -100,4 +100,35 @@ printf '@import("mod.nift")\n' > "$td/importer.nift"
 if (cd "$td" && "$NIFT" run importer.nift >/dev/null 2>"$td/e"); then echo "import leaked FileValue unexpectedly" >&2; exit 1; fi
 grep -q '@import completion' "$td/e"
 
+# Review regressions: a stale cursor after a content-shrinking edit must never
+# crash read/write (the cursor is clamped); same() recognises FileValue
+# identity; and opaque FileValue tokens never leak through serialization or
+# template rendering.
+printf 'abcdef' > "$td/shrink.txt"
+cat > "$td/shrink.nift" <<'NIFT'
+f := file("shrink.txt")
+f.open("rw")
+f.seek(4)
+f.replace_once("abcdef", "x")
+print(f.tell())
+print(f.read_all() == "")
+f.write("Z")
+f.seek(0)
+print(f.read_all())
+f.revert()
+f.close()
+NIFT
+[[ "$(cd "$td" && "$NIFT" run shrink.nift)" == $'1\ntrue\nxZ' ]]
+cat > "$td/ident.nift" <<'NIFT'
+a := file("shrink.txt")
+b := a
+c := file("shrink.txt")
+print(same(a, b))
+print(same(a, c))
+print(a == c)
+NIFT
+[[ "$(cd "$td" && "$NIFT" run ident.nift)" == $'true\nfalse\nfalse' ]]
+printf 'print(file("shrink.txt").stringify())\n' > "$td/leak.nift"
+if (cd "$td" && "$NIFT" run leak.nift >/dev/null 2>&1); then echo "FileValue stringify leaked" >&2; exit 1; fi
+
 echo 'CP105-CP113 managed FileValue smoke: PASS'
