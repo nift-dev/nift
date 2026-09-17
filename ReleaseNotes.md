@@ -11,6 +11,11 @@ Nift v4.3 expands the native v4 language without restoring the v3 LuaJIT runtime
 - Structural equality for data values, identity equality for callables and identity-bearing objects, plus explicit `same(a, b)`.
 - First-class named callables, expression/block lambdas, and lexical closures that capture bindings and can safely escape their declaring frame.
 - Higher-order collection operations: `map`, `filter`, `reduce`, `any`, `all`, `find`, `count`, plus stable mutable array `sort` with an optional comparator.
+- Object and collection querying/transformation additions including `keys`, `values`, `entries`, `has`, `get`, non-mutating `merge`, `find_index`, `sort_by`, `reverse`, `unique`, `flatten`, `sum`, `min`, `max`, and `group_by`.
+- Standalone `nift eval` expression evaluation with deterministic `--json` output and machine-readable capability discovery for scripts and coding agents.
+- Read-only `project` introspection in templates and `nift eval`, including tracked files, schemas, typed content, and taxonomies.
+- Conventional YAML front matter plus one optional external front-matter source per tracked file; multiple front-matter sources and conflicting content types are hard errors.
+- Project-loaded `.schema` files with native `@schema(...)` declarations, typed-content validation/discovery, and `.tax` files with first-class `@taxonomy(...)`, automatic terms, reverse content indexes, and hierarchical taxonomy support.
 
 ## v4.2.0
 

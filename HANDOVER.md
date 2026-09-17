@@ -27,8 +27,8 @@ whether it is a regression.
 - Current branch: `main` in this checkout.
 - Current project phase: **post-release** — the public v4.1.0 release is
   published (tag `v4.1.0` at `b499798`), and the v4.3 language/scripting
-  campaign has completed CP140 of the accepted CP115–CP167 structured-data,
-  agent-eval, project-model and typed-content/taxonomy campaign before the held CP48–CP50
+  campaign has completed CP167 of the accepted CP115–CP167 structured-data,
+  agent-eval, project-model and typed-content/taxonomy campaign. Review is now required before the held CP48–CP50
   final release gates. The embedded engine, its language
   bindings, the shared corpus and the experimental Rust implementation remain
   in-tree but are not publicly released, documented or promoted; they are
