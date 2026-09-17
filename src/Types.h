@@ -18,6 +18,8 @@ struct Config {
     std::string incremental_mode = "modified";
     std::set<std::string> minify_exts;
     std::map<std::string, std::string> contracts;
+    std::vector<std::string> schema_files;
+    std::vector<std::string> taxonomy_files;
     int build_threads = -1;
 };
 

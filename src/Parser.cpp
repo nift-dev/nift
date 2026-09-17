@@ -554,7 +554,18 @@ bool Parser::reference_would_cycle(const std::string& target_ref, const std::str
 }
 
 Parser::Parser(RenderHost& host, TrackedInfo& tracked_info)
-    : host_(host), tracked_info_(tracked_info) { variable_scopes_.emplace_back(); if(!tracked_info_.name.empty()){ json::Document m=json::Document::make_object(); std::string e; auto cp=host_.content_path(tracked_info_); if(filesystem::file_exists(cp)){auto parsed=frontmatter::parse_inline(filesystem::read_file(cp)); if(tracked_info_.frontmatter && parsed.present){ m["_error"]=json::Document("multiple front matter sources"); } else if(tracked_info_.frontmatter){frontmatter::load_external(host_.root(),*tracked_info_.frontmatter,m,e); if(!e.empty())m["_error"]=json::Document(e);} else if(parsed.present&&!parsed.error.empty())m["_error"]=json::Document(parsed.error); else if(parsed.present)m=parsed.value;} json_bindings_["frontmatter"]=std::make_shared<const json::Document>(std::move(m)); } }
+    : host_(host), tracked_info_(tracked_info) {
+    variable_scopes_.emplace_back();
+    if (!tracked_info_.name.empty()) {
+        json::Document m=json::Document::make_object(); bool from_project=false;
+        if (const auto* pb=host_.binding("project"); pb && *pb && (*pb)->is_object() && (*pb)->has("files")) {
+            const auto& files=(**pb)["files"]; if(files.is_array()) for(const auto& f:files.array) if(f.is_object()&&f.has("name")&&f["name"].is_string()&&f["name"].string==tracked_info_.name&&f.has("metadata")){m=f["metadata"];from_project=true;break;}
+            if ((*pb)->has("errors") && (**pb)["errors"].is_array() && !(**pb)["errors"].array.empty()) m["_error"]=json::Document((**pb)["errors"].array.front().string);
+        }
+        if(!from_project){std::string e;auto cp=host_.content_path(tracked_info_);if(filesystem::file_exists(cp)){auto parsed=frontmatter::parse_inline(filesystem::read_file(cp));if(tracked_info_.frontmatter&&parsed.present)m["_error"]=json::Document("multiple front matter sources");else if(tracked_info_.frontmatter){frontmatter::load_external(host_.root(),*tracked_info_.frontmatter,m,e);if(!e.empty())m["_error"]=json::Document(e);}else if(parsed.present&&!parsed.error.empty())m["_error"]=json::Document(parsed.error);else if(parsed.present)m=parsed.value;}}
+        json_bindings_["frontmatter"]=std::make_shared<const json::Document>(std::move(m));
+    }
+}
 
 bool Parser::eval_expression(const std::string& expression, json::Document& value, std::string& error) {
     standalone_script_host_ = true;
@@ -773,8 +784,18 @@ bool Parser::resolve_json_value(const std::string& expression,
     bool contract_binding = false;
     // Host-supplied bindings (Embedded Nift engine defaults / Context overlays)
     // resolve before @json bindings, contracts and built-in metadata.
-    if (const auto* supplied = host_.binding(root_name)) {
+    VariableBinding* local_binding=nullptr;
+    for(auto scope=variable_scopes_.rbegin();scope!=variable_scopes_.rend();++scope){auto it=scope->find(root_name);if(it!=scope->end()){local_binding=&it->second;break;}}
+    if (local_binding && local_binding->value && (local_binding->value->is_object() || local_binding->value->is_array())) {
+        current = local_binding->value;
+    } else if (const auto* supplied = host_.binding(root_name)) {
         current = *supplied;
+        if (root_name == "project") {
+            result_.dependencies.insert(host_.relative(host_.root() / ".nift/config.json"));
+            result_.dependencies.insert(host_.relative(host_.root() / ".nift/tracked.json"));
+            if (current && current->is_object() && current->has("files") && (*current)["files"].is_array()) for (const auto& f : (*current)["files"].array) if (f.is_object() && f.has("path") && f["path"].is_string()) { result_.dependencies.insert(f["path"].string); if(f.has("frontmatter_source")&&f["frontmatter_source"].is_string())result_.dependencies.insert(f["frontmatter_source"].string); }
+            if (current && current->is_object()) for (const char* key : {"schemas","taxonomies"}) if (current->has(key) && (*current)[key].is_object()) for (const auto& kv : (*current)[key].object) if (kv.second.is_object() && kv.second.has("source") && kv.second["source"].is_string()) result_.dependencies.insert(kv.second["source"].string);
+        }
     } else {
         const auto binding = json_bindings_.find(root_name);
         if (binding != json_bindings_.end()) {
@@ -846,40 +867,16 @@ bool Parser::resolve_json_value(const std::string& expression,
         }
 
         if (expression[position] == '[') {
-            ++position;
-            const std::size_t index_start = position;
-            while (position < expression.size() &&
-                   std::isdigit(static_cast<unsigned char>(expression[position]))) {
-                ++position;
+            ++position; const std::size_t token_start=position; bool quoted=false; char quote=0;
+            if(position<expression.size()&&(expression[position]=='"'||expression[position]=='\'')){quoted=true;quote=expression[position++];while(position<expression.size()&&expression[position]!=quote){if(expression[position]=='\\'&&position+1<expression.size())position+=2;else ++position;}if(position>=expression.size()){error="unterminated JSON object key in '"+expression+"'";return true;}++position;}else while(position<expression.size()&&expression[position]!=']')++position;
+            if(position>=expression.size()||expression[position]!=']'){error="JSON index has no closing ']' in '"+expression+"'";return true;}std::string token=trim_copy(expression.substr(token_start,position-token_start));++position;
+            if(current->is_array()){
+                if(quoted||token.empty()||!std::all_of(token.begin(),token.end(),[](unsigned char c){return std::isdigit(c); })){error="JSON array indices must be non-negative integers in '"+expression+"'";return true;}std::size_t index=0;try{index=(std::size_t)std::stoull(token);}catch(...){error="JSON array index is out of range in '"+expression+"'";return true;}if(index>=current->array.size()){error="JSON array index "+std::to_string(index)+" is out of range in '"+expression+"'";return true;}const json::Document* child=&(*current)[index];current=std::shared_ptr<const json::Document>(current,child);continue;
             }
-            if (index_start == position || position >= expression.size() || expression[position] != ']') {
-                error = "JSON array indices must be non-negative integers in '" + expression + "'";
-                return true;
+            if(current->is_object()){
+                std::string key;if(quoted){if(token.size()<2){error="invalid JSON object key";return true;}key=token.substr(1,token.size()-2);}else{VariableBinding* kb=nullptr;for(auto scope=variable_scopes_.rbegin();scope!=variable_scopes_.rend();++scope){auto it=scope->find(token);if(it!=scope->end()){kb=&it->second;break;}}if(!kb||!kb->value||!kb->value->is_string()){error="JSON object index must be a quoted string or string binding in '"+expression+"'";return true;}key=kb->value->string;}if(!current->has(key)){error="JSON object has no key '"+key+"'";return true;}const json::Document* child=&(*current)[key];current=std::shared_ptr<const json::Document>(current,child);continue;
             }
-
-            std::size_t index = 0;
-            try {
-                index = static_cast<std::size_t>(
-                    std::stoull(expression.substr(index_start, position - index_start)));
-            } catch (...) {
-                error = "JSON array index is out of range in '" + expression + "'";
-                return true;
-            }
-            ++position;
-
-            if (!current->is_array()) {
-                error = "cannot index JSON value in '" + expression + "' because it is not an array";
-                return true;
-            }
-            if (index >= current->array.size()) {
-                error = "JSON array index " + std::to_string(index) +
-                        " is out of range in '" + expression + "'";
-                return true;
-            }
-
-            const json::Document* child = &(*current)[index];
-            current = std::shared_ptr<const json::Document>(current, child);
-            continue;
+            error="cannot index JSON value in '"+expression+"'";return true;
         }
 
         error = "invalid JSON access syntax in '" + expression + "'";
@@ -1792,7 +1789,8 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                     method=="seek"||method=="modified"||method=="save"||method=="revert"||method=="replace_once"||
                     method=="insert"||method=="insert_before"||method=="insert_after"||method=="prepend"||method=="append"||
                     method=="copy"||method=="move"||method=="remove"||method=="cat"||
-                    method=="keys"||method=="values"||method=="entries"||method=="has"||method=="get"||method=="merge";
+                    method=="keys"||method=="values"||method=="entries"||method=="has"||method=="get"||method=="merge"||
+                    method=="map"||method=="filter"||method=="reduce"||method=="any"||method=="all"||method=="find"||method=="find_index"||method=="count"||method=="sort_by"||method=="group_by"||method=="unique"||method=="flatten"||method=="sum"||method=="min"||method=="max";
                 if (known) {
                     json::Document base;
                     if (!eval(receiver,base,depth+1)) return false;
@@ -1906,6 +1904,17 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                     }
                     if(base.is_array()) {
                         const auto& a=base.array;
+                        auto invoke_value_callback=[&](const std::string& cbexpr,const std::vector<json::Document>& av,json::Document& result)->bool{
+                            json::Document cb;if(!eval(cbexpr,cb,depth+1))return false;if(!cb.is_string()||cb.string.rfind("\x1fnift:callable:",0)!=0){error="transformation: callback must be callable";return false;}
+                            push_variable_scope();auto& sc=variable_scopes_.back();auto csp=std::make_shared<json::Document>(cb);sc["__nift_cb"]=VariableBinding{csp,nift_binding_type(*csp),false,false};std::string call="__nift_cb(";
+                            for(size_t ai=0;ai<av.size();++ai){if(ai)call+=",";std::string n="__nift_arg"+std::to_string(ai);auto sp=std::make_shared<json::Document>(av[ai]);sc[n]=VariableBinding{sp,nift_binding_type(*sp),false,false};call+=n;}call+=")";bool r=eval(call,result,depth+1);pop_variable_scope();return r;};
+                        if(method=="map"||method=="filter"||method=="reduce"||method=="any"||method=="all"||method=="find"||method=="find_index"||method=="count"||method=="sort_by"||method=="group_by"){
+                            if((method=="reduce"&&args.size()!=2)||(method!="reduce"&&args.size()!=1)){error=method+": invalid arguments";return false;}json::Document arr=json::Document::make_array(),acc;if(method=="reduce"&&!eval_arg(1,acc))return false;double cnt=0;std::vector<std::pair<json::Document,json::Document>> keyed;
+                            for(size_t vi=0;vi<a.size();++vi){const auto&v=a[vi];json::Document r;if(!invoke_value_callback(args[0],method=="reduce"?std::vector<json::Document>{acc,v}:std::vector<json::Document>{v},r))return false;if(method=="map")arr.array.push_back(r);else if(method=="filter"){if(!r.is_bool()){error="filter: callback must return bool";return false;}if(r.boolean)arr.array.push_back(v);}else if(method=="reduce")acc=r;else if(method=="sort_by"||method=="group_by"){if(!(r.is_string()||r.is_number()||r.is_bool())){error=method+": key must be scalar";return false;}keyed.push_back({r,v});}else{if(!r.is_bool()){error=method+": callback must return bool";return false;}if(method=="any"&&r.boolean){out=json::Document(true);return true;}if(method=="all"&&!r.boolean){out=json::Document(false);return true;}if(method=="find"&&r.boolean){out=v;return true;}if(method=="find_index"&&r.boolean){out=json::Document((double)vi);return true;}if(method=="count"&&r.boolean)cnt+=1;}}
+                            if(method=="sort_by"){std::stable_sort(keyed.begin(),keyed.end(),[&](const auto&x,const auto&y){if(x.first.is_number()&&y.first.is_number())return x.first.num<y.first.num;if(x.first.is_string()&&y.first.is_string())return x.first.string<y.first.string;if(x.first.is_bool()&&y.first.is_bool())return x.first.boolean<y.first.boolean;return (int)x.first.type<(int)y.first.type;});out=json::Document::make_array();for(auto&kv:keyed)out.array.push_back(kv.second);return true;}
+                            if(method=="group_by"){out=json::Document::make_object();for(auto&kv:keyed){std::string k=kv.first.is_string()?kv.first.string:render_expression_value(kv.first);if(!out.has(k))out[k]=json::Document::make_array();out[k].push_back(kv.second);}return true;}
+                            if(method=="map"||method=="filter")out=arr;else if(method=="reduce")out=acc;else if(method=="any")out=json::Document(false);else if(method=="all")out=json::Document(true);else if(method=="find"||method=="find_index")out=json::Document(method=="find"?json::Document(nullptr):json::Document(-1.0));else out=json::Document(cnt);return true;}
+                        if(method=="unique"||method=="flatten"||method=="sum"||method=="min"||method=="max"){if(!args.empty()){error=method+": expected no arguments";return false;}if(method=="unique"){out=json::Document::make_array();for(const auto&v:a){bool seen=false;for(const auto&w:out.array)if(structural_equal(v,w)){seen=true;break;}if(!seen)out.array.push_back(v);}return true;}if(method=="flatten"){out=json::Document::make_array();for(const auto&v:a){if(v.is_array())out.array.insert(out.array.end(),v.array.begin(),v.array.end());else out.array.push_back(v);}return true;}if(a.empty()){if(method=="sum"){out=json::Document(0.0);return true;}error=method+": cannot aggregate an empty array";return false;}if(method=="sum"){double total=0;for(const auto&v:a){if(!v.is_number()){error="sum: values must be numeric";return false;}total+=v.num;}out=json::Document(total);return true;}out=a.front();for(size_t ai=1;ai<a.size();++ai){const auto&v=a[ai];bool take=false;if(out.is_number()&&v.is_number())take=method=="min"?v.num<out.num:v.num>out.num;else if(out.is_string()&&v.is_string())take=method=="min"?v.string<out.string:v.string>out.string;else{error=method+": values must be comparable and homogeneous";return false;}if(take)out=v;}return true;}
                         if(method=="size"||method=="length"){if(!no_args())return false;out=json::Document((double)a.size());return true;}
                         if(method=="empty"){if(!no_args())return false;out=json::Document(a.empty());return true;}
                         if(method=="first"||method=="last"){if(!no_args())return false;if(a.empty()){error=method+": array is empty";return false;}out=method=="first"?a.front():a.back();return true;}

@@ -156,6 +156,13 @@ bool load_config(const fs::path& root, Config& config, std::string& error) {
         }
     }
 
+    auto load_source_list = [&](const char* key, std::vector<std::string>& out, const char* ext) -> bool {
+        out.clear(); if (!value.has(key)) return true; if (!value[key].is_array()) { error = std::string(key) + " must be an array of project-relative paths"; return false; }
+        for (const auto& item : value[key].array) { if (!item.is_string() || item.string.empty()) { error = std::string("every ") + key + " entry must be a non-empty path string"; return false; }
+            fs::path p=(root/item.string).lexically_normal(); if(!filesystem::path_within(root,p)){error=std::string(key)+" path must stay inside the Nift project: "+item.string;return false;}
+            if(p.extension()!=ext){error=std::string(key)+" entries must use "+ext+": "+item.string;return false;} out.push_back(item.string); } return true; };
+    if (!load_source_list("schemas", config.schema_files, ".schema") || !load_source_list("taxonomies", config.taxonomy_files, ".tax")) return false;
+
     config.minify_exts.clear();
     if (value.has("minify-exts")) {
         if (!value["minify-exts"].is_array()) {
@@ -189,7 +196,7 @@ bool load_config(const fs::path& root, Config& config, std::string& error) {
     static const std::unordered_set<std::string> known_config_keys = {
         "content-dir", "content-ext", "output-dir", "output-ext",
         "default-template", "incremental-mode", "build-threads",
-        "contracts", "minify-exts",
+        "contracts", "minify-exts", "schemas", "taxonomies",
     };
     for (const auto& entry : value.object) {
         if (!known_config_keys.count(entry.first)) {
