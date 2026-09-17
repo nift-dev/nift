@@ -530,6 +530,7 @@ test-v43-language: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_postfix_composition_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_hierarchy_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_hierarchy_incremental_smoke.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 benchmarks/hierarchy_scaling.py
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp172_from_entries_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp173_index_by_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp174_pick_omit_smoke.sh
