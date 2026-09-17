@@ -27,6 +27,26 @@ check num-round-neg    '-3'    '(-2.5).round()'
 check lit-array-index  '2'     '[1,2,3][1]'
 check lit-obj-index    '1'     '{"a":1}["a"]'
 check lit-nested       '3'     '[[1,2],[3,4]][1][0]'
+
+# array computed-index (full scripts; the check wrapper is single-expression)
+cat > t.nift <<'NIFT'
+a := [10,20,30]
+i := 1
+print(a[i])
+NIFT
+[ "$("$NIFT" run t.nift 2>/dev/null)" = "20" ] && echo "PASS  arr-bind-index" || { echo "FAIL  arr-bind-index" >&2; exit 1; }
+cat > t.nift <<'NIFT'
+a := [10,20,30]
+i := 1 + 1
+print(a[i])
+NIFT
+[ "$("$NIFT" run t.nift 2>/dev/null)" = "30" ] && echo "PASS  arr-expr-index" || { echo "FAIL  arr-expr-index" >&2; exit 1; }
+cat > t.nift <<'NIFT'
+a := [[1],[2,3],[4,5,6]]
+i := 2
+print(a[i][1])
+NIFT
+[ "$("$NIFT" run t.nift 2>/dev/null)" = "5" ] && echo "PASS  arr-nested-index" || { echo "FAIL  arr-nested-index" >&2; exit 1; }
 check html-escape      '&lt;b&gt;&amp;x&lt;/b&gt;' 'html_escape("<b>&x</b>")'
 check attr-escape      'a&#39;b&amp;c' 'attr_escape("a'"'"'b&c")'
 check url-encode       'a%20b%2Fc%3Fd%3De%26f' 'url_encode("a b/c?d=e&f")'

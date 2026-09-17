@@ -894,7 +894,18 @@ bool Parser::resolve_json_value(const std::string& expression,
             if(position<expression.size()&&(expression[position]=='"'||expression[position]=='\'')){quoted=true;quote=expression[position++];while(position<expression.size()&&expression[position]!=quote){if(expression[position]=='\\'&&position+1<expression.size())position+=2;else ++position;}if(position>=expression.size()){error="unterminated JSON object key in '"+expression+"'";return true;}++position;}else while(position<expression.size()&&expression[position]!=']')++position;
             if(position>=expression.size()||expression[position]!=']'){error="JSON index has no closing ']' in '"+expression+"'";return true;}std::string token=trim_copy(expression.substr(token_start,position-token_start));++position;
             if(current->is_array()){
-                if(quoted||token.empty()||!std::all_of(token.begin(),token.end(),[](unsigned char c){return std::isdigit(c); })){error="JSON array indices must be non-negative integers in '"+expression+"'";return true;}std::size_t index=0;try{index=(std::size_t)std::stoull(token);}catch(...){error="JSON array index is out of range in '"+expression+"'";return true;}if(index>=current->array.size()){error="JSON array index "+std::to_string(index)+" is out of range in '"+expression+"'";return true;}const json::Document* child=&(*current)[index];current=std::shared_ptr<const json::Document>(current,child);continue;
+                std::size_t index=0;
+                if(quoted||token.empty()||!std::all_of(token.begin(),token.end(),[](unsigned char c){return std::isdigit(c); })){
+                    if(quoted||token.empty()){
+                        error="JSON array indices must be non-negative integers in '"+expression+"'";return true;
+                    }
+                    json::Document computed;
+                    if(!evaluate_expression(token,computed,error)||!computed.is_number()||computed.num<0||std::trunc(computed.num)!=computed.num){
+                        if(error.empty())error="JSON array indices must be non-negative integers in '"+expression+"'";return true;
+                    }
+                    index=(std::size_t)computed.num;
+                }else{try{index=(std::size_t)std::stoull(token);}catch(...){error="JSON array index is out of range in '"+expression+"'";return true;}}
+                if(index>=current->array.size()){error="JSON array index "+std::to_string(index)+" is out of range in '"+expression+"'";return true;}const json::Document* child=&(*current)[index];current=std::shared_ptr<const json::Document>(current,child);continue;
             }
             if(current->is_object()){
                 std::string key;if(quoted){if(token.size()<2){error="invalid JSON object key";return true;}key=token.substr(1,token.size()-2);}else{VariableBinding* kb=nullptr;for(auto scope=variable_scopes_.rbegin();scope!=variable_scopes_.rend();++scope){auto it=scope->find(token);if(it!=scope->end()){kb=&it->second;break;}}if(!kb||!kb->value||!kb->value->is_string()){
@@ -2546,13 +2557,21 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                 } else if (kind == 2) {
                     std::string token = trim_copy(operand.substr(1, operand.size() - 2));
                     if (base.is_array()) {
-                        if (token.empty() || !std::all_of(token.begin(), token.end(), [](unsigned char c) { return std::isdigit(c); })) {
-                            error = "JSON array indices must be non-negative integers in '" + text + "'";
-                            return false;
-                        }
                         std::size_t index = 0;
-                        try { index = static_cast<std::size_t>(std::stoull(token)); }
-                        catch (...) { error = "JSON array index is out of range in '" + text + "'"; return false; }
+                        if (!token.empty() && std::all_of(token.begin(), token.end(), [](unsigned char c) { return std::isdigit(c); })) {
+                            try { index = static_cast<std::size_t>(std::stoull(token)); }
+                            catch (...) { error = "JSON array index is out of range in '" + text + "'"; return false; }
+                        } else {
+                            // Computed index from a binding or resolvable
+                            // expression (e.g. a[i], a[i + 1]).
+                            json::Document computed;
+                            if (!resolve_direct(token, computed) || !computed.is_number() ||
+                                computed.num < 0 || std::trunc(computed.num) != computed.num) {
+                                error = "JSON array indices must be non-negative integers in '" + text + "'";
+                                return false;
+                            }
+                            index = static_cast<std::size_t>(computed.num);
+                        }
                         if (index >= base.array.size()) {
                             error = "JSON array index " + std::to_string(index) + " is out of range in '" + text + "'";
                             return false;
