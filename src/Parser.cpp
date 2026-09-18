@@ -1664,6 +1664,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             if (!local_error.empty()) {
                 const bool compound = text.find("&&") != std::string::npos || text.find("||") != std::string::npos ||
                     text.find("==") != std::string::npos || text.find("!=") != std::string::npos ||
+                    text.find("??") != std::string::npos ||
                     text.find("<=") != std::string::npos || text.find(">=") != std::string::npos ||
                     text.find(" + ") != std::string::npos || text.find(" - ") != std::string::npos ||
                     text.find(" * ") != std::string::npos || text.find(" / ") != std::string::npos ||
@@ -1709,6 +1710,31 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             for (auto scope=variable_scopes_.rbegin(); scope!=variable_scopes_.rend(); ++scope) { auto it=scope->find(name); if(it!=scope->end()) { it->second.sync(); return &it->second; } }
             if(!receiver_stack_.empty()){auto it=receiver_stack_.back()->fields.find(name);if(it!=receiver_stack_.back()->fields.end())return &it->second;}
             return nullptr;
+        };
+
+        auto truthy_value = [](const json::Document& document) {
+            if (document.is_bool()) return document.boolean;
+            if (document.is_null()) return false;
+            if (document.is_number()) return document.num != 0.0;
+            if (document.is_string()) return !document.string.empty();
+            if (document.is_array()) return !document.array.empty();
+            if (document.is_object()) return !document.object.empty();
+            return false;
+        };
+        auto find_top_level_op = [&](const std::string& op) -> std::size_t {
+            bool quoted=false; char quote=0; int parens=0; int brackets=0;
+            for (std::size_t i=0; i+op.size()<=text.size(); ++i) {
+                char c=text[i];
+                if (quoted) { if (c=='\\' && i+1<text.size()) ++i; else if (c==quote) quoted=false; continue; }
+                if (c=='\'' || c=='"') { quoted=true; quote=c; continue; }
+                if (c=='[') { ++brackets; continue; }
+                if (c==']') { if (brackets) --brackets; continue; }
+                if (brackets) continue;
+                if (c=='(') { ++parens; continue; }
+                if (c==')') { if (parens) --parens; continue; }
+                if (!parens && text.compare(i,op.size(),op)==0) return i;
+            }
+            return std::string::npos;
         };
         // Exact int64-vs-double comparison across the complete supported range.
         // An integer is compared without converting it to a lossy double; a
@@ -2660,6 +2686,45 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                 out = base;
                 return true;
             };
+            // Ternary condition (value semantics) is the outermost operator. A '?'
+            // that begins '??', '?.' or '?[' is an optionality marker, not a
+            // ternary; nested ternaries are tracked so the matching ':' is found at
+            // the correct depth.
+            {
+                bool quoted=false; char quote=0; int parens=0, brackets=0, braces=0;
+                std::size_t question=std::string::npos; int nested=0;
+                for (std::size_t z=0; z<text.size(); ++z) {
+                    const char c=text[z];
+                    if (quoted) { if (c=='\\' && z+1<text.size()) ++z; else if (c==quote) quoted=false; continue; }
+                    if (c=='\'' || c=='"') { quoted=true; quote=c; continue; }
+                    if (c=='(') { ++parens; continue; } if (c==')') { if (parens) --parens; continue; }
+                    if (c=='[') { ++brackets; continue; } if (c==']') { if (brackets) --brackets; continue; }
+                    if (c=='{') { ++braces; continue; } if (c=='}') { if (braces) --braces; continue; }
+                    if (parens || brackets || braces) continue;
+                    if (c=='?') {
+                        if (z+1<text.size() && (text[z+1]=='?' || text[z+1]=='.' || text[z+1]=='[')) continue;
+                        if (z>0 && text[z-1]=='?') continue;
+                        if (question==std::string::npos) question=z; else ++nested;
+                        continue;
+                    }
+                    if (c==':' && question!=std::string::npos) {
+                        if (nested>0) { --nested; continue; }
+                        json::Document cond;
+                        if(!eval(text.substr(0,question),cond,depth+1)) return false;
+                        const std::string selected = truthy_value(cond) ? text.substr(question+1,z-question-1) : text.substr(z+1);
+                        return eval(selected,out,depth+1);
+                    }
+                }
+                if (question!=std::string::npos) { error="ternary expression has '?' without a matching ':'"; return false; }
+            }
+            // CP206: null coalescing. Null is Nift's sole public absence value;
+            // RHS evaluation is deliberately lazy. Handled before safe access so
+            // (a?.b ?? c) resolves to c when a is null.
+            if (const auto p=find_top_level_op("??"); p!=std::string::npos) {
+                json::Document left;if(!eval(text.substr(0,p),left,depth+1))return false;
+                if(!left.is_null()){out=std::move(left);return true;}
+                return eval(text.substr(p+2),out,depth+1);
+            }
             // CP207: safe access is null propagation only. Evaluate the receiver;
             // when non-null, retry the same expression with the first safe marker
             // converted to ordinary access so normal missing/type errors survive.
@@ -2671,39 +2736,6 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             if (compose_postfix(text, out)) return true;
             if (!error.empty()) return false;
             if (resolve_direct(text,out)) return true; if (!error.empty()) return false;
-        }
-
-        auto truthy_value = [](const json::Document& document) {
-            if (document.is_bool()) return document.boolean;
-            if (document.is_null()) return false;
-            if (document.is_number()) return document.num != 0.0;
-            if (document.is_string()) return !document.string.empty();
-            if (document.is_array()) return !document.array.empty();
-            if (document.is_object()) return !document.object.empty();
-            return false;
-        };
-        auto find_top_level_op = [&](const std::string& op) -> std::size_t {
-            bool quoted=false; char quote=0; int parens=0; int brackets=0;
-            for (std::size_t i=0; i+op.size()<=text.size(); ++i) {
-                char c=text[i];
-                if (quoted) { if (c=='\\' && i+1<text.size()) ++i; else if (c==quote) quoted=false; continue; }
-                if (c=='\'' || c=='"') { quoted=true; quote=c; continue; }
-                if (c=='[') { ++brackets; continue; }
-                if (c==']') { if (brackets) --brackets; continue; }
-                if (brackets) continue;
-                if (c=='(') { ++parens; continue; }
-                if (c==')') { if (parens) --parens; continue; }
-                if (!parens && text.compare(i,op.size(),op)==0) return i;
-            }
-            return std::string::npos;
-        };
-
-        // CP206: null coalescing. Null is Nift's sole public absence value;
-        // RHS evaluation is deliberately lazy.
-        if (const auto p=find_top_level_op("??"); p!=std::string::npos) {
-            json::Document left;if(!eval(text.substr(0,p),left,depth+1))return false;
-            if(!left.is_null()){out=std::move(left);return true;}
-            return eval(text.substr(p+2),out,depth+1);
         }
 
         auto find_top_level_assignment = [&]() -> std::size_t {
@@ -2759,7 +2791,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             if(lhs.front()=='['){if(!rhs.is_array()){error="array destructuring requires an array";return true;}if(rhs.array.size()!=names.size()){error="array destructuring requires exactly "+std::to_string(names.size())+" items";return true;}values=rhs.array;}
             else{if(!rhs.is_object()){error="object destructuring requires an object";return true;}for(const auto& n:names){if(!rhs.has(n)){error="object destructuring missing key: "+n;return true;}values.push_back(rhs[n]);}}
             if(variable_scopes_.empty())variable_scopes_.emplace_back();
-            if(declaration){for(const auto& n:names){if(reserved_binding_name(n)||host_.is_contract_name(n)){error="destructuring name is reserved: "+n;return true;}if(variable_scopes_.back().count(n)){error="binding already declared in this scope: "+n;return true;}}
+            if(declaration){std::set<std::string> seen;for(const auto& n:names){if(!seen.insert(n).second){error="duplicate destructuring target: "+n;return true;}if(reserved_binding_name(n)||host_.is_contract_name(n)){error="destructuring name is reserved: "+n;return true;}if(variable_scopes_.back().count(n)){error="binding already declared in this scope: "+n;return true;}}
                 for(std::size_t j=0;j<names.size();++j){auto sp=std::make_shared<json::Document>(values[j]);variable_scopes_.back().emplace(names[j],VariableBinding{sp,nift_binding_type_from_text(values[j].dump(0),values[j]),true,false});}}
             else{std::vector<VariableBinding*> targets;for(std::size_t j=0;j<names.size();++j){VariableBinding* b=nullptr;for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(names[j]);if(it!=sc->end()){b=&it->second;break;}}if(!b){error="assignment to undefined binding: "+names[j];return true;}if(!b->mutable_binding){error="cannot assign to const binding: "+names[j];return true;}const int at=nift_binding_type_from_text(values[j].dump(0),values[j]);if(!nift_type_assignable(at,b->type)){error="cannot change binding type in destructuring: "+names[j];return true;}targets.push_back(b);}for(std::size_t j=0;j<targets.size();++j)targets[j]->rebind(std::make_shared<json::Document>(values[j]));}
             out=rhs;if(depth==0)last_expression_mutation_=true;return true;
@@ -3213,8 +3245,13 @@ bool Parser::translate_function_program(const std::string& source, std::string& 
                 // double-wrapped as $[@...]/$[$...] and routed through the full
                 // expression evaluator. Pass them through verbatim; only bare
                 // v4.2 function-program statements need the $[...] wrapper.
-                if(stmt[0]=='@'||stmt[0]=='$') out+=stmt;
-                else out+="$["+stmt+"]";
+                if(stmt[0]=='@'||stmt[0]=='$'){
+                    out+=stmt;
+                    // A verbatim single-line comment has no terminating newline
+                    // once inter-statement whitespace is stripped; emit one so it
+                    // cannot swallow the following statement.
+                    if(stmt.rfind("@//",0)==0) out+='\n';
+                } else out+="$["+stmt+"]";
             }
             if(i<in.size())++i;
         }
@@ -3502,6 +3539,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             if(variable_scopes_.empty())variable_scopes_.emplace_back();if(variable_scopes_.back().count(name)){fail(source_path,source,i,"binding already declared in this scope: "+name);break;}
             std::string body=source.substr(bo+1,bc-bo-1);for(char& c:body)if(c=='\n'||c==';')c=',';bool ok=false;auto items=parse_parameters(body,ok);if(!ok||items.empty()){fail(source_path,source,i,"enum requires at least one member");break;}json::Document ns=json::Document::make_object();std::set<std::int64_t> used;std::int64_t next=0;bool good=true;
             for(auto raw:items){raw=trim_copy(raw);if(raw.empty())continue;auto eq=raw.find('=');std::string member=trim_copy(eq==std::string::npos?raw:raw.substr(0,eq));if(!valid_binding_identifier(member)||ns.has(member)){fail(source_path,source,i,"invalid or duplicate enum member: "+member);good=false;break;}std::int64_t val=next;if(eq!=std::string::npos){std::string vs=trim_copy(raw.substr(eq+1));auto pr=std::from_chars(vs.data(),vs.data()+vs.size(),val);if(pr.ec!=std::errc()||pr.ptr!=vs.data()+vs.size()){fail(source_path,source,i,"enum values must be signed integer literals");good=false;break;}}if(!used.insert(val).second){fail(source_path,source,i,"duplicate enum integer value: "+std::to_string(val));good=false;break;}ns[member]=json::Document(std::string("\x1fnift:enum:")+name+":"+member+":"+std::to_string(val));if(val==std::numeric_limits<std::int64_t>::max()){next=val;}else next=val+1;}
+            if(ns.object.empty()){fail(source_path,source,i,"enum requires at least one member");good=false;}
             if(!good)break;auto sp=std::make_shared<json::Document>(std::move(ns));variable_scopes_.back().emplace(name,VariableBinding{sp,nift_binding_type_from_text("{}",*sp),false,true});i=bc+1;continue;
         }
 
@@ -3620,6 +3658,10 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                         if (c == '}') { if (braces) --braces; continue; }
                         if (parens || brackets || braces) continue;
                         if (c == '?') {
+                            // '??', '?.' and '?[' are optionality markers, not
+                            // ternary; they fall through to evaluate_expression.
+                            if (pos + 1 < expression.size() && (expression[pos + 1] == '?' || expression[pos + 1] == '.' || expression[pos + 1] == '[')) continue;
+                            if (pos > 0 && expression[pos - 1] == '?') continue;
                             if (question == std::string::npos) question = pos;
                             else ++nested_ternary;
                             continue;
