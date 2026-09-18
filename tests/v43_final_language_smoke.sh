@@ -22,6 +22,14 @@ print(type(Status.Draft)); print(is_enum(Status.Draft)); print(Code.OK.to_int())
 print(Status.Draft == Status.Draft); print(Status.Draft == Status.Published)
 NIFT
 [[ "$("$NIFT" run "$T/e.nift")" == $'Draft\n1\nArchived\nenum\ntrue\n200\n201\n404\ntrue\nfalse' ]]
+cat > "$T/enum-json.nift" <<'NIFT'
+enum Code { OK = 200, Missing = 404 }
+o := ofstream("enum.jsonl")
+o.write_val(Code.Missing)
+close(o)
+print(open("enum.jsonl"))
+NIFT
+[[ "$(cd "$T" && "$NIFT" run enum-json.nift)" == 404 ]]
 cat > "$T/bad.nift" <<'NIFT'
 enum Bad { A = 1, B = 1 }
 NIFT
