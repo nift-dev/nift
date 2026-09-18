@@ -1122,11 +1122,13 @@ bool Parser::scalar_literal(const std::string& text, json::Document& value, std:
 }
 
 std::string Parser::render_expression_value(const json::Document& value) const {
+    if (value.is_string() && value.string.rfind("\x1fnift:enum:",0)==0) { const auto last=value.string.rfind(':'); const auto prev=last==std::string::npos?last:value.string.rfind(':',last-1); if(prev!=std::string::npos&&last!=std::string::npos)return value.string.substr(prev+1,last-prev-1); }
     if (value.is_string()) return value.string;
     return value.dump(0);
 }
 
 bool Parser::serialize_value(const json::Document& value, bool pretty, std::string& output, std::string& error, int depth) const {
+    if(value.is_string()&&value.string.rfind("\x1fnift:enum:",0)==0){const auto p=value.string.rfind(':');if(p==std::string::npos){error="invalid enum value";return false;}output+=value.string.substr(p+1);return true;}
     if (depth > 128) { error = "value serialization depth exceeded"; return false; }
     const std::string pad(pretty ? static_cast<std::size_t>(depth * 2) : 0, ' ');
     const std::string child_pad(pretty ? static_cast<std::size_t>((depth + 1) * 2) : 0, ' ');
@@ -1815,6 +1817,49 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             if(call_args("open",args,q)){fs::path p;if(args.size()!=1||!checked_path("open",args,q,0,p))return false;std::error_code ec;if(fs::is_directory(p,ec)){error="open: path is a directory";return false;}std::ifstream f(p,std::ios::binary);if(!f){error="open: cannot open path";return false;}std::ostringstream ss;ss<<f.rdbuf();out=json::Document(ss.str());return true;}
             if(call_args("file",args,q)){fs::path p;if(args.size()!=1||!checked_path("file",args,q,0,p))return false;auto f=std::make_shared<FileInstance>();f->path=p;auto id=std::to_string(next_file_instance_id_++);file_instances_[id]=f;out=json::Document(std::string("\x1fnift:file:")+id);return true;}
             if(call_args("page",args,q)){if(args.size()!=1){error="page: expected one page name";return false;}json::Document d;if(!arg_value(args,q,0,d)||!d.is_string()){error="page: name must be a string";return false;}std::string ref;if(!host_.page_ref_for(d.string,ref)){error="page: unknown tracked page '"+d.string+"'";return false;}out=json::Document(ref);return true;}
+            // CP204-205: stable public runtime introspection. Internal marker
+            // encodings are mapped to public language categories, not exposed.
+            auto public_type=[&](const json::Document& v)->std::string{
+                if(v.is_null()) return "null";
+                if(v.is_bool()) return "bool";
+                if(v.type==json::Type::StrNumber) return "int";
+                if(v.is_number()) return std::trunc(v.num)==v.num ? "int" : "float";
+                if(v.is_array()) return "array";
+                if(v.is_object()) return "object";
+                if(v.is_string()){
+                    if(v.string.rfind("\x1fnift:struct:",0)==0) return "struct";
+                    if(v.string.rfind("\x1fnift:callable:",0)==0) return "function";
+                    if(v.string.rfind("\x1fnift:collection:",0)==0) return "collection";
+                    if(v.string.rfind("\x1fnift:file:",0)==0) return "file";
+                    if(v.string.rfind("\x1fnift:stream:",0)==0) return "stream";
+                    if(v.string.rfind("\x1fnift:page:",0)==0) return "page";
+                    if(v.string.rfind("\x1fnift:enum:",0)==0) return "enum";
+                    return "string";
+                }
+                return "object";
+            };
+            if(call_args("type",args,q)){
+                if(args.size()!=1){error="type: expected one value";return false;}
+                json::Document v;if(!arg_value(args,q,0,v))return false;out=json::Document(public_type(v));return true;
+            }
+            for(const std::string pred:{"is_null","is_bool","is_number","is_int","is_float","is_string","is_array","is_object","is_struct","is_function","is_collection","is_enum"}){
+                if(call_args(pred,args,q)){
+                    if(args.size()!=1){error=pred+": expected one value";return false;}
+                    json::Document v;if(!arg_value(args,q,0,v))return false;const std::string t=public_type(v);
+                    bool yes=pred=="is_null"?t=="null":pred=="is_bool"?t=="bool":pred=="is_number"?(t=="int"||t=="float"):pred=="is_int"?t=="int":pred=="is_float"?t=="float":pred=="is_string"?t=="string":pred=="is_array"?t=="array":pred=="is_object"?t=="object":pred=="is_struct"?t=="struct":pred=="is_function"?t=="function":pred=="is_collection"?t=="collection":t=="enum";
+                    out=json::Document(yes);return true;
+                }
+            }
+            // CP210: Python-style integer ranges, stop-exclusive and materialized.
+            if(call_args("range",args,q)){
+                if(args.empty()||args.size()>3){error="range: expected stop, start/stop, or start/stop/step";return false;}
+                std::vector<std::int64_t> n; for(std::size_t ai=0;ai<args.size();++ai){json::Document v;if(!arg_value(args,q,ai,v)||!v.is_number()||std::trunc(v.num)!=v.num||v.num<(double)std::numeric_limits<std::int64_t>::min()||v.num>=9223372036854775808.0){error="range: arguments must be signed 64-bit integers";return false;}n.push_back((std::int64_t)v.num);}
+                std::int64_t start=args.size()==1?0:n[0], stop=args.size()==1?n[0]:n[1], step=args.size()==3?n[2]:1;
+                if(step==0){error="range: step must not be zero";return false;}
+                out=json::Document::make_array(); constexpr std::size_t limit=10000000;
+                for(std::int64_t x=start; step>0?x<stop:x>stop;){if(out.array.size()>=limit){error="range: result exceeds 10000000 items";return false;}out.array.emplace_back((double)x);if((step>0&&x>std::numeric_limits<std::int64_t>::max()-step)||(step<0&&x<std::numeric_limits<std::int64_t>::min()-step)){error="range: integer overflow";return false;}x+=step;}
+                return true;
+            }
             if(call_args("html_escape",args,q)||call_args("attr_escape",args,q)||call_args("url_encode",args,q)){
                 const bool is_attr=text.rfind("attr_escape(",0)==0; const bool is_url=text.rfind("url_encode(",0)==0; const char* fname=is_attr?"attr_escape":(is_url?"url_encode":"html_escape");
                 if(args.size()!=1){error=std::string(fname)+": expected one value";return false;}
@@ -1845,7 +1890,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             }
             if(call_args("ifstream",args,q)||call_args("ofstream",args,q)){const bool output=text.rfind("ofstream(",0)==0;fs::path p;if(args.size()!=1||!checked_path(output?"ofstream":"ifstream",args,q,0,p))return false;auto st=std::make_shared<StreamInstance>();st->kind=output?StreamInstance::Kind::Output:StreamInstance::Kind::Input;if(output){st->output=std::make_shared<std::ofstream>(p,std::ios::binary|std::ios::trunc);if(!*st->output){error="ofstream: cannot open path";return false;}}else{st->input=std::make_shared<std::ifstream>(p,std::ios::binary);if(!*st->input){error="ifstream: cannot open path";return false;}}auto id=std::to_string(next_stream_instance_id_++);stream_instances_[id]=st;out=json::Document(std::string("\x1fnift:stream:")+id);return true;}
             if(call_args("close",args,q)){if(args.size()!=1){error="close: expected stream";return false;}json::Document d;if(!arg_value(args,q,0,d)||!d.is_string()||d.string.rfind("\x1fnift:stream:",0)!=0){error="close: expected stream";return false;}auto it=stream_instances_.find(d.string.substr(13));if(it==stream_instances_.end()){error="close: invalid stream";return false;}if(it->second->closed){error="close: stream already closed";return false;}if(it->second->input)it->second->input->close();if(it->second->output)it->second->output->close();it->second->closed=true;out=json::Document(nullptr);return true;}
-            if(call_args("print",args,q)){if(args.size()!=1){error="print: expected one value";return false;}json::Document d;if(!arg_value(args,q,0,d))return false;if(d.is_string()&&q.size()>0&&q[0]&&d.string.find("$[")!=std::string::npos){std::string r,e;if(!interpolate_parameter(d.string,r,e)){error="print: "+e;return false;}d=json::Document(r);}if(d.is_array()||d.is_object()||(d.is_string()&&d.string.rfind("\x1fnift:",0)==0)){error="print: value is not directly renderable";return false;}const std::string rendered=render_expression_value(d);{static std::mutex print_mutex;std::lock_guard<std::mutex> lock(print_mutex);std::cout<<rendered<<'\n';std::cout.flush();}out=json::Document(nullptr);return true;}
+            if(call_args("print",args,q)){if(args.size()!=1){error="print: expected one value";return false;}json::Document d;if(!arg_value(args,q,0,d))return false;if(d.is_string()&&q.size()>0&&q[0]&&d.string.find("$[")!=std::string::npos){std::string r,e;if(!interpolate_parameter(d.string,r,e)){error="print: "+e;return false;}d=json::Document(r);}if(d.is_array()||d.is_object()||(d.is_string()&&d.string.rfind("\x1fnift:",0)==0&&d.string.rfind("\x1fnift:enum:",0)!=0)){error="print: value is not directly renderable";return false;}const std::string rendered=render_expression_value(d);{static std::mutex print_mutex;std::lock_guard<std::mutex> lock(print_mutex);std::cout<<rendered<<'\n';std::cout.flush();}out=json::Document(nullptr);return true;}
             if(call_args("read",args,q)){if(!args.empty()){error="read: expected no arguments";return false;}if(!standalone_script_host_){error="read: interactive input is only available under nift run/nift sh";return false;}std::string line;if(!std::getline(std::cin,line)){if(std::cin.eof()){std::cin.clear();out=json::Document(nullptr);return true;}error="read: input failure";return false;}out=json::Document(line);return true;}
         }
 
@@ -1940,6 +1985,11 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                         return eval(args[i],v,depth+1);
                     };
                     auto no_args=[&]()->bool{if(!args.empty()){error=method+": expected no arguments";return false;}return true;};
+                    if(base.is_string()&&base.string.rfind("\x1fnift:enum:",0)==0&&(method=="to_int"||method=="to_string")){
+                        if(!no_args())return false;const auto last=base.string.rfind(':');const auto prev=last==std::string::npos?last:base.string.rfind(':',last-1);if(last==std::string::npos||prev==std::string::npos){error="invalid enum value";return false;}
+                        if(method=="to_string"){out=json::Document(base.string.substr(prev+1,last-prev-1));return true;}
+                        std::int64_t v=0;auto r=std::from_chars(base.string.data()+last+1,base.string.data()+base.string.size(),v);if(r.ec!=std::errc()){error="invalid enum backing value";return false;}out=json::Document((double)v);if(v>9007199254740992LL||v<-9007199254740992LL){out.type=json::Type::StrNumber;out.string=std::to_string(v);}return true;
+                    }
                     // CP171: all operations that construct object keys from values
                     // share one conversion rule. JSON objects ultimately have string
                     // keys, so Nift accepts only renderable scalar key values and
@@ -2610,6 +2660,14 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                 out = base;
                 return true;
             };
+            // CP207: safe access is null propagation only. Evaluate the receiver;
+            // when non-null, retry the same expression with the first safe marker
+            // converted to ordinary access so normal missing/type errors survive.
+            {
+                bool quoted=false;char quote=0;int pa=0,br=0;std::size_t sp=std::string::npos;
+                for(std::size_t z=0;z+1<text.size();++z){char c=text[z];if(quoted){if(c=='\\'&&z+1<text.size())++z;else if(c==quote)quoted=false;continue;}if(c=='\''||c=='"'){quoted=true;quote=c;continue;}if(c=='(')++pa;else if(c==')'&&pa)--pa;else if(c=='[')++br;else if(c==']'&&br)--br;if((text.compare(z,2,"?.")==0||text.compare(z,2,"?[")==0)){sp=z;break;}}
+                if(sp!=std::string::npos){json::Document recv;if(!eval(text.substr(0,sp),recv,depth+1))return false;if(recv.is_null()){out=json::Document(nullptr);return true;}std::string ordinary=text;ordinary.erase(sp,1);return eval(ordinary,out,depth+1);}
+            }
             if (compose_postfix(text, out)) return true;
             if (!error.empty()) return false;
             if (resolve_direct(text,out)) return true; if (!error.empty()) return false;
@@ -2639,6 +2697,14 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             }
             return std::string::npos;
         };
+
+        // CP206: null coalescing. Null is Nift's sole public absence value;
+        // RHS evaluation is deliberately lazy.
+        if (const auto p=find_top_level_op("??"); p!=std::string::npos) {
+            json::Document left;if(!eval(text.substr(0,p),left,depth+1))return false;
+            if(!left.is_null()){out=std::move(left);return true;}
+            return eval(text.substr(p+2),out,depth+1);
+        }
 
         auto find_top_level_assignment = [&]() -> std::size_t {
             bool quoted=false; char quote=0; int parens=0, brackets=0, braces=0;
@@ -2678,6 +2744,28 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
         const bool prefix_inc=(text.rfind("++",0)==0||text.rfind("--",0)==0);
         const bool postfix_inc=(text.size()>2&&(text.compare(text.size()-2,2,"++")==0||text.compare(text.size()-2,2,"--")==0) && find_top_level_op(":=")==std::string::npos && find_top_level_assignment()==std::string::npos);
         if(prefix_inc||postfix_inc){const bool inc=prefix_inc?text[0]=='+':text[text.size()-2]=='+';const std::string target=trim_copy(prefix_inc?text.substr(2):text.substr(0,text.size()-2));json::Document oldv,one(1.0),next;if(!eval(target,oldv,depth+1))return false;if(!oldv.is_number()){error="increment/decrement requires a numeric lvalue";return false;}if(!numeric_binary(oldv,one,inc?'+':'-',next))return false;json::Document assigned;if(!eval(target+" = "+next.dump(0),assigned,depth+1))return false;out=prefix_inc?assigned:oldv;if(depth==0)last_expression_mutation_=true;return true;}
+
+        // CP208-209: deliberately small, flat destructuring surface.
+        // Arrays are exact-length; objects require named keys and ignore extras.
+        // No nesting, defaults, rest, or renaming in v4.3. Both declaration and
+        // assignment validate/evaluate completely before mutating bindings.
+        auto destructure=[&](bool declaration,std::size_t p)->bool{
+            std::string lhs=trim_copy(text.substr(0,p));
+            if(lhs.size()<2||!((lhs.front()=='['&&lhs.back()==']')||(lhs.front()=='{'&&lhs.back()=='}')))return false;
+            bool pok=false;auto names=parse_parameters(lhs.substr(1,lhs.size()-2),pok);if(!pok||names.empty()){error="destructuring pattern must contain identifiers";return true;}
+            for(auto& n:names){n=trim_copy(n);if(!valid_binding_identifier(n)){error="destructuring patterns support only flat identifiers";return true;}}
+            json::Document rhs;if(!eval(text.substr(p+(declaration?2:1)),rhs,depth+1))return true;
+            std::vector<json::Document> values;
+            if(lhs.front()=='['){if(!rhs.is_array()){error="array destructuring requires an array";return true;}if(rhs.array.size()!=names.size()){error="array destructuring requires exactly "+std::to_string(names.size())+" items";return true;}values=rhs.array;}
+            else{if(!rhs.is_object()){error="object destructuring requires an object";return true;}for(const auto& n:names){if(!rhs.has(n)){error="object destructuring missing key: "+n;return true;}values.push_back(rhs[n]);}}
+            if(variable_scopes_.empty())variable_scopes_.emplace_back();
+            if(declaration){for(const auto& n:names){if(reserved_binding_name(n)||host_.is_contract_name(n)){error="destructuring name is reserved: "+n;return true;}if(variable_scopes_.back().count(n)){error="binding already declared in this scope: "+n;return true;}}
+                for(std::size_t j=0;j<names.size();++j){auto sp=std::make_shared<json::Document>(values[j]);variable_scopes_.back().emplace(names[j],VariableBinding{sp,nift_binding_type_from_text(values[j].dump(0),values[j]),true,false});}}
+            else{std::vector<VariableBinding*> targets;for(std::size_t j=0;j<names.size();++j){VariableBinding* b=nullptr;for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(names[j]);if(it!=sc->end()){b=&it->second;break;}}if(!b){error="assignment to undefined binding: "+names[j];return true;}if(!b->mutable_binding){error="cannot assign to const binding: "+names[j];return true;}const int at=nift_binding_type_from_text(values[j].dump(0),values[j]);if(!nift_type_assignable(at,b->type)){error="cannot change binding type in destructuring: "+names[j];return true;}targets.push_back(b);}for(std::size_t j=0;j<targets.size();++j)targets[j]->rebind(std::make_shared<json::Document>(values[j]));}
+            out=rhs;if(depth==0)last_expression_mutation_=true;return true;
+        };
+        if(const auto dp=find_top_level_op(":=");dp!=std::string::npos){std::string lhs=trim_copy(text.substr(0,dp));if(!lhs.empty()&&(lhs.front()=='['||lhs.front()=='{')){if(destructure(true,dp))return error.empty();}}
+        if(const auto dp=find_top_level_assignment();dp!=std::string::npos){std::string lhs=trim_copy(text.substr(0,dp));if(!lhs.empty()&&(lhs.front()=='['||lhs.front()=='{')){if(destructure(false,dp))return error.empty();}}
 
         if (const auto p=find_top_level_op(":="); p!=std::string::npos) {
             std::string declaration = trim_copy(text.substr(0, p));
@@ -3064,6 +3152,10 @@ bool Parser::translate_function_program(const std::string& source, std::string& 
                 if(bo>=in.size()||in[bo]!='{'||!find_balanced(in,bo,'{','}',bc)){error="fn requires a block";return false;}
                 out += "@fn("+in.substr(p+1,pc-p-1)+"){"+in.substr(bo+1,bc-bo-1)+"}"; i=bc+1; continue;
             }
+            if(boundary(i,"enum")) {
+                std::size_t p=i+4;while(p<in.size()&&std::isspace((unsigned char)in[p]))++p;std::size_t ns=p;while(p<in.size()&&(std::isalnum((unsigned char)in[p])||in[p]=='_'))++p;std::string name=in.substr(ns,p-ns);while(p<in.size()&&std::isspace((unsigned char)in[p]))++p;std::size_t bc=0;
+                if(name.empty()||p>=in.size()||in[p]!='{'||!find_balanced(in,p,'{','}',bc)){error="enum requires 'Name { members }'";return false;}out+="@enum("+name+"){"+in.substr(p+1,bc-p-1)+"}";i=bc+1;continue;
+            }
             if(boundary(i,"struct")) {
                 std::size_t p=i+6; while(p<in.size()&&std::isspace((unsigned char)in[p]))++p; std::size_t pc=0;
                 if(p>=in.size()||in[p]!='('||!find_balanced(in,p,'(',')',pc)){error="struct requires '(name)'";return false;}
@@ -3402,6 +3494,14 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             if(!evaluate_expression(arg,pv,pe)||!pv.is_string()){fail(source_path,source,i,"@import path must be a string expression");break;}
             if(!execute_import_file(pv.string,source_path,depth+1,pe)){fail(source_path,source,i,"@import: "+pe);break;}
             i=ec+1; continue;
+        }
+
+        if(source.compare(i,6,"@enum(")==0){
+            std::size_t hc=0;if(!find_balanced(source,i+5,'(',')',hc)){fail(source_path,source,i,"enum definition has no matching ')'");break;}const std::string name=trim_copy(source.substr(i+6,hc-(i+6)));if(!valid_binding_identifier(name)){fail(source_path,source,i,"invalid enum name");break;}std::size_t bo=hc+1;while(bo<source.size()&&std::isspace((unsigned char)source[bo]))++bo;std::size_t bc=0;if(bo>=source.size()||source[bo]!='{'||!find_balanced(source,bo,'{','}',bc)){fail(source_path,source,i,"enum definition requires a block");break;}
+            if(variable_scopes_.empty())variable_scopes_.emplace_back();if(variable_scopes_.back().count(name)){fail(source_path,source,i,"binding already declared in this scope: "+name);break;}
+            std::string body=source.substr(bo+1,bc-bo-1);for(char& c:body)if(c=='\n'||c==';')c=',';bool ok=false;auto items=parse_parameters(body,ok);if(!ok||items.empty()){fail(source_path,source,i,"enum requires at least one member");break;}json::Document ns=json::Document::make_object();std::set<std::int64_t> used;std::int64_t next=0;bool good=true;
+            for(auto raw:items){raw=trim_copy(raw);if(raw.empty())continue;auto eq=raw.find('=');std::string member=trim_copy(eq==std::string::npos?raw:raw.substr(0,eq));if(!valid_binding_identifier(member)||ns.has(member)){fail(source_path,source,i,"invalid or duplicate enum member: "+member);good=false;break;}std::int64_t val=next;if(eq!=std::string::npos){std::string vs=trim_copy(raw.substr(eq+1));auto pr=std::from_chars(vs.data(),vs.data()+vs.size(),val);if(pr.ec!=std::errc()||pr.ptr!=vs.data()+vs.size()){fail(source_path,source,i,"enum values must be signed integer literals");good=false;break;}}if(!used.insert(val).second){fail(source_path,source,i,"duplicate enum integer value: "+std::to_string(val));good=false;break;}ns[member]=json::Document(std::string("\x1fnift:enum:")+name+":"+member+":"+std::to_string(val));if(val==std::numeric_limits<std::int64_t>::max()){next=val;}else next=val+1;}
+            if(!good)break;auto sp=std::make_shared<json::Document>(std::move(ns));variable_scopes_.back().emplace(name,VariableBinding{sp,nift_binding_type_from_text("{}",*sp),false,true});i=bc+1;continue;
         }
 
         if (source.compare(i, 8, "@struct(") == 0) {
