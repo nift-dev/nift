@@ -483,6 +483,10 @@ test-template-variables: $(TARGET)
 test-v41-certification: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v41_certification_adversarial.sh
 
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v41_inject_dependency.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v41_language_smoke.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v41_operator_smoke.sh
+
 # Nift v4.2 structured-control/function-program language tranche.
 test-v42-language: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v42_null_smoke.sh
@@ -536,6 +540,17 @@ test-v43-language: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_frontend_surface_dogfood.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_surface_robustness_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_object_expressions_smoke.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_recursion_guard_smoke.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp167_dogfood.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp141_cp163_content_model.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp137_cp140_frontmatter.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp131_cp136_project_model.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp130_eval_parity.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp129_eval_capabilities.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp127_eval_json_smoke.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp126_eval_smoke.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp124_json_object_wall.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp117_object_methods_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_final_language_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 benchmarks/hierarchy_scaling.py
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp172_from_entries_smoke.sh

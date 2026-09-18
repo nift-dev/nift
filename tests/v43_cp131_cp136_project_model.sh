@@ -11,7 +11,8 @@ cat > "$ROOT/.nift/tracked.json" <<'JSON'
 JSON
 : > "$ROOT/content/a.md"; : > "$ROOT/content/b.md"
 cd "$ROOT"
-OUT=$($OLDPWD/$BIN eval --json 'project')
+if [[ "$BIN" == /* ]]; then B="$BIN"; else B="$OLDPWD/$BIN"; fi
+OUT=$($B eval --json 'project')
 python3 - "$OUT" "$ROOT" <<'PY'
 import json,sys
 p=json.loads(sys.argv[1]); root=sys.argv[2]
@@ -19,4 +20,4 @@ assert p['root']==root and p['mode']=='modified' and len(p['files'])==2
 assert [x['name'] for x in p['files']]==['a','b']
 assert all(set(('name','path','output_path','url','extension','metadata')) <= set(x) for x in p['files'])
 PY
-[[ $($OLDPWD/$BIN eval --json 'project.files.size()') == '2' ]]
+[[ $($B eval --json 'project.files.size()') == '2' ]]

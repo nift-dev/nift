@@ -1691,6 +1691,10 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             return false;
         }
         if (scalar_literal(text, literal, literal_error)) { if(literal.is_string()&&literal.string.find("$[")!=std::string::npos){std::string r,e;if(!interpolate_parameter(literal.string,r,e)){error=e;return false;}literal=json::Document(r);} out = std::move(literal); return true; }
+        // A numeric-looking literal that failed only because its magnitude is
+        // outside the signed 64-bit range deserves its precise diagnostic rather
+        // than the generic unknown-expression fallback.
+        if (literal_error.rfind("integer literal outside signed 64-bit range", 0) == 0) { error = literal_error; return false; }
         return false;
     };
 
@@ -2456,13 +2460,15 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                         if(tag.rfind("\x1fnift:callable:named:",0)==0){ci=callables_.find(tag.substr(21));}
                         else if(tag.rfind("\x1fnift:callable:lambda:",0)==0){
                             auto li=lambda_instances_.find(tag.substr(22));if(li==lambda_instances_.end()){error="invalid lambda";return false;}auto fn=li->second;
-                            bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(!aok||ar.size()!=fn->params.size()){error="lambda argument count mismatch";return false;}
-                            std::vector<json::Document> av;for(size_t ai=0;ai<ar.size();++ai){json::Document v;if(!eval(ar[ai],v,depth+1))return false;av.push_back(std::move(v));}
+                            if (callable_call_depth_ >= kMaxCallableDepth) { error = "callable recursion depth exceeded"; return false; }
+                            ++callable_call_depth_;
+                            bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(!aok||ar.size()!=fn->params.size()){error="lambda argument count mismatch";--callable_call_depth_;return false;}
+                            std::vector<json::Document> av;for(size_t ai=0;ai<ar.size();++ai){json::Document v;if(!eval(ar[ai],v,depth+1)){--callable_call_depth_;return false;}av.push_back(std::move(v));}
                             push_variable_scope();auto& sc=variable_scopes_.back();for(const auto& kv:fn->captures)sc[kv.first]=kv.second;for(size_t ai=0;ai<av.size();++ai){auto sp=std::make_shared<json::Document>(std::move(av[ai]));sc[fn->params[ai]]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
                             bool okcall=true;
                             if(fn->block){++function_call_depth_;auto nested=execute_native_program(fn->body,fn->source_path,1);--function_call_depth_;if(!nested.ok){error=nested.error.message;okcall=false;}else if(pending_control_.kind==ControlFlow::Return){out=pending_control_.value?*pending_control_.value:json::Document(nullptr);pending_control_={};}else out=json::Document(nullptr);}
-                            else { okcall=eval(fn->body,out,depth+1); if(!okcall) error="lambda body error: "+error; }
-                            pop_variable_scope();return okcall;
+                            else { okcall=eval(fn->body,out,depth+1); if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0) error="lambda body error: "+error; }
+                            pop_variable_scope();--callable_call_depth_;return okcall;
                         }
                     }
                 }
@@ -4538,7 +4544,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 if (!return_expr.empty()) {
                     std::string return_error;
                     if (!evaluate_expression(return_expr, return_value, return_error)) {
-                        fail(source_path, source, i, "return: " + return_error);
+                        fail(source_path, source, i, return_error.rfind("callable recursion depth exceeded",0)==0 ? return_error : "return: " + return_error);
                         break;
                     }
                 }
