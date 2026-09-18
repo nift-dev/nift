@@ -2871,6 +2871,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                 equal = structural_equal(left,right);
                 result = op=="==" ? equal : !equal;
             } else {
+                if((left.is_string()&&left.string.rfind("\x1fnift:enum:",0)==0)||(right.is_string()&&right.string.rfind("\x1fnift:enum:",0)==0)){error="enum ordering is not defined; compare explicit to_int() values if intended";return false;}
                 if ((!left.is_number() || !right.is_number()) && !(left.is_string() && right.is_string())) { error="ordering comparisons require two numbers or two strings"; return false; }
                 int ordering=0;
                 if (left.is_number() && right.is_number()) {
