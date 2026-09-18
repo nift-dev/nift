@@ -8,7 +8,7 @@ For documentation, examples and downloads, visit **[nift.dev](https://nift.dev)*
 
 ## Project status
 
-Nift has completed its planned Checkpoints 0–10 deliberate hardening campaign. The current development tree is `Nift v4.0.5`, following the public v4.0.4 release, and the project has moved from synthetic hardening into **distribution, dogfooding and field evidence**. Existing regression, sanitizer, filesystem, parser, incremental and cross-platform gates remain maintained; new hardening work should be driven by concrete findings or newly justified guarantees rather than arbitrary checkpoint numbers.
+Nift has completed its planned Checkpoints 0–10 deliberate hardening campaign, followed by the v4.2 and v4.3 language/content campaigns. The current development tree is `Nift v4.3.0`, following the public v4.2.0 release, and is the v4.3.0 release candidate (the intended tag is `v4.3.0`). The v4.3 surface adds runtime introspection (`type()`/`is_*()`), null-safe access/defaulting (`??`, `?.`, `?[]`), destructuring, `range()`, symbolic integer-backed enums and expression-valued object literals, plus the frontend algebra and intrinsic page hierarchy. Existing regression, sanitizer, filesystem, parser, incremental, cross-platform, performance and packaging gates remain maintained; new hardening work should be driven by concrete findings or newly justified guarantees rather than arbitrary checkpoint numbers.
 
 ## Features
 
@@ -143,9 +143,9 @@ Objects can be iterated with `@for((key, val) : object){...}`. Loops expose rese
 
 A tracked entry can also opt into pagination with a positive `items-per-page` value. `@item{...}` captures rendered items, exactly one `@paginate` inserts the paginated result, pagination templates receive `$[paginate.items]`, `$[paginate.current]`, `$[paginate.total]`, `$[paginate.first]`, `$[paginate.last]`, `$[paginate.previous]` and `$[paginate.next]`, and `@pathtopage(n)` resolves absolute generated page links. Signed forms such as `@pathtopage(+1)`, `@pathtopage(-1)` and `@pathtopage(+$[offset])` resolve relative to the current pagination page. The complete generated page set remains one tracked dependency/invalidation unit even though its pages may render concurrently.
 
-## v4.3 language development
+## v4.3 language surface
 
-The current development line adds signed 64-bit integers, compound assignment and `++`/`--`, mutable arrays, native stack/queue/priority/map/set collections, first-class lambdas and lexical closures, and higher-order `map`/`filter`/`reduce`/`any`/`all`/`find`/`count`/`sort` operations. `map` and `set` preserve insertion order; sorted variants provide comparison order. See `docs/handover/V4.3-LANGUAGE-CAMPAIGN.md` for the frozen contract and checkpoint evidence.
+The v4.3 language surface (implemented and certified) adds signed 64-bit integers, compound assignment and `++`/`--`, mutable arrays, native stack/queue/priority/map/set collections, first-class lambdas and lexical closures, higher-order collection operations, runtime introspection (`type()`/`is_*()`), null-safe access and defaulting (`??`, `?.`, `?[]`), flat destructuring, `range()`, symbolic integer-backed enums, expression-valued array and object literals, and the intrinsic page hierarchy (`page`, `page(name)`, `parent`/`children`/`ancestors`/`descendants`/`siblings`). `map` and `set` preserve insertion order; sorted variants provide comparison order. See `docs/handover/V4.3-LANGUAGE-CAMPAIGN.md` for the frozen contract, checkpoint evidence and final release-hardening record.
 
 ## Documentation
 

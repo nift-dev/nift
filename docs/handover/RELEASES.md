@@ -7,12 +7,13 @@ approved release is packaged and published.
 
 ## Authority and current state
 
-The development executable currently reports `Nift v4.2.0` (the v4.2
-template-language campaign), following the public v4.1.0 release. The exact
-executable identity remains documented in project history and release notes,
-but it is not part of the public product version. Exact tag, artifact, and
-public release conventions must follow `PACKAGING.md` and actual Git/release
-evidence.
+The development executable currently reports `Nift v4.3.0` and the Snap
+metadata in `snap/snapcraft.yaml` also declares `4.3.0`. This is the v4.3
+language/content/hardening campaign state, intended as the v4.3.0 release
+candidate following the public v4.2.0 release. The exact executable identity
+remains documented in project history and release notes. Exact tag, artifact,
+and public release conventions must follow `PACKAGING.md` and actual
+Git/release evidence; the intended release tag is `v4.3.0`.
 
 ## v4.0.12 release status and Snap decision
 
