@@ -1676,8 +1676,18 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
         json::Document literal;
         std::string literal_error;
         if (!text.empty() && (text.front() == '{' || text.front() == '[')) {
-            if (nift_json::parse(text, literal, literal_error)) { out = std::move(literal); return true; }
-            error = "invalid structured literal: " + literal_error;
+            // Only treat a self-contained balanced literal as a structured
+            // literal. A '{'/'['-prefixed compound expression (e.g.
+            // {"a":x}.a + "|" + {"a":x}.a) must fall through to the operator
+            // machinery rather than raise a spurious JSON parse error.
+            const char openc = text.front();
+            const char closec = openc == '{' ? '}' : ']';
+            std::size_t balanced = 0;
+            if (find_balanced(text, 0, openc, closec, balanced) && balanced == text.size() - 1) {
+                if (nift_json::parse(text, literal, literal_error)) { out = std::move(literal); return true; }
+                error = "invalid structured literal: " + literal_error;
+                return false;
+            }
             return false;
         }
         if (scalar_literal(text, literal, literal_error)) { if(literal.is_string()&&literal.string.find("$[")!=std::string::npos){std::string r,e;if(!interpolate_parameter(literal.string,r,e)){error=e;return false;}literal=json::Document(r);} out = std::move(literal); return true; }
@@ -1722,7 +1732,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             return false;
         };
         auto find_top_level_op = [&](const std::string& op) -> std::size_t {
-            bool quoted=false; char quote=0; int parens=0; int brackets=0;
+            bool quoted=false; char quote=0; int parens=0; int brackets=0; int braces=0;
             for (std::size_t i=0; i+op.size()<=text.size(); ++i) {
                 char c=text[i];
                 if (quoted) { if (c=='\\' && i+1<text.size()) ++i; else if (c==quote) quoted=false; continue; }
@@ -1730,6 +1740,9 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                 if (c=='[') { ++brackets; continue; }
                 if (c==']') { if (brackets) --brackets; continue; }
                 if (brackets) continue;
+                if (c=='{') { ++braces; continue; }
+                if (c=='}') { if (braces) --braces; continue; }
+                if (braces) continue;
                 if (c=='(') { ++parens; continue; }
                 if (c==')') { if (parens) --parens; continue; }
                 if (!parens && text.compare(i,op.size(),op)==0) return i;
@@ -2545,6 +2558,42 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             }
         }
 
+        // Expression-valued object literals, mirroring array literals. Quoted
+        // string values are literal strings (JSON escape conventions); every
+        // other value is a Nift expression evaluated left-to-right exactly once,
+        // preserving its runtime type (enums stay symbolic). Pure JSON objects
+        // keep the JSON fast path (strict double-quoted keys, duplicate-key
+        // rejection, big integers, scientific notation, full string escaping).
+        if (text.size()>=2 && text.front()=='{' && text.back()=='}') {
+            std::size_t close=0;
+            if(find_balanced(text,0,'{','}',close)&&close==text.size()-1){
+                std::string json_error;
+                if(nift_json::parse(text,out,json_error))return true;
+                const std::string inner=trim_copy(text.substr(1,text.size()-2));
+                out=json::Document::make_object();
+                if(inner.empty())return true;
+                if(inner.back()==','){error="object literal: trailing comma";return false;}
+                bool ok=false;auto members=parse_parameters(inner,ok);
+                if(!ok){error="object literal: malformed members";return false;}
+                for(auto& raw : members){
+                    raw=trim_copy(raw);
+                    if(raw.empty()){error="object literal: empty member";return false;}
+                    std::size_t colon=std::string::npos;bool q=false;char qc=0;int pa=0,br=0,bc=0;
+                    for(std::size_t z=0;z<raw.size();++z){char c=raw[z];if(q){if(c=='\\'&&z+1<raw.size())++z;else if(c==qc)q=false;continue;}if(c=='\''||c=='"'){q=true;qc=c;continue;}if(c=='(')++pa;else if(c==')')--pa;else if(c=='[')++br;else if(c==']')--br;else if(c=='{')++bc;else if(c=='}')--bc;if(c==':'&&!q&&!pa&&!br&&!bc){colon=z;break;}}
+                    if(colon==std::string::npos){error="object literal: expected 'key: value' member";return false;}
+                    std::string key=trim_copy(raw.substr(0,colon));std::string value=trim_copy(raw.substr(colon+1));
+                    if(key.size()<2||key.front()!='"'||key.back()!='"'){error="object literal: keys must be double-quoted strings";return false;}
+                    key=unescape_parameter_string(key.substr(1,key.size()-2));
+                    if(out.has(key)){error="object literal: duplicate object key '"+key+"'";return false;}
+                    json::Document v;
+                    if(value.size()>=2&&((value.front()=='"'&&value.back()=='"')||(value.front()=='\''&&value.back()=='\''))){v=json::Document(unescape_parameter_string(value.substr(1,value.size()-2)));}
+                    else{if(value.empty()){error="object literal: missing value for key '"+key+"'";return false;}if(!eval(value,v,depth+1))return false;}
+                    out[key]=std::move(v);
+                }
+                return true;
+            }
+        }
+
         // Declarations/assignments must be parsed before direct JSON-path lookup;
         // structured RHS values can otherwise make the whole mutation look like an object expression.
         const bool whole_quoted=text.size()>=2&&((text.front()=='"'&&text.back()=='"')||(text.front()=='\''&&text.back()=='\''));
@@ -2601,12 +2650,31 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                 // Only engage for receivers that require evaluation (method
                 // calls or parenthesized/indexed expressions); pure binding
                 // paths stay on the efficient resolve_direct path.
+                const bool literal_receiver = !receiver.empty() && (receiver[0] == '[' || receiver[0] == '{');
                 // Engage for receivers that require evaluation: method calls,
                 // parenthesized/indexed expressions, or structured literals
-                // (e.g. [1,2,3][0], {"a":1}["a"]). Pure binding paths stay on
-                // the efficient resolve_direct path.
-                const bool literal_receiver = !receiver.empty() && (receiver[0] == '[' || receiver[0] == '{');
+                // (e.g. [1,2,3][0], {"a":1}["a"]). A receiver that contains a
+                // TOP-LEVEL binary operator (e.g. {"a":x}.a + "|" + {"a":x})
+                // must fall through to the operator machinery so the trailing
+                // member binds only to the last value, not the whole compound.
                 if (kind != 3 && receiver.find('(') == std::string::npos && !literal_receiver) return false;
+                if (kind != 3) {
+                    bool toplevel_operator = false;
+                    bool q=false; char qc=0; int pa=0, br=0, bc=0;
+                    for (std::size_t z = 0; z < receiver.size(); ++z) {
+                        const char c = receiver[z];
+                        if (q) { if (c=='\\' && z+1<receiver.size()) ++z; else if (c==qc) q=false; continue; }
+                        if (c=='\'' || c=='"') { q=true; qc=c; continue; }
+                        if (c=='(') { ++pa; continue; } if (c==')') { if (pa) --pa; continue; }
+                        if (c=='[') { ++br; continue; } if (c==']') { if (br) --br; continue; }
+                        if (c=='{') { ++bc; continue; } if (c=='}') { if (bc) --bc; continue; }
+                        if (pa || br || bc) continue;
+                        if (c=='?') { if (z+1<receiver.size() && (receiver[z+1]=='?'||receiver[z+1]=='.'||receiver[z+1]=='[')) continue; toplevel_operator = true; break; }
+                        if (c=='>' && z+1<receiver.size() && receiver[z+1]=='=') continue; // =>
+                        if (c=='+'||c=='-'||c=='*'||c=='/'||c=='%'||c=='<'||c=='>'||c=='='||c=='&'||c=='|'||c==':'||c=='!') { toplevel_operator = true; break; }
+                    }
+                    if (toplevel_operator) return false;
+                }
                 json::Document base;
                 if (!eval(receiver, base, depth + 1)) return false;
                 if (kind == 1) {
@@ -2729,8 +2797,8 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             // when non-null, retry the same expression with the first safe marker
             // converted to ordinary access so normal missing/type errors survive.
             {
-                bool quoted=false;char quote=0;int pa=0,br=0;std::size_t sp=std::string::npos;
-                for(std::size_t z=0;z+1<text.size();++z){char c=text[z];if(quoted){if(c=='\\'&&z+1<text.size())++z;else if(c==quote)quoted=false;continue;}if(c=='\''||c=='"'){quoted=true;quote=c;continue;}if(c=='(')++pa;else if(c==')'&&pa)--pa;else if(c=='[')++br;else if(c==']'&&br)--br;if((text.compare(z,2,"?.")==0||text.compare(z,2,"?[")==0)){sp=z;break;}}
+                bool quoted=false;char quote=0;int pa=0,br=0,bc=0;std::size_t sp=std::string::npos;
+                for(std::size_t z=0;z+1<text.size();++z){char c=text[z];if(quoted){if(c=='\\'&&z+1<text.size())++z;else if(c==quote)quoted=false;continue;}if(c=='\''||c=='"'){quoted=true;quote=c;continue;}if(c=='(')++pa;else if(c==')'&&pa)--pa;else if(c=='[')++br;else if(c==']'&&br)--br;else if(c=='{')++bc;else if(c=='}'&&bc)--bc;if(!pa&&!br&&!bc&&(text.compare(z,2,"?.")==0||text.compare(z,2,"?[")==0)){sp=z;break;}}
                 if(sp!=std::string::npos){json::Document recv;if(!eval(text.substr(0,sp),recv,depth+1))return false;if(recv.is_null()){out=json::Document(nullptr);return true;}std::string ordinary=text;ordinary.erase(sp,1);return eval(ordinary,out,depth+1);}
             }
             if (compose_postfix(text, out)) return true;
