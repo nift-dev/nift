@@ -865,11 +865,14 @@ bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_er
 }
 
 int ProjectInfo::build_many(const std::vector<BuildJob>& jobs, bool targeted, bool full_detail, std::size_t requested_count) {
+    last_build_affected.clear();
     if (jobs.empty()) {
-        std::lock_guard<std::mutex> lock(console::output_mutex);
-        if (targeted) return 1;
-        std::cout << console::good("✓") << ' ' << requested_count << " tracked "
-                  << (requested_count == 1 ? "file is" : "files are") << " up to date\n";
+        if (!console::build_quiet()) {
+            std::lock_guard<std::mutex> lock(console::output_mutex);
+            if (targeted) return 1;
+            std::cout << console::good("✓") << ' ' << requested_count << " tracked "
+                      << (requested_count == 1 ? "file is" : "files are") << " up to date\n";
+        }
         return 0;
     }
 
@@ -905,6 +908,10 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& jobs, bool targeted, bo
     // line and flush — only then may diagnostics and the summary be written.
     progress.finish();
 
+    last_build_affected.clear();
+    for (std::size_t i = 0; i < jobs.size(); ++i)
+        if (succeeded[i]) last_build_affected.push_back(jobs[i].info->name);
+
     for (std::size_t i = 0; i < jobs.size(); ++i)
         if (errors[i].has_value()) print_build_error(*errors[i]);
 
@@ -921,6 +928,7 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& jobs, bool targeted, bo
     }
 
     const bool detailed = full_detail || (has_rebuild_reasons && jobs.size() <= detailed_build_output_limit);
+    if (!console::build_quiet()) {
     if (detailed) {
         for (std::size_t i = 0; i < jobs.size(); ++i) {
             if (!succeeded[i]) continue;
@@ -964,6 +972,7 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& jobs, bool targeted, bo
                   << (incremental ? "rebuilt" : "built") << " successfully\n";
     } else {
         std::cout << successful_count << " of " << jobs.size() << " files built successfully\n";
+    }
     }
 
     return failed_count == 0 ? 0 : 1;

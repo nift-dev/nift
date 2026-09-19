@@ -124,6 +124,9 @@ private:
     struct CommandInstance { std::vector<ProcessSpec> stages; };
     std::unordered_map<std::string, std::shared_ptr<CommandInstance>> command_instances_;
     std::uint64_t next_command_instance_id_ = 1;
+    // Lazily opened project/build automation context for native script bindings.
+    std::shared_ptr<class ProjectInfo> automation_project_;
+    std::filesystem::path automation_root_;
     struct StructField { std::string name; std::string initializer; bool private_member = false; };
     struct StructMethod { Callable callable; bool private_member = false; bool constructor = false; };
     struct StructDefinition { std::string name; std::vector<StructField> fields; std::unordered_map<std::string, StructMethod> methods; };

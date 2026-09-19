@@ -79,6 +79,7 @@ std::ostream& BuildProgress::sink() const {
 }
 
 bool BuildProgress::render() {
+    if (console::build_quiet()) return true;
     std::string frame_text;
     try {
         std::size_t width = console::terminal_width();

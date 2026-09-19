@@ -27,6 +27,9 @@
 namespace console {
 inline std::mutex output_mutex;
 inline std::atomic<bool> plain_output{false};
+inline std::atomic<bool> quiet_build{false};
+
+inline bool build_quiet() { return quiet_build.load(std::memory_order_relaxed); }
 
 inline bool stdout_is_tty() {
     return !plain_output.load(std::memory_order_relaxed) && NIFT_ISATTY(NIFT_FILENO(stdout)) != 0;
@@ -108,6 +111,25 @@ public:
 
     ScopedPlainOutput(const ScopedPlainOutput&) = delete;
     ScopedPlainOutput& operator=(const ScopedPlainOutput&) = delete;
+
+private:
+    bool previous_;
+};
+
+// Suppresses the build's normal console progress/summary output (used by the
+// native script automation API so callers receive structured results without
+// command-output noise). Build errors still reach stderr.
+class ScopedQuietBuild {
+public:
+    ScopedQuietBuild()
+        : previous_(quiet_build.exchange(true, std::memory_order_relaxed)) {}
+
+    ~ScopedQuietBuild() {
+        quiet_build.store(previous_, std::memory_order_relaxed);
+    }
+
+    ScopedQuietBuild(const ScopedQuietBuild&) = delete;
+    ScopedQuietBuild& operator=(const ScopedQuietBuild&) = delete;
 
 private:
     bool previous_;

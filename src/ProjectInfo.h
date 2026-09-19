@@ -59,6 +59,10 @@ public:
     int build_all(bool force, bool explain = false, bool repair = false);
     int build_names(const std::vector<std::string>& names, bool force, bool explain = false);
 
+    // Page names built by the most recent build_all/build_names/build_many
+    // call, exposed to the structured automation API.
+    std::vector<std::string> last_build_affected;
+
     // Central epoch-completion rule (CP3.1): every controlled exit after
     // ownership acquisition routes through this and returns the command exit
     // code. A failure clears the marker only for an ordinary build with proven
