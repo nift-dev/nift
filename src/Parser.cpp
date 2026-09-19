@@ -10,6 +10,7 @@
 #include "JsonSchema.h"
 #include "RenderHost.h"
 #include <markup/Markup.h>
+#include <minify/Minify.h>
 
 #include <algorithm>
 #include <chrono>
@@ -1966,6 +1967,66 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             if(call_args("cat",args,q)){fs::path p;if(args.size()!=1||!checked_path("cat",args,q,0,p))return false;std::error_code ec;if(fs::is_directory(p,ec)){error="cat: path is a directory";return false;}std::ifstream f(p,std::ios::binary);if(!f){error="cat: cannot open path";return false;}std::ostringstream ss;ss<<f.rdbuf();{static std::mutex cat_mutex;std::lock_guard<std::mutex> lock(cat_mutex);std::cout<<ss.str();std::cout.flush();}out=json::Document(nullptr);return true;}
             if(call_args("ls",args,q)){if(args.size()>1){error="ls: expected zero or one path/pattern";return false;}out=json::Document::make_array();if(args.empty()){fs::path p=standalone_script_host_?fs::current_path():host_.root();std::error_code ec;std::vector<std::string> names;for(fs::directory_iterator it(p,ec),end;!ec&&it!=end;it.increment(ec))names.push_back(it->path().filename().generic_string());if(ec){error="ls: "+ec.message();return false;}std::sort(names.begin(),names.end());for(const auto& n:names)out.array.emplace_back(n);return true;}std::string raw;if(!string_arg("ls",args,q,0,raw))return false;fs::path p=resolve_path(raw);if(!standalone_script_host_&&!host_.root().empty()&&!filesystem::path_within(fs::absolute(host_.root()).lexically_normal(),p)){error="ls: path must stay inside the Nift project";return false;}if(!nift_fs_root_allowed(p,standalone_script_host_,error)){error="ls: "+error;return false;}if(nift_glob_has_magic(raw)){auto matches=nift_glob_expand(p);const fs::path base=standalone_script_host_?fs::current_path():host_.root();const bool absolute=fs::path(raw).is_absolute();for(const auto&m:matches){std::error_code rec;auto shown=absolute?m:fs::relative(m,base,rec);out.array.emplace_back((rec?m:shown).generic_string());}return true;}std::error_code ec;if(!fs::is_directory(p,ec)||ec){error="ls: path is not a readable directory";return false;}std::vector<std::string> names;for(fs::directory_iterator it(p,ec),end;!ec&&it!=end;it.increment(ec))names.push_back(it->path().filename().generic_string());if(ec){error="ls: "+ec.message();return false;}std::sort(names.begin(),names.end());for(const auto& n:names)out.array.emplace_back(n);return true;}
             if(call_args("open",args,q)){fs::path p;if(args.size()!=1||!checked_path("open",args,q,0,p))return false;std::error_code ec;if(fs::is_directory(p,ec)){error="open: path is a directory";return false;}std::ifstream f(p,std::ios::binary);if(!f){error="open: cannot open path";return false;}std::ostringstream ss;ss<<f.rdbuf();out=json::Document(ss.str());return true;}
+            // Native script-land Minify++ (v4.4 package campaign CP19-CP24).
+            // Delegates to the same embedded Minify++ the CLI uses; never a
+            // subprocess, so it also works under --no-process. Overloads:
+            //   minify(source, "js")                     -> string->string
+            //   minify("app.js")                         -> app.min.js
+            //   minify("app.js", {"output": "out.js"})   -> explicit output
+            //   minify("app.css", {"in_place": true})    -> overwrite input
+            // Returns {ok, output, error, format, written}; ordinary minify
+            // failures are represented in the result, not a process abort.
+            auto minify_format_from_name=[&](const std::string& name,minify::Format& f)->bool{
+                if(name=="html"){f=minify::Format::Html;return true;}if(name=="css"){f=minify::Format::Css;return true;}
+                if(name=="js"){f=minify::Format::JavaScript;return true;}if(name=="jsx"){f=minify::Format::Jsx;return true;}
+                if(name=="json"){f=minify::Format::Json;return true;}if(name=="xml"){f=minify::Format::Xml;return true;}
+                if(name=="svg"){f=minify::Format::Svg;return true;}return false;};
+            auto minify_format_name=[&](minify::Format f)->std::string{
+                switch(f){case minify::Format::Html:return "html";case minify::Format::Css:return "css";case minify::Format::JavaScript:return "js";case minify::Format::Jsx:return "jsx";case minify::Format::Json:return "json";case minify::Format::Xml:return "xml";case minify::Format::Svg:return "svg";}return "?";};
+            if(call_args("minify",args,q)){
+                if(args.empty()||args.size()>2){error="minify: expected source or path plus optional format string or options object";return false;}
+                json::Document first;if(!arg_value(args,q,0,first))return false;
+                if(!first.is_string()){error="minify: source or path must be a string";return false;}
+                std::string format_name;bool explicit_format=false;bool has_opts=false;json::Document opts;
+                if(args.size()==2){
+                    if(!arg_value(args,q,1,opts))return false;
+                    if(opts.is_string()){format_name=opts.string;explicit_format=true;}
+                    else if(opts.is_object()){has_opts=true;if(opts.has("format")){const auto& fv=opts["format"];if(!fv.is_string()){error="minify: format must be a string";return false;}format_name=fv.string;explicit_format=true;}}
+                    else{error="minify: second argument must be a format string or options object";return false;}
+                }
+                // Mode rule: an explicit format STRING means the first argument
+                // is a source string (string->string). A bare path or an
+                // options object means the first argument is a file path.
+                const std::string arg0=first.string;
+                auto minify_fail=[&](const std::string& msg,const std::string& fmt,const std::string& written)->json::Document{json::Document r=json::Document::make_object();r["ok"]=json::Document(false);r["output"]=json::Document("");r["error"]=json::Document(msg);r["format"]=json::Document(fmt);r["written"]=json::Document(written);return r;};
+                if(explicit_format&&!has_opts){
+                    minify::Format fmt;if(!minify_format_from_name(format_name,fmt)){out=minify_fail("unsupported format '"+format_name+"'",format_name,"");return true;}
+                    std::string out_text,merr;if(!minify::run(fmt,arg0,out_text,merr)){out=minify_fail(merr,format_name,"");return true;}
+                    json::Document r=json::Document::make_object();r["ok"]=json::Document(true);r["output"]=json::Document(out_text);r["error"]=json::Document("");r["format"]=json::Document(format_name);r["written"]=json::Document("");out=std::move(r);return true;
+                }
+                fs::path p0=resolve_path(arg0);
+                const bool arg0_is_file=fs::is_regular_file(p0);
+                if(!arg0_is_file){out=minify_fail("file does not exist or is not a regular file: "+arg0,"","");return true;}
+                fs::path in=p0;
+                if(!standalone_script_host_&&!host_.root().empty()&&!filesystem::path_within(fs::absolute(host_.root()).lexically_normal(),in)){error="minify: path must stay inside the Nift project";return false;}
+                if(!nift_fs_root_allowed(in,standalone_script_host_,error)){error="minify: "+error;return false;}
+                minify::Format fmt;
+                if(explicit_format){if(!minify_format_from_name(format_name,fmt)){out=minify_fail("unsupported format '"+format_name+"'",format_name,"");return true;}}
+                else{std::string ext=in.extension().string();if(!minify::format_for_extension(ext,fmt)){out=minify_fail("cannot infer format from extension "+ext,ext,"");return true;}format_name=minify_format_name(fmt);}
+                const std::string source=filesystem::read_file(in);
+                std::string out_text,merr;if(!minify::run(fmt,source,out_text,merr)){out=minify_fail(merr,format_name,"");return true;}
+                bool in_place=false;bool want_output=false;fs::path dest;
+                if(has_opts){
+                    if(opts.has("in_place")){const auto& v=opts["in_place"];if(!v.is_bool()){error="minify: in_place must be a boolean";return false;}in_place=v.boolean;}
+                    if(opts.has("output")){const auto& v=opts["output"];if(!v.is_string()){error="minify: output must be a string";return false;}want_output=true;}
+                }
+                if(in_place&&want_output){error="minify: choose either in_place or output, not both";return false;}
+                if(in_place)dest=in;
+                else if(want_output){fs::path od=resolve_path(opts["output"].string);if(!standalone_script_host_&&!host_.root().empty()&&!filesystem::path_within(fs::absolute(host_.root()).lexically_normal(),od)){error="minify: output must stay inside the Nift project";return false;}if(!nift_fs_root_allowed(od,standalone_script_host_,error)){error="minify: "+error;return false;}dest=od;}
+                else dest=in.parent_path()/(in.stem().string()+".min"+in.extension().string());
+                if(!filesystem::write_file(dest,out_text)){out=minify_fail("failed to write "+dest.generic_string(),format_name,"");return true;}
+                json::Document r=json::Document::make_object();r["ok"]=json::Document(true);r["output"]=json::Document(out_text);r["error"]=json::Document("");r["format"]=json::Document(format_name);r["written"]=json::Document(dest.generic_string());out=std::move(r);return true;
+            }
             if(call_args("file",args,q)){fs::path p;if(args.size()!=1||!checked_path("file",args,q,0,p))return false;auto f=std::make_shared<FileInstance>();f->path=p;auto id=std::to_string(next_file_instance_id_++);file_instances_[id]=f;out=json::Document(std::string("\x1fnift:file:")+id);return true;}
             if(call_args("page",args,q)){if(args.size()!=1){error="page: expected one page name";return false;}json::Document d;if(!arg_value(args,q,0,d)||!d.is_string()){error="page: name must be a string";return false;}std::string ref;if(!host_.page_ref_for(d.string,ref)){error="page: unknown tracked page '"+d.string+"'";return false;}out=json::Document(ref);return true;}
             if(call_args("min",args,q)||call_args("max",args,q)){const bool want_min=text.rfind("min(",0)==0;const std::string name=want_min?"min":"max";std::vector<json::Document> vals;if(args.size()==1){json::Document v;if(!arg_value(args,q,0,v))return false;if(v.is_array())vals=v.array;else vals.push_back(std::move(v));}else for(std::size_t ai=0;ai<args.size();++ai){json::Document v;if(!arg_value(args,q,ai,v))return false;vals.push_back(std::move(v));}if(vals.empty()){error=name+": expected at least one value";return false;}out=vals.front();for(std::size_t ai=1;ai<vals.size();++ai){const auto& v=vals[ai];bool take=false;if(out.is_number()&&v.is_number())take=want_min?v.num<out.num:v.num>out.num;else if(out.is_string()&&v.is_string())take=want_min?v.string<out.string:v.string>out.string;else{error=name+": values must be comparable and homogeneous";return false;}if(take)out=v;}return true;}
