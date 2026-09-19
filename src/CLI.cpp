@@ -810,7 +810,7 @@ static int run_eval(int argc, char** argv) {
 static std::vector<std::string> shell_tokens(const std::string& line) {
     std::vector<std::string> out; std::string cur; bool sq=false,dq=false,esc=false;
     auto flush=[&](){if(!cur.empty()){out.push_back(cur);cur.clear();}};
-    for(size_t i=0;i<line.size();++i){char c=line[i];if(esc){cur+=c;esc=false;continue;}if(c=='\\'&&!sq){esc=true;continue;}if(c=='\''&&!dq){sq=!sq;continue;}if(c=='"'&&!sq){dq=!dq;continue;}if(!sq&&!dq){std::string op;if(i+3<=line.size()&&line.substr(i,4)=="2>&1")op="2>&1";else if(i+1<line.size()&&(line.substr(i,2)=="&&"||line.substr(i,2)=="||"||line.substr(i,2)==">>"||line.substr(i,2)=="2>"))op=line.substr(i,2);else if(c=='|'||c=='<'||c=='>'||c=='&')op=std::string(1,c);if(!op.empty()){flush();out.push_back(op);i+=op.size()-1;continue;}if(std::isspace((unsigned char)c)){flush();continue;}}cur+=c;}flush();return out;
+    for(size_t i=0;i<line.size();++i){char c=line[i];if(esc){cur+=c;esc=false;continue;}if(c=='\\'&&!sq){esc=true;continue;}if(c=='\''&&!dq){sq=!sq;continue;}if(c=='"'&&!sq){dq=!dq;continue;}if(!sq&&!dq){std::string op;if(i+3<=line.size()&&line.substr(i,4)=="2>&1")op="2>&1";else if(i+1<line.size()&&(line.substr(i,2)=="&&"||line.substr(i,2)=="||"||line.substr(i,2)==">>"||line.substr(i,2)=="2>"))op=line.substr(i,2);else if(c=='|'||c=='<'||c=='>'||c=='&'){if(cur=="2"){if(i+3<=line.size()&&line.substr(i,4)==">&1")op="2>&1";else if(i+1<line.size()&&line.substr(i,2)==">>")op="2>>";else if(c=='>')op="2>";}if(op.empty())op=std::string(1,c);}if(!op.empty()){flush();out.push_back(op);i+=op.size()-1;continue;}if(std::isspace((unsigned char)c)){flush();continue;}}cur+=c;}flush();return out;
 }
 static std::string quote_nift_string(const std::string& x){std::string r="\"";for(char c:x){if(c=='\\'||c=='\"')r+='\\';r+=c;}return r+'"';}
 static bool shell_glob_expand(const std::string& token,std::vector<std::string>& out){
@@ -860,7 +860,14 @@ static int run_script_shell() {
         // CP85: the parser reports whether the accumulated input is complete,
         // an incomplete prefix (keep reading), or invalid (balanced but
         // malformed, executed so the canonical diagnostic is shown).
-        const std::string trimmed=pending.substr(0,pending.find_last_not_of("\r\n")+1);bool command_style=false;{auto sp=trimmed.find_first_of(" \t");command_style=(sp!=std::string::npos||trimmed=="pwd"||trimmed=="ls")&&trimmed.find(":=")==std::string::npos&&trimmed.find('(')==std::string::npos&&trimmed.rfind("fn ",0)!=0&&trimmed.rfind("if ",0)!=0&&trimmed.rfind("for ",0)!=0&&trimmed.rfind("while ",0)!=0;}
+        const std::string trimmed=pending.substr(0,pending.find_last_not_of("\r\n")+1);bool command_style=false;{
+            auto sp=trimmed.find_first_of(" \t");
+            auto toks=shell_tokens(trimmed);
+            // A standalone assignment operator as the second token (x = 7,
+            // x += 2) is a Nift statement, not an env-assigned command.
+            const bool assignment_like=toks.size()>=2&&(toks[1]=="="||toks[1]==":="||toks[1]=="+="||toks[1]=="-="||toks[1]=="*="||toks[1]=="/=");
+            command_style=!assignment_like&&(sp!=std::string::npos||trimmed=="pwd"||trimmed=="ls")&&trimmed.find(":=")==std::string::npos&&trimmed.find('(')==std::string::npos&&trimmed.rfind("fn ",0)!=0&&trimmed.rfind("if ",0)!=0&&trimmed.rfind("for ",0)!=0&&trimmed.rfind("while ",0)!=0;
+        }
         if(command_style){execute_shell_command(parser,trimmed);pending.clear();continue;}
         const Parser::StatementState st=parser.statement_state(pending);
         if(st==Parser::StatementState::Incomplete)continue;
