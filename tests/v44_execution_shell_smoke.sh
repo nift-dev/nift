@@ -19,4 +19,4 @@ grep -q HELLO "$t/shell"
 # Shell assignment statements must route to the Nift statement engine, and
 # adjacent fd-redirects (2>) must not become a literal argument.
 printf 'x := 5\nx = 7\nprint(x)\nexit\n' | "$NIFT" sh 2>/dev/null | grep -qE ' 7$'
-printf 'sh -c "echo out; echo err >&2" 2>%s/err.txt\ncat %s/err.txt\nexit\n' "$t" "$t" | "$NIFT" sh 2>/dev/null | grep -q '^err$'
+printf 'sh -c "echo out; echo err >&2" 2>%s/err.txt\ncat %s/err.txt\nexit\n' "$t" "$t" | "$NIFT" sh 2>/dev/null | grep -q ' err$'
