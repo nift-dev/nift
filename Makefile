@@ -940,6 +940,9 @@ checkpoint-10-cross-platform: $(TARGET)
 .PHONY: checkpoint-10-cross-platform
 
 # Nift v4.4 execution/shell/packages campaign focused tests.
+test-v44-execution-shell: $(TARGET)
+	NIFT="$(CURDIR)/$(TARGET)" tests/v44_execution_shell_smoke.sh
+
 test-v44-language-foundation: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp2_variadic_functions_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp3_variadic_lambdas_smoke.sh
