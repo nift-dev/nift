@@ -2305,6 +2305,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         if(method=="to_int"){
                             if(!no_args())return false;if(str.empty()){error="to_int: invalid integer";return false;}const char* data=str.data();std::size_t size=str.size();if(str[0]=='+'){data+=1;size-=1;}if(size==0){error="to_int: invalid integer";return false;}std::int64_t v=0;auto pr=std::from_chars(data,data+size,v);if(pr.ec!=std::errc()||pr.ptr!=data+size){error="to_int: invalid or out-of-range integer";return false;}out=json::Document((double)v);if(v>9007199254740992LL||v<-9007199254740992LL){out.type=json::Type::StrNumber;out.string=std::to_string(v);}return true;
                         }
+                        if(method=="to_string"){if(!no_args())return false;out=json::Document(str);return true;}
                         if(method=="to_double"){
                             if(!no_args())return false;if(str.empty()||std::isspace((unsigned char)str.front())||std::isspace((unsigned char)str.back())){error="to_double: invalid number";return false;}if(str.find("0x")!=std::string::npos||str.find("0X")!=std::string::npos){error="to_double: invalid number";return false;}char* end=nullptr;errno=0;double v=std::strtod(str.c_str(),&end);if(errno==ERANGE||!end||end!=str.c_str()+str.size()||!std::isfinite(v)){error="to_double: invalid or out-of-range number";return false;}out=json::Document(v);return true;
                         }
@@ -2313,6 +2314,8 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         }
                     }
                     if(method=="to_string" && base.is_number()) { if(!no_args())return false;out=json::Document(render_expression_value(base));return true; }
+                    if(method=="to_string" && base.is_bool()) { if(!no_args())return false;out=json::Document(base.boolean?"true":"false");return true; }
+                    if(method=="to_string" && base.is_null()) { if(!no_args())return false;out=json::Document("null");return true; }
                     if(base.is_number()) {
                         if(method=="abs"){if(!no_args())return false;out=json::Document(std::fabs(base.num));return true;}
                         if(method=="floor"){if(!no_args())return false;out=json::Document(std::floor(base.num));return true;}
@@ -2481,7 +2484,8 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         if(method=="join"){if(args.size()!=1){error="join: expected separator";return false;}json::Document sep;if(!eval_arg(0,sep)||!sep.is_string()){error="join: separator must be a string";return false;}std::string r;for(std::size_t i=0;i<a.size();++i){if(i)r+=sep.string;if(a[i].is_array()||a[i].is_object()||(a[i].is_string()&&a[i].string.rfind("\x1fnift:",0)==0)){error="join: elements must be renderable scalar values";return false;}r+=render_expression_value(a[i]);}out=json::Document(r);return true;}
                         if(method=="slice"){if(args.empty()||args.size()>2){error="slice: expected start and optional end";return false;}json::Document st,en;if(!eval_arg(0,st)||!st.is_number()||std::trunc(st.num)!=st.num||st.num<0){error="slice: invalid start";return false;}std::size_t b=(std::size_t)st.num,e=a.size();if(args.size()==2){if(!eval_arg(1,en)||!en.is_number()||std::trunc(en.num)!=en.num||en.num<0){error="slice: invalid end";return false;}e=(std::size_t)en.num;}b=std::min(b,a.size());e=std::min(e,a.size());if(e<b)e=b;out=json::Document::make_array();out.array.assign(a.begin()+b,a.begin()+e);return true;}
                     }
-                    if(method=="to_string" && !(base.is_string() && base.string.rfind("\x1fnift:",0)==0)){error="to_string: expected int or double";return false;}
+                    if(method=="to_string" && (base.is_array()||base.is_object())){error="to_string: use stringify() for composite values";return false;}
+                    if(method=="to_string" && !(base.is_string() && base.string.rfind("\x1fnift:",0)==0)){error="to_string: expected int, double, bool, null or string";return false;}
                     if((base.is_string() && base.string.rfind("\x1fnift:",0)!=0)||base.is_number()||(base.is_array()&&method!="insert"&&method!="remove")){error=method+": unsupported for this value";return false;}
                 }
             }

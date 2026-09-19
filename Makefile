@@ -976,6 +976,7 @@ test-v44-automation: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_automation_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_script_comments_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_package_language_smoke.sh
+	NIFT="$(CURDIR)/$(TARGET)" tests/v44_scalar_conversion_smoke.sh
 
 test-v44-hooks: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_hooks_smoke.sh
