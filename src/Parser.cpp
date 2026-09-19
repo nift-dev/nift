@@ -52,6 +52,40 @@ static const int kMaxCallableDepth = 64;
 
 namespace {
 
+static bool nift_glob_has_magic(const std::string& s) {
+    bool escaped=false; for(char c:s){if(escaped){escaped=false;continue;}if(c=='\\'){escaped=true;continue;}if(c=='*'||c=='?')return true;} return false;
+}
+static bool nift_glob_component_match(const std::string& pattern,const std::string& name){
+    if(!name.empty()&&name[0]=='.'&&(pattern.empty()||pattern[0]!='.'))return false;
+    std::size_t p=0,n=0,star=std::string::npos,mark=0; bool escaped=false;
+    while(n<name.size()){
+        if(p<pattern.size()&&pattern[p]=='\\'&&!escaped){if(p+1<pattern.size()){++p;if(pattern[p]==name[n]){++p;++n;continue;}}}
+        else if(p<pattern.size()&&pattern[p]=='?'){++p;++n;continue;}
+        else if(p<pattern.size()&&pattern[p]=='*'){star=p++;mark=n;continue;}
+        else if(p<pattern.size()&&pattern[p]==name[n]){++p;++n;continue;}
+        if(star!=std::string::npos){p=star+1;n=++mark;continue;}return false;
+    }
+    while(p<pattern.size()&&pattern[p]=='*')++p;return p==pattern.size();
+}
+static void nift_glob_walk(const fs::path& base,const std::vector<std::string>& parts,std::size_t i,std::vector<fs::path>& out){
+    if(i==parts.size()){std::error_code ec;if(fs::exists(base,ec)&&!ec)out.push_back(fs::absolute(base).lexically_normal());return;}
+    const auto& part=parts[i];
+    if(part=="**"){
+        nift_glob_walk(base,parts,i+1,out);
+        std::error_code ec; if(!fs::is_directory(base,ec)||ec)return;
+        std::vector<fs::directory_entry> entries; for(fs::directory_iterator it(base,fs::directory_options::skip_permission_denied,ec),end;!ec&&it!=end;it.increment(ec))entries.push_back(*it);
+        std::sort(entries.begin(),entries.end(),[](const auto&a,const auto&b){return a.path().generic_string()<b.path().generic_string();});
+        for(const auto& e:entries){auto name=e.path().filename().string();if(!name.empty()&&name[0]=='.')continue;std::error_code sec;if(e.is_directory(sec)&&!e.is_symlink(sec))nift_glob_walk(e.path(),parts,i,out);}
+        return;
+    }
+    if(!nift_glob_has_magic(part)){std::string literal;literal.reserve(part.size());for(std::size_t k=0;k<part.size();++k){if(part[k]=='\\'&&k+1<part.size())literal+=part[++k];else literal+=part[k];}nift_glob_walk(base/literal,parts,i+1,out);return;}
+    std::error_code ec;if(!fs::is_directory(base,ec)||ec)return;std::vector<fs::directory_entry> entries;for(fs::directory_iterator it(base,fs::directory_options::skip_permission_denied,ec),end;!ec&&it!=end;it.increment(ec))entries.push_back(*it);
+    std::sort(entries.begin(),entries.end(),[](const auto&a,const auto&b){return a.path().generic_string()<b.path().generic_string();});for(const auto&e:entries)if(nift_glob_component_match(part,e.path().filename().string()))nift_glob_walk(e.path(),parts,i+1,out);
+}
+static std::vector<fs::path> nift_glob_expand(const fs::path& resolved_pattern){
+    std::string g=resolved_pattern.generic_string();fs::path root=resolved_pattern.root_path();std::string rel=root.empty()?g:g.substr(root.generic_string().size());while(!rel.empty()&&rel.front()=='/')rel.erase(rel.begin());std::vector<std::string> parts;std::stringstream ss(rel);std::string part;while(std::getline(ss,part,'/'))if(!part.empty())parts.push_back(part);std::vector<fs::path> out;nift_glob_walk(root.empty()?fs::path("."):root,parts,0,out);std::sort(out.begin(),out.end(),[](const auto&a,const auto&b){return a.generic_string()<b.generic_string();});out.erase(std::unique(out.begin(),out.end()),out.end());return out;
+}
+
 // Presentation-method chain recognizer (.stringify()/.prettify()/.highlight()).
 // It only strips a trailing chain when the dots sit at bracket/paren/quote
 // depth 0 and the remaining base is a single value expression with no
