@@ -331,6 +331,7 @@ static fs::path package_root(){ return fs::current_path()/".nift"/"packages"; }
 static bool package_name_ok(const std::string& n){if(n.empty())return false;for(char c:n)if(!(std::isalnum((unsigned char)c)||c=='-'||c=='_'||c=='.'))return false;return n!="."&&n!="..";}
 static std::string package_basename(std::string src){while(!src.empty()&&src.back()=='/')src.pop_back();auto p=src.find_last_of('/');std::string n=p==std::string::npos?src:src.substr(p+1);if(n.size()>4&&n.substr(n.size()-4)==".git")n.resize(n.size()-4);return n;}
 static std::string package_git_source(const std::string& source){
+    if(source.find('/')==std::string::npos && source.find(':')==std::string::npos && source.find('.')==std::string::npos) return "https://github.com/nift-packages/"+source+".git";
     if(source.rfind("github:",0)==0){std::string r=source.substr(7);return "https://github.com/"+r+(r.size()>4&&r.substr(r.size()-4)==".git"?"":".git");}
     if(source.find("://")!=std::string::npos||source.rfind("git@",0)==0)return source;
     return source;
