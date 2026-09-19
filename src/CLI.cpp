@@ -55,7 +55,7 @@ void nift_setenv(const char* name, const char* value, int /*overwrite*/) {
     ::setenv(name, value, 1);
 #endif
 }
-constexpr const char* version_text = "Nift v4.3.0";
+constexpr const char* version_text = "Nift v4.4.0";
 constexpr auto build_auto_poll_interval = std::chrono::milliseconds(200);
 constexpr const char* build_auto_log_path = ".nift/build-auto.log";
 
