@@ -212,6 +212,7 @@ bool load_config(const fs::path& root, Config& config, std::string& error) {
 }
 
 bool load_tracking(const fs::path& root, const Config& config, std::vector<TrackedInfo>& tracked, std::string& error) {
+    static const std::vector<std::string> hook_keys = {"pre build","post build","pre build -all","post build -all","pre build --auto","post build --auto","pre build --repair","post build --repair"};
     const fs::path path = root / ".nift/tracked.json";
     // A root without .nift/tracked.json lacks the relevant project state; it is
     // not a Nift project (the historical ~/.nift global config dir has only
