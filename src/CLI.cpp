@@ -929,7 +929,11 @@ static int run_script_shell() {
             // A standalone assignment operator as the second token (x = 7,
             // x += 2) is a Nift statement, not an env-assigned command.
             const bool assignment_like=toks.size()>=2&&(toks[1]=="="||toks[1]==":="||toks[1]=="+="||toks[1]=="-="||toks[1]=="*="||toks[1]=="/=");
-            command_style=!assignment_like&&(sp!=std::string::npos||trimmed=="pwd"||trimmed=="ls")&&trimmed.find(":=")==std::string::npos&&trimmed.find('(')==std::string::npos&&trimmed.rfind("fn ",0)!=0&&trimmed.rfind("if ",0)!=0&&trimmed.rfind("for ",0)!=0&&trimmed.rfind("while ",0)!=0;
+            // A '(' inside a $[...] interpolation belongs to the command
+            // argument (e.g. echo $[project_root()]), not to Nift statement
+            // syntax, so ignore interpolation spans when routing.
+            std::string no_interp; { bool in_interp=false; bool saw_dollar=false; for(char c : trimmed) { if(c=='['&&!in_interp&&saw_dollar){in_interp=true;saw_dollar=false;continue;} if(in_interp){ if(c==']') in_interp=false; continue; } no_interp+=c; saw_dollar=(c=='$'); } }
+            command_style=!assignment_like&&(sp!=std::string::npos||trimmed=="pwd"||trimmed=="ls")&&no_interp.find(":=")==std::string::npos&&no_interp.find('(')==std::string::npos&&trimmed.rfind("fn ",0)!=0&&trimmed.rfind("if ",0)!=0&&trimmed.rfind("for ",0)!=0&&trimmed.rfind("while ",0)!=0;
         }
         if(command_style){execute_shell_command(parser,trimmed);pending.clear();continue;}
         const Parser::StatementState st=parser.statement_state(pending);

@@ -25,6 +25,12 @@ interp_out=$(printf 'who := "world"\necho hello $[who]\nprintf one ; printf two\
 grep -q 'hello world' <<<"$interp_out"
 grep -q 'onetwo' <<<"$interp_out"
 grep -q 'three' <<<"$interp_out"
+# Function-call interpolation in command arguments (e.g. $[project_root()])
+# must route through command land, not the Nift statement path.
+fn_out=$(printf 'print("R1")
+echo $[project_root()]
+exit\n' | "$NIFT" sh 2>/dev/null || true)
+grep -q 'R1' <<<"$fn_out"
 # Background & still fails explicitly rather than being misinterpreted.
 bg_out=$(printf 'sleep 1 &\nexit\n' | "$NIFT" sh 2>&1 || true)
 grep -q 'background job control is not implemented' <<<"$bg_out"
