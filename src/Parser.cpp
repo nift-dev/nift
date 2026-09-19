@@ -1906,6 +1906,21 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 ProcessSpec spec;spec.program=vals.front();spec.args.assign(vals.begin()+1,vals.end());auto pr=nift_run_process(spec,true,false);
                 out=json::Document::make_object();out["exit_code"]=json::Document((double)pr.exit_code);out["stdout"]=json::Document(pr.out);out["stderr"]=json::Document(pr.err);out["launched"]=json::Document(pr.launched);if(!pr.error.empty())out["error"]=json::Document(pr.error);return true;
             }
+            if(call_args("getenv",args,q)){if(args.size()!=1){error="getenv: expected name";return false;}std::string k;if(!string_arg("getenv",args,q,0,k))return false;const char*v=std::getenv(k.c_str());out=v?json::Document(std::string(v)):json::Document(nullptr);return true;}
+            if(call_args("setenv",args,q)){if(!standalone_script_host_){error="setenv: only available under nift run/nift sh";return false;}if(args.size()!=2){error="setenv: expected name and value";return false;}std::string k,v;if(!string_arg("setenv",args,q,0,k)||!string_arg("setenv",args,q,1,v))return false;
+#ifdef _WIN32
+                if(_putenv_s(k.c_str(),v.c_str())!=0){error="setenv: failed";return false;}
+#else
+                if(::setenv(k.c_str(),v.c_str(),1)!=0){error="setenv: failed";return false;}
+#endif
+                out=json::Document(nullptr);return true;}
+            if(call_args("unsetenv",args,q)){if(!standalone_script_host_){error="unsetenv: only available under nift run/nift sh";return false;}if(args.size()!=1){error="unsetenv: expected name";return false;}std::string k;if(!string_arg("unsetenv",args,q,0,k))return false;
+#ifdef _WIN32
+                _putenv_s(k.c_str(),"");
+#else
+                ::unsetenv(k.c_str());
+#endif
+                out=json::Document(nullptr);return true;}
             if(call_args("pwd",args,q)){if(!args.empty()){error="pwd: expected no arguments";return false;}out=json::Document((standalone_script_host_?fs::current_path():host_.root()).generic_string());return true;}
             if(call_args("cd",args,q)){if(!standalone_script_host_){error="cd: only available under nift run/nift sh";return false;}fs::path p;if(args.size()!=1||!checked_path("cd",args,q,0,p))return false;std::error_code ec;fs::current_path(p,ec);if(ec){error="cd: "+ec.message();return false;}out=json::Document(nullptr);return true;}
             if(call_args("exists",args,q)){fs::path p;if(args.size()!=1||!checked_path("exists",args,q,0,p))return false;std::error_code ec;out=json::Document(fs::exists(p,ec)&&!ec);return true;}
