@@ -2534,7 +2534,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         if(method=="size"){out=json::Document(static_cast<double>(a.size()));return true;} if(method=="empty"){out=json::Document(a.empty());return true;}
                         if(method=="first"||method=="last"||method=="pop"){if(a.empty()){error=method+": array is empty";return false;}out=method=="first"?a.front():a.back();if(method=="pop"){if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}a.pop_back();last_expression_mutation_=true;}return true;}
                         if(method=="clear"){if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}a.clear();out=json::Document(nullptr);last_expression_mutation_=true;return true;}
-                        if(method=="push"){if(args.size()!=1){error="push: expected one argument";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}json::Document v;if(!eval(args[0],v,depth+1))return false;a.push_back(v);out=v;last_expression_mutation_=true;return true;}
+                        if(method=="push"){if(args.size()!=1){error="push: expected one argument";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}json::Document v;if(quoted_args.size()>0&&quoted_args[0])v=json::Document(args[0]);else if(!eval(args[0],v,depth+1))return false;a.push_back(v);out=v;last_expression_mutation_=true;return true;}
                         if(method=="insert"){if(args.size()!=2){error="insert: expected index and value";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}json::Document ix,v;if(!eval(args[0],ix,depth+1)||!eval(args[1],v,depth+1)||!ix.is_number()){error="insert: invalid index";return false;}size_t i=static_cast<size_t>(ix.num);if(i>a.size()){error="insert: index out of range";return false;}a.insert(a.begin()+i,v);out=v;last_expression_mutation_=true;return true;}
                         if(method=="remove"){if(args.size()!=1){error="remove: expected index";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}json::Document ix;if(!eval(args[0],ix,depth+1)||!ix.is_number()){error="remove: invalid index";return false;}size_t i=static_cast<size_t>(ix.num);if(i>=a.size()){error="remove: index out of range";return false;}out=a[i];a.erase(a.begin()+i);last_expression_mutation_=true;return true;}
                         if(method=="indexOf"||method=="contains"){if(args.size()!=1){error=method+": expected one value";return false;}json::Document v;if(!eval(args[0],v,depth+1))return false;std::size_t i=0;for(;i<a.size();++i)if(structural_equal(a[i],v))break;if(method=="contains")out=json::Document(i<a.size());else out=json::Document(i<a.size()?static_cast<double>(i):-1.0);return true;}
@@ -4045,10 +4045,16 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 if (evaluate_expression(trim_copy(key), expression_value, expression_error)) {
                     if (last_expression_mutation_) { i = end + 1; continue; }
                     if (expression_value.is_array()) {
+                        // Script land: a bare call statement that returns a
+                        // non-renderable collection is fire-and-forget.
+                        const std::string ck=trim_copy(key);
+                        if (standalone_script_host_ && !ck.empty() && ck.back()==')') { i = end + 1; continue; }
                         fail(source_path, source, i, "cannot render JSON array $[" + key + "]; select an element first");
                         break;
                     }
                     if (expression_value.is_object()) {
+                        const std::string ck=trim_copy(key);
+                        if (standalone_script_host_ && !ck.empty() && ck.back()==')') { i = end + 1; continue; }
                         fail(source_path, source, i, "cannot render JSON object $[" + key + "]; select a member first");
                         break;
                     }
