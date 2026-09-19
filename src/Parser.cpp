@@ -2,6 +2,7 @@
 #include "FrontMatter.h"
 #include "Console.h"
 #include "FileSystem.h"
+#include "Process.h"
 #include "Json.h"
 #include "JsonSchema.h"
 #include "RenderHost.h"
