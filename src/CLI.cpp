@@ -713,11 +713,19 @@ bool initialise_project(const InitOptions& options) {
 }
 
 
-static int run_script_file(const fs::path& path) {
+static int run_script_file(const fs::path& path, const std::vector<std::string>& script_args = {}) {
     const fs::path absolute=fs::absolute(path).lexically_normal();
     if(!filesystem::file_exists(absolute)){console::error("run: script does not exist: "+path.string());return 1;}
+    std::string source=filesystem::read_file(absolute);
+    // A leading shebang (#!/usr/bin/env nift) is a script header, not Nift
+    // syntax. Strip the first line so the same file runs through nift run.
+    if(source.rfind("#!",0)==0){
+        const std::size_t nl=source.find('\n');
+        source = (nl==std::string::npos) ? "" : source.substr(nl+1);
+    }
     ScriptRenderHost host(absolute.parent_path()); TrackedInfo info; Parser parser(host,info);
-    auto rr=parser.run_script(filesystem::read_file(absolute),absolute);
+    parser.set_script_args(script_args);
+    auto rr=parser.run_script(source,absolute);
     if(!rr.ok){console::error(rr.error.message.empty()?"script failed":rr.error.message);return 1;}
     if(!rr.output.empty())std::cout<<rr.output<<'\n';
     return 0;
@@ -934,6 +942,10 @@ static int run_script_shell() {
             // syntax, so ignore interpolation spans when routing.
             std::string no_interp; { bool in_interp=false; bool saw_dollar=false; for(char c : trimmed) { if(c=='['&&!in_interp&&saw_dollar){in_interp=true;saw_dollar=false;continue;} if(in_interp){ if(c==']') in_interp=false; continue; } no_interp+=c; saw_dollar=(c=='$'); } }
             command_style=!assignment_like&&(sp!=std::string::npos||trimmed=="pwd"||trimmed=="ls")&&no_interp.find(":=")==std::string::npos&&no_interp.find('(')==std::string::npos&&trimmed.rfind("fn ",0)!=0&&trimmed.rfind("if ",0)!=0&&trimmed.rfind("for ",0)!=0&&trimmed.rfind("while ",0)!=0;
+            // Executable paths (./x, ../x, /x, dir/x) are ordinary external
+            // commands even without arguments, exactly like Bash executing a
+            // path: ./hello.f, ./scripts/deploy.f, ../tools/generate.f.
+            if(!command_style&&!assignment_like&&!toks.empty()&&(toks[0].rfind("./",0)==0||toks[0].rfind("../",0)==0||(!toks[0].empty()&&toks[0][0]=='/')||toks[0].find('/')!=std::string::npos))command_style=true;
         }
         if(command_style){execute_shell_command(parser,trimmed);pending.clear();continue;}
         const Parser::StatementState st=parser.statement_state(pending);
@@ -994,9 +1006,10 @@ int run_cli(int argc, char** argv) {
             else if (a.rfind("--fs-root=", 0) == 0) nift_setenv("NIFT_FS_ROOT", a.substr(10).c_str(), 1);
             else rest.push_back(a);
         }
-        if (rest.size()!=1){console::error("run requires exactly one script path");return 1;}
+        if (rest.empty()){console::error("run requires a script path");return 1;}
         if (no_process) nift_setenv("NIFT_NO_PROCESS","1",1);
-        return run_script_file(rest[0]);
+        std::vector<std::string> args(rest.begin()+1, rest.end());
+        return run_script_file(rest[0], args);
     }
     if (command == "sh") {
         bool no_process=false;
@@ -1070,6 +1083,22 @@ int run_cli(int argc, char** argv) {
         if (minified_count > 1)
             std::cout << console::dim(std::to_string(minified_count) + " files minified") << '\n';
         return failed ? 1 : 0;
+    }
+
+    // Executable-script shorthand: `nift script.f`, `nift ./script.f` and
+    // `nift path/to/script.f` are equivalent to `nift run script.f`. This is
+    // what makes `#!/usr/bin/env nift` work. Only applied when the argument
+    // genuinely resolves to an existing file, so a typoed command name is not
+    // silently turned into an arbitrary path.
+    if (filesystem::file_exists(command) && !fs::is_directory(command)) {
+        std::vector<std::string> script_args;
+        for (int i = 2; i < argc; ++i) {
+            const std::string a = argv[i];
+            if (a == "--no-process") nift_setenv("NIFT_NO_PROCESS","1",1);
+            else if (a.rfind("--fs-root=", 0) == 0) nift_setenv("NIFT_FS_ROOT", a.substr(10).c_str(), 1);
+            else script_args.push_back(a);
+        }
+        return run_script_file(command, script_args);
     }
 
     // Historical spellings removed by the CLI unification. These return an

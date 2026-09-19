@@ -34,6 +34,11 @@ public:
     void reset_script_control();
     bool finalize_script_resources(std::string& error);
 
+    // Script arguments exposed to standalone scripts as the `args` array
+    // (user arguments only; the script path itself is not included).
+    void set_script_args(std::vector<std::string> args) { script_args_ = std::move(args); }
+    const std::vector<std::string>& script_args() const { return script_args_; }
+
     // Parser-reported statement state for the interactive shell: the REPL asks
     // the parser whether the accumulated input is a complete statement, an
     // incomplete prefix that needs more input, or a balanced-but-invalid form.
@@ -149,6 +154,7 @@ private:
     bool in_import_program_ = false;
     bool standalone_script_host_ = false;
     bool strict_script_mode_ = false;
+    std::vector<std::string> script_args_;
     std::vector<std::string> requested_exports_;
     enum class ControlFlow { None, Return, Break, Continue };
     struct PendingControl {

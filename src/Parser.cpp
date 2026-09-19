@@ -3587,7 +3587,25 @@ bool Parser::translate_function_program(const std::string& source, std::string& 
                     // once inter-statement whitespace is stripped; emit one so it
                     // cannot swallow the following statement.
                     if(stmt.rfind("@//",0)==0) out+='\n';
-                } else out+="$["+stmt+"]";
+                } else {
+                    // Executable-path command style: a statement whose first
+                    // token is a filesystem path (./x, ../x, /x, dir/x) runs the
+                    // executable as an ordinary external process (executable .f
+                    // scripts, .sh, .py, binaries). This is process execution,
+                    // never in-process Nift evaluation.
+                    std::size_t f0=stmt.find_first_of(" \t");
+                    const std::string first=f0==std::string::npos?stmt:stmt.substr(0,f0);
+                    const bool path_first = (first.rfind("./",0)==0||first.rfind("../",0)==0||(!first.empty()&&first[0]=='/')||first.find('/')!=std::string::npos);
+                    // Only a plain command line (no unquoted parens/brackets/
+                    // braces/assignment) is external command style. This keeps
+                    // ./tool(args) call attempts and `./x = ...` out of the
+                    // process path so the shell's callable-first routing still
+                    // works.
+                    bool cmd_like=path_first; bool qq=false;char qc=0;int pp=0,bb=0,cc2=0;bool saw_delim=false;
+                    for(std::size_t k=0;k<stmt.size()&&cmd_like;++k){char c=stmt[k];if(qq){if(c=='\\')++k;else if(c==qc)qq=false;continue;}if(c=='\''||c=='"'){qq=true;qc=c;continue;}if(c=='('){++pp;saw_delim=true;}else if(c==')'){--pp;saw_delim=true;}else if(c=='['){++bb;saw_delim=true;}else if(c==']'){--bb;saw_delim=true;}else if(c=='{'){++cc2;saw_delim=true;}else if(c=='}'){--cc2;saw_delim=true;}else if((c=='='||c==':')&&pp==0&&bb==0&&cc2==0){cmd_like=false;}}
+                    if(cmd_like&&!saw_delim&&pp==0&&bb==0&&cc2==0) out += "@__nift_cmd(" + stmt + ")";
+                    else out+="$["+stmt+"]";
+                }
             }
             if(i<in.size())++i;
         }
@@ -3635,6 +3653,11 @@ std::vector<std::string> Parser::shell_completions(const std::string& prefix) co
 RenderResult Parser::run_script(const std::string& source, const fs::path& source_path) {
     result_ = RenderResult{};
     variable_scopes_.clear(); variable_scopes_.emplace_back();
+    // Standalone scripts receive their user arguments as an immutable `args`
+    // array (the script path itself is not included).
+    auto arr = std::make_shared<json::Document>(json::Document::make_array());
+    for (const auto& a : script_args_) arr->array.emplace_back(a);
+    variable_scopes_.back()["args"] = VariableBinding{arr, nift_binding_type(*arr), false, true};
     callables_.clear(); structs_.clear(); requested_exports_.clear(); pending_control_={};
     in_import_program_=false; standalone_script_host_=true; strict_script_mode_=true; function_call_depth_=1;
     auto rr=execute_native_program(source,source_path,0);
@@ -3884,6 +3907,25 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
         if (source.compare(i, 16, "@__bare_return()") == 0) {
             if(function_call_depth_<=0){fail(source_path,source,i,"return is only valid in script/function execution");break;}
             pending_control_.kind=ControlFlow::Return; pending_control_.value.reset(); i+=16; break;
+        }
+
+        if (source.compare(i, 12, "@__nift_cmd(") == 0) {
+            // Executable-path command style from script land (e.g. ./generate.f
+            // foo bar): ordinary OS process execution. Never in-process Nift
+            // evaluation. Output is streamed; a non-zero exit status does not
+            // abort the script (matching the REPL shell), but a process that
+            // cannot be launched is a hard error.
+            std::size_t cc=0; if(!find_balanced(source,i+11,'(',')',cc)){fail(source_path,source,i,"@__nift_cmd has no matching ')'");break;}
+            const std::string raw=source.substr(i+12,cc-(i+12));
+            if(std::getenv("NIFT_NO_PROCESS")){fail(source_path,source,i,"external process execution disabled");break;}
+            // Quote-aware tokenization of the command line.
+            std::vector<std::string> toks; std::string cur; bool sq=false,dq=false,esc=false;
+            for(std::size_t t=0;t<raw.size();++t){char c=raw[t];if(esc){cur+=c;esc=false;continue;}if(c=='\\'&&!sq){esc=true;continue;}if(c=='\''&&!dq){sq=!sq;continue;}if(c=='"'&&!sq){dq=!dq;continue;}if((c==' '||c=='\t'||c=='\r'||c=='\n')&&!sq&&!dq){if(!cur.empty()){toks.push_back(cur);cur.clear();}continue;}cur+=c;}if(!cur.empty())toks.push_back(cur);
+            if(toks.empty()){fail(source_path,source,i,"empty command");break;}
+            ProcessSpec spec; spec.program=toks.front(); spec.args.assign(toks.begin()+1,toks.end());
+            auto pr=nift_run_process(spec,true,true);
+            if(!pr.launched){fail(source_path,source,i,pr.error.empty()?("cannot launch command: "+spec.program):pr.error);break;}
+            i=cc+1; continue;
         }
 
         if (source.compare(i, 10, "@__export(") == 0) {
