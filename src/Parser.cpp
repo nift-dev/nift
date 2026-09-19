@@ -2577,7 +2577,9 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 // vips.resize(...)). Invoke the field's callable directly.
                 auto ff=inst->second->fields.find(mn);
                 if(ff!=inst->second->fields.end()&&ff->second.value&&ff->second.value->is_string()&&ff->second.value->string.rfind("\x1fnift:callable:",0)==0){
-                    std::string call = "("; bool ok=false; std::vector<bool> qq; auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),ok,&qq); if(!ok){error="malformed arguments";return false;} for(size_t i=0;i<ar.size();++i){if(i)call+=","; call+=ar[i];} call+=")";
+                    // Reconstruct a call that preserves quoted string arguments
+                    // (parse_parameters strips quotes and reports them via qq).
+                    std::string call = "("; bool ok=false; std::vector<bool> qq; auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),ok,&qq); if(!ok){error="malformed arguments";return false;} for(size_t i=0;i<ar.size();++i){if(i)call+=","; if(i<qq.size()&&qq[i])call+="\""+ar[i]+"\""; else call+=ar[i];} call+=")";
                     json::Document cb=*ff->second.value; push_variable_scope(); auto& sc=variable_scopes_.back(); auto csp=std::make_shared<json::Document>(std::move(cb)); sc["__nift_module_field"]=VariableBinding{csp,nift_binding_type(*csp),false,false};
                     bool r=eval("__nift_module_field"+call,out,depth+1); pop_variable_scope(); return r;
                 }
@@ -3446,9 +3448,24 @@ bool Parser::translate_function_program(const std::string& source, std::string& 
                 i = (line_end == std::string::npos) ? in.size() : line_end;
                 continue;
             }
+            // Script-land single-line comment without the template '@' prefix.
+            if (in.compare(i, 2, "//") == 0) {
+                std::size_t line_end = in.find('\n', i);
+                out += '\n';
+                i = (line_end == std::string::npos) ? in.size() : line_end;
+                continue;
+            }
             if (in.compare(i, 3, "@/*") == 0) {
                 std::size_t block_end = in.find("*/", i + 3);
                 if (block_end == std::string::npos) { error = "open comment '@/*' has no close '*/'"; return false; }
+                i = block_end + 2;
+                continue;
+            }
+            // Script-land block comment without the template '@' prefix.
+            if (in.compare(i, 2, "/*") == 0) {
+                std::size_t block_end = in.find("*/", i + 2);
+                if (block_end == std::string::npos) { error = "open comment '/*' has no close '*/'"; return false; }
+                out += '\n';
                 i = block_end + 2;
                 continue;
             }
@@ -3858,7 +3875,10 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     const auto mb=normalize_control_block_body(body.substr(mbo+1,mbc-mbo-1));
                     def.methods[mn]=StructMethod{Callable{ps,"",mb.text,source_path,false},priv,ctor}; p=mbc+1; continue;
                 }
-                std::size_t eol=body.find_first_of("\n;",p); if(eol==std::string::npos)eol=body.size();
+                // Struct fields are separated by top-level newlines or
+                // semicolons; a ';' or newline inside a nested lambda/block must
+                // not split the field. Scan with paren/bracket/brace/quote depth.
+                std::size_t eol=p; { int par=0,br=0,bc=0; bool q=false; char qc=0; for(;eol<body.size();++eol){char ch=body[eol];if(q){if(ch=='\\'){++eol;continue;}if(ch==qc)q=false;continue;}if(ch=='\''||ch=='"'){q=true;qc=ch;continue;}if(ch=='(')++par;else if(ch==')')--par;else if(ch=='[')++br;else if(ch==']')--br;else if(ch=='{')++bc;else if(ch=='}')--bc;else if(!par&&!br&&!bc&&(ch=='\n'||ch==';'))break;} }
                 std::string line=trim_copy(body.substr(p,eol-p)); const auto dp=line.find(":=");
                 if(dp==std::string::npos){fail(source_path,source,i,"struct fields require 'name := initializer'");struct_ok=false;break;}
                 std::string fn=trim_copy(line.substr(0,dp)), init=trim_copy(line.substr(dp+2));
