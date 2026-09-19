@@ -38,5 +38,27 @@ NIFT
   fout=$(cd "$tmp/site" && "$NIFT_ABS" run full.f)
   expected=$'true\ntrue\ntrue\ntrue\n2\nhello\nO\x27Brien\n3.14\n0\nfalse\n2'
   [ "$fout" = "$expected" ] || { printf 'unexpected sqlite output:\n%s\nexpected:\n%s\n' "$fout" "$expected" >&2; exit 1; }
+  # Unicode database path and data, plus no leaked temp files.
+  cat > "$tmp/site/uni.f" <<'NIFT'
+@import("sqlite")
+db := sqlite_open("wéird ü.db")
+print(sqlite_exec(db, "CREATE TABLE t(v TEXT)").ok)
+print(sqlite_exec(db, "INSERT INTO t VALUES(?)", "héllo").ok)
+print(sqlite_exec(db, "INSERT INTO t VALUES(?)", null).ok)
+r := sqlite_query(db, "SELECT * FROM t")
+print(r.rows.size())
+print(r.rows[0].v)
+print(r.rows[1].v)
+NIFT
+  uout=$(cd "$tmp/site" && "$NIFT_ABS" run uni.f)
+  [ "$uout" = $'true\ntrue\ntrue\n2\nh\xc3\xa9llo\nnull' ] || { printf 'unexpected unicode sqlite output:\n%s\n' "$uout" >&2; exit 1; }
+  rm -f "$tmp/site/wéird ü.db"
+  # Query fallback without mktemp on PATH (deterministic temp-name path).
+  sqlite3_bin="$(command -v sqlite3)"
+  rm -f "$tmp/site/full.db"
+  nopq=$(cd "$tmp/site" && PATH="$(dirname "$sqlite3_bin")" "$NIFT_ABS" run full.f)
+  [ "$nopq" = "$expected" ] || { printf 'sqlite fallback (no mktemp) mismatch:\n%s\n' "$nopq" >&2; exit 1; }
+  leaks=$(cd "$tmp/site" && ls .nift-sqlite-*.json 2>/dev/null || true)
+  [ -z "$leaks" ] || { printf 'leaked sqlite temp files: %s\n' "$leaks" >&2; exit 1; }
 fi
 echo 'PASS sqlite package dogfood'

@@ -3392,6 +3392,21 @@ bool Parser::translate_function_program(const std::string& source, std::string& 
                 if(p>=in.size()||in[p]!='('||!find_balanced(in,p,'(',')',pc)){error="export requires '(binding)'";return false;}
                 out += "@__export("+in.substr(p+1,pc-p-1)+")"; i=pc+1; if(i<in.size()&&in[i]==';')++i; continue;
             }
+            // A single-line @// comment must be consumed to end-of-line BEFORE
+            // statement splitting, so a ';' inside the comment cannot turn the
+            // rest of the comment into a statement.
+            if (in.compare(i, 3, "@//") == 0) {
+                std::size_t line_end = in.find('\n', i);
+                out += '\n';
+                i = (line_end == std::string::npos) ? in.size() : line_end;
+                continue;
+            }
+            if (in.compare(i, 3, "@/*") == 0) {
+                std::size_t block_end = in.find("*/", i + 3);
+                if (block_end == std::string::npos) { error = "open comment '@/*' has no close '*/'"; return false; }
+                i = block_end + 2;
+                continue;
+            }
             if(boundary(i,"while")) {
                 std::size_t p=i+5;while(p<in.size()&&std::isspace((unsigned char)in[p]))++p;std::size_t pc=0;
                 if(p>=in.size()||in[p]!='('||!find_balanced(in,p,'(',')',pc)){error="function while requires '(...)'";return false;}
