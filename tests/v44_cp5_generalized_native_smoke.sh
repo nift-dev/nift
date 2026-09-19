@@ -14,10 +14,13 @@ copy(["$t/src/a", "$t/src/b"], "$t/copy")
 move("$t/copy/a", "$t/copy/b", "$t/move")
 remove(["$t/move/a", "$t/move/b"])
 print(exists("$t/move/a"))
+\$[c := copy([1, [2, 3]])]
+print(c.size())
 F
 out=$($NIFT run "$t/test.f")
 [ "$out" = "2
 9
 3
-false" ] || { printf '%s\n' "$out" >&2; exit 1; }
+false
+2" ] || { printf '%s\n' "$out" >&2; exit 1; }
 echo 'PASS v4.4 CP5 generalized native operations'
