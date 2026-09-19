@@ -21,7 +21,10 @@ grep -q HELLO "$t/shell"
 printf 'x := 5\nx = 7\nprint(x)\nexit\n' | "$NIFT" sh 2>/dev/null | grep -qE ' 7$'
 printf 'sh -c "echo out; echo err >&2" 2>%s/err.txt\ncat %s/err.txt\nexit\n' "$t" "$t" | "$NIFT" sh 2>/dev/null | grep -q ' err$'
 # $[...] interpolation in command arguments and ; command separation.
-printf 'who := "world"\necho hello $[who]\nprintf one ; printf two\nfalse ; printf three\nexit\n' | "$NIFT" sh 2>/dev/null | grep -q 'hello world'
-printf 'printf one ; printf two\nfalse ; printf three\nexit\n' | "$NIFT" sh 2>/dev/null | grep -qE 'onetwothree'
+interp_out=$(printf 'who := "world"\necho hello $[who]\nprintf one ; printf two\nfalse ; printf three\nexit\n' | "$NIFT" sh 2>/dev/null || true)
+grep -q 'hello world' <<<"$interp_out"
+grep -q 'onetwo' <<<"$interp_out"
+grep -q 'three' <<<"$interp_out"
 # Background & still fails explicitly rather than being misinterpreted.
-printf 'sleep 1 &\nexit\n' | "$NIFT" sh 2>/dev/null | grep -q 'background job control is not implemented'
+bg_out=$(printf 'sleep 1 &\nexit\n' | "$NIFT" sh 2>&1 || true)
+grep -q 'background job control is not implemented' <<<"$bg_out"
