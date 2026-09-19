@@ -20,6 +20,7 @@
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
+#include <fstream>
 #ifndef _WIN32
 #include <glob.h>
 #endif
@@ -783,14 +784,25 @@ static int execute_shell_command(Parser& parser,const std::string& line,bool pri
         for(auto&st:stages)if(st.program.empty()){if(print_errors)console::error("empty command in pipeline");return 2;}auto pr=nift_run_pipeline(stages,true,true);last=pr.exit_code;if(!pr.error.empty()&&print_errors)console::error(pr.error);
     }pending_op=end<toks.size()?toks[end]:"";pos=end+1;}return last;}
 
+static fs::path nift_history_path(){
+    if(const char* home=std::getenv("HOME")) return fs::path(home)/".nift_history";
+#ifdef _WIN32
+    if(const char* home=std::getenv("USERPROFILE")) return fs::path(home)/".nift_history";
+#endif
+    return fs::path(".nift_history");
+}
+static std::vector<std::string> load_nift_history(){
+    std::vector<std::string> h;std::ifstream in(nift_history_path());std::string line;while(std::getline(in,line))if(!line.empty())h.push_back(line);if(h.size()>1000)h.erase(h.begin(),h.end()-1000);return h;
+}
+static void append_nift_history(const std::string& line){if(line.empty())return;std::ofstream out(nift_history_path(),std::ios::app);if(out)out<<line<<'\n';}
 static int run_script_shell() {
-    ScriptRenderHost host(fs::current_path()); TrackedInfo info; Parser parser(host,info); std::string pending;
+    ScriptRenderHost host(fs::current_path()); TrackedInfo info; Parser parser(host,info); std::string pending; auto history=load_nift_history(); (void)history;
     if(const char* home=std::getenv("HOME")){fs::path rc=fs::path(home)/".niftrc";if(filesystem::file_exists(rc)){auto rr=parser.run_statement(filesystem::read_file(rc),rc);if(!rr.ok){console::error("niftrc: "+rr.error.message);return 1;}}}
     while(true){if(pending.empty()){
         std::string shown=fs::current_path().generic_string();
         if(const char* home=std::getenv("HOME")){std::string h=fs::path(home).lexically_normal().generic_string();if(shown==h)shown="~";else if(!h.empty()&&shown.rfind(h+"/",0)==0)shown="~"+shown.substr(h.size());}
         std::cout << console::paint(shown, "1;32", console::stdout_colour_enabled()) << "$ ";
-    }else{std::cout << "... ";}std::cout.flush();std::string line;if(!std::getline(std::cin,line))break;if(pending.empty()&&(line=="exit"||line=="quit"))break;pending+=line+"\n";
+    }else{std::cout << "... ";}std::cout.flush();std::string line;if(!std::getline(std::cin,line))break;if(pending.empty()&&(line=="exit"||line=="quit"))break;if(pending.empty()&&!line.empty())append_nift_history(line);pending+=line+"\n";
         // CP85: the parser reports whether the accumulated input is complete,
         // an incomplete prefix (keep reading), or invalid (balanced but
         // malformed, executed so the canonical diagnostic is shown).
