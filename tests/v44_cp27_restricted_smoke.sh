@@ -45,4 +45,9 @@ print(touch("$t/root/outside.txt"))
 F
 if (cd "$t/root/inner" && "$BIN" run escape.f --fs-root="$t/root/inner") >"$t/e" 2>&1; then echo "fs-root escape allowed" >&2; exit 1; fi
 grep -q 'escapes configured filesystem root' "$t/e"
+# inject() must also respect the filesystem root.
+printf 'outside-data\n' > "$t/root/secret.txt"
+printf "print(inject(\"$t/root/secret.txt\"))\n" > "$t/root/inner/inj.f"
+if (cd "$t/root/inner" && "$BIN" run inj.f --fs-root="$t/root/inner") >"$t/e2" 2>&1; then echo "inject escaped fs-root" >&2; exit 1; fi
+grep -q 'escapes configured filesystem root' "$t/e2"
 echo 'PASS v4.4 restricted mode'
