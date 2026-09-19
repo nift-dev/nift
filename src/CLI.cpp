@@ -793,7 +793,7 @@ static int run_script_shell() {
         // CP85: the parser reports whether the accumulated input is complete,
         // an incomplete prefix (keep reading), or invalid (balanced but
         // malformed, executed so the canonical diagnostic is shown).
-        const std::string trimmed=pending.substr(0,pending.find_last_not_of("\r\n")+1);bool command_style=false;{auto sp=trimmed.find_first_of(" \t");command_style=sp!=std::string::npos&&trimmed.find(":=")==std::string::npos&&trimmed.find('(')==std::string::npos&&trimmed.rfind("fn ",0)!=0&&trimmed.rfind("if ",0)!=0&&trimmed.rfind("for ",0)!=0&&trimmed.rfind("while ",0)!=0;}
+        const std::string trimmed=pending.substr(0,pending.find_last_not_of("\r\n")+1);bool command_style=false;{auto sp=trimmed.find_first_of(" \t");command_style=(sp!=std::string::npos||trimmed=="pwd"||trimmed=="ls")&&trimmed.find(":=")==std::string::npos&&trimmed.find('(')==std::string::npos&&trimmed.rfind("fn ",0)!=0&&trimmed.rfind("if ",0)!=0&&trimmed.rfind("for ",0)!=0&&trimmed.rfind("while ",0)!=0;}
         if(command_style){execute_shell_command(parser,trimmed);pending.clear();continue;}
         const Parser::StatementState st=parser.statement_state(pending);
         if(st==Parser::StatementState::Incomplete)continue;
