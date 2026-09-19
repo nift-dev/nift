@@ -3,6 +3,7 @@ set -eu
 NIFT=${NIFT:-./nift}; t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
 mkdir -p "$t/tree/a/deep" "$t/tree/b" "$t/tree/.hidden" "$t/out"
 touch "$t/tree/a/one.o" "$t/tree/a/two.txt" "$t/tree/a/deep/three.o" "$t/tree/b/four.o" "$t/tree/.hidden/secret.o"
+i=0; while [ $i -lt 200 ]; do touch "$t/tree/b/item-$i.tmp"; i=$((i+1)); done
 cat >"$t/test.f" <<F
 print(ls("$t/tree/**/*.o").size())
 copy("$t/tree/a/*.o", "$t/out")

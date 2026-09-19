@@ -1886,7 +1886,11 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             auto string_arg=[&](const std::string& name,const std::vector<std::string>& args,const std::vector<bool>& q,size_t i,std::string& v)->bool{
                 json::Document d;if(!arg_value(args,q,i,d)||!d.is_string()){error=name+": expected string path";return false;}v=d.string;return true;
             };
-            auto resolve_path=[&](const std::string& raw)->fs::path{fs::path p(raw);if(p.is_relative())p=(standalone_script_host_?fs::current_path():host_.root())/p;return fs::absolute(p).lexically_normal();};
+            auto resolve_path=[&](const std::string& raw)->fs::path{std::string expanded=raw;if(standalone_script_host_&&!expanded.empty()&&expanded[0]=='~'&&(expanded.size()==1||expanded[1]=='/'||expanded[1]=='\\')){const char* home=std::getenv("HOME");
+#ifdef _WIN32
+if(!home)home=std::getenv("USERPROFILE");
+#endif
+if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p.is_relative())p=(standalone_script_host_?fs::current_path():host_.root())/p;return fs::absolute(p).lexically_normal();};
             auto checked_path=[&](const std::string& name,const std::vector<std::string>& aa,const std::vector<bool>& qq,size_t i,fs::path& p)->bool{std::string raw;if(!string_arg(name,aa,qq,i,raw))return false;p=resolve_path(raw);if(!standalone_script_host_&&!host_.root().empty()&&!filesystem::path_within(fs::absolute(host_.root()).lexically_normal(),p)){error=name+": path must stay inside the Nift project";return false;}return true;};
             std::vector<std::string> args;std::vector<bool> q;
             if(call_args("pwd",args,q)){if(!args.empty()){error="pwd: expected no arguments";return false;}out=json::Document((standalone_script_host_?fs::current_path():host_.root()).generic_string());return true;}
