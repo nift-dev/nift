@@ -2,6 +2,7 @@
 #include "ProjectInfoHost.h"
 #include "ProjectOwnership.h"
 #include "ProjectRead.h"
+#include "Hooks.h"
 #include <minify/Minify.h>
 #include "BuildProgress.h"
 #include "Console.h"
@@ -879,6 +880,12 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& jobs, bool targeted, bo
     const unsigned hardware = std::max(1u, std::thread::hardware_concurrency());
     std::size_t thread_count = config.build_threads < 0 ? static_cast<std::size_t>(-static_cast<long long>(config.build_threads)) * hardware : (config.build_threads == 0 ? hardware : static_cast<std::size_t>(config.build_threads));
     thread_count = std::max<std::size_t>(1, std::min(thread_count, jobs.size()));
+    // Per-file hooks run the native Parser (process-global env context), so
+    // any affected file with hooks serializes the build to keep hooks safe
+    // and their output readable.
+    bool any_file_hooks = false;
+    for (const auto& job : jobs) if (!job.info->build_hooks.empty()) { any_file_hooks = true; break; }
+    if (any_file_hooks) thread_count = 1;
 
     std::atomic<std::size_t> next{0};
     std::atomic<std::size_t> completed{0};
@@ -887,6 +894,7 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& jobs, bool targeted, bo
     BuildProgress progress(jobs.size(), completed);
 
     auto worker = [&] {
+        const std::string hook_mode = current_hook_mode_;
         while (true) {
             const std::size_t index = next.fetch_add(1);
             if (index >= jobs.size()) break;
@@ -894,7 +902,27 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& jobs, bool targeted, bo
             // worker owns its slots, so no shared buffer needs locking). They
             // are emitted only after progress has stopped, so no diagnostic
             // can ever be written into an active progress line.
+            if (any_file_hooks) {
+                std::string hook_error;
+                if (!nift_hooks::run_file_hooks(root, *jobs[index].info, "pre", hook_mode, hook_error)) {
+                    std::lock_guard<std::mutex> lock(console::output_mutex);
+                    std::cerr << console::error_label() << ' ' << hook_error << '\n';
+                    errors[index] = BuildError{jobs[index].info->name, {}, 0, hook_error};
+                    succeeded[index] = 0;
+                    ++completed;
+                    continue;
+                }
+            }
             succeeded[index] = build_one(*jobs[index].info, &errors[index]) ? 1 : 0;
+            if (succeeded[index] && any_file_hooks) {
+                std::string hook_error;
+                if (!nift_hooks::run_file_hooks(root, *jobs[index].info, "post", hook_mode, hook_error)) {
+                    std::lock_guard<std::mutex> lock(console::output_mutex);
+                    std::cerr << console::error_label() << ' ' << hook_error << '\n';
+                    errors[index] = BuildError{jobs[index].info->name, {}, 0, hook_error};
+                    succeeded[index] = 0;
+                }
+            }
             ++completed;
         }
     };
@@ -1024,6 +1052,18 @@ int ProjectInfo::build_all(bool force, bool explain, bool repair) {
     }
     reset_build_caches();
 
+    const std::string mode = nift_hooks::effective_mode(force, repair, build_mode_hint_);
+    // Project pre-hooks run before the affected-set calculation so generated
+    // inputs can change dependencies for this invocation.
+    { std::string hook_error;
+      if (!nift_hooks::run_project_hooks(root, config, "pre", mode, hook_error)) {
+          std::lock_guard<std::mutex> lock(console::output_mutex);
+          std::cerr << console::error_label() << ' ' << hook_error << '\n';
+          return finish_if_epoch_complete(ownership, 1, repair);
+      }
+    }
+    current_hook_mode_ = mode;
+
     std::vector<BuildJob> jobs;
     jobs.reserve(tracked.size());
     if (force || tracked.size() < 2) {
@@ -1058,6 +1098,14 @@ int ProjectInfo::build_all(bool force, bool explain, bool repair) {
     }
 
     const int result = build_many(jobs, false, explain, tracked.size());
+    if (result == 0) {
+        std::string hook_error;
+        if (!nift_hooks::run_project_hooks(root, config, "post", mode, hook_error)) {
+            std::lock_guard<std::mutex> lock(console::output_mutex);
+            std::cerr << console::error_label() << ' ' << hook_error << '\n';
+            return finish_if_epoch_complete(ownership, 1, repair);
+        }
+    }
     return finish_if_epoch_complete(ownership, result, repair);
 }
 
@@ -1311,7 +1359,25 @@ int ProjectInfo::build_names(const std::vector<std::string>& names, bool, bool e
         return finish_if_epoch_complete(ownership, 1, /*repair=*/false);
     }
 
+    const std::string mode = "names";
+    { std::string hook_error;
+      if (!nift_hooks::run_project_hooks(root, config, "pre", mode, hook_error)) {
+          std::lock_guard<std::mutex> lock(console::output_mutex);
+          std::cerr << console::error_label() << ' ' << hook_error << '\n';
+          return finish_if_epoch_complete(ownership, 1, /*repair=*/false);
+      }
+    }
+    current_hook_mode_ = mode;
+
     const int result = build_many(jobs, true, explain, names.size());
+    if (result == 0) {
+        std::string hook_error;
+        if (!nift_hooks::run_project_hooks(root, config, "post", mode, hook_error)) {
+            std::lock_guard<std::mutex> lock(console::output_mutex);
+            std::cerr << console::error_label() << ' ' << hook_error << '\n';
+            return finish_if_epoch_complete(ownership, 1, /*repair=*/false);
+        }
+    }
     return finish_if_epoch_complete(ownership, result, /*repair=*/false);
 }
 

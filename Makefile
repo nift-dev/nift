@@ -7,7 +7,7 @@ LDFLAGS ?=
 LDLIBS ?=
 
 # Shared core + CLI implementation (the ordinary Nift CLI needs only these).
-CORE_SOURCES := src/nift.cpp src/ProjectOwnership.cpp src/CLI.cpp src/Process.cpp src/Value.cpp src/FileSystem.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp markuppp/src/Markup.cpp markuppp/src/AsciiDoc.cpp markuppp/src/ReStructuredText.cpp src/Parser.cpp src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp src/WatchList.cpp src/BuildProgress.cpp src/Automation.cpp
+CORE_SOURCES := src/nift.cpp src/ProjectOwnership.cpp src/CLI.cpp src/Process.cpp src/Value.cpp src/FileSystem.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp markuppp/src/Markup.cpp markuppp/src/AsciiDoc.cpp markuppp/src/ReStructuredText.cpp src/Parser.cpp src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp src/WatchList.cpp src/BuildProgress.cpp src/Automation.cpp src/Hooks.cpp
 # Embedding-exclusive implementation (Engine, Context, C ABI). The reduced CLI
 # never compiles or links these; they are built by the embed library and the
 # engine/C ABI test targets.
@@ -971,4 +971,7 @@ test-v44-packages: $(TARGET)
 test-v44-automation: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_automation_smoke.sh
 
-test-v44: test-v44-execution-shell test-v44-language-foundation test-v44-shell-restricted test-v44-packages test-v44-automation
+test-v44-hooks: $(TARGET)
+	NIFT="$(CURDIR)/$(TARGET)" tests/v44_hooks_smoke.sh
+
+test-v44: test-v44-execution-shell test-v44-language-foundation test-v44-shell-restricted test-v44-packages test-v44-automation test-v44-hooks

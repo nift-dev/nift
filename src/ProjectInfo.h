@@ -59,6 +59,13 @@ public:
     int build_all(bool force, bool explain = false, bool repair = false);
     int build_names(const std::vector<std::string>& names, bool force, bool explain = false);
 
+    // Build-mode hint for v4.4 build hooks. The CLI sets "auto" for the watch
+    // loop; other modes are derived from the build entry point itself.
+    std::string build_mode_hint_ = "updated";
+    // Effective hook mode for the current build invocation (file hooks read it
+    // inside build_many).
+    std::string current_hook_mode_ = "updated";
+
     // Page names built by the most recent build_all/build_names/build_many
     // call, exposed to the structured automation API.
     std::vector<std::string> last_build_affected;
