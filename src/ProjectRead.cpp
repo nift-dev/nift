@@ -191,12 +191,16 @@ bool load_config(const fs::path& root, Config& config, std::string& error) {
         return false;
     }
 
+    static const std::vector<std::string> hook_keys = {"pre build","post build","pre build -all","post build -all","pre build --auto","post build --auto","pre build --repair","post build --repair"};
+    for (const auto& key : hook_keys) if (value.has(key)) { if(!value[key].is_string()||value[key].string.empty()){error="build hook '"+key+"' must be a non-empty .f path string";return false;} config.build_hooks[key]=value[key].string; }
+
     // Unknown config keys fail loudly, exactly like the CLI: a project must
     // never believe a setting is honoured when it is not.
     static const std::unordered_set<std::string> known_config_keys = {
         "content-dir", "content-ext", "output-dir", "output-ext",
         "default-template", "incremental-mode", "build-threads",
         "contracts", "minify-exts", "schemas", "taxonomies",
+        "pre build", "post build", "pre build -all", "post build -all", "pre build --auto", "post build --auto", "pre build --repair", "post build --repair",
     };
     for (const auto& entry : value.object) {
         if (!known_config_keys.count(entry.first)) {
@@ -241,10 +245,11 @@ bool load_tracking(const fs::path& root, const Config& config, std::vector<Track
                 std::move(entry["name"].string),
                 std::move(entry["title"].string),
                 entry.has("template") ? std::move(entry["template"].string) : std::string{},
-                "", "", std::nullopt, std::nullopt, std::nullopt, std::nullopt
+                "", "", std::nullopt, std::nullopt, std::nullopt, std::nullopt, {}
             };
             if (entry.has("type")) { if(!entry["type"].is_string()){entries_valid=false;entry_error="tracked type must be a string";return false;} info.type=entry["type"].string; }
             if (entry.has("frontmatter")) { if(!entry["frontmatter"].is_string()){entries_valid=false;entry_error="tracked frontmatter must be a string";return false;} info.frontmatter=entry["frontmatter"].string; }
+            for (const auto& key : hook_keys) if (entry.has(key)) { if(!entry[key].is_string()||entry[key].string.empty()){entries_valid=false;entry_error="tracked build hook '"+key+"' must be a non-empty .f path string";return false;} info.build_hooks[key]=entry[key].string; }
             if (entry.has("content-ext")) {
                 if (!entry["content-ext"].is_string()) {
                     entries_valid = false;

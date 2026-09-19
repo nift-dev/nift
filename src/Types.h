@@ -21,6 +21,7 @@ struct Config {
     std::vector<std::string> schema_files;
     std::vector<std::string> taxonomy_files;
     int build_threads = -1;
+    std::map<std::string, std::string> build_hooks;
 };
 
 struct PaginationConfig {
@@ -39,6 +40,7 @@ struct TrackedInfo {
     std::optional<PaginationConfig> paginate;
     std::optional<std::string> type;
     std::optional<std::string> frontmatter;
+    std::map<std::string, std::string> build_hooks;
 };
 
 struct BuildError {
