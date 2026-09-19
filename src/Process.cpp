@@ -89,10 +89,12 @@ std::string build_command_line(const std::string& program, const std::vector<std
 HANDLE open_redirect(const std::string& path, bool read, bool append) {
     if (path.empty()) return INVALID_HANDLE_VALUE;
     SECURITY_ATTRIBUTES sa; sa.nLength = sizeof(sa); sa.bInheritHandle = TRUE; sa.lpSecurityDescriptor = nullptr;
+    // Append is implemented by seeking to end after open; GENERIC_WRITE opens
+    // with the same semantics (FILE_APPEND_DATA is an access right, not a file
+    // attribute, and its value 0x4 collides with FILE_ATTRIBUTE_SYSTEM).
     DWORD access = read ? GENERIC_READ : GENERIC_WRITE;
     DWORD share = read ? FILE_SHARE_READ : 0;
     DWORD disp = read ? OPEN_EXISTING : (append ? OPEN_ALWAYS : CREATE_ALWAYS);
-    DWORD flags = append ? FILE_APPEND_DATA : 0;
     HANDLE h = CreateFileW(widen(path).c_str(), access, share, &sa, disp, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (h == INVALID_HANDLE_VALUE) return INVALID_HANDLE_VALUE;
     if (!read && append) { SetFilePointer(h, 0, nullptr, FILE_END); }

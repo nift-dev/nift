@@ -95,6 +95,7 @@ private:
         bool block = false;
         std::filesystem::path source_path;
         std::unordered_map<std::string, VariableBinding> captures;
+        std::shared_ptr<ModuleEnv> module_env;
     };
     std::unordered_map<std::string, std::shared_ptr<LambdaInstance>> lambda_instances_;
     std::uint64_t next_lambda_instance_id_ = 1;

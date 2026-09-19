@@ -1866,6 +1866,13 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                 li->block=rhs.size()>=2&&rhs.front()=='{'&&rhs.back()=='}';
                 li->body=li->block?rhs.substr(1,rhs.size()-2):rhs;
                 for(const auto& scope:variable_scopes_) for(const auto& kv:scope) li->captures[kv.first]=kv.second;
+                // A lambda created inside an imported module may escape via an
+                // exported value; snapshot the module's callables so its body
+                // can still reach package-private @fn helpers.
+                if (in_import_program_ && !callables_.empty()) {
+                    auto env=std::make_shared<ModuleEnv>(); env->callables=callables_;
+                    li->module_env=std::move(env);
+                }
                 const std::string id=std::to_string(next_lambda_instance_id_++); lambda_instances_[id]=li;
                 out=json::Document(std::string("\x1fnift:callable:lambda:")+id); return true;
             }
@@ -2088,6 +2095,24 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     method=="copy"||method=="move"||method=="remove"||method=="cat"||
                     method=="keys"||method=="values"||method=="entries"||method=="has"||method=="get"||method=="merge"||
                     method=="map"||method=="filter"||method=="reduce"||method=="any"||method=="all"||method=="find"||method=="find_index"||method=="count"||method=="sort_by"||method=="group_by"||method=="unique"||method=="flatten"||method=="sum"||method=="min"||method=="max"||method=="from_entries"||method=="index_by"||method=="pick"||method=="omit"||method=="merge_deep"||method=="partition"||method=="unique_by"||method=="min_by"||method=="max_by"||method=="count_by"||method=="take"||method=="drop"||method=="chunk"||method=="group_by_each"||method=="pipe"||method=="stdin"||method=="stdout"||method=="stderr"||method=="cwd"||method=="env"||method=="run";
+                if (!known) {
+                    // Module-style value: a JSON object member holding a callable is
+                    // invoked as a method (e.g. vips.resize(...) for a plain-object
+                    // module), keeping any captured package-private context.
+                    json::Document base;
+                    if (eval(receiver, base, depth + 1) && base.is_object()) {
+                        for (const auto& kv : base.object) {
+                            if (kv.first == method && kv.second.is_string() && kv.second.string.rfind("\x1fnift:callable:",0)==0) {
+                                push_variable_scope(); auto& sc=variable_scopes_.back();
+                                auto csp=std::make_shared<json::Document>(kv.second);
+                                sc["__nift_module_field"]=VariableBinding{csp,nift_binding_type(*csp),false,false};
+                                bool ok=eval("__nift_module_field("+arg_text+")",out,depth+1);
+                                pop_variable_scope();
+                                return ok;
+                            }
+                        }
+                    }
+                }
                 if (known) {
                     // Fast path: read-only container methods on a pure JSON-path
                     // receiver (e.g. project.files.size()) resolve through the
@@ -2538,7 +2563,16 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             if (terminal_call && text.substr(0,lp).find('.') != std::string::npos) {
                 const std::string target=trim_copy(text.substr(0,lp)); const auto dot=target.rfind('.'); const std::string root=target.substr(0,dot), mn=target.substr(dot+1);
                 VariableBinding* rb=nullptr;for(auto scope=variable_scopes_.rbegin();scope!=variable_scopes_.rend();++scope){auto it=scope->find(root);if(it!=scope->end()){rb=&it->second;break;}}
-                if(rb&&rb->value->is_string()&&rb->value->string.rfind("\x1fnift:struct:",0)==0){auto inst=struct_instances_.find(rb->value->string.substr(13));if(inst==struct_instances_.end()){error="invalid struct instance";return false;}auto sd=structs_.find(inst->second->type_name);auto mi=sd->second.methods.find(mn);if(mi==sd->second.methods.end()||mi->second.constructor){error="struct has no method: "+mn;return false;}if(mi->second.private_member&&(receiver_stack_.empty()||receiver_stack_.back()!=inst->second)){error="private struct method: "+mn;return false;}bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(!aok){error="malformed method arguments";return false;}std::vector<json::Document> av;for(std::size_t ai=0;ai<ar.size();++ai){json::Document v;if(ai<aq.size()&&aq[ai])v=json::Document(ar[ai]);else if(!eval(ar[ai],v,depth+1))return false;av.push_back(std::move(v));}return invoke_struct_method(inst->second,mi->second,av,ar,out,error);}
+                if(rb&&rb->value->is_string()&&rb->value->string.rfind("\x1fnift:struct:",0)==0){auto inst=struct_instances_.find(rb->value->string.substr(13));if(inst==struct_instances_.end()){error="invalid struct instance";return false;}auto sd=structs_.find(inst->second->type_name);if(sd==structs_.end()){error="struct type is not available in this scope: "+inst->second->type_name;return false;}auto mi=sd->second.methods.find(mn);if((mi==sd->second.methods.end()||mi->second.constructor)){
+                // A callable FIELD acts as a method (module-style values such as
+                // vips.resize(...)). Invoke the field's callable directly.
+                auto ff=inst->second->fields.find(mn);
+                if(ff!=inst->second->fields.end()&&ff->second.value&&ff->second.value->is_string()&&ff->second.value->string.rfind("\x1fnift:callable:",0)==0){
+                    std::string call = "("; bool ok=false; std::vector<bool> qq; auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),ok,&qq); if(!ok){error="malformed arguments";return false;} for(size_t i=0;i<ar.size();++i){if(i)call+=","; call+=ar[i];} call+=")";
+                    json::Document cb=*ff->second.value; push_variable_scope(); auto& sc=variable_scopes_.back(); auto csp=std::make_shared<json::Document>(std::move(cb)); sc["__nift_module_field"]=VariableBinding{csp,nift_binding_type(*csp),false,false};
+                    bool r=eval("__nift_module_field"+call,out,depth+1); pop_variable_scope(); return r;
+                }
+                error="struct has no method: "+mn;return false;}if(mi->second.private_member&&(receiver_stack_.empty()||receiver_stack_.back()!=inst->second)){error="private struct method: "+mn;return false;}bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(!aok){error="malformed method arguments";return false;}std::vector<json::Document> av;for(std::size_t ai=0;ai<ar.size();++ai){json::Document v;if(ai<aq.size()&&aq[ai])v=json::Document(ar[ai]);else if(!eval(ar[ai],v,depth+1))return false;av.push_back(std::move(v));}return invoke_struct_method(inst->second,mi->second,av,ar,out,error);}
             }
             if (terminal_call && valid_binding_identifier(trim_copy(text.substr(0, lp)))) {
                 const std::string call_name = trim_copy(text.substr(0, lp));
@@ -2567,11 +2601,12 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                             ++callable_call_depth_;
                             bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(aok){std::vector<std::string> ex;std::vector<bool> eq;for(size_t ai=0;ai<ar.size();++ai){if(!(ai<aq.size()&&aq[ai])&&trim_copy(ar[ai]).rfind("...",0)==0){json::Document sv;if(!eval(trim_copy(ar[ai]).substr(3),sv,depth+1)){--callable_call_depth_;return false;}if(!sv.is_array()){error="spread value must be an array";--callable_call_depth_;return false;}for(const auto& item:sv.array){std::string enc;if(!serialize_value(item,false,enc,error)){--callable_call_depth_;return false;}ex.push_back(enc);eq.push_back(false);}}else{ex.push_back(ar[ai]);eq.push_back(ai<aq.size()&&aq[ai]);}}ar.swap(ex);aq.swap(eq);}if(!aok||(!fn->variadic_param.empty()?ar.size()<fn->params.size():ar.size()!=fn->params.size())){error="lambda argument count mismatch";--callable_call_depth_;return false;}
                             std::vector<json::Document> av;for(size_t ai=0;ai<ar.size();++ai){json::Document v;if(ai<aq.size()&&aq[ai])v=json::Document(ar[ai]);else if(!eval(ar[ai],v,depth+1)){--callable_call_depth_;return false;}av.push_back(std::move(v));}
+                            const auto saved_lambda_env=active_module_env_; if(fn->module_env) active_module_env_=fn->module_env;
                             push_variable_scope();auto& sc=variable_scopes_.back();for(const auto& kv:fn->captures)sc[kv.first]=kv.second;for(size_t ai=0;ai<fn->params.size();++ai){auto sp=std::make_shared<json::Document>(std::move(av[ai]));sc[fn->params[ai]]=VariableBinding{sp,nift_binding_type(*sp),true,false};}if(!fn->variadic_param.empty()){json::Document rest=json::Document::make_array();for(size_t ai=fn->params.size();ai<av.size();++ai)rest.array.push_back(std::move(av[ai]));auto sp=std::make_shared<json::Document>(std::move(rest));sc[fn->variadic_param]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
                             bool okcall=true;
                             if(fn->block){std::string bt=trim_copy(fn->body);const bool rendered=!bt.empty()&&bt.front()=='<';if(rendered){auto nested=parse(fn->body,fn->source_path,1);if(!nested.ok){error=nested.error.message;okcall=false;}else out=json::Document(nested.output);}else{++function_call_depth_;auto nested=execute_native_program(fn->body,fn->source_path,1);--function_call_depth_;if(!nested.ok){error=nested.error.message;okcall=false;}else if(pending_control_.kind==ControlFlow::Return){out=pending_control_.value?*pending_control_.value:json::Document(nullptr);pending_control_={};}else out=json::Document(nullptr);}}
                             else { okcall=eval(fn->body,out,depth+1); if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0) error="lambda body error: "+error; }
-                            pop_variable_scope();--callable_call_depth_;return okcall;
+                            pop_variable_scope();active_module_env_=saved_lambda_env;--callable_call_depth_;return okcall;
                         }
                     }
                 }
@@ -3606,19 +3641,31 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
     for(const auto& name:exports){
         bool collision=false; for(auto it=variable_scopes_.rbegin();it!=variable_scopes_.rend();++it) if(it->count(name)){collision=true;break;}
         if(collision||callables_.count(name)||structs_.count(name)){error="export collides with existing binding: "+name;return false;}
-        auto vi=isolated_scope.find(name); if(vi!=isolated_scope.end()){vars.emplace(name,vi->second);continue;}
+        auto vi=isolated_scope.find(name); if(vi!=isolated_scope.end()){
+            // Exporting a struct instance must also make its type resolvable in
+            // the importer so module-style values such as vips.resize(...) work.
+            if(vi->second.value && vi->second.value->is_string() && vi->second.value->string.rfind("\x1fnift:struct:",0)==0){
+                auto ii=struct_instances_.find(vi->second.value->string.substr(13));
+                if(ii!=struct_instances_.end()){
+                    auto sit=isolated_structs.find(ii->second->type_name);
+                    if(sit!=isolated_structs.end() && !types.count(ii->second->type_name)) types.emplace(ii->second->type_name, sit->second);
+                }
+            }
+            vars.emplace(name,vi->second);continue;
+        }
         auto fi=isolated_callables.find(name); if(fi!=isolated_callables.end()){funcs.emplace(name,fi->second);continue;}
         auto si=isolated_structs.find(name); if(si!=isolated_structs.end()){types.emplace(name,si->second);continue;}
         error="export names no existing binding: "+name;return false;
     }
-    // Exported callables may reference the module's private callables and
-    // top-level bindings. Attach a shared module environment so those
-    // references resolve while the module stays isolated from the importer.
-    if (!funcs.empty()) {
+    // Exported callables and struct methods may reference the module's private
+    // callables and top-level bindings. Attach a shared module environment so
+    // those references resolve while the module stays isolated from the importer.
+    if (!funcs.empty() || !types.empty()) {
         auto module_env = std::make_shared<ModuleEnv>();
         module_env->callables = isolated_callables;
         module_env->vars = isolated_scope;
         for (auto& kv : funcs) kv.second.module_env = module_env;
+        for (auto& kv : types) for (auto& m : kv.second.methods) m.second.callable.module_env = module_env;
     }
     // Install only after the complete export set has validated.
     auto& dst=variable_scopes_.back(); for(auto& kv:vars)dst.emplace(kv.first,std::move(kv.second));
