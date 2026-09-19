@@ -1900,6 +1900,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 auto c=std::make_shared<CommandInstance>();ProcessSpec ps;ps.program=vals.front();ps.args.assign(vals.begin()+1,vals.end());c->stages.push_back(std::move(ps));auto id=std::to_string(next_command_instance_id_++);command_instances_[id]=c;out=json::Document(std::string("\x1fnift:cmd:")+id);return true;
             }
             if(call_args("run",args,q)){
+                if(std::getenv("NIFT_NO_PROCESS")){error="run: external process execution disabled";return false;}
                 if(args.empty()){error="run: expected executable and optional arguments";return false;}
                 std::vector<std::string> vals;
                 for(std::size_t ai=0;ai<args.size();++ai){json::Document v;if(!arg_value(args,q,ai,v))return false;if(v.is_array()){for(const auto& x:v.array){if(!x.is_string()&&!x.is_number()&&!x.is_bool()){error="run: arguments must be scalar";return false;}vals.push_back(render_expression_value(x));}}else if(v.is_string()||v.is_number()||v.is_bool())vals.push_back(render_expression_value(v));else{error="run: arguments must be scalar";return false;}}
