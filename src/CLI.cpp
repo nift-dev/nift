@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdlib>
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
@@ -908,8 +909,19 @@ int run_cli(int argc, char** argv) {
     if (command == "update") { if(argc>3){console::error("update takes at most one package name");return 1;} return package_install_cli(true,argc==3?argv[2]:std::string{}); }
 
     if (command == "eval") return run_eval(argc, argv);
-    if (command == "run") { if(argc!=3){console::error("run requires exactly one script path");return 1;} return run_script_file(argv[2]); }
-    if (command == "sh") { if(argc!=2){console::error("sh takes no arguments");return 1;} return run_script_shell(); }
+    if (command == "run") {
+        std::vector<std::string> rest; bool no_process=false;
+        for (int i = 2; i < argc; ++i) { if (std::string(argv[i]) == "--no-process") no_process=true; else rest.push_back(argv[i]); }
+        if (rest.size()!=1){console::error("run requires exactly one script path");return 1;}
+        if (no_process) ::setenv("NIFT_NO_PROCESS","1",1);
+        return run_script_file(rest[0]);
+    }
+    if (command == "sh") {
+        bool no_process=false;
+        for (int i = 2; i < argc; ++i) { if (std::string(argv[i]) == "--no-process") no_process=true; else { console::error("sh takes no arguments"); return 1; } }
+        if (no_process) ::setenv("NIFT_NO_PROCESS","1",1);
+        return run_script_shell();
+    }
 
     if (command == "minify") {
         bool in_place = false;

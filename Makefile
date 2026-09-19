@@ -444,6 +444,7 @@ test: test-content test-commands test-comments test-contracts test-json \
 	test-init-targets test-init-lock test-control-flow test-template-variables test-cross-feature test-v41-certification test-v42-language test-v42-struct test-v43-language test-config-validation \
 	test-zero-mutation test-repair-campaign test-ownership-concurrency \
 	test-macos-runner-policy \
+	test-v44-execution-shell test-v44-language-foundation test-v44-shell-restricted \
 	test-progress-render $(PROGRESS_PTY_TARGET) test-snap-contract test-distribution-summary test-version-consistency test-unreadable-source test-incremental-modified-immediate
 
 # CP10.2: Embed host-seam failure contract (C++ Engine level).
@@ -952,3 +953,18 @@ test-v44-language-foundation: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp8_structured_wildcards_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp9_map_markup_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp10_filesystem_authority_smoke.sh
+
+# Remaining v4.4 shell/restriction/package surface. Kept as a separate target so
+# the package tests can run with NIFT and the sibling sqlite package injected.
+test-v44-shell-restricted: $(TARGET)
+	NIFT="$(CURDIR)/$(TARGET)" tests/v44_shell_glob.sh
+	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp21_history_smoke.sh
+	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp22_completion_smoke.sh
+	bash tests/v44_cp27_restricted_smoke.sh $(CURDIR)/$(TARGET)
+
+test-v44-packages: $(TARGET)
+	NIFT="$(CURDIR)/$(TARGET)" tests/package_refs_smoke.sh
+	NIFT="$(CURDIR)/$(TARGET)" tests/package_callable_closure_smoke.sh
+	NIFT="$(CURDIR)/$(TARGET)" SQLITE_PACKAGE="$(CURDIR)/../nift-packages/sqlite" tests/package_sqlite_dogfood.sh
+
+test-v44: test-v44-execution-shell test-v44-language-foundation test-v44-shell-restricted test-v44-packages
