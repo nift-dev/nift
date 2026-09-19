@@ -795,6 +795,13 @@ static std::vector<std::string> load_nift_history(){
     std::vector<std::string> h;std::ifstream in(nift_history_path());std::string line;while(std::getline(in,line))if(!line.empty())h.push_back(line);if(h.size()>1000)h.erase(h.begin(),h.end()-1000);return h;
 }
 static void append_nift_history(const std::string& line){if(line.empty())return;std::ofstream out(nift_history_path(),std::ios::app);if(out)out<<line<<'\n';}
+static std::vector<std::string> nift_shell_completions(const std::string& prefix){
+    static const std::vector<std::string> builtins={"build","cat","cd","cp","exists","ls","mkdir","mv","pwd","rm","touch","which"};
+    std::set<std::string> out;for(const auto& b:builtins)if(b.rfind(prefix,0)==0)out.insert(b);
+    if(const char* path=std::getenv("PATH")){std::stringstream ss(path);std::string dir;while(std::getline(ss,dir,':')){std::error_code ec;for(auto it=fs::directory_iterator(dir,ec);!ec&&it!=fs::directory_iterator();it.increment(ec)){auto n=it->path().filename().string();if(n.rfind(prefix,0)==0)out.insert(n);}}}
+    fs::path pp=prefix.empty()?fs::path("."):fs::path(prefix);fs::path parent=pp.has_parent_path()?pp.parent_path():fs::path(".");std::string leaf=pp.filename().string();std::error_code ec;for(auto it=fs::directory_iterator(parent,ec);!ec&&it!=fs::directory_iterator();it.increment(ec)){auto n=it->path().filename().string();if(n.rfind(leaf,0)==0){auto c=(pp.has_parent_path()?parent/fs::path(n):fs::path(n)).generic_string();if(it->is_directory(ec))c+="/";out.insert(c);}}
+    return {out.begin(),out.end()};
+}
 static int run_script_shell() {
     ScriptRenderHost host(fs::current_path()); TrackedInfo info; Parser parser(host,info); std::string pending; auto history=load_nift_history(); (void)history;
     if(const char* home=std::getenv("HOME")){fs::path rc=fs::path(home)/".niftrc";if(filesystem::file_exists(rc)){auto rr=parser.run_statement(filesystem::read_file(rc),rc);if(!rr.ok){console::error("niftrc: "+rr.error.message);return 1;}}}
@@ -821,6 +828,11 @@ int run_cli(int argc, char** argv) {
     const std::string command = argc > 1 ? argv[1] : "";
     if (command.empty()) { print_commands(); return 0; }
 
+    if (command == "complete") {
+        const std::string prefix = argc > 2 ? argv[2] : "";
+        for (const auto& item : nift_shell_completions(prefix)) std::cout << item << '\n';
+        return 0;
+    }
     if (command == "about") {
         print_about();
         return 0;
