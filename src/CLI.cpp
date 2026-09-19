@@ -310,6 +310,12 @@ void print_commands() {
     row("run", "<path>", "Run a native Nift script");
     row("sh", "", "Start the persistent native Nift shell");
 
+    std::cout << '\n' << console::dim("Packages") << '\n';
+    row("add", "<source> [--ref=REF]", "Add a Git, GitHub or local Nift package");
+    row("remove", "<name>", "Remove a package dependency");
+    row("install", "", "Install locked/package manifest dependencies");
+    row("update", "[name]", "Refresh floating package refs and lock commits");
+
     std::cout << '\n' << console::dim("General") << '\n';
     row("init", "[--target=platform] [--ext=.ext] [--handover]", "Create a Nift project");
     row("minify", "[-i|--in-place] <files...>", "Minify to *.min.ext by default; -i overwrites sources");
@@ -317,6 +323,44 @@ void print_commands() {
     row("version", "", "Show version information");
     row("commands", "", "Show this command reference");
 }
+
+
+static fs::path package_manifest_path(){ return fs::current_path()/"manifest.json"; }
+static fs::path package_lock_path(){ return fs::current_path()/".nift"/"packages.lock.json"; }
+static fs::path package_root(){ return fs::current_path()/".nift"/"packages"; }
+static bool package_name_ok(const std::string& n){if(n.empty())return false;for(char c:n)if(!(std::isalnum((unsigned char)c)||c=='-'||c=='_'||c=='.'))return false;return n!="."&&n!="..";}
+static std::string package_basename(std::string src){while(!src.empty()&&src.back()=='/')src.pop_back();auto p=src.find_last_of('/');std::string n=p==std::string::npos?src:src.substr(p+1);if(n.size()>4&&n.substr(n.size()-4)==".git")n.resize(n.size()-4);return n;}
+static std::string package_git_source(const std::string& source){
+    if(source.rfind("github:",0)==0){std::string r=source.substr(7);return "https://github.com/"+r+(r.size()>4&&r.substr(r.size()-4)==".git"?"":".git");}
+    if(source.find("://")!=std::string::npos||source.rfind("git@",0)==0)return source;
+    return source;
+}
+static bool package_validate_manifest(const fs::path& dir,std::string& name,std::string& error){
+    json::Document d;if(!load_json_file(dir/"manifest.json",d,error)||!d.is_object()){if(error.empty())error="missing/invalid manifest.json";return false;}
+    if(!d.has("name")||!d["name"].is_string()||!package_name_ok(d["name"].string)){error="manifest.json requires a valid string name";return false;}name=d["name"].string;
+    if(!d.has("entry")||!d["entry"].is_string()){error="manifest.json requires a string entry";return false;}
+    fs::path entry=(dir/d["entry"].string).lexically_normal();if(!filesystem::file_exists(entry)){error="package entry does not exist: "+d["entry"].string;return false;}return true;
+}
+static json::Document load_or_make_project_manifest(){json::Document d;std::string e;if(filesystem::file_exists(package_manifest_path())&&load_json_file(package_manifest_path(),d,e)&&d.is_object())return d;return json::Document::make_object();}
+static bool package_git(const std::vector<std::string>& args,const fs::path& cwd,ProcessResult& r){ProcessSpec s;s.program="git";s.args=args;s.cwd=cwd;r=nift_run_process(s,true,false);return r.launched&&r.exit_code==0;}
+static bool package_checkout(const std::string& source,const std::string& ref,const fs::path& dest,std::string& commit,std::string& error){
+    std::error_code ec;fs::remove_all(dest,ec);fs::create_directories(dest.parent_path(),ec);ProcessResult r;
+    if(!package_git({"clone","--quiet",package_git_source(source),dest.string()},fs::current_path(),r)){error=r.error.empty()?r.err:r.error;return false;}
+    if(!ref.empty()&&ref!="latest"&&ref!="latest-tag"){if(!package_git({"checkout","--quiet",ref},dest,r)){error=r.err;fs::remove_all(dest,ec);return false;}}
+    if(ref=="latest-tag"){if(!package_git({"tag","--list","v*","--sort=-v:refname"},dest,r)||r.out.empty()){error="no semantic-version-style tag found";fs::remove_all(dest,ec);return false;}std::string tag=r.out.substr(0,r.out.find('\n'));if(!package_git({"checkout","--quiet",tag},dest,r)){error=r.err;fs::remove_all(dest,ec);return false;}}
+    if(!package_git({"rev-parse","HEAD"},dest,r)){error=r.err;return false;}commit=r.out;while(!commit.empty()&&(commit.back()=='\n'||commit.back()=='\r'))commit.pop_back();return true;
+}
+static int package_add_cli(int argc,char**argv){
+    if(argc<3){console::error("add requires a package source");return 1;}std::string source=argv[2],ref="latest";for(int i=3;i<argc;++i){std::string a=argv[i];if(a.rfind("--ref=",0)==0)ref=a.substr(6);else{console::error("unknown add option: "+a);return 1;}}
+    bool local=fs::is_directory(fs::path(source));std::string guess=package_basename(source),name,error,commit;fs::path staged=package_root()/(".staging-"+guess),dest;
+    std::error_code ec;fs::create_directories(package_root(),ec);
+    if(local){fs::path src=fs::absolute(source).lexically_normal();if(!package_validate_manifest(src,name,error)){console::error(error);return 1;}dest=package_root()/name;fs::remove_all(dest,ec);fs::create_directory_symlink(src,dest,ec);if(ec){console::error("cannot link local package: "+ec.message());return 1;}commit="local";}
+    else {if(!package_checkout(source,ref,staged,commit,error)){console::error("package clone failed: "+error);return 1;}if(!package_validate_manifest(staged,name,error)){fs::remove_all(staged,ec);console::error(error);return 1;}dest=package_root()/name;fs::remove_all(dest,ec);fs::rename(staged,dest,ec);if(ec){console::error("cannot install package: "+ec.message());return 1;}}
+    json::Document manifest=load_or_make_project_manifest();if(!manifest.has("dependencies")||!manifest["dependencies"].is_object())manifest["dependencies"]=json::Document::make_object();json::Document spec=json::Document::make_object();spec["source"]=json::Document(source);spec["ref"]=json::Document(local?"local":ref);manifest["dependencies"][name]=spec;if(!save_json_file(package_manifest_path(),manifest)){console::error("cannot write manifest.json");return 1;}
+    fs::create_directories(package_lock_path().parent_path(),ec);json::Document lock;std::string le;if(filesystem::file_exists(package_lock_path())&&load_json_file(package_lock_path(),lock,le)&&lock.is_object()){}else lock=json::Document::make_object();json::Document ent=json::Document::make_object();ent["source"]=json::Document(source);ent["requested"]=json::Document(local?"local":ref);ent["commit"]=json::Document(commit);lock[name]=ent;save_json_file(package_lock_path(),lock);std::cout<<"added "<<name<<" ("<<commit<<")\n";return 0;
+}
+static int package_remove_cli(int argc,char**argv){if(argc!=3){console::error("remove requires one package name");return 1;}std::string n=argv[2];json::Document m=load_or_make_project_manifest();if(m.has("dependencies")&&m["dependencies"].is_object())m["dependencies"].object.erase(std::remove_if(m["dependencies"].object.begin(),m["dependencies"].object.end(),[&](const auto&kv){return kv.first==n;}),m["dependencies"].object.end());save_json_file(package_manifest_path(),m);json::Document l;std::string e;if(load_json_file(package_lock_path(),l,e)&&l.is_object()){l.object.erase(std::remove_if(l.object.begin(),l.object.end(),[&](const auto&kv){return kv.first==n;}),l.object.end());save_json_file(package_lock_path(),l);}std::error_code ec;fs::remove_all(package_root()/n,ec);return 0;}
+static int package_install_cli(bool update,const std::string& only={}){json::Document m;std::string e;if(!load_json_file(package_manifest_path(),m,e)||!m.is_object()||!m.has("dependencies")||!m["dependencies"].is_object()){console::error("manifest.json has no dependencies");return 1;}for(const auto& kv:m["dependencies"].object){const std::string&n=kv.first;if(!only.empty()&&n!=only)continue;if(!kv.second.is_object()||!kv.second.has("source")||!kv.second["source"].is_string()){console::error("invalid dependency: "+n);return 1;}std::string source=kv.second["source"].string,ref=kv.second.has("ref")&&kv.second["ref"].is_string()?kv.second["ref"].string:"latest";if(ref=="local"){std::error_code ec;fs::remove_all(package_root()/n,ec);fs::create_directory_symlink(fs::absolute(source),package_root()/n,ec);if(ec){console::error(ec.message());return 1;}continue;}std::string commit,error;fs::path stage=package_root()/(".staging-"+n);if(!package_checkout(source,ref,stage,commit,error)){console::error(error);return 1;}std::string actual;if(!package_validate_manifest(stage,actual,error)||actual!=n){console::error(error.empty()?"package name mismatch":error);return 1;}std::error_code ec;fs::remove_all(package_root()/n,ec);fs::rename(stage,package_root()/n,ec);json::Document l;std::string le;if(!load_json_file(package_lock_path(),l,le)||!l.is_object())l=json::Document::make_object();json::Document ent=json::Document::make_object();ent["source"]=json::Document(source);ent["requested"]=json::Document(ref);ent["commit"]=json::Document(commit);l[n]=ent;fs::create_directories(package_lock_path().parent_path(),ec);save_json_file(package_lock_path(),l);std::cout<<(update?"updated ":"installed ")<<n<<" ("<<commit<<")\n";}return 0;}
 
 bool has_option(int argc, char** argv, int start, const std::string& option) {
     for (int i = start; i < argc; ++i)
@@ -856,6 +900,11 @@ int run_cli(int argc, char** argv) {
         std::cerr << "  use 'nift init' instead\n";
         return 1;
     }
+
+    if (command == "add") return package_add_cli(argc,argv);
+    if (command == "remove") return package_remove_cli(argc,argv);
+    if (command == "install") return package_install_cli(false);
+    if (command == "update") { if(argc>3){console::error("update takes at most one package name");return 1;} return package_install_cli(true,argc==3?argv[2]:std::string{}); }
 
     if (command == "eval") return run_eval(argc, argv);
     if (command == "run") { if(argc!=3){console::error("run requires exactly one script path");return 1;} return run_script_file(argv[2]); }
