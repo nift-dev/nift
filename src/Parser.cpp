@@ -1,3 +1,4 @@
+#include "JsonFile.h"
 #include "Parser.h"
 #include "FrontMatter.h"
 #include "Console.h"
@@ -3515,7 +3516,13 @@ RenderResult Parser::execute_native_program(const std::string& source, const fs:
 
 bool Parser::execute_import_file(const std::string& argument, const fs::path& caller_path, int depth, std::string& error) {
     fs::path path=argument;
-    if(path.is_relative()) {
+    const bool package_name = argument.find('/') == std::string::npos && argument.find('\\') == std::string::npos && fs::path(argument).extension().empty();
+    if (package_name && standalone_script_host_) {
+        fs::path root = fs::current_path()/".nift"/"packages"/argument;
+        json::Document manifest; std::string me;
+        if (load_json_file(root/"manifest.json", manifest, me) && manifest.is_object() && manifest.has("entry") && manifest["entry"].is_string()) path=root/manifest["entry"].string;
+        else { error="package is not installed or has invalid manifest: "+argument; return false; }
+    } else if(path.is_relative()) {
         if(standalone_script_host_ && caller_path == fs::path("<nift-sh>")) path=fs::current_path()/path;
         fs::path local=caller_path.parent_path()/path;
         if(!caller_path.parent_path().empty() && host_.source_exists(local)) path=local;
