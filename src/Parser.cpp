@@ -2643,8 +2643,10 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 auto ff=inst->second->fields.find(mn);
                 if(ff!=inst->second->fields.end()&&ff->second.value&&ff->second.value->is_string()&&ff->second.value->string.rfind("\x1fnift:callable:",0)==0){
                     // Reconstruct a call that preserves quoted string arguments
-                    // (parse_parameters strips quotes and reports them via qq).
-                    std::string call = "("; bool ok=false; std::vector<bool> qq; auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),ok,&qq); if(!ok){error="malformed arguments";return false;} for(size_t i=0;i<ar.size();++i){if(i)call+=","; if(i<qq.size()&&qq[i])call+="\""+ar[i]+"\""; else call+=ar[i];} call+=")";
+                    // (parse_parameters strips quotes and unescapes; re-escape
+                    // so inner quotes/backslashes/control characters survive).
+                    auto reescape_parameter=[&](const std::string& raw)->std::string{std::string o;o.reserve(raw.size());for(char c:raw){if(c=='\\'){o+="\\\\";}else if(c=='"'){o+="\\\"";}else if(c=='\n'){o+="\\n";}else if(c=='\r'){o+="\\r";}else if(c=='\t'){o+="\\t";}else{o+=c;}}return o;};
+                    std::string call = "("; bool ok=false; std::vector<bool> qq; auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),ok,&qq); if(!ok){error="malformed arguments";return false;} for(size_t i=0;i<ar.size();++i){if(i)call+=","; if(i<qq.size()&&qq[i])call+="\""+reescape_parameter(ar[i])+"\""; else call+=ar[i];} call+=")";
                     json::Document cb=*ff->second.value; push_variable_scope(); auto& sc=variable_scopes_.back(); auto csp=std::make_shared<json::Document>(std::move(cb)); sc["__nift_module_field"]=VariableBinding{csp,nift_binding_type(*csp),false,false};
                     bool r=eval("__nift_module_field"+call,out,depth+1); pop_variable_scope(); return r;
                 }
@@ -4338,8 +4340,10 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     pop_json_scope();
                     if (!nested.ok) break;
                     append_indented(output, nested.output, control_indent, insertion_code_block_depth);
-                    if (pending_control_.kind == ControlFlow::Continue) { pending_control_ = {}; continue; }
-                    if (pending_control_.kind == ControlFlow::Break) { pending_control_ = {}; break; }
+                    // A break/continue/return raised inside an else branch must
+                    // propagate to the enclosing loop/function; do not consume
+                    // it here or the control-flow signal is silently lost.
+                    if (pending_control_.kind != ControlFlow::None) break;
                     selected = true;
                 }
 
