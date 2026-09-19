@@ -785,6 +785,7 @@ static int execute_shell_command(Parser& parser,const std::string& line,bool pri
 
 static int run_script_shell() {
     ScriptRenderHost host(fs::current_path()); TrackedInfo info; Parser parser(host,info); std::string pending;
+    if(const char* home=std::getenv("HOME")){fs::path rc=fs::path(home)/".niftrc";if(filesystem::file_exists(rc)){auto rr=parser.run_statement(filesystem::read_file(rc),rc);if(!rr.ok){console::error("niftrc: "+rr.error.message);return 1;}}}
     while(true){if(pending.empty()){
         std::string shown=fs::current_path().generic_string();
         if(const char* home=std::getenv("HOME")){std::string h=fs::path(home).lexically_normal().generic_string();if(shown==h)shown="~";else if(!h.empty()&&shown.rfind(h+"/",0)==0)shown="~"+shown.substr(h.size());}
