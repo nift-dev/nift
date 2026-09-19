@@ -969,6 +969,8 @@ test-v44-packages: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/package_hardening_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/package_module_export_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" SQLITE_PACKAGE="$(CURDIR)/../nift-packages/sqlite" tests/package_sqlite_dogfood.sh
+	NIFT="$(CURDIR)/$(TARGET)" tests/package_combined_dogfood.sh
+	NIFT="$(CURDIR)/$(TARGET)" tests/package_tools_dogfood.sh
 
 test-v44-automation: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_automation_smoke.sh
