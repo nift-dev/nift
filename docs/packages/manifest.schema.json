@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Nift package manifest",
+  "type": "object",
+  "required": ["name", "version", "entry"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {"type":"string", "pattern":"^[a-z0-9][a-z0-9_-]*$"},
+    "version": {"type":"string", "minLength":1},
+    "entry": {"type":"string", "pattern":"\\.f$"},
+    "dependencies": {"type":"object", "additionalProperties": {"oneOf":[{"type":"string"},{"type":"object"}]}}
+  }
+}
