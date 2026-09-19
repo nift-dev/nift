@@ -1894,6 +1894,11 @@ if(!home)home=std::getenv("USERPROFILE");
 if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p.is_relative())p=(standalone_script_host_?fs::current_path():host_.root())/p;return fs::absolute(p).lexically_normal();};
             auto checked_path=[&](const std::string& name,const std::vector<std::string>& aa,const std::vector<bool>& qq,size_t i,fs::path& p)->bool{std::string raw;if(!string_arg(name,aa,qq,i,raw))return false;p=resolve_path(raw);if(!standalone_script_host_&&!host_.root().empty()&&!filesystem::path_within(fs::absolute(host_.root()).lexically_normal(),p)){error=name+": path must stay inside the Nift project";return false;}return true;};
             std::vector<std::string> args;std::vector<bool> q;
+            if(call_args("cmd",args,q)){
+                if(args.empty()){error="cmd: expected executable and optional arguments";return false;}std::vector<std::string> vals;
+                for(std::size_t ai=0;ai<args.size();++ai){json::Document v;if(!arg_value(args,q,ai,v))return false;if(v.is_array()){for(const auto&x:v.array){if(!(x.is_string()||x.is_number()||x.is_bool())){error="cmd: arguments must be scalar";return false;}vals.push_back(render_expression_value(x));}}else if(v.is_string()||v.is_number()||v.is_bool())vals.push_back(render_expression_value(v));else{error="cmd: arguments must be scalar";return false;}}
+                auto c=std::make_shared<CommandInstance>();ProcessSpec ps;ps.program=vals.front();ps.args.assign(vals.begin()+1,vals.end());c->stages.push_back(std::move(ps));auto id=std::to_string(next_command_instance_id_++);command_instances_[id]=c;out=json::Document(std::string("\x1fnift:cmd:")+id);return true;
+            }
             if(call_args("run",args,q)){
                 if(args.empty()){error="run: expected executable and optional arguments";return false;}
                 std::vector<std::string> vals;
@@ -2049,7 +2054,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     method=="insert"||method=="insert_before"||method=="insert_after"||method=="prepend"||method=="append"||
                     method=="copy"||method=="move"||method=="remove"||method=="cat"||
                     method=="keys"||method=="values"||method=="entries"||method=="has"||method=="get"||method=="merge"||
-                    method=="map"||method=="filter"||method=="reduce"||method=="any"||method=="all"||method=="find"||method=="find_index"||method=="count"||method=="sort_by"||method=="group_by"||method=="unique"||method=="flatten"||method=="sum"||method=="min"||method=="max"||method=="from_entries"||method=="index_by"||method=="pick"||method=="omit"||method=="merge_deep"||method=="partition"||method=="unique_by"||method=="min_by"||method=="max_by"||method=="count_by"||method=="take"||method=="drop"||method=="chunk"||method=="group_by_each";
+                    method=="map"||method=="filter"||method=="reduce"||method=="any"||method=="all"||method=="find"||method=="find_index"||method=="count"||method=="sort_by"||method=="group_by"||method=="unique"||method=="flatten"||method=="sum"||method=="min"||method=="max"||method=="from_entries"||method=="index_by"||method=="pick"||method=="omit"||method=="merge_deep"||method=="partition"||method=="unique_by"||method=="min_by"||method=="max_by"||method=="count_by"||method=="take"||method=="drop"||method=="chunk"||method=="group_by_each"||method=="pipe"||method=="stdin"||method=="stdout"||method=="stderr"||method=="cwd"||method=="env"||method=="run";
                 if (known) {
                     // Fast path: read-only container methods on a pure JSON-path
                     // receiver (e.g. project.files.size()) resolve through the
@@ -2097,6 +2102,15 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         rendered=key.is_string()?key.string:render_expression_value(key);
                         return true;
                     };
+                    if(base.is_string() && base.string.rfind("\x1fnift:cmd:",0)==0) {
+                        auto ci=command_instances_.find(base.string.substr(10));if(ci==command_instances_.end()){error="invalid command";return false;}auto c=ci->second;
+                        auto& aa=args; auto& qq=aq;
+                        auto sval=[&](size_t i,std::string&v){if(i>=aa.size())return false;json::Document d;if(i<qq.size()&&qq[i])d=json::Document(aa[i]);else if(!eval(aa[i],d,depth+1))return false;if(!d.is_string()){error=method+": expected string";return false;}v=d.string;return true;};
+                        if(method=="pipe"){if(aa.size()!=1){error="pipe: expected command";return false;}json::Document d;if(!eval(aa[0],d,depth+1)||!d.is_string()||d.string.rfind("\x1fnift:cmd:",0)!=0){error="pipe: expected cmd(...)";return false;}auto oi=command_instances_.find(d.string.substr(10));if(oi==command_instances_.end()){error="pipe: invalid command";return false;}c->stages.insert(c->stages.end(),oi->second->stages.begin(),oi->second->stages.end());out=base;return true;}
+                        if(method=="stdin"||method=="stdout"||method=="stderr"||method=="cwd"){std::string v;if((aa.size()<1||aa.size()>2)||!sval(0,v))return false;auto&st=(method=="stdin"?c->stages.front():c->stages.back());if(method=="stdin")st.stdin_path=v;else if(method=="stdout"){st.stdout_path=v;if(aa.size()==2){std::string m;if(!sval(1,m))return false;st.append_stdout=m=="append";}}else if(method=="stderr"){st.stderr_path=v;if(aa.size()==2){std::string m;if(!sval(1,m))return false;st.append_stderr=m=="append";}}else for(auto&x:c->stages)x.cwd=v;out=base;return true;}
+                        if(method=="env"){if(aa.size()!=2){error="env: expected name and value";return false;}std::string k,v;if(!sval(0,k)||!sval(1,v))return false;for(auto&x:c->stages)x.env[k]=v;out=base;return true;}
+                        if(method=="run"){if(!aa.empty()){error="run: command method takes no arguments";return false;}auto pr=nift_run_pipeline(c->stages,true,false);out=json::Document::make_object();out["exit_code"]=json::Document((double)pr.exit_code);out["stdout"]=json::Document(pr.out);out["stderr"]=json::Document(pr.err);out["launched"]=json::Document(pr.launched);return true;}
+                    }
                     if(base.is_string() && base.string.rfind("\x1fnift:file:",0)==0) {
                         auto fit=file_instances_.find(base.string.substr(11)); if(fit==file_instances_.end()){error="file: invalid FileValue";return false;} auto f=fit->second;
                         auto can_read=[&](){return f->mode=="r"||f->mode=="rw";}; auto can_write=[&](){return f->mode=="w"||f->mode=="a"||f->mode=="rw";};

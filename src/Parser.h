@@ -8,6 +8,7 @@
 #include <memory>
 #include <unordered_map>
 #include <fstream>
+#include "Process.h"
 
 namespace json { class Document; }
 
@@ -112,6 +113,9 @@ private:
     };
     std::unordered_map<std::string, std::shared_ptr<FileInstance>> file_instances_;
     std::uint64_t next_file_instance_id_ = 1;
+    struct CommandInstance { std::vector<ProcessSpec> stages; };
+    std::unordered_map<std::string, std::shared_ptr<CommandInstance>> command_instances_;
+    std::uint64_t next_command_instance_id_ = 1;
     struct StructField { std::string name; std::string initializer; bool private_member = false; };
     struct StructMethod { Callable callable; bool private_member = false; bool constructor = false; };
     struct StructDefinition { std::string name; std::vector<StructField> fields; std::unordered_map<std::string, StructMethod> methods; };
