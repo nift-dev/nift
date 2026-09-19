@@ -1821,8 +1821,9 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                     if(!pok){error="lambda: malformed parameter list";return false;}
                 } else if (valid_binding_identifier(lhs)) params.push_back(lhs);
                 else { error="lambda: expected identifier or parenthesized parameter list"; return false; }
-                for(auto& p:params){p=trim_copy(p);if(!valid_binding_identifier(p)){error="lambda: invalid parameter";return false;}}
-                auto li=std::make_shared<LambdaInstance>(); li->params=params;
+                std::string variadic_param;
+                for(std::size_t pi=0;pi<params.size();++pi){auto p=trim_copy(params[pi]);if(p.rfind("...",0)==0){if(!variadic_param.empty()||pi+1!=params.size()||!valid_binding_identifier(trim_copy(p.substr(3)))){error="lambda: invalid variadic parameter";return false;}variadic_param=trim_copy(p.substr(3));params.pop_back();break;}if(!valid_binding_identifier(p)){error="lambda: invalid parameter";return false;}params[pi]=p;}
+                auto li=std::make_shared<LambdaInstance>(); li->params=params; li->variadic_param=variadic_param;
                 li->block=rhs.size()>=2&&rhs.front()=='{'&&rhs.back()=='}';
                 li->body=li->block?rhs.substr(1,rhs.size()-2):rhs;
                 for(const auto& scope:variable_scopes_) for(const auto& kv:scope) li->captures[kv.first]=kv.second;
@@ -2462,9 +2463,9 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                             auto li=lambda_instances_.find(tag.substr(22));if(li==lambda_instances_.end()){error="invalid lambda";return false;}auto fn=li->second;
                             if (callable_call_depth_ >= kMaxCallableDepth) { error = "callable recursion depth exceeded"; return false; }
                             ++callable_call_depth_;
-                            bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(!aok||ar.size()!=fn->params.size()){error="lambda argument count mismatch";--callable_call_depth_;return false;}
+                            bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(!aok||(!fn->variadic_param.empty()?ar.size()<fn->params.size():ar.size()!=fn->params.size())){error="lambda argument count mismatch";--callable_call_depth_;return false;}
                             std::vector<json::Document> av;for(size_t ai=0;ai<ar.size();++ai){json::Document v;if(!eval(ar[ai],v,depth+1)){--callable_call_depth_;return false;}av.push_back(std::move(v));}
-                            push_variable_scope();auto& sc=variable_scopes_.back();for(const auto& kv:fn->captures)sc[kv.first]=kv.second;for(size_t ai=0;ai<av.size();++ai){auto sp=std::make_shared<json::Document>(std::move(av[ai]));sc[fn->params[ai]]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
+                            push_variable_scope();auto& sc=variable_scopes_.back();for(const auto& kv:fn->captures)sc[kv.first]=kv.second;for(size_t ai=0;ai<fn->params.size();++ai){auto sp=std::make_shared<json::Document>(std::move(av[ai]));sc[fn->params[ai]]=VariableBinding{sp,nift_binding_type(*sp),true,false};}if(!fn->variadic_param.empty()){json::Document rest=json::Document::make_array();for(size_t ai=fn->params.size();ai<av.size();++ai)rest.array.push_back(std::move(av[ai]));auto sp=std::make_shared<json::Document>(std::move(rest));sc[fn->variadic_param]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
                             bool okcall=true;
                             if(fn->block){++function_call_depth_;auto nested=execute_native_program(fn->body,fn->source_path,1);--function_call_depth_;if(!nested.ok){error=nested.error.message;okcall=false;}else if(pending_control_.kind==ControlFlow::Return){out=pending_control_.value?*pending_control_.value:json::Document(nullptr);pending_control_={};}else out=json::Document(nullptr);}
                             else { okcall=eval(fn->body,out,depth+1); if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0) error="lambda body error: "+error; }
@@ -2474,12 +2475,12 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                 }
                 if (ci != callables_.end()) {
                     if (callable_call_depth_ >= kMaxCallableDepth) { error = "callable recursion depth exceeded: " + call_name; return false; }
-                    bool args_ok=false; std::vector<bool> quoted_args; auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),args_ok,&quoted_args); if(!args_ok||args.size()!=ci->second.params.size()){error="callable argument count mismatch: "+call_name;return false;}
+                    bool args_ok=false; std::vector<bool> quoted_args; auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),args_ok,&quoted_args); if(!args_ok||(!ci->second.variadic_param.empty()?args.size()<ci->second.params.size():args.size()!=ci->second.params.size())){error="callable argument count mismatch: "+call_name;return false;}
                     std::vector<json::Document> values; for(std::size_t ai=0;ai<args.size();++ai){json::Document v;if(ai<quoted_args.size()&&quoted_args[ai])v=json::Document(args[ai]);else if(!eval(args[ai],v,depth+1))return false;values.push_back(std::move(v));}
                     ++callable_call_depth_;
                     const int caller_loop_depth = loop_depth_;
                     loop_depth_ = 0;
-                    push_variable_scope(); auto& scope=variable_scopes_.back(); for(std::size_t ai=0;ai<values.size();++ai){auto sp=std::make_shared<json::Document>(std::move(values[ai]));scope.emplace(ci->second.params[ai],VariableBinding{sp,nift_binding_type_from_text(args[ai],*sp),true,false});}
+                    push_variable_scope(); auto& scope=variable_scopes_.back(); for(std::size_t ai=0;ai<ci->second.params.size();++ai){auto sp=std::make_shared<json::Document>(std::move(values[ai]));scope.emplace(ci->second.params[ai],VariableBinding{sp,nift_binding_type_from_text(args[ai],*sp),true,false});}if(!ci->second.variadic_param.empty()){json::Document rest=json::Document::make_array();for(std::size_t ai=ci->second.params.size();ai<values.size();++ai)rest.array.push_back(std::move(values[ai]));auto sp=std::make_shared<json::Document>(std::move(rest));scope.emplace(ci->second.variadic_param,VariableBinding{sp,nift_binding_type(*sp),true,false});}
                     const bool saved_mutation = last_expression_mutation_;
                     bool call_ok = true; std::string call_error;
                     if (ci->second.fragment) {
@@ -3642,7 +3643,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     if(!valid_binding_identifier(mn)||!pok||mbo>=body.size()||body[mbo]!='{'||!find_balanced(body,mbo,'{','}',mbc)){fail(source_path,source,i,"invalid struct method");struct_ok=false;break;}
                     const bool ctor=mn==struct_name; if(ctor && def.methods.find(struct_name)!=def.methods.end()){fail(source_path,source,i,"struct may define at most one constructor");struct_ok=false;break;}
                     const auto mb=normalize_control_block_body(body.substr(mbo+1,mbc-mbo-1));
-                    def.methods[mn]=StructMethod{Callable{ps,mb.text,source_path,false},priv,ctor}; p=mbc+1; continue;
+                    def.methods[mn]=StructMethod{Callable{ps,"",mb.text,source_path,false},priv,ctor}; p=mbc+1; continue;
                 }
                 std::size_t eol=body.find_first_of("\n;",p); if(eol==std::string::npos)eol=body.size();
                 std::string line=trim_copy(body.substr(p,eol-p)); const auto dp=line.find(":=");
@@ -3663,11 +3664,22 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             const std::string signature = trim_copy(source.substr(open + 1, header_close - open - 1)); const auto lp = signature.find('(');
             if (lp == std::string::npos || signature.back() != ')') { fail(source_path, source, i, "callable signature must be name(args)"); break; }
             const std::string name = trim_copy(signature.substr(0, lp)); bool params_ok=false; auto params=parse_parameters(signature.substr(lp+1, signature.size()-lp-2), params_ok);
+            std::string variadic_param;
+            if(params_ok){
+                for(std::size_t pi=0;pi<params.size();++pi){
+                    std::string p=trim_copy(params[pi]);
+                    if(p.rfind("...",0)==0){
+                        if(!variadic_param.empty()||pi+1!=params.size()||!valid_binding_identifier(trim_copy(p.substr(3)))){params_ok=false;break;}
+                        variadic_param=trim_copy(p.substr(3)); params.pop_back(); break;
+                    }
+                    if(!valid_binding_identifier(p)){params_ok=false;break;} params[pi]=p;
+                }
+            }
             if (!valid_binding_identifier(name) || !params_ok) { fail(source_path, source, i, "invalid callable signature"); break; }
             std::size_t bo=header_close+1; while(bo<source.size()&&std::isspace(static_cast<unsigned char>(source[bo])))++bo; std::size_t bc=0;
             if(bo>=source.size()||source[bo]!='{'||!find_balanced(source,bo,'{','}',bc)){fail(source_path,source,i,"callable definition requires a block");break;}
             const auto def_body = normalize_control_block_body(source.substr(bo+1,bc-bo-1));
-            callables_[name]=Callable{params,def_body.text,source_path,fragment}; i=bc+1; continue;
+            callables_[name]=Callable{params,variadic_param,def_body.text,source_path,fragment}; i=bc+1; continue;
         }
 
         if (source.compare(i, 4, "@:=(") == 0) {
