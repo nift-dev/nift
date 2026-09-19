@@ -1838,7 +1838,13 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                 if(text.rfind(name+"(",0)!=0||text.back()!=')')return false;
                 std::size_t close=0;if(!find_balanced(text,name.size(),'(',')',close)||close!=text.size()-1)return false;
                 bool ok=false;args=parse_parameters(text.substr(name.size()+1,text.size()-name.size()-2),ok,&quoted);
-                if(!ok){error=name+": malformed arguments";}return ok;
+                if(!ok){error=name+": malformed arguments";return false;}
+                std::vector<std::string> expanded; std::vector<bool> expanded_q;
+                for(std::size_t ai=0;ai<args.size();++ai){
+                    if(!(ai<quoted.size()&&quoted[ai])&&trim_copy(args[ai]).rfind("...",0)==0){json::Document sv;if(!eval(trim_copy(args[ai]).substr(3),sv,depth+1))return false;if(!sv.is_array()){error=name+": spread value must be an array";return false;}for(const auto& item:sv.array){std::string encoded;if(!serialize_value(item,false,encoded,error))return false;expanded.push_back(encoded);expanded_q.push_back(false);}}
+                    else {expanded.push_back(args[ai]);expanded_q.push_back(ai<quoted.size()&&quoted[ai]);}
+                }
+                args.swap(expanded);quoted.swap(expanded_q);return true;
             };
             auto arg_value=[&](const std::vector<std::string>& args,const std::vector<bool>& q,size_t i,json::Document& v)->bool{
                 if(i>=args.size())return false;if(i<q.size()&&q[i]){v=json::Document(args[i]);return true;}return eval(args[i],v,depth+1);
@@ -2463,7 +2469,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                             auto li=lambda_instances_.find(tag.substr(22));if(li==lambda_instances_.end()){error="invalid lambda";return false;}auto fn=li->second;
                             if (callable_call_depth_ >= kMaxCallableDepth) { error = "callable recursion depth exceeded"; return false; }
                             ++callable_call_depth_;
-                            bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(!aok||(!fn->variadic_param.empty()?ar.size()<fn->params.size():ar.size()!=fn->params.size())){error="lambda argument count mismatch";--callable_call_depth_;return false;}
+                            bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(aok){std::vector<std::string> ex;std::vector<bool> eq;for(size_t ai=0;ai<ar.size();++ai){if(!(ai<aq.size()&&aq[ai])&&trim_copy(ar[ai]).rfind("...",0)==0){json::Document sv;if(!eval(trim_copy(ar[ai]).substr(3),sv,depth+1)){--callable_call_depth_;return false;}if(!sv.is_array()){error="spread value must be an array";--callable_call_depth_;return false;}for(const auto& item:sv.array){std::string enc;if(!serialize_value(item,false,enc,error)){--callable_call_depth_;return false;}ex.push_back(enc);eq.push_back(false);}}else{ex.push_back(ar[ai]);eq.push_back(ai<aq.size()&&aq[ai]);}}ar.swap(ex);aq.swap(eq);}if(!aok||(!fn->variadic_param.empty()?ar.size()<fn->params.size():ar.size()!=fn->params.size())){error="lambda argument count mismatch";--callable_call_depth_;return false;}
                             std::vector<json::Document> av;for(size_t ai=0;ai<ar.size();++ai){json::Document v;if(ai<aq.size()&&aq[ai])v=json::Document(ar[ai]);else if(!eval(ar[ai],v,depth+1)){--callable_call_depth_;return false;}av.push_back(std::move(v));}
                             push_variable_scope();auto& sc=variable_scopes_.back();for(const auto& kv:fn->captures)sc[kv.first]=kv.second;for(size_t ai=0;ai<fn->params.size();++ai){auto sp=std::make_shared<json::Document>(std::move(av[ai]));sc[fn->params[ai]]=VariableBinding{sp,nift_binding_type(*sp),true,false};}if(!fn->variadic_param.empty()){json::Document rest=json::Document::make_array();for(size_t ai=fn->params.size();ai<av.size();++ai)rest.array.push_back(std::move(av[ai]));auto sp=std::make_shared<json::Document>(std::move(rest));sc[fn->variadic_param]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
                             bool okcall=true;
@@ -2475,7 +2481,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                 }
                 if (ci != callables_.end()) {
                     if (callable_call_depth_ >= kMaxCallableDepth) { error = "callable recursion depth exceeded: " + call_name; return false; }
-                    bool args_ok=false; std::vector<bool> quoted_args; auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),args_ok,&quoted_args); if(!args_ok||(!ci->second.variadic_param.empty()?args.size()<ci->second.params.size():args.size()!=ci->second.params.size())){error="callable argument count mismatch: "+call_name;return false;}
+                    bool args_ok=false; std::vector<bool> quoted_args; auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),args_ok,&quoted_args); if(args_ok){std::vector<std::string> ex;std::vector<bool> eq;for(size_t ai=0;ai<args.size();++ai){if(!(ai<quoted_args.size()&&quoted_args[ai])&&trim_copy(args[ai]).rfind("...",0)==0){json::Document sv;if(!eval(trim_copy(args[ai]).substr(3),sv,depth+1))return false;if(!sv.is_array()){error="spread value must be an array";return false;}for(const auto& item:sv.array){std::string enc;if(!serialize_value(item,false,enc,error))return false;ex.push_back(enc);eq.push_back(false);}}else{ex.push_back(args[ai]);eq.push_back(ai<quoted_args.size()&&quoted_args[ai]);}}args.swap(ex);quoted_args.swap(eq);}if(!args_ok||(!ci->second.variadic_param.empty()?args.size()<ci->second.params.size():args.size()!=ci->second.params.size())){error="callable argument count mismatch: "+call_name;return false;}
                     std::vector<json::Document> values; for(std::size_t ai=0;ai<args.size();++ai){json::Document v;if(ai<quoted_args.size()&&quoted_args[ai])v=json::Document(args[ai]);else if(!eval(args[ai],v,depth+1))return false;values.push_back(std::move(v));}
                     ++callable_call_depth_;
                     const int caller_loop_depth = loop_depth_;
