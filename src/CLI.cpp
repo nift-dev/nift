@@ -734,7 +734,7 @@ static int run_eval(int argc, char** argv) {
 static std::vector<std::string> shell_tokens(const std::string& line) {
     std::vector<std::string> out; std::string cur; bool sq=false,dq=false,esc=false;
     auto flush=[&](){if(!cur.empty()){out.push_back(cur);cur.clear();}};
-    for(size_t i=0;i<line.size();++i){char c=line[i];if(esc){cur+=c;esc=false;continue;}if(c=='\\'&&!sq){esc=true;continue;}if(c=='\''&&!dq){sq=!sq;continue;}if(c=='"'&&!sq){dq=!dq;continue;}if(!sq&&!dq){std::string op;if(i+3<=line.size()&&line.substr(i,4)=="2>&1")op="2>&1";else if(i+1<line.size()&&(line.substr(i,2)=="&&"||line.substr(i,2)=="||"||line.substr(i,2)==">>"||line.substr(i,2)=="2>"))op=line.substr(i,2);else if(c=='|'||c=='<'||c=='>'||c=='&'){if(cur=="2"){if(i+3<=line.size()&&line.substr(i,4)==">&1")op="2>&1";else if(i+1<line.size()&&line.substr(i,2)==">>")op="2>>";else if(c=='>')op="2>";}if(op.empty())op=std::string(1,c);}if(!op.empty()){flush();out.push_back(op);i+=op.size()-1;continue;}if(std::isspace((unsigned char)c)){flush();continue;}}cur+=c;}flush();return out;
+    for(size_t i=0;i<line.size();++i){char c=line[i];if(esc){cur+=c;esc=false;continue;}if(c=='\\'&&!sq){esc=true;continue;}if(c=='\''&&!dq){sq=!sq;continue;}if(c=='"'&&!sq){dq=!dq;continue;}if(!sq&&!dq){std::string op;if(i+3<=line.size()&&line.substr(i,4)=="2>&1")op="2>&1";else if(i+1<line.size()&&(line.substr(i,2)=="&&"||line.substr(i,2)=="||"||line.substr(i,2)==">>"||line.substr(i,2)=="2>"))op=line.substr(i,2);else if(c=='|'||c=='<'||c=='>'||c=='&'||c==';'){if(cur=="2"){if(i+3<=line.size()&&line.substr(i,4)==">&1")op="2>&1";else if(i+1<line.size()&&line.substr(i,2)==">>")op="2>>";else if(c=='>')op="2>";}if(op.empty())op=std::string(1,c);}if(!op.empty()){flush();out.push_back(op);i+=op.size()-1;continue;}if(std::isspace((unsigned char)c)){flush();continue;}}cur+=c;}flush();return out;
 }
 static std::string quote_nift_string(const std::string& x){std::string r="\"";for(char c:x){if(c=='\\'||c=='\"')r+='\\';r+=c;}return r+'"';}
 static bool shell_glob_expand(const std::string& token,std::vector<std::string>& out){
@@ -744,14 +744,33 @@ static bool shell_glob_expand(const std::string& token,std::vector<std::string>&
     out.push_back(token);return true;
 #endif
 }
+// Interpolate $[expr] inside a command token using the live parser. Returns
+    // false and sets error on an unterminated bracket or evaluation failure.
+    static const auto command_token_interpolate = [](Parser& p, std::string& token, std::string& err) -> bool {
+        std::size_t i = 0;
+        while ((i = token.find("$[", i)) != std::string::npos) {
+            const std::size_t close = token.find(']', i + 2);
+            if (close == std::string::npos) { err = "unterminated $[...] in command argument: " + token; return false; }
+            const std::string expr = token.substr(i + 2, close - i - 2);
+            json::Document v; std::string ee;
+            if (!p.eval_expression(expr, v, ee)) { err = "command interpolation failed: $[" + expr + "]: " + ee; return false; }
+            const std::string rendered = p.render_expression_value(v);
+            token.replace(i, close - i + 1, rendered);
+            i += rendered.size();
+        }
+        return true;
+    };
+    static const auto is_command_operator = [](const std::string& t){ return t=="|"||t=="<"||t==">"||t==">>"||t=="2>"||t=="2>&1"||t=="&&"||t=="||"||t==";"||t=="&"; };
 static int execute_shell_command(Parser& parser,const std::string& line,bool print_errors=true){auto toks=shell_tokens(line);if(toks.empty())return 0;
+    // $[...] interpolation in command arguments (all non-operator tokens).
+    for(auto& t : toks) { if (is_command_operator(t)) continue; std::string ie; if(!command_token_interpolate(parser, t, ie)){ if(print_errors) console::error(ie); return 2; } }
     // First try a command-style Nift callable for a simple command. Literal command tokens become strings.
-    bool has_ops=false;for(const auto&t:toks)if(t=="|"||t=="<"||t==">"||t==">>"||t=="2>"||t=="2>&1"||t=="&&"||t=="||"||t=="&")has_ops=true;
+    bool has_ops=false;for(const auto&t:toks)if(is_command_operator(t))has_ops=true;
     if(!has_ops){std::string expr=toks[0]+"(";for(size_t i=1;i<toks.size();++i){if(i>1)expr+=",";expr+=quote_nift_string(toks[i]);}expr+=")";auto rr=parser.run_statement(expr,"<nift-sh>");if(rr.ok){if(!rr.output.empty())std::cout<<rr.output<<'\n';return 0;}}
     // Bash-like command chain. &&/|| are evaluated left-to-right over pipeline exit status.
     if(std::getenv("NIFT_NO_PROCESS")){if(print_errors)console::error("external process execution disabled");return 126;}
     size_t pos=0;int last=0;std::string pending_op;
-    while(pos<toks.size()){size_t end=pos;while(end<toks.size()&&toks[end]!="&&"&&toks[end]!="||")++end;bool should=pending_op.empty()||(pending_op=="&&"?last==0:last!=0);if(should){std::vector<ProcessSpec> stages(1);size_t si=0;bool expect_in=false,expect_out=false,expect_err=false;for(size_t i=pos;i<end;++i){const std::string&t=toks[i];if(t=="|"){stages.emplace_back();++si;continue;}if(t=="<"){expect_in=true;continue;}if(t==">"||t==">>"){expect_out=true;stages[si].append_stdout=t==">>";continue;}if(t=="2>"){expect_err=true;continue;}if(t=="2>&1"){stages[si].merge_stderr=true;continue;}if(t=="&"){if(print_errors)console::error("background job control is not implemented; use structured process APIs or omit &");return 2;}if(expect_in){stages[si].stdin_path=t;expect_in=false;continue;}if(expect_out){stages[si].stdout_path=t;expect_out=false;continue;}if(expect_err){stages[si].stderr_path=t;expect_err=false;continue;}if(stages[si].program.empty()){auto eq=t.find('=');if(eq!=std::string::npos&&eq>0){stages[si].env[t.substr(0,eq)]=t.substr(eq+1);continue;}stages[si].program=t;}else{std::vector<std::string> ex;shell_glob_expand(t,ex);stages[si].args.insert(stages[si].args.end(),ex.begin(),ex.end());}}
+    while(pos<toks.size()){size_t end=pos;while(end<toks.size()&&toks[end]!="&&"&&toks[end]!="||"&&toks[end]!=";")++end;bool should=pending_op.empty()||(pending_op=="&&"?last==0:last!=0)||pending_op==";";if(should){std::vector<ProcessSpec> stages(1);size_t si=0;bool expect_in=false,expect_out=false,expect_err=false;for(size_t i=pos;i<end;++i){const std::string&t=toks[i];if(t=="|"){stages.emplace_back();++si;continue;}if(t=="<"){expect_in=true;continue;}if(t==">"||t==">>"){expect_out=true;stages[si].append_stdout=t==">>";continue;}if(t=="2>"){expect_err=true;continue;}if(t=="2>&1"){stages[si].merge_stderr=true;continue;}if(t=="&"){if(print_errors)console::error("background job control is not implemented; use structured process APIs or omit &");return 2;}if(expect_in){stages[si].stdin_path=t;expect_in=false;continue;}if(expect_out){stages[si].stdout_path=t;expect_out=false;continue;}if(expect_err){stages[si].stderr_path=t;expect_err=false;continue;}if(stages[si].program.empty()){auto eq=t.find('=');if(eq!=std::string::npos&&eq>0){stages[si].env[t.substr(0,eq)]=t.substr(eq+1);continue;}stages[si].program=t;}else{std::vector<std::string> ex;shell_glob_expand(t,ex);stages[si].args.insert(stages[si].args.end(),ex.begin(),ex.end());}}
         for(auto&st:stages)if(st.program.empty()){if(print_errors)console::error("empty command in pipeline");return 2;}auto pr=nift_run_pipeline(stages,true,true);last=pr.exit_code;if(!pr.error.empty()&&print_errors)console::error(pr.error);
     }pending_op=end<toks.size()?toks[end]:"";pos=end+1;}return last;}
 

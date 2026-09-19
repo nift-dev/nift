@@ -48,6 +48,9 @@ public:
     // Shared single-expression host used by `nift eval`; identical evaluator to templates/scripts.
     bool eval_expression(const std::string& expression, json::Document& value, std::string& error);
 
+    // Render a scalar/string value for output or command arguments.
+    std::string render_expression_value(const json::Document& value) const;
+
     // Shared template+page composition: parse template_source, let @content
     // pull page_source, and (when require_exactly_one_content) enforce the
     // exactly-one-@content rule. The CLI's render() and the embedded Engine
@@ -176,7 +179,6 @@ private:
     bool evaluate_expression(const std::string& expression, json::Document& value, std::string& error);
     bool evaluate_collection_value(const std::string& expression, json::Document& value, std::string& error);
     bool evaluate_condition(const std::string& expression, bool& value, std::string& error);
-    std::string render_expression_value(const json::Document& value) const;
     bool serialize_value(const json::Document& value, bool pretty, std::string& output, std::string& error, int depth = 0) const;
     bool resolve_pagination_value(const std::string& expression, std::shared_ptr<const json::Document>& value) const;
     std::string path_to_page(std::size_t page);
