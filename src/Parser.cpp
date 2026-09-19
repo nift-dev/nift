@@ -2560,26 +2560,34 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         }
                     }
                 }
-                if (ci != callables_.end()) {
+                // A callable exported from an @import module may reference the module's
+                // private callables and top-level bindings. Resolve through the active
+                // module environment when the name is not locally defined; local
+                // callables and indirect callable bindings take precedence.
+                const Callable* callee = (ci != callables_.end()) ? &ci->second : nullptr;
+                if (!callee && active_module_env_) { auto mit=active_module_env_->callables.find(call_name); if (mit!=active_module_env_->callables.end()) callee=&mit->second; }
+                if (callee) {
                     if (callable_call_depth_ >= kMaxCallableDepth) { error = "callable recursion depth exceeded: " + call_name; return false; }
-                    bool args_ok=false; std::vector<bool> quoted_args; auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),args_ok,&quoted_args); if(args_ok){std::vector<std::string> ex;std::vector<bool> eq;for(size_t ai=0;ai<args.size();++ai){if(!(ai<quoted_args.size()&&quoted_args[ai])&&trim_copy(args[ai]).rfind("...",0)==0){json::Document sv;if(!eval(trim_copy(args[ai]).substr(3),sv,depth+1))return false;if(!sv.is_array()){error="spread value must be an array";return false;}for(const auto& item:sv.array){std::string enc;if(!serialize_value(item,false,enc,error))return false;ex.push_back(enc);eq.push_back(false);}}else{ex.push_back(args[ai]);eq.push_back(ai<quoted_args.size()&&quoted_args[ai]);}}args.swap(ex);quoted_args.swap(eq);}if(!args_ok||(!ci->second.variadic_param.empty()?args.size()<ci->second.params.size():args.size()!=ci->second.params.size())){error="callable argument count mismatch: "+call_name;return false;}
+                    bool args_ok=false; std::vector<bool> quoted_args; auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),args_ok,&quoted_args); if(args_ok){std::vector<std::string> ex;std::vector<bool> eq;for(size_t ai=0;ai<args.size();++ai){if(!(ai<quoted_args.size()&&quoted_args[ai])&&trim_copy(args[ai]).rfind("...",0)==0){json::Document sv;if(!eval(trim_copy(args[ai]).substr(3),sv,depth+1))return false;if(!sv.is_array()){error="spread value must be an array";return false;}for(const auto& item:sv.array){std::string enc;if(!serialize_value(item,false,enc,error))return false;ex.push_back(enc);eq.push_back(false);}}else{ex.push_back(args[ai]);eq.push_back(ai<quoted_args.size()&&quoted_args[ai]);}}args.swap(ex);quoted_args.swap(eq);}if(!args_ok||(!callee->variadic_param.empty()?args.size()<callee->params.size():args.size()!=callee->params.size())){error="callable argument count mismatch: "+call_name;return false;}
                     std::vector<json::Document> values; for(std::size_t ai=0;ai<args.size();++ai){json::Document v;if(ai<quoted_args.size()&&quoted_args[ai])v=json::Document(args[ai]);else if(!eval(args[ai],v,depth+1))return false;values.push_back(std::move(v));}
                     ++callable_call_depth_;
                     const int caller_loop_depth = loop_depth_;
                     loop_depth_ = 0;
-                    push_variable_scope(); auto& scope=variable_scopes_.back(); for(std::size_t ai=0;ai<ci->second.params.size();++ai){auto sp=std::make_shared<json::Document>(std::move(values[ai]));scope.emplace(ci->second.params[ai],VariableBinding{sp,nift_binding_type_from_text(args[ai],*sp),true,false});}if(!ci->second.variadic_param.empty()){json::Document rest=json::Document::make_array();for(std::size_t ai=ci->second.params.size();ai<values.size();++ai)rest.array.push_back(std::move(values[ai]));auto sp=std::make_shared<json::Document>(std::move(rest));scope.emplace(ci->second.variadic_param,VariableBinding{sp,nift_binding_type(*sp),true,false});}
+                    const auto saved_env = active_module_env_;
+                    if (callee->module_env) active_module_env_ = callee->module_env;
+                    push_variable_scope(); auto& scope=variable_scopes_.back(); if(active_module_env_){for(const auto& kv:active_module_env_->vars){if(!scope.count(kv.first))scope[kv.first]=kv.second;}} for(std::size_t ai=0;ai<callee->params.size();++ai){auto sp=std::make_shared<json::Document>(std::move(values[ai]));scope.emplace(callee->params[ai],VariableBinding{sp,nift_binding_type_from_text(args[ai],*sp),true,false});}if(!callee->variadic_param.empty()){json::Document rest=json::Document::make_array();for(std::size_t ai=callee->params.size();ai<values.size();++ai)rest.array.push_back(std::move(values[ai]));auto sp=std::make_shared<json::Document>(std::move(rest));scope.emplace(callee->variadic_param,VariableBinding{sp,nift_binding_type(*sp),true,false});}
                     const bool saved_mutation = last_expression_mutation_;
                     bool call_ok = true; std::string call_error;
-                    if (ci->second.fragment) {
+                    if (callee->fragment) {
                         const bool saved_fragment = in_fragment_body_; in_fragment_body_ = true;
-                        auto nested = parse(ci->second.body, ci->second.source_path, 1);
+                        auto nested = parse(callee->body, callee->source_path, 1);
                         in_fragment_body_ = saved_fragment;
                         if (!nested.ok) { call_ok = false; call_error = nested.error.message; }
                         else { out = json::Document(nested.output); if (pending_control_.kind == ControlFlow::Return) pending_control_ = {}; }
                     } else {
                         ++function_call_depth_;
                         if (pending_control_.kind != ControlFlow::None) { pending_control_ = {}; }
-                        auto body_result = execute_native_program(ci->second.body, ci->second.source_path, 1);
+                        auto body_result = execute_native_program(callee->body, callee->source_path, 1);
                         --function_call_depth_;
                         if (!body_result.ok) { call_ok = false; call_error = body_result.error.message; }
                         else if (pending_control_.kind == ControlFlow::None) { out = json::Document(nullptr); }
@@ -2587,6 +2595,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     }
                     last_expression_mutation_ = saved_mutation;
                     pop_variable_scope();
+                    active_module_env_ = saved_env;
                     loop_depth_ = caller_loop_depth;
                     --callable_call_depth_;
                     if (!call_ok) { error = call_error; return false; }
@@ -2626,8 +2635,9 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
         if (text.rfind("inject(", 0) == 0 && text.back() == ')') {
             std::string arg = trim_copy(text.substr(7, text.size() - 8));
             if (arg.size() >= 2 && ((arg.front() == '"' && arg.back() == '"') || (arg.front() == '\'' && arg.back() == '\''))) arg = arg.substr(1, arg.size() - 2);
+            else { json::Document av; if (!eval(arg, av, depth + 1) || !av.is_string()) { error = "inject: expected string path"; return false; } arg = av.string; }
             fs::path path = fs::absolute(host_.root() / arg).lexically_normal();
-            if (!filesystem::path_within(fs::absolute(host_.root()).lexically_normal(), path)) { error = "inject: path must stay inside the Nift project"; return false; }
+            if (!standalone_script_host_ && !host_.root().empty() && !filesystem::path_within(fs::absolute(host_.root()).lexically_normal(), path)) { error = "inject: path must stay inside the Nift project"; return false; }
             if (std::find(input_stack_.begin(), input_stack_.end(), path) != input_stack_.end()) { error = "inject: source cycle through " + path.generic_string(); return false; }
             auto injected = filesystem::read_file_checked(path); if (!injected) { error = "inject: source is not readable"; return false; }
             result_.dependencies.insert(host_.relative(path)); input_stack_.push_back(path); push_variable_scope();
@@ -2691,8 +2701,12 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
         // Declarations/assignments must be parsed before direct JSON-path lookup;
         // structured RHS values can otherwise make the whole mutation look like an object expression.
         const bool whole_quoted=text.size()>=2&&((text.front()=='"'&&text.back()=='"')||(text.front()=='\''&&text.back()=='\''));
-        const bool mutation_candidate = !whole_quoted && (text.find(":=") != std::string::npos ||
-            (text.find('=') != std::string::npos && text.find("==") == std::string::npos && text.find("!=") == std::string::npos && text.find("<=") == std::string::npos && text.find(">=") == std::string::npos && text.find("=>") == std::string::npos));
+        // Assignment operators only count at bracket/paren/quote depth zero; a
+        // `=`/`:=` inside a quoted argument (e.g. a SQL string) must not turn a
+        // postfix-composition expression such as fn("a = b").member into a
+        // mutation candidate.
+        auto top_level_assignment=[&](const std::string& s)->bool{bool q1=false,q2=false,esc=false;int par=0,br=0,bc=0;for(size_t i=0;i<s.size();++i){char c=s[i];if(esc){esc=false;continue;}if(c=='\\'&&(q1||q2)){esc=true;continue;}if(c=='\''&&!q2){q1=!q1;continue;}if(c=='"'&&!q1){q2=!q2;continue;}if(q1||q2)continue;if(c=='(')++par;else if(c==')')--par;else if(c=='[')++br;else if(c==']')--br;else if(c=='{')++bc;else if(c=='}')--bc;else if(c==':'&&i+1<s.size()&&s[i+1]=='='&&par==0&&br==0&&bc==0)return true;else if(c=='='&&par==0&&br==0&&bc==0){if(i+1<s.size()&&(s[i+1]=='='||s[i+1]=='>')){++i;continue;}if(i>0&&(s[i-1]=='!'||s[i-1]=='<'||s[i-1]=='>'))continue;return true;}}return false;};
+        const bool mutation_candidate = !whole_quoted && top_level_assignment(text);
         if (!mutation_candidate) {
             // General postfix composition: any value-producing expression can
             // feed the next postfix operator. final_postfix already chains
@@ -3556,6 +3570,15 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
         auto fi=isolated_callables.find(name); if(fi!=isolated_callables.end()){funcs.emplace(name,fi->second);continue;}
         auto si=isolated_structs.find(name); if(si!=isolated_structs.end()){types.emplace(name,si->second);continue;}
         error="export names no existing binding: "+name;return false;
+    }
+    // Exported callables may reference the module's private callables and
+    // top-level bindings. Attach a shared module environment so those
+    // references resolve while the module stays isolated from the importer.
+    if (!funcs.empty()) {
+        auto module_env = std::make_shared<ModuleEnv>();
+        module_env->callables = isolated_callables;
+        module_env->vars = isolated_scope;
+        for (auto& kv : funcs) kv.second.module_env = module_env;
     }
     // Install only after the complete export set has validated.
     auto& dst=variable_scopes_.back(); for(auto& kv:vars)dst.emplace(kv.first,std::move(kv.second));
