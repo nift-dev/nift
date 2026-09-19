@@ -2184,8 +2184,9 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                             std::vector<std::string> wanted;
                             for(const auto& k:keys.array){if(!k.is_string()){error=method+": keys must be strings";return false;}if(std::find(wanted.begin(),wanted.end(),k.string)==wanted.end())wanted.push_back(k.string);}
                             json::Document result=json::Document::make_object();
-                            if(method=="pick"){for(const auto& k:wanted){auto it=std::find_if(base.object.begin(),base.object.end(),[&](const auto& kv){return kv.first==k;});if(it!=base.object.end())result[it->first]=it->second;}}
-                            else {for(const auto& kv:base.object)if(std::find(wanted.begin(),wanted.end(),kv.first)==wanted.end())result[kv.first]=kv.second;}
+                            auto wanted_key=[&](const std::string& key){for(const auto& pat:wanted){if(nift_glob_has_magic(pat)?nift_glob_component_match(pat,key):pat==key)return true;}return false;};
+                            if(method=="pick"){for(const auto& kv:base.object)if(wanted_key(kv.first))result[kv.first]=kv.second;}
+                            else {for(const auto& kv:base.object)if(!wanted_key(kv.first))result[kv.first]=kv.second;}
                             out=std::move(result);return true;
                         }
                         if(method=="has"||method=="get") {
