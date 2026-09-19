@@ -47,6 +47,14 @@
 namespace fs = std::filesystem;
 
 namespace {
+// Portable environment assignment (Windows has no setenv()).
+void nift_setenv(const char* name, const char* value, int /*overwrite*/) {
+#ifdef _WIN32
+    _putenv_s(name, value);
+#else
+    ::setenv(name, value, 1);
+#endif
+}
 constexpr const char* version_text = "Nift v4.3.0";
 constexpr auto build_auto_poll_interval = std::chrono::milliseconds(200);
 constexpr const char* build_auto_log_path = ".nift/build-auto.log";
@@ -948,7 +956,7 @@ int run_cli(int argc, char** argv) {
     if (command == "update") { if(argc>3){console::error("update takes at most one package name");return 1;} return package_install_cli(true,argc==3?argv[2]:std::string{}); }
 
     if (command == "eval") {
-        for (int i = 2; i < argc; ++i) if (std::string(argv[i]) == "--no-process") ::setenv("NIFT_NO_PROCESS", "1", 1);
+        for (int i = 2; i < argc; ++i) if (std::string(argv[i]) == "--no-process") nift_setenv("NIFT_NO_PROCESS", "1", 1);
         return run_eval(argc, argv);
     }
     if (command == "run") {
@@ -956,11 +964,11 @@ int run_cli(int argc, char** argv) {
         for (int i = 2; i < argc; ++i) {
             const std::string a = argv[i];
             if (a == "--no-process") no_process=true;
-            else if (a.rfind("--fs-root=", 0) == 0) ::setenv("NIFT_FS_ROOT", a.substr(10).c_str(), 1);
+            else if (a.rfind("--fs-root=", 0) == 0) nift_setenv("NIFT_FS_ROOT", a.substr(10).c_str(), 1);
             else rest.push_back(a);
         }
         if (rest.size()!=1){console::error("run requires exactly one script path");return 1;}
-        if (no_process) ::setenv("NIFT_NO_PROCESS","1",1);
+        if (no_process) nift_setenv("NIFT_NO_PROCESS","1",1);
         return run_script_file(rest[0]);
     }
     if (command == "sh") {
@@ -968,10 +976,10 @@ int run_cli(int argc, char** argv) {
         for (int i = 2; i < argc; ++i) {
             const std::string a = argv[i];
             if (a == "--no-process") no_process=true;
-            else if (a.rfind("--fs-root=", 0) == 0) ::setenv("NIFT_FS_ROOT", a.substr(10).c_str(), 1);
+            else if (a.rfind("--fs-root=", 0) == 0) nift_setenv("NIFT_FS_ROOT", a.substr(10).c_str(), 1);
             else { console::error("sh takes no arguments"); return 1; }
         }
-        if (no_process) ::setenv("NIFT_NO_PROCESS","1",1);
+        if (no_process) nift_setenv("NIFT_NO_PROCESS","1",1);
         return run_script_shell();
     }
 
@@ -1092,7 +1100,7 @@ int run_cli(int argc, char** argv) {
             else if (!arg.empty() && arg[0] == '-') { console::error("unknown build option '" + arg + "'"); return 1; }
             else names.emplace_back(arg);
         }
-        if (no_process) ::setenv("NIFT_NO_PROCESS", "1", 1);
+        if (no_process) nift_setenv("NIFT_NO_PROCESS", "1", 1);
         if (mode_flags > 1 || (mode_flags == 1 && !names.empty())) {
             console::error("build modes are mutually exclusive");
             return 1;

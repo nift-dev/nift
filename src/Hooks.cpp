@@ -28,10 +28,17 @@ bool run_hook_script(const fs::path& root, const std::string& hook_path,
     if (!filesystem::path_exists(p)) { error = "build hook script does not exist: " + p.generic_string(); return false; }
 
     // Structured hook context via the process environment.
+#ifdef _WIN32
+    _putenv_s("NIFT_HOOK_PHASE", phase.c_str());
+    _putenv_s("NIFT_HOOK_MODE", mode.c_str());
+    if (target.empty()) _putenv_s("NIFT_HOOK_TARGET", "");
+    else _putenv_s("NIFT_HOOK_TARGET", target.c_str());
+#else
     ::setenv("NIFT_HOOK_PHASE", phase.c_str(), 1);
     ::setenv("NIFT_HOOK_MODE", mode.c_str(), 1);
     if (target.empty()) ::unsetenv("NIFT_HOOK_TARGET");
     else ::setenv("NIFT_HOOK_TARGET", target.c_str(), 1);
+#endif
 
     ScriptRenderHost host(root);
     TrackedInfo info;
