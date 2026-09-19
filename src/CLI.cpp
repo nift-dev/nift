@@ -28,6 +28,10 @@
 #include <optional>
 #include <set>
 #include <sstream>
+#ifndef _WIN32
+#include <termios.h>
+#include <unistd.h>
+#endif
 #include <thread>
 
 #if defined(_WIN32)
@@ -849,14 +853,130 @@ static std::vector<std::string> nift_shell_completions(const std::string& prefix
     fs::path pp=prefix.empty()?fs::path("."):fs::path(prefix);fs::path parent=pp.has_parent_path()?pp.parent_path():fs::path(".");std::string leaf=pp.filename().string();std::error_code ec;for(auto it=fs::directory_iterator(parent,ec);!ec&&it!=fs::directory_iterator();it.increment(ec)){auto n=it->path().filename().string();if(n.rfind(leaf,0)==0){auto c=(pp.has_parent_path()?parent/fs::path(n):fs::path(n)).generic_string();if(it->is_directory(ec))c+="/";out.insert(c);}}
     return {out.begin(),out.end()};
 }
+#ifndef _WIN32
+namespace {
+std::string shell_prompt_text(bool continuation) {
+    if (continuation) return "... ";
+    std::string shown = fs::current_path().generic_string();
+    if (const char* home = std::getenv("HOME")) {
+        std::string h = fs::path(home).lexically_normal().generic_string();
+        if (shown == h) shown = "~";
+        else if (!h.empty() && shown.rfind(h + "/", 0) == 0) shown = "~" + shown.substr(h.size());
+    }
+    return console::paint(shown, "1;32", console::stdout_colour_enabled()) + "$ ";
+}
+std::string quote_for_shell_arg(const std::string& s) {
+    if (s.find_first_of(" \t\"'$`\\") == std::string::npos) return s;
+    std::string r = "'";
+    for (char c : s) { if (c == '\'') r += "'\\''"; else r += c; }
+    return r + "'";
+}
+// Union of the static shell completions (builtins/PATH/files) and the live
+// parser context (user/imported callables, structs, variable bindings).
+std::vector<std::string> full_shell_completions(const Parser& parser, const std::string& prefix) {
+    std::set<std::string> out;
+    for (auto& c : nift_shell_completions(prefix)) out.insert(c);
+    for (auto& c : parser.shell_completions(prefix)) out.insert(c);
+    return {out.begin(), out.end()};
+}
+// Command-style candidates only (builtins + PATH executables + parser names),
+// used for the leading token so plain cwd files do not crowd command TABs.
+std::vector<std::string> command_completions(const Parser& parser, const std::string& prefix) {
+    std::set<std::string> out;
+    for (auto& c : parser.shell_completions(prefix)) out.insert(c);
+    for (const std::string& b : {"build","cat","cd","cmd","copy","cp","exists","file","getenv","ls","make_dir","max","min","mkdir","move","mv","open","page","pwd","remove","rm","run","setenv","touch","unsetenv","which"})
+        if (b.rfind(prefix, 0) == 0) out.insert(b);
+    if (const char* path = std::getenv("PATH")) {
+        std::stringstream ss(path); std::string dir;
+        while (std::getline(ss, dir, ':')) { std::error_code ec;
+            for (auto it = fs::directory_iterator(dir, ec); !ec && it != fs::directory_iterator(); it.increment(ec)) { auto n = it->path().filename().string(); if (n.rfind(prefix, 0) == 0) out.insert(n); } }
+    }
+    return {out.begin(), out.end()};
+}
+void complete_token(Parser& parser, std::string& buf, size_t& cursor) {
+    if (cursor == 0) return;
+    size_t start = cursor;
+    while (start > 0 && buf[start-1] != ' ' && buf[start-1] != '\t' && buf[start-1] != '(' && buf[start-1] != ',') --start;
+    const bool leading = (start == 0);
+    std::string prefix = buf.substr(start, cursor - start);
+    // Strip a leading quote from the token prefix.
+    size_t tok = start;
+    if (!prefix.empty() && (prefix[0] == '"' || prefix[0] == '\'')) { tok = start + 1; prefix = buf.substr(tok, cursor - tok); }
+    const bool pathish = prefix.find('/') != std::string::npos || prefix.rfind("./", 0) == 0 || prefix.rfind("~/", 0) == 0 || prefix.rfind(".", 0) == 0;
+    std::vector<std::string> cands;
+    if (leading && !pathish) cands = command_completions(parser, prefix);
+    if (cands.empty()) cands = full_shell_completions(parser, prefix);
+    if (cands.empty()) return;
+    std::sort(cands.begin(), cands.end());
+    cands.erase(std::unique(cands.begin(), cands.end()), cands.end());
+    if (cands.size() == 1) {
+        std::string ins = quote_for_shell_arg(cands[0]);
+        buf.replace(tok, cursor - tok, ins);
+        cursor = tok + ins.size();
+        return;
+    }
+    std::string common = cands[0];
+    for (size_t i = 1; i < cands.size(); ++i) { size_t k = 0; while (k < common.size() && k < cands[i].size() && common[k] == cands[i][k]) ++k; common.resize(k); }
+    if (common.size() > prefix.size()) { buf.replace(tok, cursor - tok, common); cursor = tok + common.size(); }
+    else { std::cout << '\n'; for (auto& c : cands) std::cout << c << ' '; std::cout << '\n'; }
+}
+enum class ShellRead { Line, Eof, Interrupt };
+ShellRead interactive_read_line(Parser& parser, const std::string& prompt, std::vector<std::string>& history, size_t& hist_pos, std::string& out) {
+    if (!isatty(STDIN_FILENO)) { std::cout << prompt << std::flush; if (!std::getline(std::cin, out)) return ShellRead::Eof; return ShellRead::Line; }
+    termios old{}; tcgetattr(STDIN_FILENO, &old);
+    termios raw = old; raw.c_lflag &= ~(ICANON | ECHO | ISIG); raw.c_cc[VMIN] = 1; raw.c_cc[VTIME] = 0;
+    tcsetattr(STDIN_FILENO, TCSANOW, &raw);
+    std::string buf; size_t cursor = 0;
+    auto redraw = [&] {
+        std::cout << "\r\x1b[2K" << prompt << buf;
+        size_t right = buf.size() - cursor; if (right) std::cout << "\x1b[" << right << "D";
+        std::cout.flush();
+    };
+    redraw();
+    ShellRead result = ShellRead::Line;
+    while (true) {
+        char c;
+        if (read(STDIN_FILENO, &c, 1) != 1) { result = ShellRead::Eof; break; }
+        if (c == '\n' || c == '\r') { std::cout << '\n'; break; }
+        if (c == 0x7f || c == 0x08) { if (cursor > 0) { buf.erase(cursor - 1, 1); --cursor; redraw(); } continue; }
+        if (c == '\t') { complete_token(parser, buf, cursor); redraw(); continue; }
+        if (c == 0x03) { std::cout << '\n'; result = ShellRead::Interrupt; break; }
+        if (c == 0x04) { if (buf.empty()) { result = ShellRead::Eof; break; } continue; }
+        if (c == 0x1b) { char seq[2]; if (read(STDIN_FILENO, seq, 2) != 2) continue;
+            if (seq[0] == '[' && seq[1] == 'A') { if (hist_pos > 0) { --hist_pos; buf = history[hist_pos]; cursor = buf.size(); redraw(); } continue; }
+            if (seq[0] == '[' && seq[1] == 'B') { if (hist_pos < history.size()) { ++hist_pos; buf = (hist_pos == history.size()) ? std::string{} : history[hist_pos]; cursor = buf.size(); redraw(); } continue; }
+            if (seq[0] == '[' && seq[1] == 'C') { if (cursor < buf.size()) { ++cursor; redraw(); } continue; }
+            if (seq[0] == '[' && seq[1] == 'D') { if (cursor > 0) { --cursor; redraw(); } continue; }
+            continue;
+        }
+        if (c >= 32) { buf.insert(cursor, 1, c); ++cursor; redraw(); }
+    }
+    tcsetattr(STDIN_FILENO, TCSANOW, &old);
+    out = buf;
+    return result;
+}
+}
+#endif
 static int run_script_shell() {
-    ScriptRenderHost host(fs::current_path()); TrackedInfo info; Parser parser(host,info); std::string pending; auto history=load_nift_history(); (void)history;
+    ScriptRenderHost host(fs::current_path()); TrackedInfo info; Parser parser(host,info); std::string pending;
+    auto history=load_nift_history(); size_t hist_pos=history.size();
+#ifndef _WIN32
+    const bool interactive = isatty(STDIN_FILENO);
+#else
+    const bool interactive = false;
+#endif
     if(const char* home=std::getenv("HOME")){fs::path rc=fs::path(home)/".niftrc";if(filesystem::file_exists(rc)){auto rr=parser.run_statement(filesystem::read_file(rc),rc);if(!rr.ok){console::error("niftrc: "+rr.error.message);return 1;}}}
-    while(true){if(pending.empty()){
-        std::string shown=fs::current_path().generic_string();
-        if(const char* home=std::getenv("HOME")){std::string h=fs::path(home).lexically_normal().generic_string();if(shown==h)shown="~";else if(!h.empty()&&shown.rfind(h+"/",0)==0)shown="~"+shown.substr(h.size());}
-        std::cout << console::paint(shown, "1;32", console::stdout_colour_enabled()) << "$ ";
-    }else{std::cout << "... ";}std::cout.flush();std::string line;if(!std::getline(std::cin,line))break;if(pending.empty()&&(line=="exit"||line=="quit"))break;if(pending.empty()&&!line.empty())append_nift_history(line);pending+=line+"\n";
+    while(true){const std::string prompt=shell_prompt_text(!pending.empty());
+#ifndef _WIN32
+        std::string line;ShellRead r;
+        if(interactive){r=interactive_read_line(parser,prompt,history,hist_pos,line);}
+        else {std::cout<<prompt<<std::flush;r=std::getline(std::cin,line)?ShellRead::Line:ShellRead::Eof;}
+        if(r==ShellRead::Eof)break;
+        if(r==ShellRead::Interrupt){pending.clear();continue;}
+#else
+        std::string line;std::cout<<prompt<<std::flush;if(!std::getline(std::cin,line))break;
+#endif
+        if(pending.empty()&&(line=="exit"||line=="quit"))break;if(pending.empty()&&!line.empty()){append_nift_history(line);if(history.size()>=1000)history.erase(history.begin());history.push_back(line);hist_pos=history.size();}pending+=line+"\n";
         // CP85: the parser reports whether the accumulated input is complete,
         // an incomplete prefix (keep reading), or invalid (balanced but
         // malformed, executed so the canonical diagnostic is shown).

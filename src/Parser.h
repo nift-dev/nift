@@ -40,6 +40,11 @@ public:
     enum class StatementState { Complete, Incomplete, Invalid };
     StatementState statement_state(const std::string& source) const;
 
+    // Live parser-context completion candidates for the interactive shell:
+    // user/imported callables, structs and current variable bindings matching
+    // the prefix. Builtin/PATH/filesystem completion lives in the CLI shell.
+    std::vector<std::string> shell_completions(const std::string& prefix) const;
+
     // Shared single-expression host used by `nift eval`; identical evaluator to templates/scripts.
     bool eval_expression(const std::string& expression, json::Document& value, std::string& error);
 

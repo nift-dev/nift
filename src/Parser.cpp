@@ -22,6 +22,7 @@
 #include <unordered_set>
 #include <vector>
 #include <functional>
+#include <set>
 #include <thread>
 #include <atomic>
 #include <charconv>
@@ -3460,6 +3461,16 @@ Parser::StatementState Parser::statement_state(const std::string& raw) const {
     std::string program, error;
     if (!translate_function_program(source, program, error)) return StatementState::Invalid;
     return StatementState::Complete;
+}
+
+std::vector<std::string> Parser::shell_completions(const std::string& prefix) const {
+    std::vector<std::string> out;
+    std::set<std::string> seen;
+    for (const auto& kv : callables_) if (kv.first.rfind(prefix, 0) == 0 && seen.insert(kv.first).second) out.push_back(kv.first);
+    for (const auto& kv : structs_) if (kv.first.rfind(prefix, 0) == 0 && seen.insert(kv.first).second) out.push_back(kv.first);
+    for (auto scope = variable_scopes_.rbegin(); scope != variable_scopes_.rend(); ++scope)
+        for (const auto& kv : *scope) if (kv.first.rfind(prefix, 0) == 0 && seen.insert(kv.first).second) out.push_back(kv.first);
+    return out;
 }
 
 RenderResult Parser::run_script(const std::string& source, const fs::path& source_path) {
