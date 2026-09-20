@@ -15,6 +15,7 @@ struct Expr {
 };
 struct Context {
     std::function<bool(const std::string&, json::Document&, std::string&)> resolve;
+    std::function<bool(const std::string&, std::shared_ptr<const json::Document>&, std::string&)> resolve_ref;
     std::function<bool(const std::string&, json::Document&, std::string&)> legacy;
     std::function<std::string(const json::Document&)> render;
 };
