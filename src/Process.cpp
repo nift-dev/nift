@@ -13,6 +13,7 @@
 extern char **environ;
 #else
 #include <windows.h>
+#include "windows_compat.h"
 #endif
 namespace fs=std::filesystem;
 static std::string read_all(const fs::path&p){std::ifstream f(p,std::ios::binary);return {std::istreambuf_iterator<char>(f),{}};}
@@ -65,6 +66,7 @@ ProcessResult nift_run_process(const ProcessSpec&s,bool capture,bool stream){ret
 // code-reviewed on Linux but has NOT been compiled/run here; it must be
 // verified in CI on a Windows runner before release.
 #include <windows.h>
+#include "windows_compat.h"
 #include <wchar.h>
 #include <vector>
 #include <string>

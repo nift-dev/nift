@@ -14,6 +14,7 @@
     #define NOMINMAX
     #define WIN32_LEAN_AND_MEAN
     #include <windows.h>
+#include "windows_compat.h"
     #define NIFT_ISATTY _isatty
     #define NIFT_FILENO _fileno
 #else
