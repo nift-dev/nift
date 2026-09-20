@@ -30,6 +30,18 @@ struct P {
 };
 bool eq(const json::Document&a,const json::Document&b){if(a.is_number()&&b.is_number())return a.num==b.num;if(a.type!=b.type)return false;if(a.is_null())return true;if(a.is_bool())return a.boolean==b.boolean;if(a.is_string())return a.string==b.string;if(a.is_array()){if(a.array.size()!=b.array.size())return false;for(size_t i=0;i<a.array.size();++i)if(!eq(a.array[i],b.array[i]))return false;return true;}if(a.is_object()){if(a.object.size()!=b.object.size())return false;for(const auto&x:a.object){if(!b.has(x.first)||!eq(x.second,b[x.first]))return false;}return true;}return false;}
 }
+
+StatementParseResult parse_statement(const std::string& source){
+ auto trim=[](std::string x){auto b=x.find_first_not_of(" \t\r\n");if(b==std::string::npos)return std::string();auto e=x.find_last_not_of(" \t\r\n");return x.substr(b,e-b+1);};
+ std::string t=trim(source);auto st=std::make_unique<Stmt>();st->text=t;st->span={0,source.size()};if(t.empty())return{std::move(st),{},false};
+ auto ident=[](const std::string&x){if(x.empty()||!(std::isalpha((unsigned char)x[0])||x[0]=='_'))return false;for(char c:x)if(!(std::isalnum((unsigned char)c)||c=='_'))return false;return true;};
+ for(const auto& op:{std::string("+="),std::string("-="),std::string("*="),std::string("/="),std::string("%=")}){auto p=t.find(op);if(p!=std::string::npos){auto n=trim(t.substr(0,p));if(!ident(n))break;auto r=parse_expression(t.substr(p+2));if(!r.supported)return{std::move(st),r.error,false};st->kind=StmtKind::CompoundAssignment;st->name=n;st->op=op;st->expr=std::move(r.expr);return{std::move(st),{},true};}}
+ if(t.size()>2&&(t.substr(0,2)=="++"||t.substr(0,2)=="--")){auto n=trim(t.substr(2));if(ident(n)){st->kind=StmtKind::Increment;st->name=n;st->op=t.substr(0,2);return{std::move(st),{},true};}}
+ if(t.size()>2&&(t.substr(t.size()-2)=="++"||t.substr(t.size()-2)=="--")){auto n=trim(t.substr(0,t.size()-2));if(ident(n)){st->kind=StmtKind::Increment;st->name=n;st->op=t.substr(t.size()-2);return{std::move(st),{},true};}}
+ auto dp=t.find(":=");if(dp!=std::string::npos){auto lhs=trim(t.substr(0,dp));auto sp=lhs.find_last_of(" \t");auto n=sp==std::string::npos?lhs:trim(lhs.substr(sp+1));if(ident(n)){auto r=parse_expression(t.substr(dp+2));if(r.supported){st->kind=StmtKind::Declaration;st->name=n;st->expr=std::move(r.expr);return{std::move(st),{},true};}}}
+ for(std::size_t p=0;p<t.size();++p)if(t[p]=='='&&(p==0||std::string("=!<>").find(t[p-1])==std::string::npos)&&(p+1==t.size()||t[p+1]!='=')){auto n=trim(t.substr(0,p));if(ident(n)){auto r=parse_expression(t.substr(p+1));if(r.supported){st->kind=StmtKind::Assignment;st->name=n;st->expr=std::move(r.expr);return{std::move(st),{},true};}}break;}
+ auto r=parse_expression(t);if(r.supported){st->kind=StmtKind::Expression;st->expr=std::move(r.expr);return{std::move(st),{},true};}return{std::move(st),r.error,false};
+}
 ParseResult parse_expression(const std::string& source){P p{source};auto e=p.logical_or();p.ws();if(!e||p.p!=source.size())return{{},p.error.empty()?"unsupported expression":p.error,false};return{std::move(e),{},true};}
 bool truthy(const json::Document& d){if(d.is_bool())return d.boolean;if(d.is_null())return false;if(d.is_number())return d.num!=0;if(d.is_string())return !d.string.empty();if(d.is_array())return !d.array.empty();if(d.is_object())return !d.object.empty();return false;}
 bool evaluate(const Expr& e,Context& c,json::Document& out,std::string& error){

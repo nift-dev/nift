@@ -18,7 +18,11 @@ struct Context {
     std::function<bool(const std::string&, json::Document&, std::string&)> legacy;
     std::function<std::string(const json::Document&)> render;
 };
+enum class StmtKind { Block, Declaration, Assignment, CompoundAssignment, Increment, Expression, If, While, Legacy };
+struct Stmt { StmtKind kind=StmtKind::Legacy; SourceSpan span{}; std::string text, name, op; std::unique_ptr<Expr> expr, condition; };
+struct StatementParseResult { std::unique_ptr<Stmt> stmt; std::string error; bool supported=false; };
 struct ParseResult { std::unique_ptr<Expr> expr; std::string error; bool supported=false; };
+StatementParseResult parse_statement(const std::string& source);
 ParseResult parse_expression(const std::string& source);
 bool evaluate(const Expr& expr, Context& ctx, json::Document& out, std::string& error);
 bool truthy(const json::Document& value);
