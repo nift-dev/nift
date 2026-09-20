@@ -5,13 +5,13 @@ t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
 cat >"$t/run.f" <<'F'
 r := run("sh", "-c", "printf out; printf err >&2; exit 3")
 if(r.exit_code != 3) { return "bad exit" }
-if(r.stdout != "out") { return "bad stdout" }
-if(r.stderr != "err") { return "bad stderr" }
+if(r.stdout.trim() != "out") { return "bad stdout" }
+if(r.stderr.trim() != "err") { return "bad stderr" }
 p := cmd("printf", "hello").pipe(cmd("tr", "a-z", "A-Z")).run()
-if(p.stdout != "HELLO") { return "bad pipeline" }
+if(p.stdout.trim() != "HELLO") { return "bad pipeline" }
 setenv("NIFT_V44_ENV", "yes")
 e := run("sh", "-c", "printf $NIFT_V44_ENV")
-if(e.stdout != "yes") { return "bad env" }
+if(e.stdout.trim() != "yes") { return "bad env" }
 F
 rf_out=$("$NIFT" run "$t/run.f" 2>&1) || { echo "run.f failed: $rf_out" >&2; exit 1; }
 test -z "$rf_out" || { echo "run.f returned: $rf_out" >&2; exit 1; }

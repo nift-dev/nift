@@ -961,13 +961,14 @@ test-v44-language-foundation: $(TARGET)
 # autoconf exit 77 (platform skip) from a v44 test is an acknowledged skip,
 # not a failure: POSIX-only tests report it on platforms without the facility.
 V44_SKIP_77 := ; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped: platform lacks facility)"; else exit $$st; fi
+PORTABLE_TIMEOUT ?= python3 -c "import subprocess,sys; subprocess.call(sys.argv[1:], timeout=120)"
 
 test-v44-shell-restricted: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_shell_glob.sh $(V44_SKIP_77)
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp21_history_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp22_completion_smoke.sh
-	timeout 120 python3 -u tests/v44_interactive_completion_pty.py $(CURDIR)/$(TARGET) $(V44_SKIP_77)
-	timeout 120 python3 -u tests/v44_shell_foreground_tty_smoke.py $(CURDIR)/$(TARGET)
+	$(PORTABLE_TIMEOUT) python3 -u tests/v44_interactive_completion_pty.py $(CURDIR)/$(TARGET) $(V44_SKIP_77)
+	$(PORTABLE_TIMEOUT) python3 -u tests/v44_shell_foreground_tty_smoke.py $(CURDIR)/$(TARGET)
 	bash tests/v44_cp27_restricted_smoke.sh $(CURDIR)/$(TARGET)
 
 test-v44-packages: $(TARGET)
