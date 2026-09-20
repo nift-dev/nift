@@ -3104,14 +3104,46 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
 
         // Compound assignment is a true mutation expression. Current assignable
         // paths are identifiers and struct member paths; both are side-effect-free
-        // to resolve, so the target is read once and written once.
+        // to resolve, so the target is read once and written once. For a plain
+        // identifier target, assign directly instead of rebuilding "name = value"
+        // and re-parsing it through the evaluator (a full string round-trip on
+        // every += in a hot loop).
+        auto assign_identifier = [&](const std::string& name, json::Document&& value) -> bool {
+            VariableBinding* tb = find_binding(name);
+            if (!tb) { error = "assignment to undefined binding: " + name; return false; }
+            if (!tb->mutable_binding) { error = "cannot assign to const binding: " + name; return false; }
+            const int at = nift_binding_type(value);
+            if (!nift_type_assignable(at, tb->type)) {
+                error = "cannot assign " + std::string(nift_binding_type_name(at)) +
+                        " to " + std::string(nift_binding_type_name(tb->type)) + " binding '" + name + "'";
+                return false;
+            }
+            auto rebound = std::make_shared<json::Document>(std::move(value));
+            tb->rebind(rebound);
+            out = *rebound;
+            return true;
+        };
         for(const std::string cop:{"+=","-=","*=","/=","%="}){const auto p=find_top_level_op(cop);if(p!=std::string::npos){const std::string target=trim_copy(text.substr(0,p));
             {bool decl=false;bool iq=false;char iqc=0;int ip=0,ib=0;for(std::size_t k=0;k+1<target.size();++k){char cc=target[k];if(iq){if(cc=='\\')++k;else if(cc==iqc)iq=false;continue;}if(cc=='\''||cc=='"'){iq=true;iqc=cc;continue;}if(cc=='(')++ip;else if(cc==')')--ip;else if(cc=='[')++ib;else if(cc==']')--ib;if(ip||ib)continue;if(target.compare(k,2,":=")==0||target.compare(k,2,"=>")==0){decl=true;break;}}if(decl)break;}
-            json::Document oldv,rhs,next;if(!eval(target,oldv,depth+1)||!eval(text.substr(p+2),rhs,depth+1))return false;if(cop=="+="&&oldv.is_string()&&rhs.is_string())next=json::Document(oldv.string+rhs.string);else if(cop=="+="&&oldv.is_array()&&rhs.is_array()){next=json::Document::make_array();next.array.reserve(oldv.array.size()+rhs.array.size());next.array.insert(next.array.end(),oldv.array.begin(),oldv.array.end());next.array.insert(next.array.end(),rhs.array.begin(),rhs.array.end());}else if(!numeric_binary(oldv,rhs,cop[0],next))return false;const std::string assignment=target+" = "+next.dump(0);if(!eval(assignment,out,depth+1))return false;if(depth==0)last_expression_mutation_=true;return true;}}
+            json::Document oldv,rhs,next;if(!eval(target,oldv,depth+1)||!eval(text.substr(p+2),rhs,depth+1))return false;if(cop=="+="&&oldv.is_string()&&rhs.is_string())next=json::Document(oldv.string+rhs.string);else if(cop=="+="&&oldv.is_array()&&rhs.is_array()){next=json::Document::make_array();next.array.reserve(oldv.array.size()+rhs.array.size());next.array.insert(next.array.end(),oldv.array.begin(),oldv.array.end());next.array.insert(next.array.end(),rhs.array.begin(),rhs.array.end());}else if(!numeric_binary(oldv,rhs,cop[0],next))return false;
+            if (target.find_first_of(".([") == std::string::npos) {
+                if (!assign_identifier(target, std::move(next))) return false;
+            } else {
+                const std::string assignment=target+" = "+next.dump(0);
+                if(!eval(assignment,out,depth+1))return false;
+            }
+            if(depth==0)last_expression_mutation_=true;return true;}}
 
         const bool prefix_inc=(text.rfind("++",0)==0||text.rfind("--",0)==0);
         const bool postfix_inc=(text.size()>2&&(text.compare(text.size()-2,2,"++")==0||text.compare(text.size()-2,2,"--")==0) && find_top_level_op(":=")==std::string::npos && find_top_level_assignment()==std::string::npos);
-        if(prefix_inc||postfix_inc){const bool inc=prefix_inc?text[0]=='+':text[text.size()-2]=='+';const std::string target=trim_copy(prefix_inc?text.substr(2):text.substr(0,text.size()-2));json::Document oldv,one(1.0),next;if(!eval(target,oldv,depth+1))return false;if(!oldv.is_number()){error="increment/decrement requires a numeric lvalue";return false;}if(!numeric_binary(oldv,one,inc?'+':'-',next))return false;json::Document assigned;if(!eval(target+" = "+next.dump(0),assigned,depth+1))return false;out=prefix_inc?assigned:oldv;if(depth==0)last_expression_mutation_=true;return true;}
+        if(prefix_inc||postfix_inc){const bool inc=prefix_inc?text[0]=='+':text[text.size()-2]=='+';const std::string target=trim_copy(prefix_inc?text.substr(2):text.substr(0,text.size()-2));json::Document oldv,one(1.0),next;if(!eval(target,oldv,depth+1))return false;if(!oldv.is_number()){error="increment/decrement requires a numeric lvalue";return false;}if(!numeric_binary(oldv,one,inc?'+':'-',next))return false;
+            if (target.find_first_of(".([") == std::string::npos) {
+                if (!assign_identifier(target, std::move(next))) return false;
+                if (!prefix_inc) out = oldv; // postfix yields the pre-increment value
+            } else {
+                json::Document assigned;if(!eval(target+" = "+next.dump(0),assigned,depth+1))return false;out=prefix_inc?assigned:oldv;
+            }
+            if(depth==0)last_expression_mutation_=true;return true;}
 
         // CP208-209: deliberately small, flat destructuring surface.
         // Arrays are exact-length; objects require named keys and ignore extras.
