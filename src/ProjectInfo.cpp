@@ -1154,7 +1154,6 @@ bool parse_pagination_index(const std::string& s, std::size_t begin, std::size_t
 } // namespace
 
 bool ProjectInfo::repair_derived_state() {
-    std::cerr << "REPAIR-DIAG repair_derived_state start tracked=" << tracked.size() << "\n";
     // Ownership model (CP4-DESIGN.md): only files Nift can establish as its
     // own derived artifacts are removed. The output tree is never wiped, and
     // derived metadata is never used to authorize deleting a public file.
@@ -1221,11 +1220,7 @@ bool ProjectInfo::repair_derived_state() {
                     // suffixes, fail closed (preserve the file).
                     std::size_t page_index = 0;
                     if (parse_pagination_index(fname, marker + 1, page_index)) {
-                        if (!filesystem::remove_owned_file(path)) {
-                            std::lock_guard<std::mutex> lock(console::output_mutex);
-                            std::cerr << "REPAIR-DIAG pagination surplus removal failed: " << path.generic_string() << "\n";
-                            return false;
-                        }
+                        if (!filesystem::remove_owned_file(path)) return false;
                     }
                     break; // this file belongs to this page's namespace (kept or removed)
                 }
@@ -1256,14 +1251,12 @@ bool ProjectInfo::repair_derived_state() {
                                      std::char_traits<char>::length(suffix), suffix) != 0)
                     continue;
                 if (current_info_paths.count(path.lexically_normal())) continue; // current page
-                std::error_code rec;
-                std::filesystem::remove(path, rec);
-                if (rec) {
-                    std::lock_guard<std::mutex> lock(console::output_mutex);
-                    std::cerr << "REPAIR-DIAG orphan info removal failed: " << path.generic_string()
-                              << " ec=" << rec.value() << " msg=" << rec.message() << "\n";
-                    return false; // required metadata removal failed
-                }
+                // Nift writes .info.json read-only; Windows cannot unlink a
+                // read-only file unless the attribute is cleared first, so use
+                // the ownership-aware removal (POSIX unlink also works from a
+                // writable directory). Without this, repair failed on Windows
+                // with ERROR_ACCESS_DENIED for an orphaned page's metadata.
+                if (!filesystem::remove_owned_file(path)) return false; // required metadata removal failed
             }
         }
     }
