@@ -4,6 +4,7 @@
 # through ProjectInfo directly from scripts (never a subprocess).
 set -euo pipefail
 NIFT=${NIFT:-./nift}
+echo "AUTOMARK setup" 
 case "$NIFT" in /*) NIFT_ABS="$NIFT";; *) NIFT_ABS="$(pwd)/$NIFT";; esac
 t=$(cd "$(mktemp -d)" && pwd -P); trap 'rm -rf "$t"' EXIT
 mkdir -p "$t/site/.nift" "$t/site/content" "$t/site/templates" "$t/site/public"
@@ -25,6 +26,7 @@ t := track("about", "About", "templates/main.html")
 print(t.ok)
 print(tracked().join(","))
 F
+echo "AUTOMARK run auto.f"
 out=$(cd "$t/site" && "$NIFT_ABS" run auto.f 2>&1) || { printf 'auto.f failed: %s\n' "$out" >&2; exit 1; }
 # project_root() reports the site path in the platform's native form; match it
 # by its 'site' suffix so the assertion is portable across POSIX/MSYS2.
@@ -45,6 +47,7 @@ u := untrack("about")
 print(u.ok)
 print(tracked().join(","))
 F
+echo "AUTOMARK run auto2.f"
 out2=$(cd "$t/site" && "$NIFT_ABS" run auto2.f 2>&1) || { printf 'auto2.f failed: %s\n' "$out2" >&2; exit 1; }
 # The incremental 'modified' detection may legitimately report '/' as well as
 # 'about' on filesystems with coarse mtime resolution (Windows/NTFS), so the
@@ -60,8 +63,9 @@ out2=$(cd "$t/site" && "$NIFT_ABS" run auto2.f 2>&1) || { printf 'auto2.f failed
 { printf '%s\n' "$out2" | grep -q '^/$'; } || { printf 'unexpected:\n%s\n' "$out2" >&2; exit 1; }
 # build_repair is available and succeeds on a clean project
 printf 'print(build_repair().ok)\n' > "$t/site/repair.f"
+echo "AUTOMARK run repair.f"
 out3=$(cd "$t/site" && "$NIFT_ABS" run repair.f)
-[ "$out3" = "true" ] || exit 1
+[ "$out3" = "true" ] || { printf 'repair.f output: %s\n' "$out3" >&2; exit 1; }
 # automation is script-land only
 if cd "$t/site" && printf '@content\n$[build()]' > templates/main.html && printf 'x' > content/index.html; then
   if "$NIFT_ABS" build --all >/dev/null 2>&1; then
