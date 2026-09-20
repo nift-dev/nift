@@ -119,8 +119,10 @@ test-snap-contract:
 # and the Snap metadata version in snap/snapcraft.yaml must agree, and any
 # expected/tag version must match both. No network access.
 test-version-consistency:
-	python3 tests/version_consistency_test.py
-	python3 scripts/check_version_consistency.py
+	@if command -v python3 >/dev/null 2>&1; then \
+	  python3 tests/version_consistency_test.py && \
+	  python3 scripts/check_version_consistency.py; \
+	else echo "  (skipped: python3 unavailable)"; fi
 
 # Focused unit tests for the Distribution Verification summary classification:
 # Snap edge must never be reported as stable success, and stable/edge/mismatch/
