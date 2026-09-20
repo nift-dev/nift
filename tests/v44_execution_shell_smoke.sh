@@ -55,7 +55,8 @@ grep -q 'fixtool-ran' <<<"$bare_out" || { echo "$bare_out" >&2; exit 1; }
 true_out=$(printf 'true\n' | "$NIFT" sh 2>/dev/null)
 grep -qE '(^| )true$' <<<"$true_out" || { echo "$true_out" >&2; exit 1; }
 # a shell-scope binding shadows any external executable of the same name
-printf 'fixtool := "shadowed"\nfixtool\n' | "$NIFT" sh 2>/dev/null | grep -q '"shadowed"' || exit 1
+shadow_out=$(printf 'fixtool := "shadowed"\nfixtool\n' | "$NIFT" sh 2>&1 || true)
+grep -q '"shadowed"' <<<"$shadow_out" || { echo "shadow: $shadow_out" >&2; exit 1; }
 # a deliberately nonexistent bare command reports command not found
 nope_out=$(printf 'nonexistentcmdxyz\n' | "$NIFT" sh 2>&1)
 grep -q 'command not found: nonexistentcmdxyz' <<<"$nope_out" || { echo "$nope_out" >&2; exit 1; }
