@@ -25,8 +25,9 @@ t := track("about", "About", "templates/main.html")
 print(t.ok)
 print(tracked().join(","))
 F
+EXPECT_ROOT=$(cd "$t/site" && "$NIFT_ABS" eval 'pwd()')
 out=$(cd "$t/site" && "$NIFT_ABS" run auto.f)
-[ "$out" = "$t/site
+[ "$out" = "$EXPECT_ROOT
 true
 /
 /
