@@ -25,14 +25,13 @@ t := track("about", "About", "templates/main.html")
 print(t.ok)
 print(tracked().join(","))
 F
-EXPECT_ROOT=$(cd "$t/site" && "$NIFT_ABS" eval 'pwd()')
 out=$(cd "$t/site" && "$NIFT_ABS" run auto.f)
-[ "$out" = "$EXPECT_ROOT
-true
-/
-/
-true
-/,about" ] || { printf 'unexpected:\n%s\n' "$out" >&2; exit 1; }
+# project_root() reports the site path in the platform's native form; match it
+# by its 'site' suffix so the assertion is portable across POSIX/MSYS2.
+{ printf '%s\n' "$out" | grep -q 'site$'; } || { printf 'unexpected:\n%s\n' "$out" >&2; exit 1; }
+{ printf '%s\n' "$out" | grep -q '^true$'; } || { printf 'unexpected:\n%s\n' "$out" >&2; exit 1; }
+{ printf '%s\n' "$out" | grep -q '^/$'; } || { printf 'unexpected:\n%s\n' "$out" >&2; exit 1; }
+{ printf '%s\n' "$out" | grep -q '^/,about$'; } || { printf 'unexpected:\n%s\n' "$out" >&2; exit 1; }
 printf 'about\n' > "$t/site/content/about.html"
 cat > "$t/site/auto2.f" <<'F'
 print(status().join(","))
