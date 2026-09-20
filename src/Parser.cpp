@@ -3146,6 +3146,70 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 if(assigned.is_string()&&(assigned.string.rfind("\x1fnift:struct:",0)==0||assigned.string.rfind("\x1fnift:collection:",0)==0)){std::string parent_id;for(const auto& e:struct_instances_)if(e.second==parent){parent_id=e.first;break;}if(reference_would_cycle(assigned.string,std::string("\x1fnift:struct:")+parent_id)){error="assignment would create a cyclic reference: "+member;return false;}}
                 fit->second.value=std::make_shared<json::Document>(std::move(assigned));out=*fit->second.value;if(depth==0)last_expression_mutation_=true;return true;
             }
+            if (name.find('[') != std::string::npos) {
+                // Bracket-indexed assignment: a[i] = v, m["k"] = v, grid[r][c] = v.
+                // Mutates the element in place through the root binding's shared
+                // Document so earlier reads of the binding see the change. This
+                // also makes a[i] += 1 and a[i]++ work (they rewrite to a[i] = v).
+                const std::size_t open = name.find('[');
+                const std::string root = trim_copy(name.substr(0, open));
+                VariableBinding* rb = nullptr;
+                for (auto scope = variable_scopes_.rbegin(); scope != variable_scopes_.rend(); ++scope) {
+                    const auto it = scope->find(root);
+                    if (it != scope->end()) { rb = &it->second; break; }
+                }
+                if (!rb) { error = "assignment to undefined binding: " + root; return false; }
+                if (!rb->mutable_binding) { error = "cannot assign to const binding: " + root; return false; }
+                std::vector<std::string> indexes;
+                std::size_t pos = open;
+                while (pos < name.size()) {
+                    const std::size_t close = name.find(']', pos);
+                    if (close == std::string::npos) { error = "unterminated index in assignment target: " + name; return false; }
+                    indexes.push_back(trim_copy(name.substr(pos + 1, close - pos - 1)));
+                    pos = close + 1;
+                    std::size_t q = pos;
+                    while (q < name.size() && isspace(static_cast<unsigned char>(name[q]))) ++q;
+                    if (q == name.size()) break;
+                    if (name[q] != '[') { error = "invalid assignment target: " + name; return false; }
+                    pos = q;
+                }
+                json::Document assigned;
+                if (!eval(text.substr(p + 1), assigned, depth + 1)) return false;
+                json::Document* node = rb->value.get();
+                for (std::size_t k = 0; k + 1 < indexes.size(); ++k) {
+                    json::Document idx;
+                    if (!eval(indexes[k], idx, depth + 1)) return false;
+                    if (idx.is_number() && node->is_array()) {
+                        if (idx.num < 0) { error = "negative index in assignment: " + indexes[k]; return false; }
+                        const std::size_t i = static_cast<std::size_t>(idx.num);
+                        if (i >= node->array.size()) { error = "index out of range: " + indexes[k]; return false; }
+                        node = &(*node)[i];
+                    } else if (idx.is_string() && node->is_object()) {
+                        if (!node->has(idx.string)) { error = "object has no member: " + idx.string; return false; }
+                        node = &(*node)[idx.string];
+                    } else {
+                        error = "assignment index does not address an array or object: " + indexes[k];
+                        return false;
+                    }
+                }
+                json::Document last;
+                if (!eval(indexes.back(), last, depth + 1)) return false;
+                if (last.is_number() && node->is_array()) {
+                    if (last.num < 0) { error = "negative index in assignment: " + indexes.back(); return false; }
+                    const std::size_t i = static_cast<std::size_t>(last.num);
+                    if (i >= node->array.size()) { error = "index out of range: " + indexes.back(); return false; }
+                    (*node)[i] = std::move(assigned);
+                    out = (*node)[i];
+                } else if (last.is_string() && node->is_object()) {
+                    (*node)[last.string] = std::move(assigned);
+                    out = (*node)[last.string];
+                } else {
+                    error = "assignment index does not address an array or object: " + indexes.back();
+                    return false;
+                }
+                if (depth == 0) last_expression_mutation_ = true;
+                return true;
+            }
             if (!valid_binding_identifier(name)) { error = "assignment requires an identifier before '='"; return false; }
             VariableBinding* binding = nullptr;
             for (auto scope = variable_scopes_.rbegin(); scope != variable_scopes_.rend(); ++scope) {
