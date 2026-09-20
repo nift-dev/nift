@@ -8,11 +8,11 @@
 
 namespace nift::ast {
 struct SourceSpan { std::size_t begin=0, end=0; };
-enum class Kind { Literal, Binding, Unary, Binary, Logical, Index, Member, Range, Call, Lambda, Legacy };
+enum class Kind { Literal, Binding, Unary, Binary, Logical, Index, Member, Range, Call, Lambda, Array, Object, Legacy };
 struct Expr {
     Kind kind=Kind::Legacy; SourceSpan span{}; std::string text, op, name; std::vector<std::string> params;
     json::Document literal;
-    std::unique_ptr<Expr> left, right;
+    std::unique_ptr<Expr> left, right; std::vector<std::unique_ptr<Expr>> items;
 };
 struct Context {
     std::function<bool(const std::string&, json::Document&, std::string&)> resolve;
