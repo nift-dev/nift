@@ -119,6 +119,13 @@ cat > "$t/bin/fixtool" <<'B'
 echo "fixtool-ran $1"
 B
 chmod +x "$t/bin/fixtool"
+# Windows cannot CreateProcess a shebang script directly; provide a .cmd twin
+# (nift_find_executable prefers .cmd/.bat there) so command-style bare commands
+# exercise the same contract, matching the exec-shell test's fixtool.
+cat > "$t/bin/fixtool.cmd" <<'B'
+@echo off
+echo fixtool-ran %1
+B
 cat > "$t/cc.f" <<'NIFT'
 fixtool one
 fixtool one two three
