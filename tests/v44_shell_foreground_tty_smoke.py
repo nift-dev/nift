@@ -17,6 +17,19 @@ if os.name == "nt":
 NIFT = sys.argv[1] if len(sys.argv) > 1 else "./nift"
 T = os.path.dirname(os.path.abspath(NIFT))
 
+# Hard backstop: report where the test is and exit instead of hanging a runner.
+_last = "start"
+def _mark(m):
+    global _last
+    _last = m
+    print(f"MARK {m}", flush=True)
+try:
+    import signal
+    signal.signal(signal.SIGALRM, lambda *a: (_ for _ in ()).throw(RuntimeError(f"stuck after {_last}")))
+    signal.alarm(100)
+except Exception:
+    pass
+
 FIXTURE = os.path.join(T, ".interactive-foreground-probe")
 with open(FIXTURE, "w") as f:
     f.write("#!/bin/sh\nfor s in 0 1 2; do if [ -t $s ]; then echo fd$s-tty; else echo fd$s-pipe; fi; done\n")
@@ -96,6 +109,7 @@ def run_in_shell(cmd, timeout=3.0):
     return out.decode(errors="replace")
 
 # Foreground simple command: all three streams must be TTYs (direct inherit).
+_mark("run1")
 out = run_in_shell(FIXTURE + "\n")
 check("foreground-stdin-tty", "fd0-tty" in out, out)
 check("foreground-stdout-tty", "fd1-tty" in out, out)
@@ -107,6 +121,7 @@ try:
     os.remove(redir)
 except OSError:
     pass
+_mark("run2")
 out = run_in_shell(f"{FIXTURE} > {redir}\ncat {redir}\nexit\n")
 check("redirection-routes-stdout", "fd1-pipe" in out, out)
 
@@ -114,6 +129,7 @@ check("redirection-routes-stdout", "fd1-pipe" in out, out)
 probe_script = os.path.join(T, ".interactive-run-probe.f")
 with open(probe_script, "w") as f:
     f.write('r := run("' + FIXTURE + '")\nprint(r.stdout.trim())\n')
+_mark("run3")
 out = subprocess.run([NIFT, "run", probe_script], capture_output=True, text=True, timeout=30).stdout
 check("run-captures-not-tty", "fd1-pipe" in out and "fd0-pipe" in out, out)
 

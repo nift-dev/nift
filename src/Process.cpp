@@ -161,10 +161,10 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capt
             HANDLE wp; if (!CreatePipe(&next_read, &wp, &sa, 0)) { ok = false; break; }
             out = wp;
         } else if (!spec.stdout_path.empty()) out = open_redirect(spec.stdout_path, false, spec.append_stdout);
-        else if (capture) out = CreateFileW(ow.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, TRUNCATE_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        else if (capture) { SECURITY_ATTRIBUTES ca{}; ca.nLength = sizeof(ca); ca.bInheritHandle = TRUE; out = CreateFileW(ow.c_str(), GENERIC_WRITE, FILE_SHARE_READ, &ca, TRUNCATE_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr); }
         if (spec.merge_stderr) err = out;
         else if (!spec.stderr_path.empty()) err = open_redirect(spec.stderr_path, false, spec.append_stderr);
-        else if (capture) err = CreateFileW(ew.c_str(), GENERIC_WRITE, FILE_SHARE_READ, nullptr, TRUNCATE_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+        else if (capture) { SECURITY_ATTRIBUTES ca{}; ca.nLength = sizeof(ca); ca.bInheritHandle = TRUE; err = CreateFileW(ew.c_str(), GENERIC_WRITE, FILE_SHARE_READ, &ca, TRUNCATE_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr); }
 
         STARTUPINFOW si{}; si.cb = sizeof(si);
         si.dwFlags = STARTF_USESTDHANDLES;
