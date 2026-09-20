@@ -82,7 +82,7 @@ print(magick.available())
 print("magick-ident")
 id := magick.identify("assets/base.png")
 print(id.ok)
-print(id.width + "x" + id.height + " " + id.format)
+if(id.ok) { print(id.width + "x" + id.height + " " + id.format) }
 print("magick-thumb")
 print(magick.resize("assets/base.png", "out/t.png", {"width": 100, "height": 100}).ok)
 print("magick-crop")
@@ -93,7 +93,7 @@ print("magick-convert")
 print(magick.convert("assets/base.png", "out/b.jpg").ok)
 print("magick-verify")
 v := magick.identify("out/b.jpg")
-print(v.format)
+if(v.ok) { print(v.format) }
 print("magick-invalid")
 print(magick.identify("out/missing.png").ok)
 NIFT

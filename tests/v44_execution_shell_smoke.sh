@@ -13,7 +13,8 @@ setenv("NIFT_V44_ENV", "yes")
 e := run("sh", "-c", "printf $NIFT_V44_ENV")
 if(e.stdout != "yes") { return "bad env" }
 F
-"$NIFT" run "$t/run.f" >/dev/null
+rf_out=$("$NIFT" run "$t/run.f" 2>&1) || { echo "run.f failed: $rf_out" >&2; exit 1; }
+test -z "$rf_out" || { echo "run.f returned: $rf_out" >&2; exit 1; }
 printf 'printf hello | tr a-z A-Z > %s/out\ncat %s/out\nexit\n' "$t" "$t" | "$NIFT" sh >"$t/shell" 2>/dev/null
 grep -q HELLO "$t/shell"
 # Shell assignment statements must route to the Nift statement engine, and
