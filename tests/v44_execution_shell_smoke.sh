@@ -54,6 +54,13 @@ cat > "$t/bin/fixtool" <<'B'
 echo "fixtool-ran $1"
 B
 chmod +x "$t/bin/fixtool"
+# Windows cannot CreateProcess a shebang script directly; provide a .cmd batch
+# twin so the bare-command fallback (nift_find_executable prefers .cmd/.bat on
+# Windows) exercises the same contract there.
+cat > "$t/bin/fixtool.cmd" <<'B'
+@echo off
+echo fixtool-ran %1
+B
 bare_out=$(cd "$t" && printf 'fixtool\n' | PATH="$t/bin:$PATH" "$NIFT" sh 2>/dev/null)
 grep -q 'fixtool-ran' <<<"$bare_out" || { echo "$bare_out" >&2; exit 1; }
 echo "MARK builtins"
