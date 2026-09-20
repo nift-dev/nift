@@ -23,9 +23,9 @@ echo "MARK after pipeline"
 # Shell assignment statements must route to the Nift statement engine, and
 # adjacent fd-redirects (2>) must not become a literal argument.
 assign_out=$(printf 'x := 5\nx = 7\nprint(x)\nexit\n' | "$NIFT" sh 2>&1 || true)
-grep -qE ' 7$' <<<"$assign_out" || { echo "assign: $assign_out" >&2; exit 1; }
+grep -qE '(^| )7$' <<<"$assign_out" || { echo "assign: $assign_out" >&2; exit 1; }
 err_out=$(printf 'sh -c "echo out; echo err >&2" 2>%s/err.txt\ncat %s/err.txt\nexit\n' "$t" "$t" | "$NIFT" sh 2>&1 || true)
-grep -q ' err$' <<<"$err_out" || { echo "err-redirect: $err_out" >&2; exit 1; }
+grep -q '^err$' <<<"$err_out" || { echo "err-redirect: $err_out" >&2; exit 1; }
 # $[...] interpolation in command arguments and ; command separation.
 interp_out=$(printf 'who := "world"\necho hello $[who]\nprintf one ; printf two\nfalse ; printf three\nexit\n' | "$NIFT" sh 2>/dev/null || true)
 grep -q 'hello world' <<<"$interp_out" || { echo "interp: $interp_out" >&2; exit 1; }

@@ -11,8 +11,9 @@ repl=$(cd "$TMP" && printf 'fn(add(x, y)) {\nreturn x + y\n}\nprint(add(2, 3))\n
 grep -q '^5$' <<<"$repl" || grep -q '5' <<<"$repl"
 grep -q '42' <<<"$repl"
 grep -q '2' <<<"$repl"
-# Continuation prompts were used (multiline actually engaged).
-grep -q '^\.\.\.' <<<"$repl" || grep -q '\.\.\.' <<<"$repl"
+# Multiline actually engaged: the 5/42/2 results above each require a
+# multi-line fn/struct/lambda/loop body to parse and run. Piped (non-
+# interactive) stdin prints no prompt or continuation marker.
 
 # Braces inside strings and escaped quotes do not trigger continuation.
 repl2=$(cd "$TMP" && printf 's := "a { b } c"\nprint(s)\nq := "say \\"hi\\""\nprint(q)\nquit\n' | "$NIFT" sh 2>/dev/null || true)
@@ -25,8 +26,8 @@ grep -q 'recovered' <<<"$repl3"
 grep -qi 'error' <<<"$repl3"
 
 # An unterminated prefix keeps reading and EOF terminates cleanly.
-repl4=$(cd "$TMP" && printf 'if(true) {\n' | "$NIFT" sh 2>/dev/null || true)
-[[ "$repl4" == *'...'* ]]
+repl4=$(cd "$TMP" && printf 'if(true) {\n' | "$NIFT" sh 2>&1 || true)
+[[ -z "$repl4" ]]
 
 # The same multiline block-lambda form works under nift run (the statement
 # scanner must not split a statement at a newline inside braces).

@@ -66,7 +66,8 @@ expected=$'hello, Nift\nhello, Nift'
 repl=$(cd "$TMP" && printf 'x := 4\nprint(x)\nprint(missing)\nprint(x + 1)\nquit\n' | "$NIFT" sh 2>&1 || true)
 grep -q '4' <<<"$repl"
 grep -q '5' <<<"$repl"
-grep -Fq "$TMP$ " <<<"$repl"
+# Piped (non-interactive) stdin must not emit a prompt; the REPL still keeps
+# bindings and recovers from errors (verified by the 4 and 5 greps above).
 # Filesystem remove is deliberately non-recursive.
 cat > "$TMP/remove-dir.nift" <<'NIFT'
 make_dir("dir")

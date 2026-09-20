@@ -24,7 +24,7 @@ out="$(cd "$td" && "$NIFT" run check.nift)"
 repl="$(cd "$td" && printf 'x := [1, 2]\nx\nx.prettify()\nx.highlight()\nx.prettify().highlight()\nx.highlight().prettify()\nnull\n""\ncd(".")\n' | HOME="$td" NO_COLOR=1 "$NIFT" sh)"
 [[ "$repl" == *'[1,2]'* ]]
 [[ "$repl" == *$'[\n  1,\n  2\n]'* ]]
-[[ "$repl" == *'~$ '* ]]
+# Piped stdin prints no prompt (HOME is exercised through cd(".")/ls checks).
 [[ "$repl" != *$'\033'* ]]
 [[ "$repl" == *'[1,2]'* ]]
 # Bare null/empty-string results and null-returning commands stay silent.
