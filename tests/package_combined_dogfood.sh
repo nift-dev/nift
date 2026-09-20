@@ -6,6 +6,12 @@
 # (client-certified) and postgres/mysql imported for namespace isolation.
 set -euo pipefail
 NIFT="${NIFT:-./nift}"
+# The combined dogfood starts a local python HTTP server; skip when python3 is
+# unavailable (e.g. the Windows msys2 shell PATH lacks it) rather than fail.
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "SKIP combined dogfood (python3 unavailable)"
+  exit 0
+fi
 case "$NIFT" in /*) NIFT_ABS="$NIFT";; *) NIFT_ABS="$(pwd)/$NIFT";; esac
 PKG_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/nift-packages"
 SQLITE3_BIN="${SQLITE3_BIN:-sqlite3}"
