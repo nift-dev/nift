@@ -74,12 +74,17 @@ print(redis.set(client, "nift:combined", "cached").ok)
 print(redis.get(client, "nift:combined").data)
 redis.del(client, "nift:combined")
 
-// image pipeline: vips and imagemagick coexist; magick runs live
+// image pipeline: vips and imagemagick coexist; magick runs live when present.
+// The identify/width section is guarded on the resize result so a runner
+// without the magick executable cannot crash the dogfood on a missing field.
+res := magick.resize("assets/pic.png", "out/thumb.png", {"width": 120, "height": 120})
 print("magick-thumb")
-print(magick.resize("assets/pic.png", "out/thumb.png", {"width": 120, "height": 120}).ok)
-id := magick.identify("out/thumb.png")
-print("magick-size")
-print(id.width + "x" + id.height)
+print(res.ok)
+if(res.ok) {
+    id := magick.identify("out/thumb.png")
+    print("magick-size")
+    print(id.width + "x" + id.height)
+}
 print("vips-imported")
 print(vips.available())
 
