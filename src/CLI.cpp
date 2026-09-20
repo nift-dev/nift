@@ -938,11 +938,11 @@ static int run_script_shell() {
 #ifndef _WIN32
         std::string line;ShellRead r;
         if(interactive){r=interactive_read_line(parser,prompt,history,hist_pos,line);}
-        else {std::cout<<prompt<<std::flush;r=std::getline(std::cin,line)?ShellRead::Line:ShellRead::Eof;}
+        else {r=std::getline(std::cin,line)?ShellRead::Line:ShellRead::Eof;}
         if(r==ShellRead::Eof)break;
         if(r==ShellRead::Interrupt){pending.clear();continue;}
 #else
-        std::string line;std::cout<<prompt<<std::flush;if(!std::getline(std::cin,line))break;
+        std::string line;if(_isatty(_fileno(stdin)))std::cout<<prompt<<std::flush;if(!std::getline(std::cin,line))break;
 #endif
         if(pending.empty()&&(line=="exit"||line=="quit"))break;if(pending.empty()&&!line.empty()){append_nift_history(line);if(history.size()>=1000)history.erase(history.begin());history.push_back(line);hist_pos=history.size();}pending+=line+"\n";
         // CP85: the parser reports whether the accumulated input is complete,

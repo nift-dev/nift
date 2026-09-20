@@ -6,7 +6,7 @@ case "$bin" in /*) BIN="$bin";; *) BIN="$(cd "$(dirname "$bin")" && pwd)/$(basen
 # execution on every script-reachable surface including build hooks.
 out=$(printf 'printf hello\nexit\n' | "$BIN" sh --no-process 2>&1 || true)
 grep -q 'external process execution disabled' <<<"$out"
-t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
+t=$(cd "$(mktemp -d)" && pwd -P); trap 'rm -rf "$t"' EXIT
 # The structured cmd() pipeline API must not bypass the restriction.
 cat >"$t/bypass.f" <<'F'
 p := cmd("echo", "BYPASS").run()
