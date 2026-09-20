@@ -44,18 +44,34 @@ i := 0
 while(i < 80000) { s.add(i); i += 1 }
 print(s.size())
 F
+cat >"$t/map40.f" <<'F'
+m := map()
+i := 0
+while(i < 40000) { m.set(i, i); i += 1 }
+print(m.size())
+F
+cat >"$t/map80.f" <<'F'
+m := map()
+i := 0
+while(i < 80000) { m.set(i, i); i += 1 }
+print(m.size())
+F
 
 p40=$("$NIFT_ABS" run "$t/push40.f"); [ "$p40" = "40000" ] || { echo "push40 wrong: $p40" >&2; exit 1; }
 p80=$("$NIFT_ABS" run "$t/push80.f"); [ "$p80" = "80000" ] || { echo "push80 wrong: $p80" >&2; exit 1; }
 s40=$("$NIFT_ABS" run "$t/set40.f"); [ "$s40" = "40000" ] || { echo "set40 wrong: $s40" >&2; exit 1; }
 s80=$("$NIFT_ABS" run "$t/set80.f"); [ "$s80" = "80000" ] || { echo "set80 wrong: $s80" >&2; exit 1; }
+m40=$("$NIFT_ABS" run "$t/map40.f"); [ "$m40" = "40000" ] || { echo "map40 wrong: $m40" >&2; exit 1; }
+m80=$("$NIFT_ABS" run "$t/map80.f"); [ "$m80" = "80000" ] || { echo "map80 wrong: $m80" >&2; exit 1; }
 
 push_lo=$(measure "$t/push40.f")
 push_hi=$(measure "$t/push80.f")
 set_lo=$(measure "$t/set40.f")
 set_hi=$(measure "$t/set80.f")
+map_lo=$(measure "$t/map40.f")
+map_hi=$(measure "$t/map80.f")
 
-echo "push 40k=${push_lo}ms 80k=${push_hi}ms | set 40k=${set_lo}ms 80k=${set_hi}ms"
+echo "push 40k=${push_lo}ms 80k=${push_hi}ms | set 40k=${set_lo}ms 80k=${set_hi}ms | map 40k=${map_lo}ms 80k=${map_hi}ms"
 
 ratio_ok() { # $1 lo, $2 hi; doubling must be under 3.5x (linear ~2x, O(n^2) ~4x)
   local lo=$1 hi=$2
@@ -65,5 +81,6 @@ ratio_ok() { # $1 lo, $2 hi; doubling must be under 3.5x (linear ~2x, O(n^2) ~4x
 
 if ! ratio_ok "$push_lo" "$push_hi"; then echo "FAIL: array push scaling regression (40k=${push_lo}ms 80k=${push_hi}ms)" >&2; exit 1; fi
 if ! ratio_ok "$set_lo" "$set_hi"; then echo "FAIL: set add scaling regression (40k=${set_lo}ms 80k=${set_hi}ms)" >&2; exit 1; fi
+if ! ratio_ok "$map_lo" "$map_hi"; then echo "FAIL: map set scaling regression (40k=${map_lo}ms 80k=${map_hi}ms)" >&2; exit 1; fi
 
-echo "PASS performance scaling guards (array push + set add remain linear)"
+echo "PASS performance scaling guards (array push + set add + map set remain linear)"
