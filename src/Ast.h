@@ -32,4 +32,5 @@ StatementParseResult parse_statement(const std::string& source);
 ParseResult parse_expression(const std::string& source);
 bool evaluate(const Expr& expr, Context& ctx, json::Document& out, std::string& error);
 bool truthy(const json::Document& value);
+void fold_constants(Expr& expr);
 } // namespace nift::ast

@@ -69,9 +69,27 @@ StatementParseResult parse_statement(const std::string& source){
  for(std::size_t p=0;p<t.size();++p)if(t[p]=='='&&(p==0||std::string("=!<>").find(t[p-1])==std::string::npos)&&(p+1==t.size()||t[p+1]!='=')){auto n=trim(t.substr(0,p));if(ident(n)){auto r=parse_expression(t.substr(p+1));if(r.supported){st->kind=StmtKind::Assignment;st->name=n;st->expr=std::move(r.expr);return{std::move(st),{},true};}}break;}
  auto r=parse_expression(t);if(r.supported){st->kind=StmtKind::Expression;st->expr=std::move(r.expr);return{std::move(st),{},true};}return{std::move(st),r.error,false};
 }
+void fold_constants(Expr& e){
+ for(auto& item:e.items)if(item)fold_constants(*item);
+ if(e.left)fold_constants(*e.left); if(e.right)fold_constants(*e.right);
+ auto literal=[](const std::unique_ptr<Expr>& p){return p&&p->kind==Kind::Literal;};
+ bool candidate=false;
+ if(e.kind==Kind::Unary)candidate=literal(e.right);
+ else if(e.kind==Kind::Binary||e.kind==Kind::Logical||e.kind==Kind::Coalesce)candidate=literal(e.left)&&literal(e.right);
+ if(!candidate)return;
+ // Do not fold strings: string '+' uses runtime rendering semantics. Do not
+ // fold operations that would raise (division/modulo by zero, bad types).
+ auto scalar=[](const json::Document& d){return d.is_number()||d.is_bool()||d.is_null();};
+ if(e.left&&!scalar(e.left->literal))return; if(e.right&&!scalar(e.right->literal))return;
+ Context c; c.resolve=[](const std::string&,json::Document&,std::string&){return false;};
+ c.legacy=[](const std::string&,json::Document&,std::string&){return false;};
+ json::Document v; std::string error; if(!evaluate(e,c,v,error))return;
+ e.kind=Kind::Literal; e.literal=std::move(v); e.text.clear(); e.op.clear(); e.name.clear(); e.params.clear(); e.left.reset(); e.right.reset(); e.items.clear();
+}
+
 ParseResult parse_expression(const std::string& source){
  {auto arrow=source.find("=>");if(arrow!=std::string::npos){auto lhs=source.substr(0,arrow);auto trim=[](std::string x){auto b=x.find_first_not_of(" \t\r\n");if(b==std::string::npos)return std::string();auto e=x.find_last_not_of(" \t\r\n");return x.substr(b,e-b+1);};lhs=trim(lhs);if(lhs.size()>=2&&lhs.front()=='('&&lhs.back()==')'){auto n=std::make_unique<Expr>();n->kind=Kind::Lambda;n->span={0,source.size()};n->text=source;std::string ps=lhs.substr(1,lhs.size()-2);std::size_t p=0;while(p<=ps.size()){auto c=ps.find(',',p);auto v=trim(ps.substr(p,c==std::string::npos?std::string::npos:c-p));if(!v.empty()){if(v.rfind("...",0)==0){n->op="variadic:"+trim(v.substr(3));n->params.push_back(trim(v.substr(3)));}else n->params.push_back(v);}if(c==std::string::npos)break;p=c+1;}return{std::move(n),{},true};}}}
- P p{source};auto e=p.coalesce();p.ws();if(!e||p.p!=source.size())return{{},p.error.empty()?"unsupported expression":p.error,false};return{std::move(e),{},true};}
+ P p{source};auto e=p.coalesce();p.ws();if(!e||p.p!=source.size())return{{},p.error.empty()?"unsupported expression":p.error,false};fold_constants(*e);return{std::move(e),{},true};}
 TemplateParseResult parse_template(const std::string& source){
  TemplateParseResult r; std::size_t pos=0,lit=0;
  auto literal=[&](std::size_t b,std::size_t e){if(e<=b)return;auto n=std::make_unique<TemplateNode>();n->kind=TemplateKind::Literal;n->span={b,e};n->text=source.substr(b,e-b);r.nodes.push_back(std::move(n));};
