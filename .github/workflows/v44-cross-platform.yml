@@ -132,7 +132,7 @@ jobs:
         timeout-minutes: 6
         if: runner.os == 'Windows'
         shell: msys2 {0}
-        run: |
+run: |
           # The runner installs Python but it is not on the msys2 shell PATH;
           # locate it and expose it so the version-consistency gate actually
           # certifies on Windows instead of skipping.
@@ -141,7 +141,7 @@ jobs:
             echo "pythonLocation=$PY"
             if [ -n "$PY" ]; then
               # C:\hostedtoolcache\... -> /c/hostedtoolcache/... (no cygpath)
-              PYU="$(printf '%s' "$PY" | sed 's|\\|/|g; s|^\([A-Za-z]\):||; s|^|/|')"
+              PYU="$(printf '%s' "$PY" | sed 's|\\\\|/|g; s|^\\([A-Za-z]\\):|/\\L\\1|')"
               echo "python path=$PYU"
               export PATH="$PATH:$PYU"
             fi
