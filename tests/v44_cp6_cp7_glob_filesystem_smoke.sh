@@ -14,6 +14,5 @@ out=$($NIFT run "$t/test.f")
 [ "$out" = "ALL=3
 A=1
 B=1
-ADEEP=1
 ADEEP=1" ] || { printf '%s\n' "$out" >&2; exit 1; }
 echo 'PASS v4.4 CP6-CP7 filesystem globs'
