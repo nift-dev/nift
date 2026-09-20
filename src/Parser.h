@@ -80,10 +80,11 @@ private:
         int type = 0;
         bool mutable_binding = true;
         bool deep_readonly = false;
+        bool is_script_args = false;
         std::shared_ptr<std::shared_ptr<json::Document>> slot;
         VariableBinding() : slot(std::make_shared<std::shared_ptr<json::Document>>(value)) {}
         VariableBinding(std::shared_ptr<json::Document> v, int t, bool m, bool d)
-            : value(std::move(v)), type(t), mutable_binding(m), deep_readonly(d), slot(std::make_shared<std::shared_ptr<json::Document>>(value)) {}
+            : value(std::move(v)), type(t), mutable_binding(m), deep_readonly(d), is_script_args(false), slot(std::make_shared<std::shared_ptr<json::Document>>(value)) {}
         void sync() { if (slot) value = *slot; }
         void rebind(std::shared_ptr<json::Document> v) { value=std::move(v); if(slot)*slot=value; }
     };

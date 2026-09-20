@@ -1,5 +1,4 @@
 #include "CLI.h"
-#include "Console.h"
 #include "FileSystem.h"
 #include "JsonFile.h"
 #include <minify/Minify.h>
@@ -15,6 +14,10 @@
 #include "RenderHost.h"
 #include "ScriptHost.h"
 #include "Json.h"
+// Console.h pulls <windows.h> on Windows; include it after the standard-library
+// heavy headers so libstdc++'s <filesystem>/<locale> are parsed before any
+// windows.h macros are visible (mingw locale/gthread fragility).
+#include "Console.h"
 
 #include <algorithm>
 #include <chrono>
@@ -783,7 +786,17 @@ static int execute_shell_command(Parser& parser,const std::string& line,bool pri
     if(std::getenv("NIFT_NO_PROCESS")){if(print_errors)console::error("external process execution disabled");return 126;}
     size_t pos=0;int last=0;std::string pending_op;
     while(pos<toks.size()){size_t end=pos;while(end<toks.size()&&toks[end]!="&&"&&toks[end]!="||"&&toks[end]!=";")++end;bool should=pending_op.empty()||(pending_op=="&&"?last==0:last!=0)||pending_op==";";if(should){std::vector<ProcessSpec> stages(1);size_t si=0;bool expect_in=false,expect_out=false,expect_err=false;for(size_t i=pos;i<end;++i){const std::string&t=toks[i];if(t=="|"){stages.emplace_back();++si;continue;}if(t=="<"){expect_in=true;continue;}if(t==">"||t==">>"){expect_out=true;stages[si].append_stdout=t==">>";continue;}if(t=="2>"){expect_err=true;continue;}if(t=="2>&1"){stages[si].merge_stderr=true;continue;}if(t=="&"){if(print_errors)console::error("background job control is not implemented; use structured process APIs or omit &");return 2;}if(expect_in){stages[si].stdin_path=t;expect_in=false;continue;}if(expect_out){stages[si].stdout_path=t;expect_out=false;continue;}if(expect_err){stages[si].stderr_path=t;expect_err=false;continue;}if(stages[si].program.empty()){auto eq=t.find('=');if(eq!=std::string::npos&&eq>0){stages[si].env[t.substr(0,eq)]=t.substr(eq+1);continue;}stages[si].program=t;}else{std::vector<std::string> ex;shell_glob_expand(t,ex);stages[si].args.insert(stages[si].args.end(),ex.begin(),ex.end());}}
-        for(auto&st:stages)if(st.program.empty()){if(print_errors)console::error("empty command in pipeline");return 2;}auto pr=nift_run_pipeline(stages,true,true);last=pr.exit_code;if(!pr.error.empty()&&print_errors)console::error(pr.error);
+        for(auto&st:stages)if(st.program.empty()){if(print_errors)console::error("empty command in pipeline");return 2;}
+        // A simple foreground command (no operators, no redirection, no
+        // pipeline) is attached directly to the shell's terminal: the child
+        // inherits stdin/stdout/stderr and becomes the foreground process
+        // group, so interactive/terminal programs (fastfetch, top, less,
+        // editors) behave as if launched from Bash. Redirections and
+        // pipelines use their requested pipes/files; run()/cmd() structured
+        // capture is unaffected.
+        const bool direct = !has_ops && stages.size()==1;
+        if(direct) stages[0].foreground_terminal = true;
+        auto pr=nift_run_pipeline(stages, !direct, !direct);last=pr.exit_code;if(!pr.error.empty()&&print_errors)console::error(pr.error);
     }pending_op=end<toks.size()?toks[end]:"";pos=end+1;}return last;}
 
 static fs::path nift_history_path(){
@@ -950,7 +963,36 @@ static int run_script_shell() {
         if(command_style){execute_shell_command(parser,trimmed);pending.clear();continue;}
         const Parser::StatementState st=parser.statement_state(pending);
         if(st==Parser::StatementState::Incomplete)continue;
-        auto rr=parser.run_statement(pending,"<nift-sh>");pending.clear();if(!rr.ok){console::error(rr.error.message);continue;}if(!rr.output.empty())std::cout<<rr.output<<'\n';
+        auto rr=parser.run_statement(pending,"<nift-sh>");pending.clear();
+        if(!rr.ok){
+            // A bare unrecognized single token may be an ordinary external
+            // command on PATH (fastfetch, git, env, printf, ...). Nift keeps
+            // precedence: run_statement already had the first chance, so real
+            // bindings, functions, builtins and values evaluate there; only an
+            // otherwise-unrecognized plain identifier falls through to ordinary
+            // external executable/PATH resolution. --no-process stays
+            // authoritative and rejects the fallback.
+            const std::string tv=[&](){std::string s=trimmed;std::size_t a=s.find_first_not_of(" \t\r\n");std::size_t b=s.find_last_not_of(" \t\r\n");return a==std::string::npos?std::string():s.substr(a,b-a+1);}();
+            const bool bare_token = !tv.empty() &&
+                tv.find_first_of(" \t()[]{}:=@$\"'")==std::string::npos && tv.find("//")==std::string::npos;
+            if(bare_token){
+                static const std::unordered_set<std::string> shell_builtins={"build","cat","cd","cmd","copy","cp","exists","file","getenv","ls","make_dir","max","min","mkdir","move","mv","open","page","pwd","remove","rm","run","setenv","touch","unsetenv","which"};
+                const bool is_builtin = shell_builtins.count(tv) != 0;
+                std::string resolved;
+                const bool on_path = !is_builtin && nift_find_executable(tv, resolved);
+                if(on_path){
+                    if(std::getenv("NIFT_NO_PROCESS")){console::error("external process execution disabled");continue;}
+                    execute_shell_command(parser, tv, true);
+                    continue;
+                }
+                if(!is_builtin){
+                    console::error("command not found: " + tv);
+                    continue;
+                }
+            }
+            console::error(rr.error.message);continue;
+        }
+        if(!rr.output.empty())std::cout<<rr.output<<'\n';
     }
     std::string resource_error;
     if(!parser.finalize_script_resources(resource_error)){console::error(resource_error);return 1;}

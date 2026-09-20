@@ -3114,13 +3114,18 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             if (!valid_binding_identifier(name)) { error = "declaration requires an identifier before ':='"; return false; }
             if (reserved_binding_name(name) || host_.is_contract_name(name)) { error = "declaration name is reserved: " + name; return false; }
             if (variable_scopes_.empty()) variable_scopes_.emplace_back();
-            if (variable_scopes_.back().find(name) != variable_scopes_.back().end()) { error = "binding already declared in this scope: " + name; return false; }
+            if (variable_scopes_.back().find(name) != variable_scopes_.back().end()) {
+                // The injected script `args` binding may be shadowed by a
+                // script that intentionally declares its own.
+                auto& existing = variable_scopes_.back().find(name)->second;
+                if (!existing.is_script_args) { error = "binding already declared in this scope: " + name; return false; }
+            }
             json::Document assigned;
             if (!eval(text.substr(p + 2), assigned, depth + 1)) return false;
             std::shared_ptr<json::Document> stored;
             const std::string rhs_name=trim_copy(text.substr(p+2)); VariableBinding* alias=find_binding(rhs_name);
             if(alias&&alias->value&&alias->value->is_array()) stored=alias->value; else stored=std::make_shared<json::Document>(assigned);
-            variable_scopes_.back().emplace(name, VariableBinding{stored, nift_binding_type_from_text(text.substr(p + 2), assigned), mutable_binding, deep_readonly});
+            variable_scopes_.back()[name] = VariableBinding{stored, nift_binding_type_from_text(text.substr(p + 2), assigned), mutable_binding, deep_readonly};
             if (depth == 0) last_expression_mutation_ = true;
             out = std::move(assigned);
             return true;
@@ -3596,12 +3601,26 @@ bool Parser::translate_function_program(const std::string& source, std::string& 
                     std::size_t f0=stmt.find_first_of(" \t");
                     const std::string first=f0==std::string::npos?stmt:stmt.substr(0,f0);
                     const bool path_first = (first.rfind("./",0)==0||first.rfind("../",0)==0||(!first.empty()&&first[0]=='/')||first.find('/')!=std::string::npos);
+                    // Command-style also covers a plain word + arguments
+                    // (git status, gh repo view, printf one): a multi-token
+                    // line without Nift syntax cannot be a single expression,
+                    // so it is ordinary external process execution. A single
+                    // bare token stays an expression (bindings have precedence).
+                    const bool multi_token = f0 != std::string::npos;
+                    // Reject Nift declaration/assignment forms: x := 5, x = 5,
+                    // x=5, ./x = 5. A '=' inside a later command argument
+                    // (printf a=b, git log --format=%H) stays a command.
+                    bool assignment_form = first.find('=')!=std::string::npos;
+                    if(!assignment_form && f0!=std::string::npos){
+                        const std::string rest=trim_copy(stmt.substr(f0));
+                        assignment_form = rest.rfind(":=",0)==0 || (rest.rfind("=",0)==0 && rest.size()>1 && rest[1]!='=');
+                    }
                     // Only a plain command line (no unquoted parens/brackets/
                     // braces/assignment) is external command style. This keeps
                     // ./tool(args) call attempts and `./x = ...` out of the
                     // process path so the shell's callable-first routing still
                     // works.
-                    bool cmd_like=path_first; bool qq=false;char qc=0;int pp=0,bb=0,cc2=0;bool saw_delim=false;
+                    bool cmd_like=(path_first||multi_token)&&!assignment_form; bool qq=false;char qc=0;int pp=0,bb=0,cc2=0;bool saw_delim=false;
                     for(std::size_t k=0;k<stmt.size()&&cmd_like;++k){char c=stmt[k];if(qq){if(c=='\\')++k;else if(c==qc)qq=false;continue;}if(c=='\''||c=='"'){qq=true;qc=c;continue;}if(c=='('){++pp;saw_delim=true;}else if(c==')'){--pp;saw_delim=true;}else if(c=='['){++bb;saw_delim=true;}else if(c==']'){--bb;saw_delim=true;}else if(c=='{'){++cc2;saw_delim=true;}else if(c=='}'){--cc2;saw_delim=true;}else if((c=='='||c==':')&&pp==0&&bb==0&&cc2==0){cmd_like=false;}}
                     if(cmd_like&&!saw_delim&&pp==0&&bb==0&&cc2==0) out += "@__nift_cmd(" + stmt + ")";
                     else out+="$["+stmt+"]";
@@ -3654,10 +3673,16 @@ RenderResult Parser::run_script(const std::string& source, const fs::path& sourc
     result_ = RenderResult{};
     variable_scopes_.clear(); variable_scopes_.emplace_back();
     // Standalone scripts receive their user arguments as an immutable `args`
-    // array (the script path itself is not included).
-    auto arr = std::make_shared<json::Document>(json::Document::make_array());
-    for (const auto& a : script_args_) arr->array.emplace_back(a);
-    variable_scopes_.back()["args"] = VariableBinding{arr, nift_binding_type(*arr), false, true};
+    // array (the script path itself is not included). The binding is always
+    // present (empty when no arguments were passed) so scripts can read `args`
+    // unconditionally; a script that declares its own `args` shadows it.
+    {
+        auto arr = std::make_shared<json::Document>(json::Document::make_array());
+        for (const auto& a : script_args_) arr->array.emplace_back(a);
+        VariableBinding vb{arr, nift_binding_type(*arr), false, true};
+        vb.is_script_args = true;
+        variable_scopes_.back()["args"] = std::move(vb);
+    }
     callables_.clear(); structs_.clear(); requested_exports_.clear(); pending_control_={};
     in_import_program_=false; standalone_script_host_=true; strict_script_mode_=true; function_call_depth_=1;
     auto rr=execute_native_program(source,source_path,0);

@@ -102,4 +102,23 @@ grep -q "^./my dir/$" <<<"$out" || { echo "$out" >&2; exit 1; }
 out=$(cd "$t" && "$NIFT_ABS" complete "./my dir/with ")
 grep -q "^./my dir/with space.f$" <<<"$out" || { echo "$out" >&2; exit 1; }
 
+
+# command-style external commands from script land: word + args resolves on PATH
+mkdir -p "$t/bin"
+cat > "$t/bin/fixtool" <<'B'
+#!/bin/sh
+echo "fixtool-ran $1"
+B
+chmod +x "$t/bin/fixtool"
+cat > "$t/cc.f" <<'NIFT'
+fixtool one
+fixtool one two three
+print("cc-done")
+NIFT
+out=$(cd "$t" && PATH="$t/bin:$PATH" "$NIFT_ABS" run cc.f)
+grep -q 'fixtool-ran one' <<<"$out" || { echo "$out" >&2; exit 1; }
+grep -q '^cc-done$' <<<"$out" || exit 1
+# command-style in script land is blocked by --no-process
+if (cd "$t" && PATH="$t/bin:$PATH" NIFT_NO_PROCESS=1 "$NIFT_ABS" run cc.f 2>/dev/null | grep -q 'fixtool-ran'); then echo "script command-style ran under --no-process" >&2; exit 1; fi
+
 echo 'PASS v4.4 executable .f scripts'
