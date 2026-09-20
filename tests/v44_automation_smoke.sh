@@ -25,7 +25,7 @@ t := track("about", "About", "templates/main.html")
 print(t.ok)
 print(tracked().join(","))
 F
-out=$(cd "$t/site" && "$NIFT_ABS" run auto.f)
+out=$(cd "$t/site" && "$NIFT_ABS" run auto.f 2>&1) || { printf 'auto.f failed: %s\n' "$out" >&2; exit 1; }
 # project_root() reports the site path in the platform's native form; match it
 # by its 'site' suffix so the assertion is portable across POSIX/MSYS2.
 { printf '%s\n' "$out" | grep -q 'site$'; } || { printf 'unexpected:\n%s\n' "$out" >&2; exit 1; }
@@ -45,7 +45,7 @@ u := untrack("about")
 print(u.ok)
 print(tracked().join(","))
 F
-out2=$(cd "$t/site" && "$NIFT_ABS" run auto2.f)
+out2=$(cd "$t/site" && "$NIFT_ABS" run auto2.f 2>&1) || { printf 'auto2.f failed: %s\n' "$out2" >&2; exit 1; }
 # The incremental 'modified' detection may legitimately report '/' as well as
 # 'about' on filesystems with coarse mtime resolution (Windows/NTFS), so the
 # affected/status lines accept either form. The API contract (status, build
