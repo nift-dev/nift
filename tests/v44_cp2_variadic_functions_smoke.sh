@@ -15,11 +15,13 @@ if(n <= 0) { return xs.size() }
 return recur(n - 1, n, ...xs)
 }
 print(recur(2))
+print("RECUR[" + recur(2).to_string() + "]")
 F
 out=$($NIFT run "$t/ok.f")
 [ "$out" = "x:0
 3
-2" ] || { printf 'unexpected output:\n%s\n' "$out" >&2; exit 1; }
+2
+RECUR[2]" ] || { printf 'unexpected output:\n%s\n' "$out" >&2; exit 1; }
 for sig in 'f(...a, b)' 'f(...a, ...b)' 'f(...)'; do
   printf '@fn(%s){ return null }\n' "$sig" >"$t/bad.f"
   if $NIFT run "$t/bad.f" >/dev/null 2>&1; then echo "accepted bad variadic: $sig" >&2; exit 1; fi
