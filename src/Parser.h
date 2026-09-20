@@ -111,6 +111,14 @@ private:
         CollectionKind kind = CollectionKind::Stack;
         std::vector<json::Document> values;
         std::vector<std::pair<json::Document, json::Document>> entries;
+        // O(1) membership index for Set/SortedSet scalar values. The key is
+        // canonical for plain scalars (bool/number/non-marker string), so key
+        // presence implies structural equality; marked references (struct/
+        // collection/callable) use the empty key and fall back to the linear
+        // scan. has_huge_int tracks any StrNumber so a Number add never misses
+        // a numerically-equal big-integer member (Number vs StrNumber equality).
+        std::unordered_set<std::string> scalar_keys;
+        bool has_huge_int = false;
     };
     std::unordered_map<std::string, std::shared_ptr<CollectionInstance>> collection_instances_;
     std::uint64_t next_collection_instance_id_ = 1;
