@@ -2,6 +2,7 @@
 set -euo pipefail
 NIFT=${NIFT:-./nift}
 t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
+echo "MARK exec-shell start"
 cat >"$t/run.f" <<'F'
 r := run("sh", "-c", "printf out; printf err >&2; exit 3")
 if(r.exit_code != 3) { return "bad exit" }
@@ -15,8 +16,10 @@ if(e.stdout.trim() != "yes") { return "bad env" }
 F
 rf_out=$("$NIFT" run "$t/run.f" 2>&1) || { echo "run.f failed: $rf_out" >&2; exit 1; }
 test -z "$rf_out" || { echo "run.f returned: $rf_out" >&2; exit 1; }
+echo "MARK after run.f"
 shell_out=$(printf 'printf hello | tr a-z A-Z > %s/out\ncat %s/out\nexit\n' "$t" "$t" | "$NIFT" sh 2>&1 || true)
 grep -q HELLO <<<"$shell_out" || { echo "shell pipeline: $shell_out" >&2; exit 1; }
+echo "MARK after pipeline"
 # Shell assignment statements must route to the Nift statement engine, and
 # adjacent fd-redirects (2>) must not become a literal argument.
 assign_out=$(printf 'x := 5\nx = 7\nprint(x)\nexit\n' | "$NIFT" sh 2>&1 || true)
