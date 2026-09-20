@@ -12,7 +12,7 @@ import os, pty, select, subprocess, sys, time
 # line-based input until the platform backend lands. Skip there.
 if os.name == "nt":
     print("SKIP v4.4 interactive completion PTY (Windows uses line-based input)")
-    sys.exit(0)
+    sys.exit(77)
 
 NIFT = sys.argv[1] if len(sys.argv) > 1 else "./nift"
 FAILS = []

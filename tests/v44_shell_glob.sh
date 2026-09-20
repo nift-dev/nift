@@ -6,7 +6,7 @@ case "$NIFT" in /*) NIFT_ABS="$NIFT";; *) NIFT_ABS="$(pwd)/$NIFT";; esac
 # through until a native glob backend lands, so skip the assertion there.
 if [ "$(uname -s 2>/dev/null)" = "MINGW"* ] || [ "${OS:-}" = "Windows_NT" ]; then
   echo 'SKIP v4.4 shell glob (Windows passthrough pending glob backend)'
-  exit 0
+  exit 77
 fi
 t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
 touch "$t/a.txt" "$t/b.txt"
