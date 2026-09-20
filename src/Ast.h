@@ -8,7 +8,7 @@
 
 namespace nift::ast {
 struct SourceSpan { std::size_t begin=0, end=0; };
-enum class Kind { Literal, Binding, Unary, Binary, Logical, Index, Member, Range, Call, Lambda, Array, Object, Legacy };
+enum class Kind { Literal, Binding, Unary, Binary, Logical, Coalesce, Index, Member, SafeIndex, SafeMember, Range, Call, Lambda, Array, Object, Legacy };
 struct Expr {
     Kind kind=Kind::Legacy; SourceSpan span{}; std::string text, op, name; std::vector<std::string> params;
     json::Document literal;
@@ -20,7 +20,7 @@ struct Context {
     std::function<bool(const std::string&, json::Document&, std::string&)> legacy;
     std::function<std::string(const json::Document&)> render;
 };
-enum class StmtKind { Block, Declaration, Assignment, CompoundAssignment, Increment, Expression, If, While, For, Break, Continue, Return, Function, Legacy };
+enum class StmtKind { Block, Declaration, Assignment, CompoundAssignment, Increment, Expression, If, While, For, Break, Continue, Return, Function, Struct, Enum, Import, Export, Script, Legacy };
 struct Stmt { StmtKind kind=StmtKind::Legacy; SourceSpan span{}; std::string text, name, op; std::unique_ptr<Expr> expr, condition, iterable; std::vector<std::string> params, bindings; std::string variadic_param; std::vector<std::unique_ptr<Stmt>> body; };
 struct StatementParseResult { std::unique_ptr<Stmt> stmt; std::string error; bool supported=false; };
 struct ParseResult { std::unique_ptr<Expr> expr; std::string error; bool supported=false; };
