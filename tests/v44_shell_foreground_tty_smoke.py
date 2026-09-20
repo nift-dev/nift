@@ -29,6 +29,28 @@ def check(name, cond, detail=""):
     if not cond:
         FAILS.append(name + (" " + detail if detail else ""))
 
+def wait_pid_bounded(pid, deadline):
+    """Wait for a child to exit within the deadline; otherwise kill it and
+    raise, so a regression produces a failure instead of hanging CI forever."""
+    while time.time() < deadline:
+        try:
+            got, st = os.waitpid(pid, os.WNOHANG)
+        except ChildProcessError:
+            return
+        if got == pid:
+            return
+        time.sleep(0.05)
+    try:
+        os.kill(pid, 9)
+    except OSError:
+        pass
+    try:
+        os.waitpid(pid, 0)
+    except (OSError, ChildProcessError):
+        pass
+    raise RuntimeError("shell did not exit within the deadline")
+
+
 def run_in_shell(cmd, timeout=3.0):
     pid, fd = pty.fork()
     if pid == 0:
@@ -36,22 +58,24 @@ def run_in_shell(cmd, timeout=3.0):
         os.execv(NIFT, [NIFT, "sh"])
     time.sleep(0.4)
     os.write(fd, cmd.encode())
-    time.sleep(timeout)
+    deadline = time.time() + timeout
     out = b""
-    while True:
+    while time.time() < deadline:
         r, _, _ = select.select([fd], [], [], 0.2)
         if not r:
-            break
+            continue
         try:
-            out += os.read(fd, 4096)
+            chunk = os.read(fd, 4096)
+            if not chunk:
+                break
+            out += chunk
         except OSError:
             break
     os.write(fd, b"exit\n")
-    time.sleep(0.2)
+    wait_pid_bounded(pid, time.time() + 5.0)
     try:
         os.close(fd)
-        os.waitpid(pid, 0)
-    except (OSError, ChildProcessError):
+    except OSError:
         pass
     return out.decode(errors="replace")
 
@@ -74,7 +98,7 @@ check("redirection-routes-stdout", "fd1-pipe" in out, out)
 probe_script = os.path.join(T, ".interactive-run-probe.f")
 with open(probe_script, "w") as f:
     f.write('r := run("' + FIXTURE + '")\nprint(r.stdout.trim())\n')
-out = subprocess.run([NIFT, "run", probe_script], capture_output=True, text=True).stdout
+out = subprocess.run([NIFT, "run", probe_script], capture_output=True, text=True, timeout=30).stdout
 check("run-captures-not-tty", "fd1-pipe" in out and "fd0-pipe" in out, out)
 
 try:

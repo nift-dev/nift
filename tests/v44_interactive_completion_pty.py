@@ -108,7 +108,16 @@ try:
     time.sleep(0.5)
     drain(fd)
     try:
-        os.waitpid(pid, 0)
+        deadline = time.time() + 5.0
+        while time.time() < deadline:
+            got, _ = os.waitpid(pid, os.WNOHANG)
+            if got == pid:
+                break
+            time.sleep(0.05)
+        else:
+            os.kill(pid, 9)
+            check("ctrl-d-exits", False)
+            raise RuntimeError("shell did not exit on Ctrl-D")
         check("ctrl-d-exits", True)
     except ChildProcessError:
         check("ctrl-d-exits", False)
