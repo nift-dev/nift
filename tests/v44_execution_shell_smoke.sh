@@ -61,8 +61,8 @@ cat > "$t/bin/fixtool.cmd" <<'B'
 @echo off
 echo fixtool-ran %1
 B
-bare_out=$(cd "$t" && printf 'fixtool\n' | PATH="$t/bin:$PATH" "$NIFT" sh 2>/dev/null)
-grep -q 'fixtool-ran' <<<"$bare_out" || { echo "$bare_out" >&2; exit 1; }
+bare_out=$(cd "$t" && printf 'fixtool\n' | PATH="$t/bin:$PATH" "$NIFT" sh 2>&1 || true)
+grep -q 'fixtool-ran' <<<"$bare_out" || { echo "bare: $bare_out" >&2; exit 1; }
 echo "MARK builtins"
 # bare Nift builtins/values keep precedence: `true` is a Nift boolean, not /bin/true
 true_out=$(printf 'true\n' | "$NIFT" sh 2>/dev/null)
@@ -80,5 +80,5 @@ echo "MARK noprocess"
 if printf 'fixtool\n' | PATH="$t/bin:$PATH" NIFT_NO_PROCESS=1 "$NIFT" sh 2>/dev/null | grep -q 'fixtool-ran'; then echo "bare external ran under --no-process" >&2; exit 1; fi
 echo "MARK multi"
 # multi-token external commands (one and multiple arguments)
-multi_out=$(printf 'fixtool one\nfixtool one two three\n' | PATH="$t/bin:$PATH" "$NIFT" sh 2>/dev/null)
-grep -q 'fixtool-ran one' <<<"$multi_out" || { echo "$multi_out" >&2; exit 1; }
+multi_out=$(printf 'fixtool one\nfixtool one two three\n' | PATH="$t/bin:$PATH" "$NIFT" sh 2>&1 || true)
+grep -q 'fixtool-ran one' <<<"$multi_out" || { echo "multi: $multi_out" >&2; exit 1; }
