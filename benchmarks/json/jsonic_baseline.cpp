@@ -22,8 +22,18 @@ int main(int argc, char** argv) {
     const auto traverse0 = clock::now();
     if (document.is_array()) for (const auto& item : document.array) if (item.is_object() && item.has("v")) total += item["v"].num;
     const auto traverse1 = clock::now();
+    double mutated_total = 0.0;
+    const auto mutate0 = clock::now();
+    if (document.is_array()) for (auto& item : document.array) {
+        if (!item.is_object() || !item.has("v")) continue;
+        const double value = item["v"].num * 2.0;
+        item["total"] = json::Document(value);
+        mutated_total += item["total"].num;
+    }
+    const auto mutate1 = clock::now();
     const auto us = [](auto a, auto b) { return std::chrono::duration_cast<std::chrono::microseconds>(b-a).count(); };
     std::cout << "bytes=" << text.size() << " values=" << (document.is_array() ? document.array.size() : 0)
               << " io_us=" << us(io0, io1) << " parse_us=" << us(parse0, parse1)
-              << " traverse_us=" << us(traverse0, traverse1) << " sum=" << total << '\n';
+              << " traverse_us=" << us(traverse0, traverse1) << " sum=" << total
+              << " mutate_us=" << us(mutate0, mutate1) << " mutated_sum=" << mutated_total << '\n';
 }
