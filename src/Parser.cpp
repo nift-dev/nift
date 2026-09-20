@@ -6,6 +6,7 @@
 #include "Proc.h"
 #include "ProjectInfo.h"
 #include "Automation.h"
+#include "Ast.h"
 #include "Json.h"
 #include "JsonSchema.h"
 #include "RenderHost.h"
@@ -4578,8 +4579,19 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             if(bo>=source.size()||source[bo]!='{'||!find_balanced(source,bo,'{','}',bc)){fail(source_path,source,i,"@while(...) must be followed by a '{...}' block");break;}
             const std::string condition=source.substr(i+7,hc-(i+7));
             const auto body=normalize_control_block_body(source.substr(bo+1,bc-bo-1));
-            while(result_.ok){bool yes=false;std::string e;if(!evaluate_condition(condition,yes,e)){fail(source_path,source,i,e);break;}if(!yes)break;
-                push_json_scope(); ++loop_depth_; auto nested=parse(body.text,source_path,depth+1); --loop_depth_; pop_json_scope();if(!nested.ok)break;append_indented(output,nested.output,"",code_block_depth_);
+            // CP16 AST prototype: prepare a supported while condition once. The
+            // body remains on the compatibility parser unless it is composed
+            // solely of simple mutation expressions; those are prepared once as
+            // statement/expression trees too. Unsupported syntax is deliberately
+            // routed through the legacy evaluator, which remains the oracle.
+            auto prepared_condition=nift::ast::parse_expression(condition);
+            std::vector<std::unique_ptr<nift::ast::Stmt>> prepared_body; bool prepared_body_ok=true;
+            for(std::size_t bp=0;bp<body.text.size()&&prepared_body_ok;){while(bp<body.text.size()&&std::isspace((unsigned char)body.text[bp]))++bp;if(bp>=body.text.size())break;if(body.text.compare(bp,2,"$[")!=0){prepared_body_ok=false;break;}std::size_t close=0;if(!find_balanced(body.text,bp+1,'[',']',close)){prepared_body_ok=false;break;}auto ps=nift::ast::parse_statement(body.text.substr(bp+2,close-bp-2));if(!ps.supported||(ps.stmt->kind!=nift::ast::StmtKind::Assignment&&ps.stmt->kind!=nift::ast::StmtKind::CompoundAssignment&&ps.stmt->kind!=nift::ast::StmtKind::Increment)){prepared_body_ok=false;break;}prepared_body.push_back(std::move(ps.stmt));bp=close+1;}
+            auto ast_context=[&](){nift::ast::Context c;c.resolve=[&](const std::string& name,json::Document& out,std::string& e){for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(name);if(it!=sc->end()){it->second.sync();out=*it->second.value;return true;}}e="unknown binding: "+name;return false;};c.legacy=[&](const std::string& x,json::Document& out,std::string& e){return evaluate_expression(x,out,e);};c.render=[&](const json::Document& v){return render_expression_value(v);};return c;};
+            auto assign_plain=[&](const std::string& name,json::Document v,std::string& e)->bool{for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(name);if(it==sc->end())continue;if(!it->second.mutable_binding){e="cannot assign to const binding: "+name;return false;}const int at=nift_binding_type(v);if(!nift_type_assignable(at,it->second.type)){e="cannot change binding type: "+name;return false;}it->second.rebind(std::make_shared<json::Document>(std::move(v)));return true;}e="assignment to undefined binding: "+name;return false;};
+            auto execute_prepared=[&](const nift::ast::Stmt& st,std::string& e)->bool{auto c=ast_context();json::Document rhs,oldv,next;if(st.kind==nift::ast::StmtKind::Assignment){if(!nift::ast::evaluate(*st.expr,c,rhs,e))return false;return assign_plain(st.name,std::move(rhs),e);}if(!c.resolve(st.name,oldv,e))return false;if(st.kind==nift::ast::StmtKind::Increment){if(!oldv.is_number()){e="increment/decrement requires a numeric lvalue";return false;}next=json::Document(oldv.num+(st.op=="++"?1.0:-1.0));return assign_plain(st.name,std::move(next),e);}if(!nift::ast::evaluate(*st.expr,c,rhs,e))return false;if(st.op=="+="&&oldv.is_string()&&rhs.is_string())next=json::Document(oldv.string+rhs.string);else if(st.op=="+="&&oldv.is_array()&&rhs.is_array()){next=json::Document::make_array();next.array.reserve(oldv.array.size()+rhs.array.size());next.array.insert(next.array.end(),oldv.array.begin(),oldv.array.end());next.array.insert(next.array.end(),rhs.array.begin(),rhs.array.end());}else{if(!oldv.is_number()||!rhs.is_number()){e="arithmetic operators require numeric operands";return false;}if(st.op=="+=")next=json::Document(oldv.num+rhs.num);else if(st.op=="-=")next=json::Document(oldv.num-rhs.num);else if(st.op=="*=")next=json::Document(oldv.num*rhs.num);else if(st.op=="/="){if(rhs.num==0){e="division by zero";return false;}next=json::Document(oldv.num/rhs.num);}else{if(rhs.num==0){e="modulo by zero";return false;}next=json::Document(std::fmod(oldv.num,rhs.num));}}return assign_plain(st.name,std::move(next),e);};
+            while(result_.ok){bool yes=false;std::string e;if(prepared_condition.supported){auto c=ast_context();json::Document cv;if(!nift::ast::evaluate(*prepared_condition.expr,c,cv,e)){fail(source_path,source,i,e);break;}yes=nift::ast::truthy(cv);}else if(!evaluate_condition(condition,yes,e)){fail(source_path,source,i,e);break;}if(!yes)break;
+                push_json_scope(); ++loop_depth_; RenderResult nested;if(prepared_body_ok){for(const auto& st:prepared_body)if(!execute_prepared(*st,e)){nested.ok=false;nested.error.message=e;break;}}else nested=parse(body.text,source_path,depth+1); --loop_depth_; pop_json_scope();if(!nested.ok){fail(source_path,source,i,nested.error.message);break;}append_indented(output,nested.output,"",code_block_depth_);
                 if (pending_control_.kind == ControlFlow::Continue) { pending_control_ = {}; continue; }
                 if (pending_control_.kind == ControlFlow::Break) { pending_control_ = {}; break; }
                 if(pending_control_.kind!=ControlFlow::None)break;
