@@ -1,5 +1,6 @@
 #include "Ast.h"
 #include <cctype>
+#include <cerrno>
 #include <cmath>
 #include <cstdlib>
 #include <limits>
@@ -15,7 +16,13 @@ struct P {
  std::unique_ptr<Expr> primary(){ws();auto b=p;if(p>=s.size()){error="expected expression";return{};}
    if(s[p]=='('){++p;auto n=logical_or();ws();if(p>=s.size()||s[p]!=')'){error="expected ')'";return{};}++p;if(n)n->span={b,p};return n;}
    if(s[p]=='\''||s[p]=='\"'){char q=s[p++];std::string v;while(p<s.size()&&s[p]!=q){if(s[p]=='\\'&&p+1<s.size()){char e=s[++p];v+=e=='n'?'\n':e=='t'?'\t':e;}else v+=s[p];++p;}if(p>=s.size()){error="unterminated string";return{};}++p;auto n=node(Kind::Literal,b);n->literal=json::Document(v);return n;}
-   if(std::isdigit((unsigned char)s[p])||(s[p]=='.'&&p+1<s.size()&&std::isdigit((unsigned char)s[p+1]))){char* e=nullptr;double v=std::strtod(s.c_str()+p,&e);if(e==s.c_str()+p){error="bad number";return{};}p=(std::size_t)(e-s.c_str());auto n=node(Kind::Literal,b);n->literal=json::Document(v);return n;}
+   if(std::isdigit((unsigned char)s[p])||(s[p]=='.'&&p+1<s.size()&&std::isdigit((unsigned char)s[p+1]))){char* e=nullptr;double v=std::strtod(s.c_str()+p,&e);if(e==s.c_str()+p){error="bad number";return{};}p=(std::size_t)(e-s.c_str());
+     // Big integer literals lose precision as doubles (strtod), which breaks
+     // comparisons and arithmetic (e.g. 9007199254740993 == 9007199254740992).
+     // Nift stores large integers exactly as StrNumber in the legacy evaluator;
+     // reject them here so the whole expression falls back to legacy semantics.
+     {bool integral=std::isdigit((unsigned char)s[b])||(s[b]=='-'&&b+1<s.size()&&std::isdigit((unsigned char)s[b+1]));if(integral){for(std::size_t z=(s[b]=='-'?b+1:b);z<(std::size_t)(e-s.c_str());++z)if(!std::isdigit((unsigned char)s[z])){integral=false;break;}if(integral){errno=0;char* le=nullptr;long long lv=std::strtoll(s.c_str()+b,&le,10);if(errno==ERANGE||(le==(e))&&(lv>9007199254740992LL||lv<-9007199254740992LL)){error="unsupported large integer literal";return{};}}}}
+     auto n=node(Kind::Literal,b);n->literal=json::Document(v);return n;}
    if(std::isalpha((unsigned char)s[p])||s[p]=='_'){++p;while(p<s.size()&&(std::isalnum((unsigned char)s[p])||s[p]=='_'))++p;std::string id=s.substr(b,p-b);ws();if(p<s.size()&&s[p]=='('){int d=0;bool q=false;char qc=0;do{char ch=s[p++];if(q){if(ch=='\\'&&p<s.size())++p;else if(ch==qc)q=false;}else if(ch=='\''||ch=='\"'){q=true;qc=ch;}else if(ch=='(')++d;else if(ch==')')--d;}while(p<s.size()&&d>0);if(d!=0){error="unterminated call";return{};}auto n=node(Kind::Call,b);n->text=s.substr(b,p-b);return n;}auto n=node(Kind::Binding,b);n->name=id;if(id=="true"){n->kind=Kind::Literal;n->literal=json::Document(true);}else if(id=="false"){n->kind=Kind::Literal;n->literal=json::Document(false);}else if(id=="null"){n->kind=Kind::Literal;n->literal=json::Document(nullptr);}return n;}
    error="unsupported primary";return{};
  }
