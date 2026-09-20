@@ -56,8 +56,21 @@ def run_in_shell(cmd, timeout=3.0):
     if pid == 0:
         os.chdir(T)
         os.execv(NIFT, [NIFT, "sh"])
+    os.set_blocking(fd, False)
     time.sleep(0.4)
-    os.write(fd, cmd.encode())
+    # Bounded, non-blocking write: if the child fills the pty buffer (its own
+    # output blocks it from reading our input), os.write would otherwise block
+    # forever. A slow/deadlocked child must fail the test, not hang CI.
+    deadline = time.time() + 2.0
+    data = cmd.encode()
+    sent = 0
+    while sent < len(data) and time.time() < deadline:
+        try:
+            sent += os.write(fd, data[sent:])
+        except BlockingIOError:
+            time.sleep(0.05)
+        except OSError:
+            break
     deadline = time.time() + timeout
     out = b""
     while time.time() < deadline:
@@ -69,9 +82,12 @@ def run_in_shell(cmd, timeout=3.0):
             if not chunk:
                 break
             out += chunk
-        except OSError:
+        except (BlockingIOError, OSError):
             break
-    os.write(fd, b"exit\n")
+    try:
+        os.write(fd, b"exit\n")
+    except OSError:
+        pass
     wait_pid_bounded(pid, time.time() + 5.0)
     try:
         os.close(fd)

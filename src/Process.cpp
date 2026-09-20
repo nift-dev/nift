@@ -212,6 +212,18 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capt
     if (r.launched) r.exit_code = (int)exit;
     if (capture) {
         r.out = read_all(op); r.err = read_all(ep);
+        // MSYS2/Cygwin children write CRLF to redirected output in text mode,
+        // so normalize captured output to LF; exact-output callers (run(),
+        // cmd().run(), tests comparing stdout) otherwise see trailing \r.
+        auto normalize = [](std::string& s) {
+            std::string n; n.reserve(s.size());
+            for (std::size_t i = 0; i < s.size(); ++i) {
+                if (s[i] == '\r' && i + 1 < s.size() && s[i + 1] == '\n') continue;
+                n.push_back(s[i]);
+            }
+            s = std::move(n);
+        };
+        normalize(r.out); normalize(r.err);
         DeleteFileW(ow.c_str()); DeleteFileW(ew.c_str());
         if (stream) { std::cout << r.out; std::cerr << r.err; }
     }

@@ -93,9 +93,5 @@ pg := postgres.query(postgres.open({"host": "127.0.0.1"}), "SELECT 1")
 print("pg-struct")
 print(pg.ok)
 NIFT
-out=$(cd "$t/site" && "$NIFT_ABS" run combined.f)
-echo "$out" > /tmp/opencode/combined_out.txt
-echo "=== COMBINED DOGFOOD OUTPUT ==="
-echo "$out"
-rm -f /tmp/opencode/combined_out.txt
+(cd "$t/site" && "$NIFT_ABS" run combined.f)
 kill $SRV 2>/dev/null || true

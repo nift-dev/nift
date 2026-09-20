@@ -966,8 +966,8 @@ test-v44-shell-restricted: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_shell_glob.sh $(V44_SKIP_77)
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp21_history_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp22_completion_smoke.sh
-	python3 tests/v44_interactive_completion_pty.py $(CURDIR)/$(TARGET) $(V44_SKIP_77)
-	python3 tests/v44_shell_foreground_tty_smoke.py $(CURDIR)/$(TARGET)
+	timeout 120 python3 -u tests/v44_interactive_completion_pty.py $(CURDIR)/$(TARGET) $(V44_SKIP_77)
+	timeout 120 python3 -u tests/v44_shell_foreground_tty_smoke.py $(CURDIR)/$(TARGET)
 	bash tests/v44_cp27_restricted_smoke.sh $(CURDIR)/$(TARGET)
 
 test-v44-packages: $(TARGET)
