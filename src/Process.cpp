@@ -1,5 +1,6 @@
 #include "Proc.h"
 #include <cstdlib>
+#include <algorithm>
 #include <cctype>
 #include <fstream>
 #include <sstream>
@@ -16,17 +17,52 @@ extern char **environ;
 #endif
 namespace fs=std::filesystem;
 static std::string read_all(const fs::path&p){std::ifstream f(p,std::ios::binary);return {std::istreambuf_iterator<char>(f),{}};}
-bool nift_find_executable(const std::string& name,std::string& path){fs::path p(name);if(p.has_parent_path()){if(fs::exists(p)){path=fs::absolute(p).string();return true;}return false;}const char* pe=std::getenv("PATH");if(!pe)return false;
+bool nift_find_executable(const std::string& name,std::string& path){
+    fs::path p(name);
 #ifdef _WIN32
-char sep=';'; const char* exts[]={"",".exe",".cmd",".bat"};
+    // Match Windows command lookup semantics closely enough for direct
+    // CreateProcessW execution: for an extensionless command, prefer PATHEXT
+    // candidates (.COM/.EXE/.BAT/.CMD by default) before an extensionless file.
+    // An MSYS2 directory can legitimately contain both `tool` (a shebang
+    // script) and `tool.cmd`; selecting the former merely because it exists
+    // makes CreateProcessW fail with ERROR_BAD_EXE_FORMAT (193).
+    auto win_candidates=[&](const fs::path& base){
+        std::vector<fs::path> out;
+        if(base.has_extension()){out.push_back(base);return out;}
+        std::vector<std::string> exts;
+        const char* px=std::getenv("PATHEXT");
+        std::string raw=(px&&*px)?px:".COM;.EXE;.BAT;.CMD";
+        std::stringstream es(raw);std::string ext;
+        while(std::getline(es,ext,';')){
+            if(ext.empty())continue;
+            if(ext.front()!='.')ext.insert(ext.begin(),'.');
+            exts.push_back(ext);
+        }
+        // De-duplicate PATHEXT entries case-insensitively while preserving its
+        // order. The extensionless path is a final fallback, never preferred.
+        std::vector<std::string> seen;
+        for(const auto& e:exts){
+            std::string low=e;for(char& c:low)c=(char)std::tolower((unsigned char)c);
+            if(std::find(seen.begin(),seen.end(),low)!=seen.end())continue;
+            seen.push_back(low);out.push_back(fs::path(base.string()+e));
+        }
+        out.push_back(base);
+        return out;
+    };
+    auto accept=[&](const fs::path& c){std::error_code ec;if(fs::is_regular_file(c,ec)&&!ec){path=fs::absolute(c).string();return true;}return false;};
+    if(p.has_parent_path()){for(const auto& c:win_candidates(p))if(accept(c))return true;return false;}
+    const char* pe=std::getenv("PATH");if(!pe)return false;
+    std::stringstream ss(pe);std::string d;
+    while(std::getline(ss,d,';'))for(const auto& c:win_candidates(fs::path(d)/name))if(accept(c))return true;
+    return false;
 #else
-char sep=':'; const char* exts[]={""};
+    if(p.has_parent_path()){std::error_code ec;if(fs::is_regular_file(p,ec)&&!ec&&::access(p.c_str(),X_OK)==0){path=fs::absolute(p).string();return true;}return false;}
+    const char* pe=std::getenv("PATH");if(!pe)return false;
+    std::stringstream ss(pe);std::string d;
+    while(std::getline(ss,d,':')){fs::path c=fs::path(d)/name;std::error_code ec;if(fs::is_regular_file(c,ec)&&!ec&&::access(c.c_str(),X_OK)==0){path=c.string();return true;}}
+    return false;
 #endif
-std::stringstream ss(pe);std::string d;while(std::getline(ss,d,sep))for(auto e:exts){fs::path c=fs::path(d)/(name+e);std::error_code ec;if(fs::exists(c,ec)&&!ec){
-#ifndef _WIN32
-if(::access(c.c_str(),X_OK)!=0)continue;
-#endif
-path=c.string();return true;}}return false;}
+}
 #ifndef _WIN32
 static int open_temp(std::string& path){char t[]="/tmp/nift-proc-XXXXXX";int fd=mkstemp(t);if(fd>=0)path=t;return fd;}
 ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs,bool capture,bool stream){
