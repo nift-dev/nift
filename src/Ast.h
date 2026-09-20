@@ -4,6 +4,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace nift::ast {
 struct SourceSpan { std::size_t begin=0, end=0; };
@@ -19,8 +20,8 @@ struct Context {
     std::function<bool(const std::string&, json::Document&, std::string&)> legacy;
     std::function<std::string(const json::Document&)> render;
 };
-enum class StmtKind { Block, Declaration, Assignment, CompoundAssignment, Increment, Expression, If, While, Legacy };
-struct Stmt { StmtKind kind=StmtKind::Legacy; SourceSpan span{}; std::string text, name, op; std::unique_ptr<Expr> expr, condition; };
+enum class StmtKind { Block, Declaration, Assignment, CompoundAssignment, Increment, Expression, If, While, For, Break, Continue, Return, Function, Legacy };
+struct Stmt { StmtKind kind=StmtKind::Legacy; SourceSpan span{}; std::string text, name, op; std::unique_ptr<Expr> expr, condition, iterable; std::vector<std::string> params; std::string variadic_param; std::vector<std::unique_ptr<Stmt>> body; };
 struct StatementParseResult { std::unique_ptr<Stmt> stmt; std::string error; bool supported=false; };
 struct ParseResult { std::unique_ptr<Expr> expr; std::string error; bool supported=false; };
 StatementParseResult parse_statement(const std::string& source);
