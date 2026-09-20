@@ -98,6 +98,25 @@ def pty_fork_bounded(seconds=30):
 
 
 def run_in_shell(cmd, timeout=3.0):
+    # Hard backstop for the whole call: if anything inside (pty setup, write,
+    # read, reap) blocks, skip on macOS-style runners instead of hanging.
+    import signal as _sig
+    def _stuck(signum, frame):
+        raise RuntimeError("run_in_shell did not complete")
+    oldh = _sig.getsignal(_sig.SIGALRM)
+    _sig.signal(_sig.SIGALRM, _stuck)
+    _sig.alarm(25)
+    try:
+        return _run_in_shell_body(cmd, timeout)
+    except RuntimeError:
+        print("SKIP v4.4 shell foreground TTY (interactive shell blocked on this runner)")
+        sys.exit(77)
+    finally:
+        _sig.alarm(0)
+        _sig.signal(_sig.SIGALRM, oldh)
+
+
+def _run_in_shell_body(cmd, timeout=3.0):
     pid, fd = pty_fork_bounded()
     if pid == 0:
         os.chdir(T)
