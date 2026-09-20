@@ -210,13 +210,27 @@ ProcessResult nift_run_pipeline(const std::vector<ProcessSpec>& specs, bool capt
 
         std::string program = spec.program;
         std::vector<std::string> args = spec.args;
-        std::string resolved; bool is_script = false;
+        std::string resolved; bool is_script = false; bool nift_script = false;
         if (nift_find_executable(spec.program, resolved)) {
             std::string low = resolved; for (auto& c : low) c = (char)tolower((unsigned char)c);
             if (low.size() > 4 && (low.substr(low.size()-4) == ".cmd" || low.substr(low.size()-4) == ".bat")) is_script = true;
+            // Nift executable .f scripts have no OS-level shebang execution on
+            // Windows, so running ./script.f directly (from nift sh, command
+            // style, or run()) must route through `nift run <script> <args>`.
+            // Spawn the current executable so the same binary interprets it.
+            if (low.size() > 2 && low.substr(low.size()-2) == ".f") nift_script = true;
         }
         std::wstring cmdline;
         if (is_script) { cmdline = L"cmd.exe /c " + widen(build_command_line(resolved, args)); program = "cmd.exe"; }
+        else if (nift_script) {
+            char self[MAX_PATH];
+            const DWORD n = GetModuleFileNameA(nullptr, self, MAX_PATH);
+            program = (n > 0 && n < MAX_PATH) ? std::string(self) : "nift";
+            std::vector<std::string> runner; runner.reserve(2 + args.size());
+            runner.push_back("run"); runner.push_back(resolved);
+            runner.insert(runner.end(), args.begin(), args.end());
+            cmdline = widen(build_command_line(program, runner));
+        }
         else { if (!resolved.empty()) program = resolved; cmdline = widen(build_command_line(program, args)); }
 
         EnvRestore restore;
