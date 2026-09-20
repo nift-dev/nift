@@ -132,4 +132,13 @@ jobs:
         timeout-minutes: 6
         if: runner.os == 'Windows'
         shell: msys2 {0}
-        run: make -C nift test-version-consistency
+        run: |
+          # The runner has Python (pythonLocation env) but it is not on the
+          # msys2 shell PATH; expose it so the version-consistency gate and the
+          # PTY-skip tests actually run their real logic instead of skipping.
+          PY="${pythonLocation:-}"
+          if [ -n "$PY" ]; then
+            PYU="$(cygpath -u "$PY" 2>/dev/null || echo "$PY")"
+            export PATH="$PATH:$PYU"
+          fi
+          make -C nift test-version-consistency

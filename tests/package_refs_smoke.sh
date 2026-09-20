@@ -5,7 +5,7 @@ NIFT="${NIFT:-./nift}"
 # unavailable (e.g. the Windows msys2 shell PATH lacks it) rather than fail.
 if ! command -v git >/dev/null 2>&1; then
   echo "SKIP package refs/local lock (git unavailable)"
-  exit 0
+  exit 77
 fi
 case "$NIFT" in /*) NIFT_ABS="$NIFT";; *) NIFT_ABS="$(pwd)/$NIFT";; esac
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT

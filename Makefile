@@ -119,10 +119,8 @@ test-snap-contract:
 # and the Snap metadata version in snap/snapcraft.yaml must agree, and any
 # expected/tag version must match both. No network access.
 test-version-consistency:
-	@if command -v python3 >/dev/null 2>&1; then \
-	  python3 tests/version_consistency_test.py && \
-	  python3 scripts/check_version_consistency.py; \
-	else echo "  (skipped: python3 unavailable)"; fi
+	python3 tests/version_consistency_test.py
+	python3 scripts/check_version_consistency.py
 
 # Focused unit tests for the Distribution Verification summary classification:
 # Snap edge must never be reported as stable success, and stable/edge/mismatch/
@@ -975,12 +973,12 @@ test-v44-shell-restricted: $(TARGET)
 	bash tests/v44_cp27_restricted_smoke.sh $(CURDIR)/$(TARGET)
 
 test-v44-packages: $(TARGET)
-	NIFT="$(CURDIR)/$(TARGET)" tests/package_refs_smoke.sh
+	NIFT="$(CURDIR)/$(TARGET)" tests/package_refs_smoke.sh $(V44_SKIP_77)
 	NIFT="$(CURDIR)/$(TARGET)" tests/package_callable_closure_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/package_hardening_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/package_module_export_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" SQLITE_PACKAGE="$(CURDIR)/../nift-packages/sqlite" tests/package_sqlite_dogfood.sh
-	NIFT="$(CURDIR)/$(TARGET)" tests/package_combined_dogfood.sh
+	NIFT="$(CURDIR)/$(TARGET)" tests/package_combined_dogfood.sh $(V44_SKIP_77)
 	NIFT="$(CURDIR)/$(TARGET)" tests/package_tools_dogfood.sh
 
 test-v44-automation: $(TARGET)
