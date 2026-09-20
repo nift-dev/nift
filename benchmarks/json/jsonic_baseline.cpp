@@ -18,7 +18,12 @@ int main(int argc, char** argv) {
     const auto parse0 = clock::now();
     if (!nift_json::parse(text, document, error)) { std::cerr << error << '\n'; return 1; }
     const auto parse1 = clock::now();
+    double total = 0.0;
+    const auto traverse0 = clock::now();
+    if (document.is_array()) for (const auto& item : document.array) if (item.is_object() && item.has("v")) total += item["v"].num;
+    const auto traverse1 = clock::now();
     const auto us = [](auto a, auto b) { return std::chrono::duration_cast<std::chrono::microseconds>(b-a).count(); };
     std::cout << "bytes=" << text.size() << " values=" << (document.is_array() ? document.array.size() : 0)
-              << " io_us=" << us(io0, io1) << " parse_us=" << us(parse0, parse1) << '\n';
+              << " io_us=" << us(io0, io1) << " parse_us=" << us(parse0, parse1)
+              << " traverse_us=" << us(traverse0, traverse1) << " sum=" << total << '\n';
 }
