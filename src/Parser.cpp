@@ -2808,9 +2808,21 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             if (!nift_fs_root_allowed(path,standalone_script_host_,error)) { error = "inject: " + error; return false; }
             if (std::find(input_stack_.begin(), input_stack_.end(), path) != input_stack_.end()) { error = "inject: source cycle through " + path.generic_string(); return false; }
             auto injected = filesystem::read_file_checked(path); if (!injected) { error = "inject: source is not readable"; return false; }
-            result_.dependencies.insert(host_.relative(path)); input_stack_.push_back(path); push_variable_scope();
+            result_.dependencies.insert(host_.relative(path)); input_stack_.push_back(path);
+            // JSON is the overwhelmingly common structured-data inject case.  Do
+            // not feed a multi-megabyte JSON document through the generic Nift
+            // expression classifier: that repeatedly scans the complete source
+            // for operators before eventually reaching the JSON literal parser.
+            // Parse valid JSON directly into the runtime Document and retain the
+            // expression evaluator as the compatibility path for .expr files and
+            // Nift expression-valued object/array literals.
+            json::Document injected_value; std::string direct_json_error;
+            if (nift_json::parse(*injected, injected_value, direct_json_error)) {
+                input_stack_.pop_back(); out = std::move(injected_value); return true;
+            }
+            push_variable_scope();
             const bool saved_mutation = last_expression_mutation_;
-            json::Document injected_value; std::string nested_error; const bool ok = evaluate_expression(*injected, injected_value, nested_error);
+            std::string nested_error; const bool ok = evaluate_expression(*injected, injected_value, nested_error);
             last_expression_mutation_ = depth == 0 ? last_expression_mutation_ : saved_mutation;
             pop_variable_scope(); input_stack_.pop_back(); if (!ok) { error = "inject: " + nested_error; return false; } out = std::move(injected_value); return true;
         }
