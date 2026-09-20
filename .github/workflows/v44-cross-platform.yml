@@ -133,12 +133,18 @@ jobs:
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: |
-          # The runner has Python (pythonLocation env) but it is not on the
-          # msys2 shell PATH; expose it so the version-consistency gate and the
-          # PTY-skip tests actually run their real logic instead of skipping.
-          PY="${pythonLocation:-}"
-          if [ -n "$PY" ]; then
-            PYU="$(cygpath -u "$PY" 2>/dev/null || echo "$PY")"
-            export PATH="$PATH:$PYU"
+          # The runner installs Python but it is not on the msys2 shell PATH;
+          # locate it and expose it so the version-consistency gate actually
+          # certifies on Windows instead of skipping.
+          if ! command -v python3 >/dev/null 2>&1; then
+            PY="${pythonLocation:-}"
+            echo "pythonLocation=$PY"
+            if [ -n "$PY" ]; then
+              # C:\hostedtoolcache\... -> /c/hostedtoolcache/... (no cygpath)
+              PYU="$(printf '%s' "$PY" | sed 's|\\|/|g; s|^\([A-Za-z]\):||; s|^|/|')"
+              echo "python path=$PYU"
+              export PATH="$PATH:$PYU"
+            fi
+            echo "python3 -> $(command -v python3 || echo NONE)"
           fi
           make -C nift test-version-consistency
