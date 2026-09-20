@@ -37,7 +37,7 @@ jobs:
         with:
           msystem: UCRT64
           update: true
-          install: make mingw-w64-ucrt-x86_64-gcc
+          install: make mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-winpthreads
       - name: Build Nift
         if: runner.os != 'Windows'
         run: make -j2

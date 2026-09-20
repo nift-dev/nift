@@ -51,7 +51,7 @@ class VersionConsistencyTest(unittest.TestCase):
                 'constexpr const char* version_text = "Nift v4.0.13";\n',
                 encoding="utf-8",
             )
-            (snap / "snapcraft.yaml").write_text("version: '4.0.12'\n", encoding="utf-8")
+            (snap / "snapcraft.yaml").write_text("version: '4.0.12'\nconfinement: classic\n", encoding="utf-8")
 
             old = vc.repo_root
             vc.repo_root = lambda: root
@@ -75,7 +75,7 @@ class VersionConsistencyTest(unittest.TestCase):
                 encoding="utf-8",
             )
             (root / "snap" / "snapcraft.yaml").write_text(
-                "version: '4.1.0'\n", encoding="utf-8"
+                "version: '4.1.0'\nconfinement: classic\n", encoding="utf-8"
             )
             old = vc.repo_root
             vc.repo_root = lambda: root
@@ -95,7 +95,7 @@ class VersionConsistencyTest(unittest.TestCase):
                 encoding="utf-8",
             )
             (root / "snap" / "snapcraft.yaml").write_text(
-                "version: 'four.zero.thirteen'\n", encoding="utf-8"
+                "version: 'four.zero.thirteen'\nconfinement: classic\n", encoding="utf-8"
             )
             old = vc.repo_root
             vc.repo_root = lambda: root
@@ -114,7 +114,7 @@ class VersionConsistencyTest(unittest.TestCase):
                 "constexpr const char* version_text = 0;\n", encoding="utf-8"
             )
             (root / "snap" / "snapcraft.yaml").write_text(
-                "# no version\n", encoding="utf-8"
+                "# no version\nconfinement: classic\n", encoding="utf-8"
             )
             old = vc.repo_root
             vc.repo_root = lambda: root
@@ -134,7 +134,7 @@ class VersionConsistencyTest(unittest.TestCase):
                 encoding="utf-8",
             )
             (root / "snap" / "snapcraft.yaml").write_text(
-                "version: '4.1.0'\n", encoding="utf-8"
+                "version: '4.1.0'\nconfinement: classic\n", encoding="utf-8"
             )
             old = vc.repo_root
             vc.repo_root = lambda: root
@@ -179,7 +179,7 @@ class VersionConsistencyTest(unittest.TestCase):
                 encoding="utf-8",
             )
             (root / "snap" / "snapcraft.yaml").write_text(
-                "version: '4.1.0'\n", encoding="utf-8"
+                "version: '4.1.0'\nconfinement: classic\n", encoding="utf-8"
             )
             old = vc.repo_root
             vc.repo_root = lambda: root

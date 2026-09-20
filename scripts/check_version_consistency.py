@@ -87,6 +87,19 @@ def validate_version(value: str | None, label: str) -> int:
     return 0
 
 
+def snap_confinement() -> str | None:
+    """Return the snap confinement policy from snap/snapcraft.yaml."""
+    path = repo_root() / "snap" / "snapcraft.yaml"
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    match = re.search(r'^confinement:\s*["\']?([^"\'\s#]+)["\']?\s*(?:#.*)?$', text, re.MULTILINE)
+    if not match:
+        return None
+    return match.group(1)
+
+
 def check(expected: str | None = None, tag: str | None = None) -> int:
     failures = 0
 
@@ -95,6 +108,19 @@ def check(expected: str | None = None, tag: str | None = None) -> int:
 
     failures += validate_version(exe, "executable (src/CLI.cpp)")
     failures += validate_version(snap, "Snap metadata (snap/snapcraft.yaml)")
+
+    # v4.4 policy: Nift behaves like an ordinary installed scripting language/
+    # shell/tool (external commands, Git/database CLIs, executable .f scripts,
+    # arbitrary project paths), so the Snap must use classic confinement. This
+    # gate prevents an accidental revert to strict.
+    confinement = snap_confinement()
+    if confinement != "classic":
+        print(
+            f"FAIL: Snap confinement must be classic (found: {confinement!r}); "
+            "strict confinement undermines the v4.4 shell/process model",
+            file=sys.stderr,
+        )
+        failures += 1
 
     if exe is not None and snap is not None and VERSION_RE.match(exe) and VERSION_RE.match(snap):
         if exe != snap:

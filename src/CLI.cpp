@@ -817,7 +817,8 @@ static std::vector<std::string> nift_shell_completions(const std::string& prefix
     fs::path pp=prefix.empty()?fs::path("."):fs::path(prefix);fs::path parent=pp.has_parent_path()?pp.parent_path():fs::path(".");std::string leaf=pp.filename().string();std::error_code ec;for(auto it=fs::directory_iterator(parent,ec);!ec&&it!=fs::directory_iterator();it.increment(ec)){auto n=it->path().filename().string();if(n.rfind(leaf,0)==0){auto c=(pp.has_parent_path()?parent/fs::path(n):fs::path(n)).generic_string();if(it->is_directory(ec))c+="/";out.insert(c);}}
     return {out.begin(),out.end()};
 }
-#ifndef _WIN32
+// The prompt is portable (path rendering + console colour) and used by the
+// shell on every platform, so it lives outside the POSIX-only helper block.
 namespace {
 std::string shell_prompt_text(bool continuation) {
     if (continuation) return "... ";
@@ -829,6 +830,9 @@ std::string shell_prompt_text(bool continuation) {
     }
     return console::paint(shown, "1;32", console::stdout_colour_enabled()) + "$ ";
 }
+} // namespace
+#ifndef _WIN32
+namespace {
 std::string quote_for_shell_arg(const std::string& s) {
     if (s.find_first_of(" \t\"'$`\\") == std::string::npos) return s;
     std::string r = "'";

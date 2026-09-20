@@ -9,7 +9,7 @@ description: |
 
 base: core24
 grade: stable
-confinement: strict
+confinement: classic
 license: MIT
 website: https://nift.dev
 source-code: https://github.com/nift-dev/nift
@@ -26,8 +26,6 @@ platforms:
 apps:
   nift:
     command: usr/bin/nift
-    plugs:
-      - home
 
 parts:
   nift:
