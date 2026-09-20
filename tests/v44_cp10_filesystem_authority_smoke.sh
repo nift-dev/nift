@@ -2,10 +2,10 @@
 set -eu
 NIFT=${NIFT:-./nift}; t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
 mkdir -p "$t/a/b"; printf outside >"$t/a/outside.txt"
+cd "$t/a/b"
 cat >"$t/a/b/test.f" <<F
-cd("$t/a/b")
 print(cat("../outside.txt"))
-print(exists("$t/a/outside.txt"))
+print(exists("../outside.txt"))
 print(type(ls("~")))
 F
 out=$($NIFT run "$t/a/b/test.f")

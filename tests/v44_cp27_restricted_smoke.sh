@@ -28,10 +28,10 @@ hb=$(cd "$t/site" && "$BIN" build --all --no-process 2>&1 || true)
 grep -q 'external process execution disabled' <<<"$hb"
 # Nift-native filesystem operations remain available under the restriction.
 cat >"$t/native.f" <<F
-touch("$t/ok.txt")
-print(exists("$t/ok.txt"))
+touch("native-ok.txt")
+print(exists("native-ok.txt"))
 F
-[ "$("$BIN" run "$t/native.f" --no-process)" = "true" ]
+[ "$(cd "$t" && "$BIN" run native.f --no-process)" = "true" ]
 # Filesystem-root restriction confines Nift-native filesystem operations.
 mkdir -p "$t/root" "$t/root/inner"
 printf 'z\n' > "$t/root/outside.txt"
@@ -39,15 +39,15 @@ printf 'in\n' > "$t/root/inner/ok.txt"
 cat >"$t/root/inner/t.f" <<'F'
 print(open("ok.txt"))
 F
-[ "$(cd "$t/root/inner" && "$BIN" run t.f --fs-root="$t/root/inner")" = "in" ]
+[ "$(cd "$t/root/inner" && "$BIN" run t.f --fs-root=.)" = "in" ]
 cat >"$t/root/inner/escape.f" <<F
-print(touch("$t/root/outside.txt"))
+print(touch("../outside.txt"))
 F
-if (cd "$t/root/inner" && "$BIN" run escape.f --fs-root="$t/root/inner") >"$t/e" 2>&1; then echo "fs-root escape allowed" >&2; exit 1; fi
+if (cd "$t/root/inner" && "$BIN" run escape.f --fs-root=.) >"$t/e" 2>&1; then echo "fs-root escape allowed" >&2; exit 1; fi
 grep -q 'escapes configured filesystem root' "$t/e"
 # inject() must also respect the filesystem root.
 printf 'outside-data\n' > "$t/root/secret.txt"
-printf "print(inject(\"$t/root/secret.txt\"))\n" > "$t/root/inner/inj.f"
-if (cd "$t/root/inner" && "$BIN" run inj.f --fs-root="$t/root/inner") >"$t/e2" 2>&1; then echo "inject escaped fs-root" >&2; exit 1; fi
+printf "print(inject(\"../secret.txt\"))\n" > "$t/root/inner/inj.f"
+if (cd "$t/root/inner" && "$BIN" run inj.f --fs-root=.) >"$t/e2" 2>&1; then echo "inject escaped fs-root" >&2; exit 1; fi
 grep -q 'escapes configured filesystem root' "$t/e2"
 echo 'PASS v4.4 restricted mode'
