@@ -5,7 +5,7 @@
 set -euo pipefail
 NIFT=${NIFT:-./nift}
 case "$NIFT" in /*) NIFT_ABS="$NIFT";; *) NIFT_ABS="$(pwd)/$NIFT";; esac
-t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
+t=$(cd "$(mktemp -d)" && pwd -P); trap 'rm -rf "$t"' EXIT
 mkdir -p "$t/site/.nift" "$t/site/content" "$t/site/templates" "$t/site/public"
 cat > "$t/site/.nift/config.json" <<'JSON'
 {"config":{"content-dir":"content/","content-ext":".html","output-dir":"public/","output-ext":".html","default-template":"templates/main.html","build-threads":1,"incremental-mode":"modified"}}
