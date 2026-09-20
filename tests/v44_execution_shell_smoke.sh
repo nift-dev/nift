@@ -15,12 +15,12 @@ if(e.stdout.trim() != "yes") { return "bad env" }
 F
 rf_out=$("$NIFT" run "$t/run.f" 2>&1) || { echo "run.f failed: $rf_out" >&2; exit 1; }
 test -z "$rf_out" || { echo "run.f returned: $rf_out" >&2; exit 1; }
-printf 'printf hello | tr a-z A-Z > %s/out\ncat %s/out\nexit\n' "$t" "$t" | "$NIFT" sh >"$t/shell" 2>/dev/null
-grep -q HELLO "$t/shell"
+shell_out=$(printf 'printf hello | tr a-z A-Z > %s/out\ncat %s/out\nexit\n' "$t" "$t" | "$NIFT" sh 2>&1)
+grep -q HELLO <<<"$shell_out" || { echo "shell pipeline: $shell_out" >&2; exit 1; }
 # Shell assignment statements must route to the Nift statement engine, and
 # adjacent fd-redirects (2>) must not become a literal argument.
-assign_out=$(printf 'x := 5\nx = 7\nprint(x)\nexit\n' | "$NIFT" sh 2>/dev/null)
-grep -qE ' 7$' <<<"$assign_out"
+assign_out=$(printf 'x := 5\nx = 7\nprint(x)\nexit\n' | "$NIFT" sh 2>&1)
+grep -qE ' 7$' <<<"$assign_out" || { echo "assign: $assign_out" >&2; exit 1; }
 err_out=$(printf 'sh -c "echo out; echo err >&2" 2>%s/err.txt\ncat %s/err.txt\nexit\n' "$t" "$t" | "$NIFT" sh 2>/dev/null)
 grep -q ' err$' <<<"$err_out"
 # $[...] interpolation in command arguments and ; command separation.
