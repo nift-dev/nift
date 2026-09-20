@@ -8,7 +8,7 @@
 #include <memory>
 #include <unordered_map>
 #include <fstream>
-#include "ProcessRunner.h"
+#include "Proc.h"
 
 namespace json { class Document; }
 

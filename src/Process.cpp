@@ -1,4 +1,4 @@
-#include "ProcessRunner.h"
+#include "Proc.h"
 #include <cstdlib>
 #include <cctype>
 #include <fstream>
