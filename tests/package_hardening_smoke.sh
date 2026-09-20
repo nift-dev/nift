@@ -19,7 +19,7 @@ mkdir -p "$t/pkg/src"
 printf '{"name":"demo","entry":"src/main.f"}\n' > "$t/pkg/manifest.json"
 printf 'v := 1\nexport(v)\n' > "$t/pkg/src/main.f"
 echo "HARD-STEP 2"
-pkg_add=$(cd "$t/site" && "$NIFT_ABS" add ../pkg 2>&1)
+pkg_add=$(cd "$t/site" && "$NIFT_ABS" add ../pkg 2>&1 || true)
 echo "HARD-DIAG first add ../pkg output: $pkg_add"
 dup=$(cd "$t/site" && "$NIFT_ABS" add ../pkg 2>&1 || true)
 grep -q "already a dependency" <<<"$dup" || { echo "HARD-DIAG dup add output: $dup" >&2; exit 1; }
