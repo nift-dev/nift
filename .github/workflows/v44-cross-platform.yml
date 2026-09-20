@@ -27,6 +27,10 @@ jobs:
           - id: windows
             runner: windows-latest
     runs-on: ${{ matrix.runner }}
+    # Outer safety boundary: a shell/PTY/process regression must FAIL the job,
+    # never consume a runner for an unbounded time. Observed healthy durations
+    # are a few minutes per platform; 25 minutes is a generous ceiling.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v5
         with:
@@ -86,36 +90,46 @@ jobs:
         shell: msys2 {0}
         run: make -C nift -j2
       - name: v4.4 execution shell + language foundation
+        timeout-minutes: 6
         if: runner.os != 'Windows'
         run: make -C nift test-v44-execution-shell test-v44-language-foundation
       - name: v4.4 execution shell + language foundation on Windows
+        timeout-minutes: 6
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: make -C nift test-v44-execution-shell test-v44-language-foundation
       - name: v4.4 shell restricted (glob/history/completion/PTY/restriction)
+        timeout-minutes: 6
         if: runner.os != 'Windows'
         run: make -C nift test-v44-shell-restricted
       - name: v4.4 shell restricted on Windows (glob/history/completion/restriction)
+        timeout-minutes: 6
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: make -C nift test-v44-shell-restricted
       - name: v4.4 automation + hooks
+        timeout-minutes: 6
         if: runner.os != 'Windows'
         run: make -C nift test-v44-automation test-v44-hooks
       - name: v4.4 automation + hooks on Windows
+        timeout-minutes: 6
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: make -C nift test-v44-automation test-v44-hooks
       - name: v4.4 local packages (sqlite dogfood skips if sqlite3 absent)
+        timeout-minutes: 6
         if: runner.os != 'Windows'
         run: make -C nift test-v44-packages
       - name: v4.4 local packages on Windows
+        timeout-minutes: 6
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: make -C nift test-v44-packages
       - name: Version consistency gate (executable + Snap metadata)
+        timeout-minutes: 6
         run: make -C nift test-version-consistency
       - name: Version consistency gate on Windows
+        timeout-minutes: 6
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: make -C nift test-version-consistency
