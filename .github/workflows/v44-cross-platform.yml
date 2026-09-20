@@ -29,6 +29,43 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v5
+      # The v4.4 package dogfoods resolve the nift-packages repos as a sibling
+      # `nift-packages/` directory, pinned to the coherent v4.4 package set.
+      - uses: actions/checkout@v5
+        with:
+          repository: nift-packages/sqlite
+          ref: 85f59b3007c5d64ef7f600e2cf773e192757d6c2
+          path: nift-packages/sqlite
+      - uses: actions/checkout@v5
+        with:
+          repository: nift-packages/curl
+          ref: aa4f851bae9c65ebb17956097feada43be2c1cf4
+          path: nift-packages/curl
+      - uses: actions/checkout@v5
+        with:
+          repository: nift-packages/postgres
+          ref: 42873336b721a69d4132541523c05b816ba489eb
+          path: nift-packages/postgres
+      - uses: actions/checkout@v5
+        with:
+          repository: nift-packages/mysql
+          ref: 4526f3794bac2ad8b6d80d087d0abab974eed38c
+          path: nift-packages/mysql
+      - uses: actions/checkout@v5
+        with:
+          repository: nift-packages/redis
+          ref: 7719fa88f0bb4c42fbae1b2cac3a8cb675a4a978
+          path: nift-packages/redis
+      - uses: actions/checkout@v5
+        with:
+          repository: nift-packages/vips
+          ref: 735b9965d6d6c365b4195f0454ded31e577dc5f1
+          path: nift-packages/vips
+      - uses: actions/checkout@v5
+        with:
+          repository: nift-packages/imagemagick
+          ref: dda5437fb20ca92045cea901323c2bd2399f38a8
+          path: nift-packages/imagemagick
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'

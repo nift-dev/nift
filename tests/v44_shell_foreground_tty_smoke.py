@@ -8,6 +8,12 @@ Uses a deterministic fixture executable (no dependency on fastfetch/top).
 """
 import os, pty, select, subprocess, sys, time
 
+# POSIX-only: pty.fork() drives the interactive terminal. Windows `nift sh`
+# is line-based; skip there with the repo's acknowledged-skip code.
+if os.name == "nt":
+    print("SKIP v4.4 shell foreground TTY (POSIX PTY test)")
+    sys.exit(77)
+
 NIFT = sys.argv[1] if len(sys.argv) > 1 else "./nift"
 T = os.path.dirname(os.path.abspath(NIFT))
 
