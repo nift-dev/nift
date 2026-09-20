@@ -64,10 +64,14 @@ NIFT
 out=$(cd "$t" && PATH="$BIN:$PATH" "$NIFT_ABS" run r.f)
 grep -q "^exit=0$" <<<"$out" || { echo "$out" >&2; exit 1; }
 
-# executable permission failure: chmod -x must NOT fall back to nift run
+# executable permission failure: chmod -x must NOT fall back to nift run.
+# The exec permission bit is POSIX-only; Windows files have no exec-bit
+# semantics (chmod -x is a no-op there), so this assertion is POSIX-only.
+case "$(uname -s)" in MINGW*|MSYS*) ;; *)
 chmod -x "$t/hello.f"
 if (cd "$t" && PATH="$BIN:$PATH" ./hello.f >/dev/null 2>&1); then echo "exec -x succeeded" >&2; exit 1; fi
 chmod +x "$t/hello.f"
+;; esac
 
 # --no-process blocks external execution (command-style and run())
 cat > "$t/c.f" <<'NIFT'
