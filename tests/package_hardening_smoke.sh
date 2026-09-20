@@ -11,14 +11,14 @@ mkdir -p "$t/site/.nift"
 mkdir -p "$t/evil"
 printf '{"name":"evil","entry":"../../escape.f"}\n' > "$t/evil/manifest.json"
 printf 'print("pwned")\n' > "$t/escape.f"
-evil=$(cd "$t/site" && "$NIFT_ABS" add "$t/evil" 2>&1 || true)
+evil=$(cd "$t/site" && "$NIFT_ABS" add ../evil 2>&1 || true)
 grep -q 'package entry escapes the package directory' <<<"$evil"
 # 2) adding a dependency name that already exists is refused
 mkdir -p "$t/pkg/src"
 printf '{"name":"demo","entry":"src/main.f"}\n' > "$t/pkg/manifest.json"
 printf 'v := 1\nexport(v)\n' > "$t/pkg/src/main.f"
-(cd "$t/site" && "$NIFT_ABS" add "$t/pkg" >/dev/null 2>&1)
-dup=$(cd "$t/site" && "$NIFT_ABS" add "$t/pkg" 2>&1 || true)
+(cd "$t/site" && "$NIFT_ABS" add ../pkg >/dev/null 2>&1)
+dup=$(cd "$t/site" && "$NIFT_ABS" add ../pkg 2>&1 || true)
 grep -q "already a dependency" <<<"$dup"
 # 3) import isolation: exported functions keep private context; private
 #    bindings never leak into the importer.
