@@ -69,9 +69,9 @@ jobs:
           repository: nift-packages/imagemagick
           ref: dda5437fb20ca92045cea901323c2bd2399f38a8
           path: nift-packages/imagemagick
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.13'
+      # The hosted runners already carry a system python3 (used by the
+      # package dogfoods' local HTTP server); setup-python is not needed and
+      # its teardown has hung on macOS runners.
       - uses: msys2/setup-msys2@v2
         if: runner.os == 'Windows'
         with:
