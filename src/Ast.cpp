@@ -51,6 +51,10 @@ StatementParseResult parse_statement(const std::string& source){
  auto trim=[](std::string x){auto b=x.find_first_not_of(" \t\r\n");if(b==std::string::npos)return std::string();auto e=x.find_last_not_of(" \t\r\n");return x.substr(b,e-b+1);};
  std::string t=trim(source);auto st=std::make_unique<Stmt>();st->text=t;st->span={0,source.size()};if(t.empty())return{std::move(st),{},false};
  if(t=="break"){st->kind=StmtKind::Break;return{std::move(st),{},true};} if(t=="continue"){st->kind=StmtKind::Continue;return{std::move(st),{},true};}
+ // CP26: preserve module/script boundaries explicitly; execution still delegates to the established loader/runtime during migration.
+ if(t.rfind("@import(",0)==0||t.rfind("import(",0)==0){st->kind=StmtKind::Import;st->name=t.substr(0,t.find('('));return{std::move(st),{},true};}
+ if(t.rfind("export ",0)==0){st->kind=StmtKind::Export;st->name=trim(t.substr(7));return{std::move(st),{},true};}
+ if(t.rfind("@script",0)==0){st->kind=StmtKind::Script;return{std::move(st),{},true};}
  // CP24: preserve struct/enum declarations structurally while their established runtime remains authoritative.
  for(auto spec:{std::pair<const char*,StmtKind>{"struct",StmtKind::Struct},{"enum",StmtKind::Enum}}){std::string kw=spec.first;if(t.rfind(kw+" ",0)==0||t.rfind(kw+"(",0)==0){std::size_t b=kw.size();while(b<t.size()&&(std::isspace((unsigned char)t[b])||t[b]=='('))++b;std::size_t e=b;while(e<t.size()&&(std::isalnum((unsigned char)t[e])||t[e]=='_'))++e;if(e>b){st->kind=spec.second;st->name=t.substr(b,e-b);return{std::move(st),{},true};}}}
  if(t.rfind("return",0)==0&&(t.size()==6||std::isspace((unsigned char)t[6])||t[6]=='(')){std::string x=trim(t.substr(6));if(!x.empty()&&x.front()=='('&&x.back()==')')x=trim(x.substr(1,x.size()-2));st->kind=StmtKind::Return;if(!x.empty()){auto r=parse_expression(x);if(!r.supported)return{std::move(st),r.error,false};st->expr=std::move(r.expr);}return{std::move(st),{},true};}
