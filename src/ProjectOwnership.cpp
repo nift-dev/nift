@@ -11,7 +11,6 @@
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#include "windows_compat.h"
 #else
 #include <fcntl.h>
 #include <sys/file.h>

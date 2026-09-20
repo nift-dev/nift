@@ -710,6 +710,7 @@ test-guarantee-registry-ci:
 
 test-test-integrity:
 	python3 scripts/test_integrity_check.py tests scripts --output "$(TEST_DIR)/bh2/test-integrity-report.json"
+	python3 scripts/check_header_name_collisions.py
 
 BH1_WEBSITE_ROOT ?= ../nift-dev.github.io
 BH1_REGRESSION_ROOT ?= ../nift-regression-suite

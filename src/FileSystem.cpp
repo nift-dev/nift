@@ -15,7 +15,6 @@
 #endif
 #ifdef _WIN32
 #include <windows.h>
-#include "windows_compat.h"
 #else
 #include <signal.h>
 #include <unistd.h>
