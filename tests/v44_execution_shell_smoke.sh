@@ -21,22 +21,22 @@ grep -q HELLO <<<"$shell_out" || { echo "shell pipeline: $shell_out" >&2; exit 1
 # adjacent fd-redirects (2>) must not become a literal argument.
 assign_out=$(printf 'x := 5\nx = 7\nprint(x)\nexit\n' | "$NIFT" sh 2>&1 || true)
 grep -qE ' 7$' <<<"$assign_out" || { echo "assign: $assign_out" >&2; exit 1; }
-err_out=$(printf 'sh -c "echo out; echo err >&2" 2>%s/err.txt\ncat %s/err.txt\nexit\n' "$t" "$t" | "$NIFT" sh 2>/dev/null)
-grep -q ' err$' <<<"$err_out"
+err_out=$(printf 'sh -c "echo out; echo err >&2" 2>%s/err.txt\ncat %s/err.txt\nexit\n' "$t" "$t" | "$NIFT" sh 2>&1 || true)
+grep -q ' err$' <<<"$err_out" || { echo "err-redirect: $err_out" >&2; exit 1; }
 # $[...] interpolation in command arguments and ; command separation.
 interp_out=$(printf 'who := "world"\necho hello $[who]\nprintf one ; printf two\nfalse ; printf three\nexit\n' | "$NIFT" sh 2>/dev/null || true)
-grep -q 'hello world' <<<"$interp_out"
-grep -q 'onetwo' <<<"$interp_out"
-grep -q 'three' <<<"$interp_out"
+grep -q 'hello world' <<<"$interp_out" || { echo "interp: $interp_out" >&2; exit 1; }
+grep -q 'onetwo' <<<"$interp_out" || { echo "interp-one-two: $interp_out" >&2; exit 1; }
+grep -q 'three' <<<"$interp_out" || { echo "interp-three: $interp_out" >&2; exit 1; }
 # Function-call interpolation in command arguments (e.g. $[project_root()])
 # must route through command land, not the Nift statement path.
 fn_out=$(printf 'print("R1")
 echo $[project_root()]
 exit\n' | "$NIFT" sh 2>/dev/null || true)
-grep -q 'R1' <<<"$fn_out"
+grep -q 'R1' <<<"$fn_out" || { echo "fn-interp: $fn_out" >&2; exit 1; }
 # Background & still fails explicitly rather than being misinterpreted.
 bg_out=$(printf 'sleep 1 &\nexit\n' | "$NIFT" sh 2>&1 || true)
-grep -q 'background job control is not implemented' <<<"$bg_out"
+grep -q 'background job control is not implemented' <<<"$bg_out" || { echo "bg: $bg_out" >&2; exit 1; }
 
 # Bare single-token commands fall through to ordinary external executable/PATH
 # resolution (fastfetch, git, env, printf, ...), preserving Nift precedence.

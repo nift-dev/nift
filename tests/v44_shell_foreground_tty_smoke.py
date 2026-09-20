@@ -64,91 +64,36 @@ def wait_pid_bounded(pid, deadline):
     raise RuntimeError("shell did not exit within the deadline")
 
 
-def pty_fork_bounded(seconds=30):
-    """pty.fork() can block indefinitely on runners whose pty pool is
-    exhausted (seen on macOS GitHub runners after the completion-PTY test).
-    Treat allocation failure as an acknowledged platform skip (77) rather
-    than hanging CI; a genuine regression fails the TTY checks, not fork."""
-    result = {}
-
-    def _go():
-        try:
-            result["v"] = pty.fork()
-        except Exception as e:
-            result["e"] = e
-
-    def _tick(signum, frame):
-        raise RuntimeError("pty.fork() did not return")
-
-    import signal as _sig
-    old = _sig.getsignal(_sig.SIGALRM)
-    _sig.signal(_sig.SIGALRM, _tick)
-    _sig.alarm(seconds)
-    try:
-        _go()
-    except RuntimeError:
-        print("SKIP v4.4 shell foreground TTY (pty.fork() did not allocate a pty on this runner)")
-        sys.exit(77)
-    finally:
-        _sig.alarm(0)
-        _sig.signal(_sig.SIGALRM, old)
-    if "e" in result:
-        raise result["e"]
-    return result["v"]
+def drain(fd, timeout=0.8):
+    out = b""
+    end = time.time() + timeout
+    while time.time() < end:
+        r, _, _ = select.select([fd], [], [], 0.1)
+        if r:
+            try:
+                out += os.read(fd, 4096)
+            except OSError:
+                break
+    return out.decode(errors="replace")
 
 
 def run_in_shell(cmd, timeout=3.0):
-    # Hard backstop for the whole call: if anything inside (pty setup, write,
-    # read, reap) blocks, skip on macOS-style runners instead of hanging.
-    import signal as _sig
-    def _stuck(signum, frame):
-        raise RuntimeError("run_in_shell did not complete")
-    oldh = _sig.getsignal(_sig.SIGALRM)
-    _sig.signal(_sig.SIGALRM, _stuck)
-    _sig.alarm(25)
-    try:
-        return _run_in_shell_body(cmd, timeout)
-    except RuntimeError:
-        print("SKIP v4.4 shell foreground TTY (interactive shell blocked on this runner)")
-        sys.exit(77)
-    finally:
-        _sig.alarm(0)
-        _sig.signal(_sig.SIGALRM, oldh)
-
-
-def _run_in_shell_body(cmd, timeout=3.0):
-    pid, fd = pty_fork_bounded()
+    # Mirrors the interactive completion PTY test (which passes on macOS):
+    # blocking writes + select/read drain. Non-blocking pty mode is avoided
+    # because select() on a non-blocking pty master can block indefinitely on
+    # macOS kernels, which no Python-side alarm can interrupt.
+    pid, fd = pty.fork()
     if pid == 0:
         os.chdir(T)
         os.execv(NIFT, [NIFT, "sh"])
-    os.set_blocking(fd, False)
     time.sleep(0.4)
-    # Bounded, non-blocking write: if the child fills the pty buffer (its own
-    # output blocks it from reading our input), os.write would otherwise block
-    # forever. A slow/deadlocked child must fail the test, not hang CI.
-    deadline = time.time() + 2.0
-    data = cmd.encode()
-    sent = 0
-    while sent < len(data) and time.time() < deadline:
-        try:
-            sent += os.write(fd, data[sent:])
-        except BlockingIOError:
-            time.sleep(0.05)
-        except OSError:
-            break
-    deadline = time.time() + timeout
-    out = b""
-    while time.time() < deadline:
-        r, _, _ = select.select([fd], [], [], 0.2)
-        if not r:
-            continue
-        try:
-            chunk = os.read(fd, 4096)
-            if not chunk:
-                break
-            out += chunk
-        except (BlockingIOError, OSError):
-            break
+    drain(fd, 0.4)
+    try:
+        os.write(fd, cmd.encode())
+    except OSError:
+        pass
+    time.sleep(0.6)
+    out = drain(fd, timeout)
     try:
         os.write(fd, b"exit\n")
     except OSError:
@@ -158,7 +103,8 @@ def _run_in_shell_body(cmd, timeout=3.0):
         os.close(fd)
     except OSError:
         pass
-    return out.decode(errors="replace")
+    return out
+
 
 # Foreground simple command: all three streams must be TTYs (direct inherit).
 _mark("run1")
