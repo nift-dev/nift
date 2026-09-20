@@ -1,5 +1,6 @@
 #include "CLI.h"
 #ifdef _WIN32
+#include <cstdio>
 #include <fcntl.h>
 #include <io.h>
 #endif
