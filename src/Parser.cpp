@@ -2169,6 +2169,22 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     // Module-style value: a JSON object member holding a callable is
                     // invoked as a method (e.g. vips.resize(...) for a plain-object
                     // module), keeping any captured package-private context.
+                    // Only a plain-object (or struct) receiver can be a module, so
+                    // skip this path for an array receiver: evaluating the receiver
+                    // would deep-copy the entire array on every call, turning
+                    // mutation methods such as a.push(...) into O(n) per call.
+                    const std::size_t rdot = receiver.find_first_of(".[(");
+                    const std::string rroot = trim_copy(receiver.substr(0, rdot == std::string::npos ? receiver.size() : rdot));
+                    VariableBinding* rb2 = nullptr;
+                    for (auto scope = variable_scopes_.rbegin(); scope != variable_scopes_.rend(); ++scope) {
+                        const auto it = scope->find(rroot);
+                        if (it != scope->end()) { rb2 = &it->second; break; }
+                    }
+                    const bool receiver_is_module = !rb2 || (rb2->value &&
+                        (rb2->value->is_object() ||
+                         (rb2->value->is_string() && rb2->value->string.rfind("\x1fnift:struct:", 0) == 0)));
+                    if (!receiver_is_module) { /* array/collection/scalar receiver cannot be a module */ }
+                    else {
                     json::Document base;
                     if (eval(receiver, base, depth + 1) && base.is_object()) {
                         for (const auto& kv : base.object) {
@@ -2181,6 +2197,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                                 return ok;
                             }
                         }
+                    }
                     }
                 }
                 if (known) {
