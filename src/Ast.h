@@ -24,6 +24,10 @@ enum class StmtKind { Block, Declaration, Assignment, CompoundAssignment, Increm
 struct Stmt { StmtKind kind=StmtKind::Legacy; SourceSpan span{}; std::string text, name, op; std::unique_ptr<Expr> expr, condition, iterable; std::vector<std::string> params, bindings; std::string variadic_param; std::vector<std::unique_ptr<Stmt>> body; };
 struct StatementParseResult { std::unique_ptr<Stmt> stmt; std::string error; bool supported=false; };
 struct ParseResult { std::unique_ptr<Expr> expr; std::string error; bool supported=false; };
+enum class TemplateKind { Literal, Expression, Script, If, For, Fragment, Function, LegacyDirective };
+struct TemplateNode { TemplateKind kind=TemplateKind::Literal; SourceSpan span{}; std::string text; std::unique_ptr<Expr> expr; std::vector<std::unique_ptr<TemplateNode>> children; };
+struct TemplateParseResult { std::vector<std::unique_ptr<TemplateNode>> nodes; std::string error; bool supported=false; };
+TemplateParseResult parse_template(const std::string& source);
 StatementParseResult parse_statement(const std::string& source);
 ParseResult parse_expression(const std::string& source);
 bool evaluate(const Expr& expr, Context& ctx, json::Document& out, std::string& error);
