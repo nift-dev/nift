@@ -717,7 +717,9 @@ bool initialise_project(const InitOptions& options) {
 
 
 static int run_script_file(const fs::path& path, const std::vector<std::string>& script_args = {}) {
-    const fs::path absolute=fs::absolute(path).lexically_normal();
+    std::error_code path_ec;
+    const fs::path absolute=fs::absolute(path, path_ec).lexically_normal();
+    if (path_ec) { console::error("run: cannot resolve script path: " + path.string() + " (" + path_ec.message() + ")"); return 1; }
     if(!filesystem::file_exists(absolute)){console::error("run: script does not exist: "+path.string());return 1;}
     std::string source=filesystem::read_file(absolute);
     // A leading shebang (#!/usr/bin/env nift) is a script header, not Nift

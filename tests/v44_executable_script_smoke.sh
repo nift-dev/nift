@@ -84,15 +84,20 @@ NIFT
 if (cd "$t" && PATH="$BIN:$PATH" NIFT_NO_PROCESS=1 "$NIFT_ABS" run r2.f >/dev/null 2>&1); then echo "run() not blocked" >&2; exit 1; fi
 
 # paths with spaces and Unicode
+# Non-ASCII paths/args are POSIX-clean; on Windows the MSYS2 -> native-binary
+# argument boundary delivers them in the ANSI codepage, so Nift (which treats
+# argv as UTF-8) cannot resolve them. The space-path case is portable and is
+# still tested; the Unicode case is POSIX-only.
 mkdir -p "$t/my dir" "$t/üni"
 cp "$t/hello.f" "$t/my dir/with space.f"
 cp "$t/hello.f" "$t/üni/child.f"
 chmod +x "$t/my dir/with space.f" "$t/üni/child.f"
-out=$(cd "$t" && PATH="$BIN:$PATH" "$NIFT_ABS" run - <<<"" 2>/dev/null || true)
 out=$(cd "$t" && PATH="$BIN:$PATH" ./my\ dir/with\ space.f sp)
 grep -q "^arg:sp$" <<<"$out" || { echo "$out" >&2; exit 1; }
+case "$(uname -s)" in MINGW*|MSYS*) ;; *)
 out=$(cd "$t" && PATH="$BIN:$PATH" ./üni/child.f "héllo wörld")
 grep -q "^arg:héllo wörld$" <<<"$out" || { echo "$out" >&2; exit 1; }
+;; esac
 
 # environment inheritance
 out=$(cd "$t" && PATH="$BIN:$PATH" NIFT_EXEC_TEST="envval" "$NIFT_ABS" run "$t/hello.f")
