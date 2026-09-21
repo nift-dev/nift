@@ -2415,8 +2415,37 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                             out=std::move(result);return true;
                         }
                         auto invoke_value_cb=[&](const json::Document& cb,const std::vector<json::Document>& av,json::Document& result)->bool{
-                            push_variable_scope();auto& sc=variable_scopes_.back();auto csp=std::make_shared<json::Document>(cb);sc["__nift_cb"]=VariableBinding{csp,nift_binding_type(*csp),false,false};std::string call="__nift_cb(";
-                            for(size_t ai=0;ai<av.size();++ai){if(ai)call+=",";std::string n="__nift_arg"+std::to_string(ai);auto sp=std::make_shared<json::Document>(av[ai]);sc[n]=VariableBinding{sp,nift_binding_type(*sp),false,false};call+=n;}call+=")";bool r=eval(call,result,depth+1);pop_variable_scope();return r;};
+                            if(!cb.is_string()||cb.string.rfind("\x1fnift:callable:",0)!=0){error="transformation: callback must be callable";return false;}
+                            const std::string tag=cb.string;
+                            if(tag.rfind("\x1fnift:callable:lambda:",0)==0){
+                                auto li=lambda_instances_.find(tag.substr(22));if(li==lambda_instances_.end()){error="invalid lambda";return false;}auto fn=li->second;
+                                if(callable_call_depth_>=kMaxCallableDepth){error="callable recursion depth exceeded";return false;}++callable_call_depth_;
+                                if(fn->variadic_param.empty()?av.size()!=fn->params.size():av.size()<fn->params.size()){--callable_call_depth_;error="callback argument count mismatch";return false;}
+                                const auto saved_lambda_env=active_module_env_;if(fn->module_env)active_module_env_=fn->module_env;
+                                push_variable_scope();auto& sc=variable_scopes_.back();for(const auto& kv:fn->captures)sc[kv.first]=kv.second;
+                                for(std::size_t ai=0;ai<fn->params.size();++ai){auto sp=std::make_shared<json::Document>(av[ai]);sc[fn->params[ai]]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
+                                if(!fn->variadic_param.empty()){json::Document rest=json::Document::make_array();for(std::size_t ai=fn->params.size();ai<av.size();++ai)rest.array.push_back(av[ai]);auto sp=std::make_shared<json::Document>(std::move(rest));sc[fn->variadic_param]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
+                                bool okcall=true;
+                                if(fn->block){std::string bt=trim_copy(fn->body);const bool rendered=!bt.empty()&&bt.front()=='<';if(rendered){auto nested=parse(fn->body,fn->source_path,1);if(!nested.ok){error=nested.error.message;okcall=false;}else result=json::Document(nested.output);}else{okcall=eval(fn->body,result,depth+1);if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0)error="lambda body error: "+error;}}
+                                else{okcall=eval(fn->body,result,depth+1);if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0)error="lambda body error: "+error;}
+                                pop_variable_scope();active_module_env_=saved_lambda_env;--callable_call_depth_;return okcall;
+                            }
+                            if(tag.rfind("\x1fnift:callable:named:",0)==0){
+                                auto ci=callables_.find(tag.substr(21));if(ci==callables_.end()){error="invalid callable";return false;}const Callable& callee=ci->second;
+                                if(callable_call_depth_>=kMaxCallableDepth){error="callable recursion depth exceeded";return false;}++callable_call_depth_;
+                                if(callee.variadic_param.empty()?av.size()!=callee.params.size():av.size()<callee.params.size()){--callable_call_depth_;error="callback argument count mismatch";return false;}
+                                const auto saved_env=active_module_env_;if(callee.module_env)active_module_env_=callee.module_env;
+                                push_variable_scope();auto& scope=variable_scopes_.back();if(active_module_env_){for(const auto& kv:active_module_env_->vars){if(!scope.count(kv.first))scope[kv.first]=kv.second;}}
+                                for(std::size_t ai=0;ai<callee.params.size();++ai){auto sp=std::make_shared<json::Document>(av[ai]);scope.emplace(callee.params[ai],VariableBinding{sp,nift_binding_type(*sp),true,false});}
+                                if(!callee.variadic_param.empty()){json::Document rest=json::Document::make_array();for(std::size_t ai=callee.params.size();ai<av.size();++ai)rest.array.push_back(av[ai]);auto sp=std::make_shared<json::Document>(std::move(rest));scope.emplace(callee.variadic_param,VariableBinding{sp,nift_binding_type(*sp),true,false});}
+                                const int caller_loop_depth=loop_depth_;loop_depth_=0;pending_control_={};
+                                bool call_ok=true;std::string call_error;
+                                if(callee.fragment){const bool saved_fragment=in_fragment_body_;in_fragment_body_=true;auto nested=parse(callee.body,callee.source_path,1);in_fragment_body_=saved_fragment;if(!nested.ok){call_ok=false;call_error=nested.error.message;}else result=json::Document(nested.output);}
+                                else{++function_call_depth_;auto body_result=execute_native_program(callee.body,callee.source_path,1);--function_call_depth_;if(!body_result.ok){call_ok=false;call_error=body_result.error.message;}else if(pending_control_.kind==ControlFlow::None)result=json::Document(nullptr);else{result=pending_control_.value?std::move(*pending_control_.value):json::Document(nullptr);pending_control_={};}}
+                                loop_depth_=caller_loop_depth;pop_variable_scope();active_module_env_=saved_env;--callable_call_depth_;
+                                if(!call_ok){error=call_error;return false;}return true;
+                            }
+                            error="callback is not a callable";return false;};
                         auto invoke_value_callback=[&](const std::string& cbexpr,const std::vector<json::Document>& av,json::Document& result)->bool{
                             json::Document cb;if(!eval(cbexpr,cb,depth+1))return false;if(!cb.is_string()||cb.string.rfind("\x1fnift:callable:",0)!=0){error="transformation: callback must be callable";return false;}
                             return invoke_value_cb(cb,av,result);};
