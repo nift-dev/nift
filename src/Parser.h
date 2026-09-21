@@ -77,6 +77,15 @@ private:
     std::unordered_map<std::string, std::shared_ptr<const json::Document>> json_bindings_;
     std::unordered_map<std::string, std::shared_ptr<const json::Document>> contract_bindings_;
     std::vector<std::vector<std::string>> json_binding_scopes_;
+    struct PathComponent {
+        enum class Kind { Index, Key };
+        Kind kind = Kind::Index;
+        std::size_t index = 0;
+        std::string key;
+        static PathComponent at(std::size_t i) { PathComponent p; p.index=i; return p; }
+        static PathComponent member(std::string k) { PathComponent p; p.kind=Kind::Key; p.key=std::move(k); return p; }
+        bool operator==(const PathComponent& o) const { return kind==o.kind && (kind==Kind::Index ? index==o.index : key==o.key); }
+    };
     struct VariableBinding {
         std::shared_ptr<json::Document> value;
         int type = 0;
@@ -84,11 +93,37 @@ private:
         bool deep_readonly = false;
         bool is_script_args = false;
         std::shared_ptr<std::shared_ptr<json::Document>> slot;
+        // A nested aggregate binding is a logical location reference.  It owns
+        // the root binding slot plus a parsed key/index path; it never owns a
+        // pointer into vector<Document>, so parent reallocation cannot dangle it.
+        std::shared_ptr<std::shared_ptr<json::Document>> ref_root_slot;
+        std::vector<PathComponent> ref_path;
+        bool ref_valid = true;
         VariableBinding() : slot(std::make_shared<std::shared_ptr<json::Document>>(value)) {}
         VariableBinding(std::shared_ptr<json::Document> v, int t, bool m, bool d)
             : value(std::move(v)), type(t), mutable_binding(m), deep_readonly(d), is_script_args(false), slot(std::make_shared<std::shared_ptr<json::Document>>(value)) {}
-        void sync() { if (slot) value = *slot; }
-        void rebind(std::shared_ptr<json::Document> v) { value=std::move(v); if(slot)*slot=value; }
+        bool is_location_ref() const { return static_cast<bool>(ref_root_slot); }
+        json::Document* resolve_location() const {
+            if(!ref_root_slot || !*ref_root_slot) return nullptr;
+            json::Document* cur=ref_root_slot->get();
+            for(const auto& p:ref_path){
+                if(p.kind==PathComponent::Kind::Index){
+                    if(!cur->is_array() || p.index>=cur->array.size()) return nullptr;
+                    cur=&cur->array[p.index];
+                } else {
+                    if(!cur->is_object() || !cur->has(p.key)) return nullptr;
+                    cur=&(*cur)[p.key];
+                }
+            }
+            return cur;
+        }
+        void sync() {
+            if(ref_root_slot){
+                auto root=*ref_root_slot; json::Document* p=resolve_location(); ref_valid=(p!=nullptr);
+                value=(p&&root)?std::shared_ptr<json::Document>(root,p):std::shared_ptr<json::Document>{};
+            } else if(slot) value=*slot;
+        }
+        void rebind(std::shared_ptr<json::Document> v) { ref_root_slot.reset(); ref_path.clear(); ref_valid=true; value=std::move(v); if(slot)*slot=value; }
     };
     std::vector<std::unordered_map<std::string, VariableBinding>> variable_scopes_;
     struct ModuleEnv;
