@@ -6,6 +6,7 @@
 # Run under ASan/UBSan/LSan for the full memory certification value.
 set -eu
 NIFT=${NIFT:-./nift}
+case "$NIFT" in /*) : ;; *) NIFT="$(pwd)/$NIFT" ;; esac
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
 
 # 1. Destructuring then parent growth (classic B2 UAF).
@@ -84,7 +85,7 @@ $[m["d"] = 4]
 }
 SUM=$[s]
 E
-"$NIFT" build --all -r "$D" >/dev/null 2>&1 || { cd "$D" && "$NIFT" build --all >/dev/null 2>&1; } || { printf 'formap build failed\n' >&2; exit 1; }
+(cd "$D" && "$NIFT" build --all >/dev/null 2>&1) || { printf 'formap build failed\n' >&2; exit 1; }
 grep -q 'SUM=6' "$D/public/index.html" || { printf 'formap: %s\n' "$(cat "$D/public/index.html")" >&2; exit 1; }
 
 # 6. @for over an array whose body mutates the array.
@@ -102,7 +103,7 @@ $[a.push(0)]
 }
 SUM=$[s]
 E
-"$NIFT" build --all -r "$D" >/dev/null 2>&1 || { cd "$D" && "$NIFT" build --all >/dev/null 2>&1; } || { printf 'forarr build failed\n' >&2; exit 1; }
+(cd "$D" && "$NIFT" build --all >/dev/null 2>&1) || { printf 'forarr build failed\n' >&2; exit 1; }
 grep -q 'SUM=10' "$D/public/index.html" || { printf 'forarr: %s\n' "$(cat "$D/public/index.html")" >&2; exit 1; }
 
 echo 'PASS v4.4 root+path corruption reproducers (destruct/growth/structarr/mapstruct/formap/forarr)'
