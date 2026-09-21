@@ -7,10 +7,18 @@
 # native calls, sort/group, JSON ops, maps, string methods, for-ranges and
 # big-integer handling.
 set -euo pipefail
+# Portable timeout: GNU timeout where present, otherwise perl alarm (macOS has
+# no GNU timeout by default).
+timed() {
+  local secs="$1"; shift
+  if command -v timeout >/dev/null 2>&1; then timeout "$secs" "$@";
+  else perl -e 'alarm shift; exec @ARGV' "$secs" "$@";
+  fi
+}
 nift=${NIFT:-"$(cd "$(dirname "$0")/.." && pwd)/nift"}
 t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
 
-run() { printf '%s' "$1" > "$t/prog.f"; timeout 30 "$nift" run "$t/prog.f" 2>&1 | tr '\n' '|'; }
+run() { printf '%s' "$1" > "$t/prog.f"; timed 30 "$nift" run "$t/prog.f" 2>&1 | tr '\n' '|'; }
 
 fail=0
 check() { # name expected actual

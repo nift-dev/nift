@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# Portable timeout: GNU timeout where present, otherwise perl alarm (macOS has
+# no GNU timeout by default).
+timed() {
+  local secs="$1"; shift
+  if command -v timeout >/dev/null 2>&1; then timeout "$secs" "$@";
+  else perl -e 'alarm shift; exec @ARGV' "$secs" "$@";
+  fi
+}
 cxx=${CXX:-g++}
 t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
 "$cxx" -std=c++17 -O2 -Isrc -Ijsonic/include tests/ast_expression_unit.cpp src/Ast.cpp -o "$t/ast-test"
@@ -12,7 +20,7 @@ nift=${NIFT:-"$(cd "$(dirname "$0")/.." && pwd)/nift"}
 
 run_script() {
     cat > "$t/probe.f"
-    timeout 30 "$nift" run "$t/probe.f" 2>&1 | head -1
+    timed 30 "$nift" run "$t/probe.f" 2>&1 | head -1
 }
 
 fail=0

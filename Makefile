@@ -945,10 +945,14 @@ checkpoint-10-cross-platform: $(TARGET)
 test-v44-execution-shell: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_execution_shell_smoke.sh
 
+
+# Portable Python discovery for the AST fuzz/property target. Windows msys2
+# PATH exposes python (from setup-python) rather than python3.
+PYTHON ?= $(shell command -v python3 2>/dev/null || command -v python 2>/dev/null)
 test-v44-language-foundation: $(TARGET)
 	tests/v44_ast_expression_smoke.sh
 	tests/v44_ast_differential_corpus.sh
-	NIFT="$(CURDIR)/$(TARGET)" python3 tests/v44_ast_fuzz.py
+	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(TARGET)" $(PYTHON) tests/v44_ast_fuzz.py; else echo "  (fuzz skipped: no python3/python on PATH)"; fi
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_perf_scaling_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_element_assignment_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp2_variadic_functions_smoke.sh
