@@ -107,3 +107,54 @@ E
 grep -q 'SUM=10' "$D/public/index.html" || { printf 'forarr: %s\n' "$(cat "$D/public/index.html")" >&2; exit 1; }
 
 echo 'PASS v4.4 root+path corruption reproducers (destruct/growth/structarr/mapstruct/formap/forarr)'
+# --- CP34 final adversarial battery (all must stay ASan-clean) ---
+
+# Escaped reference through object member after the parent slot is replaced.
+cat >"$T/escaped.f" <<'F'
+a := {"x": [[1],[2]]}
+b := a.x
+c := b[0]
+e := a.x[1]
+a["x"] = []
+print(c[0])
+print(e[0])
+F
+set +e
+"$NIFT" run "$T/escaped.f" >"$T/out" 2>"$T/err"; rc=$?
+set -e
+[[ $rc -ne 0 ]] || { echo 'escaped-ref unexpectedly succeeded' >&2; exit 1; }
+grep -q 'reference target no longer exists' "$T/err" || { cat "$T/err" >&2; exit 1; }
+
+# Reference created inside a loop scope escapes and stays live after the scope.
+cat >"$T/scope.f" <<'F'
+a := [[1]]
+b := a[0]
+i := 0
+while(i < 1) {
+  c := b
+  c[0] = 5
+  i = i + 1
+}
+print(a[0][0])
+F
+out=$("$NIFT" run "$T/scope.f")
+[ "$out" = "5" ] || { printf 'scope: %s\n' "$out" >&2; exit 1; }
+
+# Heavy reallocation with composed locations retained.
+cat >"$T/stress.f" <<'F'
+a := []
+i := 0
+while(i < 20000) {
+  a.push([[i], {"k": [i]}])
+  i = i + 1
+}
+b := a[0]
+c := a[0][0]
+d := a[0][1]
+e := a[19999]
+print(c[0])
+print(e[1].k[0])
+F
+out=$("$NIFT" run "$T/stress.f")
+[ "$out" = "0
+19999" ] || { printf 'stress: %s\n' "$out" >&2; exit 1; }
