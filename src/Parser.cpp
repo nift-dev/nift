@@ -848,6 +848,13 @@ bool Parser::resolve_json_value(const std::string& expression,
     // resolve before @json bindings, contracts and built-in metadata.
     VariableBinding* local_binding=nullptr;
     for(auto scope=variable_scopes_.rbegin();scope!=variable_scopes_.rend();++scope){auto it=scope->find(root_name);if(it!=scope->end()){local_binding=&it->second;break;}}
+    if (local_binding) {
+        // Location references must be re-synced before use: the aliasing
+        // shared_ptr stored at loop setup can dangle if the parent aggregate
+        // was mutated by the body since setup. sync() re-resolves through the
+        // root slot + path so template paths never read a stale interior alias.
+        local_binding->sync();
+    }
     if (local_binding && local_binding->value && (local_binding->value->is_object() || local_binding->value->is_array())) {
         current = local_binding->value;
     } else if (const auto* supplied = host_.binding(root_name)) {
@@ -5118,8 +5125,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 for (std::size_t position = 0; position < order.size() && result_.ok; ++position) {
                     const std::size_t index = order[position];
                     const json::Document* element = &collection->array[index];
-                    json_bindings_[binding_part] =
-                        std::shared_ptr<const json::Document>(collection, element);
+                    json_bindings_[binding_part] = std::make_shared<const json::Document>(*element);
                     json_bindings_["loop"] = make_loop_metadata(position, order.size());
 
                     push_json_scope();
@@ -5223,8 +5229,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     for (std::size_t n = 0; n < collection->object.size(); ++n) {
                         const auto& entry = collection->object[n];
                         json_bindings_[key_name] = std::make_shared<const json::Document>(entry.first);
-                        json_bindings_[value_name] =
-                            std::shared_ptr<const json::Document>(collection, &entry.second);
+                        json_bindings_[value_name] = std::make_shared<const json::Document>(entry.second);
                         std::shared_ptr<const json::Document> key;
                         std::string key_error;
                         if (!resolve_json_value(sort_expression, key, key_error) || !key_error.empty()) {
@@ -5260,8 +5265,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 for (std::size_t position = 0; position < order.size() && result_.ok; ++position) {
                     const auto& entry = collection->object[order[position]];
                     json_bindings_[key_name] = std::make_shared<const json::Document>(entry.first);
-                    json_bindings_[value_name] =
-                        std::shared_ptr<const json::Document>(collection, &entry.second);
+                    json_bindings_[value_name] = std::make_shared<const json::Document>(entry.second);
                     json_bindings_["loop"] = make_loop_metadata(position, order.size());
 
                     push_json_scope();
