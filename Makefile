@@ -952,6 +952,7 @@ PYTHON ?= $(shell command -v python3 2>/dev/null || command -v python 2>/dev/nul
 test-v44-language-foundation: $(TARGET)
 	tests/v44_ast_expression_smoke.sh
 	tests/v44_ast_differential_corpus.sh
+	tests/v44_root_path_corruption_reproducers.sh
 	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(TARGET)" $(PYTHON) tests/v44_ast_fuzz.py; else echo "  (fuzz skipped: no python3/python on PATH)"; fi
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_perf_scaling_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_element_assignment_smoke.sh
