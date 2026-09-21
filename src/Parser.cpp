@@ -2822,10 +2822,11 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
         }
 
         if (text.rfind("copy(",0)==0 && text.back()==')') {
-            json::Document source; if(!eval(text.substr(5,text.size()-6),source,depth+1))return false;
-            if(source.is_string()&&source.string.rfind("\x1fnift:collection:",0)==0){auto it=collection_instances_.find(source.string.substr(17));if(it==collection_instances_.end()){error="copy: invalid collection";return false;}auto clone=std::make_shared<CollectionInstance>(*it->second);const std::string id=std::to_string(next_collection_instance_id_++);collection_instances_[id]=clone;out=json::Document(std::string("\x1fnift:collection:")+id);return true;}
-            if(source.is_string()&&source.string.rfind("\x1fnift:struct:",0)==0){auto it=struct_instances_.find(source.string.substr(13));if(it==struct_instances_.end()){error="copy: invalid struct instance";return false;}auto clone=std::make_shared<StructInstance>();clone->type_name=it->second->type_name;for(const auto& f:it->second->fields){auto sp=std::make_shared<json::Document>(*f.second.value);clone->fields.emplace(f.first,VariableBinding{sp,f.second.type,f.second.mutable_binding,f.second.deep_readonly});}const std::string id=std::to_string(next_struct_instance_id_++);struct_instances_[id]=clone;out=json::Document(std::string("\x1fnift:struct:")+id);return true;}
-            out=source; return true;
+            // v4.4 ownership model: assignment/extraction is the sharing
+            // operation; copy() means a recursively independent value.  Keep
+            // deepcopy() as a compatibility spelling for now and route copy()
+            // through the same certified recursive clone implementation.
+            return eval("deepcopy("+text.substr(5,text.size()-6)+")",out,depth+1);
         }
 
         if (text.rfind("deepcopy(",0)==0 && text.back()==')') {
