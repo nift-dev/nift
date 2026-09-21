@@ -948,6 +948,7 @@ test-v44-execution-shell: $(TARGET)
 test-v44-language-foundation: $(TARGET)
 	tests/v44_ast_expression_smoke.sh
 	tests/v44_ast_differential_corpus.sh
+	NIFT="$(CURDIR)/$(TARGET)" python3 tests/v44_ast_fuzz.py
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_perf_scaling_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_element_assignment_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp2_variadic_functions_smoke.sh
