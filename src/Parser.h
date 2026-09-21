@@ -67,6 +67,14 @@ public:
                                  bool require_exactly_one_content);
 
 private:
+    // Consume a callable's return into `out`, propagating any location that the
+    // return carried so a following declaration can rebind to the same location.
+    void consume_return(json::Document& out) {
+        last_call_return_loc_root_ = pending_control_.ref_root_slot;
+        last_call_return_loc_path_ = pending_control_.ref_path;
+        out = pending_control_.value ? std::move(*pending_control_.value) : json::Document(nullptr);
+        pending_control_ = {};
+    }
     RenderHost& host_;
     std::optional<RenderSource> page_source_;
     TrackedInfo& tracked_info_;
@@ -198,6 +206,10 @@ private:
     int expression_type(const std::string& source) const;
     bool reference_would_cycle(const std::string& target_id, const std::string& container_id) const;
     bool last_expression_mutation_ = false;
+    // Location of the most recent call result that returned a location ref, so
+    // a declaration `c := f(loc)` can rebind c to the same root+path location.
+    std::shared_ptr<std::shared_ptr<json::Document>> last_call_return_loc_root_;
+    std::vector<PathComponent> last_call_return_loc_path_;
     int function_call_depth_ = 0;
     bool in_fragment_body_ = false;
     bool in_import_program_ = false;
@@ -209,6 +221,11 @@ private:
     struct PendingControl {
         ControlFlow kind = ControlFlow::None;
         std::shared_ptr<json::Document> value;
+        // Location carried by a `return <location>` so the returned reference
+        // keeps root+path identity across the call boundary instead of being
+        // reduced to a value copy.
+        std::shared_ptr<std::shared_ptr<json::Document>> ref_root_slot;
+        std::vector<PathComponent> ref_path;
     };
     PendingControl pending_control_;
     int callable_call_depth_ = 0;

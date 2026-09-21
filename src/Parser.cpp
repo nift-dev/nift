@@ -1803,6 +1803,23 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             dst.type=nift_binding_type(*dst.value);return true;
         };
 
+        // Bind a callable parameter: preserve location identity when the argument
+        // denotes an aggregate location (root+path), otherwise bind an independent
+        // value copy. Shared by the named-callable and lambda call paths so both
+        // implement identical function-boundary location semantics.
+        auto bind_call_param = [&](const std::string& arg_text, bool quoted, json::Document& value) -> VariableBinding {
+            if (!quoted) {
+                VariableBinding loc;
+                if (try_location_ref(arg_text, loc) && loc.is_location_ref() && loc.value) {
+                    loc.mutable_binding = true;
+                    loc.deep_readonly = false;
+                    return loc;
+                }
+            }
+            auto sp = std::make_shared<json::Document>(std::move(value));
+            return VariableBinding{sp, nift_binding_type_from_text(arg_text, *sp), true, false};
+        };
+
         auto truthy_value = [](const json::Document& document) {
             if (document.is_bool()) return document.boolean;
             if (document.is_null()) return false;
@@ -2466,7 +2483,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                                 const int caller_loop_depth=loop_depth_;loop_depth_=0;pending_control_={};
                                 bool call_ok=true;std::string call_error;
                                 if(callee.fragment){const bool saved_fragment=in_fragment_body_;in_fragment_body_=true;auto nested=parse(callee.body,callee.source_path,1);in_fragment_body_=saved_fragment;if(!nested.ok){call_ok=false;call_error=nested.error.message;}else result=json::Document(nested.output);}
-                                else{++function_call_depth_;auto body_result=execute_native_program(callee.body,callee.source_path,1);--function_call_depth_;if(!body_result.ok){call_ok=false;call_error=body_result.error.message;}else if(pending_control_.kind==ControlFlow::None)result=json::Document(nullptr);else{result=pending_control_.value?std::move(*pending_control_.value):json::Document(nullptr);pending_control_={};}}
+                                else{++function_call_depth_;auto body_result=execute_native_program(callee.body,callee.source_path,1);--function_call_depth_;if(!body_result.ok){call_ok=false;call_error=body_result.error.message;}else if(pending_control_.kind==ControlFlow::None)result=json::Document(nullptr);else consume_return(result);}
                                 loop_depth_=caller_loop_depth;pop_variable_scope();active_module_env_=saved_env;--callable_call_depth_;
                                 if(!call_ok){error=call_error;return false;}return true;
                             }
@@ -2581,8 +2598,19 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
         }
         if (text.rfind("same(",0)==0 && text.back()==')') {
             bool ok=false; auto args=parse_parameters(text.substr(5,text.size()-6),ok); if(!ok||args.size()!=2){error="same: expected two values";return false;}
-            const std::string an=trim_copy(args[0]),bn=trim_copy(args[1]); VariableBinding* ab=find_binding(an);VariableBinding* bb=find_binding(bn);
-            if(ab&&bb&&ab->value&&bb->value&&ab->value->is_array()&&bb->value->is_array()){out=json::Document(ab->value==bb->value);return true;}
+            const std::string an=trim_copy(args[0]),bn=trim_copy(args[1]);
+            VariableBinding la,lb;bool a_loc=false,b_loc=false;
+            if(try_location_ref(an,la)&&la.is_location_ref()&&la.value){a_loc=true;}
+            else{json::Document av;if(!eval(args[0],av,depth+1))return false;if(last_call_return_loc_root_&&(av.is_array()||av.is_object()||(av.is_string()&&av.string.rfind("\x1fnift:",0)==0))){la.ref_root_slot=last_call_return_loc_root_;la.ref_path=last_call_return_loc_path_;la.sync();if(la.value)a_loc=true;}}
+            if(try_location_ref(bn,lb)&&lb.is_location_ref()&&lb.value){b_loc=true;}
+            else{json::Document bv;if(!eval(args[1],bv,depth+1))return false;if(last_call_return_loc_root_&&(bv.is_array()||bv.is_object()||(bv.is_string()&&bv.string.rfind("\x1fnift:",0)==0))){lb.ref_root_slot=last_call_return_loc_root_;lb.ref_path=last_call_return_loc_path_;lb.sync();if(lb.value)b_loc=true;}}
+            if(a_loc&&b_loc){
+                const bool same_root=(la.ref_root_slot&&lb.ref_root_slot&&la.ref_root_slot==lb.ref_root_slot);
+                const bool same_path=(la.ref_path==lb.ref_path);
+                out=json::Document(same_root&&same_path);return true;
+            }
+            VariableBinding* ab=find_binding(an);VariableBinding* bb=find_binding(bn);
+            if(ab&&bb&&ab->value&&bb->value&&ab->value->is_array()&&bb->value->is_array()){ab->sync();bb->sync();out=json::Document(ab->value==bb->value);return true;}
             json::Document a,b;if(!eval(args[0],a,depth+1)||!eval(args[1],b,depth+1))return false;
             auto identity=[](const json::Document& v)->std::string{if(!v.is_string())return {}; if(v.string.rfind("\x1fnift:struct:",0)==0||v.string.rfind("\x1fnift:callable:",0)==0||v.string.rfind("\x1fnift:collection:",0)==0||v.string.rfind("\x1fnift:file:",0)==0||v.string.rfind("\x1fnift:stream:",0)==0)return v.string;return {};};
             const auto ai=identity(a),bi=identity(b); if(ai.empty()||bi.empty()){error="same: operands must be identity-bearing values";return false;} out=json::Document(ai==bi);return true;
@@ -2776,10 +2804,10 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                             bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(aok){std::vector<std::string> ex;std::vector<bool> eq;for(size_t ai=0;ai<ar.size();++ai){if(!(ai<aq.size()&&aq[ai])&&trim_copy(ar[ai]).rfind("...",0)==0){json::Document sv;if(!eval(trim_copy(ar[ai]).substr(3),sv,depth+1)){--callable_call_depth_;return false;}if(!sv.is_array()){error="spread value must be an array";--callable_call_depth_;return false;}for(const auto& item:sv.array){std::string enc;if(!serialize_value(item,false,enc,error)){--callable_call_depth_;return false;}ex.push_back(enc);eq.push_back(false);}}else{ex.push_back(ar[ai]);eq.push_back(ai<aq.size()&&aq[ai]);}}ar.swap(ex);aq.swap(eq);}if(!aok||(!fn->variadic_param.empty()?ar.size()<fn->params.size():ar.size()!=fn->params.size())){error="lambda argument count mismatch";--callable_call_depth_;return false;}
                             std::vector<json::Document> av;for(size_t ai=0;ai<ar.size();++ai){json::Document v;if(ai<aq.size()&&aq[ai])v=json::Document(ar[ai]);else if(!eval(ar[ai],v,depth+1)){--callable_call_depth_;return false;}av.push_back(std::move(v));}
                             const auto saved_lambda_env=active_module_env_; if(fn->module_env) active_module_env_=fn->module_env;
-                            push_variable_scope();auto& sc=variable_scopes_.back();for(const auto& kv:fn->captures)sc[kv.first]=kv.second;for(size_t ai=0;ai<fn->params.size();++ai){auto sp=std::make_shared<json::Document>(std::move(av[ai]));sc[fn->params[ai]]=VariableBinding{sp,nift_binding_type(*sp),true,false};}if(!fn->variadic_param.empty()){json::Document rest=json::Document::make_array();for(size_t ai=fn->params.size();ai<av.size();++ai)rest.array.push_back(std::move(av[ai]));auto sp=std::make_shared<json::Document>(std::move(rest));sc[fn->variadic_param]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
+                            push_variable_scope();auto& sc=variable_scopes_.back();for(const auto& kv:fn->captures)sc[kv.first]=kv.second;for(size_t ai=0;ai<fn->params.size();++ai){sc[fn->params[ai]]=bind_call_param(ar[ai],ai<aq.size()&&aq[ai],av[ai]);}if(!fn->variadic_param.empty()){json::Document rest=json::Document::make_array();for(size_t ai=fn->params.size();ai<av.size();++ai)rest.array.push_back(std::move(av[ai]));auto sp=std::make_shared<json::Document>(std::move(rest));sc[fn->variadic_param]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
                             bool okcall=true;
-                            if(fn->block){std::string bt=trim_copy(fn->body);const bool rendered=!bt.empty()&&bt.front()=='<';if(rendered){auto nested=parse(fn->body,fn->source_path,1);if(!nested.ok){error=nested.error.message;okcall=false;}else out=json::Document(nested.output);}else{++function_call_depth_;auto nested=execute_native_program(fn->body,fn->source_path,1);--function_call_depth_;if(!nested.ok){error=nested.error.message;okcall=false;}else if(pending_control_.kind==ControlFlow::Return){out=pending_control_.value?*pending_control_.value:json::Document(nullptr);pending_control_={};}else out=json::Document(nullptr);}}
-                            else { okcall=eval(fn->body,out,depth+1); if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0) error="lambda body error: "+error; }
+                            if(fn->block){std::string bt=trim_copy(fn->body);const bool rendered=!bt.empty()&&bt.front()=='<';if(rendered){auto nested=parse(fn->body,fn->source_path,1);if(!nested.ok){error=nested.error.message;okcall=false;}else out=json::Document(nested.output);}else{++function_call_depth_;auto nested=execute_native_program(fn->body,fn->source_path,1);--function_call_depth_;if(!nested.ok){error=nested.error.message;okcall=false;}else if(pending_control_.kind==ControlFlow::Return){consume_return(out);}else out=json::Document(nullptr);}}
+                            else { okcall=eval(fn->body,out,depth+1); if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0) error="lambda body error: "+error; VariableBinding lr; if(try_location_ref(fn->body,lr)&&lr.is_location_ref()&&lr.value){last_call_return_loc_root_=lr.ref_root_slot;last_call_return_loc_path_=lr.ref_path;} }
                             pop_variable_scope();active_module_env_=saved_lambda_env;--callable_call_depth_;return okcall;
                         }
                     }
@@ -2799,7 +2827,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     loop_depth_ = 0;
                     const auto saved_env = active_module_env_;
                     if (callee->module_env) active_module_env_ = callee->module_env;
-                    push_variable_scope(); auto& scope=variable_scopes_.back(); if(active_module_env_){for(const auto& kv:active_module_env_->vars){if(!scope.count(kv.first))scope[kv.first]=kv.second;}} for(std::size_t ai=0;ai<callee->params.size();++ai){auto sp=std::make_shared<json::Document>(std::move(values[ai]));scope.emplace(callee->params[ai],VariableBinding{sp,nift_binding_type_from_text(args[ai],*sp),true,false});}if(!callee->variadic_param.empty()){json::Document rest=json::Document::make_array();for(std::size_t ai=callee->params.size();ai<values.size();++ai)rest.array.push_back(std::move(values[ai]));auto sp=std::make_shared<json::Document>(std::move(rest));scope.emplace(callee->variadic_param,VariableBinding{sp,nift_binding_type(*sp),true,false});}
+                    push_variable_scope(); auto& scope=variable_scopes_.back(); if(active_module_env_){for(const auto& kv:active_module_env_->vars){if(!scope.count(kv.first))scope[kv.first]=kv.second;}} for(std::size_t ai=0;ai<callee->params.size();++ai){scope.emplace(callee->params[ai],bind_call_param(args[ai],ai<quoted_args.size()&&quoted_args[ai],values[ai]));}if(!callee->variadic_param.empty()){json::Document rest=json::Document::make_array();for(std::size_t ai=callee->params.size();ai<values.size();++ai)rest.array.push_back(std::move(values[ai]));auto sp=std::make_shared<json::Document>(std::move(rest));scope.emplace(callee->variadic_param,VariableBinding{sp,nift_binding_type(*sp),true,false});}
                     const bool saved_mutation = last_expression_mutation_;
                     bool call_ok = true; std::string call_error;
                     if (callee->fragment) {
@@ -2815,7 +2843,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         --function_call_depth_;
                         if (!body_result.ok) { call_ok = false; call_error = body_result.error.message; }
                         else if (pending_control_.kind == ControlFlow::None) { out = json::Document(nullptr); }
-                        else { out = pending_control_.value ? std::move(*pending_control_.value) : json::Document(nullptr); pending_control_ = {}; }
+                        else consume_return(out);
                     }
                     last_expression_mutation_ = saved_mutation;
                     pop_variable_scope();
@@ -3266,6 +3294,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 if (!existing.is_script_args) { error = "binding already declared in this scope: " + name; return false; }
             }
             json::Document assigned;
+            last_call_return_loc_root_.reset(); last_call_return_loc_path_.clear();
             if (!eval(text.substr(p + 2), assigned, depth + 1)) return false;
             std::shared_ptr<json::Document> stored;
             const std::string rhs_name=trim_copy(text.substr(p+2)); VariableBinding* alias=find_binding(rhs_name);
@@ -3276,6 +3305,16 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             // RHS is not a reference-shaped expression this simply remains an
             // ordinary value/root binding.
             try_location_ref(text.substr(p+2),declared_binding);
+            // A call whose return carried a location keeps that location here,
+            // so `c := get(loc)` rebinds c to the same root+path location.
+            if(!declared_binding.is_location_ref()&&last_call_return_loc_root_&&
+               (assigned.is_array()||assigned.is_object()||(assigned.is_string()&&assigned.string.rfind("\x1fnift:",0)==0))){
+                declared_binding.ref_root_slot=last_call_return_loc_root_;
+                declared_binding.ref_path=last_call_return_loc_path_;
+                declared_binding.sync();
+                if(declared_binding.value){declared_binding.type=nift_binding_type(*declared_binding.value);last_call_return_loc_root_.reset();last_call_return_loc_path_.clear();}
+                else{declared_binding.ref_root_slot.reset();declared_binding.ref_path.clear();declared_binding.sync();}
+            }
             if (depth == 0) last_expression_mutation_ = true;
             out = std::move(assigned);
             return true;
@@ -4690,7 +4729,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             return true;};
         std::function<bool(const std::vector<std::unique_ptr<nift::ast::Stmt>>&,std::string&)> execute_body;
         std::function<bool(const nift::ast::Stmt&,std::string&)> execute_prepared;
-        auto ast_context=[&](){nift::ast::Context c;c.resolve=[&](const std::string& name,json::Document& out,std::string& e){for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(name);if(it!=sc->end()){it->second.sync();if(!it->second.value){e="reference target no longer exists: "+name;return false;}out=*it->second.value;return true;}}e="unknown value or malformed expression: "+name;return false;};c.legacy=[&](const std::string& x,json::Document& out,std::string& e){return evaluate_expression(x,out,e);};c.call=[&](const std::string& name,std::vector<json::Document>&& args,json::Document& out,std::string& e)->bool{
+        auto ast_context=[&](){nift::ast::Context c;c.resolve=[&](const std::string& name,json::Document& out,std::string& e){for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(name);if(it!=sc->end()){it->second.sync();if(!it->second.value){e="reference target no longer exists: "+name;return false;}out=*it->second.value;return true;}}e="unknown value or malformed expression: "+name;return false;};c.legacy=[&](const std::string& x,json::Document& out,std::string& e){return evaluate_expression(x,out,e);};c.arg_is_location=[&](const std::string& arg)->bool{VariableBinding loc;const std::string ref_source=trim_copy(arg);auto parsed=nift::ast::parse_expression(ref_source);if(!parsed.supported||!parsed.expr)return false;std::shared_ptr<std::shared_ptr<json::Document>> root;std::vector<PathComponent> path;std::function<bool(const nift::ast::Expr&)> walk;walk=[&](const nift::ast::Expr& ex)->bool{if(ex.kind==nift::ast::Kind::Binding){VariableBinding* b=nullptr;for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(ex.name);if(it!=sc->end()){it->second.sync();b=&it->second;break;}}if(!b||!b->value)return false;if(b->is_location_ref()){root=b->ref_root_slot;path=b->ref_path;}else root=b->slot;return true;}if(ex.kind==nift::ast::Kind::Member){if(!ex.left||!walk(*ex.left))return false;path.push_back(PathComponent::member(ex.name));return true;}if(ex.kind==nift::ast::Kind::Index){if(!ex.left||!walk(*ex.left))return false;json::Document idx;std::string index_error;if(!evaluate_expression(ex.right->text.empty()?ref_source.substr(ex.right->span.begin,ex.right->span.end-ex.right->span.begin):ex.right->text,idx,index_error))return false;if(idx.is_number()&&idx.num>=0&&std::trunc(idx.num)==idx.num)path.push_back(PathComponent::at((std::size_t)idx.num));else if(idx.is_string())path.push_back(PathComponent::member(idx.string));else return false;return true;}return false;};if(!walk(*parsed.expr)||path.empty())return false;loc.ref_root_slot=std::move(root);loc.ref_path=std::move(path);loc.sync();if(!loc.value)return false;return loc.value->is_array()||loc.value->is_object()||(loc.value->is_string()&&loc.value->string.rfind("\x1fnift:",0)==0);};c.call=[&](const std::string& name,std::vector<json::Document>&& args,json::Document& out,std::string& e)->bool{
             // Prepared dispatch for user callables: bind args, run the prepared
             // body once, propagate the return value. Any failure falls back to
             // the legacy evaluator (the oracle) via the Call handler.
@@ -4716,7 +4755,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             loop_depth_=saved_loop_depth;--callable_call_depth_;
             pop_variable_scope();
             if(!ok){e=pe;return false;}
-            if(pending_control_.kind==ControlFlow::Return){out=pending_control_.value?std::move(*pending_control_.value):json::Document(nullptr);pending_control_={};}
+            if(pending_control_.kind==ControlFlow::Return)consume_return(out);
             else out=json::Document(nullptr);
             return true;};c.resolve_ref=[&](const std::string& name,std::shared_ptr<const json::Document>& out,std::string& e){for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(name);if(it!=sc->end()){it->second.sync();if(!it->second.value){e="reference target no longer exists: "+name;return false;}out=it->second.value;return true;}}e="unknown value or malformed expression: "+name;return false;};c.native_method=[&](const json::Document& recv,const std::string& method,std::vector<json::Document>&& args,json::Document& out,std::string& e)->bool{
             if(method=="to_string"&&recv.is_number()){out=json::Document(render_expression_value(recv));return true;}
@@ -4842,7 +4881,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             // aggregate binding, so in-body mutation of the parent (push/pop/
             // replace) cannot dangle the element (no interior pointer retained).
             if(st.iterable&&st.iterable->kind==nift::ast::Kind::Binding){auto* src=find_binding(st.iterable->name);if(src){src->sync();if(src->value&&(src->value->is_array()||src->value->is_object())){lb.ref_root_slot=src->slot;std::vector<PathComponent> pc;pc.push_back(PathComponent::at(k));lb.ref_path=std::move(pc);}}}
-            variable_scopes_.back().emplace(st.name,std::move(lb));++loop_depth_;const bool bok=execute_body(st.body,e);--loop_depth_;pop_json_scope();if(!bok)return false;if(pending_control_.kind==ControlFlow::Break){pending_control_={};break;}if(pending_control_.kind==ControlFlow::Continue){pending_control_={};continue;}}return true;}if(st.kind==nift::ast::StmtKind::Break){pending_control_.kind=ControlFlow::Break;pending_control_.value.reset();return true;}if(st.kind==nift::ast::StmtKind::Continue){pending_control_.kind=ControlFlow::Continue;pending_control_.value.reset();return true;}if(st.kind==nift::ast::StmtKind::Return){json::Document rv;if(st.expr){if(!nift::ast::evaluate(*st.expr,c,rv,e))return false;pending_control_.value=std::make_shared<json::Document>(std::move(rv));}else pending_control_.value.reset();pending_control_.kind=ControlFlow::Return;return true;}if(st.kind==nift::ast::StmtKind::Expression){return execute_native_call(st,e);}if(st.kind==nift::ast::StmtKind::Declaration){if(!nift::ast::evaluate(*st.expr,c,rhs,e))return false;if(large_num(rhs)){json::Document lege;return c.legacy(st.text,lege,e);}if(variable_scopes_.empty()){e="no scope for declaration: "+st.name;return false;}auto& scope=variable_scopes_.back();if(scope.count(st.name)){e="binding already declared in this scope: "+st.name;return false;}auto sp=std::make_shared<json::Document>(std::move(rhs));const int dt=st.decl_type;const int bt=(dt==3)?3:((dt==2)?nift_binding_type(*sp):((dt>=0&&dt!=2&&dt!=3)?dt:nift_binding_type(*sp)));auto ins=scope.emplace(st.name,VariableBinding{sp,bt,true,false});if(st.expr&&(st.expr->kind==nift::ast::Kind::Index||st.expr->kind==nift::ast::Kind::Member)){std::string re;if(!bind_location(ins.first->second,*st.expr,re)&&!re.empty()){e=re;scope.erase(ins.first);return false;}}else if(st.expr&&st.expr->kind==nift::ast::Kind::Binding&&(sp->is_array()||sp->is_object())){auto* src=find_binding(st.expr->name);if(src){src->sync();if(src->value){ins.first->second.value=src->value;*ins.first->second.slot=src->value;}}}return true;}if(st.kind==nift::ast::StmtKind::Assignment){if(!nift::ast::evaluate(*st.expr,c,rhs,e))return false;if(large_num(rhs)){json::Document lege;return c.legacy(st.text,lege,e);}if(st.target)return assign_indexed(*st.target,std::move(rhs),e);return assign_plain(st.name,std::move(rhs),e);}VariableBinding* cb=nullptr;for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(st.name);if(it!=sc->end()){cb=&it->second;break;}}if(!cb){e="assignment to undefined binding: "+st.name;return false;}cb->sync();if(!cb->mutable_binding){e="cannot assign to const binding: "+st.name;return false;}if(st.kind==nift::ast::StmtKind::Increment){if(!cb->value->is_number()){e="increment/decrement requires a numeric lvalue";return false;}oldv=*cb->value;if(large_num(oldv)){json::Document lege;return c.legacy(st.text,lege,e);}next=json::Document(oldv.num+(st.op=="++"?1.0:-1.0));return assign_plain(st.name,std::move(next),e);}if(!nift::ast::evaluate(*st.expr,c,rhs,e))return false;if(st.op=="+="&&cb->value->is_string()&&rhs.is_string()){if(cb->value.use_count()==2){cb->value->string.append(rhs.string);last_expression_mutation_=true;return true;}oldv=*cb->value;next=json::Document(oldv.string+rhs.string);}else if(st.op=="+="&&cb->value->is_array()&&rhs.is_array()){oldv=*cb->value;next=json::Document::make_array();next.array.reserve(oldv.array.size()+rhs.array.size());next.array.insert(next.array.end(),oldv.array.begin(),oldv.array.end());next.array.insert(next.array.end(),rhs.array.begin(),rhs.array.end());}else{oldv=*cb->value;if(!oldv.is_number()||!rhs.is_number()){e="arithmetic operators require numeric operands";return false;}if(large_num(oldv)||large_num(rhs)){json::Document lege;return c.legacy(st.text,lege,e);}if(st.op=="+=")next=json::Document(oldv.num+rhs.num);else if(st.op=="-=")next=json::Document(oldv.num-rhs.num);else if(st.op=="*=")next=json::Document(oldv.num*rhs.num);else if(st.op=="/="){if(rhs.num==0){e="division by zero";return false;}next=json::Document(oldv.num/rhs.num);}else{if(rhs.num==0){e="modulo by zero";return false;}next=json::Document(std::fmod(oldv.num,rhs.num));}}return assign_plain(st.name,std::move(next),e);};
+            variable_scopes_.back().emplace(st.name,std::move(lb));++loop_depth_;const bool bok=execute_body(st.body,e);--loop_depth_;pop_json_scope();if(!bok)return false;if(pending_control_.kind==ControlFlow::Break){pending_control_={};break;}if(pending_control_.kind==ControlFlow::Continue){pending_control_={};continue;}}return true;}if(st.kind==nift::ast::StmtKind::Break){pending_control_.kind=ControlFlow::Break;pending_control_.value.reset();return true;}if(st.kind==nift::ast::StmtKind::Continue){pending_control_.kind=ControlFlow::Continue;pending_control_.value.reset();return true;}if(st.kind==nift::ast::StmtKind::Return){json::Document rv;pending_control_.ref_root_slot.reset();pending_control_.ref_path.clear();if(st.expr){if(!nift::ast::evaluate(*st.expr,c,rv,e))return false;VariableBinding rl;std::string locerr;if(bind_location(rl,*st.expr,locerr)&&rl.is_location_ref()&&rl.value){pending_control_.ref_root_slot=rl.ref_root_slot;pending_control_.ref_path=rl.ref_path;}else if(last_call_return_loc_root_&&(rv.is_array()||rv.is_object()||(rv.is_string()&&rv.string.rfind("\x1fnift:",0)==0))){pending_control_.ref_root_slot=last_call_return_loc_root_;pending_control_.ref_path=last_call_return_loc_path_;}pending_control_.value=std::make_shared<json::Document>(std::move(rv));}else pending_control_.value.reset();pending_control_.kind=ControlFlow::Return;return true;}if(st.kind==nift::ast::StmtKind::Expression){return execute_native_call(st,e);}if(st.kind==nift::ast::StmtKind::Declaration){last_call_return_loc_root_.reset();last_call_return_loc_path_.clear();if(!nift::ast::evaluate(*st.expr,c,rhs,e))return false;if(large_num(rhs)){json::Document lege;return c.legacy(st.text,lege,e);}if(variable_scopes_.empty()){e="no scope for declaration: "+st.name;return false;}auto& scope=variable_scopes_.back();if(scope.count(st.name)){e="binding already declared in this scope: "+st.name;return false;}if(last_call_return_loc_root_&&(rhs.is_array()||rhs.is_object()||(rhs.is_string()&&rhs.string.rfind("\x1fnift:",0)==0))){VariableBinding dloc;dloc.ref_root_slot=last_call_return_loc_root_;dloc.ref_path=last_call_return_loc_path_;dloc.sync();if(!dloc.value){e="reference target no longer exists";return false;}dloc.type=nift_binding_type(*dloc.value);dloc.mutable_binding=true;last_call_return_loc_root_.reset();last_call_return_loc_path_.clear();scope.emplace(st.name,std::move(dloc));return true;}auto sp=std::make_shared<json::Document>(std::move(rhs));const int dt=st.decl_type;const int bt=(dt==3)?3:((dt==2)?nift_binding_type(*sp):((dt>=0&&dt!=2&&dt!=3)?dt:nift_binding_type(*sp)));auto ins=scope.emplace(st.name,VariableBinding{sp,bt,true,false});if(st.expr&&(st.expr->kind==nift::ast::Kind::Index||st.expr->kind==nift::ast::Kind::Member)){std::string re;if(!bind_location(ins.first->second,*st.expr,re)&&!re.empty()){e=re;scope.erase(ins.first);return false;}}else if(st.expr&&st.expr->kind==nift::ast::Kind::Binding&&(sp->is_array()||sp->is_object())){auto* src=find_binding(st.expr->name);if(src){src->sync();if(src->value){ins.first->second.value=src->value;*ins.first->second.slot=src->value;}}}return true;}if(st.kind==nift::ast::StmtKind::Assignment){if(!nift::ast::evaluate(*st.expr,c,rhs,e))return false;if(large_num(rhs)){json::Document lege;return c.legacy(st.text,lege,e);}if(st.target)return assign_indexed(*st.target,std::move(rhs),e);return assign_plain(st.name,std::move(rhs),e);}VariableBinding* cb=nullptr;for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(st.name);if(it!=sc->end()){cb=&it->second;break;}}if(!cb){e="assignment to undefined binding: "+st.name;return false;}cb->sync();if(!cb->mutable_binding){e="cannot assign to const binding: "+st.name;return false;}if(st.kind==nift::ast::StmtKind::Increment){if(!cb->value->is_number()){e="increment/decrement requires a numeric lvalue";return false;}oldv=*cb->value;if(large_num(oldv)){json::Document lege;return c.legacy(st.text,lege,e);}next=json::Document(oldv.num+(st.op=="++"?1.0:-1.0));return assign_plain(st.name,std::move(next),e);}if(!nift::ast::evaluate(*st.expr,c,rhs,e))return false;if(st.op=="+="&&cb->value->is_string()&&rhs.is_string()){if(cb->value.use_count()==2){cb->value->string.append(rhs.string);last_expression_mutation_=true;return true;}oldv=*cb->value;next=json::Document(oldv.string+rhs.string);}else if(st.op=="+="&&cb->value->is_array()&&rhs.is_array()){oldv=*cb->value;next=json::Document::make_array();next.array.reserve(oldv.array.size()+rhs.array.size());next.array.insert(next.array.end(),oldv.array.begin(),oldv.array.end());next.array.insert(next.array.end(),rhs.array.begin(),rhs.array.end());}else{oldv=*cb->value;if(!oldv.is_number()||!rhs.is_number()){e="arithmetic operators require numeric operands";return false;}if(large_num(oldv)||large_num(rhs)){json::Document lege;return c.legacy(st.text,lege,e);}if(st.op=="+=")next=json::Document(oldv.num+rhs.num);else if(st.op=="-=")next=json::Document(oldv.num-rhs.num);else if(st.op=="*=")next=json::Document(oldv.num*rhs.num);else if(st.op=="/="){if(rhs.num==0){e="division by zero";return false;}next=json::Document(oldv.num/rhs.num);}else{if(rhs.num==0){e="modulo by zero";return false;}next=json::Document(std::fmod(oldv.num,rhs.num));}}return assign_plain(st.name,std::move(next),e);};
         if (source.compare(i, 7, "@while(") == 0) {
             std::size_t hc=0;if(!find_balanced(source,i+6,'(',')',hc)){fail(source_path,source,i,"@while has no matching ')' for its condition");break;}
             std::size_t bo=hc+1;while(bo<source.size()&&std::isspace((unsigned char)source[bo]))++bo;std::size_t bc=0;
@@ -5351,6 +5390,22 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     if (!evaluate_expression(return_expr, return_value, return_error)) {
                         fail(source_path, source, i, return_error.rfind("callable recursion depth exceeded",0)==0 ? return_error : "return: " + return_error);
                         break;
+                    }
+                }
+                pending_control_.ref_root_slot.reset(); pending_control_.ref_path.clear();
+                if (!return_expr.empty()) {
+                    auto rp = nift::ast::parse_expression(return_expr);
+                    if (rp.supported && rp.expr) {
+                        VariableBinding rl; std::string locerr;
+                        if (bind_location(rl, *rp.expr, locerr) && rl.is_location_ref() && rl.value) {
+                            pending_control_.ref_root_slot = rl.ref_root_slot;
+                            pending_control_.ref_path = rl.ref_path;
+                        }
+                    }
+                    if(!pending_control_.ref_root_slot&&last_call_return_loc_root_&&
+                       (return_value.is_array()||return_value.is_object()||(return_value.is_string()&&return_value.string.rfind("\x1fnift:",0)==0))){
+                        pending_control_.ref_root_slot=last_call_return_loc_root_;
+                        pending_control_.ref_path=last_call_return_loc_path_;
                     }
                 }
                 pending_control_.value = std::make_shared<json::Document>(std::move(return_value));
@@ -6260,5 +6315,5 @@ bool Parser::invoke_struct_method(std::shared_ptr<StructInstance> instance,
     pop_variable_scope(); loop_depth_=caller_loop_depth; --callable_call_depth_;
     if(!rr.ok){error=rr.error.message;pending_control_={};return false;}
     if(method.constructor && pending_control_.kind==ControlFlow::Return && pending_control_.value && !pending_control_.value->is_null()){error="constructor cannot return a value";pending_control_={};return false;}
-    out=pending_control_.value?*pending_control_.value:json::Document(nullptr); pending_control_={}; return true;
+    consume_return(out); return true;
 }

@@ -20,6 +20,12 @@ struct Context {
     std::function<bool(const std::string&, json::Document&, std::string&)> legacy;
     std::function<bool(const std::string&, std::vector<json::Document>&&, json::Document&, std::string&)> call;
     std::function<bool(const json::Document&, const std::string&, std::vector<json::Document>&&, json::Document&, std::string&)> native_method;
+    // Optional: given an argument expression text, report whether it denotes a
+    // location reference that must keep its identity across the call boundary.
+    // When set and true for any argument, the prepared Call dispatch is skipped
+    // and evaluation falls back to the legacy evaluator (the oracle), which
+    // performs the location-aware binding.
+    std::function<bool(const std::string&)> arg_is_location;
     std::function<std::string(const json::Document&)> render;
 };
 enum class StmtKind { Block, Declaration, Assignment, CompoundAssignment, Increment, Expression, If, While, For, Break, Continue, Return, Function, Struct, Enum, Import, Export, Script, Legacy };
