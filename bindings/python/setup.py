@@ -34,6 +34,7 @@ CABI_SOURCES = [
     "native/markuppp/src/AsciiDoc.cpp",
     "native/markuppp/src/ReStructuredText.cpp",
     "native/src/Parser.cpp",
+    "native/src/Ast.cpp",
     "native/src/Automation.cpp",
     "native/src/Process.cpp",
     "native/src/Hooks.cpp",
