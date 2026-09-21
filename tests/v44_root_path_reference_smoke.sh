@@ -9,6 +9,10 @@ run_case composed_path $'7\n8' \
 'a := {"x": [[1]]}' 'b := a["x"]' 'c := b[0]' 'a["x"][0][0] = 7' 'print(c[0])' 'c[0] = 8' 'print(a["x"][0][0])'
 run_case replacement '99' \
 'a := [[1]]' 'b := a[0]' 'a[0] = [99]' 'print(b[0])'
+run_case growth '1' \
+'a := [[1]]' 'b := a[0]' 'i := 0' 'while(i < 1000) { a.push([i]); i++ }' 'print(b[0])'
+run_case root_rebind '9' \
+'a := [[1]]' 'b := a[0]' 'a = [[9]]' 'print(b[0])'
 cat >"$TMP/missing.f" <<'F'
 a := [[1], [2]]
 b := a[1]

@@ -1626,6 +1626,8 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                 }
                 break;
             }
+            root_it->second.sync();
+            if(!root_it->second.value){ error="reference target no longer exists: "+text.substr(0,root_len); return false; }
             const json::Document* cur = root_it->second.value.get();
             std::size_t pos = root_len;
             bool walk_ok = true;
