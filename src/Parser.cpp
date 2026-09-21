@@ -4687,7 +4687,20 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             if(!ok){e=pe;return false;}
             if(pending_control_.kind==ControlFlow::Return){out=pending_control_.value?std::move(*pending_control_.value):json::Document(nullptr);pending_control_={};}
             else out=json::Document(nullptr);
-            return true;};c.resolve_ref=[&](const std::string& name,std::shared_ptr<const json::Document>& out,std::string& e){for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(name);if(it!=sc->end()){it->second.sync();out=it->second.value;return true;}}e="unknown value or malformed expression: "+name;return false;};c.render=[&](const json::Document& v){return render_expression_value(v);};return c;};
+            return true;};c.resolve_ref=[&](const std::string& name,std::shared_ptr<const json::Document>& out,std::string& e){for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(name);if(it!=sc->end()){it->second.sync();out=it->second.value;return true;}}e="unknown value or malformed expression: "+name;return false;};c.native_method=[&](const json::Document& recv,const std::string& method,std::vector<json::Document>&& args,json::Document& out,std::string& e)->bool{
+            if(method=="to_string"&&recv.is_number()){out=json::Document(render_expression_value(recv));return true;}
+            if(method=="to_string"&&recv.is_string()){out=recv;return true;}
+            if(method=="to_int"&&recv.is_number()){out=json::Document((double)(long long)recv.num);return true;}
+            if(method=="to_double"&&recv.is_number()){out=recv;return true;}
+            if(method=="abs"&&recv.is_number()){out=json::Document(std::fabs(recv.num));return true;}
+            if(method=="floor"&&recv.is_number()){out=json::Document(std::floor(recv.num));return true;}
+            if(method=="ceil"&&recv.is_number()){out=json::Document(std::ceil(recv.num));return true;}
+            if(method=="round"&&recv.is_number()){out=json::Document(std::round(recv.num));return true;}
+            if(method=="length"&&recv.is_string()){out=json::Document((double)recv.string.size());return true;}
+            if(method=="trim"&&recv.is_string()){std::string s=recv.string;auto b=s.find_first_not_of(" \t\r\n");if(b==std::string::npos)s.clear();else{s=s.substr(b);auto epos=s.find_last_not_of(" \t\r\n");s=s.substr(0,epos+1);}out=json::Document(s);return true;}
+            if(method=="to_lower"&&recv.is_string()){std::string s=recv.string;for(auto&ch:s)ch=(char)std::tolower((unsigned char)ch);out=json::Document(s);return true;}
+            if(method=="to_upper"&&recv.is_string()){std::string s=recv.string;for(auto&ch:s)ch=(char)std::toupper((unsigned char)ch);out=json::Document(s);return true;}
+            return false;};c.render=[&](const json::Document& v){return render_expression_value(v);};return c;};
         auto assign_plain=[&](const std::string& name,json::Document v,std::string& e)->bool{for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(name);if(it==sc->end())continue;if(!it->second.mutable_binding){e="cannot assign to const binding: "+name;return false;}const int at=nift_binding_type(v);if(!nift_type_assignable(at,it->second.type)){e="cannot change binding type: "+name;return false;}it->second.rebind(std::make_shared<json::Document>(std::move(v)));return true;}e="assignment to undefined binding: "+name;return false;};
             // Resolve an Index/Member chain to a non-const Document reference so
             // that assignment mutates the aliased collection element in place
