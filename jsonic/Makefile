@@ -6,6 +6,7 @@ SMOKE := $(BUILD_DIR)/jsonic-smoke
 ADVERSARIAL := $(BUILD_DIR)/jsonic-adversarial
 MEMORY_LIFETIME := $(BUILD_DIR)/jsonic-memory-lifetime
 MEMORY_LIFETIME_SAN := $(BUILD_DIR)/jsonic-memory-lifetime-san
+JSONTESTSUITE := $(BUILD_DIR)/jsonic-json-testsuite
 SANITIZER_FLAGS ?= -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined
 
 all: test
@@ -30,6 +31,15 @@ test-smoke: $(SMOKE)
 
 test-adversarial: $(ADVERSARIAL)
 	./$(ADVERSARIAL)
+
+$(JSONTESTSUITE): tests/json_test_suite_810.cpp include/json.h | $(BUILD_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $< -o $@
+
+# JSONTestSuite parsing certification. y_* must be accepted and n_* rejected;
+# i_* (implementation-defined) must be parseable. Requires the pinned corpus at
+# JSONTEST_SUITE_DIR (defaults to the sibling jsonic JSONTestSuite checkout).
+test-json-testsuite: $(JSONTESTSUITE)
+	./$(JSONTESTSUITE) $(JSONTEST_SUITE_DIR)
 
 test: test-smoke test-adversarial
 
@@ -65,4 +75,4 @@ check-minify-sync:
 clean:
 	rm -rf $(BUILD_DIR)
 
-.PHONY: all test test-smoke test-adversarial test-sanitize memory-safety-smoke memory-safety-checkpoint-1a valgrind-memory-safety-checkpoint-1a check-nift-sync check-minify-sync clean
+.PHONY: all test test-smoke test-adversarial test-json-testsuite test-sanitize memory-safety-smoke memory-safety-checkpoint-1a valgrind-memory-safety-checkpoint-1a check-nift-sync check-minify-sync clean
