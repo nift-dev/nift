@@ -4675,8 +4675,29 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 auto c=ast_context();std::vector<json::Document> av;
                 VariableBinding* rb=nullptr;
                 for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(st.name);if(it!=sc->end()){rb=&it->second;break;}}
-                if(!rb||!rb->value||!rb->value->is_array()){json::Document lege;return c.legacy(st.text,lege,e);}
                 for(const auto& a:st.call_args){json::Document v;if(!nift::ast::evaluate(*a,c,v,e))return false;av.push_back(std::move(v));}
+                if(!rb||!rb->value){json::Document lege;return c.legacy(st.text,lege,e);}
+                if(rb->value->is_string()&&rb->value->string.rfind("\x1fnift:file:",0)==0){
+                    auto fid=rb->value->string.substr(11);
+                    auto fi=file_instances_.find(fid);
+                    if(fi==file_instances_.end()){e="invalid file handle";return false;}
+                    auto& f=fi->second;
+                    if(st.op=="write"||st.op=="write_line"){
+                        if(av.size()!=1||!f->open||!(f->mode=="w"||f->mode=="a"||f->mode=="rw")){if(av.size()!=1&&e.empty())e=st.op+": expected one value";return false;}
+                        json::Document v=std::move(av[0]);
+                        if(v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0)){e=st.op+": value is not directly renderable";return false;}
+                        std::string d=render_expression_value(v);
+                        if(st.op=="write_line")d+='\n';
+                        const std::size_t base=std::min(f->cursor,f->working.size());
+                        const std::size_t ov=std::min(d.size(),f->working.size()-base);
+                        f->working.replace(base,ov,d);
+                        f->cursor=base+d.size();
+                        f->dirty=f->working!=f->saved;
+                        return true;
+                    }
+                    {json::Document lege;return c.legacy(st.text,lege,e);}
+                }
+                if(!rb->value->is_array()){json::Document lege;return c.legacy(st.text,lege,e);}
                 auto& arr=rb->value->array;
                 if(st.op=="push"){if(av.size()!=1){e="push: expected one argument";return false;}if(!rb->mutable_binding){e="cannot mutate const array: "+st.name;return false;}arr.push_back(std::move(av[0]));last_expression_mutation_=true;return true;}
                 if(st.op=="size"||st.op=="length"){if(!av.empty()){e=st.op+": expected no arguments";return false;}last_expression_mutation_=false;return true;}
