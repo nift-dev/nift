@@ -4697,6 +4697,30 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     }
                     {json::Document lege;return c.legacy(st.text,lege,e);}
                 }
+                if(rb->value->is_string()&&rb->value->string.rfind("\x1fnift:collection:",0)==0){
+                    auto cid=rb->value->string.substr(17);
+                    auto ci=collection_instances_.find(cid);
+                    if(ci==collection_instances_.end()){e="invalid collection handle";return false;}
+                    auto& cc=ci->second;
+                    const bool is_map=cc->kind==CollectionKind::Map||cc->kind==CollectionKind::SortedMap;
+                    auto ckey=[&](const json::Document& x)->std::string{if(x.is_bool())return std::string("b")+(x.boolean?"1":"0");if(x.is_string()){if(x.string.rfind("\x1fnift:",0)==0)return "";return std::string("s")+x.string;}if(x.type==json::Type::StrNumber)return std::string("N")+x.string;double nn=x.num;if(nn==0.0)nn=0.0;uint64_t bits=0;std::memcpy(&bits,&nn,sizeof(bits));return std::string("n")+std::to_string(bits);};
+                    if(!is_map&&(st.op=="add"||st.op=="contains"||st.op=="size"||st.op=="empty")){
+                        if(st.op=="size"){if(!av.empty()){e="size: expected no arguments";return false;}return true;}
+                        if(st.op=="empty"){if(!av.empty()){e="empty: expected no arguments";return false;}return true;}
+                        if(st.op=="add"||st.op=="contains"){
+                            if(av.size()!=1){e=st.op+": expected one value";return false;}
+                            const json::Document& v=av[0];
+                            const std::string k=ckey(v);
+                            const bool indexed=!k.empty()&&!(v.is_number()&&v.type!=json::Type::StrNumber&&cc->has_huge_int);
+                            if(!indexed){json::Document lege;return c.legacy(st.text,lege,e);}
+                            const bool present=cc->scalar_keys.count(k)!=0;
+                            if(st.op=="contains"){return true;}
+                            if(!rb->mutable_binding){e="cannot mutate const collection: "+st.name;return false;}
+                            if(st.op=="add"&&!present){cc->values.push_back(v);cc->scalar_keys.insert(k);}else if(st.op=="add"&&present){/* already present: no-op */}last_expression_mutation_=true;return true;
+                        }
+                    }
+                    {json::Document lege;return c.legacy(st.text,lege,e);}
+                }
                 if(!rb->value->is_array()){json::Document lege;return c.legacy(st.text,lege,e);}
                 auto& arr=rb->value->array;
                 if(st.op=="push"){if(av.size()!=1){e="push: expected one argument";return false;}if(!rb->mutable_binding){e="cannot mutate const array: "+st.name;return false;}arr.push_back(std::move(av[0]));last_expression_mutation_=true;return true;}
