@@ -18,6 +18,7 @@ struct Context {
     std::function<bool(const std::string&, json::Document&, std::string&)> resolve;
     std::function<bool(const std::string&, std::shared_ptr<const json::Document>&, std::string&)> resolve_ref;
     std::function<bool(const std::string&, json::Document&, std::string&)> legacy;
+    std::function<bool(const std::string&, std::vector<json::Document>&&, json::Document&, std::string&)> call;
     std::function<std::string(const json::Document&)> render;
 };
 enum class StmtKind { Block, Declaration, Assignment, CompoundAssignment, Increment, Expression, If, While, For, Break, Continue, Return, Function, Struct, Enum, Import, Export, Script, Legacy };

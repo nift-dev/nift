@@ -10,6 +10,7 @@
 #include <unordered_set>
 #include <fstream>
 #include "Proc.h"
+#include "Ast.h"
 
 namespace json { class Document; }
 
@@ -94,6 +95,9 @@ private:
     struct Callable { std::vector<std::string> params; std::string variadic_param; std::string body; std::filesystem::path source_path; bool fragment = false; std::shared_ptr<ModuleEnv> module_env; };
     struct ModuleEnv { std::unordered_map<std::string, Callable> callables; std::unordered_map<std::string, VariableBinding> vars; };
     std::unordered_map<std::string, Callable> callables_;
+    // Prepared AST bodies for user callables, cached on first prepared call.
+    struct PreparedCallable { bool ready=false; std::vector<std::unique_ptr<nift::ast::Stmt>> stmts; };
+    std::unordered_map<const Callable*, PreparedCallable> prepared_callables_;
     std::shared_ptr<ModuleEnv> active_module_env_;
     struct LambdaInstance {
         std::vector<std::string> params;
