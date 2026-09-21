@@ -1,5 +1,9 @@
 # Nift release notes
 
+## v4.5.0 (development)
+
+Nift v4.5 development is not yet underway; the v4.4.0 release is the current public release.
+
 ## v4.4.0 (development)
 
 Nift v4.4 turns the v4.3 native language into a coherent execution environment: variadics, spread, wildcards, a real cross-platform shell, process interoperability, native build/project scripting, lifecycle hooks, opt-in restrictions, and a Git-native Nift package ecosystem with the first `sqlite` package.
