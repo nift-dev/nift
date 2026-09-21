@@ -70,8 +70,22 @@ set_lo=$(measure "$t/set40.f")
 set_hi=$(measure "$t/set80.f")
 map_lo=$(measure "$t/map40.f")
 map_hi=$(measure "$t/map80.f")
+cat > "$t/str160.f" <<'F'
+s := ""
+i := 1
+while(i <= 160000) { s += "abc"; i += 1 }
+print(s.length())
+F
+cat > "$t/str320.f" <<'F'
+s := ""
+i := 1
+while(i <= 320000) { s += "abc"; i += 1 }
+print(s.length())
+F
+str_lo=$(measure "$t/str160.f")
+str_hi=$(measure "$t/str320.f")
 
-echo "push 40k=${push_lo}ms 80k=${push_hi}ms | set 40k=${set_lo}ms 80k=${set_hi}ms | map 40k=${map_lo}ms 80k=${map_hi}ms"
+echo "push 40k=${push_lo}ms 80k=${push_hi}ms | set 40k=${set_lo}ms 80k=${set_hi}ms | map 40k=${map_lo}ms 80k=${map_hi}ms | str += 160k=${str_lo}ms 320k=${str_hi}ms"
 
 ratio_ok() { # $1 lo, $2 hi; doubling must be under 3.5x (linear ~2x, O(n^2) ~4x)
   local lo=$1 hi=$2
@@ -82,5 +96,6 @@ ratio_ok() { # $1 lo, $2 hi; doubling must be under 3.5x (linear ~2x, O(n^2) ~4x
 if ! ratio_ok "$push_lo" "$push_hi"; then echo "FAIL: array push scaling regression (40k=${push_lo}ms 80k=${push_hi}ms)" >&2; exit 1; fi
 if ! ratio_ok "$set_lo" "$set_hi"; then echo "FAIL: set add scaling regression (40k=${set_lo}ms 80k=${set_hi}ms)" >&2; exit 1; fi
 if ! ratio_ok "$map_lo" "$map_hi"; then echo "FAIL: map set scaling regression (40k=${map_lo}ms 80k=${map_hi}ms)" >&2; exit 1; fi
+if ! ratio_ok "$str_lo" "$str_hi"; then echo "FAIL: string += scaling regression (160k=${str_lo}ms 320k=${str_hi}ms)" >&2; exit 1; fi
 
-echo "PASS performance scaling guards (array push + set add + map set remain linear)"
+echo "PASS performance scaling guards (array push + set add + map set + string += remain linear)"
