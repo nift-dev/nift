@@ -33,4 +33,25 @@ printf 'args = []\n' > "$t/mutate.f"
 if "$BIN" "$t/mutate.f" >/dev/null 2>&1; then echo 'args mutation unexpectedly accepted' >&2; exit 1; fi
 out=$(printf 'cmd\nargs.prettify()\nexit\n' | "$BIN")
 grep -q '<repl>' <<<"$out"
+# -e is canonical full-program execution; -c is an exact alias.
+[ "$("$BIN" -e 'x := 3; print(x * 4)')" = '12' ]
+[ "$("$BIN" -c 'x := 3; print(x * 4)')" = '12' ]
+[ "$("$BIN" -e $'x := 2\ny := 5\nprint(x + y)')" = '7' ]
+[ "$("$BIN" -e 'return 9')" = '9' ]
+[ "$("$BIN" -i -c 'exit')" = '' ]
+# -i continues in the exact same live parser/runtime after success.
+out=$(printf 'twice(6)\nx\ncmd\nargs.join("|")\nexit\n' | "$BIN" -i -e 'x := 41; fn(twice(v)) { return v * 2 }' alpha -- beta)
+[ "$out" = $'12\n41\n"<command-line>"\n"alpha|beta"' ]
+cat > "$t/interactive.f" <<'F'
+x := 17
+fn(plus_one(v)) { return v + 1 }
+F
+out=$(printf 'plus_one(x)\ncmd\nexit\n' | "$BIN" -i "$t/interactive.f")
+[ "$(sed -n '1p' <<<"$out")" = '18' ]
+[ "$(sed -n '2p' <<<"$out")" = "\"$t/interactive.f\"" ]
+# A failed initial program is terminal: piped follow-up input must not be run as a REPL.
+if printf 'print("BAD-REPL")\n' | "$BIN" -i -e 'this is not valid := ' >"$t/fail.out" 2>"$t/fail.err"; then
+  echo '-i accepted invalid initial program' >&2; exit 1
+fi
+! grep -q 'BAD-REPL' "$t/fail.out"
 echo 'PASS v4.5 unified CLI invocation'

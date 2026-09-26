@@ -741,11 +741,25 @@ bool initialise_project(const InitOptions& options) {
 }
 
 
-static int run_script_file(const fs::path& path, const std::vector<std::string>& script_args = {}) {
+static int run_script_shell_loop(Parser& parser, bool load_rc);
+
+static int run_script_source(const std::string& source, const fs::path& source_path,
+                             const std::string& cmd, const std::vector<std::string>& script_args,
+                             const fs::path& host_root, bool interactive_after = false) {
+    ScriptRenderHost host(host_root); TrackedInfo info; Parser parser(host,info);
+    parser.set_script_invocation(cmd, script_args);
+    auto rr=parser.run_script(source,source_path);
+    if(!rr.ok){console::error(rr.error.message.empty()?"script failed":rr.error.message);return 1;}
+    if(!rr.output.empty())std::cout<<rr.output<<'\n';
+    if(interactive_after) return run_script_shell_loop(parser, /*load_rc=*/false);
+    return 0;
+}
+
+static int run_script_file(const fs::path& path, const std::vector<std::string>& script_args = {}, bool interactive_after = false) {
     std::error_code path_ec;
     const fs::path absolute=fs::absolute(path, path_ec).lexically_normal();
-    if (path_ec) { console::error("run: cannot resolve script path: " + path.string() + " (" + path_ec.message() + ")"); return 1; }
-    if(!filesystem::file_exists(absolute)){console::error("run: script does not exist: "+path.string());return 1;}
+    if (path_ec) { console::error("script: cannot resolve script path: " + path.string() + " (" + path_ec.message() + ")"); return 1; }
+    if(!filesystem::file_exists(absolute)){console::error("script: script does not exist: "+path.string());return 1;}
     std::string source=filesystem::read_file(absolute);
     // A leading shebang (#!/usr/bin/env nift) is a script header, not Nift
     // syntax. Strip the first line so direct file execution accepts it too.
@@ -753,12 +767,20 @@ static int run_script_file(const fs::path& path, const std::vector<std::string>&
         const std::size_t nl=source.find('\n');
         source = (nl==std::string::npos) ? "" : source.substr(nl+1);
     }
-    ScriptRenderHost host(absolute.parent_path()); TrackedInfo info; Parser parser(host,info);
-    parser.set_script_invocation(path.string(), script_args);
-    auto rr=parser.run_script(source,absolute);
-    if(!rr.ok){console::error(rr.error.message.empty()?"script failed":rr.error.message);return 1;}
-    if(!rr.output.empty())std::cout<<rr.output<<'\n';
-    return 0;
+    return run_script_source(source, absolute, path.string(), script_args, absolute.parent_path(), interactive_after);
+}
+
+static int run_inline_script(const std::string& source, const std::vector<std::string>& script_args, bool interactive_after) {
+    // `exit`/`quit` are shell control words. Accept them as the initial inline
+    // program too so `nift -i -c "exit"` is a useful non-interactive probe and
+    // does not unexpectedly enter a REPL.
+    std::string trimmed=source;
+    const auto first=trimmed.find_first_not_of(" \t\r\n");
+    const auto last=trimmed.find_last_not_of(" \t\r\n");
+    trimmed=first==std::string::npos?std::string():trimmed.substr(first,last-first+1);
+    if(trimmed=="exit"||trimmed=="quit") return 0;
+    return run_script_source(source, fs::path("<command-line>"), "<command-line>", script_args,
+                             fs::current_path(), interactive_after);
 }
 
 static int run_eval(int argc, char** argv) {
@@ -952,15 +974,15 @@ ShellRead interactive_read_line(Parser& parser, const std::string& prompt, std::
 }
 }
 #endif
-static int run_script_shell() {
-    ScriptRenderHost host(fs::current_path()); TrackedInfo info; Parser parser(host,info); parser.set_script_invocation("<repl>", {}); std::string pending;
+static int run_script_shell_loop(Parser& parser, bool load_rc) {
+    std::string pending;
     auto history=load_nift_history(); size_t hist_pos=history.size();
 #ifndef _WIN32
     const bool interactive = isatty(STDIN_FILENO);
 #else
     const bool interactive = false;
 #endif
-    if(const char* home=std::getenv("HOME")){fs::path rc=fs::path(home)/".niftrc";if(filesystem::file_exists(rc)){auto rr=parser.run_statement(filesystem::read_file(rc),rc);if(!rr.ok){console::error("niftrc: "+rr.error.message);return 1;}}}
+    if(load_rc) if(const char* home=std::getenv("HOME")){fs::path rc=fs::path(home)/".niftrc";if(filesystem::file_exists(rc)){auto rr=parser.run_statement(filesystem::read_file(rc),rc);if(!rr.ok){console::error("niftrc: "+rr.error.message);return 1;}}}
     while(true){const std::string prompt=shell_prompt_text(!pending.empty());
 #ifndef _WIN32
         std::string line;ShellRead r;
@@ -1030,9 +1052,55 @@ static int run_script_shell() {
     return 0;
 }
 
+static int run_script_shell() {
+    ScriptRenderHost host(fs::current_path()); TrackedInfo info; Parser parser(host,info);
+    parser.set_script_invocation("<repl>", {});
+    return run_script_shell_loop(parser, /*load_rc=*/true);
+}
+
 int run_cli(int argc, char** argv) {
     const std::string command = argc > 1 ? argv[1] : "";
     if (command.empty()) return run_script_shell();
+
+    // Full-program command-line execution. -e is canonical; -c is an exact
+    // alias. -i may prefix either an inline program or a script path and keeps
+    // the same Parser instance alive after successful initial execution.
+    if (command == "-e" || command == "-c" || command == "-i") {
+        bool interactive = command == "-i";
+        int index = 2;
+        std::string mode = command;
+        if (interactive) {
+            if (index >= argc) return run_script_shell();
+            mode = argv[index++];
+        }
+        if (mode == "-e" || mode == "-c") {
+            if (index >= argc) { console::error(mode + " requires program source"); return 2; }
+            const std::string source = argv[index++];
+            std::vector<std::string> script_args;
+            bool literal_args=false;
+            for (; index < argc; ++index) {
+                const std::string a=argv[index];
+                if (!literal_args && a=="--") { literal_args=true; continue; }
+                if (!literal_args && a=="-i") { interactive=true; continue; }
+                script_args.push_back(a);
+            }
+            return run_inline_script(source, script_args, interactive);
+        }
+        if (filesystem::file_exists(mode) && !fs::is_directory(mode)) {
+            std::vector<std::string> script_args;
+            bool literal_args=false;
+            for (; index < argc; ++index) {
+                const std::string a=argv[index];
+                if (!literal_args && a=="--") { literal_args=true; continue; }
+                if (!literal_args && a=="--no-process") nift_setenv("NIFT_NO_PROCESS","1",1);
+                else if (!literal_args && a.rfind("--fs-root=",0)==0) nift_setenv("NIFT_FS_ROOT",a.substr(10).c_str(),1);
+                else script_args.push_back(a);
+            }
+            return run_script_file(mode, script_args, /*interactive_after=*/true);
+        }
+        console::error("-i requires -e, -c, or an existing script path");
+        return 2;
+    }
     // Zero-source shell capability options replace the old `nift sh <option>`
     // spelling. General source/interactive option parsing is completed later
     // in the v4.5 invocation checkpoints.
