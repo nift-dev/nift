@@ -88,6 +88,7 @@ const std::string& Value::string() const {
     static const std::string empty;
     return impl_ ? impl_->doc.string : empty;
 }
+std::string Value::json() const { return impl_ ? impl_->doc.dump(0) : std::string("null"); }
 
 void Value::push_back(const Value& value) {
     if (!impl_) impl_ = std::make_shared<Impl>();
