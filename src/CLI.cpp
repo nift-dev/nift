@@ -749,7 +749,16 @@ static int run_script_source(const std::string& source, const fs::path& source_p
     ScriptRenderHost host(host_root); TrackedInfo info; Parser parser(host,info);
     parser.set_script_invocation(cmd, script_args);
     auto rr=parser.run_script(source,source_path);
-    if(!rr.ok){console::error(rr.error.message.empty()?"script failed":rr.error.message);return 1;}
+    if(!rr.ok){
+        const std::string message=rr.error.message.empty()?"script failed":rr.error.message;
+        if(!rr.error.source_file.empty() && rr.error.line>0) {
+            std::ostringstream where;
+            where << rr.error.source_file.generic_string() << ':' << rr.error.line;
+            if(rr.error.column>0) where << ':' << rr.error.column;
+            console::error(where.str() + ": " + message);
+        } else console::error(message);
+        return 1;
+    }
     if(!rr.output.empty())std::cout<<rr.output<<'\n';
     if(interactive_after) return run_script_shell_loop(parser, /*load_rc=*/false);
     return 0;
@@ -780,6 +789,20 @@ static int run_inline_script(const std::string& source, const std::vector<std::s
     trimmed=first==std::string::npos?std::string():trimmed.substr(first,last-first+1);
     if(trimmed=="exit"||trimmed=="quit") return 0;
     return run_script_source(source, fs::path("<command-line>"), "<command-line>", script_args,
+                             fs::current_path(), interactive_after);
+}
+
+
+static int run_stdin_script(const std::vector<std::string>& script_args, bool interactive_after) {
+    std::ostringstream buffer;
+    buffer << std::cin.rdbuf();
+    if (std::cin.bad()) { console::error("stdin: failed while reading program source"); return 1; }
+    std::string source=buffer.str();
+    if (source.find('\0') != std::string::npos) {
+        console::error("stdin: program source contains a NUL byte");
+        return 1;
+    }
+    return run_script_source(source, fs::path("<stdin>"), "<stdin>", script_args,
                              fs::current_path(), interactive_after);
 }
 
@@ -1086,6 +1109,16 @@ int run_cli(int argc, char** argv) {
             }
             return run_inline_script(source, script_args, interactive);
         }
+        if (mode == "-") {
+            std::vector<std::string> script_args;
+            bool literal_args=false;
+            for (; index < argc; ++index) {
+                const std::string a=argv[index];
+                if (!literal_args && a=="--") { literal_args=true; continue; }
+                script_args.push_back(a);
+            }
+            return run_stdin_script(script_args, /*interactive_after=*/true);
+        }
         if (filesystem::file_exists(mode) && !fs::is_directory(mode)) {
             std::vector<std::string> script_args;
             bool literal_args=false;
@@ -1101,6 +1134,17 @@ int run_cli(int argc, char** argv) {
         console::error("-i requires -e, -c, or an existing script path");
         return 2;
     }
+    if (command == "-") {
+        std::vector<std::string> script_args;
+        bool literal_args=false;
+        for (int i=2; i<argc; ++i) {
+            const std::string a=argv[i];
+            if (!literal_args && a=="--") { literal_args=true; continue; }
+            script_args.push_back(a);
+        }
+        return run_stdin_script(script_args, /*interactive_after=*/false);
+    }
+
     // Zero-source shell capability options replace the old `nift sh <option>`
     // spelling. General source/interactive option parsing is completed later
     // in the v4.5 invocation checkpoints.

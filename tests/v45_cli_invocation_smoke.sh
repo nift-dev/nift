@@ -54,4 +54,29 @@ if printf 'print("BAD-REPL")\n' | "$BIN" -i -e 'this is not valid := ' >"$t/fail
   echo '-i accepted invalid initial program' >&2; exit 1
 fi
 ! grep -q 'BAD-REPL' "$t/fail.out"
+# stdin is an explicit one-shot script source with a stable identity.
+out=$(printf 'print(cmd)\nprint(args.join("|"))\n' | "$BIN" - alpha -- beta)
+[ "$out" = $'<stdin>\nalpha|beta' ]
+printf 'print("redirected")\n' > "$t/stdin.f"
+[ "$("$BIN" - < "$t/stdin.f")" = 'redirected' ]
+[ "$(printf '' | "$BIN" -)" = '' ]
+# Stdin diagnostics retain the synthetic source identity and parser location.
+if printf 'break\n' | "$BIN" - >"$t/stdin-bad.out" 2>"$t/stdin-bad.err"; then
+  echo 'invalid stdin program unexpectedly succeeded' >&2; exit 1
+fi
+grep -q '<stdin>:1:' "$t/stdin-bad.err"
+# Binary/NUL input is rejected rather than silently truncated or reinterpreted.
+python3 - "$BIN" <<'PY_NUL'
+import subprocess, sys
+p=subprocess.run([sys.argv[1], '-'], input=b'print("before")\x00print("after")\n', stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+assert p.returncode != 0
+assert b'NUL byte' in p.stderr
+assert b'before' not in p.stdout and b'after' not in p.stdout
+PY_NUL
+# A reasonably large piped source is consumed through EOF without truncation.
+python3 - <<'PY_LARGE' | "$BIN" - > "$t/large.out"
+for _ in range(5000): print('// padding')
+print('print("large-ok")')
+PY_LARGE
+[ "$(cat "$t/large.out")" = 'large-ok' ]
 echo 'PASS v4.5 unified CLI invocation'
