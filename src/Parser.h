@@ -63,6 +63,7 @@ public:
 
     // Shared single-expression host used by `nift eval`; identical evaluator to templates/scripts.
     bool eval_expression(const std::string& expression, json::Document& value, std::string& error);
+    bool invoke_callable(const std::string& name, const std::vector<json::Document>& args, json::Document& value, std::string& error);
 
     // Render a scalar/string value for output or command arguments.
     std::string render_expression_value(const json::Document& value) const;

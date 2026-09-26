@@ -33,6 +33,7 @@ struct nift::Engine::Impl {
 
     // Long-lived application-wide value bindings (engine.set / set_json).
     std::unordered_map<std::string, std::shared_ptr<const json::Document>> defaults;
+    std::unordered_map<std::string, nift::Engine::HostFunction> host_functions;
 
     mutable std::mutex source_cache_mutex_;
     mutable std::unordered_map<std::string, std::unique_ptr<const std::string>> source_cache_;
@@ -84,6 +85,11 @@ public:
     }
 
     // Per-render Context overlays win over Engine defaults.
+    bool has_host_callable(const std::string& name) const override { return impl_.host_functions.count(name) != 0; }
+    bool call_host_callable(const std::string& name, const std::vector<json::Document>& args, json::Document& out, std::string& error) const override {
+        auto it=impl_.host_functions.find(name);if(it==impl_.host_functions.end())return false;try{std::vector<nift::Value> av;av.reserve(args.size());for(const auto& d:args){nift::Value v;nift::ValueAccess::doc(v)=d;av.push_back(std::move(v));}nift::Value r=it->second(av);out=nift::ValueAccess::doc(r);return true;}catch(const std::exception& ex){error=std::string("host callable '")+name+"' failed: "+ex.what();return false;}catch(...){error=std::string("host callable '")+name+"' failed";return false;}
+    }
+
     const std::shared_ptr<const json::Document>* binding(const std::string& name) const override {
         if (render_bindings_) {
             const auto it = render_bindings_->find(name);
@@ -277,6 +283,14 @@ ScriptResult Engine::execute(std::string_view script, std::string cmd, std::vect
 
 ScriptResult Engine::evaluate(std::string_view expression) {
     std::lock_guard<std::mutex> lock(impl_->script_mutex_);if(!impl_->script_state){impl_->script_state=std::make_unique<Impl::ScriptState>(*impl_);json::Document init;std::string ie;impl_->script_state->parser.run_embedded_script("","<embed>",init,ie);}json::Document doc;std::string error;ScriptResult out;if(!impl_->script_state->parser.eval_expression(std::string(expression),doc,error)){out.error_.message=std::move(error);out.error_.source="<embed>";return out;}ValueAccess::doc(out.value_)=std::move(doc);out.ok_=true;return out;
+}
+
+bool Engine::register_function(std::string name, HostFunction function) {
+    if(!detail::valid_binding_identifier(name)||!function)return false;std::lock_guard<std::mutex> lock(impl_->script_mutex_);impl_->host_functions[std::move(name)]=std::move(function);return true;
+}
+
+ScriptResult Engine::call(std::string_view name, const std::vector<Value>& args) {
+    std::lock_guard<std::mutex> lock(impl_->script_mutex_);ScriptResult out;if(!impl_->script_state){out.error_.message="no embedded script has been executed";out.error_.source="<embed>";return out;}std::vector<json::Document> av;av.reserve(args.size());for(const auto& v:args)av.push_back(ValueAccess::doc(v));json::Document result;std::string error;if(!impl_->script_state->parser.invoke_callable(std::string(name),av,result,error)){out.error_.message=std::move(error);out.error_.source="<embed>";return out;}ValueAccess::doc(out.value_)=std::move(result);out.ok_=true;return out;
 }
 
 bool Engine::reload(std::string* error) {

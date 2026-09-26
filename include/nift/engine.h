@@ -40,6 +40,7 @@ namespace nift {
 // - The internal source/JSON caches are mutex-protected.
 class Engine {
 public:
+    using HostFunction = std::function<Value(const std::vector<Value>&)>;
     Engine();
     ~Engine();
     Engine(Engine&&) noexcept;
@@ -160,6 +161,8 @@ public:
     ScriptResult execute(std::string_view script, std::string cmd = "<embed>", std::vector<std::string> args = {});
     ScriptResult evaluate(std::string_view expression);
     void set_target(std::string target);
+    bool register_function(std::string name, HostFunction function);
+    ScriptResult call(std::string_view name, const std::vector<Value>& args = {});
 
     // Full page + template composition (template contains @content; exactly one
     // @content is required). The page and template may each be text or path

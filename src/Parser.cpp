@@ -3065,6 +3065,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     if (!call_ok) { error = call_error; return false; }
                     return true;
                 }
+                if(host_.has_host_callable(call_name)){bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(!aok){error="malformed host callable arguments";return false;}std::vector<json::Document> av;for(size_t ai=0;ai<ar.size();++ai){json::Document v;if(ai<aq.size()&&aq[ai])v=json::Document(ar[ai]);else if(!eval(ar[ai],v,depth+1))return false;av.push_back(std::move(v));}return host_.call_host_callable(call_name,av,out,error);}
                 if (call_name != "inject" && call_name != "validate" && call_name != "copy" && call_name != "deepcopy") { error = "undefined callable: " + call_name; return false; }
             }
         }
@@ -4143,6 +4144,10 @@ bool Parser::invoke_ffi_callback_i64(const std::string& callable_tag, std::int64
     if(!ok)return false;if(!result.is_number()||std::trunc(result.num)!=result.num){error="callback result must be an integer";return false;}out_value=static_cast<std::int64_t>(result.num);return true;
 }
 
+bool Parser::invoke_callable(const std::string& name, const std::vector<json::Document>& args, json::Document& value, std::string& error) {
+    if(!valid_binding_identifier(name)){error="invalid callable name";return false;}if(variable_scopes_.empty())variable_scopes_.emplace_back();std::vector<std::string> names;names.reserve(args.size());for(size_t i=0;i<args.size();++i){std::string n="__nift_host_arg_"+std::to_string(i);auto sp=std::make_shared<json::Document>(args[i]);variable_scopes_.back()[n]=VariableBinding{sp,nift_binding_type(*sp),false,false};names.push_back(n);}std::string expr=name+"(";for(size_t i=0;i<names.size();++i){if(i)expr+=",";expr+=names[i];}expr+=")";bool ok=evaluate_expression(expr,value,error);for(const auto& n:names)variable_scopes_.back().erase(n);return ok;
+}
+
 void Parser::set_script_invocation(std::string cmd, std::vector<std::string> args) {
     script_cmd_ = std::move(cmd);
     script_args_ = std::move(args);
@@ -4975,6 +4980,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             auto ci=callables_.find(name);
             if(ci!=callables_.end())callee=&ci->second;
             if(!callee&&active_module_env_){auto mit=active_module_env_->callables.find(name);if(mit!=active_module_env_->callables.end())callee=&mit->second;}
+            if(!callee&&host_.has_host_callable(name))return host_.call_host_callable(name,args,out,e);
             if(!callee||callee->fragment)return false;
             if(callee->variadic_param.empty()?args.size()!=callee->params.size():args.size()<callee->params.size())return false;
             auto& prep=prepared_callables_[callee];

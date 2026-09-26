@@ -6,6 +6,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace json { class Document; }
 
@@ -58,6 +59,11 @@ public:
     // bindings and contracts. ProjectInfoHost returns nullptr (the CLI has no
     // pre-supplied bindings), so CLI resolution is unchanged.
     virtual const std::shared_ptr<const json::Document>* binding(const std::string& name) const = 0;
+
+    // Trusted embedding-host callables. These are distinct from dynamic-library
+    // FFI: the host owns the C++ callable and typed conversion boundary.
+    virtual bool has_host_callable(const std::string&) const { return false; }
+    virtual bool call_host_callable(const std::string&, const std::vector<json::Document>&, json::Document&, std::string& error) const { error = "host callable is not available"; return false; }
 
     // Per-page model-equivalent metadata (front matter, type resolution, schema
     // validation) computed WITHOUT constructing the project-wide query model, so
