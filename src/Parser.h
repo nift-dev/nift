@@ -47,6 +47,7 @@ public:
     void set_script_invocation(std::string cmd, std::vector<std::string> args);
     const std::string& script_cmd() const { return script_cmd_; }
     const std::vector<std::string>& script_args() const { return script_args_; }
+    bool invoke_ffi_callback_i64(const std::string& callable_tag, std::int64_t arg, std::int64_t& out, std::string& error);
 
     // Parser-reported statement state for the interactive shell: the REPL asks
     // the parser whether the accumulated input is a complete statement, an
@@ -199,6 +200,11 @@ private:
     std::unordered_map<std::string, void*> ffi_pointers_;
     std::uint64_t next_ffi_library_id_ = 1;
     std::uint64_t next_ffi_pointer_id_ = 1;
+    struct FfiBufferInstance { std::vector<unsigned char> bytes; };
+    std::unordered_map<std::string, std::shared_ptr<FfiBufferInstance>> ffi_buffers_;
+    std::unordered_map<std::string, std::string> ffi_callbacks_i64_;
+    std::uint64_t next_ffi_buffer_id_ = 1;
+    std::uint64_t next_ffi_callback_id_ = 1;
 
     enum class CollectionKind { Stack, Queue, PriQue, Map, SortedMap, Set, SortedSet };
     struct CollectionInstance {
