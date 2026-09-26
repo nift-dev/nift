@@ -507,3 +507,13 @@ class TestLifetimeLong(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class V45ScriptTests(unittest.TestCase):
+    def test_execute_evaluate(self):
+        e = Engine.new()
+        try:
+            self.assertEqual(e.execute("x := 40; return x + 2;", "python-test", ["a"]), 42)
+            self.assertEqual(e.evaluate("x + 1"), 41)
+        finally:
+            e.close()

@@ -52,6 +52,21 @@ internal static partial class Native
     [DllImport(Lib, EntryPoint = "nift_engine_set_environment_provider", CallingConvention = Cdecl)]
     internal static extern int nift_engine_set_environment_provider(IntPtr engine, EnvironmentCallbackNative callback, IntPtr user_data);
 
+    [DllImport(Lib, EntryPoint = "nift_engine_execute", CallingConvention = Cdecl)]
+    internal static extern int nift_engine_execute(IntPtr engine, IntPtr script, UIntPtr script_len, IntPtr cmd, UIntPtr cmd_len, IntPtr args, IntPtr arg_lens, UIntPtr arg_count, out IntPtr result);
+
+    [DllImport(Lib, EntryPoint = "nift_engine_evaluate", CallingConvention = Cdecl)]
+    internal static extern int nift_engine_evaluate(IntPtr engine, IntPtr expression, UIntPtr expression_len, out IntPtr result);
+
+    [DllImport(Lib, EntryPoint = "nift_script_result_free", CallingConvention = Cdecl)]
+    internal static extern void nift_script_result_free(IntPtr result);
+    [DllImport(Lib, EntryPoint = "nift_script_result_ok", CallingConvention = Cdecl)]
+    internal static extern int nift_script_result_ok(IntPtr result);
+    [DllImport(Lib, EntryPoint = "nift_script_result_value_json", CallingConvention = Cdecl)]
+    internal static extern int nift_script_result_value_json(IntPtr result, out NiftString out_);
+    [DllImport(Lib, EntryPoint = "nift_script_result_error_message", CallingConvention = Cdecl)]
+    internal static extern int nift_script_result_error_message(IntPtr result, out NiftString out_);
+
     [DllImport(Lib, EntryPoint = "nift_context_new", CallingConvention = Cdecl)]
     internal static extern IntPtr nift_context_new();
 

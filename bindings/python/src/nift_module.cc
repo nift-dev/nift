@@ -45,6 +45,7 @@
 #include "nift/c_abi.h"
 
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -268,6 +269,19 @@ NiftEngineObject* EngineFromArgs(PyObject* args) {
   }
   NiftEngineObject* self = reinterpret_cast<NiftEngineObject*>(obj);
   if (self->disposed || self->destroyed) {
+    PyErr_SetString(PyExc_RuntimeError, "Engine has been disposed");
+    return nullptr;
+  }
+  return self;
+}
+
+NiftEngineObject* CheckEngineObject(PyObject* obj) {
+  if (!PyObject_TypeCheck(obj, &NiftEngineType)) {
+    PyErr_SetString(PyExc_TypeError, "expected an Engine");
+    return nullptr;
+  }
+  NiftEngineObject* self = reinterpret_cast<NiftEngineObject*>(obj);
+  if (self->disposed || self->destroyed || self->engine == nullptr) {
     PyErr_SetString(PyExc_RuntimeError, "Engine has been disposed");
     return nullptr;
   }
@@ -903,6 +917,30 @@ PyObject* ContextSetCurrentOutput(PyObject*, PyObject* args) {
   Py_RETURN_NONE;
 }
 
+
+PyObject* EngineExecute(PyObject*, PyObject* args) {
+  PyObject* obj=nullptr; const char* script=nullptr; Py_ssize_t sl=0; const char* cmd=nullptr; Py_ssize_t cl=0; PyObject* argv_obj=nullptr;
+  if (!PyArg_ParseTuple(args, "Os#s#O", &obj, &script, &sl, &cmd, &cl, &argv_obj)) return nullptr;
+  NiftEngineObject* self=CheckEngineObject(obj); if(!self) return nullptr;
+  PyObject* seq=PySequence_Fast(argv_obj, "args must be a sequence of strings"); if(!seq) return nullptr;
+  Py_ssize_t n=PySequence_Fast_GET_SIZE(seq); std::vector<std::string> av; av.reserve((size_t)n);
+  std::vector<const char*> ap; std::vector<size_t> al; ap.reserve((size_t)n); al.reserve((size_t)n);
+  for(Py_ssize_t i=0;i<n;++i){ PyObject* item=PySequence_Fast_GET_ITEM(seq,i); if(!PyUnicode_Check(item)){Py_DECREF(seq);PyErr_SetString(PyExc_TypeError,"args must contain strings");return nullptr;} Py_ssize_t l=0; const char* p=PyUnicode_AsUTF8AndSize(item,&l); if(!p){Py_DECREF(seq);return nullptr;} av.emplace_back(p,(size_t)l);}
+  for(auto& x:av){ap.push_back(x.data());al.push_back(x.size());}
+  nift_script_result* r=nullptr; nift_status rc=nift_engine_execute(self->engine,script,(size_t)sl,cmd,(size_t)cl,ap.empty()?nullptr:ap.data(),al.empty()?nullptr:al.data(),(size_t)n,&r); Py_DECREF(seq);
+  if(rc!=NIFT_OK||!r){PyErr_SetString(PyExc_RuntimeError,"nift_engine_execute failed");return nullptr;}
+  nift_string out{nullptr,0}; if(!nift_script_result_ok(r)){nift_script_result_error_message(r,&out);std::string m(out.data?out.data:"",out.length);nift_script_result_free(r);PyErr_SetString(PyExc_RuntimeError,m.c_str());return nullptr;}
+  nift_script_result_value_json(r,&out); PyObject* py=PyUnicode_DecodeUTF8(out.data?out.data:"",(Py_ssize_t)out.length,"strict"); nift_script_result_free(r); return py;
+}
+
+PyObject* EngineEvaluate(PyObject*, PyObject* args) {
+  PyObject* obj=nullptr; const char* expr=nullptr; Py_ssize_t el=0; if(!PyArg_ParseTuple(args,"Os#",&obj,&expr,&el)) return nullptr;
+  NiftEngineObject* self=CheckEngineObject(obj); if(!self) return nullptr; nift_script_result* r=nullptr; nift_status rc=nift_engine_evaluate(self->engine,expr,(size_t)el,&r);
+  if(rc!=NIFT_OK||!r){PyErr_SetString(PyExc_RuntimeError,"nift_engine_evaluate failed");return nullptr;} nift_string out{nullptr,0};
+  if(!nift_script_result_ok(r)){nift_script_result_error_message(r,&out);std::string m(out.data?out.data:"",out.length);nift_script_result_free(r);PyErr_SetString(PyExc_RuntimeError,m.c_str());return nullptr;}
+  nift_script_result_value_json(r,&out); PyObject* py=PyUnicode_DecodeUTF8(out.data?out.data:"",(Py_ssize_t)out.length,"strict"); nift_script_result_free(r); return py;
+}
+
 // ---------------------------------------------------------------------------
 // Type objects
 // ---------------------------------------------------------------------------
@@ -938,6 +976,8 @@ PyMethodDef kMethods[] = {
     {"engine_set_json", EngineSetJSON, METH_VARARGS, "Set a JSON binding."},
     {"engine_set_loader", EngineSetLoader, METH_VARARGS, "Set the loader callback."},
     {"engine_set_environment_provider", EngineSetEnvironmentProvider, METH_VARARGS, "Set the environment provider."},
+    {"engine_execute", EngineExecute, METH_VARARGS, "Execute a complete Nift script."},
+    {"engine_evaluate", EngineEvaluate, METH_VARARGS, "Evaluate a Nift expression."},
     {"engine_render_page", EngineRenderPage, METH_VARARGS, "Render a tracked page."},
     {"engine_render", EngineRender, METH_VARARGS, "Composed render."},
     {"engine_render_partial", EngineRenderPartial, METH_VARARGS, "Partial render."},

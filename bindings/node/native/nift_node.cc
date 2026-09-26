@@ -48,6 +48,7 @@
 #include <cstdlib>
 #include <mutex>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -633,6 +634,30 @@ napi_value EngineIsOpen(napi_env env, napi_callback_info info) {
   return out;
 }
 
+
+napi_value ScriptJsonOrThrow(napi_env env, nift_script_result* r) {
+  if (r == nullptr) return ThrowJs(env, "Nift native: null script result");
+  nift_string out{nullptr,0};
+  if (!nift_script_result_ok(r)) { nift_script_result_error_message(r,&out); std::string m(out.data?out.data:"",out.length); nift_script_result_free(r); return ThrowJs(env,m); }
+  if (nift_script_result_value_json(r,&out)!=NIFT_OK) { nift_script_result_free(r); return ThrowJs(env,"Nift native: could not read script result"); }
+  napi_value v=nullptr; napi_create_string_utf8(env,out.data?out.data:"",out.length,&v); nift_script_result_free(r); return v;
+}
+
+napi_value EngineExecute(napi_env env, napi_callback_info info) {
+  napi_value this_value=nullptr,args[3]={nullptr,nullptr,nullptr}; size_t argc=3; NAPI_CHECK(env,napi_get_cb_info(env,info,&argc,args,&this_value,nullptr));
+  EngineWrap* e=UnwrapEngine(env,this_value); if(!e) return nullptr; if(argc<1) return ThrowJs(env,"execute(script[, cmd, args]) requires script");
+  std::string script=GetString(env,args[0]); std::string cmd=argc>1?GetString(env,args[1]):"<embed>";
+  std::vector<std::string> av; if(argc>2){ bool is_array=false; napi_is_array(env,args[2],&is_array); if(!is_array)return ThrowJs(env,"execute args must be an array"); uint32_t n=0;napi_get_array_length(env,args[2],&n);for(uint32_t i=0;i<n;++i){napi_value x=nullptr;napi_get_element(env,args[2],i,&x);av.push_back(GetString(env,x));}}
+  std::vector<const char*> ap; std::vector<size_t> al; for(auto& x:av){ap.push_back(x.data());al.push_back(x.size());}
+  nift_script_result* r=nullptr; nift_status rc=nift_engine_execute(e->engine,script.data(),script.size(),cmd.data(),cmd.size(),ap.empty()?nullptr:ap.data(),al.empty()?nullptr:al.data(),av.size(),&r);
+  if(rc!=NIFT_OK)return ThrowJs(env,"nift_engine_execute failed"); return ScriptJsonOrThrow(env,r);
+}
+
+napi_value EngineEvaluate(napi_env env, napi_callback_info info) {
+  napi_value this_value=nullptr,args[1]={nullptr}; size_t argc=1; NAPI_CHECK(env,napi_get_cb_info(env,info,&argc,args,&this_value,nullptr)); EngineWrap* e=UnwrapEngine(env,this_value); if(!e)return nullptr; if(argc<1)return ThrowJs(env,"evaluate(expression) requires an expression");
+  std::string expr=GetString(env,args[0]); nift_script_result* r=nullptr; nift_status rc=nift_engine_evaluate(e->engine,expr.data(),expr.size(),&r); if(rc!=NIFT_OK)return ThrowJs(env,"nift_engine_evaluate failed"); return ScriptJsonOrThrow(env,r);
+}
+
 napi_value EngineSetRoot(napi_env env, napi_callback_info info) {
   napi_value this_value = nullptr, args[1] = {nullptr};
   size_t argc = 1;
@@ -1034,6 +1059,8 @@ napi_value Init(napi_env env, napi_value exports) {
       {"engineSetJSON", nullptr, EngineSetJSON, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"engineSetLoader", nullptr, EngineSetLoader, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"engineSetEnvironmentProvider", nullptr, EngineSetEnvironmentProvider, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"engineExecute", nullptr, EngineExecute, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"engineEvaluate", nullptr, EngineEvaluate, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"engineRenderPage", nullptr, RenderPage, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"engineRender", nullptr, Render, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"engineRenderPartial", nullptr, RenderPartial, nullptr, nullptr, nullptr, napi_default, nullptr},

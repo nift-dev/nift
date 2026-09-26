@@ -122,6 +122,17 @@ class Engine {
     return this;
   }
 
+  execute(script, cmd = "<embed>", args = []) {
+    this._check();
+    if (!Array.isArray(args)) throw new TypeError("Nift: execute args must be an array");
+    return JSON.parse(native.engineExecute.call(this._handle, String(script), String(cmd), args.map(String)));
+  }
+
+  evaluate(expression) {
+    this._check();
+    return JSON.parse(native.engineEvaluate.call(this._handle, String(expression)));
+  }
+
   render(pageName, ctx) {
     this._check();
     checkArg(pageName, "string", "pageName");

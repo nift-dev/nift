@@ -140,8 +140,8 @@ void install_environment(nift_engine* engine) {
 extern "C" {
 
 const char* nift_abi_version(void) { return NIFT_ABI_VERSION; }
-unsigned int nift_abi_version_major(void) { return 1; }
-unsigned int nift_abi_version_minor(void) { return 0; }
+unsigned int nift_abi_version_major(void) { return NIFT_C_ABI_VERSION_MAJOR; }
+unsigned int nift_abi_version_minor(void) { return NIFT_C_ABI_VERSION_MINOR; }
 
 nift_engine* nift_engine_new(void) {
     return new (std::nothrow) nift_engine{};
@@ -387,7 +387,7 @@ nift_status nift_context_set_json(nift_context* context, const char* name,
     }
 }
 
-static nift_status wrap_render(nift_engine* engine, nift::RenderResult result,
+static nift_status wrap_render(nift_engine* /*engine*/, nift::RenderResult result,
                                nift_render_result** out_result) {
     // A host callback failure is a rendering outcome carried by the result
     // (RenderResult.ok == false with the diagnostic); the call itself is
@@ -400,7 +400,11 @@ nift_status nift_engine_execute(nift_engine* engine, const char* script, size_t 
                                 const char* cmd, size_t cmd_len,
                                 const char* const* args, const size_t* arg_lens, size_t arg_count,
                                 nift_script_result** out_result) {
-    if(!engine||!out_result||!valid_input(script,script_len)||!valid_input(cmd,cmd_len)||(arg_count&&(!args||!arg_lens)))return NIFT_ERROR_INVALID_ARGUMENT;*out_result=nullptr;
+    if (!engine || !out_result || !valid_input(script, script_len) || !valid_input(cmd, cmd_len) ||
+        (arg_count && (!args || !arg_lens))) {
+        return NIFT_ERROR_INVALID_ARGUMENT;
+    }
+    *out_result = nullptr;
     try{std::vector<std::string> av;av.reserve(arg_count);for(size_t i=0;i<arg_count;++i){if(!valid_input(args[i],arg_lens[i]))return NIFT_ERROR_INVALID_ARGUMENT;av.emplace_back(args[i]?args[i]:"",arg_lens[i]);}auto* r=new(std::nothrow)nift_script_result{};if(!r)return NIFT_ERROR_INTERNAL;r->result=engine->engine.execute(std::string_view(script?script:"",script_len),std::string(cmd?cmd:"",cmd_len),std::move(av));if(r->result.ok())r->json=r->result.value().json();*out_result=r;return NIFT_OK;}catch(...){return NIFT_ERROR_INTERNAL;}
 }
 nift_status nift_engine_evaluate(nift_engine* engine,const char* expression,size_t expression_len,nift_script_result** out_result){if(!engine||!out_result||!valid_input(expression,expression_len))return NIFT_ERROR_INVALID_ARGUMENT;*out_result=nullptr;try{auto*r=new(std::nothrow)nift_script_result{};if(!r)return NIFT_ERROR_INTERNAL;r->result=engine->engine.evaluate(std::string_view(expression?expression:"",expression_len));if(r->result.ok())r->json=r->result.value().json();*out_result=r;return NIFT_OK;}catch(...){return NIFT_ERROR_INTERNAL;}}

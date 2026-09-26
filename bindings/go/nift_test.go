@@ -304,3 +304,16 @@ func TestReload(t *testing.T) {
 		t.Fatalf("err=%v ok=%v out=%q", err, r2.OK, r2.Output)
 	}
 }
+
+func TestV45ExecuteEvaluate(t *testing.T) {
+	e := NewEngine()
+	defer e.Close()
+	r, err := e.Execute("x := 40; return x + 2;", "go-test", []string{"a"})
+	if err != nil || !r.OK || r.Value != float64(42) {
+		t.Fatalf("execute: %#v %v", r, err)
+	}
+	r, err = e.Evaluate("x + 1")
+	if err != nil || !r.OK || r.Value != float64(41) {
+		t.Fatalf("evaluate: %#v %v", r, err)
+	}
+}

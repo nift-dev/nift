@@ -45,6 +45,7 @@ static inline void nift_go_set_env(nift_engine* engine, void* user_data) {
 import "C"
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"runtime"
@@ -838,6 +839,91 @@ func (e *Engine) RenderTextWithContext(text string, ctx *Context) (Result, error
 	})
 }
 
+// ScriptResult is a fully Go-owned embedded script result. Value preserves the
+// JSON type returned by the canonical Nift runtime.
+type ScriptResult struct {
+	OK    bool
+	Value any
+	Error string
+}
+
+func convertScriptResult(r *C.nift_script_result) (ScriptResult, error) {
+	if r == nil {
+		return ScriptResult{}, errors.New("nift: null script result")
+	}
+	if C.nift_script_result_ok(r) == 0 {
+		var msg C.nift_string
+		if C.nift_script_result_error_message(r, &msg) != C.NIFT_OK {
+			return ScriptResult{}, errors.New("nift: script failed")
+		}
+		return ScriptResult{OK: false, Error: cString(msg)}, nil
+	}
+	var raw C.nift_string
+	if C.nift_script_result_value_json(r, &raw) != C.NIFT_OK {
+		return ScriptResult{}, errors.New("nift: could not read script result")
+	}
+	var value any
+	if err := json.Unmarshal([]byte(cString(raw)), &value); err != nil {
+		return ScriptResult{}, fmt.Errorf("nift: invalid script result json: %w", err)
+	}
+	return ScriptResult{OK: true, Value: value}, nil
+}
+
+// Execute runs a complete Nift program in the Engine's persistent embedded runtime.
+func (e *Engine) Execute(script, cmd string, args []string) (ScriptResult, error) {
+	e.lifecycle.Lock()
+	defer e.lifecycle.Unlock()
+	if e.closed.Load() || e.engine == nil {
+		return ScriptResult{}, errors.New("Engine has been closed")
+	}
+	scriptp, scriptl := goString(script)
+	cmdp, cmdl := goString(cmd)
+	var pin runtime.Pinner
+	pinStrings(&pin, script, cmd)
+	defer pin.Unpin()
+	argv := make([]*C.char, len(args))
+	lens := make([]C.size_t, len(args))
+	for i := range args {
+		p, l := goString(args[i])
+		argv[i] = p
+		lens[i] = l
+		pinStrings(&pin, args[i])
+	}
+	var argvp **C.char
+	var lensp *C.size_t
+	if len(argv) > 0 {
+		argvp = &argv[0]
+		lensp = &lens[0]
+	}
+	var r *C.nift_script_result
+	status := C.nift_engine_execute(e.engine, scriptp, scriptl, cmdp, cmdl, argvp, lensp, C.size_t(len(args)), &r)
+	if status != C.NIFT_OK {
+		return ScriptResult{}, abiStatusError(status)
+	}
+	defer C.nift_script_result_free(r)
+	return convertScriptResult(r)
+}
+
+// Evaluate evaluates an expression against the Engine's persistent embedded runtime.
+func (e *Engine) Evaluate(expression string) (ScriptResult, error) {
+	e.lifecycle.Lock()
+	defer e.lifecycle.Unlock()
+	if e.closed.Load() || e.engine == nil {
+		return ScriptResult{}, errors.New("Engine has been closed")
+	}
+	p, l := goString(expression)
+	var pin runtime.Pinner
+	pinStrings(&pin, expression)
+	defer pin.Unpin()
+	var r *C.nift_script_result
+	status := C.nift_engine_evaluate(e.engine, p, l, &r)
+	if status != C.NIFT_OK {
+		return ScriptResult{}, abiStatusError(status)
+	}
+	defer C.nift_script_result_free(r)
+	return convertScriptResult(r)
+}
+
 // ---------------------------------------------------------------------------
 // Context
 // ---------------------------------------------------------------------------
@@ -1089,7 +1175,7 @@ func abiStatusError(status C.nift_status) error {
 func ABICompat() error {
 	major := int(C.nift_abi_version_major())
 	minor := int(C.nift_abi_version_minor())
-	if major != 1 || minor != 0 {
+	if major != 1 || minor < 1 {
 		return fmt.Errorf("nift: unsupported ABI version %d.%d", major, minor)
 	}
 	return nil

@@ -442,3 +442,12 @@ function makeProject() {
   console.log(`\nNode binding tests: ${passed} passed, ${failed} failed`);
   process.exit(failed === 0 ? 0 : 1);
 })();
+
+
+test("v4.5 execute/evaluate", () => {
+  const e = Engine.new();
+  try {
+    assert.equal(e.execute("x := 40; return x + 2;", "node-test", ["a"]), 42);
+    assert.equal(e.evaluate("x + 1"), 41);
+  } finally { e.close(); }
+});

@@ -1,3 +1,4 @@
+import json
 # Nift Embed Python binding - idiomatic wrapper over the native extension.
 #
 # GIL / threading model: renders are synchronous; the native extension releases
@@ -145,6 +146,16 @@ class Engine:
             raise TypeError("set_environment_provider requires a callable or None")
         _nift.engine_set_environment_provider(self._handle, fn if fn is not None else None)
         return self
+
+    def execute(self, script, cmd="<embed>", args=()):
+        """Execute a complete Nift program in this Engine's persistent runtime."""
+        self._check()
+        return json.loads(_nift.engine_execute(self._handle, str(script), str(cmd), list(args)))
+
+    def evaluate(self, expression):
+        """Evaluate an expression against this Engine's persistent runtime."""
+        self._check()
+        return json.loads(_nift.engine_evaluate(self._handle, str(expression)))
 
     def render(self, page_name, ctx=None):
         """Render a tracked project page by name. The name is ALWAYS a tracked

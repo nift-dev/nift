@@ -19,7 +19,7 @@
 #include <stdint.h>
 
 #define NIFT_C_ABI_VERSION_MAJOR 1
-#define NIFT_C_ABI_VERSION_MINOR 0
+#define NIFT_C_ABI_VERSION_MINOR 1
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,7 +29,7 @@ extern "C" {
 /* Versioning                                                               */
 /* ------------------------------------------------------------------------ */
 
-#define NIFT_ABI_VERSION "1.0"
+#define NIFT_ABI_VERSION "1.1"
 
 /* ABI version policy:
  *   - additive, backward-compatible ABI changes  -> bump the ABI MINOR;

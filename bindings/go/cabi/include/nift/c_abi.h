@@ -18,6 +18,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define NIFT_C_ABI_VERSION_MAJOR 1
+#define NIFT_C_ABI_VERSION_MINOR 1
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -26,7 +29,7 @@ extern "C" {
 /* Versioning                                                               */
 /* ------------------------------------------------------------------------ */
 
-#define NIFT_ABI_VERSION "1.0"
+#define NIFT_ABI_VERSION "1.1"
 
 /* ABI version policy:
  *   - additive, backward-compatible ABI changes  -> bump the ABI MINOR;
@@ -65,6 +68,7 @@ typedef enum {
 typedef struct nift_engine nift_engine;
 typedef struct nift_context nift_context;
 typedef struct nift_render_result nift_render_result;
+typedef struct nift_script_result nift_script_result;
 
 /* A borrowed UTF-8 string view. Valid only for the documented lifetime of the
  * object it was obtained from; copy to retain. `data` may be NULL when
@@ -194,6 +198,20 @@ nift_status nift_context_set_bool(nift_context* context, const char* name,
 nift_status nift_context_set_json(nift_context* context, const char* name,
                                   size_t name_len, const char* json,
                                   size_t json_len);
+
+/* Embedded script execution/evaluation. Script values are exposed as JSON
+ * through nift_script_result_value_json; scalar/object/array type information is
+ * preserved in that JSON representation. */
+nift_status nift_engine_execute(nift_engine* engine, const char* script, size_t script_len,
+                                const char* cmd, size_t cmd_len,
+                                const char* const* args, const size_t* arg_lens, size_t arg_count,
+                                nift_script_result** out_result);
+nift_status nift_engine_evaluate(nift_engine* engine, const char* expression, size_t expression_len,
+                                 nift_script_result** out_result);
+void nift_script_result_free(nift_script_result* result);
+int nift_script_result_ok(const nift_script_result* result);
+nift_status nift_script_result_value_json(const nift_script_result* result, nift_string* out);
+nift_status nift_script_result_error_message(const nift_script_result* result, nift_string* out);
 
 /* ------------------------------------------------------------------------ */
 /* Render                                                                   */

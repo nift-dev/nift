@@ -233,6 +233,79 @@ public sealed class Engine : IDisposable
         }
     }
 
+    /// <summary>Executes a complete Nift program in this Engine's persistent scripting runtime and returns its JSON value.</summary>
+    public string ExecuteJson(string script, string cmd = "<embed>", IReadOnlyList<string>? args = null)
+    {
+        EnterRender();
+        var allocated = new List<IntPtr>();
+        IntPtr ptrArray = IntPtr.Zero, lenArray = IntPtr.Zero;
+        try
+        {
+            using VarString sv = new(script);
+            using VarString cv = new(cmd);
+            args ??= Array.Empty<string>();
+            if (args.Count > 0)
+            {
+                ptrArray = Marshal.AllocHGlobal(IntPtr.Size * args.Count);
+                lenArray = Marshal.AllocHGlobal(IntPtr.Size * args.Count);
+                for (int i = 0; i < args.Count; ++i)
+                {
+                    byte[] bytes = System.Text.Encoding.UTF8.GetBytes(args[i]);
+                    IntPtr p = Marshal.AllocHGlobal(bytes.Length == 0 ? 1 : bytes.Length);
+                    allocated.Add(p);
+                    if (bytes.Length > 0) Marshal.Copy(bytes, 0, p, bytes.Length);
+                    Marshal.WriteIntPtr(ptrArray, i * IntPtr.Size, p);
+                    if (UIntPtr.Size == 8) Marshal.WriteInt64(lenArray, i * IntPtr.Size, bytes.Length);
+                    else Marshal.WriteInt32(lenArray, i * IntPtr.Size, bytes.Length);
+                }
+            }
+            int rc = Native.nift_engine_execute(_handle.DangerousGetHandle(), sv.Name, sv.NameLen, cv.Name, cv.NameLen, ptrArray, lenArray, (UIntPtr)args.Count, out IntPtr result);
+            if (rc != NativeStatus.Ok || result == IntPtr.Zero) throw new NiftException("nift_engine_execute failed");
+            try
+            {
+                if (Native.nift_script_result_ok(result) == 0)
+                {
+                    Native.nift_script_result_error_message(result, out NiftString err);
+                    throw new NiftException(Utf8.FromNative(err));
+                }
+                Native.nift_script_result_value_json(result, out NiftString value);
+                return Utf8.FromNative(value);
+            }
+            finally { Native.nift_script_result_free(result); }
+        }
+        finally
+        {
+            foreach (IntPtr p in allocated) Marshal.FreeHGlobal(p);
+            if (ptrArray != IntPtr.Zero) Marshal.FreeHGlobal(ptrArray);
+            if (lenArray != IntPtr.Zero) Marshal.FreeHGlobal(lenArray);
+            ExitRender();
+        }
+    }
+
+    /// <summary>Evaluates an expression against this Engine's persistent scripting runtime and returns its JSON value.</summary>
+    public string EvaluateJson(string expression)
+    {
+        EnterRender();
+        try
+        {
+            using VarString ev = new(expression);
+            int rc = Native.nift_engine_evaluate(_handle.DangerousGetHandle(), ev.Name, ev.NameLen, out IntPtr result);
+            if (rc != NativeStatus.Ok || result == IntPtr.Zero) throw new NiftException("nift_engine_evaluate failed");
+            try
+            {
+                if (Native.nift_script_result_ok(result) == 0)
+                {
+                    Native.nift_script_result_error_message(result, out NiftString err);
+                    throw new NiftException(Utf8.FromNative(err));
+                }
+                Native.nift_script_result_value_json(result, out NiftString value);
+                return Utf8.FromNative(value);
+            }
+            finally { Native.nift_script_result_free(result); }
+        }
+        finally { ExitRender(); }
+    }
+
     /// <summary>Full page + template composition (template must contain exactly one @content).</summary>
     public RenderResult Render(RenderSource page, RenderSource template, Context? ctx = null)
     {
