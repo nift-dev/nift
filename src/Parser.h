@@ -184,6 +184,13 @@ private:
         json::Document value;
     };
     std::unordered_map<std::string, std::shared_ptr<MutexInstance>> mutex_instances_;
+    struct AtomicInstance {
+        enum class Kind { Int, Bool };
+        Kind kind = Kind::Int;
+        std::atomic<std::int64_t> int_value{0};
+        std::atomic<bool> bool_value{false};
+    };
+    std::unordered_map<std::string, std::shared_ptr<AtomicInstance>> atomic_instances_;
     struct AsyncInstance {
         mutable std::mutex mutex;
         std::condition_variable cv;

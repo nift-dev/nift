@@ -8,7 +8,7 @@ Nift v4.5 promotes the native language into a reusable scripting/runtime layer w
 - `-e` / `-c` inline programs, `-i` interactive continuation, stdin source via `nift -`, shebang execution, and stable script `cmd` / `args`.
 - Runtime introspection and configuration through `env()`, `os()`, `arch()` and runtime-owned `target()` values, including explicit custom targets.
 - Bash-style POSIX job control with real process groups and terminal handoff: background `&`, `jobs`, `fg`, `bg` and `wait`.
-- Real native concurrency: `thread(...)`, replayable `join`, `hardware_concurrency()`, mutex-backed explicitly shared state, and `async` / `await` on a bounded native worker pool with nested-await progress guarantees.
+- Real native concurrency: `thread(...)`, replayable `join`, `hardware_concurrency()`, mutex-backed explicitly shared state, sequentially-consistent `atomic<int>` / `atomic<bool>` scalar handles, and `async` / `await` on a bounded native worker pool with nested-await progress guarantees.
 - C-ABI FFI through dynamic libraries, typed scalar calls, Nift-owned native buffers/struct layouts and bounded synchronous callbacks, with unsupported signatures rejected explicitly.
 - Supported embedding runtime: persistent `nift::Engine` script execution/evaluation alongside templating, isolated Engine instances, host values/functions, C ABI 1.1, staged C/C++ artifacts, and maintained Go/Python/Node/C# binding surfaces.
 - Direct script/package/FFI/concurrency/job-control integration dogfood, expanded independent v4.5 contract coverage, adversarial lifecycle tests, website documentation, and reproducible runtime/embedding performance evidence.
