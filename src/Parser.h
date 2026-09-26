@@ -11,6 +11,7 @@
 #include <fstream>
 #include <atomic>
 #include <mutex>
+#include <condition_variable>
 #include <thread>
 #include "Proc.h"
 #include "Ast.h"
@@ -170,6 +171,14 @@ private:
     };
     std::unordered_map<std::string, std::shared_ptr<ThreadInstance>> thread_instances_;
     std::uint64_t next_thread_instance_id_ = 1;
+    struct MutexInstance {
+        mutable std::mutex state_mutex;
+        std::condition_variable cv;
+        bool locked = false;
+        std::thread::id owner;
+        json::Document value;
+    };
+    std::unordered_map<std::string, std::shared_ptr<MutexInstance>> mutex_instances_;
 
     enum class CollectionKind { Stack, Queue, PriQue, Map, SortedMap, Set, SortedSet };
     struct CollectionInstance {
