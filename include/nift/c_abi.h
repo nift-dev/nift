@@ -18,6 +18,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define NIFT_C_ABI_VERSION_MAJOR 1
+#define NIFT_C_ABI_VERSION_MINOR 0
+
 #ifdef __cplusplus
 extern "C" {
 #endif
