@@ -3,6 +3,7 @@
 #include "ProjectState.h"
 #include "FileSystem.h"
 #include "ProjectModel.h"
+#include "Environment.h"
 
 #include <cstdlib>
 #include <functional>
@@ -95,6 +96,10 @@ public:
         if (const char* value = std::getenv(name.c_str()))
             return {nift::HostStatus::Found, std::string(value), ""};
         return {nift::HostStatus::NotFound, "", ""};
+    }
+    bool environment_snapshot(json::Document& out, std::string& error) const override {
+        if (environment_provider_) { error = "env(): custom environment providers are lookup-only and cannot be enumerated"; return false; }
+        return nift_environment::process_snapshot(out, error);
     }
 
 private:

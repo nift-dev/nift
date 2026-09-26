@@ -102,4 +102,12 @@ public:
     // Environment lookup for @getenv. NotFound means the variable is unset;
     // Error is a controlled host failure that fails the render.
     virtual nift::HostResult environment(const std::string& name) const = 0;
+
+    // Full environment snapshot used by script-land env(). Hosts with a custom
+    // lookup provider that cannot enumerate names must fail explicitly rather
+    // than leaking the process-global environment into an isolated runtime.
+    virtual bool environment_snapshot(json::Document&, std::string& error) const {
+        error = "environment snapshot is not available from this host";
+        return false;
+    }
 };

@@ -3,6 +3,7 @@
 #include "FrontMatter.h"
 #include "Console.h"
 #include "FileSystem.h"
+#include "Environment.h"
 #include "Proc.h"
 #include "ProjectInfo.h"
 #include "Automation.h"
@@ -1985,7 +1986,10 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             if(call_args("status",args,q)){if(!args.empty()){error="status: expected no arguments";return false;}ProjectInfo* proj=nullptr;if(!ensure_project("status",proj))return false;auto names=automation_status(*proj);out=json::Document::make_array();for(const auto& n:names)out.array.emplace_back(n);return true;}
             if(call_args("tracked",args,q)){if(!args.empty()){error="tracked: expected no arguments";return false;}ProjectInfo* proj=nullptr;if(!ensure_project("tracked",proj))return false;auto names=automation_tracked_names(*proj);out=json::Document::make_array();for(const auto& n:names)out.array.emplace_back(n);return true;}
             if(call_args("project_root",args,q)){if(!args.empty()){error="project_root: expected no arguments";return false;}ProjectInfo* proj=nullptr;if(!ensure_project("project_root",proj))return false;out=json::Document(fs::absolute(proj->root).generic_string());return true;}
-            if(call_args("getenv",args,q)){if(args.size()!=1){error="getenv: expected name";return false;}std::string k;if(!string_arg("getenv",args,q,0,k))return false;const char*v=std::getenv(k.c_str());out=v?json::Document(std::string(v)):json::Document(nullptr);return true;}
+            if(call_args("getenv",args,q)){if(args.size()!=1){error="getenv: expected name";return false;}std::string k;if(!string_arg("getenv",args,q,0,k))return false;auto v=host_.environment(k);if(v.status==nift::HostStatus::Error){error="getenv: "+v.error;return false;}out=v.status==nift::HostStatus::Found?json::Document(v.value):json::Document(nullptr);return true;}
+            if(call_args("env",args,q)){if(!args.empty()){error="env: expected no arguments";return false;}json::Document snapshot; if(!host_.environment_snapshot(snapshot,error))return false; out=std::move(snapshot);return true;}
+            if(call_args("os",args,q)){if(!args.empty()){error="os: expected no arguments";return false;}out=json::Document(std::string(nift_environment::host_os()));return true;}
+            if(call_args("arch",args,q)){if(!args.empty()){error="arch: expected no arguments";return false;}out=json::Document(std::string(nift_environment::host_arch()));return true;}
             if(call_args("setenv",args,q)){if(!standalone_script_host_){error="setenv: only available in standalone Nift scripts/shell";return false;}if(args.size()!=2){error="setenv: expected name and value";return false;}std::string k,v;if(!string_arg("setenv",args,q,0,k)||!string_arg("setenv",args,q,1,v))return false;
 #ifdef _WIN32
                 if(_putenv_s(k.c_str(),v.c_str())!=0){error="setenv: failed";return false;}

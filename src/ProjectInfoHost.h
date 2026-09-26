@@ -2,6 +2,7 @@
 #include "RenderHost.h"
 #include "ProjectInfo.h"
 #include "FileSystem.h"
+#include "Environment.h"
 #include "ProjectModel.h"
 
 #include <cstdlib>
@@ -152,6 +153,7 @@ public:
             return {nift::HostStatus::Found, std::string(value), ""};
         return {nift::HostStatus::NotFound, "", ""};
     }
+    bool environment_snapshot(json::Document& out, std::string& error) const override { return nift_environment::process_snapshot(out, error); }
 
 private:
     ProjectInfo& project_;

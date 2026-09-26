@@ -6,6 +6,7 @@
 #include "ProjectModel.h"
 #include "FileSystem.h"
 #include "Json.h"
+#include "Environment.h"
 #include <filesystem>
 #include <string>
 #include <optional>
@@ -45,6 +46,7 @@ public:
     bool source_exists(const fs::path& p) const override { return filesystem::file_exists(p); }
     bool source_readable(const fs::path& p) const override { return filesystem::file_exists(p); }
     nift::HostResult environment(const std::string& name) const override { const char* v=std::getenv(name.c_str()); return v?nift::HostResult{nift::HostStatus::Found,v,{}}:nift::HostResult{}; }
+    bool environment_snapshot(json::Document& out, std::string& error) const override { return nift_environment::process_snapshot(out, error); }
 private:
     fs::path root_; mutable std::string cache_; mutable std::shared_ptr<const json::Document> project_value_;
     Config config_; std::vector<TrackedInfo> tracked_; bool project_found_ = false;

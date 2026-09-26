@@ -1008,3 +1008,8 @@ test-v45-invocation: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/v45_cli_invocation_smoke.sh
 
 .PHONY: test-v45-invocation
+
+test-v45-host-introspection: $(TARGET)
+	NIFT="$(CURDIR)/$(TARGET)" tests/v45_host_introspection_smoke.sh
+
+.PHONY: test-v45-host-introspection

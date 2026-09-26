@@ -1,6 +1,7 @@
 #include "nift/engine.h"
 
 #include "FileSystem.h"
+#include "Environment.h"
 #include "Json.h"
 #include "Parser.h"
 #include "ProjectHost.h"
@@ -147,6 +148,10 @@ public:
         if (const char* value = std::getenv(name.c_str()))
             return {nift::HostStatus::Found, std::string(value), ""};
         return {nift::HostStatus::NotFound, "", ""};
+    }
+    bool environment_snapshot(json::Document& out, std::string& error) const override {
+        if (impl_.environment_provider) { error = "env(): custom environment providers are lookup-only and cannot be enumerated"; return false; }
+        return nift_environment::process_snapshot(out, error);
     }
 
     std::shared_ptr<const json::Document> read_shared_json(const std::filesystem::path& path,
