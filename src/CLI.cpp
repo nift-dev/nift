@@ -1125,20 +1125,59 @@ static int run_script_shell() {
 }
 
 int run_cli(int argc, char** argv) {
-    const std::string command = argc > 1 ? argv[1] : "";
-    if (command.empty()) return run_script_shell();
+    // --platform is a global execution/build selector and may appear before or
+    // after the command/script.  `--` is a hard boundary: anything after it is
+    // passed through literally and is never interpreted as a Nift option.
+    std::string selected_platform = "native";
+    bool platform_selected = false;
+    std::vector<std::string> normalized_storage;
+    normalized_storage.reserve(static_cast<std::size_t>(argc));
+    normalized_storage.emplace_back(argc > 0 && argv[0] ? argv[0] : "nift");
+    bool literal_tail = false;
+    for (int i = 1; i < argc; ++i) {
+        const std::string arg = argv[i];
+        if (!literal_tail && arg == "--") {
+            literal_tail = true;
+            normalized_storage.push_back(arg);
+            continue;
+        }
+        if (!literal_tail && arg.rfind("--platform=", 0) == 0) {
+            std::string parsed;
+            if (!parse_runtime_platform_selector(arg, parsed)) {
+                console::error("invalid platform selector '" + arg + "'");
+                return 2;
+            }
+            if (platform_selected) {
+                console::error("multiple platform selections are not allowed");
+                return 2;
+            }
+            selected_platform = std::move(parsed);
+            platform_selected = true;
+            continue;
+        }
+        normalized_storage.push_back(arg);
+    }
+    std::vector<char*> normalized_argv;
+    normalized_argv.reserve(normalized_storage.size());
+    for (auto& arg : normalized_storage) normalized_argv.push_back(arg.data());
+    argc = static_cast<int>(normalized_argv.size());
+    argv = normalized_argv.data();
 
-    // Runtime platform selector prefix for scripts/stdin/inline execution.
-    if (command.rfind("--platform=",0)==0) {
-        std::string platform;
-        if (!parse_runtime_platform_selector(command,platform)) { console::error("invalid platform selector '"+command+"'"); return 2; }
-        if (argc < 3) { ScriptRenderHost host(fs::current_path(),platform); TrackedInfo info; Parser parser(host,info); parser.set_script_invocation("<repl>",{}); return run_script_shell_loop(parser,true); }
-        const std::string source_mode=argv[2];
-        if (source_mode.rfind("--platform=",0)==0) { console::error("multiple platform selections are not allowed"); return 2; }
-        if (source_mode=="-e" || source_mode=="-c") { if(argc<4){console::error(source_mode+" requires program source");return 2;} std::vector<std::string> a; for(int i=4;i<argc;++i) if(std::string(argv[i])!="--") a.push_back(argv[i]); return run_inline_script(argv[3],a,false,platform); }
-        if (source_mode=="-") { std::vector<std::string> a; for(int i=3;i<argc;++i) if(std::string(argv[i])!="--") a.push_back(argv[i]); return run_stdin_script(a,false,platform); }
-        if (filesystem::file_exists(source_mode) && !fs::is_directory(source_mode)) { std::vector<std::string> a; for(int i=3;i<argc;++i) if(std::string(argv[i])!="--") a.push_back(argv[i]); return run_script_file(source_mode,a,false,platform); }
-        console::error("platform selector must precede an existing script path, '-', -e or -c"); return 2;
+    const std::string command = argc > 1 ? argv[1] : "";
+    const bool platform_capable_command = command.empty() || command == "build" ||
+        command == "-e" || command == "-c" || command == "-i" || command == "-" ||
+        command == "--no-process" || command.rfind("--fs-root=", 0) == 0 ||
+        (filesystem::file_exists(command) && !fs::is_directory(command));
+    if (platform_selected && !platform_capable_command) {
+        console::error("--platform is only valid for script execution, the REPL, and build");
+        return 2;
+    }
+    if (command.empty()) {
+        if (!platform_selected) return run_script_shell();
+        ScriptRenderHost host(fs::current_path(), selected_platform);
+        TrackedInfo info; Parser parser(host, info);
+        parser.set_script_invocation("<repl>", {});
+        return run_script_shell_loop(parser, true);
     }
 
     // Full-program command-line execution. -e is canonical; -c is an exact
@@ -1163,7 +1202,7 @@ int run_cli(int argc, char** argv) {
                 if (!literal_args && a=="-i") { interactive=true; continue; }
                 script_args.push_back(a);
             }
-            return run_inline_script(source, script_args, interactive);
+            return run_inline_script(source, script_args, interactive, selected_platform);
         }
         if (mode == "-") {
             std::vector<std::string> script_args;
@@ -1173,7 +1212,7 @@ int run_cli(int argc, char** argv) {
                 if (!literal_args && a=="--") { literal_args=true; continue; }
                 script_args.push_back(a);
             }
-            return run_stdin_script(script_args, /*interactive_after=*/true);
+            return run_stdin_script(script_args, /*interactive_after=*/true, selected_platform);
         }
         if (filesystem::file_exists(mode) && !fs::is_directory(mode)) {
             std::vector<std::string> script_args;
@@ -1185,7 +1224,7 @@ int run_cli(int argc, char** argv) {
                 else if (!literal_args && a.rfind("--fs-root=",0)==0) nift_setenv("NIFT_FS_ROOT",a.substr(10).c_str(),1);
                 else script_args.push_back(a);
             }
-            return run_script_file(mode, script_args, /*interactive_after=*/true);
+            return run_script_file(mode, script_args, /*interactive_after=*/true, selected_platform);
         }
         console::error("-i requires -e, -c, or an existing script path");
         return 2;
@@ -1198,7 +1237,7 @@ int run_cli(int argc, char** argv) {
             if (!literal_args && a=="--") { literal_args=true; continue; }
             script_args.push_back(a);
         }
-        return run_stdin_script(script_args, /*interactive_after=*/false);
+        return run_stdin_script(script_args, /*interactive_after=*/false, selected_platform);
     }
 
     // Zero-source shell capability options replace the old `nift sh <option>`
@@ -1329,7 +1368,7 @@ int run_cli(int argc, char** argv) {
             else if (!literal_args && a.rfind("--fs-root=", 0) == 0) nift_setenv("NIFT_FS_ROOT", a.substr(10).c_str(), 1);
             else script_args.push_back(a);
         }
-        return run_script_file(command, script_args);
+        return run_script_file(command, script_args, false, selected_platform);
     }
 
     // Historical spellings removed by the CLI unification. These return an
@@ -1375,7 +1414,6 @@ int run_cli(int argc, char** argv) {
         // --repair. -p (explain rebuild reasons) is orthogonal and combinable.
         // --no-process extends the script process restriction to build hooks.
         bool all_mode = false, auto_mode = false, repair_mode = false, explain = false, no_process = false;
-        std::string runtime_platform = "native"; bool platform_selected=false;
         std::vector<std::string> names;
         int mode_flags = 0;
         for (int i = 2; i < argc; ++i) {
@@ -1385,15 +1423,11 @@ int run_cli(int argc, char** argv) {
             else if (arg == "--repair") { repair_mode = true; ++mode_flags; }
             else if (arg == "-p") explain = true;
             else if (arg == "--no-process") no_process = true;
-            else if (arg.rfind("--platform=",0)==0) {
-                std::string selected; if(!parse_runtime_platform_selector(arg,selected)){console::error("invalid platform selector '"+arg+"'");return 1;}
-                if(platform_selected){console::error("multiple platform selections are not allowed");return 1;} runtime_platform=selected;platform_selected=true;
-            }
             else if (!arg.empty() && arg[0] == '-') { console::error("unknown build option '" + arg + "'"); return 1; }
             else names.emplace_back(arg);
         }
         if (no_process) nift_setenv("NIFT_NO_PROCESS", "1", 1);
-        project.target_ = runtime_platform;
+        project.target_ = selected_platform;
         if (mode_flags > 1 || (mode_flags == 1 && !names.empty())) {
             console::error("build modes are mutually exclusive");
             return 1;
