@@ -78,13 +78,18 @@ ProcessResult ShellJobTable::launch(const std::vector<ProcessSpec>& specs, const
             if(prev>=0)dup2(prev,STDIN_FILENO); else if(!redirect_fd(specs[i].stdin_path,STDIN_FILENO,false,true))_exit(126);
             if(i+1<specs.size())dup2(pp[1],STDOUT_FILENO); else if(!redirect_fd(specs[i].stdout_path,STDOUT_FILENO,specs[i].append_stdout,false))_exit(126);
             if(specs[i].merge_stderr)dup2(STDOUT_FILENO,STDERR_FILENO); else if(!redirect_fd(specs[i].stderr_path,STDERR_FILENO,specs[i].append_stderr,false))_exit(126);
-            if(prev>=0)close(prev); if(pp[0]>=0)close(pp[0]); if(pp[1]>=0)close(pp[1]);
+            if (prev >= 0) close(prev);
+            if (pp[0] >= 0) close(pp[0]);
+            if (pp[1] >= 0) close(pp[1]);
             std::vector<std::string> avs{specs[i].program}; avs.insert(avs.end(),specs[i].args.begin(),specs[i].args.end());
             std::vector<char*> av; for(auto& a:avs)av.push_back(a.data()); av.push_back(nullptr);
             execvp(specs[i].program.c_str(),av.data()); _exit(errno==ENOENT?127:126);
         }
-        if(pgid<0)pgid=pid; setpgid(pid,pgid);
-        if(prev>=0)close(prev); if(pp[1]>=0)close(pp[1]); prev=pp[0];
+        if (pgid < 0) pgid = pid;
+        setpgid(pid, pgid);
+        if (prev >= 0) close(prev);
+        if (pp[1] >= 0) close(pp[1]);
+        prev = pp[0];
         entry.pids.push_back(pid); entry.remaining.insert(pid); entry.info.process_ids.push_back((long long)pid); entry.last_pid=pid; result.launched=true;
     }
     if(prev>=0)close(prev);
@@ -101,7 +106,8 @@ void ShellJobTable::reap() {
     for(auto& kv:impl_->entries){ auto& e=kv.second; if(e.info.state==ShellJobState::Done)continue; bool saw_stop=false;
         for(auto it=e.remaining.begin();it!=e.remaining.end();){ int st=0; pid_t p=waitpid(*it,&st,WNOHANG|WUNTRACED|WCONTINUED); if(p==0){++it;continue;} if(p<0){if(errno==ECHILD){it=e.remaining.erase(it);continue;}++it;continue;}
             if(WIFSTOPPED(st)){saw_stop=true;e.info.state=ShellJobState::Stopped;++it;continue;} if(WIFCONTINUED(st)){e.info.state=ShellJobState::Running;++it;continue;}
-            if(p==e.last_pid)e.info.exit_code=status_code(st); it=e.remaining.erase(it);
+            if (p == e.last_pid) e.info.exit_code = status_code(st);
+            it = e.remaining.erase(it);
         }
         if(e.remaining.empty())e.info.state=ShellJobState::Done; else if(!saw_stop&&e.info.state!=ShellJobState::Stopped)e.info.state=ShellJobState::Running;
     }
