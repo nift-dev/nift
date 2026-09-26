@@ -87,6 +87,7 @@ public:
     double number() const;
     bool boolean() const;
     const std::string& string() const;
+    std::string json() const;
 
     void push_back(const Value& value);
 

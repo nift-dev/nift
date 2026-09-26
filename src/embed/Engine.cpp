@@ -26,6 +26,10 @@ struct nift::Engine::Impl {
     std::filesystem::path root;
     std::function<nift::HostResult(std::string_view)> loader;
     std::function<nift::HostResult(std::string_view)> environment_provider;
+    std::string script_target = "native";
+    mutable std::mutex script_mutex_;
+    struct ScriptState;
+    std::unique_ptr<ScriptState> script_state;
 
     // Long-lived application-wide value bindings (engine.set / set_json).
     std::unordered_map<std::string, std::shared_ptr<const json::Document>> defaults;
@@ -53,8 +57,6 @@ struct nift::Engine::Impl {
     }
 };
 
-namespace {
-
 class EngineHost : public RenderHost {
 public:
     EngineHost(nift::Engine::Impl& impl,
@@ -66,6 +68,7 @@ public:
     std::string relative(const std::filesystem::path& path) const override { return impl_.relative(path); }
     const std::string& output_dir() const override { static const std::string empty; return empty; }
     int build_threads() const override { return 1; }
+    const std::string& target() const override { return impl_.script_target; }
 
     std::filesystem::path content_path(const TrackedInfo& info) const override { return impl_.root / info.name; }
     std::filesystem::path output_path(const TrackedInfo& info) const override {
@@ -189,6 +192,13 @@ private:
     std::filesystem::path current_output_;
 };
 
+struct nift::Engine::Impl::ScriptState {
+    EngineHost host;
+    TrackedInfo tracked;
+    Parser parser;
+    explicit ScriptState(nift::Engine::Impl& impl) : host(impl, nullptr, {}), parser(host, tracked) { parser.set_script_invocation("<embed>", {}); }
+};
+
 RenderSource to_render_source(const nift::Source& source, const nift::Engine::Impl& impl) {
     RenderSource out;
     if (source.is_path()) {
@@ -201,8 +211,6 @@ RenderSource to_render_source(const nift::Source& source, const nift::Engine::Im
     }
     return out;
 }
-
-} // namespace
 
 namespace nift {
 
@@ -256,6 +264,19 @@ bool Engine::is_open() const {
 std::string Engine::open_error() const {
     std::lock_guard<std::mutex> lock(impl_->snapshot_mutex_);
     return impl_->project_open_error;
+}
+
+void Engine::set_target(std::string target) {
+    std::lock_guard<std::mutex> lock(impl_->script_mutex_); impl_->script_target = target.empty()?"native":std::move(target);
+}
+
+ScriptResult Engine::execute(std::string_view script, std::string cmd, std::vector<std::string> args) {
+    std::lock_guard<std::mutex> lock(impl_->script_mutex_); if(!impl_->script_state)impl_->script_state=std::make_unique<Impl::ScriptState>(*impl_);impl_->script_state->parser.set_script_invocation(std::move(cmd),std::move(args));
+    json::Document doc;std::string error;ScriptResult out;if(!impl_->script_state->parser.run_embedded_script(std::string(script),"<embed>",doc,error)){out.error_.message=std::move(error);out.error_.source="<embed>";return out;}ValueAccess::doc(out.value_)=std::move(doc);out.ok_=true;return out;
+}
+
+ScriptResult Engine::evaluate(std::string_view expression) {
+    std::lock_guard<std::mutex> lock(impl_->script_mutex_);if(!impl_->script_state){impl_->script_state=std::make_unique<Impl::ScriptState>(*impl_);json::Document init;std::string ie;impl_->script_state->parser.run_embedded_script("","<embed>",init,ie);}json::Document doc;std::string error;ScriptResult out;if(!impl_->script_state->parser.eval_expression(std::string(expression),doc,error)){out.error_.message=std::move(error);out.error_.source="<embed>";return out;}ValueAccess::doc(out.value_)=std::move(doc);out.ok_=true;return out;
 }
 
 bool Engine::reload(std::string* error) {

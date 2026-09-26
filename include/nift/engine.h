@@ -6,11 +6,13 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "nift/context.h"
 #include "nift/host_result.h"
 #include "nift/render_result.h"
 #include "nift/source.h"
+#include "nift/script_result.h"
 
 namespace nift {
 
@@ -151,6 +153,13 @@ public:
     bool set(std::string name, int value);
     bool set(std::string name, bool value);
     bool set_json(std::string name, std::string_view json_text);
+
+    // Persistent embedded scripting runtime. execute() resets script globals/functions
+    // for a complete program; evaluate() observes the runtime produced by the most
+    // recent execute(). Operations on one Engine are serialized.
+    ScriptResult execute(std::string_view script, std::string cmd = "<embed>", std::vector<std::string> args = {});
+    ScriptResult evaluate(std::string_view expression);
+    void set_target(std::string target);
 
     // Full page + template composition (template contains @content; exactly one
     // @content is required). The page and template may each be text or path

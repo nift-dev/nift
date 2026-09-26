@@ -8,3 +8,5 @@
 #include "nift/render_result.h"
 #include "nift/source.h"
 #include "nift/value.h"
+
+#include "nift/script_result.h"

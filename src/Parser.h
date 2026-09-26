@@ -37,6 +37,7 @@ public:
 
     // Native script hosts used by direct scripts / the Nift shell.
     RenderResult run_script(const std::string& source, const std::filesystem::path& source_path);
+    bool run_embedded_script(const std::string& source, const std::filesystem::path& source_path, json::Document& value, std::string& error);
     RenderResult run_statement(const std::string& source, const std::filesystem::path& source_path);
     void reset_script_control();
     bool finalize_script_resources(std::string& error);

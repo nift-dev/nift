@@ -4183,6 +4183,13 @@ RenderResult Parser::run_script(const std::string& source, const fs::path& sourc
     return rr;
 }
 
+bool Parser::run_embedded_script(const std::string& source, const fs::path& source_path, json::Document& value, std::string& error) {
+    result_=RenderResult{};variable_scopes_.clear();variable_scopes_.emplace_back();install_script_invocation_bindings();callables_.clear();structs_.clear();requested_exports_.clear();pending_control_={};in_import_program_=false;standalone_script_host_=false;strict_script_mode_=true;function_call_depth_=1;
+    auto rr=execute_native_program(source,source_path,0);function_call_depth_=0;strict_script_mode_=false;
+    if(!rr.ok){error=rr.error.message;pending_control_={};return false;}
+    value=json::Document(nullptr);if(pending_control_.kind==ControlFlow::Return&&pending_control_.value)value=*pending_control_.value;pending_control_={};std::string resource_error;if(!finalize_script_resources(resource_error)){error=resource_error;return false;}return true;
+}
+
 RenderResult Parser::run_statement(const std::string& source, const fs::path& source_path) {
     if(variable_scopes_.empty()) { variable_scopes_.emplace_back(); install_script_invocation_bindings(); }
     standalone_script_host_=true; strict_script_mode_=true; result_ = RenderResult{}; pending_control_={}; function_call_depth_=1;

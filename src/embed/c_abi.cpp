@@ -42,6 +42,11 @@ struct nift_render_result {
     nift::RenderResult result;
 };
 
+struct nift_script_result {
+    nift::ScriptResult result;
+    std::string json;
+};
+
 namespace {
 
 bool valid_input(const char* data, size_t length) {
@@ -390,6 +395,19 @@ static nift_status wrap_render(nift_engine* engine, nift::RenderResult result,
     *out_result = new (std::nothrow) nift_render_result{std::move(result)};
     return *out_result == nullptr ? NIFT_ERROR_INTERNAL : NIFT_OK;
 }
+
+nift_status nift_engine_execute(nift_engine* engine, const char* script, size_t script_len,
+                                const char* cmd, size_t cmd_len,
+                                const char* const* args, const size_t* arg_lens, size_t arg_count,
+                                nift_script_result** out_result) {
+    if(!engine||!out_result||!valid_input(script,script_len)||!valid_input(cmd,cmd_len)||(arg_count&&(!args||!arg_lens)))return NIFT_ERROR_INVALID_ARGUMENT;*out_result=nullptr;
+    try{std::vector<std::string> av;av.reserve(arg_count);for(size_t i=0;i<arg_count;++i){if(!valid_input(args[i],arg_lens[i]))return NIFT_ERROR_INVALID_ARGUMENT;av.emplace_back(args[i]?args[i]:"",arg_lens[i]);}auto* r=new(std::nothrow)nift_script_result{};if(!r)return NIFT_ERROR_INTERNAL;r->result=engine->engine.execute(std::string_view(script?script:"",script_len),std::string(cmd?cmd:"",cmd_len),std::move(av));if(r->result.ok())r->json=r->result.value().json();*out_result=r;return NIFT_OK;}catch(...){return NIFT_ERROR_INTERNAL;}
+}
+nift_status nift_engine_evaluate(nift_engine* engine,const char* expression,size_t expression_len,nift_script_result** out_result){if(!engine||!out_result||!valid_input(expression,expression_len))return NIFT_ERROR_INVALID_ARGUMENT;*out_result=nullptr;try{auto*r=new(std::nothrow)nift_script_result{};if(!r)return NIFT_ERROR_INTERNAL;r->result=engine->engine.evaluate(std::string_view(expression?expression:"",expression_len));if(r->result.ok())r->json=r->result.value().json();*out_result=r;return NIFT_OK;}catch(...){return NIFT_ERROR_INTERNAL;}}
+void nift_script_result_free(nift_script_result* result){delete result;}
+int nift_script_result_ok(const nift_script_result* result){return result&&result->result.ok();}
+nift_status nift_script_result_value_json(const nift_script_result* result,nift_string*out){if(!result||!result->result.ok())return NIFT_ERROR_INVALID_ARGUMENT;return set_out(out,result->json);}
+nift_status nift_script_result_error_message(const nift_script_result* result,nift_string*out){if(!result||result->result.ok())return NIFT_ERROR_INVALID_ARGUMENT;return set_out(out,result->result.error().message);}
 
 nift_status nift_engine_render_page(nift_engine* engine,
                                     const nift_context* context,
