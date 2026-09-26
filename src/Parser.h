@@ -9,6 +9,9 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <fstream>
+#include <atomic>
+#include <mutex>
+#include <thread>
 #include "Proc.h"
 #include "Ast.h"
 
@@ -155,6 +158,18 @@ private:
     };
     std::unordered_map<std::string, std::shared_ptr<LambdaInstance>> lambda_instances_;
     std::uint64_t next_lambda_instance_id_ = 1;
+    struct ThreadInstance {
+        std::thread worker;
+        mutable std::mutex mutex;
+        mutable std::mutex join_mutex;
+        bool done = false;
+        bool joined = false;
+        std::shared_ptr<json::Document> result;
+        std::string error;
+        ~ThreadInstance(){ std::lock_guard<std::mutex> guard(join_mutex); if(worker.joinable()) worker.join(); }
+    };
+    std::unordered_map<std::string, std::shared_ptr<ThreadInstance>> thread_instances_;
+    std::uint64_t next_thread_instance_id_ = 1;
 
     enum class CollectionKind { Stack, Queue, PriQue, Map, SortedMap, Set, SortedSet };
     struct CollectionInstance {

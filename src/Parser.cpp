@@ -1991,6 +1991,28 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             if(call_args("os",args,q)){if(!args.empty()){error="os: expected no arguments";return false;}out=json::Document(std::string(nift_environment::host_os()));return true;}
             if(call_args("arch",args,q)){if(!args.empty()){error="arch: expected no arguments";return false;}out=json::Document(std::string(nift_environment::host_arch()));return true;}
             if(call_args("target",args,q)){if(!args.empty()){error="target: expected no arguments";return false;}out=json::Document(host_.target());return true;}
+            if(call_args("hardware_concurrency",args,q)){if(!args.empty()){error="hardware_concurrency: expected no arguments";return false;}out=json::Document((double)std::max(1u,std::thread::hardware_concurrency()));return true;}
+            if(call_args("thread",args,q)){
+                if(args.empty()){error="thread: expected callable and optional arguments";return false;}
+                json::Document cb;if((q.size()>0&&q[0])||!eval(args[0],cb,depth+1)||!cb.is_string()||cb.string.rfind("\x1fnift:callable:",0)!=0){error="thread: first argument must be callable";return false;}
+                auto transferable=[&](const json::Document& root){std::function<bool(const json::Document&)> ok;ok=[&](const json::Document& v){if(v.is_string()&&v.string.rfind("\x1fnift:",0)==0&&v.string.rfind("\x1fnift:enum:",0)!=0&&v.string.rfind("\x1fnift:callable:",0)!=0&&v.string.rfind("\x1fnift:thread:",0)!=0)return false;if(v.is_array())for(const auto&x:v.array)if(!ok(x))return false;if(v.is_object())for(const auto&kv:v.object)if(!ok(kv.second))return false;return true;};return ok(root);};
+                std::vector<json::Document> av;for(size_t ai=1;ai<args.size();++ai){json::Document v;if(ai<q.size()&&q[ai])v=json::Document(args[ai]);else if(!eval(args[ai],v,depth+1))return false;if(!transferable(v)){error="thread: argument contains a non-transferable resource";return false;}av.push_back(v);}
+                auto state=std::make_shared<ThreadInstance>();static std::atomic<std::uint64_t> thread_ids{1};const std::string id=std::to_string(thread_ids.fetch_add(1));thread_instances_[id]=state;
+                // Snapshot ordinary root bindings and callable/lambda definitions. Opaque
+                // values are intentionally omitted from the worker environment.
+                std::unordered_map<std::string,VariableBinding> vars;
+                for(const auto& scope:variable_scopes_)for(const auto&kv:scope)if(kv.second.value&&transferable(*kv.second.value)){auto sp=std::make_shared<json::Document>(*kv.second.value);vars[kv.first]=VariableBinding{sp,kv.second.type,kv.second.mutable_binding,kv.second.deep_readonly};}
+                auto funcs=callables_;auto threads=thread_instances_;
+                std::unordered_map<std::string,std::shared_ptr<LambdaInstance>> lambdas;
+                for(const auto&kv:lambda_instances_){auto li=std::make_shared<LambdaInstance>(*kv.second);li->captures.clear();for(const auto&cv:kv.second->captures)if(cv.second.value&&transferable(*cv.second.value)){auto sp=std::make_shared<json::Document>(*cv.second.value);li->captures[cv.first]=VariableBinding{sp,cv.second.type,cv.second.mutable_binding,cv.second.deep_readonly};}lambdas[kv.first]=std::move(li);}
+                RenderHost* hp=&host_;TrackedInfo* tp=&tracked_info_;const std::string callable_tag=cb.string;
+                state->worker=std::thread([state,hp,tp,vars=std::move(vars),funcs=std::move(funcs),lambdas=std::move(lambdas),threads=std::move(threads),callable_tag,av=std::move(av)]() mutable {
+                    json::Document result;std::string e;
+                    try{Parser worker(*hp,*tp);worker.standalone_script_host_=true;worker.callables_=std::move(funcs);worker.lambda_instances_=std::move(lambdas);worker.thread_instances_=std::move(threads);worker.variable_scopes_.back()=std::move(vars);auto csp=std::make_shared<json::Document>(callable_tag);worker.variable_scopes_.back()["__thread_callable"]=VariableBinding{csp,nift_binding_type(*csp),false,false};std::string expr="__thread_callable(";for(size_t i=0;i<av.size();++i){auto sp=std::make_shared<json::Document>(av[i]);std::string n="__thread_arg"+std::to_string(i);worker.variable_scopes_.back()[n]=VariableBinding{sp,nift_binding_type(*sp),false,false};if(i)expr+=",";expr+=n;}expr+=")";if(!worker.evaluate_expression(expr,result,e)&&e.empty())e="thread callable failed";}catch(const std::exception& ex){e=ex.what();}catch(...){e="unknown worker exception";}
+                    std::lock_guard<std::mutex> lock(state->mutex);state->result=std::make_shared<json::Document>(std::move(result));state->error=std::move(e);state->done=true;
+                });
+                out=json::Document(std::string("\x1fnift:thread:")+id);return true;
+            }
             if(call_args("setenv",args,q)){if(!standalone_script_host_){error="setenv: only available in standalone Nift scripts/shell";return false;}if(args.size()!=2){error="setenv: expected name and value";return false;}std::string k,v;if(!string_arg("setenv",args,q,0,k)||!string_arg("setenv",args,q,1,v))return false;
 #ifdef _WIN32
                 if(_putenv_s(k.c_str(),v.c_str())!=0){error="setenv: failed";return false;}
@@ -2091,6 +2113,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 if(v.is_string()){
                     if(v.string.rfind("\x1fnift:struct:",0)==0) return "struct";
                     if(v.string.rfind("\x1fnift:callable:",0)==0) return "function";
+                    if(v.string.rfind("\x1fnift:thread:",0)==0) return "thread";
                     if(v.string.rfind("\x1fnift:collection:",0)==0) return "collection";
                     if(v.string.rfind("\x1fnift:file:",0)==0) return "file";
                     if(v.string.rfind("\x1fnift:stream:",0)==0) return "stream";
@@ -2206,7 +2229,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     method=="trim_start"||method=="trim_end"||method=="to_lower"||method=="to_upper"||
                     method=="replace"||method=="to_int"||method=="to_double"||method=="to_string"||method=="abs"||method=="floor"||method=="ceil"||method=="round"||
                     method=="substr"||method=="size"||method=="empty"||method=="first"||method=="last"||
-                    method=="join"||method=="slice"||method=="indexOf"||method=="path"||method=="exists"||method=="open"||
+                    method=="join"||method=="done"||method=="status"||method=="slice"||method=="indexOf"||method=="path"||method=="exists"||method=="open"||
                     method=="close"||method=="read"||method=="read_line"||method=="read_all"||method=="read_val"||
                     method=="eof"||method=="write"||method=="write_line"||method=="write_val"||method=="flush"||method=="tell"||
                     method=="seek"||method=="modified"||method=="save"||method=="revert"||method=="replace_once"||
@@ -2282,6 +2305,12 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         return eval(args[i],v,depth+1);
                     };
                     auto no_args=[&]()->bool{if(!args.empty()){error=method+": expected no arguments";return false;}return true;};
+                    if(base.is_string() && base.string.rfind("\x1fnift:thread:",0)==0){
+                        auto ti=thread_instances_.find(base.string.substr(13));if(ti==thread_instances_.end()){error="thread: invalid handle";return false;}auto st=ti->second;
+                        if(method=="done"){if(!no_args())return false;std::lock_guard<std::mutex> lock(st->mutex);out=json::Document(st->done);return true;}
+                        if(method=="status"){if(!no_args())return false;std::lock_guard<std::mutex> lock(st->mutex);out=json::Document(st->done?(st->error.empty()?"done":"error"):"running");return true;}
+                        if(method=="join"){if(!no_args())return false;{std::lock_guard<std::mutex> guard(st->join_mutex);if(st->worker.joinable())st->worker.join();}std::lock_guard<std::mutex> lock(st->mutex);st->joined=true;if(!st->error.empty()){error="thread: "+st->error;return false;}out=st->result?*st->result:json::Document(nullptr);return true;}
+                    }
                     if(base.is_string()&&base.string.rfind("\x1fnift:enum:",0)==0&&(method=="to_int"||method=="to_string")){
                         if(!no_args())return false;const auto last=base.string.rfind(':');const auto prev=last==std::string::npos?last:base.string.rfind(':',last-1);if(last==std::string::npos||prev==std::string::npos){error="invalid enum value";return false;}
                         if(method=="to_string"){out=json::Document(base.string.substr(prev+1,last-prev-1));return true;}
