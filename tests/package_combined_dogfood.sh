@@ -99,5 +99,5 @@ pg := postgres.query(postgres.open({"host": "127.0.0.1"}), "SELECT 1")
 print("pg-struct")
 print(pg.ok)
 NIFT
-(cd "$t/site" && "$NIFT_ABS" run combined.f)
+(cd "$t/site" && "$NIFT_ABS" combined.f)
 kill $SRV 2>/dev/null || true

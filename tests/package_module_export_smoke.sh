@@ -21,7 +21,7 @@ print(r.w)
 print(r.h)
 print(vips.resize(2, 3).w)
 F
-out=$(cd "$t/site" && "$NIFT_ABS" run t.f)
+out=$(cd "$t/site" && "$NIFT_ABS" t.f)
 [ "$out" = "200
 100
 4" ] || { printf 'unexpected struct-module output:\n%s\n' "$out" >&2; exit 1; }
@@ -30,7 +30,7 @@ cat > "$t/site/.nift/packages/vips/src/main.f" <<'F'
 vips := {"resize": (w, h) => { return {"w": scale_helper(w), "h": scale_helper(h)} }, "version": "0.1.0"}
 export(vips)
 F
-out2=$(cd "$t/site" && "$NIFT_ABS" run t.f)
+out2=$(cd "$t/site" && "$NIFT_ABS" t.f)
 [ "$out2" = "200
 100
 4" ] || { printf 'unexpected object-module output:\n%s\n' "$out2" >&2; exit 1; }
@@ -39,12 +39,12 @@ cat > "$t/site/t2.f" <<'F'
 @import("vips")
 print(scale_helper(5))
 F
-if (cd "$t/site" && "$NIFT_ABS" run t2.f >/dev/null 2>&1); then echo "private helper leaked" >&2; exit 1; fi
+if (cd "$t/site" && "$NIFT_ABS" t2.f >/dev/null 2>&1); then echo "private helper leaked" >&2; exit 1; fi
 # A struct instance without an exported type must not crash (clean diagnostic).
 mkdir -p "$t/local"
 cat > "$t/local/bad.f" <<'F'
 @struct(inner) { f := 1 }
 export(gone)
 F
-if (cd "$t/site" && "$NIFT_ABS" run "$t/local/bad.f" >/dev/null 2>&1); then :; fi
+if (cd "$t/site" && "$NIFT_ABS" "$t/local/bad.f" >/dev/null 2>&1); then :; fi
 echo 'PASS v4.4 exported module values with callable fields'

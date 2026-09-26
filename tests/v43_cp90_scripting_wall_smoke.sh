@@ -43,7 +43,7 @@ print(in.read_line())
 print(in.read_val())
 close(in)
 NIFT
-[[ "$(cd "$TMP" && "$NIFT" run wall.nift)" == $'1\n2\n1\n1\n22\ncounter{n:2}\nhello\nnull' ]]
+[[ "$(cd "$TMP" && "$NIFT" wall.nift)" == $'1\n2\n1\n1\n22\ncounter{n:2}\nhello\nnull' ]]
 
 # A lambda whose body is a compound assignment must not be intercepted by the
 # top-level compound-assignment matcher.
@@ -54,7 +54,7 @@ push(5)
 push(7)
 print(total)
 NIFT
-[[ "$(cd "$TMP" && "$NIFT" run compound.nift)" == '12' ]]
+[[ "$(cd "$TMP" && "$NIFT" compound.nift)" == '12' ]]
 
 # Failed imports (missing export, import cycle) fail cleanly.
 cat > "$TMP/data/missing.nift" <<'NIFT'
@@ -62,7 +62,7 @@ x := 1
 export(does_not_exist)
 NIFT
 printf '@import("data/missing.nift")\n' > "$TMP/bad1.nift"
-if (cd "$TMP" && "$NIFT" run bad1.nift >/dev/null 2>&1); then echo 'missing export import succeeded' >&2; exit 1; fi
+if (cd "$TMP" && "$NIFT" bad1.nift >/dev/null 2>&1); then echo 'missing export import succeeded' >&2; exit 1; fi
 cat > "$TMP/data/cyc-a.nift" <<'NIFT'
 @import("cyc-b.nift")
 NIFT
@@ -70,6 +70,6 @@ cat > "$TMP/data/cyc-b.nift" <<'NIFT'
 @import("cyc-a.nift")
 NIFT
 printf '@import("data/cyc-a.nift")\n' > "$TMP/bad2.nift"
-if (cd "$TMP" && "$NIFT" run bad2.nift >/dev/null 2>&1); then echo 'import cycle succeeded' >&2; exit 1; fi
+if (cd "$TMP" && "$NIFT" bad2.nift >/dev/null 2>&1); then echo 'import cycle succeeded' >&2; exit 1; fi
 
 echo 'v4.3 CP90 scripting sanitizer-wall smoke: PASS'

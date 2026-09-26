@@ -15,7 +15,7 @@ t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
 measure() { # $1 = .f source path
   local start end
   start=$(date +%s%N)
-  "$NIFT_ABS" run "$1" >/dev/null
+  "$NIFT_ABS" "$1" >/dev/null
   end=$(( $(date +%s%N) - start ))
   echo "$(( end / 1000000 ))"
 }
@@ -57,12 +57,12 @@ while(i < 80000) { m.set(i, i); i += 1 }
 print(m.size())
 F
 
-p40=$("$NIFT_ABS" run "$t/push40.f"); [ "$p40" = "40000" ] || { echo "push40 wrong: $p40" >&2; exit 1; }
-p80=$("$NIFT_ABS" run "$t/push80.f"); [ "$p80" = "80000" ] || { echo "push80 wrong: $p80" >&2; exit 1; }
-s40=$("$NIFT_ABS" run "$t/set40.f"); [ "$s40" = "40000" ] || { echo "set40 wrong: $s40" >&2; exit 1; }
-s80=$("$NIFT_ABS" run "$t/set80.f"); [ "$s80" = "80000" ] || { echo "set80 wrong: $s80" >&2; exit 1; }
-m40=$("$NIFT_ABS" run "$t/map40.f"); [ "$m40" = "40000" ] || { echo "map40 wrong: $m40" >&2; exit 1; }
-m80=$("$NIFT_ABS" run "$t/map80.f"); [ "$m80" = "80000" ] || { echo "map80 wrong: $m80" >&2; exit 1; }
+p40=$("$NIFT_ABS" "$t/push40.f"); [ "$p40" = "40000" ] || { echo "push40 wrong: $p40" >&2; exit 1; }
+p80=$("$NIFT_ABS" "$t/push80.f"); [ "$p80" = "80000" ] || { echo "push80 wrong: $p80" >&2; exit 1; }
+s40=$("$NIFT_ABS" "$t/set40.f"); [ "$s40" = "40000" ] || { echo "set40 wrong: $s40" >&2; exit 1; }
+s80=$("$NIFT_ABS" "$t/set80.f"); [ "$s80" = "80000" ] || { echo "set80 wrong: $s80" >&2; exit 1; }
+m40=$("$NIFT_ABS" "$t/map40.f"); [ "$m40" = "40000" ] || { echo "map40 wrong: $m40" >&2; exit 1; }
+m80=$("$NIFT_ABS" "$t/map80.f"); [ "$m80" = "80000" ] || { echo "map80 wrong: $m80" >&2; exit 1; }
 
 push_lo=$(measure "$t/push40.f")
 push_hi=$(measure "$t/push80.f")

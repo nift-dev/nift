@@ -13,12 +13,12 @@ cd "$TMP"
 
 check(){ # name expected script
   printf '%s\n' "$3" > t.nift
-  if out=$("$NIFT" run t.nift 2>err); then rc=0; else rc=$?; fi
+  if out=$("$NIFT" t.nift 2>err); then rc=0; else rc=$?; fi
   out=$(printf '%s' "$out" | tr '\n' ' ' | sed 's/ $//')
   if [ "$out" = "$2" ]; then echo "PASS  $1"; else echo "FAIL  $1: expected [$2] got [$out] err[$(head -1 err)]" >&2; exit 1; fi
 }
 must_error(){ # name script
-  if "$NIFT" run <(printf '%s\n' "$2") >/dev/null 2>&1; then echo "FAIL  $1: expected error" >&2; exit 1; fi
+  if "$NIFT" <(printf '%s\n' "$2") >/dev/null 2>&1; then echo "FAIL  $1: expected error" >&2; exit 1; fi
   echo "PASS  $1"
 }
 
@@ -43,7 +43,7 @@ print(post.status)
 print(post.status.to_int())
 print(type(post.status))
 NIFT
-[ "$("$NIFT" run e.nift)" = $'Published\n1\nenum' ] && echo "PASS  enum-compose" || { echo "FAIL  enum-compose" >&2; exit 1; }
+[ "$("$NIFT" e.nift)" = $'Published\n1\nenum' ] && echo "PASS  enum-compose" || { echo "FAIL  enum-compose" >&2; exit 1; }
 
 # --- nesting ---
 check nested-expr '3|2,3' 'x := 2
@@ -101,7 +101,7 @@ st.write_val(post)
 close(st)
 print(open("o.jsonl"))
 NIFT
-out=$("$NIFT" run ser.nift)
+out=$("$NIFT" ser.nift)
 [ "$(printf '%s' "$out" | sed -n '1p')" = '{"title":"Hello","status":1}' ] || { echo "FAIL  serialize-stringify: $out" >&2; exit 1; }
 [ "$(printf '%s' "$out" | sed -n '3p')" = '{"title":"Hello","status":1}' ] || { echo "FAIL  serialize-writeval" >&2; exit 1; }
 echo "PASS  serialize-enum-int"

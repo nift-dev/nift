@@ -17,7 +17,7 @@ print(ls("out/*.o").size())
 remove("out/*.o")
 print(ls("out/*.o").size())
 F
-out=$($NIFT run "$t/test.f")
+out=$($NIFT "$t/test.f")
 [ "$out" = "3
 2
 0" ] || { printf '%s\n' "$out" >&2; exit 1; }

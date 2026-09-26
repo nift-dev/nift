@@ -16,7 +16,7 @@ fn(fact(n)) { if(n <= 1) { return 1 }
 return n * fact(n - 1) }
 print(fact(10))
 NIFT
-[ "$("$NIFT" run ok.nift)" = $'0\n3628800' ] && echo "PASS  shallow-recursion" || { echo "FAIL  shallow-recursion" >&2; exit 1; }
+[ "$("$NIFT" ok.nift)" = $'0\n3628800' ] && echo "PASS  shallow-recursion" || { echo "FAIL  shallow-recursion" >&2; exit 1; }
 
 # deep lambda recursion -> clean bounded error, no crash (rc != 139/134)
 cat > deep.nift <<'NIFT'
@@ -24,7 +24,7 @@ f := (n => n == 0 ? 0 : f(n - 1))
 print(f(5000))
 NIFT
 set +e
-"$NIFT" run deep.nift >deep.out 2>deep.err
+"$NIFT" deep.nift >deep.out 2>deep.err
 rc=$?
 set -e
 [ $rc -ne 0 ] || { echo "FAIL  deep-lambda expected error" >&2; exit 1; }
@@ -37,7 +37,7 @@ fn(inf(x)) { return inf(x) }
 print(inf(0))
 NIFT
 set +e
-"$NIFT" run deepfn.nift >df.out 2>df.err
+"$NIFT" deepfn.nift >df.out 2>df.err
 rc=$?
 set -e
 [ $rc -ne 0 ] || { echo "FAIL  deep-fn expected error" >&2; exit 1; }
@@ -49,12 +49,12 @@ grep -q 'callable recursion depth exceeded' df.err && echo "PASS  deep-fn-guard"
 cat > big.nift <<'NIFT'
 print(9223372036854775807)
 NIFT
-[ "$("$NIFT" run big.nift)" = "9223372036854775807" ] && echo "PASS  int64-max" || { echo "FAIL  int64-max" >&2; exit 1; }
+[ "$("$NIFT" big.nift)" = "9223372036854775807" ] && echo "PASS  int64-max" || { echo "FAIL  int64-max" >&2; exit 1; }
 cat > toobig.nift <<'NIFT'
 print(9223372036854775808)
 NIFT
 set +e
-"$NIFT" run toobig.nift >tb.out 2>tb.err
+"$NIFT" toobig.nift >tb.out 2>tb.err
 rc=$?
 set -e
 [ $rc -ne 0 ] || { echo "FAIL  int64-overflow expected error" >&2; exit 1; }
@@ -67,12 +67,12 @@ echo "recursion + integer-boundary guard smoke passed"
 cat > big.nift <<'NIFT'
 print(9223372036854775807)
 NIFT
-[ "$("$NIFT" run big.nift)" = "9223372036854775807" ] && echo "PASS  int64-max" || { echo "FAIL  int64-max" >&2; exit 1; }
+[ "$("$NIFT" big.nift)" = "9223372036854775807" ] && echo "PASS  int64-max" || { echo "FAIL  int64-max" >&2; exit 1; }
 cat > toobig.nift <<'NIFT'
 print(9223372036854775808)
 NIFT
 set +e
-"$NIFT" run toobig.nift >tb.out 2>tb.err
+"$NIFT" toobig.nift >tb.out 2>tb.err
 rc=$?
 set -e
 [ $rc -ne 0 ] || { echo "FAIL  int64-overflow expected error" >&2; exit 1; }

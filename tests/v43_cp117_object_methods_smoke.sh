@@ -14,7 +14,7 @@ print(x.has("a"))
 print(x.has("z"))
 print(x.size())
 NIFT
-out="$($NIFT run "$T/t.nift")"
+out="$($NIFT "$T/t.nift")"
 [ "$(printf '%s\n' "$out" | sed -n '1p')" = 'b,a' ]
 [ "$(printf '%s\n' "$out" | sed -n '2p')" = '2' ]
 [ "$(printf '%s\n' "$out" | sed -n '3p')" = '2' ]
@@ -28,5 +28,5 @@ o := {"expr": y + 1, "nested": {"v": y}}
 print(o.expr)
 print(o.nested.v)
 NIFT
-[ "$("$NIFT" run "$T/e.nift")" = $'6\n5' ]
+[ "$("$NIFT" "$T/e.nift")" = $'6\n5' ]
 echo 'object methods smoke passed'

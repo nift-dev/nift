@@ -1002,3 +1002,9 @@ test-v44-hooks: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_hooks_smoke.sh
 
 test-v44: test-v44-execution-shell test-v44-language-foundation test-v44-shell-restricted test-v44-packages test-v44-automation test-v44-hooks
+
+# Nift v4.5 native runtime/shell campaign. This target grows checkpoint by checkpoint.
+test-v45-invocation: $(TARGET)
+	NIFT="$(CURDIR)/$(TARGET)" tests/v45_cli_invocation_smoke.sh
+
+.PHONY: test-v45-invocation

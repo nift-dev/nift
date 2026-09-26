@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # v4.4 executable .f scripts: nift script.f shorthand, shebang handling,
-# ./script.f from the host shell and nift sh, command-style and run() from
+# ./script.f from the host shell and plain nift shell, command-style and run() from
 # another script, script arguments, permission/restriction semantics, paths
 # with spaces, Unicode and environment inheritance.
 set -euo pipefail
@@ -29,8 +29,8 @@ out=$("$NIFT_ABS" "$t/hello.f" staging --force)
 [ "$(sed -n '3p' <<<"$out")" = "arg:--force" ] || exit 1
 grep -q "^hello$" <<<"$out" || exit 1
 
-# nift run of the same shebang file (shebang stripped)
-out=$("$NIFT_ABS" run "$t/hello.f" one)
+# direct nift script execution of the same shebang file (shebang stripped)
+out=$("$NIFT_ABS" "$t/hello.f" one)
 grep -q "^argc=1$" <<<"$out" || exit 1
 grep -q "^arg:one$" <<<"$out" || exit 1
 
@@ -41,8 +41,8 @@ grep -q "^arg:one$" <<<"$out" || exit 1
 out=$(cd "$t" && PATH="$BIN:$PATH" ./hello.f x y)
 grep -q "^argc=2$" <<<"$out" || { echo "$out" >&2; exit 1; }
 
-# ./script.f from nift sh
-out=$(cd "$t" && printf './hello.f from-sh\n' | PATH="$BIN:$PATH" "$NIFT_ABS" sh)
+# ./script.f from plain nift shell
+out=$(cd "$t" && printf './hello.f from-sh\n' | PATH="$BIN:$PATH" "$NIFT_ABS")
 grep -q "^arg:from-sh$" <<<"$out" || { echo "$out" >&2; exit 1; }
 
 # command-style from another .f script
@@ -52,7 +52,7 @@ cat > "$t/parent.f" <<'NIFT'
 print("parent-done")
 NIFT
 chmod +x "$t/parent.f"
-out=$(cd "$t" && PATH="$BIN:$PATH" "$NIFT_ABS" run parent.f)
+out=$(cd "$t" && PATH="$BIN:$PATH" "$NIFT_ABS" parent.f)
 grep -q "^arg:a$" <<<"$out" || { echo "$out" >&2; exit 1; }
 grep -q "^parent-done$" <<<"$out" || exit 1
 
@@ -61,10 +61,10 @@ cat > "$t/r.f" <<'NIFT'
 r := run("./hello.f", "one", "two")
 print("exit=" + r.exit_code.to_string())
 NIFT
-out=$(cd "$t" && PATH="$BIN:$PATH" "$NIFT_ABS" run r.f)
+out=$(cd "$t" && PATH="$BIN:$PATH" "$NIFT_ABS" r.f)
 grep -q "^exit=0$" <<<"$out" || { echo "$out" >&2; exit 1; }
 
-# executable permission failure: chmod -x must NOT fall back to nift run.
+# executable permission failure: chmod -x must NOT fall back to direct nift script execution.
 # The exec permission bit is POSIX-only; Windows files have no exec-bit
 # semantics (chmod -x is a no-op there), so this assertion is POSIX-only.
 case "$(uname -s)" in MINGW*|MSYS*) ;; *)
@@ -77,11 +77,11 @@ chmod +x "$t/hello.f"
 cat > "$t/c.f" <<'NIFT'
 ./hello.f
 NIFT
-if (cd "$t" && PATH="$BIN:$PATH" NIFT_NO_PROCESS=1 "$NIFT_ABS" run c.f >/dev/null 2>&1); then echo "command-style not blocked" >&2; exit 1; fi
+if (cd "$t" && PATH="$BIN:$PATH" NIFT_NO_PROCESS=1 "$NIFT_ABS" c.f >/dev/null 2>&1); then echo "command-style not blocked" >&2; exit 1; fi
 cat > "$t/r2.f" <<'NIFT'
 run("./hello.f")
 NIFT
-if (cd "$t" && PATH="$BIN:$PATH" NIFT_NO_PROCESS=1 "$NIFT_ABS" run r2.f >/dev/null 2>&1); then echo "run() not blocked" >&2; exit 1; fi
+if (cd "$t" && PATH="$BIN:$PATH" NIFT_NO_PROCESS=1 "$NIFT_ABS" r2.f >/dev/null 2>&1); then echo "run() not blocked" >&2; exit 1; fi
 
 # paths with spaces and Unicode
 # Non-ASCII paths/args are POSIX-clean; on Windows the MSYS2 -> native-binary
@@ -100,7 +100,7 @@ grep -q "^arg:héllo wörld$" <<<"$out" || { echo "$out" >&2; exit 1; }
 ;; esac
 
 # environment inheritance
-out=$(cd "$t" && PATH="$BIN:$PATH" NIFT_EXEC_TEST="envval" "$NIFT_ABS" run "$t/hello.f")
+out=$(cd "$t" && PATH="$BIN:$PATH" NIFT_EXEC_TEST="envval" "$NIFT_ABS" "$t/hello.f")
 grep -q "^env=envval$" <<<"$out" || { echo "$out" >&2; exit 1; }
 
 # completion: ./paths discoverable
@@ -131,10 +131,10 @@ fixtool one
 fixtool one two three
 print("cc-done")
 NIFT
-out=$(cd "$t" && PATH="$t/bin:$PATH" "$NIFT_ABS" run cc.f)
+out=$(cd "$t" && PATH="$t/bin:$PATH" "$NIFT_ABS" cc.f)
 grep -q 'fixtool-ran one' <<<"$out" || { echo "$out" >&2; exit 1; }
 grep -q '^cc-done$' <<<"$out" || exit 1
 # command-style in script land is blocked by --no-process
-if (cd "$t" && PATH="$t/bin:$PATH" NIFT_NO_PROCESS=1 "$NIFT_ABS" run cc.f 2>/dev/null | grep -q 'fixtool-ran'); then echo "script command-style ran under --no-process" >&2; exit 1; fi
+if (cd "$t" && PATH="$t/bin:$PATH" NIFT_NO_PROCESS=1 "$NIFT_ABS" cc.f 2>/dev/null | grep -q 'fixtool-ran'); then echo "script command-style ran under --no-process" >&2; exit 1; fi
 
 echo 'PASS v4.4 executable .f scripts'

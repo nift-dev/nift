@@ -10,15 +10,15 @@ cd "$TMP"
 
 check(){ # name expected script
   printf '%s\n' "$3" > t.nift
-  if out=$("$NIFT" run t.nift 2>err); then rc=0; else rc=$?; fi
+  if out=$("$NIFT" t.nift 2>err); then rc=0; else rc=$?; fi
   out=$(printf '%s' "$out" | tr '\n' ' ' | sed 's/ $//')
   if [ "$out" = "$2" ]; then echo "PASS  $1"; else echo "FAIL  $1: expected [$2] got [$out] err[$(head -1 err)]" >&2; exit 1; fi
 }
 must_error(){ # name pattern script
   printf '%s\n' "$3" > e.nift
-  if "$NIFT" run e.nift >/dev/null 2>&1; then echo "FAIL  $1: expected error" >&2; exit 1; fi
+  if "$NIFT" e.nift >/dev/null 2>&1; then echo "FAIL  $1: expected error" >&2; exit 1; fi
   local errout
-  errout=$("$NIFT" run e.nift 2>&1) || true
+  errout=$("$NIFT" e.nift 2>&1) || true
   if printf '%s' "$errout" | grep -q "$2"; then echo "PASS  $1"; else echo "FAIL  $1: error did not mention [$2]" >&2; exit 1; fi
 }
 

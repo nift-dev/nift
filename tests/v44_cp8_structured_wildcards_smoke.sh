@@ -9,7 +9,7 @@ print(o.pick(["internal"]).size())
 print({"a":1,"b":2,"c":3}.pick(["c","a"]).keys().join(","))
 print({"a":1,"b":2}.omit(["a"]).keys().join(","))
 F
-[ "$($NIFT run "$t/test.f")" = "3
+[ "$($NIFT "$t/test.f")" = "3
 3
 1
 c,a

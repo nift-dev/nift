@@ -20,7 +20,7 @@ check() { # $1=name $2=expected $3=script $4...=files
     shift 2
   done
   local out err rc
-  out=$("$NIFT" run "t_$name.nift" 2>"err_$name") && rc=0 || rc=$?
+  out=$("$NIFT" "t_$name.nift" 2>"err_$name") && rc=0 || rc=$?
   err=$(head -1 "err_$name")
   out=$(printf '%s' "$out" | tr '\n' ' ')
   if [ "$out" = "$expected" ]; then
@@ -73,7 +73,7 @@ set +e
 printf '%s' 's := ifstream("f.txt")
 print(s.read_val())' > bad.nift
 printf '%s' '{invalid' > f.txt
-"$NIFT" run bad.nift >/dev/null 2>bad.err
+"$NIFT" bad.nift >/dev/null 2>bad.err
 rc=$?
 set -e
 [ $rc -ne 0 ] && grep -q 'read_val:' bad.err && echo "PASS  malformed-errors" || { echo "FAIL  malformed-errors" >&2; exit 1; }
@@ -81,7 +81,7 @@ set -e
 set +e
 printf '%s' 's := ofstream("f.txt")
 print(s.read_val())' > wo.nift
-"$NIFT" run wo.nift >/dev/null 2>wo.err
+"$NIFT" wo.nift >/dev/null 2>wo.err
 rc=$?
 set -e
 [ $rc -ne 0 ] && grep -q 'expected input stream' wo.err && echo "PASS  write-only-rejected" || { echo "FAIL  write-only-rejected" >&2; exit 1; }
@@ -125,7 +125,7 @@ set +e
 printf '%s' 'i := ifstream("f.txt")
 i.write_val(1)' > wr.nift
 printf '%s' 'x' > f.txt
-"$NIFT" run wr.nift >/dev/null 2>wr.err
+"$NIFT" wr.nift >/dev/null 2>wr.err
 rc=$?
 set -e
 [ $rc -ne 0 ] && grep -q 'expected one value on output stream' wr.err && echo "PASS  writeval-readonly-stream" || { echo "FAIL  writeval-readonly-stream" >&2; exit 1; }

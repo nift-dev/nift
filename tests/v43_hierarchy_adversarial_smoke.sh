@@ -20,13 +20,13 @@ printf '# B\n' > content/docs/b.md
 
 must_error() { # $1=name $2=script
   printf '%s\n' "$2" > t.nift
-  if "$NIFT" run t.nift >/dev/null 2>&1; then echo "FAIL  $1: expected error, got success" >&2; exit 1; fi
+  if "$NIFT" t.nift >/dev/null 2>&1; then echo "FAIL  $1: expected error, got success" >&2; exit 1; fi
   echo "PASS  $1"
 }
 check() { # $1=name $2=expected $3=script
   printf '%s\n' "$3" > t.nift
   local out
-  out=$("$NIFT" run t.nift 2>/dev/null | tr '\n' ' ' | sed 's/ $//')
+  out=$("$NIFT" t.nift 2>/dev/null | tr '\n' ' ' | sed 's/ $//')
   if [ "$out" = "$2" ]; then echo "PASS  $1"; else echo "FAIL  $1: expected [$2] got [$out]" >&2; exit 1; fi
 }
 

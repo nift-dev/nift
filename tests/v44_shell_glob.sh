@@ -10,6 +10,6 @@ if [ "$(uname -s 2>/dev/null)" = "MINGW"* ] || [ "${OS:-}" = "Windows_NT" ]; the
 fi
 t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
 touch "$t/a.txt" "$t/b.txt"
-out=$(cd "$t" && printf "printf '%%s' *.txt\nexit\n" | "$NIFT_ABS" sh 2>/dev/null)
+out=$(cd "$t" && printf "printf '%%s' *.txt\nexit\n" | "$NIFT_ABS" 2>/dev/null)
 [[ "$out" == *"a.txtb.txt"* ]]
 echo 'PASS v4.4 shell glob'

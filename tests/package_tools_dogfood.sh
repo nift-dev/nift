@@ -61,7 +61,7 @@ print(redis.del(client, "nift:tools").data)
 print("redis-null")
 print(type(redis.get(client, "nift:gone").data))
 NIFT
-out=$(cd "$t/site" && "$NIFT_ABS" run db.f)
+out=$(cd "$t/site" && "$NIFT_ABS" db.f)
 echo "=== DATABASE TOOLS DOGFOOD ==="; echo "$out"
 
 cat > "$t/site/img.f" <<NIFT
@@ -97,7 +97,7 @@ if(v.ok) { print(v.format) }
 print("magick-invalid")
 print(magick.identify("out/missing.png").ok)
 NIFT
-out=$(cd "$t/site" && "$NIFT_ABS" run img.f)
+out=$(cd "$t/site" && "$NIFT_ABS" img.f)
 echo "=== IMAGE TOOLS DOGFOOD ==="; echo "$out"
 
 cat > "$t/site/priv.f" <<NIFT
@@ -112,5 +112,5 @@ print(redis_copy)
 print(vips_guard)
 print(magick_run)
 NIFT
-if (cd "$t/site" && "$NIFT_ABS" run priv.f >/dev/null 2>&1); then echo "private helper leaked" >&2; exit 1; fi
+if (cd "$t/site" && "$NIFT_ABS" priv.f >/dev/null 2>&1); then echo "private helper leaked" >&2; exit 1; fi
 echo "privacy: PASS"

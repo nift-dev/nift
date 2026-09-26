@@ -32,20 +32,20 @@ print(m.exists())
 m.remove()
 print(m.exists())
 NIFT
-out="$(cd "$td" && "$NIFT" run main.nift)"
+out="$(cd "$td" && "$NIFT" main.nift)"
 [[ "$out" == $'true\ntrue\nalpha foo\n10\nalpha\ntrue\nfalse\n>alpha bar!\ntrue\ntrue\nfalse' ]]
 [[ "$(cat "$td/a.txt")" == $'>alpha bar!\n42 true\nomega\n<' ]]
 
 # Dirty close is fail-closed and leaves disk unchanged until save.
 printf 'f := file("a.txt")\nf.open("rw")\nf.replace_once("bar", "BAD")\nf.close()\n' > "$td/dirty.nift"
-if (cd "$td" && "$NIFT" run dirty.nift >"$td/o" 2>"$td/e"); then echo "dirty close unexpectedly succeeded" >&2; exit 1; fi
+if (cd "$td" && "$NIFT" dirty.nift >"$td/o" 2>"$td/e"); then echo "dirty close unexpectedly succeeded" >&2; exit 1; fi
 grep -q 'unsaved changes' "$td/e"
 grep -q 'bar' "$td/a.txt"; ! grep -q BAD "$td/a.txt"
 
 # Ambiguous surgical edits fail without mutation.
 printf 'x x\n' > "$td/amb.txt"
 printf 'f := file("amb.txt")\nf.open("rw")\nf.replace_once("x", "y")\n' > "$td/amb.nift"
-if (cd "$td" && "$NIFT" run amb.nift >/dev/null 2>"$td/e"); then echo "ambiguous replace unexpectedly succeeded" >&2; exit 1; fi
+if (cd "$td" && "$NIFT" amb.nift >/dev/null 2>"$td/e"); then echo "ambiguous replace unexpectedly succeeded" >&2; exit 1; fi
 [[ "$(cat "$td/amb.txt")" == 'x x' ]]
 
 # w/a creation is transactional; revert makes a clean close legal.
@@ -68,14 +68,14 @@ r.revert()
 print(r.modified())
 r.close()
 NIFT
-[[ "$(cd "$td" && "$NIFT" run create.nift)" == $'true\nfalse' ]]
+[[ "$(cd "$td" && "$NIFT" create.nift)" == $'true\nfalse' ]]
 [[ "$(cat "$td/new.txt")" == hello ]]
 [[ "$(cat "$td/append.txt")" == tail ]]
 ! grep -q discard "$td/a.txt"
 
 # Host termination reports an open FileValue and discards dirty state.
 printf 'f := file("a.txt")\nf.open("rw")\nf.append("LEAK")\n' > "$td/leak.nift"
-if (cd "$td" && "$NIFT" run leak.nift >/dev/null 2>"$td/e"); then echo "open FileValue unexpectedly accepted" >&2; exit 1; fi
+if (cd "$td" && "$NIFT" leak.nift >/dev/null 2>"$td/e"); then echo "open FileValue unexpectedly accepted" >&2; exit 1; fi
 grep -q 'managed file left open' "$td/e"
 ! grep -q LEAK "$td/a.txt"
 
@@ -87,7 +87,7 @@ for body in \
   'f := file("a.txt"); f.open(); f.open()'
 do
   printf '%s\n' "$body" | tr ';' '\n' > "$td/bad.nift"
-  if (cd "$td" && "$NIFT" run bad.nift >/dev/null 2>&1); then echo "lifecycle violation unexpectedly succeeded: $body" >&2; exit 1; fi
+  if (cd "$td" && "$NIFT" bad.nift >/dev/null 2>&1); then echo "lifecycle violation unexpectedly succeeded: $body" >&2; exit 1; fi
 done
 
 
@@ -97,7 +97,7 @@ f := file("a.txt")
 f.open("rw")
 NIFT
 printf '@import("mod.nift")\n' > "$td/importer.nift"
-if (cd "$td" && "$NIFT" run importer.nift >/dev/null 2>"$td/e"); then echo "import leaked FileValue unexpectedly" >&2; exit 1; fi
+if (cd "$td" && "$NIFT" importer.nift >/dev/null 2>"$td/e"); then echo "import leaked FileValue unexpectedly" >&2; exit 1; fi
 grep -q '@import completion' "$td/e"
 
 # Review regressions: a stale cursor after a content-shrinking edit must never
@@ -118,7 +118,7 @@ print(f.read_all())
 f.revert()
 f.close()
 NIFT
-[[ "$(cd "$td" && "$NIFT" run shrink.nift)" == $'1\ntrue\nxZ' ]]
+[[ "$(cd "$td" && "$NIFT" shrink.nift)" == $'1\ntrue\nxZ' ]]
 cat > "$td/ident.nift" <<'NIFT'
 a := file("shrink.txt")
 b := a
@@ -127,9 +127,9 @@ print(same(a, b))
 print(same(a, c))
 print(a == c)
 NIFT
-[[ "$(cd "$td" && "$NIFT" run ident.nift)" == $'true\nfalse\nfalse' ]]
+[[ "$(cd "$td" && "$NIFT" ident.nift)" == $'true\nfalse\nfalse' ]]
 printf 'print(file("shrink.txt").stringify())\n' > "$td/leak.nift"
-if (cd "$td" && "$NIFT" run leak.nift >/dev/null 2>&1); then echo "FileValue stringify leaked" >&2; exit 1; fi
+if (cd "$td" && "$NIFT" leak.nift >/dev/null 2>&1); then echo "FileValue stringify leaked" >&2; exit 1; fi
 
 # Review regression: standard escapes (\n, \t, \") in quoted string arguments
 # to FileValue (and other quoted-arg) operations apply the real control
@@ -144,6 +144,6 @@ print(open("esc.txt").length())
 print(open("esc.txt").contains("\n"))
 print(open("esc.txt").contains("\t"))
 NIFT
-[[ "$(cd "$td" && "$NIFT" run esc.nift)" == $'5\ntrue\ntrue' ]]
+[[ "$(cd "$td" && "$NIFT" esc.nift)" == $'5\ntrue\ntrue' ]]
 
 echo 'CP105-CP113 managed FileValue smoke: PASS'

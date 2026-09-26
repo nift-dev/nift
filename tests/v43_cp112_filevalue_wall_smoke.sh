@@ -30,7 +30,7 @@ print(g.read_all())
 g.revert()
 g.close()
 NIFT
-[[ "$("$NIFT" run cursor.nift)" == $'1\ntrue\nxZ\ntrue\n5\nPRE-abcdef' ]]
+[[ "$("$NIFT" cursor.nift)" == $'1\ntrue\nxZ\ntrue\n5\nPRE-abcdef' ]]
 
 # Save failure: missing parent and read-only directory keep disk/working/dirty
 # coherent; retry after the permission is restored succeeds; no orphan temps.
@@ -41,7 +41,7 @@ f.open("rw")
 f.replace_once("DATA", "CHANGED")
 f.save()
 NIFT
-if "$NIFT" run ro.nift >/dev/null 2>&1; then echo "ro save succeeded" >&2; exit 1; fi
+if "$NIFT" ro.nift >/dev/null 2>&1; then echo "ro save succeeded" >&2; exit 1; fi
 [[ "$(cat rodir/f.txt)" == 'DATA' ]]
 chmod 755 rodir
 cat > retry.nift <<'NIFT'
@@ -52,13 +52,13 @@ f.save()
 f.close()
 print(open("rodir/f.txt"))
 NIFT
-[[ "$("$NIFT" run retry.nift)" == 'CHANGED' ]]
+[[ "$("$NIFT" retry.nift)" == 'CHANGED' ]]
 [[ -z "$(ls .nift-tmp-* 2>/dev/null || true)" ]]
 
 # Dirty retention after a genuine failed save (REPL error recovery).
 printf 'BODY' > m.txt
 mkdir -p rodir2; printf 'BODY' > rodir2/m.txt; chmod 555 rodir2
-repl=$(cd "$TMP" && printf 'f := file("rodir2/m.txt")\nf.open("rw")\nf.replace_once("BODY", "E")\nf.save()\nf.modified()\nf.revert()\nf.modified()\nf.close()\nprint("alive")\nquit\n' | "$NIFT" sh 2>&1 || true)
+repl=$(cd "$TMP" && printf 'f := file("rodir2/m.txt")\nf.open("rw")\nf.replace_once("BODY", "E")\nf.save()\nf.modified()\nf.revert()\nf.modified()\nf.close()\nprint("alive")\nquit\n' | "$NIFT" 2>&1 || true)
 grep -q 'save: cannot create temporary file' <<<"$repl"
 grep -q 'true' <<<"$repl"
 grep -q 'alive' <<<"$repl"
@@ -74,7 +74,7 @@ g.open("w")
 f.replace_once("KEEP", "GONE")
 g.write("x")
 NIFT
-if "$NIFT" run he.nift >/dev/null 2>&1; then echo "open dirty exit ok" >&2; exit 1; fi
+if "$NIFT" he.nift >/dev/null 2>&1; then echo "open dirty exit ok" >&2; exit 1; fi
 [[ "$(cat keep.txt)" == 'KEEP' ]]
 [[ ! -e keep2.txt ]]
 
@@ -99,7 +99,7 @@ print(open("s.txt"))
 a.close()
 b.close()
 NIFT
-[[ "$("$NIFT" run same.nift)" == $'false\nAAAA\nBBBB\nAAAA\nBASE\nAAAA' ]]
+[[ "$("$NIFT" same.nift)" == $'false\nAAAA\nBBBB\nAAAA\nBASE\nAAAA' ]]
 
 # Repeated save cycles leave no orphan temporaries and commit only on save.
 printf 'V' > v.txt
@@ -114,7 +114,7 @@ for(i : [1,2,3,4,5]) {
 f.revert()
 f.close()
 NIFT
-[[ "$("$NIFT" run cycles.nift)" == '' ]]
+[[ "$("$NIFT" cycles.nift)" == '' ]]
 [[ "$(cat v.txt)" == 'W5' ]]
 [[ -z "$(ls v.txt.nift-tmp-* 2>/dev/null || true)" ]]
 
@@ -141,6 +141,6 @@ print(b.join(","))
 print(s.read_val() == null)
 close(s)
 NIFT
-[[ "$("$NIFT" run rv.nift)" == $'true\n42\n3.5\ns\n1,2,3\ntrue\ntrue\n42\n3.5\ns\n1,2,3\ntrue' ]]
+[[ "$("$NIFT" rv.nift)" == $'true\n42\n3.5\ns\n1,2,3\ntrue\ntrue\n42\n3.5\ns\n1,2,3\ntrue' ]]
 
 echo 'v4.3 CP112 FileValue adversarial/resource smoke: PASS'

@@ -14,7 +14,7 @@ args.push("%{http_code}")
 print(args.size())
 print(args[1])
 F
-[ "$("$NIFT_ABS" run "$t/a.f")" = "3
+[ "$("$NIFT_ABS" "$t/a.f")" = "3
 -w" ] || exit 1
 cat > "$t/b.f" <<'F'
 @fn(mk()) { return [1, 2] }
@@ -23,12 +23,12 @@ mk()
 mko()
 print("ok")
 F
-[ "$("$NIFT_ABS" run "$t/b.f")" = "ok" ] || exit 1
+[ "$("$NIFT_ABS" "$t/b.f")" = "ok" ] || exit 1
 # A bare object VALUE still requires member selection.
 cat > "$t/c.f" <<'F'
 o := {"a": 1}
 o
 print("never")
 F
-if "$NIFT_ABS" run "$t/c.f" >/dev/null 2>&1; then echo "bare object value should error" >&2; exit 1; fi
+if "$NIFT_ABS" "$t/c.f" >/dev/null 2>&1; then echo "bare object value should error" >&2; exit 1; fi
 echo 'PASS v4.4 package-authoring language fixes'

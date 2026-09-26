@@ -16,7 +16,7 @@ print(a.q(db, "a\\b", "x"))
 print(a.q(db, 'single "quote"', "x"))
 print(a.q(db, "tab\there", "x"))
 F
-out=$("$NIFT_ABS" run "$t/a.f")
+out=$("$NIFT_ABS" "$t/a.f")
 [ "$(sed -n '1p' <<<"$out")" = 'SELECT $1, "id $1" FROM t' ] || { echo "$out" >&2; exit 1; }
 [ "$(sed -n '2p' <<<"$out")" = 'a\b' ] || exit 1
 [ "$(sed -n '3p' <<<"$out")" = 'single "quote"' ] || exit 1

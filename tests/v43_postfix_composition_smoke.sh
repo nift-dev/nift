@@ -24,7 +24,7 @@ check() { # $1=name $2=expected $3=expr (must print a scalar)
 NIFT
   printf 'print(%s)\n' "$3" >> t.nift
   local out
-  out=$("$NIFT" run t.nift 2>err) && rc=0 || rc=$?
+  out=$("$NIFT" t.nift 2>err) && rc=0 || rc=$?
   out=$(printf '%s' "$out" | tr '\n' ' ' | sed 's/ $//')
   if [ "$out" = "$2" ]; then echo "PASS  $1"; else echo "FAIL  $1: expected [$2] got [$out] err[$(head -1 err)]" >&2; exit 1; fi
 }
@@ -35,7 +35,7 @@ check_err() { # $1=name $2=error-substr $3=expr
 NIFT
   printf 'print(%s)\n' "$3" >> t.nift
   local out
-  if "$NIFT" run t.nift >/dev/null 2>err; then echo "FAIL  $1: expected error, got success" >&2; exit 1; fi
+  if "$NIFT" t.nift >/dev/null 2>err; then echo "FAIL  $1: expected error, got success" >&2; exit 1; fi
   if grep -q "$2" err; then echo "PASS  $1"; else echo "FAIL  $1: expected [$2] got [$(head -1 err)]" >&2; exit 1; fi
 }
 

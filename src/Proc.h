@@ -15,7 +15,7 @@ struct ProcessSpec {
     // terminal descriptors directly (no capture pipes) and becomes the
     // controlling-terminal foreground process group, so terminal-aware
     // programs (fastfetch, top, less, editors) behave as if launched from
-    // Bash. Used only for simple foreground commands in `nift sh`; run()/
+    // Bash. Used only for simple foreground commands in the Nift shell; run()/
     // cmd() structured capture never sets it.
     bool foreground_terminal=false;
 };

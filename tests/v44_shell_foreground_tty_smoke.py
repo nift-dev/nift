@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PTY regression: a simple foreground command entered in interactive `nift sh`
+"""PTY regression: a simple foreground command entered in interactive `plain nift shell`
 must inherit the shell's terminal directly (isatty stdin/stdout/stderr) rather
 than being captured through pipes and replayed. run()/cmd() structured capture
 is unaffected, and redirections/pipelines keep their own descriptor routing.
@@ -8,9 +8,9 @@ Uses a deterministic fixture executable (no dependency on fastfetch/top).
 """
 import os, pty, select, subprocess, sys, time
 
-# POSIX-only: pty.fork() drives the interactive terminal. Windows `nift sh`
+# POSIX-only: pty.fork() drives the interactive terminal. Windows `plain nift shell`
 # is line-based; skip there with the repo's acknowledged-skip code. macOS is
-# also skipped: `nift sh` foreground execution of an external command hangs on
+# also skipped: `plain nift shell` foreground execution of an external command hangs on
 # macOS runners (the interactive completion PTY test covers the shell's PTY
 # path there and passes). The foreground-inheritance contract is verified on
 # Linux; the macOS foreground hang is tracked as a known issue.

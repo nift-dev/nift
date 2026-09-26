@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""CP91 scripting performance campaign: nift run / nift sh / scripting surfaces.
+"""CP91 scripting performance campaign: nift <script> / plain nift shell / scripting surfaces.
 
 Times the scripting hosts rather than template builds (CP47 covered those).
 Each workload is timed over repeated samples (cold process per sample).
 Reports min/p25/median/p75/max, mean, stddev and raw samples.
 
-Surfaces: nift run startup, statement throughput, named-fn and lambda
+Surfaces: nift <script> startup, statement throughput, named-fn and lambda
 invocation, imports, filesystem primitives, whole-file open, ifstream/ofstream
-streaming and read_val, and nift sh piped-statement throughput.
+streaming and read_val, and plain nift shell piped-statement throughput.
 """
 import pathlib, shutil, statistics, subprocess, tempfile, time, json, os
 
@@ -40,7 +40,7 @@ def main():
     nift = pathlib.Path(NIFT)
     results = {}
 
-    # nift run startup (empty script).
+    # nift <script> startup (empty script).
     empty = root / "empty.nift"; write(empty, "\n")
     results["run_startup_empty"] = sample(lambda: subprocess.run([nift, "run", str(empty)], capture_output=True))
 
@@ -84,7 +84,7 @@ def main():
     write(rv, "v := ifstream(\"vals.txt\")\nn := 0\nval := v.read_val()\nwhile(val != null) { n += 1\nval = v.read_val() }\nprint(n)\nclose(v)\n")
     results["read_val_500"] = sample(lambda: subprocess.run([nift, "run", str(rv)], capture_output=True))
 
-    # nift sh piped statement throughput: 500 REPL statements in one session.
+    # plain nift shell piped statement throughput: 500 REPL statements in one session.
     repl_cmds = "\n".join("y%d := %d" % (i, i) for i in range(500)) + "\nquit\n"
     results["repl_500_statements"] = sample(
         lambda: subprocess.run([nift, "sh"], input=repl_cmds, capture_output=True, text=True))

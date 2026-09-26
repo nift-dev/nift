@@ -17,7 +17,7 @@ a.push([3])
 print(x[0])
 print(y[0])
 F
-out=$($NIFT run "$T/destruct.f")
+out=$($NIFT "$T/destruct.f")
 [ "$out" = "1
 2" ] || { printf 'destruct: %s\n' "$out" >&2; exit 1; }
 
@@ -33,7 +33,7 @@ while(i < 2000) {
 print(b[0])
 print(a[2002][0])
 F
-out=$($NIFT run "$T/growth.f")
+out=$($NIFT "$T/growth.f")
 [ "$out" = "1
 1999" ] || { printf 'growth: %s\n' "$out" >&2; exit 1; }
 
@@ -48,7 +48,7 @@ while(i < 3000) {
 }
 print(pts.size())
 F
-out=$($NIFT run "$T/structarr.f")
+out=$($NIFT "$T/structarr.f")
 [ "$out" = "3000" ] || { printf 'structarr: %s\n' "$out" >&2; exit 1; }
 
 # 4. Map of struct handles with growth; identity via == and same().
@@ -65,7 +65,7 @@ m.set("k", p1)
 print(m.get("k") == p1)
 print(same(m.get("k"), p1))
 F
-out=$($NIFT run "$T/mapstruct.f")
+out=$($NIFT "$T/mapstruct.f")
 [ "$out" = "true
 true" ] || { printf 'mapstruct: %s\n' "$out" >&2; exit 1; }
 
@@ -120,7 +120,7 @@ print(c[0])
 print(e[0])
 F
 set +e
-"$NIFT" run "$T/escaped.f" >"$T/out" 2>"$T/err"; rc=$?
+"$NIFT" "$T/escaped.f" >"$T/out" 2>"$T/err"; rc=$?
 set -e
 [[ $rc -ne 0 ]] || { echo 'escaped-ref unexpectedly succeeded' >&2; exit 1; }
 grep -q 'reference target no longer exists' "$T/err" || { cat "$T/err" >&2; exit 1; }
@@ -137,7 +137,7 @@ while(i < 1) {
 }
 print(a[0][0])
 F
-out=$("$NIFT" run "$T/scope.f")
+out=$("$NIFT" "$T/scope.f")
 [ "$out" = "5" ] || { printf 'scope: %s\n' "$out" >&2; exit 1; }
 
 # Heavy reallocation with composed locations retained.
@@ -155,6 +155,6 @@ e := a[19999]
 print(c[0])
 print(e[1].k[0])
 F
-out=$("$NIFT" run "$T/stress.f")
+out=$("$NIFT" "$T/stress.f")
 [ "$out" = "0
 19999" ] || { printf 'stress: %s\n' "$out" >&2; exit 1; }

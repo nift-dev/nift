@@ -2,9 +2,9 @@
 set -euo pipefail
 bin=${1:-./nift}
 case "$bin" in /*) BIN="$bin";; *) BIN="$(cd "$(dirname "$bin")" && pwd)/$(basename "$bin")";; esac
-# --no-process must be accepted by nift sh/run/eval/build and deny process
+# --no-process must be accepted by plain nift shell/run/eval/build and deny process
 # execution on every script-reachable surface including build hooks.
-out=$(printf 'printf hello\nexit\n' | "$BIN" sh --no-process 2>&1 || true)
+out=$(printf 'printf hello\nexit\n' | "$BIN" --no-process 2>&1 || true)
 grep -q 'external process execution disabled' <<<"$out"
 t=$(cd "$(mktemp -d)" && pwd -P); trap 'rm -rf "$t"' EXIT
 # The structured cmd() pipeline API must not bypass the restriction.
@@ -12,7 +12,7 @@ cat >"$t/bypass.f" <<'F'
 p := cmd("echo", "BYPASS").run()
 print(p.stdout)
 F
-if NIFT_NO_PROCESS=1 "$BIN" run "$t/bypass.f" >"$t/o" 2>&1; then echo "cmd().run() bypassed --no-process" >&2; exit 1; fi
+if NIFT_NO_PROCESS=1 "$BIN" "$t/bypass.f" >"$t/o" 2>&1; then echo "cmd().run() bypassed --no-process" >&2; exit 1; fi
 grep -q 'external process execution disabled' "$t/o"
 # nift eval honors the restriction.
 if NIFT_NO_PROCESS=1 "$BIN" eval 'run("echo","x").stdout' >"$t/o2" 2>&1; then echo "eval bypassed --no-process" >&2; exit 1; fi
@@ -31,7 +31,7 @@ cat >"$t/native.f" <<F
 touch("native-ok.txt")
 print(exists("native-ok.txt"))
 F
-[ "$(cd "$t" && "$BIN" run native.f --no-process)" = "true" ]
+[ "$(cd "$t" && "$BIN" native.f --no-process)" = "true" ]
 # Filesystem-root restriction confines Nift-native filesystem operations.
 mkdir -p "$t/root" "$t/root/inner"
 printf 'z\n' > "$t/root/outside.txt"
@@ -39,15 +39,15 @@ printf 'in\n' > "$t/root/inner/ok.txt"
 cat >"$t/root/inner/t.f" <<'F'
 print(open("ok.txt"))
 F
-[ "$(cd "$t/root/inner" && "$BIN" run t.f --fs-root=.)" = "in" ]
+[ "$(cd "$t/root/inner" && "$BIN" t.f --fs-root=.)" = "in" ]
 cat >"$t/root/inner/escape.f" <<F
 print(touch("../outside.txt"))
 F
-if (cd "$t/root/inner" && "$BIN" run escape.f --fs-root=.) >"$t/e" 2>&1; then echo "fs-root escape allowed" >&2; exit 1; fi
+if (cd "$t/root/inner" && "$BIN" escape.f --fs-root=.) >"$t/e" 2>&1; then echo "fs-root escape allowed" >&2; exit 1; fi
 grep -q 'escapes configured filesystem root' "$t/e"
 # inject() must also respect the filesystem root.
 printf 'outside-data\n' > "$t/root/secret.txt"
 printf "print(inject(\"../secret.txt\"))\n" > "$t/root/inner/inj.f"
-if (cd "$t/root/inner" && "$BIN" run inj.f --fs-root=.) >"$t/e2" 2>&1; then echo "inject escaped fs-root" >&2; exit 1; fi
+if (cd "$t/root/inner" && "$BIN" inj.f --fs-root=.) >"$t/e2" 2>&1; then echo "inject escaped fs-root" >&2; exit 1; fi
 grep -q 'escapes configured filesystem root' "$t/e2"
 echo 'PASS v4.4 restricted mode'

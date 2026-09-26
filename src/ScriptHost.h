@@ -14,8 +14,8 @@
 
 namespace fs = std::filesystem;
 
-// Shared standalone-script render host used by `nift run`, `nift sh`, `nift
-// eval` and the v4.4 build-hook runner. Resolves the nearest Nift project at
+// Shared standalone-script render host used by direct script execution, the Nift
+// shell, `nift eval` and the v4.4 build-hook runner. Resolves the nearest Nift project at
 // or above its root and exposes the read-only project model on demand.
 class ScriptRenderHost final : public RenderHost {
 public:

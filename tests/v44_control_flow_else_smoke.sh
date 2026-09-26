@@ -15,7 +15,7 @@ while(i < 5) {
 }
 print("done")
 F
-out=$("$NIFT_ABS" run "$t/a.f")
+out=$("$NIFT_ABS" "$t/a.f")
 [ "$out" = $'else-1\ndone' ] || { echo "$out" >&2; exit 1; }
 cat > "$t/b.f" <<'F'
 j := 0
@@ -26,7 +26,7 @@ while(j < 5) {
 }
 print("done")
 F
-out=$("$NIFT_ABS" run "$t/b.f")
+out=$("$NIFT_ABS" "$t/b.f")
 [ "$out" = $'v1\nv3\nv4\nv5\ndone' ] || { echo "$out" >&2; exit 1; }
 cat > "$t/c.f" <<'F'
 k := 0
@@ -38,6 +38,6 @@ while(k < 4) {
 }
 print("done")
 F
-out=$("$NIFT_ABS" run "$t/c.f")
+out=$("$NIFT_ABS" "$t/c.f")
 [ "$out" = $'one\ntwo\ndone' ] || { echo "$out" >&2; exit 1; }
 echo 'PASS v4.4 break/continue propagation from else branches'

@@ -2,7 +2,7 @@
 set -euo pipefail
 NIFT_BIN="${NIFT_BIN:-./nift}"
 td="$(mktemp -d)"; trap 'rm -rf "$td"' EXIT
-run(){ printf '%s\n' "$1" > "$td/t.nift"; "$NIFT_BIN" run "$td/t.nift"; }
+run(){ printf '%s\n' "$1" > "$td/t.nift"; "$NIFT_BIN" "$td/t.nift"; }
 A='[{"n":"a","featured":false,"date":2},{"n":"b","featured":true,"date":1},{"n":"c","featured":true,"date":3},{"n":"d","featured":true,"date":3}]'
 [[ "$(run "a := $A; print(a.sort_by(x => x.date).map(x => x.n).join(\",\"))")" == 'b,a,c,d' ]]
 [[ "$(run "a := $A; print(a.sort_by(x => x.featured, \"desc\", x => x.date, \"desc\").map(x => x.n).join(\",\"))")" == 'c,d,b,a' ]]

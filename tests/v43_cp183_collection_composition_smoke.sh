@@ -18,6 +18,6 @@ print(posts.count_by(x => x.published).stringify())
 print(posts.group_by_each(x => x.tags).get("nift").map(x => x.title).join(","))
 print(posts.drop(1).take(2).chunk(1).size())
 NIFT
-out="$($NIFT_BIN run "$td/t.nift")"
+out="$($NIFT_BIN "$td/t.nift")"
 [[ "$out" == $'Alpha,Gamma\nBeta\nAlpha,Beta,Gamma\nGamma\n{"true":3,"false":1}\nAlpha,Gamma,Alpha copy\n2' ]]
 echo 'CP183 collection composition smoke passed'

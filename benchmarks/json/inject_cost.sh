@@ -5,4 +5,4 @@ FIXTURE=${2:-../scripting-benchmark/benchmarks/fixtures/structured-data/records-
 TMP=$(mktemp --suffix=.f)
 trap 'rm -f "$TMP"' EXIT
 printf 'arr := inject("%s")\nprint(arr.size())\n' "$FIXTURE" > "$TMP"
-/usr/bin/time -f 'wall_s=%e peak_rss_kb=%M' "$BIN" run "$TMP"
+/usr/bin/time -f 'wall_s=%e peak_rss_kb=%M' "$BIN" "$TMP"

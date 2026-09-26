@@ -17,7 +17,7 @@ print(exists("$t/move/a"))
 \$[c := copy([1, [2, 3]])]
 print(c.size())
 F
-out=$($NIFT run "$t/test.f")
+out=$($NIFT "$t/test.f")
 [ "$out" = "2
 9
 3

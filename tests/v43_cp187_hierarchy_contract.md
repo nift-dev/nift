@@ -72,7 +72,7 @@ before CP188+ implementation.
   - Collection/postfix composition: `page.children.filter(...)`,
     `page.ancestors.map(...).join(",")`, `page.parent.title`,
     `page.children[0].url`, `page(name).children.size()`.
-  - Template (`$[...]`/`@for`), `nift run`/`nift sh`, and `nift eval` share
+  - Template (`$[...]`/`@for`), `direct nift script execution`/`plain nift shell`, and `nift eval` share
     the same page/hierarchy machinery (parity).
 
 ## Obtaining a page value

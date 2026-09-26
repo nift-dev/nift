@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PTY regression for the interactive nift sh line editor.
+"""PTY regression for the interactive plain nift shell line editor.
 
 Drives the shell through a pseudo-terminal and verifies TAB completion
 (command, builtin, file path), history recall (up-arrow), Ctrl-C interrupt
@@ -8,7 +8,7 @@ public executable interface, so it doubles as an independent contract.
 """
 import os, pty, select, subprocess, sys, time
 
-# The interactive raw-mode line editor is Unix-only; Windows `nift sh` uses
+# The interactive raw-mode line editor is Unix-only; Windows `plain nift shell` uses
 # line-based input until the platform backend lands. Skip there.
 if os.name == "nt":
     print("SKIP v4.4 interactive completion PTY (Windows uses line-based input)")

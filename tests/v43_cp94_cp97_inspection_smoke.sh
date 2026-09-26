@@ -13,7 +13,7 @@ a := [1, 2, 3]
 print(a.stringify())
 print(a.prettify())
 NIFT
-out="$(cd "$td" && "$NIFT" run check.nift)"
+out="$(cd "$td" && "$NIFT" check.nift)"
 [[ "$out" == *'"a.txt"'* && "$out" == *'"z.txt"'* ]]
 [[ "$out" == *$'beta\nalpha'* ]]
 [[ "$out" == *'[1,2,3]'* ]]
@@ -21,7 +21,7 @@ out="$(cd "$td" && "$NIFT" run check.nift)"
 # Deterministic ls ordering.
 [[ "$(printf '%s' "$out" | grep -bo '"a.txt"' | head -1 | cut -d: -f1)" -lt "$(printf '%s' "$out" | grep -bo '"z.txt"' | head -1 | cut -d: -f1)" ]]
 # REPL bare compound values are inspectable, and prettify remains ANSI-free.
-repl="$(cd "$td" && printf 'x := [1, 2]\nx\nx.prettify()\nx.highlight()\nx.prettify().highlight()\nx.highlight().prettify()\nnull\n""\ncd(".")\n' | HOME="$td" NO_COLOR=1 "$NIFT" sh)"
+repl="$(cd "$td" && printf 'x := [1, 2]\nx\nx.prettify()\nx.highlight()\nx.prettify().highlight()\nx.highlight().prettify()\nnull\n""\ncd(".")\n' | HOME="$td" NO_COLOR=1 "$NIFT")"
 [[ "$repl" == *'[1,2]'* ]]
 [[ "$repl" == *$'[\n  1,\n  2\n]'* ]]
 # Piped stdin prints no prompt (HOME is exercised through cd(".")/ls checks).
@@ -32,7 +32,7 @@ repl="$(cd "$td" && printf 'x := [1, 2]\nx\nx.prettify()\nx.highlight()\nx.prett
 [[ "$repl" != *'""'* ]]
 # Opaque values must not leak internal reference tokens through formatting.
 printf 's := ifstream("file.txt")\nprint(s.stringify())\n' > "$td/bad.nift"
-if (cd "$td" && "$NIFT" run bad.nift >"$td/bad.out" 2>"$td/bad.err"); then
+if (cd "$td" && "$NIFT" bad.nift >"$td/bad.out" 2>"$td/bad.err"); then
   echo 'expected stream stringify failure' >&2; exit 1
 fi
 ! grep -q 'nift:stream:' "$td/bad.out" "$td/bad.err"
@@ -52,7 +52,7 @@ print(x.prettify().highlight() == x.highlight().prettify())
 print(x.stringify().prettify() == x.prettify())
 print("got=" + x.prettify())
 NIFT
-[[ "$(cd "$td" && "$NIFT" run comp.nift)" == $'true\ntrue\nfalse\ntrue\ntrue\ntrue\ntrue\ngot=[\n  1,\n  2\n]' ]]
+[[ "$(cd "$td" && "$NIFT" comp.nift)" == $'true\ntrue\nfalse\ntrue\ntrue\ntrue\ntrue\ngot=[\n  1,\n  2\n]' ]]
 
 # Method calls participate in ordinary compound expressions: array/lambda/struct
 # method results compare and combine like any other value.
@@ -70,27 +70,27 @@ c := counter()
 print(c.value() == c.value())
 print(c.value() + 1)
 NIFT
-[[ "$(cd "$td" && "$NIFT" run methods.nift)" == $'true\n4\ntrue\ntrue\n1' ]]
+[[ "$(cd "$td" && "$NIFT" methods.nift)" == $'true\n4\ntrue\ntrue\n1' ]]
 
 # cat is byte-exact (no implicit newline) and rejects directories; stringify of
 # a quoted string escapes correctly; callables are opaque and rejected.
 mkdir -p "$td/adir"
 printf 'cat("adir")\n' > "$td/dir.nift"
-if (cd "$td" && "$NIFT" run dir.nift >/dev/null 2>&1); then
+if (cd "$td" && "$NIFT" dir.nift >/dev/null 2>&1); then
   echo 'cat(directory) unexpectedly succeeded' >&2; exit 1
 fi
 printf 'print("q\\"w\\nc".stringify())\n' > "$td/esc.nift"
-[[ "$(cd "$td" && "$NIFT" run esc.nift)" == '"q\"w\nc"' ]]
+[[ "$(cd "$td" && "$NIFT" esc.nift)" == '"q\"w\nc"' ]]
 
 # A filesystem primitive whose call is not terminal (embedded in a larger
 # expression) falls through to the ordinary machinery instead of reporting a
 # misleading "malformed arguments" error, and presentation composition over
 # ls() still works.
 printf 'x := ls()\nprint(x.prettify() == ls().prettify())\nprint(x.size())\n' > "$td/prim.nift"
-prim="$(cd "$td" && "$NIFT" run prim.nift)"
+prim="$(cd "$td" && "$NIFT" prim.nift)"
 [[ "$(echo "$prim" | sed -n 1p)" == 'true' ]]
 [[ "$(echo "$prim" | sed -n 2p)" -ge 1 ]]
 printf 'print(exists(".") == true)\nprint(ls().highlight() == ls().stringify())\n' > "$td/prim2.nift"
-[[ "$(cd "$td" && "$NIFT" run prim2.nift)" == $'true\ntrue' ]]
+[[ "$(cd "$td" && "$NIFT" prim2.nift)" == $'true\ntrue' ]]
 
 echo 'CP94-CP97 inspection smoke: PASS'

@@ -20,7 +20,7 @@ print(total == open("big.dat"))
 print(big.eof())
 close(big)
 NIFT
-[[ "$(cd "$TMP" && "$NIFT" run stream.nift)" == $'true\ntrue' ]]
+[[ "$(cd "$TMP" && "$NIFT" stream.nift)" == $'true\ntrue' ]]
 
 # Repeated writes, flush, then read_line/read_all/eof/read_val and null at EOF.
 cat > "$TMP/io.nift" <<'NIFT'
@@ -50,7 +50,7 @@ print(a.join(","))
 print(v.read_val() == null)
 close(v)
 NIFT
-[[ "$(cd "$TMP" && "$NIFT" run io.nift)" == $'row-1\nro\nw-2\nrow-3\ntail\ntrue\ntrue\ntrue\n42\n3.5\ns\n1,2,3\ntrue' ]]
+[[ "$(cd "$TMP" && "$NIFT" io.nift)" == $'row-1\nro\nw-2\nrow-3\ntail\ntrue\ntrue\ntrue\n42\n3.5\ns\n1,2,3\ntrue' ]]
 
 # Malformed read_val is an error, not silently a string.
 cat > "$TMP/bad.nift" <<'NIFT'
@@ -60,7 +60,7 @@ close(o)
 v := ifstream("bad.txt")
 v.read_val()
 NIFT
-if (cd "$TMP" && "$NIFT" run bad.nift >/dev/null 2>&1); then
+if (cd "$TMP" && "$NIFT" bad.nift >/dev/null 2>&1); then
   echo 'malformed read_val unexpectedly succeeded' >&2; exit 1
 fi
 
@@ -70,7 +70,7 @@ x := ifstream("d.txt")
 close(x)
 close(x)
 NIFT
-if (cd "$TMP" && "$NIFT" run dc.nift >/dev/null 2>&1); then
+if (cd "$TMP" && "$NIFT" dc.nift >/dev/null 2>&1); then
   echo 'double close unexpectedly succeeded' >&2; exit 1
 fi
 cat > "$TMP/oac.nift" <<'NIFT'
@@ -78,7 +78,7 @@ x := ifstream("d.txt")
 close(x)
 print(x.read_all())
 NIFT
-if (cd "$TMP" && "$NIFT" run oac.nift >/dev/null 2>&1); then
+if (cd "$TMP" && "$NIFT" oac.nift >/dev/null 2>&1); then
   echo 'operation after close unexpectedly succeeded' >&2; exit 1
 fi
 
@@ -87,7 +87,7 @@ cat > "$TMP/auto.nift" <<'NIFT'
 o := ofstream("auto.txt")
 o.write_line("persisted")
 NIFT
-(cd "$TMP" && "$NIFT" run auto.nift >/dev/null)
+(cd "$TMP" && "$NIFT" auto.nift >/dev/null)
 [[ "$(cat "$TMP/auto.txt")" == 'persisted' ]]
 
 # Escaping stream values: internal references cannot be written.
@@ -96,7 +96,7 @@ o := ofstream("esc.txt")
 fn(f()) { return 1 }
 o.write(f)
 NIFT
-if (cd "$TMP" && "$NIFT" run esc.nift >/dev/null 2>&1); then
+if (cd "$TMP" && "$NIFT" esc.nift >/dev/null 2>&1); then
   echo 'callable write unexpectedly succeeded' >&2; exit 1
 fi
 ! grep -q 'nift:' "$TMP/esc.txt" 2>/dev/null || { echo 'internal token leaked to file' >&2; exit 1; }

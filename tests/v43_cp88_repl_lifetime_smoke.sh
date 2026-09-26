@@ -42,7 +42,7 @@ close(in)
 quit
 EOF
 mkdir -p "$TMP/work"
-out="$(cd "$TMP" && "$NIFT" sh < session.txt 2>/dev/null || true)"
+out="$(cd "$TMP" && "$NIFT" < session.txt 2>/dev/null || true)"
 # Strip the bold prompt (path + "$ ") and CRs so values are on their own lines.
 cleaned="$(printf '%s' "$out" | sed 's|'$TMP'[^$]*\$ ||g; s|'"'"'[$TMP'"'"'[^$]*\$ ||g' | tr -d '\r')"
 # Persistent closure/struct/map values and multiline lambda result.

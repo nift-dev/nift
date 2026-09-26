@@ -14,7 +14,7 @@ print(empty.empty())
 $[normal := (x) => { return x + 1 }]
 print(normal(2))
 F
-out=$($NIFT run "$t/test.f")
+out=$($NIFT "$t/test.f")
 [ "$out" = "true
 false
 true

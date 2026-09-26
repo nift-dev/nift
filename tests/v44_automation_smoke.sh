@@ -25,7 +25,7 @@ t := track("about", "About", "templates/main.html")
 print(t.ok)
 print(tracked().join(","))
 F
-out=$(cd "$t/site" && "$NIFT_ABS" run auto.f)
+out=$(cd "$t/site" && "$NIFT_ABS" auto.f)
 # project_root() reports the site path in the platform's native form; match it
 # by its 'site' suffix so the assertion is portable across POSIX/MSYS2.
 { printf '%s\n' "$out" | grep -q 'site$'; } || { printf 'unexpected:\n%s\n' "$out" >&2; exit 1; }
@@ -45,7 +45,7 @@ u := untrack("about")
 print(u.ok)
 print(tracked().join(","))
 F
-out2=$(cd "$t/site" && "$NIFT_ABS" run auto2.f)
+out2=$(cd "$t/site" && "$NIFT_ABS" auto2.f)
 # The incremental 'modified' detection may legitimately report '/' as well as
 # 'about' on filesystems with coarse mtime resolution (Windows/NTFS), so the
 # affected/status lines accept either form. The API contract (status, build
@@ -60,7 +60,7 @@ out2=$(cd "$t/site" && "$NIFT_ABS" run auto2.f)
 { printf '%s\n' "$out2" | grep -q '^/$'; } || { printf 'unexpected:\n%s\n' "$out2" >&2; exit 1; }
 # build_repair is available and succeeds on a clean project
 printf 'print(build_repair().ok)\n' > "$t/site/repair.f"
-out3=$(cd "$t/site" && "$NIFT_ABS" run repair.f)
+out3=$(cd "$t/site" && "$NIFT_ABS" repair.f)
 [ "$out3" = "true" ] || { printf 'repair.f output: %s\n' "$out3" >&2; exit 1; }
 # automation is script-land only
 if cd "$t/site" && printf '@content\n$[build()]' > templates/main.html && printf 'x' > content/index.html; then

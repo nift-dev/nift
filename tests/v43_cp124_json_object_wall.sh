@@ -10,4 +10,4 @@ $o.merge(json_parse("{\"n\":null}")).stringify()
 $a := [3,1,3,2]
 $a.unique().sum()
 NIFT
-"$NIFT" run "$tmp/wall.nft" >/dev/null
+"$NIFT" "$tmp/wall.nft" >/dev/null

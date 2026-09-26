@@ -324,8 +324,8 @@ void print_commands() {
     row("status", "[-p]", "Show pages that need rebuilding and why");
 
     std::cout << '\n' << console::dim("Scripting") << '\n';
-    row("run", "<path>", "Run a native Nift script");
-    row("sh", "", "Start the persistent native Nift shell");
+    row("<path>", "[args...]", "Run a native Nift script");
+    row("(no command)", "", "Start the persistent native Nift shell");
 
     std::cout << '\n' << console::dim("Packages") << '\n';
     row("add", "<source> [--ref=REF]", "Add a Git, GitHub or local Nift package");
@@ -748,7 +748,7 @@ static int run_script_file(const fs::path& path, const std::vector<std::string>&
     if(!filesystem::file_exists(absolute)){console::error("run: script does not exist: "+path.string());return 1;}
     std::string source=filesystem::read_file(absolute);
     // A leading shebang (#!/usr/bin/env nift) is a script header, not Nift
-    // syntax. Strip the first line so the same file runs through nift run.
+    // syntax. Strip the first line so direct file execution accepts it too.
     if(source.rfind("#!",0)==0){
         const std::size_t nl=source.find('\n');
         source = (nl==std::string::npos) ? "" : source.substr(nl+1);
@@ -808,7 +808,7 @@ static int execute_shell_command(Parser& parser,const std::string& line,bool pri
     for(auto& t : toks) { if (is_command_operator(t)) continue; std::string ie; if(!command_token_interpolate(parser, t, ie)){ if(print_errors) console::error(ie); return 2; } }
     // First try a command-style Nift callable for a simple command. Literal command tokens become strings.
     bool has_ops=false;for(const auto&t:toks)if(is_command_operator(t))has_ops=true;
-    if(!has_ops){std::string expr=toks[0]+"(";for(size_t i=1;i<toks.size();++i){if(i>1)expr+=",";expr+=quote_nift_string(toks[i]);}expr+=")";auto rr=parser.run_statement(expr,"<nift-sh>");if(rr.ok){if(!rr.output.empty())std::cout<<rr.output<<'\n';return 0;}}
+    if(!has_ops){std::string expr=toks[0]+"(";for(size_t i=1;i<toks.size();++i){if(i>1)expr+=",";expr+=quote_nift_string(toks[i]);}expr+=")";auto rr=parser.run_statement(expr,"<repl>");if(rr.ok){if(!rr.output.empty())std::cout<<rr.output<<'\n';return 0;}}
     // Bash-like command chain. &&/|| are evaluated left-to-right over pipeline exit status.
     if(std::getenv("NIFT_NO_PROCESS")){if(print_errors)console::error("external process execution disabled");return 126;}
     size_t pos=0;int last=0;std::string pending_op;
@@ -994,7 +994,7 @@ static int run_script_shell() {
         if(command_style){execute_shell_command(parser,trimmed);pending.clear();continue;}
         const Parser::StatementState st=parser.statement_state(pending);
         if(st==Parser::StatementState::Incomplete)continue;
-        auto rr=parser.run_statement(pending,"<nift-sh>");pending.clear();
+        auto rr=parser.run_statement(pending,"<repl>");pending.clear();
         if(!rr.ok){
             // A bare unrecognized single token may be an ordinary external
             // command on PATH (fastfetch, git, env, printf, ...). Nift keeps
@@ -1032,7 +1032,19 @@ static int run_script_shell() {
 
 int run_cli(int argc, char** argv) {
     const std::string command = argc > 1 ? argv[1] : "";
-    if (command.empty()) { print_commands(); return 0; }
+    if (command.empty()) return run_script_shell();
+    // Zero-source shell capability options replace the old `nift sh <option>`
+    // spelling. General source/interactive option parsing is completed later
+    // in the v4.5 invocation checkpoints.
+    if (command == "--no-process" || command.rfind("--fs-root=", 0) == 0) {
+        for (int i = 1; i < argc; ++i) {
+            const std::string a = argv[i];
+            if (a == "--no-process") nift_setenv("NIFT_NO_PROCESS", "1", 1);
+            else if (a.rfind("--fs-root=", 0) == 0) nift_setenv("NIFT_FS_ROOT", a.substr(10).c_str(), 1);
+            else { console::error("unknown shell option '" + a + "'"); return 1; }
+        }
+        return run_script_shell();
+    }
 
     if (command == "complete") {
         const std::string prefix = argc > 2 ? argv[2] : "";
@@ -1071,30 +1083,7 @@ int run_cli(int argc, char** argv) {
         for (int i = 2; i < argc; ++i) if (std::string(argv[i]) == "--no-process") nift_setenv("NIFT_NO_PROCESS", "1", 1);
         return run_eval(argc, argv);
     }
-    if (command == "run") {
-        std::vector<std::string> rest; bool no_process=false;
-        for (int i = 2; i < argc; ++i) {
-            const std::string a = argv[i];
-            if (a == "--no-process") no_process=true;
-            else if (a.rfind("--fs-root=", 0) == 0) nift_setenv("NIFT_FS_ROOT", a.substr(10).c_str(), 1);
-            else rest.push_back(a);
-        }
-        if (rest.empty()){console::error("run requires a script path");return 1;}
-        if (no_process) nift_setenv("NIFT_NO_PROCESS","1",1);
-        std::vector<std::string> args(rest.begin()+1, rest.end());
-        return run_script_file(rest[0], args);
-    }
-    if (command == "sh") {
-        bool no_process=false;
-        for (int i = 2; i < argc; ++i) {
-            const std::string a = argv[i];
-            if (a == "--no-process") no_process=true;
-            else if (a.rfind("--fs-root=", 0) == 0) nift_setenv("NIFT_FS_ROOT", a.substr(10).c_str(), 1);
-            else { console::error("sh takes no arguments"); return 1; }
-        }
-        if (no_process) nift_setenv("NIFT_NO_PROCESS","1",1);
-        return run_script_shell();
-    }
+
 
     if (command == "minify") {
         bool in_place = false;
@@ -1158,8 +1147,8 @@ int run_cli(int argc, char** argv) {
         return failed ? 1 : 0;
     }
 
-    // Executable-script shorthand: `nift script.f`, `nift ./script.f` and
-    // `nift path/to/script.f` are equivalent to `nift run script.f`. This is
+    // Native script execution: `nift script.f`, `nift ./script.f` and
+    // `nift path/to/script.f` execute the file directly. This is
     // what makes `#!/usr/bin/env nift` work. Only applied when the argument
     // genuinely resolves to an existing file, so a typoed command name is not
     // silently turned into an arbitrary path.
@@ -1201,7 +1190,7 @@ int run_cli(int argc, char** argv) {
         "watch", "unwatch"
     };
     if (!project_commands.count(command)) {
-        console::error("unknown command '" + command + "'");
+        console::error("unknown command '" + command + "' and path does not exist");
         std::cerr << "  run 'nift commands' to list available commands\n";
         return 1;
     }

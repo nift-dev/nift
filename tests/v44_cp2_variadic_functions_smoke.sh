@@ -16,12 +16,12 @@ return recur(n - 1, n, ...xs)
 }
 print(recur(2))
 F
-out=$($NIFT run "$t/ok.f")
+out=$($NIFT "$t/ok.f")
 [ "$out" = "x:0
 3
 2" ] || { printf 'unexpected output:\n%s\n' "$out" >&2; exit 1; }
 for sig in 'f(...a, b)' 'f(...a, ...b)' 'f(...)'; do
   printf '@fn(%s){ return null }\n' "$sig" >"$t/bad.f"
-  if $NIFT run "$t/bad.f" >/dev/null 2>&1; then echo "accepted bad variadic: $sig" >&2; exit 1; fi
+  if $NIFT "$t/bad.f" >/dev/null 2>&1; then echo "accepted bad variadic: $sig" >&2; exit 1; fi
 done
 echo 'PASS v4.4 CP2 variadic functions'

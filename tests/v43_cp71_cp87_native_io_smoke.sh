@@ -24,7 +24,7 @@ print(whole.substr(0, 5))
 remove("work/c.txt")
 return pwd()
 NIFT
-out=$(cd "$TMP" && "$NIFT" run run.nift)
+out=$(cd "$TMP" && "$NIFT" run.nift)
 grep -qx 'true' <<<"$out"
 grep -qx 'hello' <<<"$out"
 grep -qx 'world' <<<"$out"
@@ -43,12 +43,12 @@ print(a.join(","))
 close(s)
 NIFT
 expected=$'true\n42\n3.5\nhello\n1,2,3'
-[[ "$(cd "$TMP" && "$NIFT" run vals.nift)" == "$expected" ]]
+[[ "$(cd "$TMP" && "$NIFT" vals.nift)" == "$expected" ]]
 cat > "$TMP/read.nift" <<'NIFT'
 x := read()
 print("got: " + x)
 NIFT
-[[ "$(cd "$TMP"; printf 'abc\n' | "$NIFT" run read.nift)" == 'got: abc' ]]
+[[ "$(cd "$TMP"; printf 'abc\n' | "$NIFT" read.nift)" == 'got: abc' ]]
 # print() interpolates quoted-string arguments (CP70/CP79) without re-parsing
 # non-literal values, and write() shares the same value semantics.
 cat > "$TMP/interp.nift" <<'NIFT'
@@ -60,10 +60,10 @@ out.write("v=$[who]")
 close(out)
 NIFT
 expected=$'hello, Nift\nhello, Nift'
-[[ "$(cd "$TMP" && "$NIFT" run interp.nift)" == "$expected" ]]
+[[ "$(cd "$TMP" && "$NIFT" interp.nift)" == "$expected" ]]
 [[ "$(cd "$TMP" && cat interp.txt)" == 'v=Nift' ]]
 # REPL keeps bindings and recovers from an ordinary error.
-repl=$(cd "$TMP" && printf 'x := 4\nprint(x)\nprint(missing)\nprint(x + 1)\nquit\n' | "$NIFT" sh 2>&1 || true)
+repl=$(cd "$TMP" && printf 'x := 4\nprint(x)\nprint(missing)\nprint(x + 1)\nquit\n' | "$NIFT" 2>&1 || true)
 grep -q '4' <<<"$repl"
 grep -q '5' <<<"$repl"
 # Piped (non-interactive) stdin must not emit a prompt; the REPL still keeps
@@ -73,7 +73,7 @@ cat > "$TMP/remove-dir.nift" <<'NIFT'
 make_dir("dir")
 remove("dir")
 NIFT
-if (cd "$TMP" && "$NIFT" run remove-dir.nift >/dev/null 2>&1); then
+if (cd "$TMP" && "$NIFT" remove-dir.nift >/dev/null 2>&1); then
   echo 'remove(directory) unexpectedly succeeded' >&2; exit 1
 fi
 # CLI contract regressions: unknown script statements exit non-zero with a
@@ -82,7 +82,7 @@ fi
 cat > "$TMP/undefined.nift" <<'NIFT'
 this_is_not_defined
 NIFT
-if (cd "$TMP" && "$NIFT" run undefined.nift >/dev/null 2>&1); then
+if (cd "$TMP" && "$NIFT" undefined.nift >/dev/null 2>&1); then
   echo 'undefined script statement exited zero' >&2; exit 1
 fi
 cat > "$TMP/exports.nift" <<'NIFT'
@@ -90,7 +90,7 @@ value := 3
 export(value)
 print(value)
 NIFT
-[[ "$(cd "$TMP" && "$NIFT" run exports.nift)" == '3' ]]
+[[ "$(cd "$TMP" && "$NIFT" exports.nift)" == '3' ]]
 cat > "$TMP/badval.nift" <<'NIFT'
 s := ifstream("vals")
 print(s.read_val())
@@ -105,7 +105,7 @@ s := ifstream("malformed")
 print(s.read_val())
 print(s.read_val())
 NIFT
-if (cd "$TMP" && "$NIFT" run badval.nift >/dev/null 2>&1); then
+if (cd "$TMP" && "$NIFT" badval.nift >/dev/null 2>&1); then
   echo 'malformed read_val succeeded' >&2; exit 1
 fi
 echo 'v4.3 CP71-CP87 native I/O smoke: PASS'

@@ -30,7 +30,7 @@ public:
     Parser(RenderHost& host, TrackedInfo& tracked_info);
     RenderResult render();
 
-    // Native script hosts used by `nift run` / `nift sh`.
+    // Native script hosts used by direct scripts / the Nift shell.
     RenderResult run_script(const std::string& source, const std::filesystem::path& source_path);
     RenderResult run_statement(const std::string& source, const std::filesystem::path& source_path);
     void reset_script_control();

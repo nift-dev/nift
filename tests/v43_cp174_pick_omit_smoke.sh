@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 NIFT_BIN="${NIFT_BIN:-./nift}"; td="$(mktemp -d)"; trap 'rm -rf "$td"' EXIT
-run(){ printf '%s\n' "$1" > "$td/t.nift"; "$NIFT_BIN" run "$td/t.nift"; }
+run(){ printf '%s\n' "$1" > "$td/t.nift"; "$NIFT_BIN" "$td/t.nift"; }
 [[ "$(run 'x := {"a":1,"b":2,"c":3}; print(x.pick(["c","a","missing"]).stringify()); print("|"); print(x.stringify())')" == '{"c":3,"a":1}
 |
 {"a":1,"b":2,"c":3}' ]]

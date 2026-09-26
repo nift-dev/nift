@@ -2,7 +2,7 @@
 set -euo pipefail
 NIFT_BIN="${NIFT_BIN:-./nift}"
 td="$(mktemp -d)"; trap 'rm -rf "$td"' EXIT
-run(){ printf '%s\n' "$1" > "$td/t.nift"; "$NIFT_BIN" run "$td/t.nift"; }
+run(){ printf '%s\n' "$1" > "$td/t.nift"; "$NIFT_BIN" "$td/t.nift"; }
 A='[{"x":1,"tag":"a","tags":["a","b"]},{"x":2,"tag":"b","tags":["b"]},{"x":1,"tag":"a","tags":["a","a"]}]'
 [[ "$(run "a := $A; print(a.partition(v => v.x > 1).stringify())")" == '{"matched":[{"x":2,"tag":"b","tags":["b"]}],"unmatched":[{"x":1,"tag":"a","tags":["a","b"]},{"x":1,"tag":"a","tags":["a","a"]}]}' ]]
 [[ "$(run "a := $A; print(a.unique_by(v => v.x).stringify())")" == '[{"x":1,"tag":"a","tags":["a","b"]},{"x":2,"tag":"b","tags":["b"]}]' ]]

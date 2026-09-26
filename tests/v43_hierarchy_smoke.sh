@@ -25,7 +25,7 @@ mk
 check() { # $1=name $2=expected $3=script
   printf '%s\n' "$3" > t.nift
   local out
-  out=$("$NIFT" run t.nift 2>err) && rc=0 || rc=$?
+  out=$("$NIFT" t.nift 2>err) && rc=0 || rc=$?
   out=$(printf '%s' "$out" | tr '\n' ' ' | sed 's/ $//')
   if [ "$out" = "$2" ]; then echo "PASS  $1"; else echo "FAIL  $1: expected [$2] got [$out] err[$(head -1 err)]" >&2; exit 1; fi
 }
