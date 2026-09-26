@@ -20,7 +20,7 @@ nift=${NIFT:-"$(cd "$(dirname "$0")/.." && pwd)/nift"}
 
 run_script() {
     cat > "$t/probe.f"
-    timed 30 "$nift" run "$t/probe.f" 2>&1 | head -1
+    timed 30 "$nift" "$t/probe.f" 2>&1 | head -1
 }
 
 fail=0

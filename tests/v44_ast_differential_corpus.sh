@@ -18,7 +18,7 @@ timed() {
 nift=${NIFT:-"$(cd "$(dirname "$0")/.." && pwd)/nift"}
 t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
 
-run() { printf '%s' "$1" > "$t/prog.f"; timed 30 "$nift" run "$t/prog.f" 2>&1 | tr '\n' '|'; }
+run() { printf '%s' "$1" > "$t/prog.f"; timed 30 "$nift" "$t/prog.f" 2>&1 | tr '\n' '|'; }
 
 fail=0
 check() { # name expected actual
