@@ -864,17 +864,32 @@ static bool shell_glob_expand(const std::string& token,std::vector<std::string>&
         return true;
     };
     static const auto is_command_operator = [](const std::string& t){ return t=="|"||t=="<"||t==">"||t==">>"||t=="2>"||t=="2>&1"||t=="&&"||t=="||"||t==";"||t=="&"; };
-static int execute_shell_command(Parser& parser,const std::string& line,bool print_errors=true){auto toks=shell_tokens(line);if(toks.empty())return 0;
+static int execute_shell_command(Parser& parser,const std::string& line,bool print_errors=true,ShellJobTable* jobs=nullptr){auto toks=shell_tokens(line);if(toks.empty())return 0;
     // $[...] interpolation in command arguments (all non-operator tokens).
     for(auto& t : toks) { if (is_command_operator(t)) continue; std::string ie; if(!command_token_interpolate(parser, t, ie)){ if(print_errors) console::error(ie); return 2; } }
+    if(toks.size()==1 && toks[0]=="jobs") {
+        if(!jobs){if(print_errors)console::error("jobs: no interactive job table");return 2;}
+        for(const auto& j:jobs->jobs(true)){
+            const char* state=j.state==ShellJobState::Running?"Running":(j.state==ShellJobState::Stopped?"Stopped":"Done");
+            std::cout<<"["<<j.id<<"] "<<state; if(j.state==ShellJobState::Done)std::cout<<" ("<<j.exit_code<<")"; std::cout<<"  "<<j.command<<'\n';
+        }
+        return 0;
+    }
     // First try a command-style Nift callable for a simple command. Literal command tokens become strings.
     bool has_ops=false;for(const auto&t:toks)if(is_command_operator(t))has_ops=true;
     if(!has_ops){std::string expr=toks[0]+"(";for(size_t i=1;i<toks.size();++i){if(i>1)expr+=",";expr+=quote_nift_string(toks[i]);}expr+=")";auto rr=parser.run_statement(expr,"<repl>");if(rr.ok){if(!rr.output.empty())std::cout<<rr.output<<'\n';return 0;}}
     // Bash-like command chain. &&/|| are evaluated left-to-right over pipeline exit status.
     if(std::getenv("NIFT_NO_PROCESS")){if(print_errors)console::error("external process execution disabled");return 126;}
     size_t pos=0;int last=0;std::string pending_op;
-    while(pos<toks.size()){size_t end=pos;while(end<toks.size()&&toks[end]!="&&"&&toks[end]!="||"&&toks[end]!=";")++end;bool should=pending_op.empty()||(pending_op=="&&"?last==0:last!=0)||pending_op==";";if(should){std::vector<ProcessSpec> stages(1);size_t si=0;bool expect_in=false,expect_out=false,expect_err=false;for(size_t i=pos;i<end;++i){const std::string&t=toks[i];if(t=="|"){stages.emplace_back();++si;continue;}if(t=="<"){expect_in=true;continue;}if(t==">"||t==">>"){expect_out=true;stages[si].append_stdout=t==">>";continue;}if(t=="2>"){expect_err=true;continue;}if(t=="2>&1"){stages[si].merge_stderr=true;continue;}if(t=="&"){if(print_errors)console::error("background job control is not implemented; use structured process APIs or omit &");return 2;}if(expect_in){stages[si].stdin_path=t;expect_in=false;continue;}if(expect_out){stages[si].stdout_path=t;expect_out=false;continue;}if(expect_err){stages[si].stderr_path=t;expect_err=false;continue;}if(stages[si].program.empty()){auto eq=t.find('=');if(eq!=std::string::npos&&eq>0){stages[si].env[t.substr(0,eq)]=t.substr(eq+1);continue;}stages[si].program=t;}else{std::vector<std::string> ex;shell_glob_expand(t,ex);stages[si].args.insert(stages[si].args.end(),ex.begin(),ex.end());}}
+    while(pos<toks.size()){size_t end=pos;while(end<toks.size()&&toks[end]!="&&"&&toks[end]!="||"&&toks[end]!=";")++end;bool should=pending_op.empty()||(pending_op=="&&"?last==0:last!=0)||pending_op==";";if(should){std::vector<ProcessSpec> stages(1);size_t si=0;bool expect_in=false,expect_out=false,expect_err=false;for(size_t i=pos;i<end;++i){const std::string&t=toks[i];if(t=="|"){stages.emplace_back();++si;continue;}if(t=="<"){expect_in=true;continue;}if(t==">"||t==">>"){expect_out=true;stages[si].append_stdout=t==">>";continue;}if(t=="2>"){expect_err=true;continue;}if(t=="2>&1"){stages[si].merge_stderr=true;continue;}if(t=="&"){if(i+1!=end){if(print_errors)console::error("& must terminate a pipeline");return 2;}continue;}if(expect_in){stages[si].stdin_path=t;expect_in=false;continue;}if(expect_out){stages[si].stdout_path=t;expect_out=false;continue;}if(expect_err){stages[si].stderr_path=t;expect_err=false;continue;}if(stages[si].program.empty()){auto eq=t.find('=');if(eq!=std::string::npos&&eq>0){stages[si].env[t.substr(0,eq)]=t.substr(eq+1);continue;}stages[si].program=t;}else{std::vector<std::string> ex;shell_glob_expand(t,ex);stages[si].args.insert(stages[si].args.end(),ex.begin(),ex.end());}}
+        const bool background = end>pos && toks[end-1]=="&";
+        if(background){
+            // '&' is only meaningful as the final token of one pipeline.
+            // It was parsed as an operator and therefore did not become argv.
+            if(!jobs){if(print_errors)console::error("background jobs require the interactive shell");return 2;}
+        }
         for(auto&st:stages)if(st.program.empty()){if(print_errors)console::error("empty command in pipeline");return 2;}
+        if(background){auto pr=jobs->launch(stages,line,false);last=pr.exit_code;if(!pr.error.empty()){if(print_errors)console::error(pr.error);return last<0?2:last;}auto js=jobs->jobs(false);if(!js.empty()){const auto&j=js.back();std::cout<<"["<<j.id<<"] "<<j.process_group<<'\n';}return 0;}
         // A simple foreground command (no operators, no redirection, no
         // pipeline) is attached directly to the shell's terminal: the child
         // inherits stdin/stdout/stderr and becomes the foreground process
@@ -899,7 +914,7 @@ static std::vector<std::string> load_nift_history(){
 }
 static void append_nift_history(const std::string& line){if(line.empty())return;std::ofstream out(nift_history_path(),std::ios::app);if(out)out<<line<<'\n';}
 static std::vector<std::string> nift_shell_completions(const std::string& prefix){
-    static const std::vector<std::string> builtins={"build","cat","cd","cmd","copy","cp","exists","file","getenv","env","os","arch","ls","make_dir","max","min","mkdir","move","mv","open","page","pwd","remove","rm","run","setenv","target","touch","unsetenv","which"};
+    static const std::vector<std::string> builtins={"build","cat","cd","cmd","copy","cp","exists","file","getenv","env","os","arch","jobs","ls","make_dir","max","min","mkdir","move","mv","open","page","pwd","remove","rm","run","setenv","target","touch","unsetenv","which"};
     std::set<std::string> out;for(const auto& b:builtins)if(b.rfind(prefix,0)==0)out.insert(b);
     if(const char* path=std::getenv("PATH")){std::stringstream ss(path);std::string dir;while(std::getline(ss,dir,':')){std::error_code ec;for(auto it=fs::directory_iterator(dir,ec);!ec&&it!=fs::directory_iterator();it.increment(ec)){auto n=it->path().filename().string();if(n.rfind(prefix,0)==0)out.insert(n);}}}
     fs::path pp=prefix.empty()?fs::path("."):fs::path(prefix);fs::path parent=pp.has_parent_path()?pp.parent_path():fs::path(".");std::string leaf=pp.filename().string();std::error_code ec;for(auto it=fs::directory_iterator(parent,ec);!ec&&it!=fs::directory_iterator();it.increment(ec)){auto n=it->path().filename().string();if(n.rfind(leaf,0)==0){auto c=(pp.has_parent_path()?parent/fs::path(n):fs::path(n)).generic_string();if(it->is_directory(ec))c+="/";out.insert(c);}}
@@ -940,7 +955,7 @@ std::vector<std::string> full_shell_completions(const Parser& parser, const std:
 std::vector<std::string> command_completions(const Parser& parser, const std::string& prefix) {
     std::set<std::string> out;
     for (auto& c : parser.shell_completions(prefix)) out.insert(c);
-    for (const std::string& b : {"build","cat","cd","cmd","copy","cp","exists","file","getenv","env","os","arch","ls","make_dir","max","min","mkdir","move","mv","open","page","pwd","remove","rm","run","setenv","touch","unsetenv","which"})
+    for (const std::string& b : {"build","cat","cd","cmd","copy","cp","exists","file","getenv","env","os","arch","jobs","ls","make_dir","max","min","mkdir","move","mv","open","page","pwd","remove","rm","run","setenv","touch","unsetenv","which"})
         if (b.rfind(prefix, 0) == 0) out.insert(b);
     if (const char* path = std::getenv("PATH")) {
         std::stringstream ss(path); std::string dir;
@@ -1014,7 +1029,7 @@ ShellRead interactive_read_line(Parser& parser, const std::string& prompt, std::
 }
 #endif
 static int run_script_shell_loop(Parser& parser, bool load_rc) {
-    std::string pending;
+    std::string pending; ShellJobTable jobs;
     auto history=load_nift_history(); size_t hist_pos=history.size();
 #ifndef _WIN32
     const bool interactive = isatty(STDIN_FILENO);
@@ -1046,13 +1061,14 @@ static int run_script_shell_loop(Parser& parser, bool load_rc) {
             // argument (e.g. echo $[project_root()]), not to Nift statement
             // syntax, so ignore interpolation spans when routing.
             std::string no_interp; { bool in_interp=false; bool saw_dollar=false; for(char c : trimmed) { if(c=='['&&!in_interp&&saw_dollar){in_interp=true;saw_dollar=false;continue;} if(in_interp){ if(c==']') in_interp=false; continue; } no_interp+=c; saw_dollar=(c=='$'); } }
-            command_style=!assignment_like&&(sp!=std::string::npos||trimmed=="pwd"||trimmed=="ls")&&no_interp.find(":=")==std::string::npos&&no_interp.find('(')==std::string::npos&&trimmed.rfind("fn ",0)!=0&&trimmed.rfind("if ",0)!=0&&trimmed.rfind("for ",0)!=0&&trimmed.rfind("while ",0)!=0;
+            const bool job_builtin = !toks.empty() && (toks[0]=="jobs" || toks[0]=="fg" || toks[0]=="bg" || toks[0]=="wait");
+            command_style=!assignment_like&&(job_builtin||sp!=std::string::npos||trimmed=="pwd"||trimmed=="ls")&&no_interp.find(":=")==std::string::npos&&no_interp.find('(')==std::string::npos&&trimmed.rfind("fn ",0)!=0&&trimmed.rfind("if ",0)!=0&&trimmed.rfind("for ",0)!=0&&trimmed.rfind("while ",0)!=0;
             // Executable paths (./x, ../x, /x, dir/x) are ordinary external
             // commands even without arguments, exactly like Bash executing a
             // path: ./hello.f, ./scripts/deploy.f, ../tools/generate.f.
             if(!command_style&&!assignment_like&&!toks.empty()&&(toks[0].rfind("./",0)==0||toks[0].rfind("../",0)==0||(!toks[0].empty()&&toks[0][0]=='/')||toks[0].find('/')!=std::string::npos))command_style=true;
         }
-        if(command_style){execute_shell_command(parser,trimmed);pending.clear();continue;}
+        if(command_style){execute_shell_command(parser,trimmed,true,&jobs);pending.clear();continue;}
         const Parser::StatementState st=parser.statement_state(pending);
         if(st==Parser::StatementState::Incomplete)continue;
         auto rr=parser.run_statement(pending,"<repl>");pending.clear();
@@ -1068,13 +1084,13 @@ static int run_script_shell_loop(Parser& parser, bool load_rc) {
             const bool bare_token = !tv.empty() &&
                 tv.find_first_of(" \t()[]{}:=@$\"'")==std::string::npos && tv.find("//")==std::string::npos;
             if(bare_token){
-                static const std::unordered_set<std::string> shell_builtins={"build","cat","cd","cmd","copy","cp","exists","file","getenv","env","os","arch","ls","make_dir","max","min","mkdir","move","mv","open","page","pwd","remove","rm","run","setenv","touch","unsetenv","which"};
+                static const std::unordered_set<std::string> shell_builtins={"build","cat","cd","cmd","copy","cp","exists","file","getenv","env","os","arch","jobs","ls","make_dir","max","min","mkdir","move","mv","open","page","pwd","remove","rm","run","setenv","touch","unsetenv","which"};
                 const bool is_builtin = shell_builtins.count(tv) != 0;
                 std::string resolved;
                 const bool on_path = !is_builtin && nift_find_executable(tv, resolved);
                 if(on_path){
                     if(std::getenv("NIFT_NO_PROCESS")){console::error("external process execution disabled");continue;}
-                    execute_shell_command(parser, tv, true);
+                    execute_shell_command(parser, tv, true, &jobs);
                     continue;
                 }
                 if(!is_builtin){
