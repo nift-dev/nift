@@ -20,13 +20,14 @@ namespace fs = std::filesystem;
 // or above its root and exposes the read-only project model on demand.
 class ScriptRenderHost final : public RenderHost {
 public:
-    explicit ScriptRenderHost(fs::path root) : root_(fs::absolute(std::move(root)).lexically_normal()) {
+    explicit ScriptRenderHost(fs::path root, std::string target = "native") : root_(fs::absolute(std::move(root)).lexically_normal()), target_(std::move(target)) {
         fs::path probe=root_; while(!probe.empty()){Config c;std::vector<TrackedInfo> t;std::string e;if(project_read::load_config(probe,c,e)&&project_read::load_tracking(probe,c,t,e)){root_=probe;config_=std::move(c);tracked_=std::move(t);project_found_=true;break;}auto parent=probe.parent_path();if(parent==probe)break;probe=parent;}
     }
     const fs::path& root() const override { return root_; }
     std::string relative(const fs::path& p) const override { std::error_code ec; auto r=fs::relative(p,root_,ec); return ec?p.generic_string():r.generic_string(); }
     const std::string& output_dir() const override { static const std::string empty; return empty; }
     int build_threads() const override { return 1; }
+    const std::string& target() const override { return target_; }
     fs::path content_path(const TrackedInfo&) const override { return {}; }
     fs::path output_path(const TrackedInfo&) const override { return {}; }
     fs::path pagination_output_path(const TrackedInfo&,std::size_t) const override { return {}; }
@@ -48,7 +49,7 @@ public:
     nift::HostResult environment(const std::string& name) const override { const char* v=std::getenv(name.c_str()); return v?nift::HostResult{nift::HostStatus::Found,v,{}}:nift::HostResult{}; }
     bool environment_snapshot(json::Document& out, std::string& error) const override { return nift_environment::process_snapshot(out, error); }
 private:
-    fs::path root_; mutable std::string cache_; mutable std::shared_ptr<const json::Document> project_value_;
+    fs::path root_; std::string target_ = "native"; mutable std::string cache_; mutable std::shared_ptr<const json::Document> project_value_;
     Config config_; std::vector<TrackedInfo> tracked_; bool project_found_ = false;
     mutable std::once_flag hierarchy_flag_; mutable std::shared_ptr<const HierarchyIndex> hierarchy_;
 

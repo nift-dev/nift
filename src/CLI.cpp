@@ -62,6 +62,22 @@ constexpr const char* version_text = "Nift v4.5.0";
 constexpr auto build_auto_poll_interval = std::chrono::milliseconds(200);
 constexpr const char* build_auto_log_path = ".nift/build-auto.log";
 
+bool valid_runtime_target(const std::string& value) {
+    if (value.empty()) return false;
+    auto first = static_cast<unsigned char>(value.front());
+    if (!((first >= 'a' && first <= 'z') || (first >= '0' && first <= '9'))) return false;
+    for (unsigned char c : value)
+        if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-')) return false;
+    return true;
+}
+
+bool parse_runtime_target_selector(const std::string& arg, std::string& target) {
+    static const std::set<std::string> builtins={"native","linux","macos","windows","android","ios","wasm"};
+    if (arg.rfind("--target=",0)==0) { target=arg.substr(9); return valid_runtime_target(target); }
+    if (arg.size()>2 && arg.rfind("--",0)==0) { const std::string id=arg.substr(2); if(builtins.count(id)){target=id;return true;} }
+    return false;
+}
+
 
 
 class ScopedStreamCapture {
@@ -745,8 +761,8 @@ static int run_script_shell_loop(Parser& parser, bool load_rc);
 
 static int run_script_source(const std::string& source, const fs::path& source_path,
                              const std::string& cmd, const std::vector<std::string>& script_args,
-                             const fs::path& host_root, bool interactive_after = false) {
-    ScriptRenderHost host(host_root); TrackedInfo info; Parser parser(host,info);
+                             const fs::path& host_root, bool interactive_after = false, const std::string& target = "native") {
+    ScriptRenderHost host(host_root, target); TrackedInfo info; Parser parser(host,info);
     parser.set_script_invocation(cmd, script_args);
     auto rr=parser.run_script(source,source_path);
     if(!rr.ok){
@@ -764,7 +780,7 @@ static int run_script_source(const std::string& source, const fs::path& source_p
     return 0;
 }
 
-static int run_script_file(const fs::path& path, const std::vector<std::string>& script_args = {}, bool interactive_after = false) {
+static int run_script_file(const fs::path& path, const std::vector<std::string>& script_args = {}, bool interactive_after = false, const std::string& target = "native") {
     std::error_code path_ec;
     const fs::path absolute=fs::absolute(path, path_ec).lexically_normal();
     if (path_ec) { console::error("script: cannot resolve script path: " + path.string() + " (" + path_ec.message() + ")"); return 1; }
@@ -776,10 +792,10 @@ static int run_script_file(const fs::path& path, const std::vector<std::string>&
         const std::size_t nl=source.find('\n');
         source = (nl==std::string::npos) ? "" : source.substr(nl+1);
     }
-    return run_script_source(source, absolute, path.string(), script_args, absolute.parent_path(), interactive_after);
+    return run_script_source(source, absolute, path.string(), script_args, absolute.parent_path(), interactive_after, target);
 }
 
-static int run_inline_script(const std::string& source, const std::vector<std::string>& script_args, bool interactive_after) {
+static int run_inline_script(const std::string& source, const std::vector<std::string>& script_args, bool interactive_after, const std::string& target = "native") {
     // `exit`/`quit` are shell control words. Accept them as the initial inline
     // program too so `nift -i -c "exit"` is a useful non-interactive probe and
     // does not unexpectedly enter a REPL.
@@ -789,11 +805,11 @@ static int run_inline_script(const std::string& source, const std::vector<std::s
     trimmed=first==std::string::npos?std::string():trimmed.substr(first,last-first+1);
     if(trimmed=="exit"||trimmed=="quit") return 0;
     return run_script_source(source, fs::path("<command-line>"), "<command-line>", script_args,
-                             fs::current_path(), interactive_after);
+                             fs::current_path(), interactive_after, target);
 }
 
 
-static int run_stdin_script(const std::vector<std::string>& script_args, bool interactive_after) {
+static int run_stdin_script(const std::vector<std::string>& script_args, bool interactive_after, const std::string& target = "native") {
     std::ostringstream buffer;
     buffer << std::cin.rdbuf();
     if (std::cin.bad()) { console::error("stdin: failed while reading program source"); return 1; }
@@ -803,7 +819,7 @@ static int run_stdin_script(const std::vector<std::string>& script_args, bool in
         return 1;
     }
     return run_script_source(source, fs::path("<stdin>"), "<stdin>", script_args,
-                             fs::current_path(), interactive_after);
+                             fs::current_path(), interactive_after, target);
 }
 
 static int run_eval(int argc, char** argv) {
@@ -883,7 +899,7 @@ static std::vector<std::string> load_nift_history(){
 }
 static void append_nift_history(const std::string& line){if(line.empty())return;std::ofstream out(nift_history_path(),std::ios::app);if(out)out<<line<<'\n';}
 static std::vector<std::string> nift_shell_completions(const std::string& prefix){
-    static const std::vector<std::string> builtins={"build","cat","cd","cmd","copy","cp","exists","file","getenv","env","os","arch","ls","make_dir","max","min","mkdir","move","mv","open","page","pwd","remove","rm","run","setenv","touch","unsetenv","which"};
+    static const std::vector<std::string> builtins={"build","cat","cd","cmd","copy","cp","exists","file","getenv","env","os","arch","ls","make_dir","max","min","mkdir","move","mv","open","page","pwd","remove","rm","run","setenv","target","touch","unsetenv","which"};
     std::set<std::string> out;for(const auto& b:builtins)if(b.rfind(prefix,0)==0)out.insert(b);
     if(const char* path=std::getenv("PATH")){std::stringstream ss(path);std::string dir;while(std::getline(ss,dir,':')){std::error_code ec;for(auto it=fs::directory_iterator(dir,ec);!ec&&it!=fs::directory_iterator();it.increment(ec)){auto n=it->path().filename().string();if(n.rfind(prefix,0)==0)out.insert(n);}}}
     fs::path pp=prefix.empty()?fs::path("."):fs::path(prefix);fs::path parent=pp.has_parent_path()?pp.parent_path():fs::path(".");std::string leaf=pp.filename().string();std::error_code ec;for(auto it=fs::directory_iterator(parent,ec);!ec&&it!=fs::directory_iterator();it.increment(ec)){auto n=it->path().filename().string();if(n.rfind(leaf,0)==0){auto c=(pp.has_parent_path()?parent/fs::path(n):fs::path(n)).generic_string();if(it->is_directory(ec))c+="/";out.insert(c);}}
@@ -1084,6 +1100,19 @@ static int run_script_shell() {
 int run_cli(int argc, char** argv) {
     const std::string command = argc > 1 ? argv[1] : "";
     if (command.empty()) return run_script_shell();
+
+    // Runtime target selector prefix for scripts/stdin/inline execution.
+    if (command.rfind("--target=",0)==0 || command=="--native" || command=="--linux" || command=="--macos" || command=="--windows" || command=="--android" || command=="--ios" || command=="--wasm") {
+        std::string target;
+        if (!parse_runtime_target_selector(command,target)) { console::error("invalid target selector '"+command+"'"); return 2; }
+        if (argc < 3) { ScriptRenderHost host(fs::current_path(),target); TrackedInfo info; Parser parser(host,info); parser.set_script_invocation("<repl>",{}); return run_script_shell_loop(parser,true); }
+        const std::string source_mode=argv[2];
+        if (source_mode.rfind("--target=",0)==0 || source_mode=="--native" || source_mode=="--linux" || source_mode=="--macos" || source_mode=="--windows" || source_mode=="--android" || source_mode=="--ios" || source_mode=="--wasm") { console::error("multiple target selections are not allowed"); return 2; }
+        if (source_mode=="-e" || source_mode=="-c") { if(argc<4){console::error(source_mode+" requires program source");return 2;} std::vector<std::string> a; for(int i=4;i<argc;++i) if(std::string(argv[i])!="--") a.push_back(argv[i]); return run_inline_script(argv[3],a,false,target); }
+        if (source_mode=="-") { std::vector<std::string> a; for(int i=3;i<argc;++i) if(std::string(argv[i])!="--") a.push_back(argv[i]); return run_stdin_script(a,false,target); }
+        if (filesystem::file_exists(source_mode) && !fs::is_directory(source_mode)) { std::vector<std::string> a; for(int i=3;i<argc;++i) if(std::string(argv[i])!="--") a.push_back(argv[i]); return run_script_file(source_mode,a,false,target); }
+        console::error("target selector must precede an existing script path, '-', -e or -c"); return 2;
+    }
 
     // Full-program command-line execution. -e is canonical; -c is an exact
     // alias. -i may prefix either an inline program or a script path and keeps
@@ -1319,6 +1348,7 @@ int run_cli(int argc, char** argv) {
         // --repair. -p (explain rebuild reasons) is orthogonal and combinable.
         // --no-process extends the script process restriction to build hooks.
         bool all_mode = false, auto_mode = false, repair_mode = false, explain = false, no_process = false;
+        std::string runtime_target = "native"; bool target_selected=false;
         std::vector<std::string> names;
         int mode_flags = 0;
         for (int i = 2; i < argc; ++i) {
@@ -1328,10 +1358,15 @@ int run_cli(int argc, char** argv) {
             else if (arg == "--repair") { repair_mode = true; ++mode_flags; }
             else if (arg == "-p") explain = true;
             else if (arg == "--no-process") no_process = true;
+            else if (arg.rfind("--target=",0)==0 || arg=="--native" || arg=="--linux" || arg=="--macos" || arg=="--windows" || arg=="--android" || arg=="--ios" || arg=="--wasm") {
+                std::string selected; if(!parse_runtime_target_selector(arg,selected)){console::error("invalid target selector '"+arg+"'");return 1;}
+                if(target_selected){console::error("multiple target selections are not allowed");return 1;} runtime_target=selected;target_selected=true;
+            }
             else if (!arg.empty() && arg[0] == '-') { console::error("unknown build option '" + arg + "'"); return 1; }
             else names.emplace_back(arg);
         }
         if (no_process) nift_setenv("NIFT_NO_PROCESS", "1", 1);
+        project.target_ = runtime_target;
         if (mode_flags > 1 || (mode_flags == 1 && !names.empty())) {
             console::error("build modes are mutually exclusive");
             return 1;

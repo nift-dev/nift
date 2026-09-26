@@ -1990,6 +1990,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             if(call_args("env",args,q)){if(!args.empty()){error="env: expected no arguments";return false;}json::Document snapshot; if(!host_.environment_snapshot(snapshot,error))return false; out=std::move(snapshot);return true;}
             if(call_args("os",args,q)){if(!args.empty()){error="os: expected no arguments";return false;}out=json::Document(std::string(nift_environment::host_os()));return true;}
             if(call_args("arch",args,q)){if(!args.empty()){error="arch: expected no arguments";return false;}out=json::Document(std::string(nift_environment::host_arch()));return true;}
+            if(call_args("target",args,q)){if(!args.empty()){error="target: expected no arguments";return false;}out=json::Document(host_.target());return true;}
             if(call_args("setenv",args,q)){if(!standalone_script_host_){error="setenv: only available in standalone Nift scripts/shell";return false;}if(args.size()!=2){error="setenv: expected name and value";return false;}std::string k,v;if(!string_arg("setenv",args,q,0,k)||!string_arg("setenv",args,q,1,v))return false;
 #ifdef _WIN32
                 if(_putenv_s(k.c_str(),v.c_str())!=0){error="setenv: failed";return false;}

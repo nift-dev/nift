@@ -28,6 +28,7 @@ public:
     virtual std::string relative(const std::filesystem::path& path) const = 0;
     virtual const std::string& output_dir() const = 0;
     virtual int build_threads() const = 0;
+    virtual const std::string& target() const { static const std::string native = "native"; return native; }
 
     virtual std::filesystem::path content_path(const TrackedInfo& info) const = 0;
     virtual std::filesystem::path output_path(const TrackedInfo& info) const = 0;

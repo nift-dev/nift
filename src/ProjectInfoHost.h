@@ -19,6 +19,7 @@ public:
     std::string relative(const std::filesystem::path& path) const override { return project_.relative(path); }
     const std::string& output_dir() const override { return project_.config.output_dir; }
     int build_threads() const override { return project_.config.build_threads; }
+    const std::string& target() const override { return project_.target_; }
 
     std::filesystem::path content_path(const TrackedInfo& info) const override { return project_.content_path(info); }
     std::filesystem::path output_path(const TrackedInfo& info) const override { return project_.output_path(info); }

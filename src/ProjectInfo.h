@@ -21,6 +21,7 @@ public:
     std::filesystem::path root;
     Config config;
     std::vector<TrackedInfo> tracked;
+    std::string target_ = "native";
 
     ProjectInfo();
     ~ProjectInfo();
