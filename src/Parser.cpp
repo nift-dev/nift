@@ -3288,10 +3288,10 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             if (reserved_binding_name(name) || host_.is_contract_name(name)) { error = "declaration name is reserved: " + name; return false; }
             if (variable_scopes_.empty()) variable_scopes_.emplace_back();
             if (variable_scopes_.back().find(name) != variable_scopes_.back().end()) {
-                // The injected script `args` binding may be shadowed by a
-                // script that intentionally declares its own.
+                // Injected `cmd`/`args` bindings may be shadowed by a script that
+                // intentionally declares its own binding.
                 auto& existing = variable_scopes_.back().find(name)->second;
-                if (!existing.is_script_args) { error = "binding already declared in this scope: " + name; return false; }
+                if (!existing.is_script_invocation) { error = "binding already declared in this scope: " + name; return false; }
             }
             json::Document assigned;
             last_call_return_loc_root_.reset(); last_call_return_loc_path_.clear();
@@ -3922,20 +3922,30 @@ std::vector<std::string> Parser::shell_completions(const std::string& prefix) co
     return out;
 }
 
+void Parser::set_script_invocation(std::string cmd, std::vector<std::string> args) {
+    script_cmd_ = std::move(cmd);
+    script_args_ = std::move(args);
+    install_script_invocation_bindings();
+}
+
+void Parser::install_script_invocation_bindings() {
+    if (variable_scopes_.empty()) variable_scopes_.emplace_back();
+    auto cmd = std::make_shared<json::Document>(script_cmd_);
+    VariableBinding cmd_binding{cmd, nift_binding_type(*cmd), false, true};
+    cmd_binding.is_script_invocation = true;
+    variable_scopes_.front()["cmd"] = std::move(cmd_binding);
+
+    auto arr = std::make_shared<json::Document>(json::Document::make_array());
+    for (const auto& a : script_args_) arr->array.emplace_back(a);
+    VariableBinding args_binding{arr, nift_binding_type(*arr), false, true};
+    args_binding.is_script_invocation = true;
+    variable_scopes_.front()["args"] = std::move(args_binding);
+}
+
 RenderResult Parser::run_script(const std::string& source, const fs::path& source_path) {
     result_ = RenderResult{};
     variable_scopes_.clear(); variable_scopes_.emplace_back();
-    // Standalone scripts receive their user arguments as an immutable `args`
-    // array (the script path itself is not included). The binding is always
-    // present (empty when no arguments were passed) so scripts can read `args`
-    // unconditionally; a script that declares its own `args` shadows it.
-    {
-        auto arr = std::make_shared<json::Document>(json::Document::make_array());
-        for (const auto& a : script_args_) arr->array.emplace_back(a);
-        VariableBinding vb{arr, nift_binding_type(*arr), false, true};
-        vb.is_script_args = true;
-        variable_scopes_.back()["args"] = std::move(vb);
-    }
+    install_script_invocation_bindings();
     callables_.clear(); structs_.clear(); requested_exports_.clear(); pending_control_={};
     in_import_program_=false; standalone_script_host_=true; strict_script_mode_=true; function_call_depth_=1;
     auto rr=execute_native_program(source,source_path,0);
@@ -3953,7 +3963,7 @@ RenderResult Parser::run_script(const std::string& source, const fs::path& sourc
 }
 
 RenderResult Parser::run_statement(const std::string& source, const fs::path& source_path) {
-    if(variable_scopes_.empty()) variable_scopes_.emplace_back();
+    if(variable_scopes_.empty()) { variable_scopes_.emplace_back(); install_script_invocation_bindings(); }
     standalone_script_host_=true; strict_script_mode_=true; result_ = RenderResult{}; pending_control_={}; function_call_depth_=1;
     const std::string t=trim_copy(source);
     // A REPL is also an inspector: a single expression is evaluated directly so

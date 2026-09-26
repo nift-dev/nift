@@ -36,9 +36,11 @@ public:
     void reset_script_control();
     bool finalize_script_resources(std::string& error);
 
-    // Script arguments exposed to standalone scripts as the `args` array
-    // (user arguments only; the script path itself is not included).
-    void set_script_args(std::vector<std::string> args) { script_args_ = std::move(args); }
+    // Host-owned invocation identity exposed to standalone scripts/shells as
+    // immutable `cmd` + `args`. A declaration may intentionally shadow these
+    // root bindings; assignment to the injected bindings is rejected.
+    void set_script_invocation(std::string cmd, std::vector<std::string> args);
+    const std::string& script_cmd() const { return script_cmd_; }
     const std::vector<std::string>& script_args() const { return script_args_; }
 
     // Parser-reported statement state for the interactive shell: the REPL asks
@@ -99,7 +101,7 @@ private:
         int type = 0;
         bool mutable_binding = true;
         bool deep_readonly = false;
-        bool is_script_args = false;
+        bool is_script_invocation = false;
         std::shared_ptr<std::shared_ptr<json::Document>> slot;
         // A nested aggregate binding is a logical location reference.  It owns
         // the root binding slot plus a parsed key/index path; it never owns a
@@ -109,7 +111,7 @@ private:
         bool ref_valid = true;
         VariableBinding() : slot(std::make_shared<std::shared_ptr<json::Document>>(value)) {}
         VariableBinding(std::shared_ptr<json::Document> v, int t, bool m, bool d)
-            : value(std::move(v)), type(t), mutable_binding(m), deep_readonly(d), is_script_args(false), slot(std::make_shared<std::shared_ptr<json::Document>>(value)) {}
+            : value(std::move(v)), type(t), mutable_binding(m), deep_readonly(d), is_script_invocation(false), slot(std::make_shared<std::shared_ptr<json::Document>>(value)) {}
         bool is_location_ref() const { return static_cast<bool>(ref_root_slot); }
         json::Document* resolve_location() const {
             if(!ref_root_slot || !*ref_root_slot) return nullptr;
@@ -215,7 +217,9 @@ private:
     bool in_import_program_ = false;
     bool standalone_script_host_ = false;
     bool strict_script_mode_ = false;
+    std::string script_cmd_ = "<repl>";
     std::vector<std::string> script_args_;
+    void install_script_invocation_bindings();
     std::vector<std::string> requested_exports_;
     enum class ControlFlow { None, Return, Break, Continue };
     struct PendingControl {

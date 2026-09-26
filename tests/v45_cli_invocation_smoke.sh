@@ -19,4 +19,18 @@ grep -q "unknown command 'sh' and path does not exist" "$t/sh.out"
 mkdir -p "$t/precedence"; printf 'print("file-build")\n' > "$t/precedence/build"
 if (cd "$t/precedence" && "$BIN" build >/dev/null 2>&1); then :; fi
 [ "$(cd "$t/precedence" && "$BIN" ./build)" = "file-build" ]
+cat > "$t/invocation.f" <<'F'
+print(cmd)
+print(args.join("|"))
+F
+out=$("$BIN" "$t/invocation.f" "hello world" -- --no-process -x)
+[ "$(sed -n '1p' <<<"$out")" = "$t/invocation.f" ]
+[ "$(sed -n '2p' <<<"$out")" = 'hello world|--no-process|-x' ]
+# host-owned values are immutable unless deliberately shadowed by declaration.
+printf 'cmd = "x"\n' > "$t/mutate.f"
+if "$BIN" "$t/mutate.f" >/dev/null 2>&1; then echo 'cmd mutation unexpectedly accepted' >&2; exit 1; fi
+printf 'args = []\n' > "$t/mutate.f"
+if "$BIN" "$t/mutate.f" >/dev/null 2>&1; then echo 'args mutation unexpectedly accepted' >&2; exit 1; fi
+out=$(printf 'cmd\nargs.prettify()\nexit\n' | "$BIN")
+grep -q '<repl>' <<<"$out"
 echo 'PASS v4.5 unified CLI invocation'

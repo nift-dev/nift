@@ -754,7 +754,7 @@ static int run_script_file(const fs::path& path, const std::vector<std::string>&
         source = (nl==std::string::npos) ? "" : source.substr(nl+1);
     }
     ScriptRenderHost host(absolute.parent_path()); TrackedInfo info; Parser parser(host,info);
-    parser.set_script_args(script_args);
+    parser.set_script_invocation(path.string(), script_args);
     auto rr=parser.run_script(source,absolute);
     if(!rr.ok){console::error(rr.error.message.empty()?"script failed":rr.error.message);return 1;}
     if(!rr.output.empty())std::cout<<rr.output<<'\n';
@@ -953,7 +953,7 @@ ShellRead interactive_read_line(Parser& parser, const std::string& prompt, std::
 }
 #endif
 static int run_script_shell() {
-    ScriptRenderHost host(fs::current_path()); TrackedInfo info; Parser parser(host,info); std::string pending;
+    ScriptRenderHost host(fs::current_path()); TrackedInfo info; Parser parser(host,info); parser.set_script_invocation("<repl>", {}); std::string pending;
     auto history=load_nift_history(); size_t hist_pos=history.size();
 #ifndef _WIN32
     const bool interactive = isatty(STDIN_FILENO);
@@ -1153,11 +1153,12 @@ int run_cli(int argc, char** argv) {
     // genuinely resolves to an existing file, so a typoed command name is not
     // silently turned into an arbitrary path.
     if (filesystem::file_exists(command) && !fs::is_directory(command)) {
-        std::vector<std::string> script_args;
+        std::vector<std::string> script_args; bool literal_args=false;
         for (int i = 2; i < argc; ++i) {
             const std::string a = argv[i];
-            if (a == "--no-process") nift_setenv("NIFT_NO_PROCESS","1",1);
-            else if (a.rfind("--fs-root=", 0) == 0) nift_setenv("NIFT_FS_ROOT", a.substr(10).c_str(), 1);
+            if (!literal_args && a == "--") { literal_args=true; continue; }
+            if (!literal_args && a == "--no-process") nift_setenv("NIFT_NO_PROCESS","1",1);
+            else if (!literal_args && a.rfind("--fs-root=", 0) == 0) nift_setenv("NIFT_FS_ROOT", a.substr(10).c_str(), 1);
             else script_args.push_back(a);
         }
         return run_script_file(command, script_args);
