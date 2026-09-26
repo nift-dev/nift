@@ -1,8 +1,19 @@
 # Nift release notes
 
-## v4.5.0 (development)
+## v4.5.0 (release candidate preparation)
 
-Nift v4.5 development is not yet underway; the v4.4.0 release is the current public release.
+Nift v4.5 promotes the native language into a reusable scripting/runtime layer while preserving Nift's website-generation core. The implementation campaign is complete through local CP34 evidence; independent Codex review, full sanitizer/cross-platform CI and publication gates remain mandatory before tagging.
+
+- Unified script invocation: plain `nift` is the persistent REPL, `nift file.f` executes scripts directly, and the old `nift run` / `nift sh` wrappers are removed.
+- `-e` / `-c` inline programs, `-i` interactive continuation, stdin source via `nift -`, shebang execution, and stable script `cmd` / `args`.
+- Runtime introspection and configuration through `env()`, `os()`, `arch()` and runtime-owned `target()` values, including explicit custom targets.
+- Bash-style POSIX job control with real process groups and terminal handoff: background `&`, `jobs`, `fg`, `bg` and `wait`.
+- Real native concurrency: `thread(...)`, replayable `join`, `hardware_concurrency()`, mutex-backed explicitly shared state, and `async` / `await` on a bounded native worker pool with nested-await progress guarantees.
+- C-ABI FFI through dynamic libraries, typed scalar calls, Nift-owned native buffers/struct layouts and bounded synchronous callbacks, with unsupported signatures rejected explicitly.
+- Supported embedding runtime: persistent `nift::Engine` script execution/evaluation alongside templating, isolated Engine instances, host values/functions, C ABI 1.1, staged C/C++ artifacts, and maintained Go/Python/Node/C# binding surfaces.
+- Direct script/package/FFI/concurrency/job-control integration dogfood, expanded independent v4.5 contract coverage, adversarial lifecycle tests, website documentation, and reproducible runtime/embedding performance evidence.
+
+Release remains blocked on the independent review and final clean optimized source, sanitizer/TSan, unprivileged regression, binding-toolchain and Linux/macOS/Windows CI walls documented in `docs/handover/V4.5-CODEX-REVIEW-HANDOFF.md`.
 
 ## v4.4.0 (development)
 

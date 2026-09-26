@@ -2,22 +2,18 @@
 
 ## Current status
 
-Nift has completed the planned Checkpoints 0–10 deliberate hardening campaign and reached the intended **hardening plateau**. The current development executable identifies as `Nift v4.0.8`, following the public v4.0.7 release. Production readiness is now a maintained state rather than a milestone still waiting to be earned through another synthetic checkpoint.
+Nift is in **v4.5 release-candidate preparation** on top of the public v4.4.0 release. The CP1–CP34 v4.5 campaign has locally implemented and exercised unified scripting invocation, native job control/concurrency, FFI, and supported embedding. CP35 is the independent Codex review/repair handoff; CP36 owns final release gates.
 
-The completed campaign established and retained evidence around component memory/resource safety, Nift lifecycle/endurance behavior, cross-component ownership, incremental-vs-clean equivalence, filesystem/transaction integrity, parser fuzz/resource boundaries, and scoped Linux/macOS/Windows behavioral equivalence. Checkpoint 10 also found and fixed a real Windows read-only artifact deletion defect before the final portable corpus converged with zero mismatches.
+The immediate priority is not another feature checkpoint. It is to run the complete clean optimized GCC/Clang, sanitizer/TSan, unprivileged independent regression, maintained binding, and Linux/macOS/Windows walls described in `V4.5-CODEX-REVIEW-HANDOFF.md`, repair anything found with permanent regressions, then obtain explicit maintainer approval before tagging/publishing.
 
-Do **not** invent Checkpoint 11 merely to continue the sequence. New hardening campaigns need a concrete trigger: a field defect, an unsupported platform claim worth establishing, a newly introduced semantic contract, or another clearly justified guarantee.
+Do not weaken flags, delete difficult tests, or rewrite repository history to make a gate green. Local tool-window limitations documented in CP31–CP34 are deferred evidence requirements, not waivers.
 
-## Current phase: v4.0.8 development
+## Current phase: v4.5 release-candidate review
 
-v4.0.7 has been released. The development executable now identifies as Nift v4.0.8.
-
-The current sequence is now:
-
-1. Maintain the current public language/configuration documentation and retain the focused/independent regressions established for the new contracts.
-2. Treat the 18 pagination incremental-vs-clean comparisons plus compact sanitizer/TSan pagination gates as scoped evidence for the exercised states, not universal proof.
-3. Continue dogfooding real sites and platform targets; turn concrete field failures into focused regressions instead of opening synthetic checkpoint sequences without a trigger.
-4. Monitor downstream distribution propagation (Homebrew auto-bump, Snap stable) for the current release.
+1. Independent architectural review and bounded repair commits.
+2. Complete source/regression/sanitizer/binding/cross-platform CI walls.
+3. Reconcile release artifacts/version/package recipes from committed state.
+4. Push/tag/publish only on explicit maintainer instruction and follow `RELEASES.md` / `PACKAGING.md` manual gates.
 
 ## Distribution validation direction
 

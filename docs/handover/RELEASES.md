@@ -15,6 +15,10 @@ remains documented in project history and release notes. Exact tag, artifact,
 and public release conventions must follow `PACKAGING.md` and actual
 Git/release evidence; the intended next release tag is `v4.5.0`.
 
+### v4.5.0 candidate status (2026-09-27)
+
+Local implementation/documentation/performance/integrity work is complete through CP34 and the CP35 independent-review brief is prepared. This is **not yet an approved release candidate for publication**: clean optimized GCC/Clang walls, final ASan/UBSan/LSan + TSan, complete unprivileged external contract, maintained binding toolchains, native Linux/macOS/Windows CI and actual independent-review repairs must all converge first. No push/tag/store action is authorized by the checkpoint plan itself.
+
 ## v4.0.12 release status and Snap decision
 
 - v4.0.12 remains the current release on the channels where it successfully

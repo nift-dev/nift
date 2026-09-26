@@ -25,14 +25,7 @@ whether it is a regression.
 - Language/toolchain: C++17 and Make.
 - Output convention for modern projects: `public/`.
 - Current branch: `main` in this checkout.
-- Current project phase: **post-release** — the public v4.1.0 release is
-  published (tag `v4.1.0` at `b499798`), and the v4.3 language/scripting
-  campaign has completed CP167 of the accepted CP115–CP167 structured-data,
-  agent-eval, project-model and typed-content/taxonomy campaign. Review is now required before the held CP48–CP50
-  final release gates. The embedded engine, its language
-  bindings, the shared corpus and the experimental Rust implementation remain
-  in-tree but are not publicly released, documented or promoted; they are
-  dogfooding/experimental work. Ordinary `make` builds only the CLI.
+- Current project phase: **v4.5 release-candidate preparation**. The public v4.4.0 release is the current stable baseline. The v4.5 native runtime/shell campaign is locally implemented through CP34 and has a prepared CP35 Codex review handoff; independent review, complete clean optimized/sanitizer/cross-platform walls, binding certification and explicit maintainer release approval remain before tagging. The embedding Engine/C ABI is now an intended supported v4.5 surface rather than experimental-only, subject to those final gates. See `docs/handover/V4.5-NATIVE-RUNTIME-SHELL.md` and `docs/handover/V4.5-CODEX-REVIEW-HANDOFF.md`.
 - Public documentation: the separate `nift-dev.github.io` repository.
 - External contract: the separate `nift-regression-suite` repository.
 - Embedded minifier: `minifypp/`, synchronized with standalone Minify++.

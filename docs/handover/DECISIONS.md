@@ -27,17 +27,15 @@ external and composable.
 a fundamental generation concern is consistently more complex than a small Nift
 primitive.
 
-## General scripting and arbitrary hooks
+## Native scripting/runtime
 
-**Status:** REJECTED
+**Status:** ACCEPTED/CURRENT FOR v4.5
 
-Do not casually restore LuaJIT, ExprTk, mutable template programming, system
-execution, or arbitrary pre/post hooks. Their removal is foundational to modern
-Nift.
+Nift now owns a native scripting/runtime layer implemented in Nift itself: direct scripts/REPL, process interoperability and job control, packages, real native concurrency, FFI and an embeddable Engine. This does **not** reverse the decision to remove LuaJIT/ExprTk or make arbitrary third-party runtimes part of the template engine. Template rendering and script execution remain distinct entry contexts with explicit host/security boundaries.
 
-**Revisit if:** a substantial project family cannot express necessary build-time
-rendering with constrained primitives and external orchestration remains clearly
-worse.
+New runtime features still need a concrete Nift use case, deterministic semantics, tests and an ownership/security model; "be Bash/Python" is not a product requirement by itself.
+
+**Revisit if:** runtime growth begins compromising website-build determinism, startup/resource goals or the maintainability of the core.
 
 ## Structured data and control flow
 
