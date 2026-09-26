@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # v4.4 executable .f scripts: nift script.f shorthand, shebang handling,
-# ./script.f from the host shell and plain nift shell, command-style and run() from
+# ./script.f from the host shell and plain `nift` shell, command-style and run() from
 # another script, script arguments, permission/restriction semantics, paths
 # with spaces, Unicode and environment inheritance.
 set -euo pipefail
@@ -41,7 +41,7 @@ grep -q "^arg:one$" <<<"$out" || exit 1
 out=$(cd "$t" && PATH="$BIN:$PATH" ./hello.f x y)
 grep -q "^argc=2$" <<<"$out" || { echo "$out" >&2; exit 1; }
 
-# ./script.f from plain nift shell
+# ./script.f from plain `nift` shell
 out=$(cd "$t" && printf './hello.f from-sh\n' | PATH="$BIN:$PATH" "$NIFT_ABS")
 grep -q "^arg:from-sh$" <<<"$out" || { echo "$out" >&2; exit 1; }
 

@@ -2,7 +2,7 @@
 set -euo pipefail
 bin=${1:-./nift}
 case "$bin" in /*) BIN="$bin";; *) BIN="$(cd "$(dirname "$bin")" && pwd)/$(basename "$bin")";; esac
-# --no-process must be accepted by plain nift shell/run/eval/build and deny process
+# --no-process must be accepted by plain `nift` shell/direct-script/eval/build and deny process
 # execution on every script-reachable surface including build hooks.
 out=$(printf 'printf hello\nexit\n' | "$BIN" --no-process 2>&1 || true)
 grep -q 'external process execution disabled' <<<"$out"

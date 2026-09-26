@@ -41,9 +41,9 @@ echo $[project_root()]
 exit\n' | "$NIFT" 2>/dev/null || true)
 grep -q 'R1' <<<"$fn_out" || { echo "fn-interp: $fn_out" >&2; exit 1; }
 echo "MARK bg"
-# Background & still fails explicitly rather than being misinterpreted.
-bg_out=$(printf 'sleep 1 &\nexit\n' | "$NIFT" 2>&1 || true)
-grep -q 'background job control is not implemented' <<<"$bg_out" || { echo "bg: $bg_out" >&2; exit 1; }
+# v4.5: background & launches a tracked shell job and wait reaps it.
+bg_out=$(printf 'sleep 0.02 &\nwait\njobs\nexit\n' | "$NIFT" 2>&1 || true)
+grep -Eq '\[[0-9]+\] Done \(0\).*sleep 0.02 &' <<<"$bg_out" || { echo "bg: $bg_out" >&2; exit 1; }
 
 echo "MARK bare"
 # Bare single-token commands fall through to ordinary external executable/PATH
