@@ -38,6 +38,7 @@ else
 		SHARED_LIB := libnift_c.dylib
 	else
 		SHARED_LIB := libnift_c.so
+		LDLIBS += -ldl
 	endif
 endif
 

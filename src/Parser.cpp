@@ -35,8 +35,24 @@
 #include <atomic>
 #include <charconv>
 #include <limits>
+#include <cstdint>
+#include <cerrno>
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <dlfcn.h>
+#endif
 
 namespace fs = std::filesystem;
+
+Parser::FfiLibraryInstance::~FfiLibraryInstance() {
+    if (!handle || closed) return;
+#ifdef _WIN32
+    FreeLibrary(static_cast<HMODULE>(handle));
+#else
+    dlclose(handle);
+#endif
+}
 static int nift_binding_type(const json::Document& value) {
     if (value.is_null()) return 0;
     if (value.is_bool()) return 1;
@@ -2086,6 +2102,55 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 std::function<bool(const json::Document&)> ok;ok=[&](const json::Document& v){if(v.is_string()&&v.string.rfind("\x1fnift:",0)==0&&v.string.rfind("\x1fnift:enum:",0)!=0&&v.string.rfind("\x1fnift:callable:",0)!=0&&v.string.rfind("\x1fnift:thread:",0)!=0&&v.string.rfind("\x1fnift:mutex:",0)!=0&&v.string.rfind("\x1fnift:async:",0)!=0)return false;if(v.is_array())for(const auto&x:v.array)if(!ok(x))return false;if(v.is_object())for(const auto&kv:v.object)if(!ok(kv.second))return false;return true;};
                 if(!ok(initial)){error="mutex: initial value contains a non-transferable resource";return false;}
                 auto st=std::make_shared<MutexInstance>();st->value=std::move(initial);static std::atomic<std::uint64_t> mutex_ids{1};const std::string id=std::to_string(mutex_ids.fetch_add(1));mutex_instances_[id]=st;out=json::Document(std::string("\x1fnift:mutex:")+id);return true;
+            }
+            if(call_args("ffi_open",args,q)){
+                if(args.size()!=1){error="ffi_open: expected library path";return false;}
+                std::string path;if(!string_arg("ffi_open",args,q,0,path))return false;
+                void* handle=nullptr;
+#ifdef _WIN32
+                int n=MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,path.c_str(),-1,nullptr,0);if(n<=0){error="ffi_open: invalid UTF-8 path";return false;}std::wstring w(static_cast<size_t>(n),L'\\0');MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,path.c_str(),-1,w.data(),n);handle=reinterpret_cast<void*>(LoadLibraryW(w.c_str()));
+#else
+                dlerror();handle=dlopen(path.c_str(),RTLD_NOW|RTLD_LOCAL);
+#endif
+                if(!handle){
+#ifdef _WIN32
+                    error="ffi_open: failed to load library";
+#else
+                    const char* e=dlerror();error=std::string("ffi_open: ")+(e?e:"failed to load library");
+#endif
+                    return false;
+                }
+                auto st=std::make_shared<FfiLibraryInstance>();st->handle=handle;const std::string id=std::to_string(next_ffi_library_id_++);ffi_libraries_[id]=st;out=json::Document(std::string("\x1fnift:ffi-lib:")+id);return true;
+            }
+            if(call_args("ffi_close",args,q)){
+                if(args.size()!=1){error="ffi_close: expected library handle";return false;}json::Document h;if(!arg_value(args,q,0,h)||!h.is_string()||h.string.rfind("\x1fnift:ffi-lib:",0)!=0){error="ffi_close: expected library handle";return false;}auto it=ffi_libraries_.find(h.string.substr(14));if(it==ffi_libraries_.end()||it->second->closed){error="ffi_close: invalid or closed library handle";return false;}
+#ifdef _WIN32
+                if(!FreeLibrary(static_cast<HMODULE>(it->second->handle))){error="ffi_close: unload failed";return false;}
+#else
+                if(dlclose(it->second->handle)!=0){const char* e=dlerror();error=std::string("ffi_close: ")+(e?e:"unload failed");return false;}
+#endif
+                it->second->handle=nullptr;it->second->closed=true;out=json::Document(nullptr);return true;
+            }
+            if(call_args("ffi_call",args,q)){
+                if(args.size()<3){error="ffi_call: expected library, symbol, signature and optional arguments";return false;}
+                json::Document lh;if(!arg_value(args,q,0,lh)||!lh.is_string()||lh.string.rfind("\x1fnift:ffi-lib:",0)!=0){error="ffi_call: expected library handle";return false;}auto li=ffi_libraries_.find(lh.string.substr(14));if(li==ffi_libraries_.end()||li->second->closed||!li->second->handle){error="ffi_call: invalid or closed library handle";return false;}
+                std::string symbol,signature;if(!string_arg("ffi_call",args,q,1,symbol)||!string_arg("ffi_call",args,q,2,signature))return false;if(symbol.empty()){error="ffi_call: symbol must not be empty";return false;}
+                signature.erase(std::remove_if(signature.begin(),signature.end(),[](unsigned char c){return std::isspace(c);}),signature.end());auto lp=signature.find('(');if(lp==std::string::npos||signature.empty()||signature.back()!=')'||signature.find('(',lp+1)!=std::string::npos){error="ffi_call: malformed signature";return false;}std::string rt=signature.substr(0,lp),inside=signature.substr(lp+1,signature.size()-lp-2);std::vector<std::string> types;if(!inside.empty()){std::size_t p=0;while(p<=inside.size()){auto c=inside.find(',',p);types.push_back(inside.substr(p,c==std::string::npos?std::string::npos:c-p));if(c==std::string::npos)break;p=c+1;}}
+                auto valid_type=[](const std::string&t){static const std::unordered_set<std::string> ok={"void","bool","i8","i16","i32","i64","u8","u16","u32","u64","f32","f64","ptr","cstr"};return ok.count(t)!=0;};if(!valid_type(rt)||rt=="void"&&false){error="ffi_call: unsupported return type";return false;}for(const auto&t:types)if(!valid_type(t)||t=="void"){error="ffi_call: unsupported argument type '"+t+"'";return false;}if(types.size()!=args.size()-3){error="ffi_call: signature argument count mismatch";return false;}if(types.size()>6){error="ffi_call: v4.5 supports at most 6 arguments";return false;}
+                void* sym=nullptr;
+#ifdef _WIN32
+                sym=reinterpret_cast<void*>(GetProcAddress(static_cast<HMODULE>(li->second->handle),symbol.c_str()));
+#else
+                dlerror();sym=dlsym(li->second->handle,symbol.c_str());const char* dlerr=dlerror();if(dlerr){error=std::string("ffi_call: symbol lookup failed: ")+dlerr;return false;}
+#endif
+                if(!sym){error="ffi_call: symbol not found: "+symbol;return false;}
+                auto is_float=[](const std::string&t){return t=="f32"||t=="f64";};bool any_float=is_float(rt);for(const auto&t:types)any_float=any_float||is_float(t);if(any_float){bool all32=(rt=="f32");bool all64=(rt=="f64");for(const auto&t:types){all32=all32&&t=="f32";all64=all64&&t=="f64";}if(!(all32||all64)){error="ffi_call: mixed floating/integer signatures are not supported by the built-in v4.5 dispatcher";return false;}if(rt=="void"){error="ffi_call: floating arguments with void return are not supported";return false;}
+                    if(all64){std::vector<double> v;for(size_t i=0;i<types.size();++i){json::Document d;if(!arg_value(args,q,i+3,d)||!d.is_number()){error="ffi_call: f64 argument must be numeric";return false;}v.push_back(d.num);}double r=0;switch(v.size()){case 0:r=reinterpret_cast<double(*)()>(sym)();break;case 1:r=reinterpret_cast<double(*)(double)>(sym)(v[0]);break;case 2:r=reinterpret_cast<double(*)(double,double)>(sym)(v[0],v[1]);break;case 3:r=reinterpret_cast<double(*)(double,double,double)>(sym)(v[0],v[1],v[2]);break;case 4:r=reinterpret_cast<double(*)(double,double,double,double)>(sym)(v[0],v[1],v[2],v[3]);break;default:error="ffi_call: f64 dispatcher supports up to 4 arguments";return false;}out=json::Document(r);return true;}
+                    std::vector<float> v;for(size_t i=0;i<types.size();++i){json::Document d;if(!arg_value(args,q,i+3,d)||!d.is_number()){error="ffi_call: f32 argument must be numeric";return false;}v.push_back(static_cast<float>(d.num));}float r=0;switch(v.size()){case 0:r=reinterpret_cast<float(*)()>(sym)();break;case 1:r=reinterpret_cast<float(*)(float)>(sym)(v[0]);break;case 2:r=reinterpret_cast<float(*)(float,float)>(sym)(v[0],v[1]);break;case 3:r=reinterpret_cast<float(*)(float,float,float)>(sym)(v[0],v[1],v[2]);break;case 4:r=reinterpret_cast<float(*)(float,float,float,float)>(sym)(v[0],v[1],v[2],v[3]);break;default:error="ffi_call: f32 dispatcher supports up to 4 arguments";return false;}out=json::Document(static_cast<double>(r));return true;
+                }
+                std::vector<std::string> string_storage;string_storage.reserve(types.size());std::vector<std::uintptr_t> v;v.reserve(types.size());for(size_t i=0;i<types.size();++i){json::Document d;if(!arg_value(args,q,i+3,d))return false;const auto&t=types[i];if(t=="cstr"){if(d.is_null()){v.push_back(0);continue;}if(!d.is_string()){error="ffi_call: cstr argument must be string or null";return false;}if(d.string.find('\0')!=std::string::npos){error="ffi_call: cstr contains embedded NUL";return false;}string_storage.push_back(d.string);v.push_back(reinterpret_cast<std::uintptr_t>(string_storage.back().c_str()));continue;}if(t=="ptr"){if(d.is_null()){v.push_back(0);continue;}if(!d.is_string()||d.string.rfind("\x1fnift:ffi-ptr:",0)!=0){error="ffi_call: ptr argument must be pointer handle or null";return false;}auto pi=ffi_pointers_.find(d.string.substr(14));if(pi==ffi_pointers_.end()){error="ffi_call: invalid pointer handle";return false;}v.push_back(reinterpret_cast<std::uintptr_t>(pi->second));continue;}if(t=="bool"){if(!d.is_bool()){error="ffi_call: bool argument must be bool";return false;}v.push_back(d.boolean?1:0);continue;}if(!d.is_number()){error="ffi_call: integer argument must be numeric";return false;}long double x=d.num;bool uns=!t.empty()&&t[0]=='u';int bits=t=="i8"||t=="u8"?8:t=="i16"||t=="u16"?16:t=="i32"||t=="u32"?32:64;if(std::trunc(x)!=x){error="ffi_call: integer argument is fractional";return false;}long double lo=uns?0.0L:-std::ldexp(1.0L,bits-1),hi=uns?std::ldexp(1.0L,bits)-1.0L:std::ldexp(1.0L,bits-1)-1.0L;if(x<lo||x>hi){error="ffi_call: integer argument out of range for "+t;return false;}v.push_back(static_cast<std::uintptr_t>(static_cast<std::uint64_t>(static_cast<std::int64_t>(x))));}
+                using W=std::uintptr_t;W r=0;switch(v.size()){case 0:r=reinterpret_cast<W(*)()>(sym)();break;case 1:r=reinterpret_cast<W(*)(W)>(sym)(v[0]);break;case 2:r=reinterpret_cast<W(*)(W,W)>(sym)(v[0],v[1]);break;case 3:r=reinterpret_cast<W(*)(W,W,W)>(sym)(v[0],v[1],v[2]);break;case 4:r=reinterpret_cast<W(*)(W,W,W,W)>(sym)(v[0],v[1],v[2],v[3]);break;case 5:r=reinterpret_cast<W(*)(W,W,W,W,W)>(sym)(v[0],v[1],v[2],v[3],v[4]);break;case 6:r=reinterpret_cast<W(*)(W,W,W,W,W,W)>(sym)(v[0],v[1],v[2],v[3],v[4],v[5]);break;}
+                if(rt=="void"){out=json::Document(nullptr);return true;}if(rt=="cstr"){const char* p=reinterpret_cast<const char*>(r);out=p?json::Document(std::string(p)):json::Document(nullptr);return true;}if(rt=="ptr"){if(!r){out=json::Document(nullptr);return true;}const std::string id=std::to_string(next_ffi_pointer_id_++);ffi_pointers_[id]=reinterpret_cast<void*>(r);out=json::Document(std::string("\x1fnift:ffi-ptr:")+id);return true;}if(rt=="bool"){out=json::Document(r!=0);return true;}bool uns=!rt.empty()&&rt[0]=='u';int bits=rt=="i8"||rt=="u8"?8:rt=="i16"||rt=="u16"?16:rt=="i32"||rt=="u32"?32:64;if(uns){std::uint64_t x=static_cast<std::uint64_t>(r);if(bits<64)x&=((std::uint64_t(1)<<bits)-1);json::Document nd;nd.type=json::Type::StrNumber;nd.string=std::to_string(x);out=std::move(nd);return true;}std::int64_t x=0;if(bits==8)x=static_cast<std::int8_t>(r);else if(bits==16)x=static_cast<std::int16_t>(r);else if(bits==32)x=static_cast<std::int32_t>(r);else x=static_cast<std::int64_t>(r);json::Document nd;nd.type=json::Type::StrNumber;nd.string=std::to_string(x);out=std::move(nd);return true;
             }
             if(call_args("setenv",args,q)){if(!standalone_script_host_){error="setenv: only available in standalone Nift scripts/shell";return false;}if(args.size()!=2){error="setenv: expected name and value";return false;}std::string k,v;if(!string_arg("setenv",args,q,0,k)||!string_arg("setenv",args,q,1,v))return false;
 #ifdef _WIN32

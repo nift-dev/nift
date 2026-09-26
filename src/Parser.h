@@ -190,6 +190,15 @@ private:
     };
     std::unordered_map<std::string, std::shared_ptr<AsyncInstance>> async_instances_;
     std::vector<std::shared_ptr<AsyncInstance>> owned_async_instances_;
+    struct FfiLibraryInstance {
+        void* handle = nullptr;
+        bool closed = false;
+        ~FfiLibraryInstance();
+    };
+    std::unordered_map<std::string, std::shared_ptr<FfiLibraryInstance>> ffi_libraries_;
+    std::unordered_map<std::string, void*> ffi_pointers_;
+    std::uint64_t next_ffi_library_id_ = 1;
+    std::uint64_t next_ffi_pointer_id_ = 1;
 
     enum class CollectionKind { Stack, Queue, PriQue, Map, SortedMap, Set, SortedSet };
     struct CollectionInstance {
