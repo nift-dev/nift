@@ -875,6 +875,16 @@ static int execute_shell_command(Parser& parser,const std::string& line,bool pri
         }
         return 0;
     }
+    if(!toks.empty() && (toks[0]=="fg" || toks[0]=="bg" || toks[0]=="wait")) {
+        if(!jobs){if(print_errors)console::error(toks[0]+": no interactive job table");return 2;}
+        if(toks.size()>2){if(print_errors)console::error(toks[0]+": expected at most one job id");return 2;}
+        int id=0;
+        if(toks.size()==2){std::string raw=toks[1];if(!raw.empty()&&raw[0]=='%')raw.erase(raw.begin());try{id=std::stoi(raw);}catch(...){if(print_errors)console::error(toks[0]+": invalid job id");return 2;}}
+        if(id==0 && toks[0]!="wait"){auto list=jobs->jobs(false);if(list.empty()){if(print_errors)console::error(toks[0]+": no current job");return 1;}id=list.back().id;}
+        if(toks[0]=="fg"){auto pr=jobs->foreground(id);if(!pr.error.empty()){if(print_errors)console::error("fg: "+pr.error);return 1;}return pr.exit_code;}
+        if(toks[0]=="bg"){std::string e;if(!jobs->background(id,e)){if(print_errors)console::error("bg: "+e);return 1;}return 0;}
+        auto pr=id?jobs->wait(id):jobs->wait_all();if(!pr.error.empty()){if(print_errors)console::error("wait: "+pr.error);return 1;}return pr.exit_code;
+    }
     // First try a command-style Nift callable for a simple command. Literal command tokens become strings.
     bool has_ops=false;for(const auto&t:toks)if(is_command_operator(t))has_ops=true;
     if(!has_ops){std::string expr=toks[0]+"(";for(size_t i=1;i<toks.size();++i){if(i>1)expr+=",";expr+=quote_nift_string(toks[i]);}expr+=")";auto rr=parser.run_statement(expr,"<repl>");if(rr.ok){if(!rr.output.empty())std::cout<<rr.output<<'\n';return 0;}}
@@ -898,8 +908,10 @@ static int execute_shell_command(Parser& parser,const std::string& line,bool pri
         // pipelines use their requested pipes/files; run()/cmd() structured
         // capture is unaffected.
         const bool direct = !has_ops && stages.size()==1;
-        if(direct) stages[0].foreground_terminal = true;
-        auto pr=nift_run_pipeline(stages, !direct, !direct);last=pr.exit_code;if(!pr.error.empty()&&print_errors)console::error(pr.error);
+        ProcessResult pr;
+        if(jobs) pr=jobs->launch(stages,line,true);
+        else { if(direct) stages[0].foreground_terminal=true; pr=nift_run_pipeline(stages,!direct,!direct); }
+        last=pr.exit_code;if(!pr.error.empty()&&print_errors)console::error(pr.error);
     }pending_op=end<toks.size()?toks[end]:"";pos=end+1;}return last;}
 
 static fs::path nift_history_path(){
@@ -914,7 +926,7 @@ static std::vector<std::string> load_nift_history(){
 }
 static void append_nift_history(const std::string& line){if(line.empty())return;std::ofstream out(nift_history_path(),std::ios::app);if(out)out<<line<<'\n';}
 static std::vector<std::string> nift_shell_completions(const std::string& prefix){
-    static const std::vector<std::string> builtins={"build","cat","cd","cmd","copy","cp","exists","file","getenv","env","os","arch","jobs","ls","make_dir","max","min","mkdir","move","mv","open","page","pwd","remove","rm","run","setenv","target","touch","unsetenv","which"};
+    static const std::vector<std::string> builtins={"build","cat","cd","cmd","copy","cp","exists","file","getenv","env","os","arch","jobs","fg","bg","wait","ls","make_dir","max","min","mkdir","move","mv","open","page","pwd","remove","rm","run","setenv","target","touch","unsetenv","which"};
     std::set<std::string> out;for(const auto& b:builtins)if(b.rfind(prefix,0)==0)out.insert(b);
     if(const char* path=std::getenv("PATH")){std::stringstream ss(path);std::string dir;while(std::getline(ss,dir,':')){std::error_code ec;for(auto it=fs::directory_iterator(dir,ec);!ec&&it!=fs::directory_iterator();it.increment(ec)){auto n=it->path().filename().string();if(n.rfind(prefix,0)==0)out.insert(n);}}}
     fs::path pp=prefix.empty()?fs::path("."):fs::path(prefix);fs::path parent=pp.has_parent_path()?pp.parent_path():fs::path(".");std::string leaf=pp.filename().string();std::error_code ec;for(auto it=fs::directory_iterator(parent,ec);!ec&&it!=fs::directory_iterator();it.increment(ec)){auto n=it->path().filename().string();if(n.rfind(leaf,0)==0){auto c=(pp.has_parent_path()?parent/fs::path(n):fs::path(n)).generic_string();if(it->is_directory(ec))c+="/";out.insert(c);}}
@@ -955,7 +967,7 @@ std::vector<std::string> full_shell_completions(const Parser& parser, const std:
 std::vector<std::string> command_completions(const Parser& parser, const std::string& prefix) {
     std::set<std::string> out;
     for (auto& c : parser.shell_completions(prefix)) out.insert(c);
-    for (const std::string& b : {"build","cat","cd","cmd","copy","cp","exists","file","getenv","env","os","arch","jobs","ls","make_dir","max","min","mkdir","move","mv","open","page","pwd","remove","rm","run","setenv","touch","unsetenv","which"})
+    for (const std::string& b : {"build","cat","cd","cmd","copy","cp","exists","file","getenv","env","os","arch","jobs","fg","bg","wait","ls","make_dir","max","min","mkdir","move","mv","open","page","pwd","remove","rm","run","setenv","touch","unsetenv","which"})
         if (b.rfind(prefix, 0) == 0) out.insert(b);
     if (const char* path = std::getenv("PATH")) {
         std::stringstream ss(path); std::string dir;
@@ -1084,7 +1096,7 @@ static int run_script_shell_loop(Parser& parser, bool load_rc) {
             const bool bare_token = !tv.empty() &&
                 tv.find_first_of(" \t()[]{}:=@$\"'")==std::string::npos && tv.find("//")==std::string::npos;
             if(bare_token){
-                static const std::unordered_set<std::string> shell_builtins={"build","cat","cd","cmd","copy","cp","exists","file","getenv","env","os","arch","jobs","ls","make_dir","max","min","mkdir","move","mv","open","page","pwd","remove","rm","run","setenv","touch","unsetenv","which"};
+                static const std::unordered_set<std::string> shell_builtins={"build","cat","cd","cmd","copy","cp","exists","file","getenv","env","os","arch","jobs","fg","bg","wait","ls","make_dir","max","min","mkdir","move","mv","open","page","pwd","remove","rm","run","setenv","touch","unsetenv","which"};
                 const bool is_builtin = shell_builtins.count(tv) != 0;
                 std::string resolved;
                 const bool on_path = !is_builtin && nift_find_executable(tv, resolved);
@@ -1102,6 +1114,7 @@ static int run_script_shell_loop(Parser& parser, bool load_rc) {
         }
         if(!rr.output.empty())std::cout<<rr.output<<'\n';
     }
+    if(jobs.has_live_jobs()) jobs.wait_all();
     std::string resource_error;
     if(!parser.finalize_script_resources(resource_error)){console::error(resource_error);return 1;}
     return 0;
