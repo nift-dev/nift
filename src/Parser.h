@@ -32,6 +32,7 @@ struct RenderSource {
 class Parser {
 public:
     Parser(RenderHost& host, TrackedInfo& tracked_info);
+    ~Parser();
     RenderResult render();
 
     // Native script hosts used by direct scripts / the Nift shell.
@@ -170,6 +171,7 @@ private:
         ~ThreadInstance(){ std::lock_guard<std::mutex> guard(join_mutex); if(worker.joinable()) worker.join(); }
     };
     std::unordered_map<std::string, std::shared_ptr<ThreadInstance>> thread_instances_;
+    std::vector<std::shared_ptr<ThreadInstance>> owned_thread_instances_;
     std::uint64_t next_thread_instance_id_ = 1;
     struct MutexInstance {
         mutable std::mutex state_mutex;
@@ -179,6 +181,15 @@ private:
         json::Document value;
     };
     std::unordered_map<std::string, std::shared_ptr<MutexInstance>> mutex_instances_;
+    struct AsyncInstance {
+        mutable std::mutex mutex;
+        std::condition_variable cv;
+        bool done = false;
+        std::shared_ptr<json::Document> result;
+        std::string error;
+    };
+    std::unordered_map<std::string, std::shared_ptr<AsyncInstance>> async_instances_;
+    std::vector<std::shared_ptr<AsyncInstance>> owned_async_instances_;
 
     enum class CollectionKind { Stack, Queue, PriQue, Map, SortedMap, Set, SortedSet };
     struct CollectionInstance {
