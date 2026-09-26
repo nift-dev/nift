@@ -137,4 +137,60 @@ grep -q '^cc-done$' <<<"$out" || exit 1
 # command-style in script land is blocked by --no-process
 if (cd "$t" && PATH="$t/bin:$PATH" NIFT_NO_PROCESS=1 "$NIFT_ABS" cc.f 2>/dev/null | grep -q 'fixtool-ran'); then echo "script command-style ran under --no-process" >&2; exit 1; fi
 
-echo 'PASS v4.4 executable .f scripts'
+
+# v4.5 shebang certification: invocation identity, cwd, args and environment.
+cat > "$t/certify.f" <<'F'
+#!/usr/bin/env nift
+print(cmd)
+print(args.join("|"))
+print(pwd())
+print(getenv("NIFT_EXEC_TEST"))
+F
+chmod +x "$t/certify.f"
+out=$(cd "$t" && PATH="$BIN:$PATH" NIFT_EXEC_TEST=certified ./certify.f one two)
+[ "$(sed -n '1p' <<<"$out")" = './certify.f' ] || { echo "$out" >&2; exit 1; }
+[ "$(sed -n '2p' <<<"$out")" = 'one|two' ] || exit 1
+[ "$(sed -n '3p' <<<"$out")" = "$t" ] || exit 1
+[ "$(sed -n '4p' <<<"$out")" = 'certified' ] || exit 1
+
+# A runtime error reached through the shebang must remain a non-zero process exit.
+cat > "$t/fail-shebang.f" <<'F'
+#!/usr/bin/env nift
+break
+F
+chmod +x "$t/fail-shebang.f"
+if (cd "$t" && PATH="$BIN:$PATH" ./fail-shebang.f >/dev/null 2>&1); then
+  echo 'failing shebang script returned zero' >&2; exit 1
+fi
+
+# The shebang marker is only special on source line one.
+cat > "$t/not-first.f" <<'F'
+print("before")
+#!/usr/bin/env nift
+print("after")
+F
+out=$("$NIFT_ABS" "$t/not-first.f")
+[ "$out" = $'before\nafter' ] || { echo 'non-leading shebang text changed script execution' >&2; echo "$out" >&2; exit 1; }
+
+# POSIX signal delivery remains ordinary process behavior for an executable script.
+case "$(uname -s)" in MINGW*|MSYS*) ;; *)
+cat > "$t/signal.f" <<'F'
+#!/usr/bin/env nift
+i := 0
+while(i < 1000000000) { i += 1 }
+F
+chmod +x "$t/signal.f"
+(
+  cd "$t"
+  PATH="$BIN:$PATH" ./signal.f >/dev/null 2>&1 &
+  pid=$!
+  sleep 0.05
+  kill -TERM "$pid"
+  set +e
+  wait "$pid"
+  rc=$?
+  set -e
+  [ "$rc" -eq 143 ]
+) || { echo 'shebang script did not preserve SIGTERM exit status' >&2; exit 1; }
+;; esac
+echo 'PASS v4.5 executable .f scripts'
