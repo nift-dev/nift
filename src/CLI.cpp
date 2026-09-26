@@ -62,7 +62,7 @@ constexpr const char* version_text = "Nift v4.5.0";
 constexpr auto build_auto_poll_interval = std::chrono::milliseconds(200);
 constexpr const char* build_auto_log_path = ".nift/build-auto.log";
 
-bool valid_runtime_target(const std::string& value) {
+bool valid_runtime_platform(const std::string& value) {
     if (value.empty()) return false;
     auto first = static_cast<unsigned char>(value.front());
     if (!((first >= 'a' && first <= 'z') || (first >= '0' && first <= '9'))) return false;
@@ -71,10 +71,8 @@ bool valid_runtime_target(const std::string& value) {
     return true;
 }
 
-bool parse_runtime_target_selector(const std::string& arg, std::string& target) {
-    static const std::set<std::string> builtins={"native","linux","macos","windows","android","ios","wasm"};
-    if (arg.rfind("--target=",0)==0) { target=arg.substr(9); return valid_runtime_target(target); }
-    if (arg.size()>2 && arg.rfind("--",0)==0) { const std::string id=arg.substr(2); if(builtins.count(id)){target=id;return true;} }
+bool parse_runtime_platform_selector(const std::string& arg, std::string& platform) {
+    if (arg.rfind("--platform=",0)==0) { platform=arg.substr(11); return valid_runtime_platform(platform); }
     return false;
 }
 
@@ -926,7 +924,7 @@ static std::vector<std::string> load_nift_history(){
 }
 static void append_nift_history(const std::string& line){if(line.empty())return;std::ofstream out(nift_history_path(),std::ios::app);if(out)out<<line<<'\n';}
 static std::vector<std::string> nift_shell_completions(const std::string& prefix){
-    static const std::vector<std::string> builtins={"build","cat","cd","cmd","copy","cp","exists","file","getenv","env","os","arch","hardware_concurrency","thread","async","await","mutex","atomic<int>","atomic<bool>","jobs","fg","bg","wait","ls","make_dir","max","min","mkdir","move","mv","open","page","pwd","remove","rm","run","setenv","target","touch","unsetenv","which"};
+    static const std::vector<std::string> builtins={"build","cat","cd","cmd","copy","cp","exists","file","getenv","env","os","arch","hardware_concurrency","thread","await","mutex","atomic<int>","atomic<bool>","jobs","fg","bg","wait","ls","make_dir","max","min","mkdir","move","mv","open","page","pwd","remove","rm","run","setenv","platform","touch","unsetenv","which"};
     std::set<std::string> out;for(const auto& b:builtins)if(b.rfind(prefix,0)==0)out.insert(b);
     if(const char* path=std::getenv("PATH")){std::stringstream ss(path);std::string dir;while(std::getline(ss,dir,':')){std::error_code ec;for(auto it=fs::directory_iterator(dir,ec);!ec&&it!=fs::directory_iterator();it.increment(ec)){auto n=it->path().filename().string();if(n.rfind(prefix,0)==0)out.insert(n);}}}
     fs::path pp=prefix.empty()?fs::path("."):fs::path(prefix);fs::path parent=pp.has_parent_path()?pp.parent_path():fs::path(".");std::string leaf=pp.filename().string();std::error_code ec;for(auto it=fs::directory_iterator(parent,ec);!ec&&it!=fs::directory_iterator();it.increment(ec)){auto n=it->path().filename().string();if(n.rfind(leaf,0)==0){auto c=(pp.has_parent_path()?parent/fs::path(n):fs::path(n)).generic_string();if(it->is_directory(ec))c+="/";out.insert(c);}}
@@ -967,7 +965,7 @@ std::vector<std::string> full_shell_completions(const Parser& parser, const std:
 std::vector<std::string> command_completions(const Parser& parser, const std::string& prefix) {
     std::set<std::string> out;
     for (auto& c : parser.shell_completions(prefix)) out.insert(c);
-    for (const std::string& b : {"build","cat","cd","cmd","copy","cp","exists","file","getenv","env","os","arch","hardware_concurrency","thread","async","await","mutex","atomic<int>","atomic<bool>","jobs","fg","bg","wait","ls","make_dir","max","min","mkdir","move","mv","open","page","pwd","remove","rm","run","setenv","touch","unsetenv","which"})
+    for (const std::string& b : {"build","cat","cd","cmd","copy","cp","exists","file","getenv","env","os","arch","hardware_concurrency","thread","await","mutex","atomic<int>","atomic<bool>","jobs","fg","bg","wait","ls","make_dir","max","min","mkdir","move","mv","open","page","pwd","remove","rm","run","setenv","touch","unsetenv","which"})
         if (b.rfind(prefix, 0) == 0) out.insert(b);
     if (const char* path = std::getenv("PATH")) {
         std::stringstream ss(path); std::string dir;
@@ -1096,7 +1094,7 @@ static int run_script_shell_loop(Parser& parser, bool load_rc) {
             const bool bare_token = !tv.empty() &&
                 tv.find_first_of(" \t()[]{}:=@$\"'")==std::string::npos && tv.find("//")==std::string::npos;
             if(bare_token){
-                static const std::unordered_set<std::string> shell_builtins={"build","cat","cd","cmd","copy","cp","exists","file","getenv","env","os","arch","hardware_concurrency","thread","async","await","mutex","jobs","fg","bg","wait","ls","make_dir","max","min","mkdir","move","mv","open","page","pwd","remove","rm","run","setenv","touch","unsetenv","which"};
+                static const std::unordered_set<std::string> shell_builtins={"build","cat","cd","cmd","copy","cp","exists","file","getenv","env","os","arch","hardware_concurrency","thread","await","mutex","jobs","fg","bg","wait","ls","make_dir","max","min","mkdir","move","mv","open","page","pwd","remove","rm","run","setenv","touch","unsetenv","which"};
                 const bool is_builtin = shell_builtins.count(tv) != 0;
                 std::string resolved;
                 const bool on_path = !is_builtin && nift_find_executable(tv, resolved);
@@ -1130,17 +1128,17 @@ int run_cli(int argc, char** argv) {
     const std::string command = argc > 1 ? argv[1] : "";
     if (command.empty()) return run_script_shell();
 
-    // Runtime target selector prefix for scripts/stdin/inline execution.
-    if (command.rfind("--target=",0)==0 || command=="--native" || command=="--linux" || command=="--macos" || command=="--windows" || command=="--android" || command=="--ios" || command=="--wasm") {
-        std::string target;
-        if (!parse_runtime_target_selector(command,target)) { console::error("invalid target selector '"+command+"'"); return 2; }
-        if (argc < 3) { ScriptRenderHost host(fs::current_path(),target); TrackedInfo info; Parser parser(host,info); parser.set_script_invocation("<repl>",{}); return run_script_shell_loop(parser,true); }
+    // Runtime platform selector prefix for scripts/stdin/inline execution.
+    if (command.rfind("--platform=",0)==0) {
+        std::string platform;
+        if (!parse_runtime_platform_selector(command,platform)) { console::error("invalid platform selector '"+command+"'"); return 2; }
+        if (argc < 3) { ScriptRenderHost host(fs::current_path(),platform); TrackedInfo info; Parser parser(host,info); parser.set_script_invocation("<repl>",{}); return run_script_shell_loop(parser,true); }
         const std::string source_mode=argv[2];
-        if (source_mode.rfind("--target=",0)==0 || source_mode=="--native" || source_mode=="--linux" || source_mode=="--macos" || source_mode=="--windows" || source_mode=="--android" || source_mode=="--ios" || source_mode=="--wasm") { console::error("multiple target selections are not allowed"); return 2; }
-        if (source_mode=="-e" || source_mode=="-c") { if(argc<4){console::error(source_mode+" requires program source");return 2;} std::vector<std::string> a; for(int i=4;i<argc;++i) if(std::string(argv[i])!="--") a.push_back(argv[i]); return run_inline_script(argv[3],a,false,target); }
-        if (source_mode=="-") { std::vector<std::string> a; for(int i=3;i<argc;++i) if(std::string(argv[i])!="--") a.push_back(argv[i]); return run_stdin_script(a,false,target); }
-        if (filesystem::file_exists(source_mode) && !fs::is_directory(source_mode)) { std::vector<std::string> a; for(int i=3;i<argc;++i) if(std::string(argv[i])!="--") a.push_back(argv[i]); return run_script_file(source_mode,a,false,target); }
-        console::error("target selector must precede an existing script path, '-', -e or -c"); return 2;
+        if (source_mode.rfind("--platform=",0)==0) { console::error("multiple platform selections are not allowed"); return 2; }
+        if (source_mode=="-e" || source_mode=="-c") { if(argc<4){console::error(source_mode+" requires program source");return 2;} std::vector<std::string> a; for(int i=4;i<argc;++i) if(std::string(argv[i])!="--") a.push_back(argv[i]); return run_inline_script(argv[3],a,false,platform); }
+        if (source_mode=="-") { std::vector<std::string> a; for(int i=3;i<argc;++i) if(std::string(argv[i])!="--") a.push_back(argv[i]); return run_stdin_script(a,false,platform); }
+        if (filesystem::file_exists(source_mode) && !fs::is_directory(source_mode)) { std::vector<std::string> a; for(int i=3;i<argc;++i) if(std::string(argv[i])!="--") a.push_back(argv[i]); return run_script_file(source_mode,a,false,platform); }
+        console::error("platform selector must precede an existing script path, '-', -e or -c"); return 2;
     }
 
     // Full-program command-line execution. -e is canonical; -c is an exact
@@ -1377,7 +1375,7 @@ int run_cli(int argc, char** argv) {
         // --repair. -p (explain rebuild reasons) is orthogonal and combinable.
         // --no-process extends the script process restriction to build hooks.
         bool all_mode = false, auto_mode = false, repair_mode = false, explain = false, no_process = false;
-        std::string runtime_target = "native"; bool target_selected=false;
+        std::string runtime_platform = "native"; bool platform_selected=false;
         std::vector<std::string> names;
         int mode_flags = 0;
         for (int i = 2; i < argc; ++i) {
@@ -1387,15 +1385,15 @@ int run_cli(int argc, char** argv) {
             else if (arg == "--repair") { repair_mode = true; ++mode_flags; }
             else if (arg == "-p") explain = true;
             else if (arg == "--no-process") no_process = true;
-            else if (arg.rfind("--target=",0)==0 || arg=="--native" || arg=="--linux" || arg=="--macos" || arg=="--windows" || arg=="--android" || arg=="--ios" || arg=="--wasm") {
-                std::string selected; if(!parse_runtime_target_selector(arg,selected)){console::error("invalid target selector '"+arg+"'");return 1;}
-                if(target_selected){console::error("multiple target selections are not allowed");return 1;} runtime_target=selected;target_selected=true;
+            else if (arg.rfind("--platform=",0)==0) {
+                std::string selected; if(!parse_runtime_platform_selector(arg,selected)){console::error("invalid platform selector '"+arg+"'");return 1;}
+                if(platform_selected){console::error("multiple platform selections are not allowed");return 1;} runtime_platform=selected;platform_selected=true;
             }
             else if (!arg.empty() && arg[0] == '-') { console::error("unknown build option '" + arg + "'"); return 1; }
             else names.emplace_back(arg);
         }
         if (no_process) nift_setenv("NIFT_NO_PROCESS", "1", 1);
-        project.target_ = runtime_target;
+        project.target_ = runtime_platform;
         if (mode_flags > 1 || (mode_flags == 1 && !names.empty())) {
             console::error("build modes are mutually exclusive");
             return 1;

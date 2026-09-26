@@ -27,7 +27,7 @@ public:
     std::string relative(const fs::path& p) const override { std::error_code ec; auto r=fs::relative(p,root_,ec); return ec?p.generic_string():r.generic_string(); }
     const std::string& output_dir() const override { static const std::string empty; return empty; }
     int build_threads() const override { return 1; }
-    const std::string& target() const override { return target_; }
+    const std::string& platform() const override { return target_; }
     fs::path content_path(const TrackedInfo&) const override { return {}; }
     fs::path output_path(const TrackedInfo&) const override { return {}; }
     fs::path pagination_output_path(const TrackedInfo&,std::size_t) const override { return {}; }

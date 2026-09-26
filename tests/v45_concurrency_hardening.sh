@@ -4,8 +4,9 @@ NIFT=${NIFT:-$(pwd)/nift}
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 cat > "$TMP/work.f" <<'NIFT'
+@fn[async](add_async(x, y)) { return x + y }
 fn(add(x, y)) { return x + y }
-fn(task(x)) { a := async(add, x, 1); t := thread(add, x, 2); return await(a) + t.join() }
+fn(task(x)) { a := add_async(x, 1); t := thread(add, x, 2); r := await a; return r + t.join() }
 print(task(10));
 NIFT
 # Independent runtimes must not share parser state or handles.

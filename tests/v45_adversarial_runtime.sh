@@ -43,17 +43,17 @@ t := thread(bad); t.join()
 NIFT
 fail_case thread_error 'thread:' "$TMP/thread-error.f"
 cat >"$TMP/async-error.f" <<'NIFT'
-fn(bad()) { return 1 / 0 }
-f := async(bad); await(f)
+@fn[async](bad()) { return 1 / 0 }
+f := bad(); r := await f
 NIFT
-fail_case async_error 'async:' "$TMP/async-error.f"
+fail_case async_error 'future:' "$TMP/async-error.f"
 # Churn handles and shutdown paths repeatedly; success is bounded completion/no signal.
 cat >"$TMP/churn.f" <<'NIFT'
-fn(id(x)) { return x }
+@fn[async](id(x)) { return x }
 i := 0
 while(i < 50) {
   t := thread(id, i); t.join()
-  f := async(id, i); await(f)
+  f := id(i); r := await f
   i += 1
 }
 NIFT
@@ -62,9 +62,9 @@ NIFT
 python3 - "$TMP/churn.f" <<'PY'
 import sys
 p=sys.argv[1]
-lines=['fn(worker(x)) { return x }']
+lines=['fn(worker(x)) { return x }', '@fn[async](aworker(x)) { return x }']
 for i in range(50):
-    lines += [f't{i} := thread(worker, {i})', f't{i}.join()', f'f{i} := async(worker, {i})', f'await(f{i})']
+    lines += [f't{i} := thread(worker, {i})', f't{i}.join()', f'f{i} := aworker({i})', f'r{i} := await f{i}']
 open(p,'w').write('\n'.join(lines)+'\n')
 PY
 timeout 20s "$NIFT" "$TMP/churn.f" >/dev/null

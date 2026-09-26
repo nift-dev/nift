@@ -6,10 +6,10 @@
 int main(){
   std::atomic<int> failures{0}; std::vector<std::thread> threads;
   for(int i=0;i<8;++i) threads.emplace_back([i,&failures]{
-    nift::Engine e; e.set_target("worker"+std::to_string(i));
+    nift::Engine e; e.set_platform("worker"+std::to_string(i));
     e.register_function("host_id",[i](const std::vector<nift::Value>&){return nift::Value(i);});
     auto r=e.execute("fn(id()) { return host_id() }\nreturn id()\n");
-    auto t=e.evaluate("target()"); if(!r.ok()||!r.value().is_number()||r.value().number()!=i||!t.ok()||t.value().string()!="worker"+std::to_string(i))++failures;
+    auto t=e.evaluate("platform()"); if(!r.ok()||!r.value().is_number()||r.value().number()!=i||!t.ok()||t.value().string()!="worker"+std::to_string(i))++failures;
   });
   for(auto& t : threads) t.join();
   assert(failures.load() == 0);
@@ -21,6 +21,6 @@ int main(){
   assert(failures.load() == 0);
 
   // Owned async work is finalized before execute returns / runtime teardown.
-  nift::Engine async_engine; auto ar=async_engine.execute("fn(f(x)) { return x + 1 }\na := async(f, 41)\nreturn await(a)\n"); assert(ar.ok()&&ar.value().number()==42);
+  nift::Engine async_engine; auto ar=async_engine.execute("@fn[async](f(x)) { return x + 1 }\na := f(41)\nreturn await a\n"); assert(ar.ok()&&ar.value().number()==42);
   return 0;
 }

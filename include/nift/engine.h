@@ -160,7 +160,7 @@ public:
     // recent execute(). Operations on one Engine are serialized.
     ScriptResult execute(std::string_view script, std::string cmd = "<embed>", std::vector<std::string> args = {});
     ScriptResult evaluate(std::string_view expression);
-    void set_target(std::string target);
+    void set_platform(std::string platform);
     bool register_function(std::string name, HostFunction function);
     ScriptResult call(std::string_view name, const std::vector<Value>& args = {});
 

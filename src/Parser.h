@@ -145,7 +145,7 @@ private:
     };
     std::vector<std::unordered_map<std::string, VariableBinding>> variable_scopes_;
     struct ModuleEnv;
-    struct Callable { std::vector<std::string> params; std::string variadic_param; std::string body; std::filesystem::path source_path; bool fragment = false; std::shared_ptr<ModuleEnv> module_env; };
+    struct Callable { std::vector<std::string> params; std::string variadic_param; std::string body; std::filesystem::path source_path; bool fragment = false; bool async = false; std::shared_ptr<ModuleEnv> module_env; };
     struct ModuleEnv { std::unordered_map<std::string, Callable> callables; std::unordered_map<std::string, VariableBinding> vars; };
     std::unordered_map<std::string, Callable> callables_;
     // Prepared AST bodies for user callables, cached on first prepared call.
@@ -157,6 +157,7 @@ private:
         std::string variadic_param;
         std::string body;
         bool block = false;
+        bool async = false;
         std::filesystem::path source_path;
         std::unordered_map<std::string, VariableBinding> captures;
         std::shared_ptr<ModuleEnv> module_env;

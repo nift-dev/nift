@@ -26,7 +26,7 @@ struct nift::Engine::Impl {
     std::filesystem::path root;
     std::function<nift::HostResult(std::string_view)> loader;
     std::function<nift::HostResult(std::string_view)> environment_provider;
-    std::string script_target = "native";
+    std::string script_platform = "native";
     mutable std::mutex script_mutex_;
     struct ScriptState;
     std::unique_ptr<ScriptState> script_state;
@@ -69,7 +69,7 @@ public:
     std::string relative(const std::filesystem::path& path) const override { return impl_.relative(path); }
     const std::string& output_dir() const override { static const std::string empty; return empty; }
     int build_threads() const override { return 1; }
-    const std::string& target() const override { return impl_.script_target; }
+    const std::string& platform() const override { return impl_.script_platform; }
 
     std::filesystem::path content_path(const TrackedInfo& info) const override { return impl_.root / info.name; }
     std::filesystem::path output_path(const TrackedInfo& info) const override {
@@ -272,8 +272,8 @@ std::string Engine::open_error() const {
     return impl_->project_open_error;
 }
 
-void Engine::set_target(std::string target) {
-    std::lock_guard<std::mutex> lock(impl_->script_mutex_); impl_->script_target = target.empty()?"native":std::move(target);
+void Engine::set_platform(std::string platform) {
+    std::lock_guard<std::mutex> lock(impl_->script_mutex_); impl_->script_platform = platform.empty()?"native":std::move(platform);
 }
 
 ScriptResult Engine::execute(std::string_view script, std::string cmd, std::vector<std::string> args) {

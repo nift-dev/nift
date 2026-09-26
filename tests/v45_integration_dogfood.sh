@@ -13,7 +13,7 @@ cc -std=c99 -Wall -Wextra -fPIC -shared tests/ffi/fixture.c -o "$T/site/lib/fixt
 cat > "$T/site/tool.f" <<'NIFT'
 #!/usr/bin/env nift
 @import("demo")
-fn(add(x, y)) { return x + y }
+@fn[async](add(x, y)) { return x + y }
 fn(inc(m, n)) {
     i := 0
     while(i < n) { m.lock(); v := m.get(); m.set(v + 1); m.unlock(); i += 1 }
@@ -23,21 +23,21 @@ lib := ffi_open("lib/fixture.so")
 m := mutex(0)
 t1 := thread(inc, m, 100)
 t2 := thread(inc, m, 100)
-a := async(add, 20, 22)
+a := add(20, 22)
 t1.join(); t2.join()
 m.lock(); count := m.get(); m.unlock()
 print(cmd)
 print(args.join(","))
-print(target())
+print(platform())
 print(os())
 print(env().get("NIFT_DOGFOOD"))
 print(package_double(21))
-print(await(a))
+print(await a)
 print(count)
 print(ffi_call(lib, "nift_ffi_add_i64", "i64(i64,i64)", 40, 2))
 NIFT
 chmod +x "$T/site/tool.f"
-out=$(cd "$T/site" && NIFT_DOGFOOD=ok "$BIN" --android tool.f a b)
+out=$(cd "$T/site" && NIFT_DOGFOOD=ok "$BIN" --platform=android tool.f a b)
 printf '%s\n' "$out" > "$T/direct.out"
 [ "$(sed -n '1p' "$T/direct.out")" = tool.f ]
 [ "$(sed -n '2p' "$T/direct.out")" = a,b ]
