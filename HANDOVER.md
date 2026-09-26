@@ -121,6 +121,7 @@ themselves. Nift owns the small build-time job it can perform precisely.
 - `docs/handover/ROADMAP.md`: living production-readiness risk assessment.
 - `docs/handover/V4.3-LANGUAGE-CAMPAIGN.md`: living v4.3 language/scripting campaign, including the accepted CP115–CP167 JSON/object, agent `nift eval`, project-model, front-matter, schema, typed-content and taxonomy implementation plan.
 - `docs/handover/V4.4-EXECUTION-SHELL-PACKAGES.md`: planned v4.4 execution/shell/package campaign; this is the authoritative forward plan for intentionally restoring process execution, shell UX and build hooks on the modern language foundation, plus the Git-native package system and first SQLite package.
+- `docs/handover/V4.5-NATIVE-RUNTIME-SHELL.md`: authoritative v4.5 campaign plan for direct script/REPL invocation, finished shell job control, host/target introspection, native threads/mutexes and async/await, C-ABI FFI, and promotion of the existing embedded Engine/C ABI into a supported scripting/template runtime.
 
 ### Detailed subject handovers
 
