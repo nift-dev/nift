@@ -26,10 +26,11 @@ whether it is a regression.
 - Output convention for modern projects: `public/`.
 - Current branch: `main` in this checkout.
 - Current project phase: **v4.6 development after the public v4.5.0 release**.
-  The local Phase 4A development bump is intentionally unpushed pending Nick's
-  Phase 4B approval. Chocolatey v4.5.0 is pending automated review; Snap v4.5.0
-  follow-up is maintainer-managed by Nick; Homebrew propagation is external and
-  automatic. Completed v4.5 certification remains in
+  The local Phase 4 development transition is committed and may remain unpushed
+  while normal v4.6 development continues. Chocolatey v4.5.0 is pending
+  automated review; Snap v4.5.0 follow-up is maintainer-managed by Nick;
+  Homebrew propagation is external and automatic. Completed v4.5 certification
+  remains in
   `docs/handover/V4.5-CODEX-REVIEW-REPORT.md` and
   `docs/evidence/release-4.5.0/release-verification.md`.
 - Public documentation: the separate `nift-dev.github.io` repository.

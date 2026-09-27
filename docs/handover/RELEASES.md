@@ -9,9 +9,10 @@ approved release is packaged and published.
 
 The local development executable reports `Nift v4.6.0` and
 `snap/snapcraft.yaml` also declares `4.6.0`, following the public v4.5.0
-release. This Phase 4A bump is committed locally and remains unpushed pending
-explicit Phase 4B authorization. Exact tag, artifact and public release history
-remains documented below; completed v4.5.0 evidence must not be rewritten.
+release. This local Phase 4 transition is committed and may remain unpushed
+until normal subsequent development is ready. Exact tag, artifact and public
+release history remains documented below; completed v4.5.0 evidence must not be
+rewritten.
 
 ### v4.5.0 candidate status (2026-09-27)
 
@@ -179,13 +180,14 @@ executable version in a separate local suite commit. Packaging metadata that
 intentionally records a published store version remains historical; development
 recipes such as `snap/snapcraft.yaml` advance with the executable identity.
 
-Commit this transition locally, validate it, report its SHA(s), and STOP without
-pushing or tagging. Local preparation is not publication and does not wait for
-Chocolatey moderation, Snap promotion, or Homebrew propagation. Only after Nick
-accepts the release/package state may the prepared commit(s) be pushed: Nift
-first, verify its remote `main`, then the regression suite. Monitor the ensuing
-CI and stop again. This split is Phase 4A (local preparation), followed by
-Phase 4B (explicitly authorized push and CI).
+Commit this transition locally and validate it before further development.
+Local preparation is not publication and does not wait for Chocolatey
+moderation, Snap promotion, Homebrew propagation, or a separate approval to
+begin development. An immediate push and full Actions run are not required
+solely for the bump. It may be pushed later with ordinary subsequent development
+work; when both repositories are pushed, push Nift first, verify remote `main`,
+then push the regression suite. Never begin new post-release development while
+the executable still identifies itself as the version just released.
 
 ## Release report
 

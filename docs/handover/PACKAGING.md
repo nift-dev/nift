@@ -380,8 +380,7 @@ continuing its task does not constitute approval.
 Phase 1  push + validate  -> STOP -> Nick approves release
 Phase 2  release + verify -> STOP -> Nick approves packaging
 Phase 3  agent submits Chocolatey; Nick owns Snap; Homebrew async
-Phase 4A prepare development bump locally -> STOP -> Nick accepts/publishes
-Phase 4B push prepared bump + verify CI    -> STOP
+Phase 4  bump next development version locally -> continue development
 ```
 
 ### Deep-guard policy
@@ -628,39 +627,34 @@ Prepare a manual `Homebrew/homebrew-core` change only if Homebrew maintainers
 Never describe a release as available through a package manager until its public
 store entry resolves to the intended version and a fresh installation succeeds.
 
-## Phase 4A — prepare the next development version locally
+## Phase 4 — local post-release development transition
 
 Immediately after the agent-owned Phase 3 work is complete, prepare the next
 development identity without publishing it. This does not require waiting for
 Chocolatey moderation, Snap builders/promotion, or Homebrew propagation.
 
-1. Advance every authoritative development-version location together
+1. Advance the development version in one distinct post-release commit, updating
+   every authoritative development-version location together
    (`src/CLI.cpp`, `snap/snapcraft.yaml`, current version fixtures, development
-   notes/metadata, and current-development regression-suite assertions).
+   notes/metadata, guarantee/development baselines, and current-development
+   regression-suite assertions where applicable).
 2. Preserve all completed release evidence, tags, checksums and historical
    version assertions.
 3. Run local version-consistency and focused behavioral validation.
 4. Commit the bump locally in a distinct post-release commit. If the regression
    suite changes, commit it separately in that repository.
-5. Confirm affected repositories are clean, report the local commit SHA(s), and
-   STOP. Do not push, create/move a tag, trigger CI, or publish anything.
+5. Confirm affected repositories are clean and report the local commit SHA(s).
+6. Do not require an immediate push or a full Actions run solely because this
+   local version transition was committed. Development may continue from the
+   bumped local baseline.
+7. Push the bump later with normal subsequent development work. When Nift and
+   the regression suite are both pushed, push Nift first, verify remote `main`,
+   then push the suite.
 
-Nick reviews the asynchronous release/package states and the prepared local
-development transition before authorizing Phase 4B.
-
-## Phase 4B — publish the prepared development bump
-
-Only after Nick explicitly accepts the release/package work and authorizes the
-push:
-
-1. Push the already-prepared Nift development commit.
-2. Verify Nift `origin/main`, then push the regression-suite commit if it depends
-   on the new Nift identity. Nift must always be pushed first.
-3. Run and monitor the applicable Actions matrix; repair only concrete
-   post-bump failures.
-4. Report and STOP.
-
-Phase 4A is preparation, not publication. Neither phase creates a release tag.
+Phase 4 is local preparation, not publication. It requires no separate approval
+to begin development, and it creates no release tag. The invariant is that new
+post-release development must not begin while the executable still identifies
+itself as the version that was just released.
 
 ## v4.0.0 publication record
 
