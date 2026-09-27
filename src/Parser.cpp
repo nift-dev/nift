@@ -4121,7 +4121,12 @@ bool Parser::translate_function_program(const std::string& source, std::string& 
                 // double-wrapped as $[@...]/$[$...] and routed through the full
                 // expression evaluator. Pass them through verbatim; only bare
                 // v4.2 function-program statements need the $[...] wrapper.
-                if(stmt[0]=='@'||stmt[0]=='$'){
+                if(stmt.rfind("#!",0)==0){
+                    // Only a leading file shebang is stripped by CLI source
+                    // loading. Elsewhere the same marker remains inert comment
+                    // text; never reinterpret it as an external path command.
+                    out += "@//" + stmt.substr(2) + "\n";
+                } else if(stmt[0]=='@'||stmt[0]=='$'){
                     out+=stmt;
                     // A verbatim single-line comment has no terminating newline
                     // once inter-statement whitespace is stripped; emit one so it
