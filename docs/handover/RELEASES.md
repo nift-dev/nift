@@ -76,12 +76,14 @@ Proportionately include:
 9. Validate representative templates/downloadable examples where relevant.
 10. Reconcile README, docs, website, AI context, release notes, decisions, and
     production roadmap.
-11. Commit the reviewed release body at
-    `docs/evidence/release-X.Y.Z/release-notes-X.Y.Z.md`, then run the complete
+11. Create and commit the reviewed release body at
+    `docs/evidence/release-X.Y.Z/release-notes-X.Y.Z.md` **before dispatching**
+    the complete
     non-publishing `Release artifacts` rehearsal with `version=X.Y.Z`. Packaging
     matrix, Deep guards and ordinary CI are not substitutes. The Phase 1 report
     must contain the exact line `Release artifacts rehearsal X.Y.Z: PASS — run
-    #... — SHA ...`; without it the candidate is not tag-ready.
+    #... — candidate SHA ...`; without it the candidate is not tag-ready and
+    tag authorization is prohibited.
 12. Build the actual package/archive, extract it freshly, build/use it, run the
     external suite against it, and verify `nift version`, `nift about`, and
     `nift commands`, plus the license and expected files. Confirm unknown and
@@ -1052,5 +1054,19 @@ init/build/status succeed.
   `SHA256SUMS`; every downloaded archive passed the published manifest.
 - Exact checksums and recovery history are recorded in
   `docs/evidence/release-4.5.0/release-verification.md`.
-- Snap, Chocolatey, and Homebrew publication and the development-version bump
-  were not performed in this phase.
+- **Chocolatey**: workflow #8 (`36298041251`) passed at `766d176`, produced and
+  submitted `nift.4.5.0.nupkg` (SHA-256
+  `3b0e9a7c46c423cba694e8855510700b6dfba36605c755a2c453339c6a4dffe3`).
+  Its metadata is version 4.5.0; its install script references the immutable
+  v4.5.0 Windows ZIP and embeds its exact SHA-256
+  `10d4a543c5c4d356a5a2f566f507e16ba0859749dcc0301ae06029ae81f844b3`.
+  The public page reports **Pending automated review**: validation,
+  verification and scan pending, in moderation, not approved and not normally
+  installable.
+- **Snap**: pending — maintainer-managed by Nick. No inspection, smoke,
+  workflow dispatch or promotion was performed by the agent.
+- **Homebrew**: automatic downstream propagation — not checked in this task.
+  No monitoring, workflow dispatch or manual PR was performed.
+- **Flathub**: out of scope.
+- The GitHub release/tag/assets were not modified. The development version
+  remains 4.5.0.

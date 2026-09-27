@@ -60,8 +60,33 @@ reported `Nift v4.5.0`.
 The release contains exactly those five assets. All four independently
 downloaded archives passed `sha256sum -c SHA256SUMS`.
 
-## Phase boundary
+## Phase 3 agent-owned packaging result
 
-Phase 2 is complete. No manual Snap, Chocolatey, or Homebrew publication was
-performed, and the development version was not advanced. Those remain separate
-Phase 3 work requiring explicit authorization.
+- Chocolatey workflow #8 (`36298041251`),
+  <https://github.com/nift-dev/nift/actions/runs/36298041251>: PASS at
+  `766d176791fb722e8836af3b853edc847d4a86b3`, including the actual publish step.
+- Retained artifact: `nift.4.5.0.nupkg`, 2,889 bytes, SHA-256
+  `3b0e9a7c46c423cba694e8855510700b6dfba36605c755a2c453339c6a4dffe3`.
+- Package metadata identifies `nift` version 4.5.0. The embedded install script
+  downloads the immutable public `nift-4.5.0-windows-x86_64.zip` and uses SHA-256
+  `10d4a543c5c4d356a5a2f566f507e16ba0859749dcc0301ae06029ae81f844b3`,
+  matching both the public archive and release evidence. The Windows staging
+  smoke executed the archived binary and accepted only `Nift v4.5.0`.
+- Public Chocolatey state observed 2026-09-27: **Pending automated review**.
+  Validation, package verification and scan are pending; the version is in
+  moderation, is not approved, does not appear in normal search, and is not
+  normally installable. Submission is complete; no moderation wait or
+  unjustified same-version resubmission was performed.
+- Snap: `pending — maintainer-managed by Nick`. No Snap polling, inspection,
+  smoke, dispatch, revision selection or promotion was performed.
+- Homebrew: `automatic downstream propagation — not checked in this task`. No
+  polling, wait, `homebrew.yml` dispatch or manual PR was performed.
+- Flathub: out of scope; no action performed.
+
+The published GitHub release remains immutable: its corrected tag target is
+`560863b664c482802b8df1206c63723bb1078e51`, release workflow #46 and all final
+archive checksums above remain unchanged, and no asset was modified or replaced.
+The development identity remains `Nift v4.5.0`; no development bump occurred.
+
+The agent-owned Phase 3 work is complete. Snap and Homebrew are recorded as
+separate maintainer/external follow-up. Phase 4 requires explicit authorization.

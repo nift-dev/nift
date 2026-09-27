@@ -1295,6 +1295,18 @@ class WorkflowStructure(unittest.TestCase):
         evidence = "Release artifacts rehearsal X.Y.Z: PASS"
         for text in (releases, packaging):
             self.assertIn(evidence, text)
+            self.assertIn("candidate SHA", text)
+            self.assertIn("release-notes-X.Y.Z.md", text)
             self.assertRegex(text, r"Packaging\s+matrix")
             self.assertRegex(text, r"Deep\s+guards")
             self.assertIn("not substitute", text)
+
+    def test_packaging_handover_assigns_phase_3_owners(self):
+        packaging = self.load("docs/handover/PACKAGING.md")
+        self.assertIn("agent-owned action is Chocolatey", packaging)
+        self.assertIn("pending — maintainer-managed by Nick", packaging)
+        self.assertIn(
+            "automatic downstream propagation — not checked in this task",
+            packaging,
+        )
+        self.assertIn("do not monitor or wait for propagation", packaging)

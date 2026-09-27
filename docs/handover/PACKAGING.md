@@ -379,7 +379,8 @@ continuing its task does not constitute approval.
 ```text
 Phase 1  push + validate  -> STOP -> Nick approves release
 Phase 2  release + verify -> STOP -> Nick approves packaging
-Phase 3  packaging        -> STOP -> Nick approves development bump
+Phase 3  agent submits Chocolatey; Nick owns Snap; Homebrew async
+                           -> STOP -> Nick approves development bump
 Phase 4  development bump
 ```
 
@@ -448,9 +449,12 @@ Ordinary push/PR CI retains the fast deterministic correctness contracts via
 11. Produce the Phase 1 report: exact commit hash, every workflow and run URL,
     every job result, any deliberately inapplicable workflow and why, and
     repository cleanliness/version consistency. It must contain the exact
-    evidence form `Release artifacts rehearsal X.Y.Z: PASS — run #... — SHA ...`.
+    evidence form
+    `Release artifacts rehearsal X.Y.Z: PASS — run #... — candidate SHA ...`.
     Without that line and a green matching rehearsal, Phase 1 is incomplete and
-    tagging is prohibited.
+    tagging is prohibited. The reviewed, committed
+    `docs/evidence/release-X.Y.Z/release-notes-X.Y.Z.md` must exist before the
+    rehearsal is dispatched; creating it after tag authorization is too late.
 
 **STOP.** Wait for Nick's explicit manual confirmation that the Actions results
 have been reviewed and the release may proceed. An agent must never infer
@@ -496,35 +500,38 @@ packaging authorization from a successful GitHub release, and must not proceed
 directly from releasing to Chocolatey, Homebrew, Snap or any other package
 channel.
 
-## Phase 3 — packaging (manual, STOP after packaging verification)
+## Phase 3 — packaging (STOP after the agent-owned Chocolatey step)
 
-This phase is authorized only after Nick explicitly authorizes packaging. Snap
-and Chocolatey are processed and verified independently by their **manual
-`workflow_dispatch`** workflows. Homebrew is **automatic**: Nift publishes the
-GitHub release, Homebrew's bump/update mechanism advances the canonical formula
-on its own schedule, and Nift verifies propagation rather than performing a
-manual publication. Flathub is out of scope.
+This phase is authorized only after Nick explicitly authorizes packaging. The
+agent-owned action is Chocolatey submission and evidence. Snap inspection,
+smoke, revision selection and promotion are maintainer-operated by Nick.
+Homebrew propagation is automatic and asynchronous; the agent does not poll or
+wait for it during this task. Flathub is out of scope.
 
-### 3a. Publish and verify Snap
+### 3a. Snap — maintainer-operated by Nick
 
 1. The connected Snap Store/Launchpad build service is the sole producer of
    published Snap revisions. It publishes every declared platform (amd64,
    arm64, armhf, ppc64el, riscv64, s390x) to `latest/edge`. GitHub-hosted
    amd64/arm64 builds are validation only, and the GitHub release finishes
    without waiting for the connected builders.
-2. Wait until `snap info nift`/the Store shows the exact release version on edge
+2. Nick waits until `snap info nift`/the Store shows the exact release version on edge
    for all six supported architectures. Do not retrigger while a slow builder
    is merely queued; duplicate revisions make exact selection harder.
 3. Nick manually inspects the build records and available revisions, then
    smoke-tests the installable amd64 candidate.
-4. Manually dispatch **Promote completed Snap builds** with version `X.Y.Z` only
+4. Nick manually dispatches **Promote completed Snap builds** with version `X.Y.Z` only
    after that inspection. It uses the pinned Snapcraft toolchain, exact-revision
    selection, strict candidate verification, candidate confinement smoke and
    explicit per-revision stable releases implemented by `packaging/snap_release.py`.
-5. Confirm the workflow succeeds and `snap info nift` reports `X.Y.Z` on
+5. Nick confirms the workflow succeeds and `snap info nift` reports `X.Y.Z` on
    `latest/stable` for every supported architecture, then perform a fresh Store
    install. If the promotion fails, fix the concrete Store/build issue and rerun
    the manual workflow; do not create a new GitHub release merely to retry Snap.
+
+The release agent must not poll builders, select revisions, run the maintainer
+smoke, dispatch `snap-promote.yml`, or promote channels. It records Snap as
+`pending — maintainer-managed by Nick` and continues to the Chocolatey step.
 
 ### 3b. Publish and verify Chocolatey
 
@@ -536,8 +543,10 @@ manual publication. Flathub is out of scope.
 3. Inspect the workflow result and retain the generated `.nupkg`. When practical,
    test install, shimmed `nift` execution, a real project, upgrade and uninstall
    in a disposable clean Windows VM.
-4. Confirm the package page shows the submission, then wait for validation,
-   verification and moderation. Workflow success means submitted, not approved.
+4. Confirm the package page shows the submission and record the exact validation,
+   verification, scan and moderation state. Workflow success means submitted,
+   not approved. Pending moderation is an acceptable stopping state; do not wait
+   for human moderation.
 5. If automated verification fails, read its public log. For a real package
    defect while the version is still unapproved, fix the workflow/template and
    manually dispatch the exact same version with `resubmit: true`.
@@ -547,7 +556,10 @@ manual publication. Flathub is out of scope.
 7. Declare Chocolatey availability only after approval and a fresh
    `choco install nift --version X.Y.Z` succeeds from the community repository.
 
-### 3c. Verify Homebrew (automatic downstream)
+Once submission and its current public state are recorded, the agent-owned
+Phase 3 task is complete. Commit/push the evidence and STOP.
+
+### 3c. Homebrew — automatic downstream, no action in this task
 
 Homebrew publication is **automatic**: Homebrew's bump/update mechanism observes
 the Nift GitHub release and advances the canonical formula on its own schedule.
@@ -557,35 +569,28 @@ validation/rehearsal workflow that builds and tests the formula against the
 immutable tagged source archive on macOS arm64 and Linux; it is not how the
 Homebrew release is published.
 
-Verification steps:
-
-1. Confirm the automatic Homebrew mechanism has observed `X.Y.Z` (check existing
-   update pull requests and formula history; do not open a simple version-bump
-   pull request or duplicate the automated update).
-2. Monitor the resulting update/PR/formula state.
-3. Verify the canonical Homebrew formula resolves to `X.Y.Z` when propagation
-   completes.
-4. Perform a fresh install/version check when publicly available.
-5. Record pending propagation honestly if it has not completed yet.
-6. Prepare a manual `Homebrew/homebrew-core` change only if Homebrew maintainers
+During the agent-owned release task, do not monitor or wait for propagation,
+open a routine version-bump PR, or dispatch `homebrew.yml` as publication.
+Record `automatic downstream propagation — not checked in this task`. Check and
+verify the canonical formula separately after it has had time to propagate.
+Prepare a manual `Homebrew/homebrew-core` change only if Homebrew maintainers
    explicitly request it for a non-routine formula change; follow their
    requested audit/test/submission process exactly. Homebrew CI and maintainers
    own official bottles.
 
-### 3d. Close the release
+### 3d. Record the agent-owned Phase 3 result
 
 1. Record the exact tag/commit, GitHub release and workflow URLs, final checksums,
-   package-manager PRs/builds/revisions/channels, installation tests and known
-   limitations in the release handover.
+   Chocolatey `.nupkg`, submission/current public state, tests and limitations.
 2. Report each downstream separately as built, submitted, verified, approved or
    publicly installable. These services may finish days apart.
 3. Update the website/download instructions only with availability that has been
    confirmed from the public store.
 4. Track incomplete downstream work explicitly rather than reopening or mutating
    the GitHub release.
-5. Verify every intended public installation and record any incomplete channel
-   separately. Do not collapse a pending moderation, promotion or propagation
-   state into a successful installation.
+5. Record Snap as `pending — maintainer-managed by Nick`, Homebrew as
+   `automatic downstream propagation — not checked in this task`, and Flathub
+   as out of scope. Do not collapse pending work into successful installation.
 
 Never describe a release as available through a package manager until its public
 store entry resolves to the intended version and a fresh installation succeeds.
