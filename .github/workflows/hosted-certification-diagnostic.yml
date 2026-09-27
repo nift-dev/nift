@@ -81,7 +81,7 @@ jobs:
         shell: msys2 {0}
         run: |
           set +e
-          make test-v44-execution-shell test-v44-language-foundation test-v44-automation test-v44-hooks > hosted-test.log 2>&1
+          NIFT="$PWD/nift.exe" bash -x tests/v44_executable_script_smoke.sh > hosted-test.log 2>&1
           rc=$?
           set -e
           cat hosted-test.log
