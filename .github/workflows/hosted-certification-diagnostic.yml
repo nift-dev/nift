@@ -22,10 +22,8 @@ jobs:
         include:
           - id: macos
             runner: macos-latest
-            shell: bash
           - id: windows
             runner: windows-latest
-            shell: msys2 {0}
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v5
@@ -35,8 +33,23 @@ jobs:
           msystem: UCRT64
           update: true
           install: make mingw-w64-ucrt-x86_64-gcc
-      - name: Build and expose compiler diagnostics
-        shell: ${{ matrix.shell }}
+      - name: Build and expose compiler diagnostics on macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set +e
+          make -j2 > hosted-build.log 2>&1
+          rc=$?
+          set -e
+          cat hosted-build.log
+          if [ "$rc" -ne 0 ]; then
+            message="$(tail -40 hosted-build.log | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | awk '{printf "%s%%0A", $0}')"
+            echo "::error title=Hosted compiler diagnostic::$message"
+            exit "$rc"
+          fi
+      - name: Build and expose compiler diagnostics on Windows
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
         run: |
           set +e
           make -j2 > hosted-build.log 2>&1
