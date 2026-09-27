@@ -72,7 +72,7 @@ jobs:
           set -e
           cat hosted-test.log
           if [ "$rc" -ne 0 ]; then
-            message="$(tail -80 hosted-test.log | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | awk '{printf "%s%%0A", $0}')"
+            message="$(tail -20 hosted-test.log | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | awk '{printf "%s%%0A", $0}')"
             echo "::error title=Hosted macOS test diagnostic::$message"
             exit "$rc"
           fi
