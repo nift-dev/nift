@@ -8,6 +8,7 @@ NIFT=${NIFT:-./nift}
 case "$NIFT" in /*) NIFT_ABS="$NIFT";; *) NIFT_ABS="$(pwd)/$NIFT";; esac
 BIN="$(dirname "$NIFT_ABS")"
 t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
+t_physical=$(cd "$t" && pwd -P)
 
 cat > "$t/hello.f" <<'F'
 #!/usr/bin/env nift
@@ -150,7 +151,7 @@ chmod +x "$t/certify.f"
 out=$(cd "$t" && PATH="$BIN:$PATH" NIFT_EXEC_TEST=certified ./certify.f one two)
 [ "$(sed -n '1p' <<<"$out")" = './certify.f' ] || { echo "$out" >&2; exit 1; }
 [ "$(sed -n '2p' <<<"$out")" = 'one|two' ] || exit 1
-[ "$(sed -n '3p' <<<"$out")" = "$t" ] || exit 1
+[ "$(sed -n '3p' <<<"$out")" = "$t_physical" ] || exit 1
 [ "$(sed -n '4p' <<<"$out")" = 'certified' ] || exit 1
 
 # A runtime error reached through the shebang must remain a non-zero process exit.
