@@ -68,7 +68,8 @@ Value::Type Value::type() const {
     switch (impl_->doc.type) {
         case json::Type::Null: return Type::Null;
         case json::Type::Boolean: return Type::Boolean;
-        case json::Type::Number: return Type::Number;
+        case json::Type::Number:
+        case json::Type::StrNumber: return Type::Number;
         case json::Type::String: return Type::String;
         case json::Type::Array: return Type::Array;
         case json::Type::Object: return Type::Object;

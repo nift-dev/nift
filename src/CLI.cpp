@@ -215,7 +215,8 @@ void print_json_value(const json::Document& value, int depth = 0) {
         case json::Type::Boolean:
             std::cout << console::json_literal(value.boolean ? "true" : "false");
             break;
-        case json::Type::Number: {
+        case json::Type::Number:
+        case json::Type::StrNumber: {
             std::string number = value.dump();
             std::cout << console::json_number(number);
             break;
@@ -965,8 +966,8 @@ std::vector<std::string> full_shell_completions(const Parser& parser, const std:
 std::vector<std::string> command_completions(const Parser& parser, const std::string& prefix) {
     std::set<std::string> out;
     for (auto& c : parser.shell_completions(prefix)) out.insert(c);
-    for (const std::string& b : {"build","cat","cd","cmd","copy","cp","exists","file","getenv","env","os","arch","hardware_concurrency","thread","await","mutex","atomic<int>","atomic<bool>","jobs","fg","bg","wait","ls","make_dir","max","min","mkdir","move","mv","open","page","pwd","remove","rm","run","setenv","touch","unsetenv","which"})
-        if (b.rfind(prefix, 0) == 0) out.insert(b);
+    for (const char* b : {"build","cat","cd","cmd","copy","cp","exists","file","getenv","env","os","arch","hardware_concurrency","thread","await","mutex","atomic<int>","atomic<bool>","jobs","fg","bg","wait","ls","make_dir","max","min","mkdir","move","mv","open","page","pwd","remove","rm","run","setenv","touch","unsetenv","which"})
+        if (std::string_view(b).rfind(prefix, 0) == 0) out.insert(b);
     if (const char* path = std::getenv("PATH")) {
         std::stringstream ss(path); std::string dir;
         while (std::getline(ss, dir, ':')) { std::error_code ec;
@@ -1057,7 +1058,9 @@ static int run_script_shell_loop(Parser& parser, bool load_rc) {
 #else
         std::string line;if(_isatty(_fileno(stdin)))std::cout<<prompt<<std::flush;if(!std::getline(std::cin,line))break;
 #endif
-        if(pending.empty()&&(line=="exit"||line=="quit"))break;if(pending.empty()&&!line.empty()){append_nift_history(line);if(history.size()>=1000)history.erase(history.begin());history.push_back(line);hist_pos=history.size();}pending+=line+"\n";
+        if(pending.empty()&&(line=="exit"||line=="quit"))break;
+        if(pending.empty()&&!line.empty()){append_nift_history(line);if(history.size()>=1000)history.erase(history.begin());history.push_back(line);hist_pos=history.size();}
+        pending+=line+"\n";
         // CP85: the parser reports whether the accumulated input is complete,
         // an incomplete prefix (keep reading), or invalid (balanced but
         // malformed, executed so the canonical diagnostic is shown).
@@ -1500,7 +1503,7 @@ int run_cli(int argc, char** argv) {
         const std::string title = argc > 3 ? argv[3] : fs::path(name).filename().string();
         const std::string templ = argc > 4 ? argv[4] : project.config.default_template;
         if (title.empty() || templ.empty()) { console::error("name, title and template path must be non-empty"); return 1; }
-        TrackedInfo candidate{name, title, templ, "", "", std::nullopt, std::nullopt};
+        TrackedInfo candidate{name, title, templ, "", "", std::nullopt, std::nullopt, std::nullopt, std::nullopt, {}};
         if (project.conflicts_with_tracked_path(candidate)) {
             console::error("tracked name resolves to a content/output path already managed by another tracked name");
             return 1;

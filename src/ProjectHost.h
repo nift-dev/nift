@@ -35,7 +35,7 @@ public:
         const ProjectState& state,
         const std::unordered_map<std::string, std::shared_ptr<const json::Document>>* render_bindings = nullptr,
         std::function<nift::HostResult(std::string_view)> environment_provider = nullptr)
-        : state_(state), render_bindings_(render_bindings), environment_provider_(std::move(environment_provider)), project_value_(make_project_value(state.root(),state.config(),state.tracked())) {}
+        : state_(state), render_bindings_(render_bindings), project_value_(make_project_value(state.root(),state.config(),state.tracked())), environment_provider_(std::move(environment_provider)) {}
 
     const std::filesystem::path& root() const override { return state_.root(); }
     std::string relative(const std::filesystem::path& path) const override { return state_.relative(path); }

@@ -68,7 +68,7 @@ public:
         return true;
     }
     bool resolve_page_member(const std::string& page_name, const std::string& member,
-                             json::Document& out, std::string& error) const override {
+                             json::Document& out, std::string&) const override {
         const HierarchyIndex* hi = hierarchy();
         if (!hi) return false;
         const std::size_t idx = hi->index_of(page_name);

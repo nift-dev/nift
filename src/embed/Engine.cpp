@@ -286,7 +286,10 @@ ScriptResult Engine::evaluate(std::string_view expression) {
 }
 
 bool Engine::register_function(std::string name, HostFunction function) {
-    if(!detail::valid_binding_identifier(name)||!function)return false;std::lock_guard<std::mutex> lock(impl_->script_mutex_);impl_->host_functions[std::move(name)]=std::move(function);return true;
+    if(!detail::valid_binding_identifier(name)||!function)return false;
+    std::lock_guard<std::mutex> lock(impl_->script_mutex_);
+    impl_->host_functions[std::move(name)]=std::move(function);
+    return true;
 }
 
 ScriptResult Engine::call(std::string_view name, const std::vector<Value>& args) {

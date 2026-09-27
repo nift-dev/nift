@@ -22,7 +22,7 @@ struct P {
      // comparisons and arithmetic (e.g. 9007199254740993 == 9007199254740992).
      // Nift stores large integers exactly as StrNumber in the legacy evaluator;
      // reject them here so the whole expression falls back to legacy semantics.
-     {bool integral=std::isdigit((unsigned char)s[b])||(s[b]=='-'&&b+1<s.size()&&std::isdigit((unsigned char)s[b+1]));if(integral){for(std::size_t z=(s[b]=='-'?b+1:b);z<(std::size_t)(e-s.c_str());++z)if(!std::isdigit((unsigned char)s[z])){integral=false;break;}if(integral){errno=0;char* le=nullptr;long long lv=std::strtoll(s.c_str()+b,&le,10);if(errno==ERANGE||(le==(e))&&(lv>9007199254740992LL||lv<-9007199254740992LL)){error="unsupported large integer literal";return{};}}}}
+     {bool integral=std::isdigit((unsigned char)s[b])||(s[b]=='-'&&b+1<s.size()&&std::isdigit((unsigned char)s[b+1]));if(integral){for(std::size_t z=(s[b]=='-'?b+1:b);z<(std::size_t)(e-s.c_str());++z)if(!std::isdigit((unsigned char)s[z])){integral=false;break;}if(integral){errno=0;char* le=nullptr;long long lv=std::strtoll(s.c_str()+b,&le,10);if(errno==ERANGE||((le==e)&&(lv>9007199254740992LL||lv<-9007199254740992LL))){error="unsupported large integer literal";return{};}}}}
      auto n=node(Kind::Literal,b);n->literal=json::Document(v);return n;}
    if(std::isalpha((unsigned char)s[p])||s[p]=='_'){++p;while(p<s.size()&&(std::isalnum((unsigned char)s[p])||s[p]=='_'))++p;std::string id=s.substr(b,p-b);ws();if(p<s.size()&&s[p]=='('){int d=0;bool q=false;char qc=0;do{char ch=s[p++];if(q){if(ch=='\\'&&p<s.size())++p;else if(ch==qc)q=false;}else if(ch=='\''||ch=='\"'){q=true;qc=ch;}else if(ch=='(')++d;else if(ch==')')--d;}while(p<s.size()&&d>0);if(d!=0){error="unterminated call";return{};}auto n=node(Kind::Call,b);n->text=s.substr(b,p-b);n->name=id;{std::size_t ap=id.size();while(ap<n->text.size()&&std::isspace((unsigned char)n->text[ap]))++ap;if(ap<n->text.size()&&n->text[ap]=='('){std::string args_text=n->text.substr(ap+1,n->text.size()-ap-2);std::vector<std::string> parts;std::string cur;int dep=0;bool aq=false;char aqc=0;for(std::size_t z=0;z<args_text.size();++z){char ch=args_text[z];if(aq){if(ch=='\\'&&z+1<args_text.size())++z;else if(ch==aqc)aq=false;cur+=ch;continue;}if(ch=='\''||ch=='"'){aq=true;aqc=ch;cur+=ch;continue;}if(ch=='('||ch=='[')++dep;else if(ch==')'||ch==']')--dep;if(ch==','&&dep==0){parts.push_back(cur);cur.clear();continue;}cur+=ch;}if(!cur.empty())parts.push_back(cur);for(const auto& part:parts){std::string a=part;{auto fb=a.find_first_not_of(" \t\r\n");if(fb!=std::string::npos){auto fe=a.find_last_not_of(" \t\r\n");a=a.substr(fb,fe-fb+1);}else a.clear();}if(a.empty())continue;auto ae=parse_expression(a);if(ae.supported){n->items.push_back(std::move(ae.expr));n->params.push_back(a);}else{n->items.clear();n->params.clear();break;}}}}return n;}auto n=node(Kind::Binding,b);n->name=id;if(id=="true"){n->kind=Kind::Literal;n->literal=json::Document(true);}else if(id=="false"){n->kind=Kind::Literal;n->literal=json::Document(false);}else if(id=="null"){n->kind=Kind::Literal;n->literal=json::Document(nullptr);}return n;}
    error="unsupported primary";return{};
@@ -71,7 +71,8 @@ StatementParseResult parse_statement(const std::string& source){
 }
 void fold_constants(Expr& e){
  for(auto& item:e.items)if(item)fold_constants(*item);
- if(e.left)fold_constants(*e.left); if(e.right)fold_constants(*e.right);
+ if(e.left)fold_constants(*e.left);
+ if(e.right)fold_constants(*e.right);
  auto literal=[](const std::unique_ptr<Expr>& p){return p&&p->kind==Kind::Literal;};
  bool candidate=false;
  if(e.kind==Kind::Unary)candidate=literal(e.right);
@@ -80,7 +81,8 @@ void fold_constants(Expr& e){
  // Do not fold strings: string '+' uses runtime rendering semantics. Do not
  // fold operations that would raise (division/modulo by zero, bad types).
  auto scalar=[](const json::Document& d){return d.is_number()||d.is_bool()||d.is_null();};
- if(e.left&&!scalar(e.left->literal))return; if(e.right&&!scalar(e.right->literal))return;
+ if(e.left&&!scalar(e.left->literal))return;
+ if(e.right&&!scalar(e.right->literal))return;
  Context c; c.resolve=[](const std::string&,json::Document&,std::string&){return false;};
  c.legacy=[](const std::string&,json::Document&,std::string&){return false;};
  json::Document v; std::string error; if(!evaluate(e,c,v,error))return;
@@ -89,7 +91,7 @@ void fold_constants(Expr& e){
 
 ParseResult parse_expression(const std::string& source){
  {auto arrow=source.find("=>");if(arrow!=std::string::npos){auto lhs=source.substr(0,arrow);auto trim=[](std::string x){auto b=x.find_first_not_of(" \t\r\n");if(b==std::string::npos)return std::string();auto e=x.find_last_not_of(" \t\r\n");return x.substr(b,e-b+1);};lhs=trim(lhs);if(lhs.size()>=2&&lhs.front()=='('&&lhs.back()==')'){auto n=std::make_unique<Expr>();n->kind=Kind::Lambda;n->span={0,source.size()};n->text=source;std::string ps=lhs.substr(1,lhs.size()-2);std::size_t p=0;while(p<=ps.size()){auto c=ps.find(',',p);auto v=trim(ps.substr(p,c==std::string::npos?std::string::npos:c-p));if(!v.empty()){if(v.rfind("...",0)==0){n->op="variadic:"+trim(v.substr(3));n->params.push_back(trim(v.substr(3)));}else n->params.push_back(v);}if(c==std::string::npos)break;p=c+1;}return{std::move(n),{},true};}}}
- P p{source};auto e=p.coalesce();p.ws();if(!e||p.p!=source.size())return{{},p.error.empty()?"unsupported expression":p.error,false};fold_constants(*e);return{std::move(e),{},true};}
+ P p{source,0,{}};auto e=p.coalesce();p.ws();if(!e||p.p!=source.size())return{{},p.error.empty()?"unsupported expression":p.error,false};fold_constants(*e);return{std::move(e),{},true};}
 TemplateParseResult parse_template(const std::string& source){
  TemplateParseResult r; std::size_t pos=0,lit=0;
  auto literal=[&](std::size_t b,std::size_t e){if(e<=b)return;auto n=std::make_unique<TemplateNode>();n->kind=TemplateKind::Literal;n->span={b,e};n->text=source.substr(b,e-b);r.nodes.push_back(std::move(n));};
