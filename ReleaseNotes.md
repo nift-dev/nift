@@ -1,8 +1,13 @@
 # Nift release notes
 
-## v4.5.0 (release candidate preparation)
+## v4.6.0 (unreleased development)
 
-Nift v4.5 promotes the native language into a reusable scripting/runtime layer while preserving Nift's website-generation core. The implementation campaign is complete through local CP34 evidence; independent Codex review, full sanitizer/cross-platform CI and publication gates remain mandatory before tagging.
+Development has advanced to v4.6.0 after the completed v4.5.0 release. No
+v4.6.0 user-visible changes have been recorded yet.
+
+## v4.5.0 (released 2026-09-27)
+
+Nift v4.5 promotes the native language into a reusable scripting/runtime layer while preserving Nift's website-generation core. Independent review, sanitizer and cross-platform certification, the release-artifacts rehearsal, and final publication gates passed before release.
 
 - Unified script invocation: plain `nift` is the persistent REPL, `nift file.f` executes scripts directly, and the old `nift run` / `nift sh` wrappers are removed.
 - `-e` / `-c` inline programs, `-i` interactive continuation, stdin source via `nift -`, shebang execution, and stable script `cmd` / `args`.
@@ -13,7 +18,8 @@ Nift v4.5 promotes the native language into a reusable scripting/runtime layer w
 - Supported embedding runtime: persistent `nift::Engine` script execution/evaluation alongside templating, isolated Engine instances, host values/functions, C ABI 1.1, staged C/C++ artifacts, and maintained Go/Python/Node/C# binding surfaces.
 - Direct script/package/FFI/concurrency/job-control integration dogfood, expanded independent v4.5 contract coverage, adversarial lifecycle tests, website documentation, and reproducible runtime/embedding performance evidence.
 
-Release remains blocked on the independent review and final clean optimized source, sanitizer/TSan, unprivileged regression, binding-toolchain and Linux/macOS/Windows CI walls documented in `docs/handover/V4.5-CODEX-REVIEW-HANDOFF.md`.
+The completed certification and immutable release evidence are recorded in
+`docs/evidence/release-4.5.0/release-verification.md`.
 
 ## v4.4.0 (development)
 

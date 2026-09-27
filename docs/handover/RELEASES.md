@@ -7,13 +7,11 @@ approved release is packaged and published.
 
 ## Authority and current state
 
-The development executable currently reports `Nift v4.5.0` and the Snap
-metadata in `snap/snapcraft.yaml` also declares `4.5.0`. This is the v4.5
-development line following the public v4.1.0/v4.2.0/v4.3.0/v4.4.0 releases
-(v4.4.0 was released at the `v4.4.0` tag). The exact executable identity
-remains documented in project history and release notes. Exact tag, artifact,
-and public release conventions must follow `PACKAGING.md` and actual
-Git/release evidence; the intended next release tag is `v4.5.0`.
+The local development executable reports `Nift v4.6.0` and
+`snap/snapcraft.yaml` also declares `4.6.0`, following the public v4.5.0
+release. This Phase 4A bump is committed locally and remains unpushed pending
+explicit Phase 4B authorization. Exact tag, artifact and public release history
+remains documented below; completed v4.5.0 evidence must not be rewritten.
 
 ### v4.5.0 candidate status (2026-09-27)
 

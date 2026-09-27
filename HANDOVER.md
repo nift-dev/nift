@@ -20,12 +20,18 @@ whether it is a regression.
 ## Current identity
 
 - Product: **Nift**, a website generator and dependency-aware website build layer.
-- Current executable identity: `Nift v4.5.0` (development), the v4.5 development line on top of
-  the public v4.1.0/v4.2.0/v4.3.0/v4.4.0 releases.
+- Current executable identity: `Nift v4.6.0` (local development), following the
+  public v4.5.0 release.
 - Language/toolchain: C++17 and Make.
 - Output convention for modern projects: `public/`.
 - Current branch: `main` in this checkout.
-- Current project phase: **v4.5 release-candidate preparation**. The public v4.4.0 release is the current stable baseline. The v4.5 native runtime/shell campaign is locally implemented through CP34 and has a prepared CP35 Codex review handoff; independent review, complete clean optimized/sanitizer/cross-platform walls, binding certification and explicit maintainer release approval remain before tagging. The embedding Engine/C ABI is now an intended supported v4.5 surface rather than experimental-only, subject to those final gates. See `docs/handover/V4.5-NATIVE-RUNTIME-SHELL.md` and `docs/handover/V4.5-CODEX-REVIEW-HANDOFF.md`.
+- Current project phase: **v4.6 development after the public v4.5.0 release**.
+  The local Phase 4A development bump is intentionally unpushed pending Nick's
+  Phase 4B approval. Chocolatey v4.5.0 is pending automated review; Snap v4.5.0
+  follow-up is maintainer-managed by Nick; Homebrew propagation is external and
+  automatic. Completed v4.5 certification remains in
+  `docs/handover/V4.5-CODEX-REVIEW-REPORT.md` and
+  `docs/evidence/release-4.5.0/release-verification.md`.
 - Public documentation: the separate `nift-dev.github.io` repository.
 - External contract: the separate `nift-regression-suite` repository.
 - Embedded minifier: `minifypp/`, synchronized with standalone Minify++.
