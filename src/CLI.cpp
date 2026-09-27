@@ -1044,8 +1044,6 @@ static int run_script_shell_loop(Parser& parser, bool load_rc) {
     auto history=load_nift_history(); size_t hist_pos=history.size();
 #ifndef _WIN32
     const bool interactive = isatty(STDIN_FILENO);
-#else
-    const bool interactive = false;
 #endif
     if(load_rc) if(const char* home=std::getenv("HOME")){fs::path rc=fs::path(home)/".niftrc";if(filesystem::file_exists(rc)){auto rr=parser.run_statement(filesystem::read_file(rc),rc);if(!rr.ok){console::error("niftrc: "+rr.error.message);return 1;}}}
     while(true){const std::string prompt=shell_prompt_text(!pending.empty());

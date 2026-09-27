@@ -12,6 +12,7 @@
 
 #if !defined(_WIN32)
 #include <unistd.h>
+extern char** environ;
 #endif
 
 namespace nift_environment {
@@ -20,7 +21,7 @@ inline bool process_snapshot(json::Document& out, std::string& error) {
     (void)error;
     out = json::Document::make_object();
 #if defined(_WIN32)
-    char** current = ::_environ;
+    char** current = _environ;
     std::map<std::string, std::pair<std::string, std::string>> values;
     if (!current) return true;
     for (; *current; ++current) {

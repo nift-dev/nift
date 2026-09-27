@@ -11,8 +11,12 @@
 
 #if defined(_WIN32)
     #include <io.h>
-    #define NOMINMAX
-    #define WIN32_LEAN_AND_MEAN
+    #ifndef NOMINMAX
+        #define NOMINMAX
+    #endif
+    #ifndef WIN32_LEAN_AND_MEAN
+        #define WIN32_LEAN_AND_MEAN
+    #endif
     #include <windows.h>
     #define NIFT_ISATTY _isatty
     #define NIFT_FILENO _fileno
