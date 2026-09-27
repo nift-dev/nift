@@ -1037,3 +1037,20 @@ init/build/status succeed.
 
 - Development identity advanced locally to `Nift v4.2.0` (distinct post-release
   commit; not pushed).
+
+## v4.5.0 release report (2026-09-27)
+
+- Certified product commit: `dc61e9a47f0988b69ad070355aa64192ce0cbf3d`.
+- Release-policy/notes commit and annotated tag target:
+  `560863b664c482802b8df1206c63723bb1078e51`.
+- Release artifacts rehearsal 4.5.0: PASS — run #45 — SHA `560863b664c482802b8df1206c63723bb1078e51`.
+- Release artifacts run #46 (`36296984201`): PASS, including all four native
+  archive jobs, publication, and the Linux/macOS public-installer smoke matrix.
+- Public, non-draft, non-prerelease release:
+  <https://github.com/nift-dev/nift/releases/tag/v4.5.0>.
+- The release contains exactly the four supported native archives plus
+  `SHA256SUMS`; every downloaded archive passed the published manifest.
+- Exact checksums and recovery history are recorded in
+  `docs/evidence/release-4.5.0/release-verification.md`.
+- Snap, Chocolatey, and Homebrew publication and the development-version bump
+  were not performed in this phase.
