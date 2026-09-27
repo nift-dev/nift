@@ -9,6 +9,7 @@ case "$NIFT" in /*) NIFT_ABS="$NIFT";; *) NIFT_ABS="$(pwd)/$NIFT";; esac
 BIN="$(dirname "$NIFT_ABS")"
 t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
 t_physical=$(cd "$t" && pwd -P)
+case "$(uname -s)" in MINGW*|MSYS*) t_physical=$(cygpath -am "$t");; esac
 
 cat > "$t/hello.f" <<'F'
 #!/usr/bin/env nift
