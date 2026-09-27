@@ -1,0 +1,48 @@
+name: Hosted certification diagnostic
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/hosted-certification-diagnostic.yml'
+      - 'src/**'
+      - 'include/**'
+      - 'Makefile'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.id }} compiler diagnostic
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: macos
+            runner: macos-latest
+          - id: windows
+            runner: windows-latest
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: msys2/setup-msys2@v2
+        if: runner.os == 'Windows'
+        with:
+          msystem: UCRT64
+          update: true
+          install: make mingw-w64-ucrt-x86_64-gcc
+      - name: Build and expose compiler diagnostics
+        shell: ${{ runner.os == 'Windows' && 'msys2 {0}' || 'bash' }}
+        run: |
+          set +e
+          make -j2 > hosted-build.log 2>&1
+          rc=$?
+          set -e
+          cat hosted-build.log
+          if [ "$rc" -ne 0 ]; then
+            message="$(tail -40 hosted-build.log | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | awk '{printf "%s%%0A", $0}')"
+            echo "::error title=Hosted compiler diagnostic::$message"
+            exit "$rc"
+          fi
