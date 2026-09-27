@@ -1073,7 +1073,7 @@ static int run_script_shell_loop(Parser& parser, bool load_rc) {
             // syntax, so ignore interpolation spans when routing.
             std::string no_interp; { bool in_interp=false; bool saw_dollar=false; for(char c : trimmed) { if(c=='['&&!in_interp&&saw_dollar){in_interp=true;saw_dollar=false;continue;} if(in_interp){ if(c==']') in_interp=false; continue; } no_interp+=c; saw_dollar=(c=='$'); } }
             const bool job_builtin = !toks.empty() && (toks[0]=="jobs" || toks[0]=="fg" || toks[0]=="bg" || toks[0]=="wait");
-            command_style=!assignment_like&&(job_builtin||sp!=std::string::npos||trimmed=="pwd"||trimmed=="ls")&&no_interp.find(":=")==std::string::npos&&no_interp.find('(')==std::string::npos&&trimmed.rfind("fn ",0)!=0&&trimmed.rfind("if ",0)!=0&&trimmed.rfind("for ",0)!=0&&trimmed.rfind("while ",0)!=0;
+            command_style=!assignment_like&&!toks.empty()&&toks[0][0]!='#'&&(job_builtin||sp!=std::string::npos||trimmed=="pwd"||trimmed=="ls")&&no_interp.find(":=")==std::string::npos&&no_interp.find('(')==std::string::npos&&trimmed.rfind("fn ",0)!=0&&trimmed.rfind("if ",0)!=0&&trimmed.rfind("for ",0)!=0&&trimmed.rfind("while ",0)!=0;
             // Executable paths (./x, ../x, /x, dir/x) are ordinary external
             // commands even without arguments, exactly like Bash executing a
             // path: ./hello.f, ./scripts/deploy.f, ../tools/generate.f.
