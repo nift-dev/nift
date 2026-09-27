@@ -131,7 +131,7 @@ fixtool one
 fixtool one two three
 print("cc-done")
 NIFT
-out=$(cd "$t" && PATH="$t/bin:$PATH" "$NIFT_ABS" cc.f)
+out=$(cd "$t" && PATH="$t/bin:$PATH" "$NIFT_ABS" cc.f 2>&1) || { echo "script command-style: $out" >&2; exit 1; }
 grep -q 'fixtool-ran one' <<<"$out" || { echo "$out" >&2; exit 1; }
 grep -q '^cc-done$' <<<"$out" || exit 1
 # command-style in script land is blocked by --no-process

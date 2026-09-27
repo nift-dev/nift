@@ -43,7 +43,14 @@ grep -q 'R1' <<<"$fn_out" || { echo "fn-interp: $fn_out" >&2; exit 1; }
 echo "MARK bg"
 # v4.5: background & launches a tracked shell job and wait reaps it.
 bg_out=$(printf 'sleep 0.02 &\nwait\njobs\nexit\n' | "$NIFT" 2>&1 || true)
-grep -Eq '\[[0-9]+\] Done \(0\).*sleep 0.02 &' <<<"$bg_out" || { echo "bg: $bg_out" >&2; exit 1; }
+case "$(uname -s)" in
+MINGW*|MSYS*)
+  grep -q 'interactive job control is not supported on Windows' <<<"$bg_out" || { echo "bg: $bg_out" >&2; exit 1; }
+  ;;
+*)
+  grep -Eq '\[[0-9]+\] Done \(0\).*sleep 0.02 &' <<<"$bg_out" || { echo "bg: $bg_out" >&2; exit 1; }
+  ;;
+esac
 
 echo "MARK bare"
 # Bare single-token commands fall through to ordinary external executable/PATH
