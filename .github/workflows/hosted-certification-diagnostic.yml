@@ -22,8 +22,10 @@ jobs:
         include:
           - id: macos
             runner: macos-latest
+            shell: bash
           - id: windows
             runner: windows-latest
+            shell: msys2 {0}
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v5
@@ -34,7 +36,7 @@ jobs:
           update: true
           install: make mingw-w64-ucrt-x86_64-gcc
       - name: Build and expose compiler diagnostics
-        shell: ${{ runner.os == 'Windows' && 'msys2 {0}' || 'bash' }}
+        shell: ${{ matrix.shell }}
         run: |
           set +e
           make -j2 > hosted-build.log 2>&1
