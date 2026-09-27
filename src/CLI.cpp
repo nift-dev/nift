@@ -1097,7 +1097,7 @@ static int run_script_shell_loop(Parser& parser, bool load_rc) {
             const bool bare_token = !tv.empty() &&
                 tv.find_first_of(" \t()[]{}:=@$\"'")==std::string::npos && tv.find("//")==std::string::npos;
             if(bare_token){
-                static const std::unordered_set<std::string> shell_builtins={"build","cat","cd","cmd","copy","cp","exists","file","getenv","env","os","arch","hardware_concurrency","thread","await","mutex","jobs","fg","bg","wait","ls","make_dir","max","min","mkdir","move","mv","open","page","pwd","remove","rm","run","setenv","touch","unsetenv","which"};
+                static const std::unordered_set<std::string> shell_builtins={"build","cd","cmd","copy","cp","exists","file","getenv","env","os","arch","hardware_concurrency","thread","await","mutex","jobs","fg","bg","wait","ls","make_dir","max","min","mkdir","move","mv","open","page","pwd","remove","rm","run","setenv","touch","unsetenv","which"};
                 const bool is_builtin = shell_builtins.count(tv) != 0;
                 std::string resolved;
                 const bool on_path = !is_builtin && nift_find_executable(tv, resolved);

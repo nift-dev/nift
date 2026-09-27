@@ -46,7 +46,7 @@ WORK = os.path.join(os.path.dirname(os.path.abspath(NIFT)), ".interactive-comple
 os.makedirs(WORK, exist_ok=True)
 if pid == 0:
     os.chdir(WORK)
-    os.execv(NIFT, [NIFT, "sh"])
+    os.execv(NIFT, [NIFT])
 
 try:
     drain(fd, 0.4)

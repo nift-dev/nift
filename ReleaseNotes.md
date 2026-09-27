@@ -23,7 +23,7 @@ Nift v4.4 turns the v4.3 native language into a coherent execution environment: 
 - Deterministic filesystem wildcards (`*`, `?`, `**`) across `ls`/`cp`/`mv`/`rm` and external-command glob expansion, plus scoped object-key wildcards for `pick`/`omit`.
 - Block lambdas can render markup values, so `filter(...).map(row => { ... }).join("")` generates content.
 - Direct process execution with structured results (`run()`), the streaming `cmd(...).pipe(...).run()` pipeline API with redirection/append/cwd/env, and no implicit shell.
-- The persistent `nift sh` shell: Bash-compatible command syntax, pipelines/redirections/`&&`/`||`/`;`, environment assignment, `$[...]` command interpolation, `niftrc`, persistent history, and an interactive TAB-completion editor with arrow-key history on Unix.
+- The persistent interactive shell (now entered with plain `nift`): Bash-compatible command syntax, pipelines/redirections/`&&`/`||`/`;`, environment assignment, `$[...]` command interpolation, `niftrc`, persistent history, and an interactive TAB-completion editor with arrow-key history on Unix.
 - Native project/build automation from scripts (`build`, `build_all`, `build_names`, `build_repair`, `track`, `untrack`, `status`, `tracked`, `project_root`) driving Nift's own machinery with structured results.
 - Project-wide and per-file build hooks (`pre build`, `post build`, and the `-all`/`--auto`/`--repair` mode-specific forms) executed as native Nift scripts with the agreed lifecycle and failure propagation.
 - Opt-in restrictions: `--no-process` across run/sh/eval/build (including build hooks) and the `--fs-root` Nift-native filesystem confinement; explicitly not an OS sandbox.

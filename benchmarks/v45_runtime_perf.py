@@ -67,7 +67,7 @@ def main():
     ffi_lib=ROOT/'.build/libnift_ffi_perf.so'; ffi_lib.parent.mkdir(exist_ok=True)
     run(['cc','-std=c99','-O2','-fPIC','-shared','tests/ffi/fixture.c','-o',str(ffi_lib)])
     thread_script = 'fn(worker(x)) { return x }\n' + ''.join(f't{i} := thread(worker, {i})\nt{i}.join()\n' for i in range(100))
-    async_script = 'fn(worker(x)) { return x }\n' + ''.join(f'a{i} := async(worker, {i})\nawait(a{i})\n' for i in range(100))
+    async_script = '@fn[async](worker(x)) { return x }\n' + ''.join(f'a{i} := worker({i})\nawait a{i}\n' for i in range(100))
     result={
       'nift_version': run([str(nift),'--version']).stdout.strip(),
       'cli_inline_median_ms': median_ms([str(nift),'-e','return 1;'],15),

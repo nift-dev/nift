@@ -63,6 +63,10 @@ echo fixtool-ran %1
 B
 bare_out=$(cd "$t" && printf 'fixtool\n' | PATH="$t/bin:$PATH" "$NIFT" 2>&1 || true)
 grep -q 'fixtool-ran' <<<"$bare_out" || { echo "bare: $bare_out" >&2; exit 1; }
+# A Nift callable name that fails as a zero-argument expression must still be
+# allowed to fall through to an ordinary PATH executable.
+bare_cat_out=$(printf 'cat\n' | "$NIFT" 2>&1 || true)
+! grep -q 'unknown value or malformed expression: cat' <<<"$bare_cat_out" || { echo "bare-cat: $bare_cat_out" >&2; exit 1; }
 echo "MARK builtins"
 # bare Nift builtins/values keep precedence: `true` is a Nift boolean, not /bin/true
 true_out=$(printf 'true\n' | "$NIFT" 2>/dev/null)

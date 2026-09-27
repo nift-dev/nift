@@ -89,7 +89,7 @@ def run_in_shell(cmd, timeout=3.0):
     pid, fd = pty.fork()
     if pid == 0:
         os.chdir(T)
-        os.execv(NIFT, [NIFT, "sh"])
+        os.execv(NIFT, [NIFT])
     time.sleep(0.4)
     drain(fd, 0.4)
     try:
@@ -132,7 +132,7 @@ probe_script = os.path.join(T, ".interactive-run-probe.f")
 with open(probe_script, "w") as f:
     f.write('r := run("' + FIXTURE + '")\nprint(r.stdout.trim())\n')
 _mark("run3")
-out = subprocess.run([NIFT, "run", probe_script], capture_output=True, text=True, timeout=30).stdout
+out = subprocess.run([NIFT, probe_script], capture_output=True, text=True, timeout=30).stdout
 check("run-captures-not-tty", "fd1-pipe" in out and "fd0-pipe" in out, out)
 
 try:
