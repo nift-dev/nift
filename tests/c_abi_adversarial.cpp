@@ -73,7 +73,7 @@ nift_status test_env(void* user_data, const char* name, size_t name_len, nift_st
 void test_version_and_handles() {
     CHECK(std::string(nift_abi_version()) == NIFT_ABI_VERSION);
     CHECK(nift_abi_version_major() == 1);
-    CHECK(nift_abi_version_minor() == 0);
+    CHECK(nift_abi_version_minor() == 1);
 
     nift_engine* engine = nift_engine_new();
     CHECK(engine != nullptr);
@@ -447,7 +447,7 @@ nift_status empty_loader(void* user_data, const char* path, size_t path_len, nif
     return NIFT_ERROR_NOT_FOUND;
 }
 
-nift_status empty_env(void* user_data, const char* name, size_t name_len, nift_string* out) {
+nift_status empty_env(void*, const char* name, size_t name_len, nift_string* out) {
     const std::string key(name, name_len);
     if (key == "EMPTY") {
         out->data = nullptr;
@@ -651,7 +651,7 @@ void test_concurrent_renders() {
 
 // Host-failure environment provider for the paginated-worker tests: FAIL_BARRIER
 // -> hard failure, OK_BARRIER -> value, otherwise unset.
-nift_status host_failure_env(void* user_data, const char* name, size_t name_len, nift_string* out) {
+nift_status host_failure_env(void*, const char* name, size_t name_len, nift_string* out) {
     const std::string key(name, name_len);
     if (key == "FAIL_BARRIER") return NIFT_ERROR_CALLBACK;
     if (key == "OK_BARRIER") {
@@ -757,7 +757,7 @@ void test_c_abi_env_host_failure() {
 // Hard callback failures must preserve a SUPPLIED diagnostic exactly: the
 // callback's out is the failure diagnostic (non-empty), and an empty out falls
 // back to the generic "host callback failed".
-nift_status diagnostic_loader(void* user_data, const char* path, size_t path_len, nift_string* out) {
+nift_status diagnostic_loader(void*, const char* path, size_t path_len, nift_string* out) {
     const std::string key(path, path_len);
     if (key.find("/templates/template.html") != std::string::npos) {
         static const std::string tpl = "<main>@content</main>";
@@ -771,7 +771,7 @@ nift_status diagnostic_loader(void* user_data, const char* path, size_t path_len
     return NIFT_ERROR_CALLBACK;
 }
 
-nift_status diagnostic_env(void* user_data, const char* name, size_t name_len, nift_string* out) {
+nift_status diagnostic_env(void*, const char*, size_t, nift_string* out) {
     static const std::string diag = "env exploded";
     out->data = diag.data();
     out->length = diag.size();
