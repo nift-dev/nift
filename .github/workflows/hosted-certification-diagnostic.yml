@@ -61,3 +61,31 @@ jobs:
             echo "::error title=Hosted compiler diagnostic::$message"
             exit "$rc"
           fi
+      - name: Diagnose macOS automation and hooks
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set +e
+          make test-v44-automation test-v44-hooks > hosted-test.log 2>&1
+          rc=$?
+          set -e
+          cat hosted-test.log
+          if [ "$rc" -ne 0 ]; then
+            message="$(tail -80 hosted-test.log | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | awk '{printf "%s%%0A", $0}')"
+            echo "::error title=Hosted macOS test diagnostic::$message"
+            exit "$rc"
+          fi
+      - name: Diagnose Windows execution shell and language foundation
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          set +e
+          make test-v44-execution-shell test-v44-language-foundation > hosted-test.log 2>&1
+          rc=$?
+          set -e
+          cat hosted-test.log
+          if [ "$rc" -ne 0 ]; then
+            message="$(tail -80 hosted-test.log | sed -e 's/%/%25/g' -e 's/\r/%0D/g' | awk '{printf "%s%%0A", $0}')"
+            echo "::error title=Hosted Windows test diagnostic::$message"
+            exit "$rc"
+          fi
