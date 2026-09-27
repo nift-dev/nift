@@ -1310,3 +1310,24 @@ class WorkflowStructure(unittest.TestCase):
             packaging,
         )
         self.assertIn("do not monitor or wait for propagation", packaging)
+
+    def test_packaging_handover_splits_local_and_published_development_bump(self):
+        packaging = self.load("docs/handover/PACKAGING.md")
+        releases = self.load("docs/handover/RELEASES.md")
+        self.assertIn("Phase 4A — prepare the next development version locally", packaging)
+        self.assertIn("Phase 4B — publish the prepared development bump", packaging)
+        self.assertIn("Do not push, create/move a tag", packaging)
+        self.assertIn("Phase 4A (local preparation)", releases)
+        self.assertIn("Phase 4B (explicitly authorized push and CI)", releases)
+
+    def test_packaging_handover_has_explicit_release_go_no_go(self):
+        packaging = self.load("docs/handover/PACKAGING.md")
+        for item in (
+            "release notes created, reviewed, tracked",
+            "release-artifacts rehearsal PASS",
+            "complete Deep Guards PASS",
+            "independent regression suite PASS",
+            "Nick explicitly approves Phase 2",
+            "Limited pre-publication tag recovery",
+        ):
+            self.assertIn(item, packaging)

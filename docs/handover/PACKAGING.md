@@ -380,8 +380,8 @@ continuing its task does not constitute approval.
 Phase 1  push + validate  -> STOP -> Nick approves release
 Phase 2  release + verify -> STOP -> Nick approves packaging
 Phase 3  agent submits Chocolatey; Nick owns Snap; Homebrew async
-                           -> STOP -> Nick approves development bump
-Phase 4  development bump
+Phase 4A prepare development bump locally -> STOP -> Nick accepts/publishes
+Phase 4B push prepared bump + verify CI    -> STOP
 ```
 
 ### Deep-guard policy
@@ -456,6 +456,29 @@ Ordinary push/PR CI retains the fast deterministic correctness contracts via
     `docs/evidence/release-X.Y.Z/release-notes-X.Y.Z.md` must exist before the
     rehearsal is dispatched; creating it after tag authorization is too late.
 
+### Phase 1 release go/no-go
+
+Every box is mandatory before tag authorization:
+
+- [ ] version selected and synchronized
+- [ ] release notes created, reviewed, tracked, and present in the candidate
+- [ ] `PENDING-WEBSITE.md` clear for the release
+- [ ] website candidate built and synchronized
+- [ ] release-artifacts rehearsal PASS, with run and candidate SHA recorded
+- [ ] complete Deep Guards PASS
+- [ ] normal CI PASS
+- [ ] independent regression suite PASS
+- [ ] packaging matrix PASS
+- [ ] applicable installer gate satisfied
+- [ ] exact candidate SHA recorded
+- [ ] every intended repository clean
+- [ ] Nick explicitly approves Phase 2
+
+Required order: choose `X.Y.Z` → prepare/review/commit release notes → run the
+release-artifacts rehearsal → require PASS → complete the remaining Phase 1
+gates → obtain Nick's Phase 2 approval → tag. Packaging matrix, Deep Guards and
+normal push CI are distinct gates and never substitute for the rehearsal.
+
 **STOP.** Wait for Nick's explicit manual confirmation that the Actions results
 have been reviewed and the release may proceed. An agent must never infer
 release authorization from green Actions, and must not push then proceed
@@ -488,6 +511,16 @@ This phase is authorized only after Nick explicitly authorizes the release.
    every supported-platform artifact was extracted and smoke-tested, every binary
    reports the released version, the public installer uses the released artifacts
    successfully, and release notes/public metadata are correct.
+
+### Limited pre-publication tag recovery
+
+After a GitHub release or any release asset exists, the assets are immutable and
+the tag must not be moved. A one-time correction is permitted only when all of
+the following are true: the tag exists; the release workflow failed before
+GitHub release creation; no release assets were published; no downstream
+package manager consumed the tag or assets; and Nick explicitly authorizes the
+specific correction. Record the old and new tag objects/targets and the exact
+recovery reason. This is an exceptional recovery path, not routine retagging.
 
 The tag-triggered `release.yml` workflow **ends here**. It builds, publishes and
 verifies the GitHub release and then **STOPs**; it does **not** invoke
@@ -595,24 +628,39 @@ Prepare a manual `Homebrew/homebrew-core` change only if Homebrew maintainers
 Never describe a release as available through a package manager until its public
 store entry resolves to the intended version and a fresh installation succeeds.
 
-**STOP.** Wait for Nick's separate explicit confirmation that the release and
-packaging work is complete and accepted.
+## Phase 4A — prepare the next development version locally
 
-## Phase 4 — development-version advancement
+Immediately after the agent-owned Phase 3 work is complete, prepare the next
+development identity without publishing it. This does not require waiting for
+Chocolatey moderation, Snap builders/promotion, or Homebrew propagation.
 
-This phase is authorized only after Nick separately confirms the release and
-packaging work is complete.
+1. Advance every authoritative development-version location together
+   (`src/CLI.cpp`, `snap/snapcraft.yaml`, current version fixtures, development
+   notes/metadata, and current-development regression-suite assertions).
+2. Preserve all completed release evidence, tags, checksums and historical
+   version assertions.
+3. Run local version-consistency and focused behavioral validation.
+4. Commit the bump locally in a distinct post-release commit. If the regression
+   suite changes, commit it separately in that repository.
+5. Confirm affected repositories are clean, report the local commit SHA(s), and
+   STOP. Do not push, create/move a tag, trigger CI, or publish anything.
 
-1. Advance the development version in one **distinct post-release commit**,
-   updating every authoritative version location together (`src/CLI.cpp`,
-   `snap/snapcraft.yaml` and any version fixtures).
-2. Push it.
-3. Run the complete applicable Actions matrix again.
-4. Report and stop.
+Nick reviews the asynchronous release/package states and the prepared local
+development transition before authorizing Phase 4B.
 
-The development-version advancement must not be combined with release
-verification, inferred from successful verification, or performed in the same
-workflow, checkpoint, commit or agent continuation as the release.
+## Phase 4B — publish the prepared development bump
+
+Only after Nick explicitly accepts the release/package work and authorizes the
+push:
+
+1. Push the already-prepared Nift development commit.
+2. Verify Nift `origin/main`, then push the regression-suite commit if it depends
+   on the new Nift identity. Nift must always be pushed first.
+3. Run and monitor the applicable Actions matrix; repair only concrete
+   post-bump failures.
+4. Report and STOP.
+
+Phase 4A is preparation, not publication. Neither phase creates a release tag.
 
 ## v4.0.0 publication record
 

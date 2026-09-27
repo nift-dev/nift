@@ -174,16 +174,20 @@ justify version/release-note changes. Tests or prose alone do not automatically
 require a binary version bump. Follow established Git/release evidence and ask
 before assigning a public release version.
 
-Immediately after a public release is completed, advance the executable/source
-identity to the next development version before beginning further development.
-Do not leave the working tree identifying itself as the version that was just
-released: keeping the development identity current prevents the next bump from
-becoming a release-day memory task. Update any regression assertion that checks
-the executable version as part of the same post-release checkpoint. Packaging
-metadata that intentionally records a published store version is separate and
-must remain historical. Packaging source recipes that participate in development
-and release validation, including `snap/snapcraft.yaml`, advance with the
-executable identity so the next release cannot inherit a stale version.
+Immediately after the agent-owned package submission/evidence work is complete,
+prepare the next executable/source development identity locally before beginning
+further development. Update any regression assertion that checks the current
+executable version in a separate local suite commit. Packaging metadata that
+intentionally records a published store version remains historical; development
+recipes such as `snap/snapcraft.yaml` advance with the executable identity.
+
+Commit this transition locally, validate it, report its SHA(s), and STOP without
+pushing or tagging. Local preparation is not publication and does not wait for
+Chocolatey moderation, Snap promotion, or Homebrew propagation. Only after Nick
+accepts the release/package state may the prepared commit(s) be pushed: Nift
+first, verify its remote `main`, then the regression suite. Monitor the ensuing
+CI and stop again. This split is Phase 4A (local preparation), followed by
+Phase 4B (explicitly authorized push and CI).
 
 ## Release report
 
