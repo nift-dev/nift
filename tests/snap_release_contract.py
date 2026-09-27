@@ -1286,3 +1286,15 @@ class WorkflowStructure(unittest.TestCase):
         self.assertNotIn("permissions:\n      contents: write", rehearse)
         self.assertNotIn("gh release", rehearse)
         self.assertNotIn("GH_TOKEN", rehearse)
+
+    def test_release_handover_requires_explicit_rehearsal_evidence(self):
+        # Process policy must make the workflow_dispatch rehearsal an explicit
+        # Phase 1 go/no-go record. Packaging CI and Deep guards are separate.
+        releases = self.load("docs/handover/RELEASES.md")
+        packaging = self.load("docs/handover/PACKAGING.md")
+        evidence = "Release artifacts rehearsal X.Y.Z: PASS"
+        for text in (releases, packaging):
+            self.assertIn(evidence, text)
+            self.assertRegex(text, r"Packaging\s+matrix")
+            self.assertRegex(text, r"Deep\s+guards")
+            self.assertIn("not substitute", text)

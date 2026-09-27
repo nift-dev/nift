@@ -75,14 +75,20 @@ Proportionately include:
 8. Build the updated Nift website with the exact candidate binary.
 9. Validate representative templates/downloadable examples where relevant.
 10. Reconcile README, docs, website, AI context, release notes, decisions, and
-   production roadmap.
-11. Build the actual package/archive, extract it freshly, build/use it, run the
+    production roadmap.
+11. Commit the reviewed release body at
+    `docs/evidence/release-X.Y.Z/release-notes-X.Y.Z.md`, then run the complete
+    non-publishing `Release artifacts` rehearsal with `version=X.Y.Z`. Packaging
+    matrix, Deep guards and ordinary CI are not substitutes. The Phase 1 report
+    must contain the exact line `Release artifacts rehearsal X.Y.Z: PASS — run
+    #... — SHA ...`; without it the candidate is not tag-ready.
+12. Build the actual package/archive, extract it freshly, build/use it, run the
     external suite against it, and verify `nift version`, `nift about`, and
     `nift commands`, plus the license and expected files. Confirm unknown and
     help-like invocations produce the intended diagnostic and direct users to
     `nift commands`; a separate `nift help` command is not part of the contract.
-12. Inspect repository state for generated/debug residue.
-13. **Deep guards (manual-only).** Before tagging a release, run the complete
+13. Inspect repository state for generated/debug residue.
+14. **Deep guards (manual-only).** Before tagging a release, run the complete
     manual `Deep guards` workflow (`.github/workflows/nightly-deep.yml`) against
     the candidate SHA and require every job to pass: parser fuzz, sanitized
     core-lifecycle memory, watch endurance, incremental equivalence and the

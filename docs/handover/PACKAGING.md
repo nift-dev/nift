@@ -434,13 +434,23 @@ Ordinary push/PR CI retains the fast deterministic correctness contracts via
    suite's GitHub workflow builds Nift from its remote `main` branch, so pushing
    the suite first makes CI test its new contract against the previous Nift
    revision.
-9. Run every applicable non-publishing CI, build, regression and
+9. Commit the reviewed release body at
+   `docs/evidence/release-X.Y.Z/release-notes-X.Y.Z.md`, then manually dispatch
+   the complete non-publishing `Release artifacts` workflow with
+   `version=X.Y.Z`. Require every platform archive, installer preflight,
+   public-installer preflight, tracked-notes check, exact-set validation and
+   rehearsal checksum step to pass. Packaging matrix, Deep guards and normal CI
+   do not substitute for this rehearsal.
+10. Run every other applicable non-publishing CI, build, regression and
    packaging-validation workflow against the pushed commit. Monitor every job to
    completion. Fix actual failures from their remote logs and repeat until the
    complete applicable matrix is green.
-10. Produce the Phase 1 report: exact commit hash, every workflow and run URL,
+11. Produce the Phase 1 report: exact commit hash, every workflow and run URL,
     every job result, any deliberately inapplicable workflow and why, and
-    repository cleanliness/version consistency.
+    repository cleanliness/version consistency. It must contain the exact
+    evidence form `Release artifacts rehearsal X.Y.Z: PASS — run #... — SHA ...`.
+    Without that line and a green matching rehearsal, Phase 1 is incomplete and
+    tagging is prohibited.
 
 **STOP.** Wait for Nick's explicit manual confirmation that the Actions results
 have been reviewed and the release may proceed. An agent must never infer
