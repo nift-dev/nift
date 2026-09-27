@@ -908,7 +908,7 @@ static int execute_shell_command(Parser& parser,const std::string& line,bool pri
         // capture is unaffected.
         const bool direct = !has_ops && stages.size()==1;
         ProcessResult pr;
-        if(jobs) pr=jobs->launch(stages,line,true);
+        if(jobs && jobs->supported()) pr=jobs->launch(stages,line,true);
         else { if(direct) stages[0].foreground_terminal=true; pr=nift_run_pipeline(stages,!direct,!direct); }
         last=pr.exit_code;if(!pr.error.empty()&&print_errors)console::error(pr.error);
     }pending_op=end<toks.size()?toks[end]:"";pos=end+1;}return last;}
