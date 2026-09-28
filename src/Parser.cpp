@@ -60,6 +60,14 @@ static bool call_runtime_host(const RenderHost& host, const std::string& name,
     return host.call_host_callable(name, args, out, error);
 }
 
+static std::string runtime_scalar_key(const nift::RuntimeValue& value) {
+    if (value.is_bool()) return std::string("b") + (value.boolean ? "1" : "0");
+    if (value.is_number()) return "n" + nift::runtime_numeric_fingerprint(value);
+    if (value.is_string() && value.string.rfind("\x1fnift:", 0) != 0)
+        return "s" + value.string;
+    return {};
+}
+
 Parser::FfiLibraryInstance::~FfiLibraryInstance() {
     if (!handle || closed) return;
 #ifdef _WIN32
@@ -71,7 +79,7 @@ Parser::FfiLibraryInstance::~FfiLibraryInstance() {
 static int nift_binding_type(const nift::RuntimeValue& value) {
     if (value.is_null()) return 0;
     if (value.is_bool()) return 1;
-    if (value.is_number()) return std::trunc(value.num) == value.num ? 2 : 3;
+    if (value.is_number()) return nift::runtime_number_is_integer(value) ? 2 : 3;
     if (value.is_string()) return 4;
     if (value.is_array()) return 5;
     if (value.is_object()) return 6;
@@ -136,6 +144,39 @@ private:
     std::mutex mutex_;std::condition_variable cv_;std::deque<std::function<void()>> queue_;std::vector<std::thread> workers_;bool stop_=false;
 };
 static NiftAsyncPool& nift_async_pool(){static NiftAsyncPool pool;return pool;}
+
+static bool nift_atomic_add_sub_checked(std::atomic<std::int64_t>& value,
+                                        std::int64_t operand, bool subtract,
+                                        std::int64_t& before, std::int64_t& after) {
+    before = value.load();
+    for (;;) {
+        if ((!subtract && ((operand > 0 && before > std::numeric_limits<std::int64_t>::max() - operand) ||
+                           (operand < 0 && before < std::numeric_limits<std::int64_t>::min() - operand))) ||
+            (subtract && ((operand > 0 && before < std::numeric_limits<std::int64_t>::min() + operand) ||
+                          (operand < 0 && before > std::numeric_limits<std::int64_t>::max() + operand)))) return false;
+        after = subtract ? before - operand : before + operand;
+        if (value.compare_exchange_weak(before, after)) return true;
+    }
+}
+
+static bool nift_numeric_exponent_sign(const std::string& text, std::size_t sign) {
+    if (sign < 2 || (text[sign - 1] != 'e' && text[sign - 1] != 'E')) return false;
+    std::size_t start = sign - 1;
+    bool digit = false;
+    bool dot = false;
+    while (start > 0) {
+        const unsigned char c = static_cast<unsigned char>(text[start - 1]);
+        if (std::isdigit(c)) { digit = true; --start; continue; }
+        if (c == '.' && !dot) { dot = true; --start; continue; }
+        break;
+    }
+    if (!digit) return false;
+    if (start > 0) {
+        const unsigned char before = static_cast<unsigned char>(text[start - 1]);
+        if (std::isalnum(before) || before == '_' || before == '.') return false;
+    }
+    return true;
+}
 
 static bool nift_glob_has_magic(const std::string& s) {
     bool escaped=false; for(char c:s){if(escaped){escaped=false;continue;}if(c=='\\'){escaped=true;continue;}if(c=='*'||c=='?')return true;} return false;
@@ -1049,11 +1090,10 @@ bool Parser::resolve_json_value(const std::string& expression,
                         error="JSON array indices must be non-negative integers in '"+expression+"'";return true;
                     }
                     nift::RuntimeValue computed;
-                    if(!evaluate_expression(token,computed,error)||!computed.is_number()||computed.num<0||std::trunc(computed.num)!=computed.num){
+                    if(!evaluate_expression(token,computed,error)||!nift::runtime_number_to_size(computed,index)){
                         if(error.empty())error="JSON array indices must be non-negative integers in '"+expression+"'";
                         return true;
                     }
-                    index=(std::size_t)computed.num;
                 }else{try{index=(std::size_t)std::stoull(token);}catch(...){error="JSON array index is out of range in '"+expression+"'";return true;}}
                 if(index>=current->array.size()){error="JSON array index "+std::to_string(index)+" is out of range in '"+expression+"'";return true;}const nift::RuntimeValue* child=&(*current)[index];current=std::shared_ptr<const nift::RuntimeValue>(current,child);continue;
             }
@@ -1265,7 +1305,14 @@ bool Parser::scalar_literal(const std::string& text, nift::RuntimeValue& value, 
     }
     char* end = nullptr;
     const double number = std::strtod(trimmed.c_str(), &end);
-    if (floating_literal && end && *end == '\0' && std::isfinite(number)) { value = nift::RuntimeValue(number); return true; }
+    if (floating_literal && end && *end == '\0' && std::isfinite(number)) {
+        if (trimmed.front() != '.' && trimmed.rfind("-.", 0) != 0) {
+            std::string parse_error;
+            const std::string json_number = trimmed.front() == '+' ? trimmed.substr(1) : trimmed;
+            if (parse_runtime_json(json_number, value, parse_error) && value.is_number()) return true;
+        }
+        value = nift::RuntimeValue(number); return true;
+    }
 
     error = "expected JSON path or scalar literal in @if condition: " + trimmed;
     return false;
@@ -1395,15 +1442,7 @@ bool Parser::evaluate_collection_value(const std::string& expression, nift::Runt
     if (!find_balanced(text, name_end, '(', ')', close) || close + 1 != text.size()) { error = "malformed @" + function + " call"; return false; }
     const std::string body = trim_copy(text.substr(name_end + 1, close - name_end - 1));
 
-    auto truthy = [](const nift::RuntimeValue& d) {
-        if (d.is_bool()) return d.boolean;
-        if (d.is_null()) return false;
-        if (d.is_number()) return d.num != 0.0;
-        if (d.is_string()) return !d.string.empty();
-        if (d.is_array()) return !d.array.empty();
-        if (d.is_object()) return !d.object.empty();
-        return false;
-    };
+    auto truthy = [](const nift::RuntimeValue& d) { return nift::runtime_truthy(d); };
     auto collection_arg = [&](const std::string& raw, nift::RuntimeValue& out) {
         if (!evaluate_collection_value(raw, out, error)) return false;
         if (!out.is_array()) { error = function + ": collection must resolve to an array"; return false; }
@@ -1477,7 +1516,7 @@ bool Parser::evaluate_collection_value(const std::string& expression, nift::Runt
         return ok;
     };
     auto comparable = [&](const nift::RuntimeValue& a, const nift::RuntimeValue& b, int& result) {
-        if (a.type != b.type || (!a.is_number() && !a.is_string())) {
+        if (!((a.is_number() && b.is_number()) || (a.is_string() && b.is_string()))) {
             error = function + ": values must be numbers or strings of the same type";
             return false;
         }
@@ -1494,8 +1533,8 @@ bool Parser::evaluate_collection_value(const std::string& expression, nift::Runt
         nift::RuntimeValue source; if (!collection_arg(params[0], source)) return false;
         auto index = [&](const std::string& raw, std::size_t& out, const char* label) {
             nift::RuntimeValue v; if (!evaluate_expression(raw, v, error)) return false;
-            if (!v.is_number() || v.num < 0 || std::trunc(v.num) != v.num) { error = std::string("slice: ") + label + " must be a non-negative integer"; return false; }
-            out = static_cast<std::size_t>(v.num); return true;
+            if (!nift::runtime_number_to_size(v, out)) { error = std::string("slice: ") + label + " must be a non-negative integer"; return false; }
+            return true;
         };
         std::size_t pos = 0, len = 0; if (!index(params[1], pos, "position") || !index(params[2], len, "length")) return false;
         value = nift::RuntimeValue::make_array();
@@ -1526,9 +1565,9 @@ bool Parser::evaluate_collection_value(const std::string& expression, nift::Runt
         nift::RuntimeValue source; if (!collection_arg(params[0], source)) return false;
         if (function == "sort") {
             value = source; if (value.array.empty()) return true;
-            const auto type = value.array.front().type;
-            if (type != nift::RuntimeType::Number && type != nift::RuntimeType::String) { error = "sort: simple form requires an array of numbers or strings"; return false; }
-            for (const auto& item : value.array) if (item.type != type) { error = "sort: values must all have the same sortable type"; return false; }
+            const bool numeric = value.array.front().is_number();
+            if (!numeric && !value.array.front().is_string()) { error = "sort: simple form requires an array of numbers or strings"; return false; }
+            for (const auto& item : value.array) if (numeric ? !item.is_number() : !item.is_string()) { error = "sort: values must all have the same sortable type"; return false; }
             std::stable_sort(value.array.begin(), value.array.end(), [](const auto& a, const auto& b) { return a.is_number() ? nift::runtime_compare_numbers(a, b) < 0 : a.string < b.string; });
             return true;
         }
@@ -1636,13 +1675,13 @@ bool Parser::evaluate_collection_value(const std::string& expression, nift::Runt
         return true;
     }
     if (keys.empty()) { value = source; return true; }
-    const auto type = keys.front().type;
-    if (type != nift::RuntimeType::Number && type != nift::RuntimeType::String) { error = "sort: keys must be numbers or strings"; return false; }
-    for (const auto& key : keys) if (key.type != type) { error = "sort: keys must all have the same type"; return false; }
+    const bool numeric = keys.front().is_number();
+    if (!numeric && !keys.front().is_string()) { error = "sort: keys must be numbers or strings"; return false; }
+    for (const auto& key : keys) if (numeric ? !key.is_number() : !key.is_string()) { error = "sort: keys must all have the same type"; return false; }
     std::vector<std::size_t> order(keys.size()); for (std::size_t i = 0; i < order.size(); ++i) order[i] = i;
     std::stable_sort(order.begin(), order.end(), [&](auto a, auto b) {
-        const bool less = type == nift::RuntimeType::Number ? nift::runtime_compare_numbers(keys[a], keys[b]) < 0 : keys[a].string < keys[b].string;
-        const bool greater = type == nift::RuntimeType::Number ? nift::runtime_compare_numbers(keys[a], keys[b]) > 0 : keys[a].string > keys[b].string;
+        const bool less = numeric ? nift::runtime_compare_numbers(keys[a], keys[b]) < 0 : keys[a].string < keys[b].string;
+        const bool greater = numeric ? nift::runtime_compare_numbers(keys[a], keys[b]) > 0 : keys[a].string > keys[b].string;
         return descending ? greater : less;
     });
     value = nift::RuntimeValue::make_array(); for (auto index : order) value.array.push_back(root->array[index]); return true;
@@ -1886,6 +1925,15 @@ bool Parser::evaluate_expression(const std::string& expression, nift::RuntimeVal
             if(!receiver_stack_.empty()){auto it=receiver_stack_.back()->fields.find(name);if(it!=receiver_stack_.back()->fields.end())return &it->second;}
             return nullptr;
         };
+        if (text.size() > 1 && (text.front() == '+' || text.front() == '-')) {
+            const std::string operand_name = trim_copy(text.substr(1));
+            if (valid_binding_identifier(operand_name)) {
+                if (auto* binding = find_binding(operand_name); binding && binding->value && binding->value->is_number()) {
+                    out = text.front() == '-' ? nift::runtime_number_negate(*binding->value) : *binding->value;
+                    return true;
+                }
+            }
+        }
 
         auto bind_temporary = [&](nift::RuntimeValue value) {
             if (variable_scopes_.empty()) variable_scopes_.emplace_back();
@@ -1904,7 +1952,7 @@ bool Parser::evaluate_expression(const std::string& expression, nift::RuntimeVal
             walk=[&](const nift::ast::Expr& ex)->bool{
                 if(ex.kind==nift::ast::Kind::Binding){auto* b=find_binding(ex.name);if(!b||!b->value)return false;if(b->is_location_ref()){root=b->ref_root_slot;path=b->ref_path;}else root=b->slot;return true;}
                 if(ex.kind==nift::ast::Kind::Member){if(!ex.left||!walk(*ex.left))return false;path.push_back(PathComponent::member(ex.name));return true;}
-                if(ex.kind==nift::ast::Kind::Index){if(!ex.left||!walk(*ex.left))return false;nift::RuntimeValue idx;if(!eval(ex.right->text.empty()?ref_source.substr(ex.right->span.begin,ex.right->span.end-ex.right->span.begin):ex.right->text,idx,depth+1))return false;if(idx.is_number()&&idx.num>=0&&std::trunc(idx.num)==idx.num)path.push_back(PathComponent::at((std::size_t)idx.num));else if(idx.is_string())path.push_back(PathComponent::member(idx.string));else return false;return true;}
+                if(ex.kind==nift::ast::Kind::Index){if(!ex.left||!walk(*ex.left))return false;nift::RuntimeValue idx;if(!eval(ex.right->text.empty()?ref_source.substr(ex.right->span.begin,ex.right->span.end-ex.right->span.begin):ex.right->text,idx,depth+1))return false;std::size_t index=0;if(nift::runtime_number_to_size(idx,index))path.push_back(PathComponent::at(index));else if(idx.is_string())path.push_back(PathComponent::member(idx.string));else return false;return true;}
                 return false;
             };
             if(!walk(*parsed.expr)||path.empty())return false;
@@ -1934,7 +1982,7 @@ bool Parser::evaluate_expression(const std::string& expression, nift::RuntimeVal
             if(document.is_string()&&document.string.rfind("\x1fnift:atomic:",0)==0){auto it=atomic_instances_.find(document.string.substr(13));if(it!=atomic_instances_.end())return it->second->kind==AtomicInstance::Kind::Bool?it->second->bool_value.load():it->second->int_value.load()!=0;}
             if (document.is_bool()) return document.boolean;
             if (document.is_null()) return false;
-            if (document.is_number()) return document.num != 0.0;
+            if (document.is_number()) return nift::runtime_truthy(document);
             if (document.is_string()) return !document.string.empty();
             if (document.is_array()) return !document.array.empty();
             if (document.is_object()) return !document.object.empty();
@@ -1961,8 +2009,8 @@ bool Parser::evaluate_expression(const std::string& expression, nift::RuntimeVal
         // Exact int64 extraction for atomic operations; general numeric equality
         // and ordering use RuntimeValue's arbitrary-decimal comparison below.
         auto exact_i64 = [](const nift::RuntimeValue& d, std::int64_t& v)->bool {
-            if(d.type==nift::RuntimeType::StrNumber){auto r=std::from_chars(d.string.data(),d.string.data()+d.string.size(),v);return r.ec==std::errc()&&r.ptr==d.string.data()+d.string.size();}
-            if(d.is_number()&&std::isfinite(d.num)&&std::trunc(d.num)==d.num&&d.num>=-9223372036854775808.0&&d.num<9223372036854775808.0){v=static_cast<std::int64_t>(d.num);return true;}return false;};
+            return nift::runtime_number_to_i64(d, v);
+        };
         auto structural_equal = [&](const nift::RuntimeValue& a, const nift::RuntimeValue& b) -> bool {
             std::function<bool(const nift::RuntimeValue&,const nift::RuntimeValue&)> eq;
             eq = [&](const nift::RuntimeValue& x,const nift::RuntimeValue& y)->bool {
@@ -2188,13 +2236,13 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 it->second->handle=nullptr;it->second->closed=true;out=nift::RuntimeValue(nullptr);return true;
             }
             if(call_args("ffi_buffer",args,q)){
-                if(args.size()!=1){error="ffi_buffer: expected string or byte array";return false;}nift::RuntimeValue d;if(!arg_value(args,q,0,d))return false;auto st=std::make_shared<FfiBufferInstance>();if(d.is_string())st->bytes.assign(d.string.begin(),d.string.end());else if(d.is_array()){for(const auto&x:d.array){if(!x.is_number()||std::trunc(x.num)!=x.num||x.num<0||x.num>255){error="ffi_buffer: array values must be bytes";return false;}st->bytes.push_back(static_cast<unsigned char>(x.num));}}else{error="ffi_buffer: expected string or byte array";return false;}const std::string id=std::to_string(next_ffi_buffer_id_++);ffi_buffers_[id]=st;out=nift::RuntimeValue(std::string("\x1fnift:ffi-buffer:")+id);return true;
+                if(args.size()!=1){error="ffi_buffer: expected string or byte array";return false;}nift::RuntimeValue d;if(!arg_value(args,q,0,d))return false;auto st=std::make_shared<FfiBufferInstance>();if(d.is_string())st->bytes.assign(d.string.begin(),d.string.end());else if(d.is_array()){for(const auto&x:d.array){std::size_t byte=0;if(!nift::runtime_number_to_size(x,byte)||byte>255){error="ffi_buffer: array values must be bytes";return false;}st->bytes.push_back(static_cast<unsigned char>(byte));}}else{error="ffi_buffer: expected string or byte array";return false;}const std::string id=std::to_string(next_ffi_buffer_id_++);ffi_buffers_[id]=st;out=nift::RuntimeValue(std::string("\x1fnift:ffi-buffer:")+id);return true;
             }
             if(call_args("ffi_bytes",args,q)){
                 if(args.size()!=1){error="ffi_bytes: expected buffer handle";return false;}nift::RuntimeValue h;if(!arg_value(args,q,0,h)||!h.is_string()||h.string.rfind("\x1fnift:ffi-buffer:",0)!=0){error="ffi_bytes: expected buffer handle";return false;}auto bi=ffi_buffers_.find(h.string.substr(17));if(bi==ffi_buffers_.end()){error="ffi_bytes: invalid buffer handle";return false;}out=nift::RuntimeValue::make_array();for(unsigned char b:bi->second->bytes)out.array.emplace_back(static_cast<int>(b));return true;
             }
             if(call_args("ffi_sizeof",args,q)||call_args("ffi_struct",args,q)){
-                const bool make_struct=text.rfind("ffi_struct(",0)==0;if((make_struct&&args.size()!=2)||(!make_struct&&args.size()!=1)){error=make_struct?"ffi_struct: expected layout and values":"ffi_sizeof: expected layout";return false;}std::string layout;if(!string_arg(make_struct?"ffi_struct":"ffi_sizeof",args,q,0,layout))return false;std::vector<std::string> fields;std::size_t pos=0;while(pos<=layout.size()){auto c=layout.find(',',pos);auto t=trim_copy(layout.substr(pos,c==std::string::npos?std::string::npos:c-pos));if(t.empty()){error="ffi struct: empty field type";return false;}fields.push_back(t);if(c==std::string::npos)break;pos=c+1;}auto sa=[&](const std::string&t,std::size_t&sz,std::size_t&al){if(t=="i8"||t=="u8"||t=="bool"){sz=al=1;return true;}if(t=="i16"||t=="u16"){sz=al=2;return true;}if(t=="i32"||t=="u32"||t=="f32"){sz=al=4;return true;}if(t=="i64"||t=="u64"||t=="f64"){sz=al=8;return true;}if(t=="ptr"||t=="cstr"){sz=al=sizeof(void*);return true;}return false;};std::vector<std::size_t> offs;std::size_t total=0,maxa=1;for(const auto&t:fields){std::size_t z,a;if(!sa(t,z,a)){error="ffi struct: unsupported field type '"+t+"'";return false;}total=(total+a-1)/a*a;offs.push_back(total);total+=z;maxa=std::max(maxa,a);}total=(total+maxa-1)/maxa*maxa;if(!make_struct){out=nift::RuntimeValue(static_cast<double>(total));return true;}nift::RuntimeValue vals;if(!arg_value(args,q,1,vals)||!vals.is_array()||vals.array.size()!=fields.size()){error="ffi_struct: values must be array matching layout";return false;}auto st=std::make_shared<FfiBufferInstance>();st->bytes.assign(total,0);for(size_t i=0;i<fields.size();++i){const auto&t=fields[i];const auto&v=vals.array[i];unsigned char* p=st->bytes.data()+offs[i];if(t=="f32"||t=="f64"){if(!v.is_number()){error="ffi_struct: floating field must be numeric";return false;}if(t=="f32"){float x=static_cast<float>(v.num);std::memcpy(p,&x,4);}else{double x=v.num;std::memcpy(p,&x,8);}continue;}if(t=="ptr"||t=="cstr"){error="ffi_struct: pointer/string fields require explicit pointer ownership and are not supported in v4.5";return false;}if(t=="bool"){if(!v.is_bool()){error="ffi_struct: bool field must be bool";return false;}unsigned char x=v.boolean?1:0;std::memcpy(p,&x,1);continue;}if(!v.is_number()||std::trunc(v.num)!=v.num){error="ffi_struct: integer field must be integral";return false;}std::int64_t x=static_cast<std::int64_t>(v.num);std::size_t z=t=="i8"||t=="u8"?1:t=="i16"||t=="u16"?2:t=="i32"||t=="u32"?4:8;std::memcpy(p,&x,z);}const std::string id=std::to_string(next_ffi_buffer_id_++);ffi_buffers_[id]=st;out=nift::RuntimeValue(std::string("\x1fnift:ffi-buffer:")+id);return true;
+                const bool make_struct=text.rfind("ffi_struct(",0)==0;if((make_struct&&args.size()!=2)||(!make_struct&&args.size()!=1)){error=make_struct?"ffi_struct: expected layout and values":"ffi_sizeof: expected layout";return false;}std::string layout;if(!string_arg(make_struct?"ffi_struct":"ffi_sizeof",args,q,0,layout))return false;std::vector<std::string> fields;std::size_t pos=0;while(pos<=layout.size()){auto c=layout.find(',',pos);auto t=trim_copy(layout.substr(pos,c==std::string::npos?std::string::npos:c-pos));if(t.empty()){error="ffi struct: empty field type";return false;}fields.push_back(t);if(c==std::string::npos)break;pos=c+1;}auto sa=[&](const std::string&t,std::size_t&sz,std::size_t&al){if(t=="i8"||t=="u8"||t=="bool"){sz=al=1;return true;}if(t=="i16"||t=="u16"){sz=al=2;return true;}if(t=="i32"||t=="u32"||t=="f32"){sz=al=4;return true;}if(t=="i64"||t=="u64"||t=="f64"){sz=al=8;return true;}if(t=="ptr"||t=="cstr"){sz=al=sizeof(void*);return true;}return false;};std::vector<std::size_t> offs;std::size_t total=0,maxa=1;for(const auto&t:fields){std::size_t z,a;if(!sa(t,z,a)){error="ffi struct: unsupported field type '"+t+"'";return false;}total=(total+a-1)/a*a;offs.push_back(total);total+=z;maxa=std::max(maxa,a);}total=(total+maxa-1)/maxa*maxa;if(!make_struct){out=nift::RuntimeValue(static_cast<double>(total));return true;}nift::RuntimeValue vals;if(!arg_value(args,q,1,vals)||!vals.is_array()||vals.array.size()!=fields.size()){error="ffi_struct: values must be array matching layout";return false;}auto st=std::make_shared<FfiBufferInstance>();st->bytes.assign(total,0);for(size_t i=0;i<fields.size();++i){const auto&t=fields[i];const auto&v=vals.array[i];unsigned char* p=st->bytes.data()+offs[i];if(t=="f32"||t=="f64"){if(!v.is_number()){error="ffi_struct: floating field must be numeric";return false;}if(t=="f32"){float x=static_cast<float>(v.num);std::memcpy(p,&x,4);}else{double x=v.num;std::memcpy(p,&x,8);}continue;}if(t=="ptr"||t=="cstr"){error="ffi_struct: pointer/string fields require explicit pointer ownership and are not supported in v4.5";return false;}if(t=="bool"){if(!v.is_bool()){error="ffi_struct: bool field must be bool";return false;}unsigned char x=v.boolean?1:0;std::memcpy(p,&x,1);continue;}const unsigned bits=t=="i8"||t=="u8"?8:t=="i16"||t=="u16"?16:t=="i32"||t=="u32"?32:64;if(t[0]=='u'){std::uint64_t x=0;if(!nift::runtime_number_to_unsigned(v,bits,x)){error="ffi_struct: integer field out of range for "+t;return false;}if(bits==8){auto y=static_cast<std::uint8_t>(x);std::memcpy(p,&y,sizeof y);}else if(bits==16){auto y=static_cast<std::uint16_t>(x);std::memcpy(p,&y,sizeof y);}else if(bits==32){auto y=static_cast<std::uint32_t>(x);std::memcpy(p,&y,sizeof y);}else std::memcpy(p,&x,sizeof x);}else{std::int64_t x=0;if(!nift::runtime_number_to_signed(v,bits,x)){error="ffi_struct: integer field out of range for "+t;return false;}if(bits==8){auto y=static_cast<std::int8_t>(x);std::memcpy(p,&y,sizeof y);}else if(bits==16){auto y=static_cast<std::int16_t>(x);std::memcpy(p,&y,sizeof y);}else if(bits==32){auto y=static_cast<std::int32_t>(x);std::memcpy(p,&y,sizeof y);}else std::memcpy(p,&x,sizeof x);}}const std::string id=std::to_string(next_ffi_buffer_id_++);ffi_buffers_[id]=st;out=nift::RuntimeValue(std::string("\x1fnift:ffi-buffer:")+id);return true;
             }
             if(call_args("ffi_callback",args,q)){
                 if(args.size()!=2){error="ffi_callback: expected callable and signature";return false;}nift::RuntimeValue cb;if(!arg_value(args,q,0,cb)||!cb.is_string()||cb.string.rfind("\x1fnift:callable:",0)!=0){error="ffi_callback: first argument must be callable";return false;}std::string sig;if(!string_arg("ffi_callback",args,q,1,sig))return false;sig.erase(std::remove_if(sig.begin(),sig.end(),[](unsigned char c){return std::isspace(c);}),sig.end());if(sig!="i64(i64)"){error="ffi_callback: v4.5 supports only i64(i64) callbacks";return false;}const std::string id=std::to_string(next_ffi_callback_id_++);ffi_callbacks_i64_[id]=cb.string;out=nift::RuntimeValue(std::string("\x1fnift:ffi-callback-i64:")+id);return true;
@@ -2216,10 +2264,10 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     if(all64){std::vector<double> v;for(size_t i=0;i<types.size();++i){nift::RuntimeValue d;if(!arg_value(args,q,i+3,d)||!d.is_number()){error="ffi_call: f64 argument must be numeric";return false;}v.push_back(d.num);}double r=0;switch(v.size()){case 0:r=reinterpret_cast<double(*)()>(sym)();break;case 1:r=reinterpret_cast<double(*)(double)>(sym)(v[0]);break;case 2:r=reinterpret_cast<double(*)(double,double)>(sym)(v[0],v[1]);break;case 3:r=reinterpret_cast<double(*)(double,double,double)>(sym)(v[0],v[1],v[2]);break;case 4:r=reinterpret_cast<double(*)(double,double,double,double)>(sym)(v[0],v[1],v[2],v[3]);break;default:error="ffi_call: f64 dispatcher supports up to 4 arguments";return false;}out=nift::RuntimeValue(r);return true;}
                     std::vector<float> v;for(size_t i=0;i<types.size();++i){nift::RuntimeValue d;if(!arg_value(args,q,i+3,d)||!d.is_number()){error="ffi_call: f32 argument must be numeric";return false;}v.push_back(static_cast<float>(d.num));}float r=0;switch(v.size()){case 0:r=reinterpret_cast<float(*)()>(sym)();break;case 1:r=reinterpret_cast<float(*)(float)>(sym)(v[0]);break;case 2:r=reinterpret_cast<float(*)(float,float)>(sym)(v[0],v[1]);break;case 3:r=reinterpret_cast<float(*)(float,float,float)>(sym)(v[0],v[1],v[2]);break;case 4:r=reinterpret_cast<float(*)(float,float,float,float)>(sym)(v[0],v[1],v[2],v[3]);break;default:error="ffi_call: f32 dispatcher supports up to 4 arguments";return false;}out=nift::RuntimeValue(static_cast<double>(r));return true;
                 }
-                std::vector<std::string> string_storage;string_storage.reserve(types.size());std::vector<std::uintptr_t> v;v.reserve(types.size());for(size_t i=0;i<types.size();++i){nift::RuntimeValue d;if(!arg_value(args,q,i+3,d))return false;const auto&t=types[i];if(t=="cstr"){if(d.is_null()){v.push_back(0);continue;}if(!d.is_string()){error="ffi_call: cstr argument must be string or null";return false;}if(d.string.find('\0')!=std::string::npos){error="ffi_call: cstr contains embedded NUL";return false;}string_storage.push_back(d.string);v.push_back(reinterpret_cast<std::uintptr_t>(string_storage.back().c_str()));continue;}if(t=="buffer"){if(!d.is_string()||d.string.rfind("\x1fnift:ffi-buffer:",0)!=0){error="ffi_call: buffer argument must be FFI buffer handle";return false;}auto bi=ffi_buffers_.find(d.string.substr(17));if(bi==ffi_buffers_.end()){error="ffi_call: invalid buffer handle";return false;}v.push_back(reinterpret_cast<std::uintptr_t>(bi->second->bytes.empty()?nullptr:bi->second->bytes.data()));continue;}if(t=="callback_i64"){if(!d.is_string()||d.string.rfind("\x1fnift:ffi-callback-i64:",0)!=0){error="ffi_call: callback_i64 argument must be callback handle";return false;}auto ci=ffi_callbacks_i64_.find(d.string.substr(23));if(ci==ffi_callbacks_i64_.end()){error="ffi_call: invalid callback handle";return false;}if(nift_ffi_callback_parser){error="ffi_call: nested native callback activation is not supported";return false;}nift_ffi_callback_parser=this;nift_ffi_callback_tag=ci->second;nift_ffi_callback_error.clear();v.push_back(reinterpret_cast<std::uintptr_t>(&nift_ffi_callback_i64_trampoline));continue;}if(t=="ptr"){if(d.is_null()){v.push_back(0);continue;}if(!d.is_string()||d.string.rfind("\x1fnift:ffi-ptr:",0)!=0){error="ffi_call: ptr argument must be pointer handle or null";return false;}auto pi=ffi_pointers_.find(d.string.substr(14));if(pi==ffi_pointers_.end()){error="ffi_call: invalid pointer handle";return false;}v.push_back(reinterpret_cast<std::uintptr_t>(pi->second));continue;}if(t=="bool"){if(!d.is_bool()){error="ffi_call: bool argument must be bool";return false;}v.push_back(d.boolean?1:0);continue;}if(!d.is_number()){error="ffi_call: integer argument must be numeric";return false;}long double x=d.num;bool uns=!t.empty()&&t[0]=='u';int bits=t=="i8"||t=="u8"?8:t=="i16"||t=="u16"?16:t=="i32"||t=="u32"?32:64;if(std::trunc(x)!=x){error="ffi_call: integer argument is fractional";return false;}long double lo=uns?0.0L:-std::ldexp(1.0L,bits-1),hi=uns?std::ldexp(1.0L,bits)-1.0L:std::ldexp(1.0L,bits-1)-1.0L;if(x<lo||x>hi){error="ffi_call: integer argument out of range for "+t;return false;}v.push_back(static_cast<std::uintptr_t>(static_cast<std::uint64_t>(static_cast<std::int64_t>(x))));}
+                std::vector<std::string> string_storage;string_storage.reserve(types.size());std::vector<std::uintptr_t> v;v.reserve(types.size());for(size_t i=0;i<types.size();++i){nift::RuntimeValue d;if(!arg_value(args,q,i+3,d))return false;const auto&t=types[i];if(t=="cstr"){if(d.is_null()){v.push_back(0);continue;}if(!d.is_string()){error="ffi_call: cstr argument must be string or null";return false;}if(d.string.find('\0')!=std::string::npos){error="ffi_call: cstr contains embedded NUL";return false;}string_storage.push_back(d.string);v.push_back(reinterpret_cast<std::uintptr_t>(string_storage.back().c_str()));continue;}if(t=="buffer"){if(!d.is_string()||d.string.rfind("\x1fnift:ffi-buffer:",0)!=0){error="ffi_call: buffer argument must be FFI buffer handle";return false;}auto bi=ffi_buffers_.find(d.string.substr(17));if(bi==ffi_buffers_.end()){error="ffi_call: invalid buffer handle";return false;}v.push_back(reinterpret_cast<std::uintptr_t>(bi->second->bytes.empty()?nullptr:bi->second->bytes.data()));continue;}if(t=="callback_i64"){if(!d.is_string()||d.string.rfind("\x1fnift:ffi-callback-i64:",0)!=0){error="ffi_call: callback_i64 argument must be callback handle";return false;}auto ci=ffi_callbacks_i64_.find(d.string.substr(23));if(ci==ffi_callbacks_i64_.end()){error="ffi_call: invalid callback handle";return false;}if(nift_ffi_callback_parser){error="ffi_call: nested native callback activation is not supported";return false;}nift_ffi_callback_parser=this;nift_ffi_callback_tag=ci->second;nift_ffi_callback_error.clear();v.push_back(reinterpret_cast<std::uintptr_t>(&nift_ffi_callback_i64_trampoline));continue;}if(t=="ptr"){if(d.is_null()){v.push_back(0);continue;}if(!d.is_string()||d.string.rfind("\x1fnift:ffi-ptr:",0)!=0){error="ffi_call: ptr argument must be pointer handle or null";return false;}auto pi=ffi_pointers_.find(d.string.substr(14));if(pi==ffi_pointers_.end()){error="ffi_call: invalid pointer handle";return false;}v.push_back(reinterpret_cast<std::uintptr_t>(pi->second));continue;}if(t=="bool"){if(!d.is_bool()){error="ffi_call: bool argument must be bool";return false;}v.push_back(d.boolean?1:0);continue;}const bool uns=!t.empty()&&t[0]=='u';const unsigned bits=t=="i8"||t=="u8"?8:t=="i16"||t=="u16"?16:t=="i32"||t=="u32"?32:64;if(uns){std::uint64_t x=0;if(!nift::runtime_number_to_unsigned(d,bits,x)){error="ffi_call: integer argument out of range for "+t;return false;}v.push_back(static_cast<std::uintptr_t>(x));}else{std::int64_t x=0;if(!nift::runtime_number_to_signed(d,bits,x)){error="ffi_call: integer argument out of range for "+t;return false;}v.push_back(static_cast<std::uintptr_t>(static_cast<std::uint64_t>(x)));}}
                 using W=std::uintptr_t;W r=0;switch(v.size()){case 0:r=reinterpret_cast<W(*)()>(sym)();break;case 1:r=reinterpret_cast<W(*)(W)>(sym)(v[0]);break;case 2:r=reinterpret_cast<W(*)(W,W)>(sym)(v[0],v[1]);break;case 3:r=reinterpret_cast<W(*)(W,W,W)>(sym)(v[0],v[1],v[2]);break;case 4:r=reinterpret_cast<W(*)(W,W,W,W)>(sym)(v[0],v[1],v[2],v[3]);break;case 5:r=reinterpret_cast<W(*)(W,W,W,W,W)>(sym)(v[0],v[1],v[2],v[3],v[4]);break;case 6:r=reinterpret_cast<W(*)(W,W,W,W,W,W)>(sym)(v[0],v[1],v[2],v[3],v[4],v[5]);break;}
                 if(nift_ffi_callback_parser==this){nift_ffi_callback_parser=nullptr;nift_ffi_callback_tag.clear();if(!nift_ffi_callback_error.empty()){error="ffi callback: "+nift_ffi_callback_error;nift_ffi_callback_error.clear();return false;}}
-                if(rt=="void"){out=nift::RuntimeValue(nullptr);return true;}if(rt=="cstr"){const char* p=reinterpret_cast<const char*>(r);out=p?nift::RuntimeValue(std::string(p)):nift::RuntimeValue(nullptr);return true;}if(rt=="ptr"){if(!r){out=nift::RuntimeValue(nullptr);return true;}const std::string id=std::to_string(next_ffi_pointer_id_++);ffi_pointers_[id]=reinterpret_cast<void*>(r);out=nift::RuntimeValue(std::string("\x1fnift:ffi-ptr:")+id);return true;}if(rt=="bool"){out=nift::RuntimeValue(r!=0);return true;}bool uns=!rt.empty()&&rt[0]=='u';int bits=rt=="i8"||rt=="u8"?8:rt=="i16"||rt=="u16"?16:rt=="i32"||rt=="u32"?32:64;if(uns){std::uint64_t x=static_cast<std::uint64_t>(r);if(bits<64)x&=((std::uint64_t(1)<<bits)-1);nift::RuntimeValue nd;nd.type=nift::RuntimeType::StrNumber;nd.string=std::to_string(x);out=std::move(nd);return true;}std::int64_t x=0;if(bits==8)x=static_cast<std::int8_t>(r);else if(bits==16)x=static_cast<std::int16_t>(r);else if(bits==32)x=static_cast<std::int32_t>(r);else x=static_cast<std::int64_t>(r);nift::RuntimeValue nd;nd.type=nift::RuntimeType::StrNumber;nd.string=std::to_string(x);out=std::move(nd);return true;
+                if(rt=="void"){out=nift::RuntimeValue(nullptr);return true;}if(rt=="cstr"){const char* p=reinterpret_cast<const char*>(r);out=p?nift::RuntimeValue(std::string(p)):nift::RuntimeValue(nullptr);return true;}if(rt=="ptr"){if(!r){out=nift::RuntimeValue(nullptr);return true;}const std::string id=std::to_string(next_ffi_pointer_id_++);ffi_pointers_[id]=reinterpret_cast<void*>(r);out=nift::RuntimeValue(std::string("\x1fnift:ffi-ptr:")+id);return true;}if(rt=="bool"){out=nift::RuntimeValue(r!=0);return true;}bool uns=!rt.empty()&&rt[0]=='u';int bits=rt=="i8"||rt=="u8"?8:rt=="i16"||rt=="u16"?16:rt=="i32"||rt=="u32"?32:64;if(uns){std::uint64_t x=static_cast<std::uint64_t>(r);if(bits<64)x&=((std::uint64_t(1)<<bits)-1);out=nift::runtime_unsigned_integer(x);return true;}std::int64_t x=0;if(bits==8)x=static_cast<std::int8_t>(r);else if(bits==16)x=static_cast<std::int16_t>(r);else if(bits==32)x=static_cast<std::int32_t>(r);else x=static_cast<std::int64_t>(r);out=nift::runtime_integer(x);return true;
             }
             if(call_args("setenv",args,q)){if(!standalone_script_host_){error="setenv: only available in standalone Nift scripts/shell";return false;}if(args.size()!=2){error="setenv: expected name and value";return false;}std::string k,v;if(!string_arg("setenv",args,q,0,k)||!string_arg("setenv",args,q,1,v))return false;
 #ifdef _WIN32
@@ -2314,8 +2362,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             auto public_type=[&](const nift::RuntimeValue& v)->std::string{
                 if(v.is_null()) return "null";
                 if(v.is_bool()) return "bool";
-                if(v.type==nift::RuntimeType::StrNumber) return "int";
-                if(v.is_number()) return std::trunc(v.num)==v.num ? "int" : "float";
+                if(v.is_number()) return nift::runtime_number_is_integer(v) ? "int" : "float";
                 if(v.is_array()) return "array";
                 if(v.is_object()) return "object";
                 if(v.is_string()){
@@ -2349,7 +2396,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             // CP210: Python-style integer ranges, stop-exclusive and materialized.
             if(call_args("range",args,q)){
                 if(args.empty()||args.size()>3){error="range: expected stop, start/stop, or start/stop/step";return false;}
-                std::vector<std::int64_t> n; for(std::size_t ai=0;ai<args.size();++ai){nift::RuntimeValue v;if(!arg_value(args,q,ai,v)||!v.is_number()||std::trunc(v.num)!=v.num||v.num<(double)std::numeric_limits<std::int64_t>::min()||v.num>=9223372036854775808.0){error="range: arguments must be signed 64-bit integers";return false;}n.push_back((std::int64_t)v.num);}
+                std::vector<std::int64_t> n; for(std::size_t ai=0;ai<args.size();++ai){nift::RuntimeValue v;std::int64_t converted=0;if(!arg_value(args,q,ai,v)||!nift::runtime_number_to_i64(v,converted)){error="range: arguments must be signed 64-bit integers";return false;}n.push_back(converted);}
                 std::int64_t start=args.size()==1?0:n[0], stop=args.size()==1?n[0]:n[1], step=args.size()==3?n[2]:1;
                 if(step==0){error="range: step must not be zero";return false;}
                 out=nift::RuntimeValue::make_array(); constexpr std::size_t limit=10000000;
@@ -2532,7 +2579,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         auto int_doc=[](std::int64_t v){nift::RuntimeValue d(static_cast<double>(v));if(v>9007199254740992LL||v<-9007199254740992LL){d.type=nift::RuntimeType::StrNumber;d.string=std::to_string(v);}return d;};
                         if(method=="load"){if(!no_args())return false;if(st->kind==AtomicInstance::Kind::Int)out=int_doc(st->int_value.load());else out=nift::RuntimeValue(st->bool_value.load());return true;}
                         if(method=="store"||method=="exchange"){if(args.size()!=1){error=method+": expected one value";return false;}nift::RuntimeValue v;if(!eval_arg(0,v))return false;if(st->kind==AtomicInstance::Kind::Int){std::int64_t x=0;if(!exact_i64(v,x)){error=method+": atomic<int> requires a signed 64-bit integer";return false;}if(method=="store"){st->int_value.store(x);out=nift::RuntimeValue(nullptr);}else out=int_doc(st->int_value.exchange(x));}else{if(!v.is_bool()){error=method+": atomic<bool> requires bool";return false;}if(method=="store"){st->bool_value.store(v.boolean);out=nift::RuntimeValue(nullptr);}else out=nift::RuntimeValue(st->bool_value.exchange(v.boolean));}return true;}
-                        if(method=="fetch_add"||method=="fetch_sub"){if(st->kind!=AtomicInstance::Kind::Int){error=method+": only valid for atomic<int>";return false;}if(args.size()!=1){error=method+": expected one integer";return false;}nift::RuntimeValue v;if(!eval_arg(0,v))return false;std::int64_t x=0;if(!exact_i64(v,x)){error=method+": expected signed 64-bit integer";return false;}out=int_doc(method=="fetch_add"?st->int_value.fetch_add(x):st->int_value.fetch_sub(x));return true;}
+                        if(method=="fetch_add"||method=="fetch_sub"){if(st->kind!=AtomicInstance::Kind::Int){error=method+": only valid for atomic<int>";return false;}if(args.size()!=1){error=method+": expected one integer";return false;}nift::RuntimeValue v;if(!eval_arg(0,v))return false;std::int64_t x=0;if(!exact_i64(v,x)){error=method+": expected signed 64-bit integer";return false;}std::int64_t before=0,after=0;if(!nift_atomic_add_sub_checked(st->int_value,x,method=="fetch_sub",before,after)){error=method+": integer overflow";return false;}out=int_doc(before);return true;}
                         if(method=="compare_exchange"){if(args.size()!=2){error="compare_exchange: expected expected and desired values";return false;}nift::RuntimeValue ev,dv;if(!eval_arg(0,ev)||!eval_arg(1,dv))return false;if(st->kind==AtomicInstance::Kind::Int){std::int64_t e=0,d=0;if(!exact_i64(ev,e)||!exact_i64(dv,d)){error="compare_exchange: atomic<int> requires signed 64-bit integers";return false;}out=nift::RuntimeValue(st->int_value.compare_exchange_strong(e,d));}else{if(!ev.is_bool()||!dv.is_bool()){error="compare_exchange: atomic<bool> requires bool values";return false;}bool e=ev.boolean;out=nift::RuntimeValue(st->bool_value.compare_exchange_strong(e,dv.boolean));}return true;}
                     }
                     if(base.is_string() && base.string.rfind("\x1fnift:mutex:",0)==0){
@@ -2588,16 +2635,16 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         if(method=="close"){if(!no_args()||!need_open())return false;if(f->dirty){error="close: file has unsaved changes; save() or revert() first";return false;}f->open=false;f->mode.clear();f->working.clear();f->saved.clear();f->cursor=0;out=nift::RuntimeValue(nullptr);return true;}
                         if(method=="modified"){if(!no_args()||!need_open())return false;out=nift::RuntimeValue(f->dirty);return true;}
                         if(method=="tell"){if(!no_args()||!need_open())return false;out=nift::RuntimeValue((double)f->cursor);return true;}
-                        if(method=="seek"){if(args.size()!=1||!need_open()){if(args.size()!=1&&error.empty())error="seek: expected byte position";return false;}nift::RuntimeValue n;if(!eval_arg(0,n)||!n.is_number()||std::trunc(n.num)!=n.num||n.num<0||n.num>(double)f->working.size()){error="seek: byte position out of range";return false;}f->cursor=(size_t)n.num;out=nift::RuntimeValue(nullptr);return true;}
+                        if(method=="seek"){if(args.size()!=1||!need_open()){if(args.size()!=1&&error.empty())error="seek: expected byte position";return false;}nift::RuntimeValue n;std::size_t position=0;if(!eval_arg(0,n)||!nift::runtime_number_to_size(n,position)||position>f->working.size()){error="seek: byte position out of range";return false;}f->cursor=position;out=nift::RuntimeValue(nullptr);return true;}
                         if(method=="eof"){if(!no_args()||!need_read())return false;out=nift::RuntimeValue(f->cursor>=f->working.size());return true;}
-                        if(method=="read"||method=="read_all"){if(!need_read())return false;size_t base=std::min(f->cursor,f->working.size());size_t n=f->working.size()-base;if(method=="read"&&!args.empty()){if(args.size()!=1){error="read: expected zero or one byte count";return false;}nift::RuntimeValue d;if(!eval_arg(0,d)||!d.is_number()||std::trunc(d.num)!=d.num||d.num<0){error="read: invalid byte count";return false;}n=std::min(n,(size_t)d.num);}else if(method=="read_all"&&!args.empty()){error="read_all: expected no arguments";return false;}out=nift::RuntimeValue(f->working.substr(base,n));f->cursor=base+n;return true;}
+                        if(method=="read"||method=="read_all"){if(!need_read())return false;size_t base=std::min(f->cursor,f->working.size());size_t n=f->working.size()-base;if(method=="read"&&!args.empty()){if(args.size()!=1){error="read: expected zero or one byte count";return false;}nift::RuntimeValue d;std::size_t count=0;if(!eval_arg(0,d)||!nift::runtime_number_to_size(d,count)){error="read: invalid byte count";return false;}n=std::min(n,count);}else if(method=="read_all"&&!args.empty()){error="read_all: expected no arguments";return false;}out=nift::RuntimeValue(f->working.substr(base,n));f->cursor=base+n;return true;}
                         if(method=="read_line"){if(!no_args()||!need_read())return false;if(f->cursor>=f->working.size()){out=nift::RuntimeValue(nullptr);return true;}auto e=f->working.find('\n',f->cursor);size_t z=e==std::string::npos?f->working.size():e;std::string line=f->working.substr(f->cursor,z-f->cursor);if(!line.empty()&&line.back()=='\r')line.pop_back();f->cursor=e==std::string::npos?f->working.size():e+1;out=nift::RuntimeValue(line);return true;}
                         if(method=="read_val"){if(!no_args()||!need_read())return false;while(f->cursor<f->working.size()&&std::isspace((unsigned char)f->working[f->cursor]))++f->cursor;if(f->cursor>=f->working.size()){out=nift::RuntimeValue(nullptr);return true;}size_t st=f->cursor;char first=f->working[f->cursor];if(first=='"'||first=='['||first=='{'){char op=first,cl=first=='['?']':first=='{'?'}':'"';int dep=0;bool qd=false,esc=false;while(f->cursor<f->working.size()){char c=f->working[f->cursor++];if(op=='"'){if(esc){esc=false;continue;}if(c=='\\'){esc=true;continue;}if(f->cursor>st+1&&c=='"')break;}else{if(qd){if(esc)esc=false;else if(c=='\\')esc=true;else if(c=='"')qd=false;}else if(c=='"')qd=true;else if(c==op)++dep;else if(c==cl&&--dep==0)break;}}}else while(f->cursor<f->working.size()&&!std::isspace((unsigned char)f->working[f->cursor]))++f->cursor;std::string tok=f->working.substr(st,f->cursor-st);nift::RuntimeValue v;if(!eval(tok,v,depth+1)){error="read_val: "+error;return false;}out=v;return true;}
                         if(method=="write_val"){if(args.size()!=1||!need_write()){if(args.size()!=1&&error.empty())error="write_val: expected one value";return false;}nift::RuntimeValue v;if(!eval_arg(0,v))return false;std::string d;if(!serialize_value(v,false,d,error))return false;d+="\n";size_t base=std::min(f->cursor,f->working.size());size_t ov=std::min(d.size(),f->working.size()-base);f->working.replace(base,ov,d);f->cursor=base+d.size();dirty();out=nift::RuntimeValue(nullptr);return true;}
                         if(method=="write"||method=="write_line"){if(args.size()!=1||!need_write()){if(args.size()!=1&&error.empty())error=method+": expected one value";return false;}nift::RuntimeValue v;if(!eval_arg(0,v))return false;if(v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0)){error=method+": value is not directly renderable";return false;}std::string d=render_expression_value(v);if(method=="write_line")d+='\n';size_t base=std::min(f->cursor,f->working.size());size_t ov=std::min(d.size(),f->working.size()-base);f->working.replace(base,ov,d);f->cursor=base+d.size();dirty();out=nift::RuntimeValue(nullptr);return true;}
                         if(method=="flush"){if(!no_args()||!need_write())return false;out=nift::RuntimeValue(nullptr);return true;}
                         if(method=="replace"||method=="replace_once"){if(args.size()!=2||!need_write()){if(args.size()!=2&&error.empty())error=method+": expected old and replacement strings";return false;}std::string a,b;if(!sarg(0,a)||!sarg(1,b))return false;if(a.empty()){error=method+": old string must not be empty";return false;}size_t count=0,pos=0;while((pos=f->working.find(a,pos))!=std::string::npos){++count;pos+=a.size();}if(method=="replace_once"&&count!=1){error="replace_once: expected exactly one match, found "+std::to_string(count);return false;}pos=0;while((pos=f->working.find(a,pos))!=std::string::npos){f->working.replace(pos,a.size(),b);pos+=b.size();if(method=="replace_once")break;}if(f->cursor>f->working.size())f->cursor=f->working.size();dirty();out=method=="replace"?nift::RuntimeValue((double)count):nift::RuntimeValue(nullptr);return true;}
-                        if(method=="insert"||method=="insert"||method=="insert_before"||method=="insert_after"||method=="prepend"||method=="append"){if(!need_write())return false;size_t pos=0;std::string d;if(method=="prepend"||method=="append"){if(args.size()!=1||!sarg(0,d)){if(args.size()!=1&&error.empty())error=method+": expected text";return false;}pos=method=="prepend"?0:f->working.size();}else if(method=="insert"){if(args.size()!=2){error="insert: expected byte position and text";return false;}nift::RuntimeValue n;if(!eval_arg(0,n)||!n.is_number()||std::trunc(n.num)!=n.num||n.num<0||n.num>(double)f->working.size()||!sarg(1,d)){error="insert: invalid byte position or text";return false;}pos=(size_t)n.num;}else{if(args.size()!=2){error=method+": expected anchor and text";return false;}std::string a;if(!sarg(0,a)||!sarg(1,d))return false;if(a.empty()){error=method+": anchor must not be empty";return false;}auto at=f->working.find(a);if(at==std::string::npos||f->working.find(a,at+a.size())!=std::string::npos){error=method+": expected exactly one anchor";return false;}pos=at+(method=="insert_after"?a.size():0);}f->working.insert(pos,d);if(f->cursor>f->working.size())f->cursor=f->working.size();dirty();out=nift::RuntimeValue(nullptr);return true;}
+                        if(method=="insert"||method=="insert"||method=="insert_before"||method=="insert_after"||method=="prepend"||method=="append"){if(!need_write())return false;size_t pos=0;std::string d;if(method=="prepend"||method=="append"){if(args.size()!=1||!sarg(0,d)){if(args.size()!=1&&error.empty())error=method+": expected text";return false;}pos=method=="prepend"?0:f->working.size();}else if(method=="insert"){if(args.size()!=2){error="insert: expected byte position and text";return false;}nift::RuntimeValue n;if(!eval_arg(0,n)||!nift::runtime_number_to_size(n,pos)||pos>f->working.size()||!sarg(1,d)){error="insert: invalid byte position or text";return false;}}else{if(args.size()!=2){error=method+": expected anchor and text";return false;}std::string a;if(!sarg(0,a)||!sarg(1,d))return false;if(a.empty()){error=method+": anchor must not be empty";return false;}auto at=f->working.find(a);if(at==std::string::npos||f->working.find(a,at+a.size())!=std::string::npos){error=method+": expected exactly one anchor";return false;}pos=at+(method=="insert_after"?a.size():0);}f->working.insert(pos,d);if(f->cursor>f->working.size())f->cursor=f->working.size();dirty();out=nift::RuntimeValue(nullptr);return true;}
                         if(method=="revert"){if(!no_args()||!need_write())return false;f->working=f->saved;f->cursor=0;f->dirty=false;out=nift::RuntimeValue(nullptr);return true;}
                         if(method=="save"){if(!no_args()||!need_write())return false;if(!f->dirty){out=nift::RuntimeValue(nullptr);return true;}std::error_code ec;auto parent=f->path.parent_path();if(!parent.empty()&&!fs::exists(parent,ec)){error="save: parent directory does not exist";return false;}fs::perms perms=fs::perms::unknown;if(fs::exists(f->path,ec)&&!ec)perms=fs::status(f->path,ec).permissions();fs::path tmp=f->path;tmp+=".nift-tmp-"+std::to_string((unsigned long long)std::chrono::steady_clock::now().time_since_epoch().count());{std::ofstream o(tmp,std::ios::binary|std::ios::trunc);if(!o){error="save: cannot create temporary file";return false;}o.write(f->working.data(),(std::streamsize)f->working.size());o.flush();if(!o){o.close();fs::remove(tmp,ec);error="save: temporary write failed";return false;}}if(perms!=fs::perms::unknown)fs::permissions(tmp,perms,ec);ec.clear();fs::rename(tmp,f->path,ec);if(ec){fs::remove(tmp);error="save: atomic replace failed: "+ec.message();return false;}f->saved=f->working;f->dirty=false;f->existed_at_open=true;out=nift::RuntimeValue(nullptr);return true;}
                         if(method=="cat"){if(!no_args()||!need_read())return false;{static std::mutex file_cat_mutex;std::lock_guard<std::mutex> lock(file_cat_mutex);std::cout<<f->working;std::cout.flush();}out=nift::RuntimeValue(nullptr);return true;}
@@ -2643,13 +2690,14 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                             if(str.empty()||std::isspace((unsigned char)str.front())||std::isspace((unsigned char)str.back())){error="to_double: invalid number";return false;}if(str.find("0x")!=std::string::npos||str.find("0X")!=std::string::npos){error="to_double: invalid number";return false;}char* end=nullptr;errno=0;double v=std::strtod(str.c_str(),&end);if(errno==ERANGE||!end||end!=str.c_str()+str.size()||!std::isfinite(v)){error="to_double: invalid or out-of-range number";return false;}out=nift::RuntimeValue(v);return true;
                         }
                         if(method=="substr"){
-                            if(args.empty()||args.size()>2){error="substr: expected pos and optional length";return false;}nift::RuntimeValue p,n;if(!eval_arg(0,p)||!p.is_number()||std::trunc(p.num)!=p.num||p.num<0){error="substr: invalid pos";return false;}std::size_t at=(std::size_t)p.num;if(at>str.size())at=str.size();std::size_t len=std::string::npos;if(args.size()==2){if(!eval_arg(1,n)||!n.is_number()||std::trunc(n.num)!=n.num||n.num<0){error="substr: invalid length";return false;}len=(std::size_t)n.num;}out=nift::RuntimeValue(str.substr(at,len));return true;
+                            if(args.empty()||args.size()>2){error="substr: expected pos and optional length";return false;}nift::RuntimeValue p,n;std::size_t at=0;if(!eval_arg(0,p)||!nift::runtime_number_to_size(p,at)){error="substr: invalid pos";return false;}if(at>str.size())at=str.size();std::size_t len=std::string::npos;if(args.size()==2){if(!eval_arg(1,n)||!nift::runtime_number_to_size(n,len)){error="substr: invalid length";return false;}}out=nift::RuntimeValue(str.substr(at,len));return true;
                         }
                     }
                     if(method=="to_string" && base.is_number()) { if(!no_args())return false;out=nift::RuntimeValue(render_expression_value(base));return true; }
                     if(method=="to_string" && base.is_bool()) { if(!no_args())return false;out=nift::RuntimeValue(base.boolean?"true":"false");return true; }
                     if(method=="to_string" && base.is_null()) { if(!no_args())return false;out=nift::RuntimeValue("null");return true; }
                     if(base.is_number()) {
+                        if(method=="to_int"){if(!no_args())return false;std::int64_t v=0;if(!nift::runtime_number_to_i64(base,v)){error="to_int: invalid or out-of-range integer";return false;}out=nift::runtime_integer(v);return true;}
                         if(method=="abs"){if(!no_args())return false;out=nift::RuntimeValue(std::fabs(base.num));return true;}
                         if(method=="floor"){if(!no_args())return false;out=nift::RuntimeValue(std::floor(base.num));return true;}
                         if(method=="ceil"){if(!no_args())return false;out=nift::RuntimeValue(std::ceil(base.num));return true;}
@@ -2815,7 +2863,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                             out=std::move(result);return true;
                         }
                         if(method=="take"||method=="drop"||method=="chunk"){
-                            if(args.size()!=1){error=method+": expected one count";return false;}nift::RuntimeValue n;if(!eval_arg(0,n)||!n.is_number()||std::trunc(n.num)!=n.num||n.num<0||(method=="chunk"&&n.num==0)){error=method+": count must be "+std::string(method=="chunk"?"a positive":"a non-negative")+" integer";return false;}size_t z=(size_t)n.num;out=nift::RuntimeValue::make_array();if(method=="take"){size_t e=std::min(z,a.size());out.array.assign(a.begin(),a.begin()+e);}else if(method=="drop"){size_t b=std::min(z,a.size());out.array.assign(a.begin()+b,a.end());}else{for(size_t b=0;b<a.size();b+=z){nift::RuntimeValue c=nift::RuntimeValue::make_array();size_t e=std::min(b+z,a.size());c.array.assign(a.begin()+b,a.begin()+e);out.array.push_back(std::move(c));}}return true;
+                            if(args.size()!=1){error=method+": expected one count";return false;}nift::RuntimeValue n;size_t z=0;if(!eval_arg(0,n)||!nift::runtime_number_to_size(n,z)||(method=="chunk"&&z==0)){error=method+": count must be "+std::string(method=="chunk"?"a positive":"a non-negative")+" integer";return false;}out=nift::RuntimeValue::make_array();if(method=="take"){size_t e=std::min(z,a.size());out.array.assign(a.begin(),a.begin()+e);}else if(method=="drop"){size_t b=std::min(z,a.size());out.array.assign(a.begin()+b,a.end());}else{for(size_t b=0;b<a.size();b+=z){nift::RuntimeValue c=nift::RuntimeValue::make_array();size_t e=std::min(b+z,a.size());c.array.assign(a.begin()+b,a.begin()+e);out.array.push_back(std::move(c));}}return true;
                         }
                         if(method=="group_by_each"){
                             if(args.size()!=1){error="group_by_each: expected one selector";return false;}nift::RuntimeValue result=nift::RuntimeValue::make_object();
@@ -2847,7 +2895,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         if(method=="indexOf"){if(args.size()!=1){error="indexOf: expected one value";return false;}nift::RuntimeValue v;if(!eval_arg(0,v))return false;std::size_t i=0;for(;i<a.size();++i)if(structural_equal(a[i],v))break;out=nift::RuntimeValue(i<a.size()?static_cast<double>(i):-1.0);return true;}
                         if(method=="contains"){if(args.size()!=1){error="contains: expected one value";return false;}nift::RuntimeValue v;if(!eval_arg(0,v))return false;for(const auto& x:a)if(structural_equal(x,v)){out=nift::RuntimeValue(true);return true;}out=nift::RuntimeValue(false);return true;}
                         if(method=="join"){if(args.size()!=1){error="join: expected separator";return false;}nift::RuntimeValue sep;if(!eval_arg(0,sep)||!sep.is_string()){error="join: separator must be a string";return false;}std::string r;for(std::size_t i=0;i<a.size();++i){if(i)r+=sep.string;if(a[i].is_array()||a[i].is_object()||(a[i].is_string()&&a[i].string.rfind("\x1fnift:",0)==0)){error="join: elements must be renderable scalar values";return false;}r+=render_expression_value(a[i]);}out=nift::RuntimeValue(r);return true;}
-                        if(method=="slice"){if(args.empty()||args.size()>2){error="slice: expected start and optional end";return false;}nift::RuntimeValue st,en;if(!eval_arg(0,st)||!st.is_number()||std::trunc(st.num)!=st.num||st.num<0){error="slice: invalid start";return false;}std::size_t b=(std::size_t)st.num,e=a.size();if(args.size()==2){if(!eval_arg(1,en)||!en.is_number()||std::trunc(en.num)!=en.num||en.num<0){error="slice: invalid end";return false;}e=(std::size_t)en.num;}b=std::min(b,a.size());e=std::min(e,a.size());if(e<b)e=b;out=nift::RuntimeValue::make_array();out.array.assign(a.begin()+b,a.begin()+e);return true;}
+                        if(method=="slice"){if(args.empty()||args.size()>2){error="slice: expected start and optional end";return false;}nift::RuntimeValue st,en;std::size_t b=0,e=a.size();if(!eval_arg(0,st)||!nift::runtime_number_to_size(st,b)){error="slice: invalid start";return false;}if(args.size()==2){if(!eval_arg(1,en)||!nift::runtime_number_to_size(en,e)){error="slice: invalid end";return false;}}b=std::min(b,a.size());e=std::min(e,a.size());if(e<b)e=b;out=nift::RuntimeValue::make_array();out.array.assign(a.begin()+b,a.begin()+e);return true;}
                     }
                     if(method=="to_string" && (base.is_array()||base.is_object())){error="to_string: use stringify() for composite values";return false;}
                     if(method=="to_string" && !(base.is_string() && base.string.rfind("\x1fnift:",0)==0)){error="to_string: expected int, double, bool, null or string";return false;}
@@ -2931,31 +2979,28 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     }
                     if(c->kind==CollectionKind::Set||c->kind==CollectionKind::SortedSet){
                         if(method=="add"||method=="contains"||method=="remove"){if(args.size()!=1){error=method+": expected one value";return false;}nift::RuntimeValue v;if(quoted_args.size()>0&&quoted_args[0])v=nift::RuntimeValue(args[0]);else if(!eval(args[0],v,depth+1))return false;if(!(v.is_bool()||v.is_number()||v.is_string())){error=method+": set values must be bool, number, or string";return false;}
-                        auto set_scalar_key=[&](const nift::RuntimeValue& x)->std::string{if(x.is_bool())return std::string("b")+(x.boolean?"1":"0");if(x.is_string()){if(x.string.rfind("\x1fnift:",0)==0)return "";return std::string("s")+x.string;}if(x.type==nift::RuntimeType::StrNumber)return std::string("N")+x.string;double nn=x.num;if(nn==0.0)nn=0.0;uint64_t bits=0;std::memcpy(&bits,&nn,sizeof(bits));return std::string("n")+std::to_string(bits);};
+                         auto set_scalar_key=[&](const nift::RuntimeValue& x)->std::string{return runtime_scalar_key(x);};
                         auto set_indexed=[&](const nift::RuntimeValue& x)->bool{const std::string k=set_scalar_key(x);return !k.empty()&&c->scalar_keys.count(k)!=0;};
                         auto set_find=[&](const nift::RuntimeValue& x)->size_t{size_t j=0;for(;j<c->values.size();++j)if(structural_equal(c->values[j],x))break;return j;};
-                        // Fast path: plain scalars use the O(1) index. A Number
-                        // add consults the linear scan when the set holds any
-                        // big integer (StrNumber), because a Number and a
-                        // StrNumber can be numerically equal despite different
-                        // canonical keys.
-                        const bool indexed=!set_scalar_key(v).empty() && !(v.is_number()&&v.type!=nift::RuntimeType::StrNumber&&c->has_huge_int);
+                         // Fingerprints select candidate buckets; equality still
+                         // confirms identity, notably leaving NaNs distinct.
+                         const bool indexed=!set_scalar_key(v).empty();
                         const size_t i=indexed?(set_indexed(v)?set_find(v):c->values.size()):set_find(v);
                         if(method=="contains"){out=nift::RuntimeValue(i<c->values.size());return true;}if(!need_mut())return false;
                         if(method=="add"&&i==c->values.size()){c->values.push_back(v);const std::string k=set_scalar_key(v);if(!k.empty())c->scalar_keys.insert(k);if(v.type==nift::RuntimeType::StrNumber)c->has_huge_int=true;if(c->kind==CollectionKind::SortedSet)std::stable_sort(c->values.begin(),c->values.end(),[&](const auto&a,const auto&b){int z=0;if(!scalar_order(a,b,z)){error="sorted_set: incomparable values";return false;}return z<0;});}
-                        else if(method=="remove"&&i<c->values.size()){const std::string k=set_scalar_key(v);if(!k.empty())c->scalar_keys.erase(k);c->values.erase(c->values.begin()+i);}
+                         else if(method=="remove"&&i<c->values.size()){const std::string k=set_scalar_key(v);c->values.erase(c->values.begin()+i);if(!k.empty()&&std::none_of(c->values.begin(),c->values.end(),[&](const auto& item){return set_scalar_key(item)==k;}))c->scalar_keys.erase(k);}
                         out=v;last_expression_mutation_=true;return true;}
                     }
                     if(c->kind==CollectionKind::Map||c->kind==CollectionKind::SortedMap){
-                        auto mkey=[&](const nift::RuntimeValue& x)->std::string{if(x.is_bool())return std::string("b")+(x.boolean?"1":"0");if(x.is_string()){if(x.string.rfind("\x1fnift:",0)==0)return "";return std::string("s")+x.string;}if(x.type==nift::RuntimeType::StrNumber)return std::string("N")+x.string;double nn=x.num;if(nn==0.0)nn=0.0;uint64_t bits=0;std::memcpy(&bits,&nn,sizeof(bits));return std::string("n")+std::to_string(bits);};
+                         auto mkey=[&](const nift::RuntimeValue& x)->std::string{return runtime_scalar_key(x);};
                         if(method=="set"){if(args.size()!=2){error="set: expected key and value";return false;}if(!need_mut())return false;nift::RuntimeValue k,v;if(quoted_args.size()>0&&quoted_args[0])k=nift::RuntimeValue(args[0]);else if(!eval(args[0],k,depth+1))return false;if(quoted_args.size()>1&&quoted_args[1])v=nift::RuntimeValue(args[1]);else if(!eval(args[1],v,depth+1))return false;if(!(k.is_bool()||k.is_number()||k.is_string())){error="map: key must be bool, number, or string";return false;}if(v.is_string()&&(v.string.rfind("\x1fnift:struct:",0)==0||v.string.rfind("\x1fnift:collection:",0)==0)){if(reference_would_cycle(v.string,rb->value->string)){error="set would create a cyclic reference";return false;}}
-                        const std::string mk=mkey(k);const bool mind=!mk.empty()&&!(k.is_number()&&k.type!=nift::RuntimeType::StrNumber&&c->has_huge_int);
+                         const std::string mk=mkey(k);const bool mind=!mk.empty();
                         size_t i;if(mind&&c->scalar_keys.count(mk)){for(i=0;i<c->entries.size();++i)if(structural_equal(c->entries[i].first,k))break;}else if(mind){i=c->entries.size();}else{for(i=0;i<c->entries.size();++i)if(structural_equal(c->entries[i].first,k))break;}
                         if(i<c->entries.size())c->entries[i].second=v;else{c->entries.push_back({k,v});if(mind)c->scalar_keys.insert(mk);}if(k.type==nift::RuntimeType::StrNumber)c->has_huge_int=true;if(c->kind==CollectionKind::SortedMap)std::stable_sort(c->entries.begin(),c->entries.end(),[&](const auto&a,const auto&b){int z=0;if(!scalar_order(a.first,b.first,z)){error="sorted_map: incomparable keys";return false;}return z<0;});out=v;last_expression_mutation_=true;return true;}
                         if(method=="contains"||method=="get"||method=="remove"){if(args.size()!=1){error=method+": expected one key";return false;}nift::RuntimeValue k;if(quoted_args.size()>0&&quoted_args[0])k=nift::RuntimeValue(args[0]);else if(!eval(args[0],k,depth+1))return false;
-                        const std::string mk=mkey(k);const bool mind=!mk.empty()&&!(k.is_number()&&k.type!=nift::RuntimeType::StrNumber&&c->has_huge_int);
+                         const std::string mk=mkey(k);const bool mind=!mk.empty();
                         size_t i;if(mind&&c->scalar_keys.count(mk)){for(i=0;i<c->entries.size();++i)if(structural_equal(c->entries[i].first,k))break;}else{for(i=0;i<c->entries.size();++i)if(structural_equal(c->entries[i].first,k))break;}
-                        if(method=="contains"){out=nift::RuntimeValue(i<c->entries.size());return true;}if(i==c->entries.size()){error=method+": key not found";return false;}out=c->entries[i].second;if(method=="remove"){if(!need_mut())return false;if(mind)c->scalar_keys.erase(mk);c->entries.erase(c->entries.begin()+i);last_expression_mutation_=true;}return true;}
+                         if(method=="contains"){out=nift::RuntimeValue(i<c->entries.size());return true;}if(i==c->entries.size()){error=method+": key not found";return false;}out=c->entries[i].second;if(method=="remove"){if(!need_mut())return false;c->entries.erase(c->entries.begin()+i);if(mind&&std::none_of(c->entries.begin(),c->entries.end(),[&](const auto& entry){return mkey(entry.first)==mk;}))c->scalar_keys.erase(mk);last_expression_mutation_=true;}return true;}
                     }
                 }
             }}
@@ -2990,15 +3035,15 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     if(method=="size"||method=="empty"||method=="first"||method=="last"||method=="pop"||method=="clear"||method=="push"||method=="insert"||method=="remove"||method=="indexOf"||method=="contains"||method=="join"||method=="slice"||method=="splice"||method=="reverse"){
                         if((method=="size"||method=="empty"||method=="first"||method=="last"||method=="pop"||method=="clear")&&!args.empty()){error=method+": expected no arguments";return false;}
                         if(method=="join"){if(args.size()!=1){error="join: expected separator";return false;}nift::RuntimeValue sep;if(!eval_arg(0,sep)||!sep.is_string()){error="join: separator must be a string";return false;}std::string joined;for(size_t j=0;j<a.size();++j){if(j)joined+=sep.string;if(a[j].is_array()||a[j].is_object()||(a[j].is_string()&&(a[j].string.rfind("\x1fnift:",0)==0))){error="join: elements must be renderable scalar values";return false;}joined+=render_expression_value(a[j]);}out=nift::RuntimeValue(joined);return true;}
-                        if(method=="slice"){if(args.empty()||args.size()>2){error="slice: expected start and optional end";return false;}nift::RuntimeValue st,en;if(!eval(args[0],st,depth+1)||!st.is_number()||std::trunc(st.num)!=st.num||st.num<0){error="slice: invalid start";return false;}size_t b=(size_t)st.num,e=a.size();if(args.size()==2){if(!eval(args[1],en,depth+1)||!en.is_number()||std::trunc(en.num)!=en.num||en.num<0){error="slice: invalid end";return false;}e=(size_t)en.num;}if(b>a.size())b=a.size();if(e>a.size())e=a.size();if(e<b)e=b;out=nift::RuntimeValue::make_array();out.array.assign(a.begin()+b,a.begin()+e);return true;}
-                        if(method=="splice"){if(args.size()<2||args.size()>3){error="splice: expected start, delete_count, optional replacement array";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}nift::RuntimeValue st,dc,repl;if(!eval(args[0],st,depth+1)||!eval(args[1],dc,depth+1)||!st.is_number()||!dc.is_number()||std::trunc(st.num)!=st.num||std::trunc(dc.num)!=dc.num||st.num<0||dc.num<0){error="splice: invalid index/count";return false;}size_t b=(size_t)st.num;if(b>a.size())b=a.size();size_t n=std::min((size_t)dc.num,a.size()-b);out=nift::RuntimeValue::make_array();out.array.assign(a.begin()+b,a.begin()+b+n);a.erase(a.begin()+b,a.begin()+b+n);if(args.size()==3){if(!eval(args[2],repl,depth+1)||!repl.is_array()){error="splice: replacements must be an array";return false;}a.insert(a.begin()+b,repl.array.begin(),repl.array.end());}last_expression_mutation_=true;return true;}
+                        if(method=="slice"){if(args.empty()||args.size()>2){error="slice: expected start and optional end";return false;}nift::RuntimeValue st,en;size_t b=0,e=a.size();if(!eval(args[0],st,depth+1)||!nift::runtime_number_to_size(st,b)){error="slice: invalid start";return false;}if(args.size()==2){if(!eval(args[1],en,depth+1)||!nift::runtime_number_to_size(en,e)){error="slice: invalid end";return false;}}if(b>a.size())b=a.size();if(e>a.size())e=a.size();if(e<b)e=b;out=nift::RuntimeValue::make_array();out.array.assign(a.begin()+b,a.begin()+e);return true;}
+                        if(method=="splice"){if(args.size()<2||args.size()>3){error="splice: expected start, delete_count, optional replacement array";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}nift::RuntimeValue st,dc,repl;size_t b=0,count=0;if(!eval(args[0],st,depth+1)||!eval(args[1],dc,depth+1)||!nift::runtime_number_to_size(st,b)||!nift::runtime_number_to_size(dc,count)){error="splice: invalid index/count";return false;}if(b>a.size())b=a.size();size_t n=std::min(count,a.size()-b);out=nift::RuntimeValue::make_array();out.array.assign(a.begin()+b,a.begin()+b+n);a.erase(a.begin()+b,a.begin()+b+n);if(args.size()==3){if(!eval(args[2],repl,depth+1)||!repl.is_array()){error="splice: replacements must be an array";return false;}a.insert(a.begin()+b,repl.array.begin(),repl.array.end());}last_expression_mutation_=true;return true;}
                         if(method=="reverse"){if(!args.empty()){error="reverse: expected no arguments";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}std::reverse(a.begin(),a.end());out=*rb->value;last_expression_mutation_=true;return true;}
                         if(method=="size"){out=nift::RuntimeValue(static_cast<double>(a.size()));return true;} if(method=="empty"){out=nift::RuntimeValue(a.empty());return true;}
                         if(method=="first"||method=="last"||method=="pop"){if(a.empty()){error=method+": array is empty";return false;}out=method=="first"?a.front():a.back();if(method=="pop"){if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}a.pop_back();last_expression_mutation_=true;}return true;}
                         if(method=="clear"){if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}a.clear();out=nift::RuntimeValue(nullptr);last_expression_mutation_=true;return true;}
                         if(method=="push"){if(args.size()!=1){error="push: expected one argument";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}nift::RuntimeValue v;if(quoted_args.size()>0&&quoted_args[0])v=nift::RuntimeValue(args[0]);else if(!eval(args[0],v,depth+1))return false;a.push_back(v);out=v;last_expression_mutation_=true;return true;}
-                        if(method=="insert"){if(args.size()!=2){error="insert: expected index and value";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}nift::RuntimeValue ix,v;if(!eval(args[0],ix,depth+1)||!eval(args[1],v,depth+1)||!ix.is_number()){error="insert: invalid index";return false;}size_t i=static_cast<size_t>(ix.num);if(i>a.size()){error="insert: index out of range";return false;}a.insert(a.begin()+i,v);out=v;last_expression_mutation_=true;return true;}
-                        if(method=="remove"){if(args.size()!=1){error="remove: expected index";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}nift::RuntimeValue ix;if(!eval(args[0],ix,depth+1)||!ix.is_number()){error="remove: invalid index";return false;}size_t i=static_cast<size_t>(ix.num);if(i>=a.size()){error="remove: index out of range";return false;}out=a[i];a.erase(a.begin()+i);last_expression_mutation_=true;return true;}
+                        if(method=="insert"){if(args.size()!=2){error="insert: expected index and value";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}nift::RuntimeValue ix,v;size_t i=0;if(!eval(args[0],ix,depth+1)||!eval(args[1],v,depth+1)||!nift::runtime_number_to_size(ix,i)){error="insert: invalid index";return false;}if(i>a.size()){error="insert: index out of range";return false;}a.insert(a.begin()+i,v);out=v;last_expression_mutation_=true;return true;}
+                        if(method=="remove"){if(args.size()!=1){error="remove: expected index";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}nift::RuntimeValue ix;size_t i=0;if(!eval(args[0],ix,depth+1)||!nift::runtime_number_to_size(ix,i)){error="remove: invalid index";return false;}if(i>=a.size()){error="remove: index out of range";return false;}out=a[i];a.erase(a.begin()+i);last_expression_mutation_=true;return true;}
                         if(method=="indexOf"||method=="contains"){if(args.size()!=1){error=method+": expected one value";return false;}nift::RuntimeValue v;if(!eval(args[0],v,depth+1))return false;std::size_t i=0;for(;i<a.size();++i)if(structural_equal(a[i],v))break;if(method=="contains")out=nift::RuntimeValue(i<a.size());else out=nift::RuntimeValue(i<a.size()?static_cast<double>(i):-1.0);return true;}
                     }
                 }
@@ -3013,7 +3058,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     if(method=="eof"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Input){error="eof: expected input stream and no arguments";return false;}out=nift::RuntimeValue(st->input->peek()==std::char_traits<char>::eof());return true;}
                     if(method=="read_line"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Input){error="read_line: expected input stream and no arguments";return false;}std::string line;if(!std::getline(*st->input,line)){if(st->input->eof()){st->input->clear();out=nift::RuntimeValue(nullptr);return true;}error="read_line: input failure";return false;}out=nift::RuntimeValue(line);return true;}
                     if(method=="read_all"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Input){error="read_all: expected input stream and no arguments";return false;}std::ostringstream ss;ss<<st->input->rdbuf();out=nift::RuntimeValue(ss.str());return true;}
-                    if(method=="read"){if(aa.size()!=1||st->kind!=StreamInstance::Kind::Input){error="read: expected byte count on input stream";return false;}nift::RuntimeValue n;if(!eval(aa[0],n,depth+1)||!n.is_number()||std::trunc(n.num)!=n.num||n.num<0){error="read: invalid byte count";return false;}std::string b((size_t)n.num,'\0');st->input->read(b.data(),(std::streamsize)b.size());b.resize((size_t)st->input->gcount());out=nift::RuntimeValue(b);return true;}
+                    if(method=="read"){if(aa.size()!=1||st->kind!=StreamInstance::Kind::Input){error="read: expected byte count on input stream";return false;}nift::RuntimeValue n;size_t count=0;if(!eval(aa[0],n,depth+1)||!nift::runtime_number_to_size(n,count)){error="read: invalid byte count";return false;}constexpr std::size_t chunk_size=64*1024;std::vector<char> chunk(chunk_size);std::string b;std::size_t remaining=count;while(remaining>0&&*st->input){const auto requested=static_cast<std::streamsize>(std::min(remaining,chunk_size));st->input->read(chunk.data(),requested);const auto received=st->input->gcount();if(received<=0)break;b.append(chunk.data(),static_cast<std::size_t>(received));remaining-=static_cast<std::size_t>(received);if(received<requested)break;}out=nift::RuntimeValue(b);return true;}
                     if(method=="read_val"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Input){error="read_val: expected input stream and no arguments";return false;}*st->input>>std::ws;if(st->input->peek()==std::char_traits<char>::eof()){out=nift::RuntimeValue(nullptr);return true;}std::string token;char first=(char)st->input->peek();if(first=='"'||first=='['||first=='{'){char open=first,close=first=='['?']':first=='{'?'}':'"';int dep=0;bool quoted=false,esc=false;char c;while(st->input->get(c)){token+=c;if(open=='"'){if(esc){esc=false;continue;}if(c=='\\'){esc=true;continue;}if(token.size()>1&&c=='"')break;}else{if(quoted){if(esc)esc=false;else if(c=='\\')esc=true;else if(c=='"')quoted=false;}else if(c=='"')quoted=true;else if(c==open)++dep;else if(c==close&&--dep==0)break;}}}else{while(st->input->peek()!=std::char_traits<char>::eof()&&!std::isspace((unsigned char)st->input->peek()))token+=(char)st->input->get();}nift::RuntimeValue v;std::string ee;if(!eval(token,v,depth+1)){error=std::string("read_val: ")+(error.empty()?("cannot parse value '"+token+"'"):error);return false;}out=v;return true;}
                     if(method=="write_val"){if(aa.size()!=1||st->kind!=StreamInstance::Kind::Output){error="write_val: expected one value on output stream";return false;}nift::RuntimeValue v;if(!((!qq.empty()&&qq[0])?(v=nift::RuntimeValue(aa[0]),true):eval(aa[0],v,depth+1)))return false;if(v.is_string()&&!qq.empty()&&qq[0]&&v.string.find("$[")!=std::string::npos){std::string r,e;if(!interpolate_parameter(v.string,r,e)){error="write_val: "+e;return false;}v=nift::RuntimeValue(r);}std::string serialized;if(!serialize_value(v,false,serialized,error))return false;*st->output<<serialized<<'\n';if(!*st->output){error="write_val: output failure";return false;}out=nift::RuntimeValue(nullptr);return true;}
                     if(method=="write"||method=="write_line"){if(aa.size()!=1||st->kind!=StreamInstance::Kind::Output){error=method+": expected one value on output stream";return false;}nift::RuntimeValue v;if(!((!qq.empty()&&qq[0])?(v=nift::RuntimeValue(aa[0]),true):eval(aa[0],v,depth+1)))return false;if(v.is_string()&&!qq.empty()&&qq[0]&&v.string.find("$[")!=std::string::npos){std::string r,e;if(!interpolate_parameter(v.string,r,e)){error=method+": "+e;return false;}v=nift::RuntimeValue(r);}if(v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0)){error=method+": value is not directly renderable";return false;}*st->output<<render_expression_value(v);if(method=="write_line")*st->output<<'\n';if(!*st->output){error=method+": output failure";return false;}out=nift::RuntimeValue(nullptr);return true;}
@@ -3022,7 +3067,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             }}
             if(lp!=std::string::npos&&text.back()==')'){std::size_t call_close=0;const std::string target=trim_copy(text.substr(0,lp));const auto dot=target.rfind('.');if(dot!=std::string::npos&&find_balanced(text,lp,'(',')',call_close)&&call_close==text.size()-1){
                 const std::string root=target.substr(0,dot),method=target.substr(dot+1);VariableBinding* rb=find_binding(root);
-                if(rb&&rb->value&&rb->value->is_string()&&method=="substr") { bool ok=false;auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),ok);if(!ok||args.empty()||args.size()>2){error="substr: expected pos and optional length";return false;}nift::RuntimeValue pos,len;if(!eval(args[0],pos,depth+1)||!pos.is_number()||std::trunc(pos.num)!=pos.num||pos.num<0){error="substr: invalid pos";return false;}size_t p=(size_t)pos.num;if(p>rb->value->string.size())p=rb->value->string.size();size_t n=std::string::npos;if(args.size()==2){if(!eval(args[1],len,depth+1)||!len.is_number()||std::trunc(len.num)!=len.num||len.num<0){error="substr: invalid length";return false;}n=(size_t)len.num;}out=nift::RuntimeValue(rb->value->string.substr(p,n));return true;}
+                if(rb&&rb->value&&rb->value->is_string()&&method=="substr") { bool ok=false;auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),ok);if(!ok||args.empty()||args.size()>2){error="substr: expected pos and optional length";return false;}nift::RuntimeValue pos,len;size_t p=0;if(!eval(args[0],pos,depth+1)||!nift::runtime_number_to_size(pos,p)){error="substr: invalid pos";return false;}if(p>rb->value->string.size())p=rb->value->string.size();size_t n=std::string::npos;if(args.size()==2){if(!eval(args[1],len,depth+1)||!nift::runtime_number_to_size(len,n)){error="substr: invalid length";return false;}}out=nift::RuntimeValue(rb->value->string.substr(p,n));return true;}
             }}
         }
 
@@ -3146,7 +3191,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             std::unordered_map<std::string,std::string> seen;
             std::function<bool(const nift::RuntimeValue&,nift::RuntimeValue&)> clone;
             clone=[&](const nift::RuntimeValue& in,nift::RuntimeValue& dst)->bool{
-                if(in.is_string()&&in.string.rfind("\x1fnift:collection:",0)==0){auto it=collection_instances_.find(in.string.substr(17));if(it==collection_instances_.end()){error="deepcopy: invalid collection";return false;}auto nc=std::make_shared<CollectionInstance>();nc->kind=it->second->kind;for(const auto& v:it->second->values){nift::RuntimeValue cv;if(!clone(v,cv))return false;nc->values.push_back(std::move(cv));if(nc->kind==CollectionKind::Set||nc->kind==CollectionKind::SortedSet){auto ck=[&](const nift::RuntimeValue& x)->std::string{if(x.is_bool())return std::string("b")+(x.boolean?"1":"0");if(x.is_string()){if(x.string.rfind("\x1fnift:",0)==0)return "";return std::string("s")+x.string;}if(x.type==nift::RuntimeType::StrNumber)return std::string("N")+x.string;double nn=x.num;if(nn==0.0)nn=0.0;uint64_t bits=0;std::memcpy(&bits,&nn,sizeof(bits));return std::string("n")+std::to_string(bits);};std::string k=ck(cv);if(!k.empty())nc->scalar_keys.insert(k);if(cv.type==nift::RuntimeType::StrNumber)nc->has_huge_int=true;}}for(const auto& e:it->second->entries){nift::RuntimeValue ck,cv;if(!clone(e.first,ck)||!clone(e.second,cv))return false;nc->entries.push_back({std::move(ck),std::move(cv)});if(nc->kind==CollectionKind::Map||nc->kind==CollectionKind::SortedMap){auto ck2=[&](const nift::RuntimeValue& x)->std::string{if(x.is_bool())return std::string("b")+(x.boolean?"1":"0");if(x.is_string()){if(x.string.rfind("\x1fnift:",0)==0)return "";return std::string("s")+x.string;}if(x.type==nift::RuntimeType::StrNumber)return std::string("N")+x.string;double nn=x.num;if(nn==0.0)nn=0.0;uint64_t bits=0;std::memcpy(&bits,&nn,sizeof(bits));return std::string("n")+std::to_string(bits);};std::string kk=ck2(nc->entries.back().first);if(!kk.empty())nc->scalar_keys.insert(kk);if(nc->entries.back().first.type==nift::RuntimeType::StrNumber)nc->has_huge_int=true;}}const std::string id=std::to_string(next_collection_instance_id_++);collection_instances_[id]=nc;dst=nift::RuntimeValue(std::string("\x1fnift:collection:")+id);return true;}
+                if(in.is_string()&&in.string.rfind("\x1fnift:collection:",0)==0){auto it=collection_instances_.find(in.string.substr(17));if(it==collection_instances_.end()){error="deepcopy: invalid collection";return false;}auto nc=std::make_shared<CollectionInstance>();nc->kind=it->second->kind;for(const auto& v:it->second->values){nift::RuntimeValue cv;if(!clone(v,cv))return false;nc->values.push_back(std::move(cv));if(nc->kind==CollectionKind::Set||nc->kind==CollectionKind::SortedSet){std::string k=runtime_scalar_key(cv);if(!k.empty())nc->scalar_keys.insert(k);if(cv.type==nift::RuntimeType::StrNumber)nc->has_huge_int=true;}}for(const auto& e:it->second->entries){nift::RuntimeValue ck,cv;if(!clone(e.first,ck)||!clone(e.second,cv))return false;nc->entries.push_back({std::move(ck),std::move(cv)});if(nc->kind==CollectionKind::Map||nc->kind==CollectionKind::SortedMap){std::string kk=runtime_scalar_key(nc->entries.back().first);if(!kk.empty())nc->scalar_keys.insert(kk);if(nc->entries.back().first.type==nift::RuntimeType::StrNumber)nc->has_huge_int=true;}}const std::string id=std::to_string(next_collection_instance_id_++);collection_instances_[id]=nc;dst=nift::RuntimeValue(std::string("\x1fnift:collection:")+id);return true;}
                 if(in.is_string()&&in.string.rfind("\x1fnift:struct:",0)==0){const std::string old=in.string.substr(13);auto sit=seen.find(old);if(sit!=seen.end()){dst=nift::RuntimeValue(std::string("\x1fnift:struct:")+sit->second);return true;}auto it=struct_instances_.find(old);if(it==struct_instances_.end()){error="deepcopy: invalid struct instance";return false;}auto ni=std::make_shared<StructInstance>();ni->type_name=it->second->type_name;const std::string id=std::to_string(next_struct_instance_id_++);seen[old]=id;struct_instances_[id]=ni;for(const auto& f:it->second->fields){nift::RuntimeValue cv;if(!clone(*f.second.value,cv))return false;auto sp=std::make_shared<nift::RuntimeValue>(std::move(cv));ni->fields.emplace(f.first,VariableBinding{sp,f.second.type,f.second.mutable_binding,f.second.deep_readonly});}dst=nift::RuntimeValue(std::string("\x1fnift:struct:")+id);return true;}
                 dst=in;if(in.is_array()){dst.array.clear();for(const auto& v:in.array){nift::RuntimeValue cv;if(!clone(v,cv))return false;dst.array.push_back(std::move(cv));}}else if(in.is_object()){dst.object.clear();for(const auto& e:in.object){nift::RuntimeValue cv;if(!clone(e.second,cv))return false;dst.object.emplace_back(e.first,std::move(cv));}}return true;
             };
@@ -3365,12 +3410,11 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                             // Computed index from a binding or resolvable
                             // expression (e.g. a[i], a[i + 1]).
                             nift::RuntimeValue computed;
-                            if (!resolve_direct(token, computed) || !computed.is_number() ||
-                                computed.num < 0 || std::trunc(computed.num) != computed.num) {
+                            if (!resolve_direct(token, computed) ||
+                                !nift::runtime_number_to_size(computed, index)) {
                                 error = "JSON array indices must be non-negative integers in '" + text + "'";
                                 return false;
                             }
-                            index = static_cast<std::size_t>(computed.num);
                         }
                         if (index >= base.array.size()) {
                             error = "JSON array index " + std::to_string(index) + " is out of range in '" + text + "'";
@@ -3491,12 +3535,11 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
         auto numeric_binary = [&](const nift::RuntimeValue& left_in, const nift::RuntimeValue& right_in, char op, nift::RuntimeValue& result)->bool {
             nift::RuntimeValue left,right;if(!atomic_scalar(left_in,left)||!atomic_scalar(right_in,right))return false;
             auto as_i64=[](const nift::RuntimeValue& d,std::int64_t& v)->bool{
-                if(d.type==nift::RuntimeType::StrNumber){auto r=std::from_chars(d.string.data(),d.string.data()+d.string.size(),v);return r.ec==std::errc()&&r.ptr==d.string.data()+d.string.size();}
-                if(d.is_number()&&std::trunc(d.num)==d.num&&d.num>=static_cast<double>(std::numeric_limits<std::int64_t>::min())&&d.num<9223372036854775808.0){v=static_cast<std::int64_t>(d.num);return true;}return false;};
+                return nift::runtime_number_to_i64(d,v);};
             std::int64_t a=0,b=0; if(as_i64(left,a)&&as_i64(right,b)&&op!='/'){std::int64_t r=0;bool overflow=false;
                 if(op=='+')overflow=__builtin_add_overflow(a,b,&r);else if(op=='-')overflow=__builtin_sub_overflow(a,b,&r);else if(op=='*')overflow=__builtin_mul_overflow(a,b,&r);else if(op=='%'){if(b==0){error="modulo by zero";return false;}if(a==std::numeric_limits<std::int64_t>::min()&&b==-1)r=0;else r=a%b;}else return false;
                 if(overflow){error="signed 64-bit integer overflow";return false;}result=nift::RuntimeValue(static_cast<double>(r));if(r>9007199254740992LL||r<-9007199254740992LL){result.type=nift::RuntimeType::StrNumber;result.string=std::to_string(r);}return true;}
-            if(!left.is_number()||!right.is_number()){error="arithmetic operators require numeric operands";return false;}double r=0;if(op=='+')r=left.num+right.num;else if(op=='-')r=left.num-right.num;else if(op=='*')r=left.num*right.num;else if(op=='/'){if(right.num==0){error="division by zero";return false;}r=left.num/right.num;}else if(op=='%'){if(right.num==0){error="modulo by zero";return false;}if(std::trunc(left.num)!=left.num||std::trunc(right.num)!=right.num){error="modulo requires integer-valued operands";return false;}r=std::fmod(left.num,right.num);}if(!std::isfinite(r)){error="arithmetic result is not finite";return false;}result=nift::RuntimeValue(r);return true;
+            if(!left.is_number()||!right.is_number()){error="arithmetic operators require numeric operands";return false;}double r=0;if(op=='+')r=left.num+right.num;else if(op=='-')r=left.num-right.num;else if(op=='*')r=left.num*right.num;else if(op=='/'){if(nift::runtime_number_is_zero(right)){error="division by zero";return false;}r=left.num/right.num;}else if(op=='%'){if(nift::runtime_number_is_zero(right)){error="modulo by zero";return false;}if(!nift::runtime_number_is_integer(left)||!nift::runtime_number_is_integer(right)){error="modulo requires integer-valued operands";return false;}r=std::fmod(left.num,right.num);}if(!std::isfinite(r)){error="arithmetic result is not finite";return false;}result=nift::RuntimeValue(r);return true;
         };
 
         // Compound assignment is a true mutation expression. Current assignable
@@ -3523,7 +3566,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
         for(const std::string cop:{"+=","-=","*=","/=","%=","&=","|=","^="}){const auto p=find_top_level_op(cop);if(p!=std::string::npos){const std::string target=trim_copy(text.substr(0,p));
             {bool decl=false;bool iq=false;char iqc=0;int ip=0,ib=0;for(std::size_t k=0;k+1<target.size();++k){char cc=target[k];if(iq){if(cc=='\\')++k;else if(cc==iqc)iq=false;continue;}if(cc=='\''||cc=='"'){iq=true;iqc=cc;continue;}if(cc=='(')++ip;else if(cc==')')--ip;else if(cc=='[')++ib;else if(cc==']')--ib;if(ip||ib)continue;if(target.compare(k,2,":=")==0||target.compare(k,2,"=>")==0){decl=true;break;}}if(decl)break;}
             nift::RuntimeValue oldv,rhs,next;if(!eval(target,oldv,depth+1)||!eval(text.substr(p+2),rhs,depth+1))return false;
-            if(target.find_first_of(".([")==std::string::npos&&oldv.is_string()&&oldv.string.rfind("\x1fnift:atomic:",0)==0){auto ai=atomic_instances_.find(oldv.string.substr(13));if(ai==atomic_instances_.end()){error="atomic: invalid handle";return false;}if(ai->second->kind!=AtomicInstance::Kind::Int){error=cop+": only valid for atomic<int>";return false;}std::int64_t v=0;if(!exact_i64(rhs,v)){error=cop+": atomic<int> requires signed 64-bit integer";return false;}auto st=ai->second;std::int64_t nv=0;if(cop=="+=")nv=st->int_value.fetch_add(v)+v;else if(cop=="-=")nv=st->int_value.fetch_sub(v)-v;else if(cop=="&=")nv=st->int_value.fetch_and(v)&v;else if(cop=="|=")nv=st->int_value.fetch_or(v)|v;else if(cop=="^=")nv=st->int_value.fetch_xor(v)^v;else if(cop=="%="){if(v==0){error="modulo by zero";return false;}auto cur=st->int_value.load();for(;;){std::int64_t desired=(cur==std::numeric_limits<std::int64_t>::min()&&v==-1)?0:cur%v;if(st->int_value.compare_exchange_weak(cur,desired)){nv=desired;break;}}}else{error=cop+": not supported for atomic<int>";return false;}out=nift::RuntimeValue(static_cast<double>(nv));if(nv>9007199254740992LL||nv<-9007199254740992LL){out.type=nift::RuntimeType::StrNumber;out.string=std::to_string(nv);}if(depth==0)last_expression_mutation_=true;return true;}
+            if(target.find_first_of(".([")==std::string::npos&&oldv.is_string()&&oldv.string.rfind("\x1fnift:atomic:",0)==0){auto ai=atomic_instances_.find(oldv.string.substr(13));if(ai==atomic_instances_.end()){error="atomic: invalid handle";return false;}if(ai->second->kind!=AtomicInstance::Kind::Int){error=cop+": only valid for atomic<int>";return false;}std::int64_t v=0;if(!exact_i64(rhs,v)){error=cop+": atomic<int> requires signed 64-bit integer";return false;}auto st=ai->second;std::int64_t nv=0;if(cop=="+="||cop=="-="){std::int64_t before=0;if(!nift_atomic_add_sub_checked(st->int_value,v,cop=="-=",before,nv)){error=cop+": integer overflow";return false;}}else if(cop=="&=")nv=st->int_value.fetch_and(v)&v;else if(cop=="|=")nv=st->int_value.fetch_or(v)|v;else if(cop=="^=")nv=st->int_value.fetch_xor(v)^v;else if(cop=="%="){if(v==0){error="modulo by zero";return false;}auto cur=st->int_value.load();for(;;){std::int64_t desired=(cur==std::numeric_limits<std::int64_t>::min()&&v==-1)?0:cur%v;if(st->int_value.compare_exchange_weak(cur,desired)){nv=desired;break;}}}else{error=cop+": not supported for atomic<int>";return false;}out=nift::RuntimeValue(static_cast<double>(nv));if(nv>9007199254740992LL||nv<-9007199254740992LL){out.type=nift::RuntimeType::StrNumber;out.string=std::to_string(nv);}if(depth==0)last_expression_mutation_=true;return true;}
             if(cop=="+="&&oldv.is_string()&&rhs.is_string())next=nift::RuntimeValue(oldv.string+rhs.string);else if(cop=="+="&&oldv.is_array()&&rhs.is_array()){next=nift::RuntimeValue::make_array();next.array.reserve(oldv.array.size()+rhs.array.size());next.array.insert(next.array.end(),oldv.array.begin(),oldv.array.end());next.array.insert(next.array.end(),rhs.array.begin(),rhs.array.end());}else if(cop=="&="||cop=="|="||cop=="^="){error=cop+": requires atomic<int>";return false;}else if(!numeric_binary(oldv,rhs,cop[0],next))return false;
             if (target.find_first_of(".([") == std::string::npos) {
                 if (!assign_identifier(target, std::move(next))) return false;
@@ -3539,7 +3582,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
         const bool prefix_inc=(text.rfind("++",0)==0||text.rfind("--",0)==0);
         const bool postfix_inc=(text.size()>2&&(text.compare(text.size()-2,2,"++")==0||text.compare(text.size()-2,2,"--")==0) && find_top_level_op(":=")==std::string::npos && find_top_level_assignment()==std::string::npos);
         if(prefix_inc||postfix_inc){const bool inc=prefix_inc?text[0]=='+':text[text.size()-2]=='+';const std::string target=trim_copy(prefix_inc?text.substr(2):text.substr(0,text.size()-2));nift::RuntimeValue oldv,one(1.0),next;if(!eval(target,oldv,depth+1))return false;
-            if(target.find_first_of(".([")==std::string::npos&&oldv.is_string()&&oldv.string.rfind("\x1fnift:atomic:",0)==0){auto ai=atomic_instances_.find(oldv.string.substr(13));if(ai==atomic_instances_.end()){error="atomic: invalid handle";return false;}if(ai->second->kind!=AtomicInstance::Kind::Int){error="increment/decrement requires atomic<int> or numeric lvalue";return false;}auto before=inc?ai->second->int_value.fetch_add(1):ai->second->int_value.fetch_sub(1);auto value=prefix_inc?(inc?before+1:before-1):before;out=nift::RuntimeValue(static_cast<double>(value));if(value>9007199254740992LL||value<-9007199254740992LL){out.type=nift::RuntimeType::StrNumber;out.string=std::to_string(value);}if(depth==0)last_expression_mutation_=true;return true;}
+            if(target.find_first_of(".([")==std::string::npos&&oldv.is_string()&&oldv.string.rfind("\x1fnift:atomic:",0)==0){auto ai=atomic_instances_.find(oldv.string.substr(13));if(ai==atomic_instances_.end()){error="atomic: invalid handle";return false;}if(ai->second->kind!=AtomicInstance::Kind::Int){error="increment/decrement requires atomic<int> or numeric lvalue";return false;}std::int64_t before=0,after=0;if(!nift_atomic_add_sub_checked(ai->second->int_value,1,!inc,before,after)){error="increment/decrement: integer overflow";return false;}const auto value=prefix_inc?after:before;out=nift::RuntimeValue(static_cast<double>(value));if(value>9007199254740992LL||value<-9007199254740992LL){out.type=nift::RuntimeType::StrNumber;out.string=std::to_string(value);}if(depth==0)last_expression_mutation_=true;return true;}
             if(!oldv.is_number()){error="increment/decrement requires a numeric lvalue";return false;}if(!numeric_binary(oldv,one,inc?'+':'-',next))return false;
             if (target.find_first_of(".([") == std::string::npos) {
                 if (!assign_identifier(target, std::move(next))) return false;
@@ -3667,9 +3710,8 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 for (std::size_t k = 0; k + 1 < indexes.size(); ++k) {
                     nift::RuntimeValue idx;
                     if (!eval(indexes[k], idx, depth + 1)) return false;
-                    if (idx.is_number() && node->is_array()) {
-                        if (idx.num < 0) { error = "negative index in assignment: " + indexes[k]; return false; }
-                        const std::size_t i = static_cast<std::size_t>(idx.num);
+                    std::size_t i = 0;
+                    if (node->is_array() && nift::runtime_number_to_size(idx, i)) {
                         if (i >= node->array.size()) { error = "index out of range: " + indexes[k]; return false; }
                         node = &(*node)[i];
                     } else if (idx.is_string() && node->is_object()) {
@@ -3682,9 +3724,8 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 }
                 nift::RuntimeValue last;
                 if (!eval(indexes.back(), last, depth + 1)) return false;
-                if (last.is_number() && node->is_array()) {
-                    if (last.num < 0) { error = "negative index in assignment: " + indexes.back(); return false; }
-                    const std::size_t i = static_cast<std::size_t>(last.num);
+                std::size_t i = 0;
+                if (node->is_array() && nift::runtime_number_to_size(last, i)) {
                     if (i >= node->array.size()) { error = "index out of range: " + indexes.back(); return false; }
                     (*node)[i] = std::move(assigned);
                     out = (*node)[i];
@@ -3784,7 +3825,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             out=nift::RuntimeValue(!truthy_value(operand)); return true;
         }
 
-        { std::size_t cp=std::string::npos;bool q=false;char qc=0;int pa=0,br=0,bc=0;for(size_t z=text.size();z-- >0;){char c=text[z];if(q){if(c==qc&&(z==0||text[z-1]!='\\'))q=false;continue;}if(c=='\''||c=='"'){q=true;qc=c;continue;}if(c==')')++pa;else if(c=='(')--pa;else if(c==']')++br;else if(c=='[')--br;else if(c=='}')++bc;else if(c=='{')--bc;else if(c=='+'&&!pa&&!br&&!bc){if(z>0&&std::string("+-*/%(<>=!&|?:,").find(text[z-1])!=std::string::npos)continue;cp=z;break;}}if(cp!=std::string::npos){nift::RuntimeValue l,r;if(!eval(text.substr(0,cp),l,depth+1)||!eval(text.substr(cp+1),r,depth+1))return false;nift::RuntimeValue ls,rs;if(!atomic_scalar(l,ls)||!atomic_scalar(r,rs))return false;l=std::move(ls);r=std::move(rs);if(l.is_array()&&r.is_array()){out=nift::RuntimeValue::make_array();out.array.reserve(l.array.size()+r.array.size());out.array.insert(out.array.end(),l.array.begin(),l.array.end());out.array.insert(out.array.end(),r.array.begin(),r.array.end());return true;}if(l.is_string()||r.is_string()){auto safe=[&](const nift::RuntimeValue& v,std::string& z){if(v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0))return false;z=render_expression_value(v);return true;};std::string a,b;if(!safe(l,a)||!safe(r,b)){error="string concatenation requires renderable scalar values";return false;}out=nift::RuntimeValue(a+b);return true;}return numeric_binary(l,r,'+',out);}}
+        { std::size_t cp=std::string::npos;bool q=false;char qc=0;int pa=0,br=0,bc=0;for(size_t z=text.size();z-- >0;){char c=text[z];if(q){if(c==qc&&(z==0||text[z-1]!='\\'))q=false;continue;}if(c=='\''||c=='"'){q=true;qc=c;continue;}if(c==')')++pa;else if(c=='(')--pa;else if(c==']')++br;else if(c=='[')--br;else if(c=='}')++bc;else if(c=='{')--bc;else if(c=='+'&&!pa&&!br&&!bc){if((z>0&&std::string("+-*/%(<>=!&|?:,").find(text[z-1])!=std::string::npos)||nift_numeric_exponent_sign(text,z))continue;cp=z;break;}}if(cp!=std::string::npos){nift::RuntimeValue l,r;if(!eval(text.substr(0,cp),l,depth+1)||!eval(text.substr(cp+1),r,depth+1))return false;nift::RuntimeValue ls,rs;if(!atomic_scalar(l,ls)||!atomic_scalar(r,rs))return false;l=std::move(ls);r=std::move(rs);if(l.is_array()&&r.is_array()){out=nift::RuntimeValue::make_array();out.array.reserve(l.array.size()+r.array.size());out.array.insert(out.array.end(),l.array.begin(),l.array.end());out.array.insert(out.array.end(),r.array.begin(),r.array.end());return true;}if(l.is_string()||r.is_string()){auto safe=[&](const nift::RuntimeValue& v,std::string& z){if(v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0))return false;z=render_expression_value(v);return true;};std::string a,b;if(!safe(l,a)||!safe(r,b)){error="string concatenation requires renderable scalar values";return false;}out=nift::RuntimeValue(a+b);return true;}return numeric_binary(l,r,'+',out);}}
 
         auto find_binary = [&](const std::string& ops) -> std::size_t {
             bool quoted=false; char quote=0; int parens=0; int brackets=0;
@@ -3798,7 +3839,9 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 if (c==')') { ++parens; continue; }
                 if (c=='(') { if (parens) --parens; continue; }
                 if (parens || ops.find(c)==std::string::npos) continue;
-                if ((c=='+' || c=='-') && (i==0 || std::string("+-*/%(<>=!&|?:,").find(text[i-1])!=std::string::npos)) continue;
+                if ((c=='+' || c=='-') &&
+                    (i==0 || std::string("+-*/%(<>=!&|?:,").find(text[i-1])!=std::string::npos ||
+                     nift_numeric_exponent_sign(text,i))) continue;
                 return i;
             }
             return std::string::npos;
@@ -3822,7 +3865,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             if (!eval(text.substr(1),operand,depth+1)) return false;
             nift::RuntimeValue scalar;if(!atomic_scalar(operand,scalar))return false;operand=std::move(scalar);
             if (!operand.is_number()) { error="unary arithmetic operators require a numeric operand"; return false; }
-            out=nift::RuntimeValue(text.front()=='-' ? -operand.num : operand.num); return true;
+            out=text.front()=='-' ? nift::runtime_number_negate(operand) : operand; return true;
         }
 
         error="unknown value or malformed expression: " + text;
@@ -3840,15 +3883,7 @@ bool Parser::evaluate_condition(const std::string& expression, bool& value, std:
         return true;
     };
 
-    auto truthy = [](const nift::RuntimeValue& document) {
-        if (document.is_bool()) return document.boolean;
-        if (document.is_null()) return false;
-        if (document.is_number()) return document.num != 0.0;
-        if (document.is_string()) return !document.string.empty();
-        if (document.is_array()) return !document.array.empty();
-        if (document.is_object()) return !document.object.empty();
-        return false;
-    };
+    auto truthy = [](const nift::RuntimeValue& document) { return nift::runtime_truthy(document); };
 
     std::function<bool(const std::string&, bool&)> eval;
     eval = [&](const std::string& raw, bool& result) -> bool {
@@ -4251,7 +4286,7 @@ bool Parser::invoke_ffi_callback_i64(const std::string& callable_tag, std::int64
     nift::RuntimeValue result; bool ok=evaluate_expression(name+"("+std::to_string(arg)+")",result,error);
     if(saved) variable_scopes_.back()[name]=*saved; else variable_scopes_.back().erase(name);
     if(!ok)return false;
-    if(!result.is_number()||std::trunc(result.num)!=result.num){error="callback result must be an integer";return false;}out_value=static_cast<std::int64_t>(result.num);return true;
+    if(!nift::runtime_number_to_i64(result,out_value)){error="callback result must be an integer";return false;}return true;
 }
 
 bool Parser::invoke_callable(const std::string& name, const std::vector<nift::RuntimeValue>& args, nift::RuntimeValue& value, std::string& error) {
@@ -5120,15 +5155,15 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             if(recv.is_string()&&recv.string.rfind("\x1fnift:atomic:",0)==0){
                 auto ai=atomic_instances_.find(recv.string.substr(13));if(ai==atomic_instances_.end()){e="atomic: invalid handle";return false;}auto st=ai->second;
                 auto int_doc=[](std::int64_t v){nift::RuntimeValue d(static_cast<double>(v));if(v>9007199254740992LL||v<-9007199254740992LL){d.type=nift::RuntimeType::StrNumber;d.string=std::to_string(v);}return d;};
-                auto as_int=[&](const nift::RuntimeValue& v,std::int64_t& x){if(v.type==nift::RuntimeType::StrNumber){auto r=std::from_chars(v.string.data(),v.string.data()+v.string.size(),x);if(r.ec==std::errc()&&r.ptr==v.string.data()+v.string.size())return true;}else if(v.is_number()&&std::isfinite(v.num)&&std::trunc(v.num)==v.num&&v.num>=-9223372036854775808.0&&v.num<9223372036854775808.0){x=static_cast<std::int64_t>(v.num);return true;}e="atomic<int>: expected signed 64-bit integer";return false;};
+                auto as_int=[&](const nift::RuntimeValue& v,std::int64_t& x){if(nift::runtime_number_to_i64(v,x))return true;e="atomic<int>: expected signed 64-bit integer";return false;};
                 if(method=="load"){if(!args.empty()){e="load: expected no arguments";return false;}if(st->kind==AtomicInstance::Kind::Int)out=int_doc(st->int_value.load());else out=nift::RuntimeValue(st->bool_value.load());return true;}
                 if(method=="store"||method=="exchange"){if(args.size()!=1){e=method+": expected one value";return false;}if(st->kind==AtomicInstance::Kind::Int){std::int64_t x=0;if(!as_int(args[0],x))return false;if(method=="store"){st->int_value.store(x);out=nift::RuntimeValue(nullptr);}else out=int_doc(st->int_value.exchange(x));}else{if(!args[0].is_bool()){e=method+": atomic<bool> requires bool";return false;}if(method=="store"){st->bool_value.store(args[0].boolean);out=nift::RuntimeValue(nullptr);}else out=nift::RuntimeValue(st->bool_value.exchange(args[0].boolean));}return true;}
-                if(method=="fetch_add"||method=="fetch_sub"){if(st->kind!=AtomicInstance::Kind::Int){e=method+": only valid for atomic<int>";return false;}if(args.size()!=1){e=method+": expected one integer";return false;}std::int64_t x=0;if(!as_int(args[0],x))return false;out=int_doc(method=="fetch_add"?st->int_value.fetch_add(x):st->int_value.fetch_sub(x));return true;}
+                if(method=="fetch_add"||method=="fetch_sub"){if(st->kind!=AtomicInstance::Kind::Int){e=method+": only valid for atomic<int>";return false;}if(args.size()!=1){e=method+": expected one integer";return false;}std::int64_t x=0;if(!as_int(args[0],x))return false;std::int64_t before=0,after=0;if(!nift_atomic_add_sub_checked(st->int_value,x,method=="fetch_sub",before,after)){e=method+": integer overflow";return false;}out=int_doc(before);return true;}
                 if(method=="compare_exchange"){if(args.size()!=2){e="compare_exchange: expected expected and desired values";return false;}if(st->kind==AtomicInstance::Kind::Int){std::int64_t expected=0,desired=0;if(!as_int(args[0],expected)||!as_int(args[1],desired))return false;out=nift::RuntimeValue(st->int_value.compare_exchange_strong(expected,desired));}else{if(!args[0].is_bool()||!args[1].is_bool()){e="compare_exchange: atomic<bool> requires bool values";return false;}bool expected=args[0].boolean;out=nift::RuntimeValue(st->bool_value.compare_exchange_strong(expected,args[1].boolean));}return true;}
             }
             if(method=="to_string"&&recv.is_number()){out=nift::RuntimeValue(render_expression_value(recv));return true;}
             if(method=="to_string"&&recv.is_string()){out=recv;return true;}
-            if(method=="to_int"&&recv.is_number()){out=nift::RuntimeValue((double)(long long)recv.num);return true;}
+            if(method=="to_int"&&recv.is_number()){if(!args.empty()){e="to_int: expected no arguments";return false;}std::int64_t value=0;if(!nift::runtime_number_to_i64(recv,value)){e="to_int: invalid or out-of-range integer";return false;}out=nift::runtime_integer(value);return true;}
             if(method=="to_double"&&recv.is_number()){out=recv;return true;}
             if(method=="abs"&&recv.is_number()){out=nift::RuntimeValue(std::fabs(recv.num));return true;}
             if(method=="floor"&&recv.is_number()){out=nift::RuntimeValue(std::floor(recv.num));return true;}
@@ -5159,7 +5194,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             if(ex.kind==nift::ast::Kind::Index){
                 if(!ex.left||!build_location_ref(*ex.left,root,path,e))return false;
                 nift::RuntimeValue idx;auto cc=ast_context();if(!nift::ast::evaluate(*ex.right,cc,idx,e))return false;
-                if(idx.is_number()&&idx.num>=0&&std::trunc(idx.num)==idx.num)path.push_back(PathComponent::at((std::size_t)idx.num));
+                std::size_t index=0;if(nift::runtime_number_to_size(idx,index))path.push_back(PathComponent::at(index));
                 else if(idx.is_string())path.push_back(PathComponent::member(idx.string));
                 else{e="invalid reference index";return false;}return true;
             }
@@ -5169,14 +5204,14 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             std::shared_ptr<std::shared_ptr<nift::RuntimeValue>> root;std::vector<PathComponent> path;if(!build_location_ref(ex,root,path,e)||path.empty())return false;
             dst.ref_root_slot=std::move(root);dst.ref_path=std::move(path);dst.sync();if(!dst.value){e="reference target no longer exists";return false;}dst.type=nift_binding_type(*dst.value);return dst.value->is_array()||dst.value->is_object()||(dst.value->is_string()&&dst.value->string.rfind("\x1fnift:",0)==0);
         };
-        auto assign_plain=[&](const std::string& name,nift::RuntimeValue v,std::string& e)->bool{for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(name);if(it==sc->end())continue;if(!it->second.mutable_binding){e="cannot assign to const binding: "+name;return false;}it->second.sync();if(it->second.value&&it->second.value->is_string()&&it->second.value->string.rfind("\x1fnift:atomic:",0)==0&&!(v.is_string()&&v.string.rfind("\x1fnift:atomic:",0)==0)){auto ai=atomic_instances_.find(it->second.value->string.substr(13));if(ai==atomic_instances_.end()){e="atomic: invalid handle";return false;}if(ai->second->kind==AtomicInstance::Kind::Int){std::int64_t x=0;if(v.type==nift::RuntimeType::StrNumber){auto r=std::from_chars(v.string.data(),v.string.data()+v.string.size(),x);if(r.ec!=std::errc()||r.ptr!=v.string.data()+v.string.size()){e="assignment to atomic<int> requires signed 64-bit integer";return false;}}else if(v.is_number()&&std::isfinite(v.num)&&std::trunc(v.num)==v.num&&v.num>=-9223372036854775808.0&&v.num<9223372036854775808.0)x=(std::int64_t)v.num;else{e="assignment to atomic<int> requires signed 64-bit integer";return false;}ai->second->int_value.store(x);}else{if(!v.is_bool()){e="assignment to atomic<bool> requires bool";return false;}ai->second->bool_value.store(v.boolean);}last_expression_mutation_=true;return true;}const int at=nift_binding_type(v);if(!nift_type_assignable(at,it->second.type)){e="cannot change binding type: "+name;return false;}it->second.rebind(std::make_shared<nift::RuntimeValue>(std::move(v)));return true;}e="assignment to undefined binding: "+name;return false;};
+        auto assign_plain=[&](const std::string& name,nift::RuntimeValue v,std::string& e)->bool{for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(name);if(it==sc->end())continue;if(!it->second.mutable_binding){e="cannot assign to const binding: "+name;return false;}it->second.sync();if(it->second.value&&it->second.value->is_string()&&it->second.value->string.rfind("\x1fnift:atomic:",0)==0&&!(v.is_string()&&v.string.rfind("\x1fnift:atomic:",0)==0)){auto ai=atomic_instances_.find(it->second.value->string.substr(13));if(ai==atomic_instances_.end()){e="atomic: invalid handle";return false;}if(ai->second->kind==AtomicInstance::Kind::Int){std::int64_t x=0;if(!nift::runtime_number_to_i64(v,x)){e="assignment to atomic<int> requires signed 64-bit integer";return false;}ai->second->int_value.store(x);}else{if(!v.is_bool()){e="assignment to atomic<bool> requires bool";return false;}ai->second->bool_value.store(v.boolean);}last_expression_mutation_=true;return true;}const int at=nift_binding_type(v);if(!nift_type_assignable(at,it->second.type)){e="cannot change binding type: "+name;return false;}it->second.rebind(std::make_shared<nift::RuntimeValue>(std::move(v)));return true;}e="assignment to undefined binding: "+name;return false;};
             // Resolve an Index/Member chain to a non-const Document reference so
             // that assignment mutates the aliased collection element in place
             // (json-mutate's e["total"] = e.v * 2 must write back into arr).
             std::function<bool(const nift::ast::Expr&,nift::RuntimeValue*&,std::string&)> resolve_target_ref;
             resolve_target_ref=[&](const nift::ast::Expr& t,nift::RuntimeValue*& out,std::string& e)->bool{
                 if(t.kind==nift::ast::Kind::Binding){for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(t.name);if(it!=sc->end()){it->second.sync();if(!it->second.mutable_binding){e="cannot assign to const binding: "+t.name;return false;}if(!it->second.value){e="reference target no longer exists: "+t.name;return false;}out=it->second.is_location_ref()?it->second.resolve_location():it->second.value.get();if(!out){e="reference target no longer exists: "+t.name;return false;}return true;}}e="assignment to undefined binding: "+t.name;return false;}
-                if(t.kind==nift::ast::Kind::Index){nift::RuntimeValue* b=nullptr;if(!resolve_target_ref(*t.left,b,e))return false;nift::RuntimeValue i;auto c=ast_context();if(!nift::ast::evaluate(*t.right,c,i,e))return false;if(b->is_array()&&i.is_number()&&i.num>=0&&std::trunc(i.num)==i.num&&(std::size_t)i.num<b->array.size()){out=&b->array[(std::size_t)i.num];return true;}if(b->is_object()&&i.is_string()){out=&(*b)[i.string];return true;}e="invalid index target";return false;}
+                if(t.kind==nift::ast::Kind::Index){nift::RuntimeValue* b=nullptr;if(!resolve_target_ref(*t.left,b,e))return false;nift::RuntimeValue i;auto c=ast_context();if(!nift::ast::evaluate(*t.right,c,i,e))return false;std::size_t index=0;if(b->is_array()&&nift::runtime_number_to_size(i,index)&&index<b->array.size()){out=&b->array[index];return true;}if(b->is_object()&&i.is_string()){out=&(*b)[i.string];return true;}e="invalid index target";return false;}
                 if(t.kind==nift::ast::Kind::Member){nift::RuntimeValue* b=nullptr;if(!resolve_target_ref(*t.left,b,e))return false;if(!b->is_object()){e="value has no member: "+t.name;return false;}out=&(*b)[t.name];return true;}
                 e="unsupported assignment target";return false;};
             auto assign_indexed=[&](const nift::ast::Expr& target,nift::RuntimeValue rhs,std::string& e)->bool{nift::RuntimeValue* slot=nullptr;if(!resolve_target_ref(target,slot,e))return false;*slot=std::move(rhs);last_expression_mutation_=true;return true;};
@@ -5217,7 +5252,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     if(ci==collection_instances_.end()){e="invalid collection handle";return false;}
                     auto& cc=ci->second;
                     const bool is_map=cc->kind==CollectionKind::Map||cc->kind==CollectionKind::SortedMap;
-                    auto ckey=[&](const nift::RuntimeValue& x)->std::string{if(x.is_bool())return std::string("b")+(x.boolean?"1":"0");if(x.is_string()){if(x.string.rfind("\x1fnift:",0)==0)return "";return std::string("s")+x.string;}if(x.type==nift::RuntimeType::StrNumber)return std::string("N")+x.string;double nn=x.num;if(nn==0.0)nn=0.0;uint64_t bits=0;std::memcpy(&bits,&nn,sizeof(bits));return std::string("n")+std::to_string(bits);};
+                    auto ckey=[&](const nift::RuntimeValue& x)->std::string{return runtime_scalar_key(x);};
                     if(!is_map&&(st.op=="add"||st.op=="contains"||st.op=="size"||st.op=="empty")){
                         if(st.op=="size"){if(!av.empty()){e="size: expected no arguments";return false;}return true;}
                         if(st.op=="empty"){if(!av.empty()){e="empty: expected no arguments";return false;}return true;}
@@ -5225,9 +5260,9 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                             if(av.size()!=1){e=st.op+": expected one value";return false;}
                             const nift::RuntimeValue& v=av[0];
                             const std::string k=ckey(v);
-                            const bool indexed=!k.empty()&&!(v.is_number()&&v.type!=nift::RuntimeType::StrNumber&&cc->has_huge_int);
+                            const bool indexed=!k.empty();
                             if(!indexed){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}
-                            const bool present=cc->scalar_keys.count(k)!=0;
+                            const bool present=cc->scalar_keys.count(k)!=0&&std::any_of(cc->values.begin(),cc->values.end(),[&](const auto& item){return ckey(item)==k&&nift::runtime_equal(item,v);});
                             if(st.op=="contains"){return true;}
                             if(!rb->mutable_binding){e="cannot mutate const collection: "+st.name;return false;}
                             if(st.op=="add"&&!present){cc->values.push_back(v);cc->scalar_keys.insert(k);}else if(st.op=="add"&&present){/* already present: no-op */}last_expression_mutation_=true;return true;

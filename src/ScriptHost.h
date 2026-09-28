@@ -44,17 +44,18 @@ public:
     }
     bool is_contract_name(const std::string&) const override { return false; }
     const std::string* contract_source(const std::string&) const override { return nullptr; }
-    HostSource read_shared_source(const fs::path& p) const override { if(!filesystem::file_exists(p))return {}; cache_=filesystem::read_file(p); return {nift::HostStatus::Found,&cache_,{}}; }
-    std::shared_ptr<const json::Document> read_shared_json(const fs::path& p,std::string& error) const override { if(!filesystem::file_exists(p)){error="JSON file does not exist";return {};} json::Document parsed; if(!json::Document::parse(filesystem::read_file(p),parsed,error))return {}; return std::make_shared<json::Document>(std::move(parsed)); }
-    std::shared_ptr<const nift::RuntimeValue> read_shared_runtime_json(const fs::path& p,std::string& error) const override { const std::string key=p.lexically_normal().generic_string();std::lock_guard<std::mutex> lock(runtime_json_mutex_);auto found=runtime_json_cache_.find(key);if(found!=runtime_json_cache_.end())return found->second;if(!filesystem::file_exists(p)){error="JSON file does not exist";return {};}json::Document parsed;if(!json::Document::parse(filesystem::read_file(p),parsed,error))return {};auto value=std::make_shared<const nift::RuntimeValue>(nift::runtime_from_json(parsed));runtime_json_cache_.emplace(key,value);return value; }
+    HostSource read_shared_source(const fs::path& p) const override { const std::string key=p.lexically_normal().generic_string();std::lock_guard<std::mutex> lock(source_mutex_);auto found=source_cache_.find(key);if(found!=source_cache_.end())return {nift::HostStatus::Found,found->second.get(),{}};if(!filesystem::file_exists(p))return {};auto stored=std::make_unique<const std::string>(filesystem::read_file(p));const std::string* content=stored.get();source_cache_.emplace(key,std::move(stored));return {nift::HostStatus::Found,content,{}}; }
+    std::shared_ptr<const json::Document> read_shared_json(const fs::path& p,std::string& error) const override { if(!filesystem::file_exists(p)){error="JSON file does not exist";return {};} json::Document parsed; if(!nift_json::parse(filesystem::read_file(p),parsed,error))return {}; return std::make_shared<json::Document>(std::move(parsed)); }
+    std::shared_ptr<const nift::RuntimeValue> read_shared_runtime_json(const fs::path& p,std::string& error) const override { const std::string key=p.lexically_normal().generic_string();std::lock_guard<std::mutex> lock(runtime_json_mutex_);auto found=runtime_json_cache_.find(key);if(found!=runtime_json_cache_.end())return found->second;if(!filesystem::file_exists(p)){error="JSON file does not exist";return {};}json::Document parsed;if(!nift_json::parse(filesystem::read_file(p),parsed,error))return {};auto value=std::make_shared<const nift::RuntimeValue>(nift::runtime_from_json(parsed));runtime_json_cache_.emplace(key,value);return value; }
     bool source_exists(const fs::path& p) const override { return filesystem::file_exists(p); }
     bool source_readable(const fs::path& p) const override { return filesystem::file_exists(p); }
     nift::HostResult environment(const std::string& name) const override { const char* v=std::getenv(name.c_str()); return v?nift::HostResult{nift::HostStatus::Found,v,{}}:nift::HostResult{}; }
     bool environment_snapshot(nift::RuntimeValue& out, std::string& error) const override { return nift_environment::process_snapshot(out, error); }
 private:
-    fs::path root_; std::string target_ = "native"; mutable std::string cache_; mutable std::shared_ptr<const nift::RuntimeValue> project_value_;
+    fs::path root_; std::string target_ = "native"; mutable std::shared_ptr<const nift::RuntimeValue> project_value_;
     Config config_; std::vector<TrackedInfo> tracked_; bool project_found_ = false;
     mutable std::once_flag hierarchy_flag_; mutable std::shared_ptr<const HierarchyIndex> hierarchy_;
+    mutable std::mutex source_mutex_; mutable std::unordered_map<std::string,std::unique_ptr<const std::string>> source_cache_;
     mutable std::mutex runtime_json_mutex_; mutable std::unordered_map<std::string,std::shared_ptr<const nift::RuntimeValue>> runtime_json_cache_;
 
     const HierarchyIndex* hierarchy() const {

@@ -12,12 +12,14 @@ cat >"$D/.nift/tracked.json" <<'JSON'
 JSON
 printf 'BODY\n' >"$D/content/index.html"
 cat >"$D/data/data.json" <<'JSON'
-{"nums":[3,1,2,2],"words":["beta","alpha","beta"],"triples":[[1,2,3],[4,5,6]],"products":[{"price":10,"quantity":2},{"price":5,"quantity":3}],"posts":[{"title":"Old","score":5,"published":true},{"title":"Draft","score":99,"published":false},{"title":"Best","score":10,"published":true}]}
+{"nums":[3,1,2,2],"exact":[9007199254740993,2],"words":["beta","alpha","beta"],"triples":[[1,2,3],[4,5,6]],"products":[{"price":10,"quantity":2},{"price":5,"quantity":3}],"posts":[{"title":"Old","score":5,"published":true},{"title":"Draft","score":99,"published":false},{"title":"Best","score":10,"published":true}]}
 JSON
 cat >"$D/templates/template.html" <<'EOF2'
 @json(d, "data/data.json")
 SORT=@sort(d.nums)
 SORTDESC=@sort(n : d.nums => n desc)
+SORTEXACT=@sort(d.exact)
+SORTEXACTKEY=@sort(n : d.exact => n)
 FILTER=@filter(p : d.posts => p.published && p.score >= 5)
 MAP=@map(p : d.posts => p.title)
 MAPEXPR=@map(p : d.posts => p.score * 2)
@@ -29,6 +31,8 @@ SUM=@sum(d.nums)
 PROD=@prod(d.nums)
 MIN=@min(d.nums)
 MAX=@max(d.nums)
+MINEXACT=@min(d.exact)
+MAXEXACT=@max(d.exact)
 MINWORD=@min(d.words)
 MAXWORD=@max(d.words)
 SUMEXPR=@sum(p : d.products => p.price * p.quantity)
@@ -61,8 +65,12 @@ def val(label):
     return dec.raw_decode(s[p:].lstrip())[0]
 assert val("SORT") == [1,2,2,3]
 assert val("SORTDESC") == [3,2,2,1]
+assert val("SORTEXACT") == [2,9007199254740993]
+assert val("SORTEXACTKEY") == [2,9007199254740993]
 assert [x["title"] for x in val("FILTER")] == ["Old","Best"]
 assert val("MAP") == ["Old","Draft","Best"]
+assert val("MINEXACT") == 2
+assert val("MAXEXACT") == 9007199254740993
 assert val("MAPEXPR") == [10,198,20]
 assert [x["title"] for x in val("SORTOBJ")] == ["Draft","Best","Old"]
 assert val("SLICE") == [1,2]

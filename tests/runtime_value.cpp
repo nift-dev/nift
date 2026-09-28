@@ -124,6 +124,60 @@ int main() {
     assert(nift::runtime_numeric_fingerprint(negative_infinity) == "-inf");
     assert(nift::runtime_numeric_fingerprint(nan) == "nan");
 
+    assert(!nift::runtime_number_is_zero(tiny));
+    assert(nift::runtime_truthy(tiny));
+    assert(!nift::runtime_number_is_integer(tiny));
+    assert(nift::runtime_number_is_integer(decimal));
+    assert(nift::runtime_number_is_integer(exact_number("-0e-999999999999999999")));
+    std::size_t size = 0;
+    assert(nift::runtime_number_to_size(exact_number("00012e1"), size) && size == 120);
+    assert(!nift::runtime_number_to_size(tiny, size));
+    assert(!nift::runtime_number_to_size(exact_number("1e999999999999"), size));
+    assert(!nift::runtime_number_to_size(exact_number("-1"), size));
+    std::int64_t signed_value = 0;
+    assert(nift::runtime_number_to_i64(exact_number("9223372036854775807"), signed_value) &&
+           signed_value == std::numeric_limits<std::int64_t>::max());
+    assert(nift::runtime_number_to_i64(exact_number("-9223372036854775808"), signed_value) &&
+           signed_value == std::numeric_limits<std::int64_t>::min());
+    assert(!nift::runtime_number_to_i64(exact_number("9223372036854775808"), signed_value));
+    assert(!nift::runtime_number_to_i64(tiny, signed_value));
+    assert(nift::runtime_number_to_signed(exact_number("-128"), 8, signed_value) &&
+           signed_value == -128);
+    assert(nift::runtime_number_to_signed(exact_number("127"), 8, signed_value) &&
+           signed_value == 127);
+    assert(!nift::runtime_number_to_signed(exact_number("-129"), 8, signed_value));
+    assert(!nift::runtime_number_to_signed(exact_number("128"), 8, signed_value));
+    std::uint64_t unsigned_value = 0;
+    assert(nift::runtime_number_to_unsigned(exact_number("18446744073709551615"), 64,
+                                            unsigned_value) &&
+           unsigned_value == std::numeric_limits<std::uint64_t>::max());
+    assert(nift::runtime_number_to_unsigned(exact_number("255"), 8, unsigned_value) &&
+           unsigned_value == 255);
+    assert(!nift::runtime_number_to_unsigned(exact_number("256"), 8, unsigned_value));
+    assert(!nift::runtime_number_to_unsigned(exact_number("-1"), 64, unsigned_value));
+    assert(!nift::runtime_number_to_unsigned(tiny, 64, unsigned_value));
+    json::Document integer_boundaries;
+    assert(json::Document::parse(
+        "[-9223372036854775808,18446744073709551615]", integer_boundaries, error));
+    const auto runtime_integer_boundaries = nift::runtime_from_json(integer_boundaries);
+    assert(nift::runtime_number_to_signed(runtime_integer_boundaries.array[0], 64, signed_value) &&
+           signed_value == std::numeric_limits<std::int64_t>::min());
+    assert(nift::runtime_number_to_unsigned(runtime_integer_boundaries.array[1], 64, unsigned_value) &&
+           unsigned_value == std::numeric_limits<std::uint64_t>::max());
+    const auto signed_runtime = nift::runtime_integer(std::numeric_limits<std::int64_t>::max());
+    assert(signed_runtime.type == nift::RuntimeType::StrNumber);
+    assert(signed_runtime.string == "9223372036854775807");
+    assert(signed_runtime.num == static_cast<double>(std::numeric_limits<std::int64_t>::max()));
+    const auto unsigned_runtime = nift::runtime_unsigned_integer(
+        std::numeric_limits<std::uint64_t>::max());
+    assert(unsigned_runtime.type == nift::RuntimeType::StrNumber);
+    assert(unsigned_runtime.string == "18446744073709551615");
+    assert(unsigned_runtime.num == static_cast<double>(std::numeric_limits<std::uint64_t>::max()));
+    assert(nift::runtime_unsigned_integer(42).type == nift::RuntimeType::Number);
+    const auto negated_tiny = nift::runtime_number_negate(tiny);
+    assert(negated_tiny.type == nift::RuntimeType::StrNumber && negated_tiny.string == "-1e-1000");
+    assert(nift::runtime_number_negate(negated_tiny).string == "1e-1000");
+
     nift::RuntimeValue duplicate_left = nift::RuntimeValue::make_object();
     duplicate_left.object.emplace_back("k", nift::RuntimeValue(1));
     duplicate_left.object.emplace_back("k", nift::RuntimeValue(2));

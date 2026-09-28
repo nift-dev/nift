@@ -16,6 +16,7 @@
 #include "Parser.h"
 #include "ProjectHost.h"
 #include "ProjectState.h"
+#include "ScriptHost.h"
 #include "Types.h"
 
 #include <atomic>
@@ -333,6 +334,44 @@ void test_pagination_error_selection_order() {
     CHECK(result.error().message.find("error-two") == std::string::npos);
 }
 
+void test_script_host_source_lifetimes() {
+    const fs::path root = fs::temp_directory_path() / "nift-script-host-source-lifetimes";
+    fs::remove_all(root);
+    write_file(root / "template.html", "template-bytes");
+    write_file(root / "separator.html", "separator-bytes");
+    write_file(root / "nested.html", "nested-bytes");
+    write_file(root / "outer.html", "outer[@input(\"nested-input.html\")]");
+    write_file(root / "nested-input.html", "inner");
+    ScriptRenderHost host(root);
+    RenderHost::HostSource template_source;
+    RenderHost::HostSource separator_source;
+    std::thread template_reader([&] { template_source = host.read_shared_source(root / "template.html"); });
+    std::thread separator_reader([&] { separator_source = host.read_shared_source(root / "separator.html"); });
+    template_reader.join();
+    separator_reader.join();
+    CHECK(template_source.status == nift::HostStatus::Found);
+    CHECK(separator_source.status == nift::HostStatus::Found);
+    CHECK(template_source.content && *template_source.content == "template-bytes");
+    CHECK(separator_source.content && *separator_source.content == "separator-bytes");
+    const auto nested_source = host.read_shared_source(root / "nested.html");
+    CHECK(nested_source.content && *nested_source.content == "nested-bytes");
+    CHECK(template_source.content && *template_source.content == "template-bytes");
+    CHECK(separator_source.content && *separator_source.content == "separator-bytes");
+    CHECK(host.read_shared_source(root / "template.html").content == template_source.content);
+
+    TrackedInfo info;
+    Parser parser(host, info);
+    RenderSource composed_template;
+    composed_template.path = root / "composed.html";
+    write_file(composed_template.path, "@input(\"outer.html\")@content");
+    RenderSource page;
+    page.text = "body";
+    page.logical_name = "page.html";
+    const auto rendered = parser.render_composed(composed_template, page, true);
+    CHECK(rendered.ok);
+    CHECK(rendered.output == "outer[inner]body");
+}
+
 }  // namespace
 
 int main() {
@@ -342,6 +381,7 @@ int main() {
     test_pagination_separator_host_error();
     test_pagination_template_host_error();
     test_pagination_error_selection_order();
+    test_script_host_source_lifetimes();
 
     if (failures == 0) {
         std::printf("host seam test passed\n");

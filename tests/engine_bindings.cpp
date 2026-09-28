@@ -424,6 +424,79 @@ int main() {
         CHECK(distinct.output() == "[\nnan,\nnan,\n[\nnan\n],\n[\nnan\n],\ninf,\n-inf\n]");
     }
 
+    // 16. Exact finite StrNumbers keep runtime semantics beyond comparison.
+    {
+        nift::Engine engine;
+        CHECK(engine.set_json("tiny", "1e-1000"));
+        CHECK(engine.set_json("same_tiny", "10.000e-1001"));
+        auto rendered = engine.render(nift::Source::text("$[tiny]"));
+        CHECK(rendered.ok());
+        CHECK(rendered.output() == "1e-1000");
+        auto truth = engine.execute("return !tiny\n");
+        auto negative = engine.execute("return -tiny\n");
+        auto positive = engine.execute("return +1e-1000\n");
+        auto type = engine.execute("return type(tiny)\n");
+        CHECK(truth.ok() && !truth.value().boolean());
+        CHECK(negative.ok() && negative.value().json() == "-1e-1000");
+        CHECK(positive.ok() && positive.value().json() == "1e-1000");
+        CHECK(type.ok() && type.value().string() == "float");
+
+        auto set_result = engine.execute(
+            "s := set()\n"
+            "s.add(tiny)\n"
+            "s.add(same_tiny)\n"
+            "return s.size()\n");
+        CHECK(set_result.ok());
+        CHECK(set_result.value().number() == 1.0);
+
+        auto map_result = engine.execute(
+            "m := map()\n"
+            "m.set(tiny, \"first\")\n"
+            "m.set(same_tiny, \"second\")\n"
+            "return [m.size(), m.get(tiny)]\n");
+        CHECK(map_result.ok());
+        CHECK(map_result.value().json() == "[\n1,\n\"second\"\n]");
+
+        auto division = engine.execute("return 1 / tiny\n");
+        CHECK(!division.ok());
+        CHECK(division.error().message.find("division by zero") == std::string::npos);
+    }
+
+    // 17. Runtime size and signed-integer consumers reject tiny and huge values.
+    {
+        nift::Engine engine;
+        CHECK(engine.set_json("values", "[1,2,3]"));
+        CHECK(engine.set_json("tiny", "1e-1000"));
+        CHECK(engine.set_json("huge", "999999999999999999999999999999"));
+        CHECK(!engine.render(nift::Source::text("$[values[tiny]]")).ok());
+        CHECK(!engine.render(nift::Source::text("$[values[huge]]")).ok());
+        CHECK(!engine.execute("return values.slice(tiny)\n").ok());
+        auto range = engine.execute("return range(9223372036854775808)\n");
+        CHECK(!range.ok());
+        CHECK(range.error().message.find("signed 64-bit") != std::string::npos);
+    }
+
+    // 18. Prepared numeric to_int uses the exact checked signed conversion.
+    {
+        nift::Engine engine;
+        CHECK(engine.set_json("maximum", "9223372036854775807"));
+        CHECK(engine.set_json("too_large", "9223372036854775808"));
+        auto maximum = engine.execute("return maximum.to_int()\n");
+        CHECK(maximum.ok());
+        CHECK(maximum.value().json() == "9223372036854775807");
+        CHECK(!engine.execute("return too_large.to_int()\n").ok());
+
+        nift::Context context;
+        context.set("fraction", nift::Value(1.5));
+        context.set("nan", nift::Value(std::numeric_limits<double>::quiet_NaN()));
+        context.set("pinf", nift::Value(std::numeric_limits<double>::infinity()));
+        context.set("ninf", nift::Value(-std::numeric_limits<double>::infinity()));
+        CHECK(!engine.render(nift::Source::text("$[fraction.to_int()]"), context).ok());
+        CHECK(!engine.render(nift::Source::text("$[nan.to_int()]"), context).ok());
+        CHECK(!engine.render(nift::Source::text("$[pinf.to_int()]"), context).ok());
+        CHECK(!engine.render(nift::Source::text("$[ninf.to_int()]"), context).ok());
+    }
+
     if (failures == 0) {
         std::printf("engine bindings test passed\n");
         return 0;

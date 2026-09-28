@@ -22,6 +22,18 @@ close(big)
 NIFT
 [[ "$(cd "$TMP" && "$NIFT" stream.nift)" == $'true\ntrue' ]]
 
+# A huge requested count reads only available bytes instead of allocating the request size.
+cat > "$TMP/huge-read.nift" <<'NIFT'
+@json(n, "count.json")
+s := ifstream("small.dat")
+print(s.read(n.count))
+print(s.eof())
+close(s)
+NIFT
+printf 'small' >"$TMP/small.dat"
+printf '{"count":18446744073709551615}\n' >"$TMP/count.json"
+[[ "$(cd "$TMP" && "$NIFT" huge-read.nift)" == $'small\ntrue' ]]
+
 # Repeated writes, flush, then read_line/read_all/eof/read_val and null at EOF.
 cat > "$TMP/io.nift" <<'NIFT'
 o := ofstream("d.txt")

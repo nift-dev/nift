@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -52,6 +53,16 @@ public:
 };
 
 bool runtime_equal(const RuntimeValue& left, const RuntimeValue& right);
+bool runtime_number_is_zero(const RuntimeValue& value);
+bool runtime_truthy(const RuntimeValue& value);
+bool runtime_number_is_integer(const RuntimeValue& value);
+bool runtime_number_to_size(const RuntimeValue& value, std::size_t& result);
+bool runtime_number_to_signed(const RuntimeValue& value, unsigned bits, std::int64_t& result);
+bool runtime_number_to_unsigned(const RuntimeValue& value, unsigned bits, std::uint64_t& result);
+bool runtime_number_to_i64(const RuntimeValue& value, std::int64_t& result);
+RuntimeValue runtime_integer(std::int64_t value);
+RuntimeValue runtime_unsigned_integer(std::uint64_t value);
+RuntimeValue runtime_number_negate(const RuntimeValue& value);
 bool runtime_numbers_equal(const RuntimeValue& left, const RuntimeValue& right);
 bool runtime_compare_numbers_relational(const RuntimeValue& left, const RuntimeValue& right,
                                         int& comparison);

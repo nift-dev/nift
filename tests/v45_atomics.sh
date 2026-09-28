@@ -51,4 +51,15 @@ grep -q 'signed 64-bit integer' "$TMP/err"
 if $NIFT -e 'x := atomic<bool>(0)' >/dev/null 2>"$TMP/err"; then exit 1; fi
 grep -q 'initial value must be bool' "$TMP/err"
 
+for expression in \
+  'x := atomic<int>(9223372036854775807); x += 1' \
+  'x := atomic<int>(-9223372036854775808); x -= 1' \
+  'x := atomic<int>(9223372036854775807); ++x' \
+  'x := atomic<int>(-9223372036854775808); x--' \
+  'x := atomic<int>(9223372036854775807); x.fetch_add(1)' \
+  'x := atomic<int>(-9223372036854775808); x.fetch_sub(1)'; do
+  if $NIFT -e "$expression" >/dev/null 2>"$TMP/err"; then exit 1; fi
+  grep -q 'integer overflow' "$TMP/err"
+done
+
 echo 'v4.5 atomics smoke passed'

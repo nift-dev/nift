@@ -2,8 +2,9 @@
 
 Date: 2026-09-29
 
-Status: implementation candidate under review; Review Gate 6A is pending. CP16
-and bytes APIs have not started.
+Status: failed Review Gate 6A repair and local verification in progress. The
+pre-existing direct FFI dispatcher prototype mismatch remains an unresolved
+Gate 6A High blocker. CP16 and bytes APIs have not started.
 
 ## Architecture
 
@@ -167,3 +168,128 @@ CP15 intentionally does not establish bytes storage, bytes semantics,
 serialization rejection, binary I/O, FFI bridges, embedding exposure or
 binding API changes. Hosted cross-platform and sanitizer jobs remain
 release-level coverage rather than local Gate 6A evidence.
+
+## Failed-gate repair
+
+The post-`7b97ae1` Gate 6A review found that exact decimal comparison had been
+centralized while truthiness, integer classification, conversion and unary
+operators still consumed the lossy `RuntimeValue::num` cache. The separate
+uncommitted repair adds canonical RuntimeValue helpers for exact zero/truth,
+integer classification, overflow-checked non-negative `size_t` conversion,
+exact width-aware signed/unsigned conversion and spelling-preserving StrNumber
+negation. The unsigned path preserves the complete `uint64_t` range; Number
+inputs are range-checked before casting and StrNumber inputs are parsed from
+their exact decimal spelling.
+
+AST and legacy evaluator paths now use those helpers for conditions and logical
+operators, public `int`/`float` introspection, indexes and assignment indexes,
+slices/splices, array counts, string positions/lengths, file positions/counts,
+stream reads, byte-array validation, ranges, callbacks and atomic integer
+validation. Division/modulo zero checks are exact, so `1e-1000` is neither zero
+nor an integer. Unary plus preserves the value and unary minus changes only a
+StrNumber's leading sign. AST numeric literals now retain Jsonic exact spelling
+when required.
+
+FFI scalar arguments and `ffi_struct` integer fields now use the width-aware
+helpers for `i8`/`u8` through `i64`/`u64`; bool remains a strict boolean. Native
+integer conversion therefore rejects fractions, unsigned negatives and width
+overflow before any cast. FFI `f32`/`f64` remain intentional floating
+boundaries. Atomic add/sub, compound assignment and increment/decrement use a
+checked compare-exchange loop, so overflow reports an error without mutating the
+atomic and no signed-overflow expression is evaluated.
+
+AST arithmetic now applies the legacy evaluator's finite-result check. Global
+sort/min/max collection paths classify Number and StrNumber as one numeric
+category while continuing to compare through the canonical numeric comparator.
+Input-stream `read(count)` appends bounded 64 KiB heap chunks rather than
+allocating the caller's full requested count up front.
+
+Prepared and legacy numeric `to_int()` now share the exact checked signed-64
+conversion and integer RuntimeValue constructor. NaN, infinities, fractions and
+out-of-range values are rejected before casting. Compact legacy subtraction no
+longer mistakes identifier suffixes such as `score-1` or `E-1` for exponent
+signs; `+`/`-` is skipped only when it follows an exponent marker inside a
+syntactically numeric mantissa.
+
+FFI integer returns now initialize the approximate `num` cache for every result
+and retain exact StrNumber spelling only outside the exact-double integer range.
+Consequently exact identity remains available while subsequent documented
+double-boundary arithmetic, including division of returned `UINT64_MAX`, no
+longer starts from a zero cache. External JSON front matter now uses the strict
+`nift_json::parse` boundary and rejects duplicate keys. `ScriptRenderHost`
+stores immutable source text per normalized path, so nested `@input` and
+simultaneously held pagination template/separator pointers remain stable for the
+host lifetime.
+
+## Unresolved Gate 6A blocker
+
+The built-in FFI dispatcher still calls resolved symbols through generic
+`std::uintptr_t` function-pointer prototypes rather than prototypes matching
+each declared native signature. That prototype mismatch predates CP15, was not
+introduced by the RuntimeValue migration, and is deliberately unchanged by
+this repair. It remains an unresolved Gate 6A **High** blocker because the calls
+are ABI-dependent even after argument and result value conversion is corrected.
+
+Resolving it requires an explicit architecture decision, such as a reviewed
+typed-dispatch strategy or a foreign-call mechanism, with platform ABI scope
+and compatibility defined first. An ad hoc dispatcher rewrite, libffi adoption,
+CP20 work, and bytes work are outside this repair. Gate 6A must not be reported
+as passed while this blocker remains.
+
+Set/map scalar numeric candidate keys now use `runtime_numeric_fingerprint`.
+Equivalent decimal spellings share a bucket and exact unequal values do not.
+Every candidate is still confirmed with structural equality; NaNs therefore
+remain unequal even though their stable fingerprints match, including the
+prepared AST set path. Removal retains a shared fingerprint bucket while any
+other key still uses it.
+
+`ScriptRenderHost::read_shared_json` and `read_shared_runtime_json` now use
+`nift_json::parse`, restoring strict duplicate-key rejection for standalone
+scripts, the shell, `nift eval` and build hooks.
+
+The remaining RuntimeValue `.num` uses were audited. Intentional double
+boundaries are binary `+`, `-`, `*`, `/`, aggregate sum/product, explicit
+floating math/conversion methods, public `Value::number()`, and native FFI
+`f32`/`f64` transport. RuntimeValue normalization/comparison and JSON bridging
+necessarily read or maintain the cache. JSON Schema, project configuration and
+build-cache `.num` uses operate on `json::Document`, not RuntimeValue. Exact
+identity, truth, validation and integral conversion no longer depend on the
+cache. Arithmetic can consequently underflow/overflow or round according to
+its documented double-result boundary, but validation is performed before that
+conversion.
+
+Repair verification commands passed:
+
+```text
+make -j2 test-runtime-value test-engine-bindings test-cp15-numeric-repair
+tests/v44_ast_expression_smoke.sh
+tests/collection_ops_smoke.sh
+tests/v43_cp78_streams_smoke.sh
+tests/v45_atomics.sh
+tests/v45_ffi_scalar.sh
+tests/v45_ffi_memory_callback.sh
+make test-host-seam
+tests/v43_cp137_cp140_frontmatter.sh
+make test
+make test-embed
+make test-python-binding
+make test-node-binding
+git diff --check
+```
+
+Coverage includes `1e-1000` truth/unary/type behavior in direct AST, standalone
+and Engine paths; equivalent exact spellings in sets/maps; huge and tiny invalid
+indexes/counts; divide-by-tiny diagnostics distinct from divide-by-zero; strict
+duplicate-key `@json`; signed-64 range limits; and AST/legacy parity. The full
+ordinary suite, C/C++ embed and staged-consumer suite, 23 Python binding tests,
+and 26 Node binding tests all passed.
+
+The final focused additions cover every signed/unsigned FFI width at accepted
+boundaries and representative underflow, overflow, fraction and unsigned
+negative failures; full-width `uint64_t` scalar and struct transport; checked
+atomic overflow forms; mixed Number/StrNumber simple/keyed sort and min/max;
+direct AST overflow; and a maximal requested stream count against a small file.
+Additional final-review coverage checks prepared/legacy `to_int()` failures,
+compact subtraction versus exponent signs, FFI return-cache arithmetic,
+duplicate-key external JSON front matter, nested `@input`, and concurrent stable
+template/separator source lifetimes.

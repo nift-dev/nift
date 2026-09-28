@@ -34,3 +34,12 @@ if (cd "$R" && "$BIN" build --all >/tmp/fm.out 2>/tmp/fm.err); then echo 'expect
 grep -q 'multiple front matter sources' /tmp/fm.err
 rm "$R/content/a.md"; echo 'body' > "$R/content/a.md"
 [[ $(cd "$R" && "$BIN" eval --json 'project.files[0].metadata.title') == '"External"' ]]
+cat > "$R/meta/a.json" <<'JSON'
+{"title":"first","title":"second"}
+JSON
+python3 - "$R/.nift/tracked.json" <<'PY'
+import json,sys
+p=sys.argv[1];d=json.load(open(p));d['tracked'][0]['frontmatter']='meta/a.json';json.dump(d,open(p,'w'))
+PY
+if (cd "$R" && "$BIN" build --all >/tmp/fm.out 2>/tmp/fm.err); then echo 'expected duplicate JSON frontmatter failure' >&2; exit 1; fi
+grep -q 'duplicate object key' /tmp/fm.err

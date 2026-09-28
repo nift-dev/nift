@@ -252,7 +252,150 @@ int compare_numeric_forms(const NumericForm& left, const NumericForm& right) {
     const int magnitude = compare_finite_magnitude(left, right);
     return left.sign < 0 ? -magnitude : magnitude;
 }
+
+bool finite_integer_digits(const NumericForm& form, std::size_t limit,
+                           std::string& digits) {
+    if (form.kind != NumericKind::Finite) return false;
+    if (form.sign == 0) { digits = "0"; return true; }
+    if (form.exponent.sign < 0) return false;
+    std::size_t zeroes = 0;
+    if (form.exponent.sign > 0) {
+        if (form.exponent.digits.size() > std::to_string(limit).size()) return false;
+        const auto converted = std::from_chars(form.exponent.digits.data(),
+                                               form.exponent.digits.data() + form.exponent.digits.size(),
+                                               zeroes);
+        if (converted.ec != std::errc() ||
+            converted.ptr != form.exponent.digits.data() + form.exponent.digits.size()) return false;
+    }
+    if (form.coefficient.size() > limit || zeroes > limit - form.coefficient.size()) return false;
+    digits = form.coefficient;
+    digits.append(zeroes, '0');
+    return true;
+}
 } // namespace
+
+bool runtime_number_is_zero(const RuntimeValue& value) {
+    if (!value.is_number()) return false;
+    const NumericForm form = numeric_form(value);
+    return form.kind == NumericKind::Finite && form.sign == 0;
+}
+
+bool runtime_truthy(const RuntimeValue& value) {
+    if (value.is_bool()) return value.boolean;
+    if (value.is_null()) return false;
+    if (value.is_number()) return !runtime_number_is_zero(value);
+    if (value.is_string()) return !value.string.empty();
+    if (value.is_array()) return !value.array.empty();
+    if (value.is_object()) return !value.object.empty();
+    return false;
+}
+
+bool runtime_number_is_integer(const RuntimeValue& value) {
+    if (!value.is_number()) return false;
+    const NumericForm form = numeric_form(value);
+    return form.kind == NumericKind::Finite &&
+           (form.sign == 0 || form.exponent.sign >= 0);
+}
+
+bool runtime_number_to_size(const RuntimeValue& value, std::size_t& result) {
+    if (!value.is_number()) return false;
+    const NumericForm form = numeric_form(value);
+    if (form.sign < 0) return false;
+    std::string digits;
+    const std::string maximum = std::to_string(std::numeric_limits<std::size_t>::max());
+    if (!finite_integer_digits(form, maximum.size(), digits) ||
+        compare_magnitude(digits, maximum) > 0) return false;
+    const auto converted = std::from_chars(digits.data(), digits.data() + digits.size(), result);
+    return converted.ec == std::errc() && converted.ptr == digits.data() + digits.size();
+}
+
+bool runtime_number_to_signed(const RuntimeValue& value, unsigned bits, std::int64_t& result) {
+    if (bits == 0 || bits > 64) return false;
+    if (!value.is_number()) return false;
+    if (value.type == RuntimeType::Number) {
+        const double bound = std::ldexp(1.0, bits - 1);
+        if (!std::isfinite(value.num) || std::trunc(value.num) != value.num ||
+            value.num < -bound || value.num >= bound) return false;
+        result = static_cast<std::int64_t>(value.num);
+        return true;
+    }
+    const NumericForm form = numeric_form(value);
+    std::string digits;
+    if (!finite_integer_digits(form, 19, digits)) return false;
+    const std::string_view maximum = form.sign < 0 ? "9223372036854775808" : "9223372036854775807";
+    if (digits.size() > maximum.size() ||
+        (digits.size() == maximum.size() && digits > maximum)) return false;
+    std::uint64_t magnitude = 0;
+    const auto converted = std::from_chars(digits.data(), digits.data() + digits.size(), magnitude);
+    if (converted.ec != std::errc() || converted.ptr != digits.data() + digits.size()) return false;
+    std::int64_t converted_value = 0;
+    if (form.sign < 0) {
+        if (magnitude == std::uint64_t{1} << 63) converted_value = std::numeric_limits<std::int64_t>::min();
+        else converted_value = -static_cast<std::int64_t>(magnitude);
+    } else converted_value = static_cast<std::int64_t>(magnitude);
+    if (bits < 64) {
+        const std::int64_t minimum = -(std::int64_t{1} << (bits - 1));
+        const std::int64_t maximum_value = (std::int64_t{1} << (bits - 1)) - 1;
+        if (converted_value < minimum || converted_value > maximum_value) return false;
+    }
+    result = converted_value;
+    return true;
+}
+
+bool runtime_number_to_unsigned(const RuntimeValue& value, unsigned bits, std::uint64_t& result) {
+    if (bits == 0 || bits > 64 || !value.is_number()) return false;
+    if (value.type == RuntimeType::Number) {
+        const double bound = std::ldexp(1.0, bits);
+        if (!std::isfinite(value.num) || std::trunc(value.num) != value.num ||
+            value.num < 0 || value.num >= bound) return false;
+        result = static_cast<std::uint64_t>(value.num);
+        return true;
+    }
+    const NumericForm form = numeric_form(value);
+    if (form.sign < 0) return false;
+    std::string digits;
+    const std::string maximum = std::to_string(std::numeric_limits<std::uint64_t>::max());
+    if (!finite_integer_digits(form, maximum.size(), digits) ||
+        compare_magnitude(digits, maximum) > 0) return false;
+    std::uint64_t converted_value = 0;
+    const auto converted = std::from_chars(digits.data(), digits.data() + digits.size(), converted_value);
+    if (converted.ec != std::errc() || converted.ptr != digits.data() + digits.size()) return false;
+    if (bits < 64 && converted_value > ((std::uint64_t{1} << bits) - 1)) return false;
+    result = converted_value;
+    return true;
+}
+
+bool runtime_number_to_i64(const RuntimeValue& value, std::int64_t& result) {
+    return runtime_number_to_signed(value, 64, result);
+}
+
+RuntimeValue runtime_integer(std::int64_t value) {
+    RuntimeValue result(static_cast<double>(value));
+    if (value > 9007199254740992LL || value < -9007199254740992LL) {
+        result.type = RuntimeType::StrNumber;
+        result.string = std::to_string(value);
+    }
+    return result;
+}
+
+RuntimeValue runtime_unsigned_integer(std::uint64_t value) {
+    RuntimeValue result(static_cast<double>(value));
+    if (value > 9007199254740992ULL) {
+        result.type = RuntimeType::StrNumber;
+        result.string = std::to_string(value);
+    }
+    return result;
+}
+
+RuntimeValue runtime_number_negate(const RuntimeValue& value) {
+    RuntimeValue result = value;
+    if (result.type == RuntimeType::StrNumber) {
+        if (!result.string.empty() && result.string.front() == '-') result.string.erase(0, 1);
+        else result.string.insert(result.string.begin(), '-');
+        result.num = -result.num;
+    } else result.num = -result.num;
+    return result;
+}
 
 int runtime_compare_numbers(const RuntimeValue& left, const RuntimeValue& right) {
     if (left.type == RuntimeType::Number && right.type == RuntimeType::Number) {
