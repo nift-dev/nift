@@ -17,3 +17,9 @@ src/main.f
 tests/
 README.md
 ```
+
+Packages that offer process, FFI or future native implementations keep backend
+selection inside their exported package facade rather than encoding variants in
+the package name or manifest. The canonical terminology, selection, resource,
+error and streaming rules are maintained in
+[`docs/handover/BACKEND-PACKAGES.md`](../handover/BACKEND-PACKAGES.md).
