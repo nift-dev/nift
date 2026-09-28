@@ -7,11 +7,11 @@ individual implementations evolve.
 
 ## Status
 
-- Current checkpoint: CP13 and Review Gate 5 complete. Bounded POSIX dynamic
-  streaming works in concurrent one-shot and persistent process modes.
-- Last review gate: Review Gate 5 selected B: process streaming is useful with
-  explicit platform, cancellation and binary-generation limitations. Retain it
-  without treating the current helper as a production/realtime server.
+- Current checkpoint: CP14 and Review Gate 6 complete. Generic binary-data
+  design is evidenced; no bytes implementation or HTTP change has begun.
+- Last review gate: Review Gate 6 selected A: add one immutable first-class
+  `bytes` value through later staged checkpoints, while retaining the mutable
+  FFI buffer as a distinct native resource.
 - Packages adopting this contract first: `curl` and `sqlite`.
 - Review Gate 1 approved later package prototypes with the documented stateful
   handle constraint; HTTP is now implemented through CP09.
@@ -1284,3 +1284,122 @@ half-close prevent an A-level production-quality claim, while the measured
 semantics and cleanup do not support C/rejection.
 
 Hard stop: Review Gate 5 is complete. Do not begin CP14 automatically.
+
+Gate 5 was accepted as B. HTTP CP13 commits `baf095a` and `c8fecbb` were
+published to `https://github.com/nift-packages/http.git` before this independent
+Nift design checkpoint. The CP13 public stream API and FIFO transport were not
+modified during CP14.
+
+### CP14 - generic binary-data design and evidence
+
+Detailed evidence: `docs/evidence/cp14-binary-data.md`.
+
+Reproducible probe:
+
+```text
+python3 tests/cp14_binary_evidence.py /home/nick/Repositories/nift/nift/nift
+```
+
+Current-state findings:
+
+- Nift strings physically use `std::string`, so files, streams, POSIX process
+  capture, ordinary copies and thread snapshots can preserve embedded NUL and
+  invalid UTF-8 exactly. The retained 1 MiB repeated-all-octet fixture survived
+  `open`/output stream, incremental input stream, managed file, filesystem copy,
+  POSIX process capture and language-thread round trips.
+- String semantics are not binary-safe as a whole. `length()` and empty split
+  interpret UTF-8, while `substr()` and search use byte offsets; there is no
+  string indexing. The `A FF B` probe failed length but survived byte substring.
+- JSON is not a binary channel. Escaped NUL round-trips, but invalid high bytes
+  are emitted unchanged by the dumper and form invalid UTF-8 JSON.
+- Runtime resources are encoded as strings beginning with `\x1fnift:`. A file
+  containing `\x1fnift:file:not-a-handle` failed ordinary string output as an
+  opaque value. Binary mode on strings would preserve this collision.
+- Files and streams are byte-capable but return strings. Managed files retain
+  complete `saved` and `working` copies. Process capture is unbounded and
+  string-valued; Windows additionally normalizes every CRLF pair in capture.
+- FFI buffers are contiguous mutable parser-owned resources. They have no
+  ordinary size/index/file API, are non-transferable, and `deepcopy` preserves
+  shared identity. `ffi_bytes()` copies each byte into a generic number value.
+- In retained single-run scale probes, a 1 MiB string -> FFI buffer -> integer
+  array conversion peaked at 221,412 KiB RSS (about 215 MiB over baseline).
+  Integer arrays are therefore not credible canonical binary storage.
+
+Candidate decision:
+
+| Candidate | Decision |
+|---|---|
+| Immutable first-class `bytes` | Selected. Clear value semantics, compact storage, safe transfer and cross-package meaning. |
+| General mutable byte buffer | Deferred. Identity, resize, aliasing, pinning and synchronization are not required for v1. |
+| Two new general types | Rejected for v1. Existing FFI buffer already covers the demonstrated mutable native-resource case. |
+| Existing integer arrays | Rejected as canonical storage due representation overhead, heterogeneous mutation and O(n) validation/conversion. |
+| Enhanced FFI buffer only | Rejected as the application value: parser-local, mutable, non-transferable and absent from public `Value`. |
+| Binary string mode | Rejected: it retains mixed units, invalid JSON, text-operation leakage and marker collisions. |
+
+### Review Gate 6 - generic binary-data decision
+
+Decision: **A - ADD A GENERIC BYTES VALUE**.
+
+The minimum coherent value is immutable and value-oriented. Keep the existing
+FFI buffer as a separate mutable, non-transferable native resource; conversion
+between the two is explicit and normally copies.
+
+Required v1 contract:
+
+- A real runtime tag, never an in-band string prefix.
+- Empty and checked integer-array construction; byte length, integer indexing,
+  byte-offset slice, concatenation and byte-sequence equality.
+- Explicit strict UTF-8 `encode`/`decode`; no silent text reinterpretation.
+- Additive `open_bytes`, input-stream byte reads and output/managed-file byte
+  writes. Existing string-returning I/O remains unchanged initially.
+- Immutable copy/deepcopy/function/thread/async behavior with shared immutable
+  contiguous backing storage so value transfer need not copy payloads.
+- Explicit serialization failure for JSON/Nift value output. No implicit base64,
+  hex or tagged-object convention.
+- Text-only interpolation, print, direct output and string concatenation also
+  reject bytes; explicit UTF-8 decode is required. Binary stream/file writes are
+  the v1 raw-byte output path.
+- Additive bytes-to-FFI-buffer copy and distinctly named FFI-buffer snapshot.
+  Existing array-returning `ffi_bytes()` remains unchanged for compatibility.
+- Public C++ `Value::Type::Bytes`, `nift_context_set_bytes`, and top-level C ABI
+  result byte data/size access with a result-owned borrowed view. Existing UTF-8
+  string APIs remain text APIs. JSON result access fails for top-level or nested
+  bytes; generic nested typed-result traversal remains deferred.
+
+Useful later, not v1: hex/base64 helpers, byte map keys, efficient mutable
+builders, process capture returning bytes, typed non-JSON embed results,
+read-only zero-copy native views and crypto-specific comparison operations.
+
+Explicitly deferred: a general mutable byte buffer, shared writable state,
+cross-thread mutation, mmap, zero-copy slices, retained native pointers,
+implicit string/bytes coercion, automatic JSON encoding and changing existing
+file/process result types.
+
+Consumer evidence:
+
+- HTTP can eventually let the existing `write` callback accept text or bytes;
+  no FIFO/helper concept enters the API and completed files remain file responses.
+- WebSocket binary frames, TCP/binary protocols, OpenSSL data, compression,
+  SQLite BLOBs, FFI snapshots and ordinary binary I/O all require the same value.
+  None of those packages/features is approved for implementation here.
+
+Runtime complexity is material. `json::Document` currently serves as both JSON
+DOM and universal runtime value, while public `Value` and the C ABI are
+JSON-shaped. A bytes tag affects storage, parser type classification, operators,
+copy/transfer, serialization rejection, embedding, bindings, I/O and FFI. Adding
+a non-JSON type directly to Jsonic risks blurring its strict JSON contract;
+another marker string is unacceptable. The first implementation checkpoint must
+choose a dedicated runtime wrapper or a carefully isolated non-JSON variant.
+
+Approved sequence only after explicit resumption:
+
+1. Representation/public-value checkpoint with real tagging, copy/equality/type,
+   nested values, C++ `Value`/C ABI shape and strict serialization rejection.
+2. Language/I/O checkpoint with construction, operations, UTF-8 conversion and
+   additive byte file/stream APIs.
+3. FFI/binding interop checkpoint with explicit copies and cross-platform
+   ownership/performance evidence.
+4. Review Gate 7 before HTTP or another package depends on bytes.
+
+Hard stop: Review Gate 6 is complete. Do not implement bytes or begin the first
+implementation checkpoint automatically.
