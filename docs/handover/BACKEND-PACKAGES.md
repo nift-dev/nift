@@ -7,8 +7,9 @@ individual implementations evolve.
 
 ## Status
 
-- Current checkpoint: CP03 complete; stop boundary reached before HTTP work.
-- Last review gate: Review Gate 1 completed with recommendation B.
+- Current checkpoint: CP04 complete; HTTP process helper bootstrapped.
+- Last review gate: Review Gate 1 approved Recommendation B with its corrections
+  already incorporated. Review Gate 2 follows CP06.
 - Packages adopting this contract first: `curl` and `sqlite`.
 - Review Gate 1 approved later package prototypes with the documented stateful
   handle constraint; none has started in this checkpoint.
@@ -312,3 +313,65 @@ facade and the struct/import limitation documented. Do not add core resource,
 future, callback or cancellation machinery based on these process-only
 prototypes. This review ends at the requested pre-HTTP stop boundary; no HTTP
 package work has started.
+
+Gate decision: accepted. The imported package-defined struct limitation remains
+a possible general package/module encapsulation improvement, separate from HTTP
+and from the deferred async FFI/future work. HTTP must not depend on resolving
+it and no Nift core change is approved for it here.
+
+### CP04 - HTTP repository and helper bootstrap
+
+Implementation commit: `nift-packages/http`
+`b06c3ecebe7ee20b106ea271a58aec2d07665f31`.
+
+Repository: `https://github.com/nift-packages/http` (independent local `main`
+worktree with `origin` configured; publication waits for the checkpoint batch).
+
+Accepted:
+
+- The package exports one `http` facade with `backends()`, `backend()`,
+  `use_backend()`, `capabilities()`, `server()` and blocking `listen()`.
+- `auto` resolves to the usable `process` backend. Creating a server freezes
+  package selection and records the concrete backend in the facade-managed
+  server handle.
+- Stateful server behavior remains on the facade rather than relying on an
+  imported package-defined struct.
+- The process topology is client -> Python HTTP helper -> one fresh Nift
+  application invocation per request -> helper -> client.
+- The helper owns the listening socket, strict HTTP parsing, finite limits,
+  worker lifecycle and response serialization. The application worker owns
+  future route/handler behavior.
+- Worker protocol framing is private JSON metadata in a per-request exchange
+  directory. Worker stdout/stderr are not protocol channels, and body objects
+  reserve `file`/`stream` evolution without promising permanent UTF-8 buffering.
+- Defaults are loopback binding, one request per connection, an 8 KiB request
+  line, 32 KiB headers, 100 headers, a 1 MiB body and a 30 second worker limit.
+  Transfer encoding, duplicate content lengths, folded headers, malformed
+  targets and invalid percent escapes are rejected before worker launch.
+- TLS, streaming, multipart, WebSockets, worker pools, FFI and native modules
+  remain deferred.
+
+Evidence:
+
+- `python3 tests/bootstrap.py /home/nick/Repositories/nift/nift/nift
+  /home/nick/Repositories/nift/nift-packages/http` passed on Linux.
+- The test installs the package into a fresh project, verifies concrete backend
+  reporting and post-resource locking, sends a real loopback request, observes
+  the intentional CP04 bootstrap 501 from a fresh Nift worker, waits for clean
+  helper exit and verifies that private package helpers do not leak.
+
+Known limitations and decisions affecting later checkpoints:
+
+- The initial helper uses Python 3's standard library and a package-owned strict
+  socket parser. Linux is the only tested platform; Python discovery and child
+  process-tree handling require explicit macOS/Windows evidence.
+- Nift does not expose a package-root intrinsic. The process backend locates its
+  installed helper under the same `.nift/packages/http` layout used by package
+  import. This is an implementation workaround, not public API.
+- Route closures cannot be serialized into another Nift process. A worker
+  therefore reruns the application script, rebuilds its route table, and has
+  `http.listen(app)` switch to request-dispatch mode via private environment and
+  file protocol state. Persistent workers remain deferred until measurements.
+
+Next approved checkpoints: CP05 routing and CP06 minimum HTTP semantics,
+followed by Review Gate 2. Do not begin CP07 before that gate.
