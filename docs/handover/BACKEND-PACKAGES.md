@@ -7,7 +7,7 @@ individual implementations evolve.
 
 ## Status
 
-- Current checkpoint: Review Gate 2 complete; hard stop before CP07.
+- Current checkpoint: CP07 complete; forms and cookies implemented.
 - Last review gate: Review Gate 2 selected A (continue process backend) after
   incorporating the correctness and lifecycle corrections found by the gate.
 - Packages adopting this contract first: `curl` and `sqlite`.
@@ -594,3 +594,48 @@ when explicitly resumed. Do not infer that FFI/native comparison, persistent
 workers, streaming, TLS or hostile-input certification is complete.
 
 Hard stop: Review Gate 2 is complete. Do not begin CP07 automatically.
+
+Gate 2 was accepted and work explicitly resumed through CP09, followed by a
+hard stop at Review Gate 3. Persistent workers remain deferred to CP10.
+
+### CP07 - forms and cookies
+
+Implementation commit: `nift-packages/http`
+`a4fd025b2e89e2d15d48bee90a942865d6df9b02`.
+
+Accepted:
+
+- `application/x-www-form-urlencoded` populates `request.form` only for that
+  media type. Single names are strings, repeated names become ordered arrays,
+  blank values survive, `+` means space and UTF-8 percent decoding is strict.
+- UTF-8 is the only accepted form charset. Duplicate Content-Type, malformed
+  escapes/encoding, excessive field count and oversized names/values fail
+  before worker launch under finite configurable limits.
+- Request Cookie fields populate `request.cookies` with the same
+  single-string/repeated-array convention. Parsing is conservative, ASCII-only,
+  does not percent-decode values and rejects malformed pairs/control bytes.
+- `http.cookie()` creates structured low-level response descriptors. The helper
+  serializes Path, Domain, Max-Age, Expires, Secure, HttpOnly and SameSite and
+  enforces `__Secure-`/`__Host-` rules.
+- Structured cookies produce one `Set-Cookie` header each and cannot be mixed
+  with a raw `set-cookie` response header. Sessions, authentication, CSRF and
+  cookie business meaning remain outside the package.
+
+Evidence:
+
+- `python3 tests/forms_cookies.py /home/nick/Repositories/nift/nift/nift
+  /home/nick/Repositories/nift/nift-packages/http` passed on Linux.
+- Coverage includes repeated/blank/UTF-8 fields, content-type parameters,
+  non-form bodies, malformed percent/UTF-8, form count/name/value limits,
+  repeated and malformed cookies, repeated Set-Cookie attributes, invalid
+  prefixed cookies and duplicate Content-Type.
+- The expanded CP06 dogfood regression passed after CP07.
+
+Architectural question retained for Review Gate 3: Python 3 remains the helper
+runtime. Do not replace it during CP08-CP09; assess whether it is acceptable
+long-term or should eventually become a compiled compatibility helper using
+implementation complexity, portability, startup/RSS, deployment and security
+maintenance evidence.
+
+Next approved checkpoints: CP08 body storage/multipart and CP09 files/ranges/
+CRUD dogfood, followed by Review Gate 3. Do not begin CP10 before that gate.
