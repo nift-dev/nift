@@ -1391,15 +1391,11 @@ a non-JSON type directly to Jsonic risks blurring its strict JSON contract;
 another marker string is unacceptable. The first implementation checkpoint must
 choose a dedicated runtime wrapper or a carefully isolated non-JSON variant.
 
-Approved sequence only after explicit resumption:
+The implementation campaign was approved after Gate 6. The authoritative plan
+is `docs/handover/BYTES-CAMPAIGN.md`; earlier shorter planning tables are
+superseded. Its sequence is CP15 RuntimeValue substrate, Gate 6A, CP16 immutable
+storage/public C++ value, CP17 language/text boundaries, CP18 transfer, Gate 6B,
+CP19 binary I/O, CP20 FFI bridges, CP21 embedding, Gate 6C, CP22 maintained
+bindings, CP23 certification, then Review Gate 7.
 
-1. Representation/public-value checkpoint with real tagging, copy/equality/type,
-   nested values, C++ `Value`/C ABI shape and strict serialization rejection.
-2. Language/I/O checkpoint with construction, operations, UTF-8 conversion and
-   additive byte file/stream APIs.
-3. FFI/binding interop checkpoint with explicit copies and cross-platform
-   ownership/performance evidence.
-4. Review Gate 7 before HTTP or another package depends on bytes.
-
-Hard stop: Review Gate 6 is complete. Do not implement bytes or begin the first
-implementation checkpoint automatically.
+Gate 7 is the hard stop before HTTP or another proof consumer depends on bytes.
