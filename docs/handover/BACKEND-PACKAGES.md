@@ -7,10 +7,11 @@ individual implementations evolve.
 
 ## Status
 
-- Current checkpoint: CP02, curl backend facade stabilized.
-- Last review gate: none; Review Gate 1 follows CP03.
+- Current checkpoint: CP03 complete; stop boundary reached before HTTP work.
+- Last review gate: Review Gate 1 completed with recommendation B.
 - Packages adopting this contract first: `curl` and `sqlite`.
-- New backend packages must wait until Review Gate 1 approves the convention.
+- Review Gate 1 approved later package prototypes with the documented stateful
+  handle constraint; none has started in this checkpoint.
 - Nift core, the package resolver and the package manifest do not select
   implementation backends.
 
@@ -203,4 +204,111 @@ Known limitations:
 - macOS and Windows execution still require CI evidence; CP02's local evidence
   is Linux-only.
 
-Next approved checkpoint: CP03 (`sqlite`), followed by Review Gate 1.
+CP03 and Review Gate 1 are complete. See their records below.
+
+### CP03 - SQLite stateful backend facade
+
+Implementation commits: `nift-packages/sqlite`
+`99f3d6b901c739db70e0cad212ecf8d74e3976df`, followed by the handle-path
+pinning correction `b57d7ebc21c5d0c5cea76700ea1ecc5295054dfb` found during Review Gate 1.
+
+Accepted:
+
+- `sqlite` owns backend selection and all database operations. `auto` resolves
+  to the currently usable `process` backend, and the first `open()` freezes the
+  package selection.
+- `open()` returns a logical database handle. Package maps own its identity,
+  backend, canonical path and open/closed state. Assignment and shallow copies
+  refer to the same logical resource; altered and unregistered handles fail as
+  `invalid_handle`.
+- `close()`, `is_open()`, `same_handle()` and `handle_backend()` expose resource
+  semantics without exposing a process or native handle.
+- Operations return stable `ok`, `error`, `error_code` and `backend` fields;
+  `exit_code` remains process diagnostic metadata.
+- Transactions retain string-statement compatibility and additionally accept
+  `{sql, params}` descriptors. Prepared statements, BLOBs, cancellation and
+  persistent connections are explicitly unsupported.
+- Temporary query output prefers `mktemp`, then Windows PowerShell, then a
+  checked fallback path, and is removed on ordinary success and error paths.
+
+Evidence:
+
+- `python3 tests/dogfood.py /home/nick/Repositories/nift/nift/nift
+  /home/nick/Repositories/nift/nift-packages/sqlite` passed on Linux. It uses a
+  deterministic fake `sqlite3` because the host has no `sqlite3` executable.
+- `NIFT=/home/nick/Repositories/nift/nift/nift
+  SQLITE_PACKAGE=/home/nick/Repositories/nift/nift-packages/sqlite bash
+  tests/package_sqlite_dogfood.sh` passed from the Nift repository.
+- Coverage includes discovery, explicit/failed selection, selection locking,
+  handle identity and copied aliases, close behavior, altered/invalid handles,
+  binding, transaction descriptors, database failures, missing process backend
+  and temporary-file cleanup.
+
+Known limitations:
+
+- An imported instance of a package-private Nift struct cannot dispatch its
+  methods because its type is unavailable in the caller. Exporting the type
+  makes dispatch possible but its methods then cannot resolve package-private
+  state/helpers. Therefore stateful handles are ordinary namespaced objects and
+  their behavior remains on the `sqlite` facade.
+- Nift objects do not have private fields. `_handle_id` is visible language
+  data, but it is only package logical identity, not a backend/native handle;
+  registry and canonical-path checks reject unknown or altered handles. This is
+  not intended as a security boundary.
+- The process backend does not provide a persistent SQLite connection, and the
+  non-atomic fallback temporary-name race documented by CP02 also applies.
+- Real `sqlite3` execution and macOS/Windows behavior still require CI evidence.
+
+### Review Gate 1 - curl and SQLite
+
+Reviewed revisions and initial worktree states:
+
+| Repository | Revision | State |
+|---|---|---|
+| `nift` | `80014191a58a6f115aa3ca25aa1354937b14f9c7` | clean |
+| `nift-packages/curl` | `ca4469e05b6b80d0d10199c0293c4cb19c57c267` | clean |
+| `nift-packages/sqlite` | `b57d7ebc21c5d0c5cea76700ea1ecc5295054dfb` | clean |
+
+Validation:
+
+- `make -j2` in `nift`: passed (`Nothing to be done for 'all'`).
+- Curl offline dogfood: passed the basic matrix, output-file behavior, private
+  exports, disabled/missing process backend, availability and no-`mktemp`
+  fallback cases.
+- SQLite deterministic dogfood and the pre-existing Nift package SQLite
+  dogfood: passed.
+
+API evidence:
+
+```nift
+@import("curl")
+curl.use_backend("process")
+response := curl.get("https://example.test/data")
+
+@import("sqlite")
+sqlite.use_backend("process")
+db := sqlite.open("app.db")
+rows := sqlite.query(db, "SELECT ? AS value", "A")
+sqlite.close(db)
+```
+
+Findings:
+
+1. The package-local facade, deterministic `auto` selection, explicit concrete
+   selection, freeze-after-first-use rule and stable semantic errors work for
+   both stateless requests and stateful logical resources without core changes.
+2. Backend behavior belongs on the package facade. Treating methods on a
+   package-private resource struct as a required convention is not viable with
+   current import/type scope behavior.
+3. The process implementations establish semantic APIs, but do not prove FFI
+   parity, native lifetime handling, binary buffers, streaming or cancellation.
+4. Local evidence is Linux-only. Curl and the new SQLite suite use deterministic
+   fixtures. The existing SQLite smoke passed, but its real-database branch was
+   skipped because this host has no `sqlite3` executable.
+
+Recommendation B: adopt the package-local backend convention and permit later
+package prototypes, with stateful resource operations kept on the package
+facade and the struct/import limitation documented. Do not add core resource,
+future, callback or cancellation machinery based on these process-only
+prototypes. This review ends at the requested pre-HTTP stop boundary; no HTTP
+package work has started.
