@@ -7,12 +7,13 @@ individual implementations evolve.
 
 ## Status
 
-- Current checkpoint: CP08 complete; body spools and multipart implemented.
-- Last review gate: Review Gate 2 selected A (continue process backend) after
-  incorporating the correctness and lifecycle corrections found by the gate.
+- Current checkpoint: CP09 and Review Gate 3 complete; hard stop before CP10.
+- Last review gate: Review Gate 3 selected qualified A (the process architecture
+  may proceed to persistent-worker design after explicit resumption, but CP09 is
+  only a development/low-traffic prototype backend, not a production server).
 - Packages adopting this contract first: `curl` and `sqlite`.
 - Review Gate 1 approved later package prototypes with the documented stateful
-  handle constraint; none has started in this checkpoint.
+  handle constraint; HTTP is now implemented through CP09.
 - Nift core, the package resolver and the package manifest do not select
   implementation backends.
 
@@ -687,3 +688,142 @@ described as streaming.
 
 Next approved checkpoint: CP09 files, ranges, limits and CRUD dogfood, followed
 by Review Gate 3. Do not begin CP10 before that gate.
+
+### CP09 - files, ranges, limits and CRUD dogfood
+
+Implementation commit: `nift-packages/http`
+`117822f810bbdd79759bb735896c6bc8de4717f6`.
+
+Accepted:
+
+- `http.file(path)` describes an application-authorized file response.
+  `http.file_from(root, relative)` is the facility for untrusted relative route
+  input: it rejects absolute, empty, dot and backslash components and uses
+  descriptor-relative no-symlink component opens on POSIX.
+- The helper validates one regular-file descriptor, derives framing from that
+  descriptor and transfers bytes with `socket.sendfile()` or bounded chunks.
+  File bytes never enter a Nift string or the JSON worker envelope.
+- GET and HEAD support closed, open-ended and suffix single byte ranges with
+  generated `Accept-Ranges`, `Content-Range` and `Content-Length`. Invalid,
+  unsatisfiable and multiple ranges return 416. Empty files, missing files,
+  directories and application disconnects have bounded behavior.
+- `max_file_response_bytes` bounds served files and `response_timeout_ms`
+  bounds client writes. Open descriptors are closed on success, HEAD, range
+  rejection, helper errors and disconnects.
+- The CRUD dogfood exercises JSON create/update, URL-encoded create, list/get,
+  structured cookies, delete, error responses, multipart attachment save,
+  full/ranged attachment download and deterministic persisted restart state.
+  Two process-local counter requests both return one, directly demonstrating
+  that each request reconstructs application and route state in a fresh worker.
+
+Evidence:
+
+- `python3 tests/files_ranges.py /home/nick/Repositories/nift/nift/nift
+  /home/nick/Repositories/nift/nift-packages/http` passed on Linux.
+- `python3 tests/crud.py /home/nick/Repositories/nift/nift/nift
+  /home/nick/Repositories/nift/nift-packages/http` passed on Linux.
+- The complete CP04-CP09 HTTP regression sequence passed after the change:
+  `bootstrap.py`, `routing.py`, `dogfood.py`, `forms_cookies.py`,
+  `multipart.py`, `files_ranges.py` and `crud.py`.
+- Rooted-file coverage includes raw/encoded traversal, repeated encoding,
+  absolute paths, alternate separators, symlinks, directories and nonexistent
+  files. Range coverage includes GET/HEAD parity, clamping and 416 framing.
+
+Known limitations:
+
+- The host still has no `sqlite3` executable. CRUD persistence therefore uses
+  an ordinary deterministic Nift value file. This proves HTTP application and
+  restart semantics, not real HTTP+SQLite integration or concurrent database
+  behavior.
+- File persistence is safe only under the current serialized request model; it
+  is not a substitute for transactional storage once concurrency is added.
+- Multipart receive remains aggregate-buffered before per-file spooling, and
+  multipart byte ranges are not supported.
+
+### Review Gate 3 - ordinary website backend viability
+
+Gate command:
+
+```text
+python3 tests/gate3.py /home/nick/Repositories/nift/nift/nift \
+  /home/nick/Repositories/nift/nift-packages/http
+```
+
+The retained run used Linux 7.0.0-29-generic x86_64 and Python 3.14.4. The
+concurrency workload used one warmed listener and a representative 40 ms
+application command per request. It deliberately measured the existing
+sequential helper rather than adding pooling or concurrency.
+
+| Simultaneous clients | Batch | Median | p95 | Throughput | Errors | Direct workers | Peak topology RSS |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 66.860 ms | 66.603 ms | 66.603 ms | 14.957 req/s | 0 | 1 | 48,016 KiB |
+| 8 | 527.087 ms | 296.023 ms | 525.137 ms | 15.178 req/s | 0 | 1 | 47,964 KiB |
+| 32 | 2,109.766 ms | 1,084.490 ms | 2,041.160 ms | 15.168 req/s | 0 | 1 | 51,040 KiB |
+
+Idle parent/helper RSS was 8,472/21,180 KiB. Peak topology process count was
+five: Nift server parent, Python helper, one Nift worker and the worker's shell
+plus sleep process. There was never more than one direct worker. Throughput
+therefore remains flat while queued-client latency grows approximately
+linearly. The result is architecture evidence, not a service benchmark.
+
+Representative resource probes:
+
+| Operation | Elapsed | Helper peak RSS | Peak topology RSS | Peak helper temp |
+|---|---:|---:|---:|---:|
+| 1 MiB multipart upload | 224.305 ms | 24,512 KiB | 48,120 KiB | 2,098,129 bytes |
+| 4 MiB slow-read file download | 309.843 ms | 21,696 KiB | 38,552 KiB | 431 bytes |
+
+The resource server's idle parent/helper RSS was 8,476/21,036 KiB. Upload
+temporary usage is approximately the aggregate wire body plus the per-file
+spool, confirming the documented buffering model. The 4 MiB download increased
+helper RSS by only 660 KiB and did not create a payload-sized spool, confirming
+helper-side file transfer. Both operations preserved exact binary bytes, had no
+request error and left no `nift-http-*` root after finite shutdown.
+
+Viability finding:
+
+- The facade can express a recognizable ordinary site backend: routing,
+  parameters/query/headers, JSON and form input, cookies, persisted CRUD,
+  bounded multipart uploads, binary downloads, ranges and ordinary 4xx/5xx
+  responses. No helper path, command, PID or wire envelope enters the public
+  API. The process boundary is not currently an application-expressiveness
+  blocker.
+- The current runtime is suitable for development, integration dogfood and
+  deliberately low-traffic deployment behind an appropriate frontend. It is
+  not a general production website server: one slow client or handler queues
+  every other client, every request pays application reconstruction cost,
+  connections always close, TLS is absent and only Linux has lifecycle evidence.
+- Persistent workers may remove reconstruction/startup cost but do not by
+  themselves solve serialized client I/O. Any later concurrency checkpoint
+  must also define persistence synchronization, backpressure, cancellation and
+  bounded in-flight work.
+
+Python dependency classification: **acceptable prototype/compatibility backend
+but probably replace later**. Python 3's standard library enabled a strict,
+dependency-free prototype quickly and is common on development systems, but it
+breaks Nift's otherwise standalone-binary deployment expectation, contributes
+about 21 MiB idle helper RSS, has only Linux evidence and leaves 959 lines of
+security-sensitive HTTP/process code maintained in a second runtime. This is
+not yet a deployment blocker for the stated prototype scope, but it is not the
+preferred long-term production boundary.
+
+Helper component classification:
+
+| Component | Classification | Reason |
+|---|---|---|
+| Route matching, handler invocation, application persistence and response descriptor construction | Can live in Nift today | These already use ordinary Nift values and package facade code. |
+| Persistent worker/control channel, child ownership and cancellation | Requires better process API | Current `run()` is blocking and exposes no durable child/stdin/stdout lifecycle handle to package code. |
+| Listener, accept, socket receive/send and zero-copy file transfer | Requires socket/net package | Nift packages do not currently own listening sockets or `sendfile`-equivalent operations. |
+| Concurrent clients, deadlines, backpressure and bounded in-flight scheduling | Requires async runtime improvement | Moving blocking socket calls alone would reproduce the same serialized behavior. |
+| Strict HTTP framing, multipart parsing, cookie serialization, rooted descriptor opens and wire validation | Better left helper/native-side | These are security-sensitive protocol/OS boundary operations and do not improve by being rewritten in facade code. |
+| Temporary exchange/spool ownership and parent/worker teardown | Helper/native-side today; better process API later | The helper can currently guarantee cleanup and POSIX process-group teardown more reliably than package code. |
+
+Decision: **qualified A - CONTINUE THE PROCESS-BACKEND PROGRAM TO CP10 ONLY
+AFTER EXPLICIT RESUMPTION**. CP09 validates the public API and a realistic
+workflow, so replacing the facade or abandoning the process experiment is not
+justified. CP10 should be treated as architecture work toward a useful
+compatibility backend, not as evidence that the present server is production
+ready. A compiled/native socket-side implementation remains the likely
+long-term direction.
+
+Hard stop: Review Gate 3 is complete. Do not begin CP10 automatically.
