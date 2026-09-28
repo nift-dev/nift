@@ -1,4 +1,5 @@
 #include "ProjectInfo.h"
+#include "RuntimeJson.h"
 #include "ProjectInfoHost.h"
 #include "ProjectOwnership.h"
 #include "ProjectRead.h"
@@ -60,6 +61,7 @@ bool ProjectInfo::open() {
 }
 
 bool ProjectInfo::load_config() {
+    invalidate_content_model();
     const fs::path path = root / ".nift/config.json";
     std::string error;
     if (!project_read::load_config(root, config, error)) {
@@ -70,6 +72,7 @@ bool ProjectInfo::load_config() {
 }
 
 bool ProjectInfo::load_tracking() {
+    invalidate_hierarchy();
     const fs::path path = root / ".nift/tracked.json";
     std::string error;
     if (!project_read::load_tracking(root, config, tracked, error)) {
@@ -84,6 +87,7 @@ bool ProjectInfo::load_tracking() {
 
 bool ProjectInfo::save_tracking() const {
     rebuild_tracked_index();
+    invalidate_hierarchy();
     json::Document document = json::Document::make_object();
     document["tracked"] = json::Document::make_array();
     for (const auto& info : tracked) {
@@ -143,16 +147,18 @@ const TrackedInfo* ProjectInfo::find(const std::string& name) const {
     return it == tracked_index_.end() ? nullptr : &tracked[it->second];
 }
 
-const content_model::Model* ProjectInfo::content_model_value() const {
-    std::call_once(content_model_flag_, [this] {
+std::shared_ptr<const content_model::Model> ProjectInfo::content_model_value() const {
+    std::lock_guard<std::mutex> lock(content_model_mutex_);
+    if (!content_model_value_) {
         content_model_value_ = std::make_shared<const content_model::Model>(
             content_model::load(root, config.schema_files, config.taxonomy_files));
-    });
-    return content_model_value_.get();
+    }
+    return content_model_value_;
 }
 
-const HierarchyIndex* ProjectInfo::hierarchy_index() const {
-    std::call_once(hierarchy_flag_, [this] {
+std::shared_ptr<const HierarchyIndex> ProjectInfo::hierarchy_index() const {
+    std::lock_guard<std::mutex> lock(hierarchy_mutex_);
+    if (!hierarchy_) {
         hierarchy_ = std::make_shared<const HierarchyIndex>(HierarchyIndex::build(tracked));
         // Publish the compact structural fingerprint when the index is built so
         // hierarchy consumers that render during this build record the value.
@@ -160,12 +166,12 @@ const HierarchyIndex* ProjectInfo::hierarchy_index() const {
         const std::string fingerprint = hierarchy_->fingerprint();
         if (!filesystem::read_file_checked(path) || *filesystem::read_file_checked(path) != fingerprint)
             filesystem::write_file(path, fingerprint);
-    });
-    return hierarchy_.get();
+    }
+    return hierarchy_;
 }
 
 void ProjectInfo::refresh_hierarchy_fingerprint() const {
-    const HierarchyIndex* hi = hierarchy_index();
+    const auto hi = hierarchy_index();
     if (!hi) return;
     const std::string fingerprint = hi->fingerprint();
     const fs::path path = root / ".nift/hierarchy.fingerprint";
@@ -174,12 +180,19 @@ void ProjectInfo::refresh_hierarchy_fingerprint() const {
     filesystem::write_file(path, fingerprint);
 }
 
-std::shared_ptr<const json::Document> ProjectInfo::project_value() const {
-    std::call_once(project_value_flag_, [this] {
-        project_value_ = make_project_value(root, config, tracked, content_model_value());
-        if (project_value_) write_project_fingerprint(project_fingerprint_of(*project_value_));
-    });
-    return project_value_;
+std::shared_ptr<const nift::RuntimeValue> ProjectInfo::runtime_project_value() const {
+    std::lock_guard<std::mutex> lock(project_value_mutex_);
+    if (!runtime_project_value_) {
+        const auto content_model = content_model_value();
+        const auto project_value = make_project_value(root, config, tracked, content_model.get());
+        if (project_fingerprint_.empty()) {
+            project_fingerprint_ = project_fingerprint_of(*project_value);
+            write_project_fingerprint(project_fingerprint_);
+        }
+        runtime_project_value_ = std::make_shared<const nift::RuntimeValue>(
+            nift::runtime_from_json(*project_value));
+    }
+    return runtime_project_value_;
 }
 
 std::string ProjectInfo::project_fingerprint_of(const json::Document& model) {
@@ -195,7 +208,35 @@ std::string ProjectInfo::project_fingerprint_of(const json::Document& model) {
 }
 
 void ProjectInfo::refresh_project_fingerprint() const {
-    project_value();
+    std::lock_guard<std::mutex> lock(project_value_mutex_);
+    if (project_fingerprint_.empty()) {
+        const auto content_model = content_model_value();
+        const auto model = make_project_value(root, config, tracked, content_model.get());
+        project_fingerprint_ = project_fingerprint_of(*model);
+        write_project_fingerprint(project_fingerprint_);
+    }
+}
+
+void ProjectInfo::invalidate_project_value() const {
+    std::lock_guard<std::mutex> lock(project_value_mutex_);
+    runtime_project_value_.reset();
+    project_fingerprint_.clear();
+}
+
+void ProjectInfo::invalidate_content_model() const {
+    {
+        std::lock_guard<std::mutex> lock(content_model_mutex_);
+        content_model_value_.reset();
+    }
+    invalidate_project_value();
+}
+
+void ProjectInfo::invalidate_hierarchy() const {
+    {
+        std::lock_guard<std::mutex> lock(hierarchy_mutex_);
+        hierarchy_.reset();
+    }
+    invalidate_project_value();
 }
 
 void ProjectInfo::write_project_fingerprint(const std::string& fingerprint) const {
@@ -219,6 +260,7 @@ bool ProjectInfo::conflicts_with_tracked_path(const TrackedInfo& candidate, cons
 
 void ProjectInfo::invalidate_tracked_index() {
     tracked_index_size_ = static_cast<std::size_t>(-1);
+    invalidate_hierarchy();
 }
 
 
@@ -300,6 +342,22 @@ std::shared_ptr<const json::Document> ProjectInfo::read_shared_json(const fs::pa
     return immutable;
 }
 
+std::shared_ptr<const nift::RuntimeValue> ProjectInfo::read_shared_runtime_json(
+    const fs::path& path, std::string& error) const {
+    const fs::path normalized = fs::absolute(path).lexically_normal();
+    const std::string key = normalized.generic_string();
+    std::lock_guard<std::mutex> lock(json_cache_mutex_);
+    const auto existing = shared_runtime_json_cache_.find(key);
+    if (existing != shared_runtime_json_cache_.end()) return existing->second;
+    if (!filesystem::path_exists(normalized)) { error = "JSON file does not exist"; return {}; }
+    if (!filesystem::file_readable(normalized)) { error = "JSON file is not readable"; return {}; }
+    json::Document document;
+    if (!nift_json::parse(filesystem::read_file(normalized), document, error)) return {};
+    auto value = std::make_shared<const nift::RuntimeValue>(nift::runtime_from_json(document));
+    shared_runtime_json_cache_.emplace(key, value);
+    return value;
+}
+
 
 bool ProjectInfo::load_user_dependencies(const TrackedInfo& info, std::set<std::string>& dependencies, BuildError* build_error) const {
     fs::path path = content_path(info);
@@ -366,7 +424,9 @@ void ProjectInfo::reset_build_caches() {
     {
         std::lock_guard<std::mutex> lock(json_cache_mutex_);
         shared_json_cache_.clear();
+        shared_runtime_json_cache_.clear();
     }
+    invalidate_content_model();
 }
 
 void ProjectInfo::refresh_hash_once(const fs::path& dependency) {

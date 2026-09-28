@@ -25,6 +25,7 @@ CABI_SOURCES = [
     "native/src/ProjectOwnership.cpp",
     "native/src/embed/Engine.cpp",
     "native/src/embed/Context.cpp",
+    "native/src/RuntimeValue.cpp",
     "native/src/Value.cpp",
     "native/src/FileSystem.cpp",
     "native/src/JsonFile.cpp",

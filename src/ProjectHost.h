@@ -2,7 +2,6 @@
 #include "RenderHost.h"
 #include "ProjectState.h"
 #include "FileSystem.h"
-#include "ProjectModel.h"
 #include "Environment.h"
 
 #include <cstdlib>
@@ -33,9 +32,9 @@ class ProjectHost : public RenderHost {
 public:
     explicit ProjectHost(
         const ProjectState& state,
-        const std::unordered_map<std::string, std::shared_ptr<const json::Document>>* render_bindings = nullptr,
+        const std::unordered_map<std::string, std::shared_ptr<const nift::RuntimeValue>>* render_bindings = nullptr,
         std::function<nift::HostResult(std::string_view)> environment_provider = nullptr)
-        : state_(state), render_bindings_(render_bindings), project_value_(make_project_value(state.root(),state.config(),state.tracked())), environment_provider_(std::move(environment_provider)) {}
+        : state_(state), render_bindings_(render_bindings), environment_provider_(std::move(environment_provider)) {}
 
     const std::filesystem::path& root() const override { return state_.root(); }
     std::string relative(const std::filesystem::path& path) const override { return state_.relative(path); }
@@ -61,8 +60,11 @@ public:
     // Per-render host value bindings (the eventual Engine defaults/Context
     // overlays). Resolved by the parser before @json bindings and contracts,
     // exactly like the standalone Engine seam. No bindings => nullptr.
-    const std::shared_ptr<const json::Document>* binding(const std::string& name) const override {
-        if (name == "project") return &project_value_;
+    const std::shared_ptr<const nift::RuntimeValue>* binding(const std::string& name) const override {
+        if (name == "project") {
+            if (!project_value_) project_value_ = state_.runtime_project_value();
+            return &project_value_;
+        }
         if (render_bindings_ != nullptr) {
             const auto it = render_bindings_->find(name);
             if (it != render_bindings_->end()) return &it->second;
@@ -87,6 +89,10 @@ public:
                                                            std::string& error) const override {
         return state_.read_shared_json(path, error);
     }
+    std::shared_ptr<const nift::RuntimeValue> read_shared_runtime_json(
+        const std::filesystem::path& path, std::string& error) const override {
+        return state_.read_shared_runtime_json(path, error);
+    }
 
     bool source_exists(const std::filesystem::path& path) const override { return filesystem::path_exists(path); }
     bool source_readable(const std::filesystem::path& path) const override { return filesystem::file_readable(path); }
@@ -97,14 +103,14 @@ public:
             return {nift::HostStatus::Found, std::string(value), ""};
         return {nift::HostStatus::NotFound, "", ""};
     }
-    bool environment_snapshot(json::Document& out, std::string& error) const override {
+    bool environment_snapshot(nift::RuntimeValue& out, std::string& error) const override {
         if (environment_provider_) { error = "env(): custom environment providers are lookup-only and cannot be enumerated"; return false; }
         return nift_environment::process_snapshot(out, error);
     }
 
 private:
     const ProjectState& state_;
-    const std::unordered_map<std::string, std::shared_ptr<const json::Document>>* render_bindings_;
-    std::shared_ptr<const json::Document> project_value_;
+    const std::unordered_map<std::string, std::shared_ptr<const nift::RuntimeValue>>* render_bindings_;
+    mutable std::shared_ptr<const nift::RuntimeValue> project_value_;
     std::function<nift::HostResult(std::string_view)> environment_provider_;
 };

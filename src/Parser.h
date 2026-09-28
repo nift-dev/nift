@@ -37,7 +37,7 @@ public:
 
     // Native script hosts used by direct scripts / the Nift shell.
     RenderResult run_script(const std::string& source, const std::filesystem::path& source_path);
-    bool run_embedded_script(const std::string& source, const std::filesystem::path& source_path, json::Document& value, std::string& error);
+    bool run_embedded_script(const std::string& source, const std::filesystem::path& source_path, nift::RuntimeValue& value, std::string& error);
     RenderResult run_statement(const std::string& source, const std::filesystem::path& source_path);
     void reset_script_control();
     bool finalize_script_resources(std::string& error);
@@ -62,11 +62,11 @@ public:
     std::vector<std::string> shell_completions(const std::string& prefix) const;
 
     // Shared single-expression host used by `nift eval`; identical evaluator to templates/scripts.
-    bool eval_expression(const std::string& expression, json::Document& value, std::string& error);
-    bool invoke_callable(const std::string& name, const std::vector<json::Document>& args, json::Document& value, std::string& error);
+    bool eval_expression(const std::string& expression, nift::RuntimeValue& value, std::string& error);
+    bool invoke_callable(const std::string& name, const std::vector<nift::RuntimeValue>& args, nift::RuntimeValue& value, std::string& error);
 
     // Render a scalar/string value for output or command arguments.
-    std::string render_expression_value(const json::Document& value) const;
+    std::string render_expression_value(const nift::RuntimeValue& value) const;
 
     // Shared template+page composition: parse template_source, let @content
     // pull page_source, and (when require_exactly_one_content) enforce the
@@ -79,10 +79,10 @@ public:
 private:
     // Consume a callable's return into `out`, propagating any location that the
     // return carried so a following declaration can rebind to the same location.
-    void consume_return(json::Document& out) {
+    void consume_return(nift::RuntimeValue& out) {
         last_call_return_loc_root_ = pending_control_.ref_root_slot;
         last_call_return_loc_path_ = pending_control_.ref_path;
-        out = pending_control_.value ? std::move(*pending_control_.value) : json::Document(nullptr);
+        out = pending_control_.value ? std::move(*pending_control_.value) : nift::RuntimeValue(nullptr);
         pending_control_ = {};
     }
     RenderHost& host_;
@@ -92,8 +92,8 @@ private:
     RenderResult result_;
     int code_block_depth_ = 0;
     int html_comment_depth_ = 0;
-    std::unordered_map<std::string, std::shared_ptr<const json::Document>> json_bindings_;
-    std::unordered_map<std::string, std::shared_ptr<const json::Document>> contract_bindings_;
+    std::unordered_map<std::string, std::shared_ptr<const nift::RuntimeValue>> json_bindings_;
+    std::unordered_map<std::string, std::shared_ptr<const nift::RuntimeValue>> contract_bindings_;
     std::vector<std::vector<std::string>> json_binding_scopes_;
     struct PathComponent {
         enum class Kind { Index, Key };
@@ -105,25 +105,25 @@ private:
         bool operator==(const PathComponent& o) const { return kind==o.kind && (kind==Kind::Index ? index==o.index : key==o.key); }
     };
     struct VariableBinding {
-        std::shared_ptr<json::Document> value;
+        std::shared_ptr<nift::RuntimeValue> value;
         int type = 0;
         bool mutable_binding = true;
         bool deep_readonly = false;
         bool is_script_invocation = false;
-        std::shared_ptr<std::shared_ptr<json::Document>> slot;
+        std::shared_ptr<std::shared_ptr<nift::RuntimeValue>> slot;
         // A nested aggregate binding is a logical location reference.  It owns
         // the root binding slot plus a parsed key/index path; it never owns a
         // pointer into vector<Document>, so parent reallocation cannot dangle it.
-        std::shared_ptr<std::shared_ptr<json::Document>> ref_root_slot;
+        std::shared_ptr<std::shared_ptr<nift::RuntimeValue>> ref_root_slot;
         std::vector<PathComponent> ref_path;
         bool ref_valid = true;
-        VariableBinding() : slot(std::make_shared<std::shared_ptr<json::Document>>(value)) {}
-        VariableBinding(std::shared_ptr<json::Document> v, int t, bool m, bool d)
-            : value(std::move(v)), type(t), mutable_binding(m), deep_readonly(d), is_script_invocation(false), slot(std::make_shared<std::shared_ptr<json::Document>>(value)) {}
+        VariableBinding() : slot(std::make_shared<std::shared_ptr<nift::RuntimeValue>>(value)) {}
+        VariableBinding(std::shared_ptr<nift::RuntimeValue> v, int t, bool m, bool d)
+            : value(std::move(v)), type(t), mutable_binding(m), deep_readonly(d), is_script_invocation(false), slot(std::make_shared<std::shared_ptr<nift::RuntimeValue>>(value)) {}
         bool is_location_ref() const { return static_cast<bool>(ref_root_slot); }
-        json::Document* resolve_location() const {
+        nift::RuntimeValue* resolve_location() const {
             if(!ref_root_slot || !*ref_root_slot) return nullptr;
-            json::Document* cur=ref_root_slot->get();
+            nift::RuntimeValue* cur=ref_root_slot->get();
             for(const auto& p:ref_path){
                 if(p.kind==PathComponent::Kind::Index){
                     if(!cur->is_array() || p.index>=cur->array.size()) return nullptr;
@@ -137,11 +137,11 @@ private:
         }
         void sync() {
             if(ref_root_slot){
-                auto root=*ref_root_slot; json::Document* p=resolve_location(); ref_valid=(p!=nullptr);
-                value=(p&&root)?std::shared_ptr<json::Document>(root,p):std::shared_ptr<json::Document>{};
+                auto root=*ref_root_slot; nift::RuntimeValue* p=resolve_location(); ref_valid=(p!=nullptr);
+                value=(p&&root)?std::shared_ptr<nift::RuntimeValue>(root,p):std::shared_ptr<nift::RuntimeValue>{};
             } else if(slot) value=*slot;
         }
-        void rebind(std::shared_ptr<json::Document> v) { ref_root_slot.reset(); ref_path.clear(); ref_valid=true; value=std::move(v); if(slot)*slot=value; }
+        void rebind(std::shared_ptr<nift::RuntimeValue> v) { ref_root_slot.reset(); ref_path.clear(); ref_valid=true; value=std::move(v); if(slot)*slot=value; }
     };
     std::vector<std::unordered_map<std::string, VariableBinding>> variable_scopes_;
     struct ModuleEnv;
@@ -164,13 +164,14 @@ private:
     };
     std::unordered_map<std::string, std::shared_ptr<LambdaInstance>> lambda_instances_;
     std::uint64_t next_lambda_instance_id_ = 1;
+    std::uint64_t next_runtime_temporary_id_ = 1;
     struct ThreadInstance {
         std::thread worker;
         mutable std::mutex mutex;
         mutable std::mutex join_mutex;
         bool done = false;
         bool joined = false;
-        std::shared_ptr<json::Document> result;
+        std::shared_ptr<nift::RuntimeValue> result;
         std::string error;
         ~ThreadInstance(){ std::lock_guard<std::mutex> guard(join_mutex); if(worker.joinable()) worker.join(); }
     };
@@ -182,7 +183,7 @@ private:
         std::condition_variable cv;
         bool locked = false;
         std::thread::id owner;
-        json::Document value;
+        nift::RuntimeValue value;
     };
     std::unordered_map<std::string, std::shared_ptr<MutexInstance>> mutex_instances_;
     struct AtomicInstance {
@@ -196,7 +197,7 @@ private:
         mutable std::mutex mutex;
         std::condition_variable cv;
         bool done = false;
-        std::shared_ptr<json::Document> result;
+        std::shared_ptr<nift::RuntimeValue> result;
         std::string error;
     };
     std::unordered_map<std::string, std::shared_ptr<AsyncInstance>> async_instances_;
@@ -219,8 +220,8 @@ private:
     enum class CollectionKind { Stack, Queue, PriQue, Map, SortedMap, Set, SortedSet };
     struct CollectionInstance {
         CollectionKind kind = CollectionKind::Stack;
-        std::vector<json::Document> values;
-        std::vector<std::pair<json::Document, json::Document>> entries;
+        std::vector<nift::RuntimeValue> values;
+        std::vector<std::pair<nift::RuntimeValue, nift::RuntimeValue>> entries;
         // O(1) membership index for Set/SortedSet scalar values. The key is
         // canonical for plain scalars (bool/number/non-marker string), so key
         // presence implies structural equality; marked references (struct/
@@ -263,14 +264,14 @@ private:
     std::unordered_map<std::string, std::shared_ptr<StructInstance>> struct_instances_;
     std::uint64_t next_struct_instance_id_ = 1;
     std::vector<std::shared_ptr<StructInstance>> receiver_stack_;
-    bool invoke_struct_method(std::shared_ptr<StructInstance> instance, const StructMethod& method, const std::vector<json::Document>& args, const std::vector<std::string>& arg_sources, json::Document& out, std::string& error);
-    int nift_binding_type_from_text(const std::string& source, const json::Document& value) const;
+    bool invoke_struct_method(std::shared_ptr<StructInstance> instance, const StructMethod& method, const std::vector<nift::RuntimeValue>& args, const std::vector<std::string>& arg_sources, nift::RuntimeValue& out, std::string& error);
+    int nift_binding_type_from_text(const std::string& source, const nift::RuntimeValue& value) const;
     int expression_type(const std::string& source) const;
     bool reference_would_cycle(const std::string& target_id, const std::string& container_id) const;
     bool last_expression_mutation_ = false;
     // Location of the most recent call result that returned a location ref, so
     // a declaration `c := f(loc)` can rebind c to the same root+path location.
-    std::shared_ptr<std::shared_ptr<json::Document>> last_call_return_loc_root_;
+    std::shared_ptr<std::shared_ptr<nift::RuntimeValue>> last_call_return_loc_root_;
     std::vector<PathComponent> last_call_return_loc_path_;
     int function_call_depth_ = 0;
     bool in_fragment_body_ = false;
@@ -284,11 +285,11 @@ private:
     enum class ControlFlow { None, Return, Break, Continue };
     struct PendingControl {
         ControlFlow kind = ControlFlow::None;
-        std::shared_ptr<json::Document> value;
+        std::shared_ptr<nift::RuntimeValue> value;
         // Location carried by a `return <location>` so the returned reference
         // keeps root+path identity across the call boundary instead of being
         // reduced to a value copy.
-        std::shared_ptr<std::shared_ptr<json::Document>> ref_root_slot;
+        std::shared_ptr<std::shared_ptr<nift::RuntimeValue>> ref_root_slot;
         std::vector<PathComponent> ref_path;
     };
     PendingControl pending_control_;
@@ -311,15 +312,15 @@ private:
                                std::string& resolved,
                                std::string& error);
     bool resolve_json_value(const std::string& expression,
-                            std::shared_ptr<const json::Document>& value,
+                            std::shared_ptr<const nift::RuntimeValue>& value,
                             std::string& error);
-    bool evaluate_expression(const std::string& expression, json::Document& value, std::string& error);
-    bool evaluate_collection_value(const std::string& expression, json::Document& value, std::string& error);
+    bool evaluate_expression(const std::string& expression, nift::RuntimeValue& value, std::string& error);
+    bool evaluate_collection_value(const std::string& expression, nift::RuntimeValue& value, std::string& error);
     bool evaluate_condition(const std::string& expression, bool& value, std::string& error);
-    bool serialize_value(const json::Document& value, bool pretty, std::string& output, std::string& error, int depth = 0) const;
-    bool resolve_pagination_value(const std::string& expression, std::shared_ptr<const json::Document>& value) const;
+    bool serialize_value(const nift::RuntimeValue& value, bool pretty, std::string& output, std::string& error, int depth = 0) const;
+    bool resolve_pagination_value(const std::string& expression, std::shared_ptr<const nift::RuntimeValue>& value) const;
     std::string path_to_page(std::size_t page);
-    bool scalar_literal(const std::string& text, json::Document& value, std::string& error) const;
+    bool scalar_literal(const std::string& text, nift::RuntimeValue& value, std::string& error) const;
     std::string trim_copy(const std::string& text) const;
     void push_json_scope();
     void pop_json_scope();

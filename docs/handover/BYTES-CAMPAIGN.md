@@ -6,6 +6,16 @@ sequence. Earlier generic-bytes planning summaries with different CP18-CP23
 numbering are superseded and must not be used for commit names or gate reports;
 unrelated historical campaigns are unaffected.
 
+CP15 implementation status: complete candidate on 2026-09-29. The evaluator,
+AST, Engine defaults/results and public C++ `Value` internals now use the
+Nift-owned recursive `RuntimeValue`; strict JSON, schema and persisted project
+data remain Jsonic documents with explicit recursive boundary conversion. No
+bytes type or API was added. Evidence is in `docs/evidence/cp15-runtime-value.md`.
+Review Gate 6A is pending after review repairs to cache invalidation, runtime
+host boundaries, shared JSON-to-runtime caching, lazy project materialization,
+arbitrary-precision JSON-number equality/fingerprints, resettable content-model
+and hierarchy generations, and compatibility diagnostics. CP16 has not started.
+
 Strict JSON remains a separate ingress/egress boundary. The implementation must
 introduce a Nift-owned runtime value model for null, bool, number, string, bytes,
 array and object rather than adding a non-JSON type to Jsonic, using marker

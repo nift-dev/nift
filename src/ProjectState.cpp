@@ -1,7 +1,9 @@
 #include "ProjectState.h"
 #include "FileSystem.h"
 #include "Json.h"
+#include "ProjectModel.h"
 #include "ProjectRead.h"
+#include "RuntimeJson.h"
 
 #include <mutex>
 
@@ -45,6 +47,11 @@ bool ProjectState::open(const std::filesystem::path& root, std::string& error) {
     {
         std::lock_guard<std::mutex> lock(json_cache_mutex_);
         shared_json_cache_.clear();
+        shared_runtime_json_cache_.clear();
+    }
+    {
+        std::lock_guard<std::mutex> lock(project_value_mutex_);
+        runtime_project_value_.reset();
     }
     return true;
 }
@@ -61,7 +68,21 @@ void ProjectState::reset() {
     {
         std::lock_guard<std::mutex> lock(json_cache_mutex_);
         shared_json_cache_.clear();
+        shared_runtime_json_cache_.clear();
     }
+    {
+        std::lock_guard<std::mutex> lock(project_value_mutex_);
+        runtime_project_value_.reset();
+    }
+}
+
+std::shared_ptr<const nift::RuntimeValue> ProjectState::runtime_project_value() const {
+    std::lock_guard<std::mutex> lock(project_value_mutex_);
+    if (!runtime_project_value_) {
+        runtime_project_value_ = std::make_shared<const nift::RuntimeValue>(
+            nift::runtime_from_json(*make_project_value(root_, config_, tracked_)));
+    }
+    return runtime_project_value_;
 }
 
 const TrackedInfo* ProjectState::find(const std::string& name) const {
@@ -131,4 +152,20 @@ std::shared_ptr<const json::Document> ProjectState::read_shared_json(const fs::p
     std::shared_ptr<const json::Document> immutable = document;
     shared_json_cache_.emplace(key, immutable);
     return immutable;
+}
+
+std::shared_ptr<const nift::RuntimeValue> ProjectState::read_shared_runtime_json(
+    const fs::path& path, std::string& error) const {
+    const fs::path normalized = fs::absolute(path).lexically_normal();
+    const std::string key = normalized.generic_string();
+    std::lock_guard<std::mutex> lock(json_cache_mutex_);
+    const auto existing = shared_runtime_json_cache_.find(key);
+    if (existing != shared_runtime_json_cache_.end()) return existing->second;
+    if (!filesystem::path_exists(normalized)) { error = "JSON file does not exist"; return {}; }
+    if (!filesystem::file_readable(normalized)) { error = "JSON file is not readable"; return {}; }
+    json::Document document;
+    if (!nift_json::parse(filesystem::read_file(normalized), document, error)) return {};
+    auto value = std::make_shared<const nift::RuntimeValue>(nift::runtime_from_json(document));
+    shared_runtime_json_cache_.emplace(key, value);
+    return value;
 }

@@ -17,6 +17,7 @@ CPPFLAGS="-Isrc -Iinclude -Iminifypp/include -Iminifypp/src"
 SOURCES="
   src/embed/Engine.cpp
   src/embed/Context.cpp
+  src/RuntimeValue.cpp
   src/Value.cpp
   src/FileSystem.cpp
   src/JsonFile.cpp

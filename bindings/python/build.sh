@@ -26,7 +26,7 @@ trap 'rm -rf "$TMP"' EXIT
 OBJ="$TMP/cabi-pic"
 mkdir -p "$OBJ" nift
 
-CABI_SOURCES="src/ProjectOwnership.cpp src/embed/Engine.cpp src/embed/Context.cpp src/Value.cpp \
+CABI_SOURCES="src/ProjectOwnership.cpp src/embed/Engine.cpp src/embed/Context.cpp src/RuntimeValue.cpp src/Value.cpp \
   src/FileSystem.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp \
   markuppp/src/Markup.cpp markuppp/src/AsciiDoc.cpp markuppp/src/ReStructuredText.cpp \
   src/Parser.cpp src/Ast.cpp src/Automation.cpp src/Process.cpp src/Hooks.cpp src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp \

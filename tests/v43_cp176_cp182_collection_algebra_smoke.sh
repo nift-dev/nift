@@ -6,6 +6,7 @@ run(){ printf '%s\n' "$1" > "$td/t.nift"; "$NIFT_BIN" "$td/t.nift"; }
 A='[{"x":1,"tag":"a","tags":["a","b"]},{"x":2,"tag":"b","tags":["b"]},{"x":1,"tag":"a","tags":["a","a"]}]'
 [[ "$(run "a := $A; print(a.partition(v => v.x > 1).stringify())")" == '{"matched":[{"x":2,"tag":"b","tags":["b"]}],"unmatched":[{"x":1,"tag":"a","tags":["a","b"]},{"x":1,"tag":"a","tags":["a","a"]}]}' ]]
 [[ "$(run "a := $A; print(a.unique_by(v => v.x).stringify())")" == '[{"x":1,"tag":"a","tags":["a","b"]},{"x":2,"tag":"b","tags":["b"]}]' ]]
+[[ "$(run 'a := [{"k":123456789012345678901234567890,"v":"huge-a"},{"k":123456789012345678901234567891,"v":"huge-b"},{"k":1e-1000,"v":"tiny"},{"k":10e-1001,"v":"tiny-duplicate"},{"k":1.2300e5,"v":"decimal"},{"k":123000,"v":"decimal-duplicate"}]; print(a.unique_by(v => v.k).map(v => v.v).join(","))')" == 'huge-a,huge-b,tiny,decimal' ]]
 [[ "$(run "a := $A; print(a.min_by(v => v.x).x); print(a.max_by(v => v.x).x)")" == $'1\n2' ]]
 [[ "$(run "a := $A; print(a.count_by(v => v.tag).stringify())")" == '{"a":2,"b":1}' ]]
 [[ "$(run 'print([1,2,3,4].take(2).stringify()); print([1,2,3,4].drop(2).stringify()); print([1,2,3,4,5].chunk(2).stringify())')" == $'[1,2]\n[3,4]\n[[1,2],[3,4],[5]]' ]]

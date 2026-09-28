@@ -34,6 +34,9 @@ must_error index-missing-key   "JSON object has no key 'z'" 'd := {"a":1}
 print(d["z"])'
 must_error index-non-string-key 'string binding, or string expression' 'd := {"a":1}
 print(d[42])'
+printf '{"a":1}\n' > data.json
+must_error json-index-non-string-key 'string binding, or string expression' '@json(d, "data.json")
+$[d[42]]'
 
 # --- immutability: helpers never mutate their source ---
 check imm-trim    '  Hi  |Hi' 'x := "  Hi  "

@@ -1,5 +1,6 @@
 #pragma once
 #include "Types.h"
+#include "RuntimeValue.h"
 #include "nift/host_result.h"
 
 #include <filesystem>
@@ -58,19 +59,19 @@ public:
     // not supplied by the host. The parser resolves these before @json
     // bindings and contracts. ProjectInfoHost returns nullptr (the CLI has no
     // pre-supplied bindings), so CLI resolution is unchanged.
-    virtual const std::shared_ptr<const json::Document>* binding(const std::string& name) const = 0;
+    virtual const std::shared_ptr<const nift::RuntimeValue>* binding(const std::string& name) const = 0;
 
     // Trusted embedding-host callables. These are distinct from dynamic-library
     // FFI: the host owns the C++ callable and typed conversion boundary.
     virtual bool has_host_callable(const std::string&) const { return false; }
-    virtual bool call_host_callable(const std::string&, const std::vector<json::Document>&, json::Document&, std::string& error) const { error = "host callable is not available"; return false; }
+    virtual bool call_host_callable(const std::string&, const std::vector<nift::RuntimeValue>&, nift::RuntimeValue&, std::string& error) const { error = "host callable is not available"; return false; }
 
     // Per-page model-equivalent metadata (front matter, type resolution, schema
     // validation) computed WITHOUT constructing the project-wide query model, so
     // ordinary pages never force the project model to be built. Returns false on
     // hosts that lack the project content model; callers fall back to direct
     // front-matter parsing.
-    virtual bool page_project_metadata(const TrackedInfo&, json::Document&, std::string&) const { return false; }
+    virtual bool page_project_metadata(const TrackedInfo&, nift::RuntimeValue&, std::string&) const { return false; }
 
     // Hierarchy: page references are opaque values (\x1fnift:page:<name>)
     // resolved on member access. page_ref_for validates a tracked name and
@@ -78,7 +79,7 @@ public:
     // data member of a page. Hosts without hierarchy return false.
     virtual bool page_ref_for(const std::string&, std::string&) const { return false; }
     virtual bool resolve_page_member(const std::string&, const std::string&,
-                                     json::Document&, std::string&) const { return false; }
+                                     nift::RuntimeValue&, std::string&) const { return false; }
 
     // Project-contract namespaces (config.contracts): the parser needs to
     // refuse bindings that collide with a configured contract name, and to
@@ -99,6 +100,8 @@ public:
     virtual HostSource read_shared_source(const std::filesystem::path& path) const = 0;
     virtual std::shared_ptr<const json::Document> read_shared_json(const std::filesystem::path& path,
                                                                    std::string& error) const = 0;
+    virtual std::shared_ptr<const nift::RuntimeValue> read_shared_runtime_json(
+        const std::filesystem::path& path, std::string& error) const = 0;
 
     // Source existence/readability as seen by this host. For a filesystem host
     // these are the ordinary filesystem checks; for a loader-backed host they
@@ -113,7 +116,7 @@ public:
     // Full environment snapshot used by script-land env(). Hosts with a custom
     // lookup provider that cannot enumerate names must fail explicitly rather
     // than leaking the process-global environment into an isolated runtime.
-    virtual bool environment_snapshot(json::Document&, std::string& error) const {
+    virtual bool environment_snapshot(nift::RuntimeValue&, std::string& error) const {
         error = "environment snapshot is not available from this host";
         return false;
     }

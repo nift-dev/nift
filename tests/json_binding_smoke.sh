@@ -106,7 +106,7 @@ expect_failure missing-member "has no member 'missing'" \
     $'@json(data, "data/test.json")\n$[data.missing]' '{"present":1}'
 expect_failure out-of-range 'JSON array index 3 is out of range' \
     $'@json(data, "data/test.json")\n$[data.items[3]]' '{"items":[1]}'
-expect_failure wrong-index-type 'because it is not an array' \
+expect_failure wrong-index-type 'string binding, or string expression' \
     $'@json(data, "data/test.json")\n$[data.item[0]]' '{"item":{"x":1}}'
 expect_failure wrong-member-type "because the current JSON value is not an object" \
     $'@json(data, "data/test.json")\n$[data.items.foo]' '{"items":[1]}'

@@ -4,7 +4,7 @@
 #include "FileSystem.h"
 #include "Environment.h"
 #include "ProjectModel.h"
-
+#include "RuntimeJson.h"
 #include <cstdlib>
 #include <optional>
 #include <string>
@@ -38,41 +38,42 @@ public:
         return std::nullopt;
     }
 
-    const std::shared_ptr<const json::Document>* binding(const std::string& name) const override {
+    const std::shared_ptr<const nift::RuntimeValue>* binding(const std::string& name) const override {
         if (name == "project") {
-            if (!project_value_) project_value_ = project_.project_value();
+            project_value_ = project_.runtime_project_value();
             return project_value_ ? &project_value_ : nullptr;
         }
         return nullptr;
     }
 
-    bool page_project_metadata(const TrackedInfo& info, json::Document& out, std::string&) const override {
-        const content_model::Model* model = project_.content_model_value();
+    bool page_project_metadata(const TrackedInfo& info, nift::RuntimeValue& out, std::string&) const override {
+        const auto model = project_.content_model_value();
         if (!model) return false;
-        out = compute_tracked_metadata(project_.root, project_.config, info, *model);
-        if (!model->errors.empty()) out["_error"] = json::Document(model->errors.front());
+        json::Document metadata = compute_tracked_metadata(project_.root, project_.config, info, *model);
+        if (!model->errors.empty()) metadata["_error"] = json::Document(model->errors.front());
+        out = nift::runtime_from_json(metadata);
         return true;
     }
 
     static std::string page_ref_of(const std::string& name) { return std::string("\x1fnift:page:") + name; }
 
     bool page_ref_for(const std::string& name, std::string& ref) const override {
-        const HierarchyIndex* hi = project_.hierarchy_index();
+        const auto hi = project_.hierarchy_index();
         if (!hi || hi->index_of(name) == HierarchyIndex::NO_PARENT) return false;
         ref = page_ref_of(name);
         return true;
     }
 
     bool resolve_page_member(const std::string& page_name, const std::string& member,
-                             json::Document& out, std::string&) const override {
-        const HierarchyIndex* hi = project_.hierarchy_index();
+                             nift::RuntimeValue& out, std::string&) const override {
+        const auto hi = project_.hierarchy_index();
         if (!hi) return false;
         const std::size_t idx = hi->index_of(page_name);
         if (idx == HierarchyIndex::NO_PARENT) return false;
         const TrackedInfo& info = project_.tracked[idx];
         if (member == "parent") {
             const std::size_t p = hi->parent_index(idx);
-            out = p == HierarchyIndex::NO_PARENT ? json::Document(nullptr) : json::Document(page_ref_of(project_.tracked[p].name));
+            out = p == HierarchyIndex::NO_PARENT ? nift::RuntimeValue(nullptr) : nift::RuntimeValue(page_ref_of(project_.tracked[p].name));
             return true;
         }
         if (member == "children" || member == "ancestors" || member == "descendants" || member == "siblings") {
@@ -100,28 +101,28 @@ public:
                         for (auto it = cc->rbegin(); it != cc->rend(); ++it) stack.push_back(*it);
                 }
             }
-            out = json::Document::make_array();
+            out = nift::RuntimeValue::make_array();
             out.array.reserve(list.size());
             for (const auto i : list) out.array.emplace_back(page_ref_of(project_.tracked[i].name));
             return true;
         }
         if (member == "name" || member == "title" || member == "path" || member == "output_path" ||
             member == "url" || member == "type" || member == "metadata" || member == "content") {
-            if (member == "name") { out = json::Document(info.name); return true; }
-            if (member == "title") { out = json::Document(info.title); return true; }
-            if (member == "type") { out = info.type ? json::Document(*info.type) : json::Document(nullptr); return true; }
+            if (member == "name") { out = nift::RuntimeValue(info.name); return true; }
+            if (member == "title") { out = nift::RuntimeValue(info.title); return true; }
+            if (member == "type") { out = info.type ? nift::RuntimeValue(*info.type) : nift::RuntimeValue(nullptr); return true; }
             const auto source = project_read::content_path_of(project_.root, project_.config, info);
             const auto output = project_read::output_path_of(project_.root, project_.config, info);
-            if (member == "path") { out = json::Document(project_read::relative_of(project_.root, source)); return true; }
-            if (member == "output_path") { out = json::Document(project_read::relative_of(project_.root, output)); return true; }
-            if (member == "url") { out = json::Document("/" + project_read::relative_of(project_.root, output).substr(project_.config.output_dir.size())); return true; }
-            if (member == "content") { out = json::Document(filesystem::file_exists(source) ? filesystem::read_file(source) : std::string{}); return true; }
+            if (member == "path") { out = nift::RuntimeValue(project_read::relative_of(project_.root, source)); return true; }
+            if (member == "output_path") { out = nift::RuntimeValue(project_read::relative_of(project_.root, output)); return true; }
+            if (member == "url") { out = nift::RuntimeValue("/" + project_read::relative_of(project_.root, output).substr(project_.config.output_dir.size())); return true; }
+            if (member == "content") { out = nift::RuntimeValue(filesystem::file_exists(source) ? filesystem::read_file(source) : std::string{}); return true; }
             if (member == "metadata") {
-                const content_model::Model* model = project_.content_model_value();
+                const auto model = project_.content_model_value();
                 json::Document meta = model
                     ? compute_tracked_metadata(project_.root, project_.config, info, *model)
                     : json::Document::make_object();
-                out = std::move(meta);
+                out = nift::runtime_from_json(meta);
                 return true;
             }
         }
@@ -145,6 +146,10 @@ public:
                                                            std::string& error) const override {
         return project_.read_shared_json(path, error);
     }
+    std::shared_ptr<const nift::RuntimeValue> read_shared_runtime_json(
+        const std::filesystem::path& path, std::string& error) const override {
+        return project_.read_shared_runtime_json(path, error);
+    }
 
     bool source_exists(const std::filesystem::path& path) const override { return filesystem::path_exists(path); }
     bool source_readable(const std::filesystem::path& path) const override { return filesystem::file_readable(path); }
@@ -154,9 +159,9 @@ public:
             return {nift::HostStatus::Found, std::string(value), ""};
         return {nift::HostStatus::NotFound, "", ""};
     }
-    bool environment_snapshot(json::Document& out, std::string& error) const override { return nift_environment::process_snapshot(out, error); }
+    bool environment_snapshot(nift::RuntimeValue& out, std::string& error) const override { return nift_environment::process_snapshot(out, error); }
 
 private:
     ProjectInfo& project_;
-    mutable std::shared_ptr<const json::Document> project_value_;
+    mutable std::shared_ptr<const nift::RuntimeValue> project_value_;
 };

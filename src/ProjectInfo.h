@@ -14,6 +14,7 @@
 
 class WatchList;
 namespace json { class Document; }
+namespace nift { class RuntimeValue; }
 namespace content_model { struct Model; }
 
 class ProjectInfo {
@@ -35,10 +36,10 @@ public:
     // (project.files / content / schemas / taxonomies). Built at most once per
     // build and shared by every page render instead of being reconstructed per
     // page (which was quadratic in the number of tracked files).
-    std::shared_ptr<const json::Document> project_value() const;
+    std::shared_ptr<const nift::RuntimeValue> runtime_project_value() const;
     void refresh_project_fingerprint() const;
-    const content_model::Model* content_model_value() const;
-    const HierarchyIndex* hierarchy_index() const;
+    std::shared_ptr<const content_model::Model> content_model_value() const;
+    std::shared_ptr<const HierarchyIndex> hierarchy_index() const;
     void refresh_hierarchy_fingerprint() const;
 
     TrackedInfo* find(const std::string& name);
@@ -53,6 +54,7 @@ public:
     std::string relative(const std::filesystem::path& path) const;
     const std::string* read_shared_source(const std::filesystem::path& path) const;
     std::shared_ptr<const json::Document> read_shared_json(const std::filesystem::path& path, std::string& error) const;
+    std::shared_ptr<const nift::RuntimeValue> read_shared_runtime_json(const std::filesystem::path& path, std::string& error) const;
 
     std::vector<std::string> build_reasons(const TrackedInfo& info) const;
     bool needs_build(const TrackedInfo& info, std::string* reason = nullptr) const;
@@ -102,13 +104,17 @@ public:
 private:
     static std::string project_fingerprint_of(const json::Document& model);
     void write_project_fingerprint(const std::string& fingerprint) const;
+    void invalidate_project_value() const;
+    void invalidate_content_model() const;
+    void invalidate_hierarchy() const;
 
     WatchList* watch_ = nullptr;
-    mutable std::once_flag project_value_flag_;
-    mutable std::shared_ptr<const json::Document> project_value_;
-    mutable std::once_flag content_model_flag_;
+    mutable std::mutex project_value_mutex_;
+    mutable std::shared_ptr<const nift::RuntimeValue> runtime_project_value_;
+    mutable std::string project_fingerprint_;
+    mutable std::mutex content_model_mutex_;
     mutable std::shared_ptr<const content_model::Model> content_model_value_;
-    mutable std::once_flag hierarchy_flag_;
+    mutable std::mutex hierarchy_mutex_;
     mutable std::shared_ptr<const HierarchyIndex> hierarchy_;
     std::atomic<bool> mutation_started_{false};
     mutable std::unordered_map<std::string, std::size_t> tracked_index_;
@@ -123,6 +129,7 @@ private:
     mutable std::unordered_map<std::string, std::unique_ptr<const std::string>> shared_source_cache_;
     mutable std::mutex json_cache_mutex_;
     mutable std::unordered_map<std::string, std::shared_ptr<const json::Document>> shared_json_cache_;
+    mutable std::unordered_map<std::string, std::shared_ptr<const nift::RuntimeValue>> shared_runtime_json_cache_;
     mutable std::mutex metadata_path_mutex_;
     mutable std::unordered_map<std::string, bool> metadata_parent_safety_cache_;
     std::mutex build_output_mutex_;

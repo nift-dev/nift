@@ -10,6 +10,6 @@ int main(){
  auto c=nift::ast::parse_expression("1 / 0"); assert(c.supported); assert(c.expr->kind==nift::ast::Kind::Binary); // preserve observable runtime error
 }
 CPP
-${CXX:-g++} -std=c++17 -I"$ROOT/src" -I"$ROOT/jsonic/include" /tmp/nift_ast_fold_test.cpp "$ROOT/src/Ast.cpp" -o /tmp/nift_ast_fold_test
+${CXX:-g++} -std=c++17 -I"$ROOT/src" -I"$ROOT/jsonic/include" /tmp/nift_ast_fold_test.cpp "$ROOT/src/Ast.cpp" "$ROOT/src/RuntimeValue.cpp" -o /tmp/nift_ast_fold_test
 /tmp/nift_ast_fold_test
 echo 'v4.4 AST constant-fold smoke: PASS'

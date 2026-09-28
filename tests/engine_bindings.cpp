@@ -6,6 +6,8 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <limits>
+#include <stdexcept>
 #include <string>
 
 static int failures = 0;
@@ -342,6 +344,84 @@ int main() {
         auto r = nift::Engine().render(nift::Source::text("$[moved.x]/$[empty]"), context);
         CHECK(r.ok());
         CHECK(r.output() == "1/null");
+    }
+
+    // 13. Host-callable arguments/results use the runtime-value seam.
+    {
+        nift::Engine engine;
+        CHECK(engine.register_function("native_pair", [](const std::vector<nift::Value>& args) {
+            nift::Value result = nift::Value::make_object();
+            result["first"] = args.empty() ? nift::Value() : args.front();
+            nift::Value values = nift::Value::make_array();
+            values.push_back(nift::Value(8));
+            values.push_back(nift::Value(9));
+            result["values"] = values;
+            return result;
+        }));
+        auto loaded = engine.execute("return native_pair(7)\n");
+        CHECK(loaded.ok());
+        CHECK(loaded.value().json() == "{\n\"first\": 7,\n\"values\": [\n8,\n9\n]\n}");
+    }
+
+    // 14. Public Value mutation keeps the pre-RuntimeValue exception contract.
+    {
+        try {
+            nift::Value(1).push_back(nift::Value(2));
+            CHECK(false);
+        } catch (const std::runtime_error& error) {
+            CHECK(std::string(error.what()) == "JSON value is not an array");
+        }
+        try {
+            nift::Value value(1);
+            value["x"] = nift::Value(2);
+            CHECK(false);
+        } catch (const std::runtime_error& error) {
+            CHECK(std::string(error.what()) == "JSON value is not an object");
+        }
+    }
+
+    // 15. Non-finite host numbers retain IEEE relational behavior at the
+    //     Engine boundary, while internal ordering remains deterministic.
+    {
+        nift::Context context;
+        context.set("nan", nift::Value(std::numeric_limits<double>::quiet_NaN()));
+        context.set("pinf", nift::Value(std::numeric_limits<double>::infinity()));
+        context.set("ninf", nift::Value(-std::numeric_limits<double>::infinity()));
+        auto result = nift::Engine().render(nift::Source::text(
+            "$[nan == nan]|$[nan != nan]|$[nan < 0]|$[nan <= 0]|"
+            "$[nan > 0]|$[nan >= 0]|$[pinf == pinf]|$[ninf == ninf]|"
+            "$[pinf != ninf]|$[ninf < pinf]|$[ninf <= ninf]|"
+            "$[pinf > ninf]|$[pinf >= pinf]"), context);
+        CHECK(result.ok());
+        CHECK(result.output() ==
+              "false|true|false|false|false|false|true|true|true|true|true|true|true");
+    }
+    {
+        nift::Engine engine;
+        CHECK(engine.register_function("native_nonfinite_values", [](const std::vector<nift::Value>&) {
+            nift::Value values = nift::Value::make_array();
+            const double nan = std::numeric_limits<double>::quiet_NaN();
+            const double infinity = std::numeric_limits<double>::infinity();
+            values.push_back(nift::Value(nan));
+            values.push_back(nift::Value(nan));
+            nift::Value nested_nan = nift::Value::make_array();
+            nested_nan.push_back(nift::Value(nan));
+            values.push_back(nested_nan);
+            values.push_back(nested_nan);
+            values.push_back(nift::Value(infinity));
+            values.push_back(nift::Value(infinity));
+            values.push_back(nift::Value(-infinity));
+            values.push_back(nift::Value(-infinity));
+            return values;
+        }));
+        auto result = engine.execute(
+            "return native_nonfinite_values().unique_by(value => value).size()\n");
+        CHECK(result.ok());
+        CHECK(result.value().number() == 6.0);
+        auto distinct = engine.render(nift::Source::text(
+            "@distinct(native_nonfinite_values())"));
+        CHECK(distinct.ok());
+        CHECK(distinct.output() == "[\nnan,\nnan,\n[\nnan\n],\n[\nnan\n],\ninf,\n-inf\n]");
     }
 
     if (failures == 0) {

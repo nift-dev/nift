@@ -1,5 +1,5 @@
 #pragma once
-#include "Json.h"
+#include "RuntimeValue.h"
 #include <cstddef>
 #include <functional>
 #include <memory>
@@ -11,22 +11,22 @@ struct SourceSpan { std::size_t begin=0, end=0; };
 enum class Kind { Literal, Binding, Unary, Binary, Logical, Coalesce, Index, Member, SafeIndex, SafeMember, Range, Call, Lambda, Array, Object, Legacy };
 struct Expr {
     Kind kind=Kind::Legacy; SourceSpan span{}; std::string text, op, name; std::vector<std::string> params;
-    json::Document literal;
+    nift::RuntimeValue literal;
     std::unique_ptr<Expr> left, right; std::vector<std::unique_ptr<Expr>> items;
 };
 struct Context {
-    std::function<bool(const std::string&, json::Document&, std::string&)> resolve;
-    std::function<bool(const std::string&, std::shared_ptr<const json::Document>&, std::string&)> resolve_ref;
-    std::function<bool(const std::string&, json::Document&, std::string&)> legacy;
-    std::function<bool(const std::string&, std::vector<json::Document>&&, json::Document&, std::string&)> call;
-    std::function<bool(const json::Document&, const std::string&, std::vector<json::Document>&&, json::Document&, std::string&)> native_method;
+    std::function<bool(const std::string&, nift::RuntimeValue&, std::string&)> resolve;
+    std::function<bool(const std::string&, std::shared_ptr<const nift::RuntimeValue>&, std::string&)> resolve_ref;
+    std::function<bool(const std::string&, nift::RuntimeValue&, std::string&)> legacy;
+    std::function<bool(const std::string&, std::vector<nift::RuntimeValue>&&, nift::RuntimeValue&, std::string&)> call;
+    std::function<bool(const nift::RuntimeValue&, const std::string&, std::vector<nift::RuntimeValue>&&, nift::RuntimeValue&, std::string&)> native_method;
     // Optional: given an argument expression text, report whether it denotes a
     // location reference that must keep its identity across the call boundary.
     // When set and true for any argument, the prepared Call dispatch is skipped
     // and evaluation falls back to the legacy evaluator (the oracle), which
     // performs the location-aware binding.
     std::function<bool(const std::string&)> arg_is_location;
-    std::function<std::string(const json::Document&)> render;
+    std::function<std::string(const nift::RuntimeValue&)> render;
 };
 enum class StmtKind { Block, Declaration, Assignment, CompoundAssignment, Increment, Expression, If, While, For, Break, Continue, Return, Function, Struct, Enum, Import, Export, Script, Legacy };
 struct Stmt { StmtKind kind=StmtKind::Legacy; SourceSpan span{}; std::string text, name, op; int decl_type=0; std::unique_ptr<Expr> expr, target, condition, iterable; std::vector<std::string> params, bindings; std::string variadic_param; std::vector<std::unique_ptr<Stmt>> body; std::vector<std::unique_ptr<Expr>> call_args; };
@@ -38,7 +38,7 @@ struct TemplateParseResult { std::vector<std::unique_ptr<TemplateNode>> nodes; s
 TemplateParseResult parse_template(const std::string& source);
 StatementParseResult parse_statement(const std::string& source);
 ParseResult parse_expression(const std::string& source);
-bool evaluate(const Expr& expr, Context& ctx, json::Document& out, std::string& error);
-bool truthy(const json::Document& value);
+bool evaluate(const Expr& expr, Context& ctx, nift::RuntimeValue& out, std::string& error);
+bool truthy(const nift::RuntimeValue& value);
 void fold_constants(Expr& expr);
 } // namespace nift::ast

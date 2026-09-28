@@ -5,6 +5,8 @@
 // the 404 rule) and pagination - while writing nothing, making no build
 // decisions, and keeping the concurrency contract.
 #include "ProjectHost.h"
+#include "ProjectInfoHost.h"
+#include "RuntimeJson.h"
 #include "ProjectState.h"
 #include "FileSystem.h"
 #include "Json.h"
@@ -118,14 +120,14 @@ bool contains_all(const std::string& haystack, std::initializer_list<const char*
     return true;
 }
 
-std::shared_ptr<const json::Document> parse_json(const char* text) {
+std::shared_ptr<const nift::RuntimeValue> parse_json(const char* text) {
     auto document = std::make_shared<json::Document>();
     std::string error;
     if (!json::Document::parse(text, *document, error)) {
         std::fprintf(stderr, "test JSON parse failed: %s\n", error.c_str());
         ++failures;
     }
-    return document;
+    return std::make_shared<const nift::RuntimeValue>(nift::runtime_from_json(*document));
 }
 
 void test_host_capabilities(const ProjectState& state) {
@@ -154,6 +156,12 @@ void test_host_capabilities(const ProjectState& state) {
     std::string json_error;
     auto document = host.read_shared_json(state.root() / "content/site.json", json_error);
     CHECK(document != nullptr);
+    auto runtime_document = host.read_shared_runtime_json(state.root() / "content/site.json", json_error);
+    CHECK(runtime_document != nullptr && (*runtime_document)["name"].string == "Nift");
+    CHECK(runtime_document == host.read_shared_runtime_json(state.root() / "content/site.json", json_error));
+    nift::RuntimeValue environment;
+    CHECK(host.environment_snapshot(environment, json_error));
+    CHECK(environment.is_object());
     CHECK(host.source_exists(state.root() / "templates/template.html"));
     CHECK(!host.source_exists(state.root() / "templates/missing.html"));
     CHECK(host.source_readable(state.root() / "data/items.json"));
@@ -161,7 +169,7 @@ void test_host_capabilities(const ProjectState& state) {
 }
 
 RenderResult render_page(const ProjectState& state, const char* name,
-                         const std::unordered_map<std::string, std::shared_ptr<const json::Document>>& bindings) {
+                         const std::unordered_map<std::string, std::shared_ptr<const nift::RuntimeValue>>& bindings) {
     const TrackedInfo* tracked = state.find(name);
     if (tracked == nullptr) {
         std::fprintf(stderr, "render_page: no tracked page '%s'\n", name);
@@ -179,7 +187,7 @@ RenderResult render_page(const ProjectState& state, const char* name,
 }
 
 void test_project_renders(const ProjectState& state,
-                          const std::unordered_map<std::string, std::shared_ptr<const json::Document>>& bindings) {
+                           const std::unordered_map<std::string, std::shared_ptr<const nift::RuntimeValue>>& bindings) {
     // Home: template composition + @input partial + contract binding + title.
     RenderResult home = render_page(state, "/", bindings);
     CHECK(home.ok);
@@ -225,7 +233,7 @@ void test_project_renders(const ProjectState& state,
 }
 
 void test_zero_writes(const ProjectState& state,
-                      const std::unordered_map<std::string, std::shared_ptr<const json::Document>>& bindings) {
+                      const std::unordered_map<std::string, std::shared_ptr<const nift::RuntimeValue>>& bindings) {
     const fs::path root = state.root();
     const auto before = tree_snapshot(root);
     for (const char* name : {"/", "about", "404", "blog/"}) {
@@ -239,7 +247,7 @@ void test_zero_writes(const ProjectState& state,
 }
 
 void test_concurrent_renders(const ProjectState& state,
-                             const std::unordered_map<std::string, std::shared_ptr<const json::Document>>& bindings) {
+                             const std::unordered_map<std::string, std::shared_ptr<const nift::RuntimeValue>>& bindings) {
     constexpr int kThreads = 8;
     constexpr int kIterations = 20;
     std::atomic<bool> ok{true};
@@ -260,6 +268,82 @@ void test_concurrent_renders(const ProjectState& state,
     CHECK(ok.load());
 }
 
+void test_persistent_project_cache(const ProjectState& state) {
+    ProjectInfo project;
+    project.root = state.root();
+    project.config = state.config();
+    project.tracked = state.tracked();
+    project.invalidate_tracked_index();
+    ProjectInfoHost host(project);
+
+    const auto first = *host.binding("project");
+    CHECK(first && (*first)["files"].array.size() == state.tracked().size());
+    nift::RuntimeValue hierarchy;
+    std::string hierarchy_error;
+    CHECK(host.resolve_page_member("about", "children", hierarchy, hierarchy_error));
+    CHECK(hierarchy.is_array() && hierarchy.array.empty());
+
+    TrackedInfo added;
+    added.name = "about/post";
+    added.title = "Persistent Added";
+    project.tracked.push_back(added);
+    project.invalidate_tracked_index();
+    const auto after_track = *host.binding("project");
+    CHECK(after_track && after_track != first);
+    CHECK((*after_track)["files"].array.size() == state.tracked().size() + 1);
+    CHECK(host.resolve_page_member("about", "children", hierarchy, hierarchy_error));
+    CHECK(hierarchy.is_array() && hierarchy.array.size() == 1);
+    if (hierarchy.is_array() && hierarchy.array.size() == 1)
+        CHECK(hierarchy.array[0].string == ProjectInfoHost::page_ref_of("about/post"));
+
+    project.tracked.pop_back();
+    project.invalidate_tracked_index();
+    const auto after_untrack = *host.binding("project");
+    CHECK(after_untrack && after_untrack != after_track);
+    CHECK((*after_untrack)["files"].array.size() == state.tracked().size());
+    CHECK(host.resolve_page_member("about", "children", hierarchy, hierarchy_error));
+    CHECK(hierarchy.is_array() && hierarchy.array.empty());
+
+    CHECK(project.load_tracking());
+    const auto after_reload = *host.binding("project");
+    CHECK(after_reload && after_reload != after_untrack);
+    CHECK((*after_reload)["files"].array.size() == state.tracked().size());
+
+    write_file(project.root / ".nift/config.json",
+        R"({"config":{"content-dir":"content/","content-ext":".html","output-dir":"public/","output-ext":".html","default-template":"templates/template.html","incremental-mode":"modified","build-threads":2,"contracts":{"site":"content/site.json"},"schemas":["model/site.schema"],"taxonomies":["model/site.tax"]}})");
+    write_file(project.root / "model/site.schema",
+        "@schema(post){\ntitle: string\ncategory: taxonomy(categories)\n}\n");
+    write_file(project.root / "model/site.tax",
+        "@taxonomy(categories){\nhierarchical: false\n}\n");
+    write_file(project.root / "data/about.json",
+        R"({"title":"About","category":"Guides/Start"})");
+    CHECK(project.load_config());
+    TrackedInfo* about = project.find("about");
+    CHECK(about != nullptr);
+    if (about) {
+        about->type = "post";
+        about->frontmatter = "data/about.json";
+        project.invalidate_tracked_index();
+    }
+    const auto before_model_reload = *host.binding("project");
+    CHECK(before_model_reload && (*before_model_reload)["schemas"]["post"]["fields"].array.size() == 2);
+    CHECK(!(*before_model_reload)["taxonomy_info"]["categories"]["hierarchical"].boolean);
+    CHECK((*before_model_reload)["taxonomies"]["categories"].array.size() == 1);
+    CHECK(!(*before_model_reload)["taxonomies"]["categories"].array[0].has("parent"));
+
+    write_file(project.root / "model/site.schema",
+        "@schema(post){\ntitle: string\ncategory: taxonomy(categories)\nfeatured: bool = true\n}\n");
+    write_file(project.root / "model/site.tax",
+        "@taxonomy(categories){\nhierarchical: true\n}\n");
+    CHECK(project.build_names({"about"}, true) == 0);
+    const auto after_build = *host.binding("project");
+    CHECK(after_build && after_build != before_model_reload);
+    CHECK((*after_build)["files"].array.size() == state.tracked().size());
+    CHECK((*after_build)["schemas"]["post"]["fields"].array.size() == 3);
+    CHECK((*after_build)["taxonomy_info"]["categories"]["hierarchical"].boolean);
+    CHECK((*after_build)["taxonomies"]["categories"].array[0]["parent"].string == "Guides");
+}
+
 } // namespace
 
 int main() {
@@ -270,13 +354,18 @@ int main() {
     std::string error;
     CHECK(state.open(root, error));
     if (!state.root().empty()) {
-        std::unordered_map<std::string, std::shared_ptr<const json::Document>> bindings;
+        const auto project_value = state.runtime_project_value();
+        CHECK(project_value);
+        CHECK(project_value == state.runtime_project_value());
+
+        std::unordered_map<std::string, std::shared_ptr<const nift::RuntimeValue>> bindings;
         bindings["app"] = parse_json(R"({"name":"TestApp"})");
 
         test_host_capabilities(state);
         test_project_renders(state, bindings);
         test_zero_writes(state, bindings);
         test_concurrent_renders(state, bindings);
+        test_persistent_project_cache(state);
     }
 
     if (failures == 0) {

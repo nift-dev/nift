@@ -9,6 +9,7 @@
 #include <vector>
 
 namespace json { class Document; }
+namespace nift { class RuntimeValue; }
 
 // Read-only snapshot of a Nift project's rendering facts: .nift/config.json
 // and .nift/tracked.json plus the shared path geometry and read caches.
@@ -56,6 +57,8 @@ public:
     // uses for rendering. Never write to the paths read here.
     const std::string* read_shared_source(const std::filesystem::path& path) const;
     std::shared_ptr<const json::Document> read_shared_json(const std::filesystem::path& path, std::string& error) const;
+    std::shared_ptr<const nift::RuntimeValue> read_shared_runtime_json(const std::filesystem::path& path, std::string& error) const;
+    std::shared_ptr<const nift::RuntimeValue> runtime_project_value() const;
 
 private:
     void reset();
@@ -69,4 +72,7 @@ private:
     mutable std::unordered_map<std::string, std::unique_ptr<const std::string>> shared_source_cache_;
     mutable std::mutex json_cache_mutex_;
     mutable std::unordered_map<std::string, std::shared_ptr<const json::Document>> shared_json_cache_;
+    mutable std::unordered_map<std::string, std::shared_ptr<const nift::RuntimeValue>> shared_runtime_json_cache_;
+    mutable std::mutex project_value_mutex_;
+    mutable std::shared_ptr<const nift::RuntimeValue> runtime_project_value_;
 };

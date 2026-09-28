@@ -7,6 +7,7 @@
 #include "ProjectHost.h"
 #include "ProjectState.h"
 #include "RenderHost.h"
+#include "RuntimeJson.h"
 #include "ValueInternal.h"
 
 #include <cstdlib>
@@ -32,13 +33,14 @@ struct nift::Engine::Impl {
     std::unique_ptr<ScriptState> script_state;
 
     // Long-lived application-wide value bindings (engine.set / set_json).
-    std::unordered_map<std::string, std::shared_ptr<const json::Document>> defaults;
+    std::unordered_map<std::string, std::shared_ptr<const nift::RuntimeValue>> defaults;
     std::unordered_map<std::string, nift::Engine::HostFunction> host_functions;
 
     mutable std::mutex source_cache_mutex_;
     mutable std::unordered_map<std::string, std::unique_ptr<const std::string>> source_cache_;
     mutable std::mutex json_cache_mutex_;
     mutable std::unordered_map<std::string, std::shared_ptr<const json::Document>> json_cache_;
+    mutable std::unordered_map<std::string, std::shared_ptr<const nift::RuntimeValue>> runtime_json_cache_;
 
     // Project-aware mode (PA3/PA4): the validated immutable snapshot is shared
     // per generation. reload() swaps in a freshly built snapshot atomically
@@ -56,12 +58,24 @@ struct nift::Engine::Impl {
         const std::filesystem::path rel = normalized.lexically_relative(root.lexically_normal());
         return rel.empty() ? normalized.generic_string() : rel.generic_string();
     }
+
+    void clear_read_caches() {
+        {
+            std::lock_guard<std::mutex> lock(source_cache_mutex_);
+            source_cache_.clear();
+        }
+        {
+            std::lock_guard<std::mutex> lock(json_cache_mutex_);
+            json_cache_.clear();
+            runtime_json_cache_.clear();
+        }
+    }
 };
 
 class EngineHost : public RenderHost {
 public:
     EngineHost(nift::Engine::Impl& impl,
-               const std::unordered_map<std::string, std::shared_ptr<const json::Document>>* render_bindings,
+               const std::unordered_map<std::string, std::shared_ptr<const nift::RuntimeValue>>* render_bindings,
                const std::filesystem::path& current_output)
         : impl_(impl), render_bindings_(render_bindings), current_output_(current_output) {}
 
@@ -86,17 +100,18 @@ public:
 
     // Per-render Context overlays win over Engine defaults.
     bool has_host_callable(const std::string& name) const override { return impl_.host_functions.count(name) != 0; }
-    bool call_host_callable(const std::string& name, const std::vector<json::Document>& args, json::Document& out, std::string& error) const override {
-        auto it=impl_.host_functions.find(name);if(it==impl_.host_functions.end())return false;try{std::vector<nift::Value> av;av.reserve(args.size());for(const auto& d:args){nift::Value v;nift::ValueAccess::doc(v)=d;av.push_back(std::move(v));}nift::Value r=it->second(av);out=nift::ValueAccess::doc(r);return true;}catch(const std::exception& ex){error=std::string("host callable '")+name+"' failed: "+ex.what();return false;}catch(...){error=std::string("host callable '")+name+"' failed";return false;}
+    bool call_host_callable(const std::string& name, const std::vector<nift::RuntimeValue>& args, nift::RuntimeValue& out, std::string& error) const override {
+        auto it=impl_.host_functions.find(name);if(it==impl_.host_functions.end())return false;try{std::vector<nift::Value> av;av.reserve(args.size());for(const auto& value:args){nift::Value v;nift::ValueAccess::runtime(v)=value;av.push_back(std::move(v));}nift::Value r=it->second(av);out=nift::ValueAccess::runtime(r);return true;}catch(const std::exception& ex){error=std::string("host callable '")+name+"' failed: "+ex.what();return false;}catch(...){error=std::string("host callable '")+name+"' failed";return false;}
     }
 
-    const std::shared_ptr<const json::Document>* binding(const std::string& name) const override {
+    const std::shared_ptr<const nift::RuntimeValue>* binding(const std::string& name) const override {
         if (render_bindings_) {
             const auto it = render_bindings_->find(name);
             if (it != render_bindings_->end()) return &it->second;
         }
         const auto it = impl_.defaults.find(name);
-        return it == impl_.defaults.end() ? nullptr : &it->second;
+        if (it == impl_.defaults.end()) return nullptr;
+        return &it->second;
     }
 
     bool is_contract_name(const std::string&) const override { return false; }
@@ -158,7 +173,7 @@ public:
             return {nift::HostStatus::Found, std::string(value), ""};
         return {nift::HostStatus::NotFound, "", ""};
     }
-    bool environment_snapshot(json::Document& out, std::string& error) const override {
+    bool environment_snapshot(nift::RuntimeValue& out, std::string& error) const override {
         if (impl_.environment_provider) { error = "env(): custom environment providers are lookup-only and cannot be enumerated"; return false; }
         return nift_environment::process_snapshot(out, error);
     }
@@ -192,9 +207,38 @@ public:
         return document;
     }
 
+    std::shared_ptr<const nift::RuntimeValue> read_shared_runtime_json(
+        const std::filesystem::path& path, std::string& error) const override {
+        const std::string key = path.lexically_normal().generic_string();
+        {
+            std::lock_guard<std::mutex> lock(impl_.json_cache_mutex_);
+            const auto it = impl_.runtime_json_cache_.find(key);
+            if (it != impl_.runtime_json_cache_.end()) return it->second;
+        }
+        std::optional<std::string> contents;
+        if (impl_.loader) {
+            nift::HostResult result = impl_.loader(key);
+            if (result.status == nift::HostStatus::Error) { error = std::move(result.error); return {}; }
+            if (result.status == nift::HostStatus::NotFound) { error = "JSON file does not exist"; return {}; }
+            contents = std::move(result.value);
+        } else {
+            if (!filesystem::file_readable(path)) { error = "JSON file is not readable"; return {}; }
+            contents = filesystem::read_file(path);
+        }
+        json::Document document;
+        if (!nift_json::parse(*contents, document, error)) return {};
+        auto value = std::make_shared<const nift::RuntimeValue>(nift::runtime_from_json(document));
+        {
+            std::lock_guard<std::mutex> lock(impl_.json_cache_mutex_);
+            const auto [it, inserted] = impl_.runtime_json_cache_.emplace(key, value);
+            if (!inserted) return it->second;
+        }
+        return value;
+    }
+
 private:
     nift::Engine::Impl& impl_;
-    const std::unordered_map<std::string, std::shared_ptr<const json::Document>>* render_bindings_;
+    const std::unordered_map<std::string, std::shared_ptr<const nift::RuntimeValue>>* render_bindings_;
     std::filesystem::path current_output_;
 };
 
@@ -278,11 +322,11 @@ void Engine::set_platform(std::string platform) {
 
 ScriptResult Engine::execute(std::string_view script, std::string cmd, std::vector<std::string> args) {
     std::lock_guard<std::mutex> lock(impl_->script_mutex_); if(!impl_->script_state)impl_->script_state=std::make_unique<Impl::ScriptState>(*impl_);impl_->script_state->parser.set_script_invocation(std::move(cmd),std::move(args));
-    json::Document doc;std::string error;ScriptResult out;if(!impl_->script_state->parser.run_embedded_script(std::string(script),"<embed>",doc,error)){out.error_.message=std::move(error);out.error_.source="<embed>";return out;}ValueAccess::doc(out.value_)=std::move(doc);out.ok_=true;return out;
+    RuntimeValue value;std::string error;ScriptResult out;if(!impl_->script_state->parser.run_embedded_script(std::string(script),"<embed>",value,error)){out.error_.message=std::move(error);out.error_.source="<embed>";return out;}ValueAccess::runtime(out.value_)=std::move(value);out.ok_=true;return out;
 }
 
 ScriptResult Engine::evaluate(std::string_view expression) {
-    std::lock_guard<std::mutex> lock(impl_->script_mutex_);if(!impl_->script_state){impl_->script_state=std::make_unique<Impl::ScriptState>(*impl_);json::Document init;std::string ie;impl_->script_state->parser.run_embedded_script("","<embed>",init,ie);}json::Document doc;std::string error;ScriptResult out;if(!impl_->script_state->parser.eval_expression(std::string(expression),doc,error)){out.error_.message=std::move(error);out.error_.source="<embed>";return out;}ValueAccess::doc(out.value_)=std::move(doc);out.ok_=true;return out;
+    std::lock_guard<std::mutex> lock(impl_->script_mutex_);if(!impl_->script_state){impl_->script_state=std::make_unique<Impl::ScriptState>(*impl_);RuntimeValue init;std::string ie;impl_->script_state->parser.run_embedded_script("","<embed>",init,ie);}RuntimeValue value;std::string error;ScriptResult out;if(!impl_->script_state->parser.eval_expression(std::string(expression),value,error)){out.error_.message=std::move(error);out.error_.source="<embed>";return out;}ValueAccess::runtime(out.value_)=std::move(value);out.ok_=true;return out;
 }
 
 bool Engine::register_function(std::string name, HostFunction function) {
@@ -293,7 +337,7 @@ bool Engine::register_function(std::string name, HostFunction function) {
 }
 
 ScriptResult Engine::call(std::string_view name, const std::vector<Value>& args) {
-    std::lock_guard<std::mutex> lock(impl_->script_mutex_);ScriptResult out;if(!impl_->script_state){out.error_.message="no embedded script has been executed";out.error_.source="<embed>";return out;}std::vector<json::Document> av;av.reserve(args.size());for(const auto& v:args)av.push_back(ValueAccess::doc(v));json::Document result;std::string error;if(!impl_->script_state->parser.invoke_callable(std::string(name),av,result,error)){out.error_.message=std::move(error);out.error_.source="<embed>";return out;}ValueAccess::doc(out.value_)=std::move(result);out.ok_=true;return out;
+    std::lock_guard<std::mutex> lock(impl_->script_mutex_);ScriptResult out;if(!impl_->script_state){out.error_.message="no embedded script has been executed";out.error_.source="<embed>";return out;}std::vector<RuntimeValue> av;av.reserve(args.size());for(const auto& v:args)av.push_back(ValueAccess::runtime(v));RuntimeValue result;std::string error;if(!impl_->script_state->parser.invoke_callable(std::string(name),av,result,error)){out.error_.message=std::move(error);out.error_.source="<embed>";return out;}ValueAccess::runtime(out.value_)=std::move(result);out.ok_=true;return out;
 }
 
 bool Engine::reload(std::string* error) {
@@ -342,9 +386,11 @@ RenderResult Engine::render(std::string_view page_name, const Context& context) 
 
     // Context overlays win over Engine defaults; both are host bindings the
     // parser resolves before @json/contracts, exactly like the standalone seam.
-    std::unordered_map<std::string, std::shared_ptr<const json::Document>> render_bindings = impl_->defaults;
+    std::unordered_map<std::string, std::shared_ptr<const RuntimeValue>> render_bindings;
+    for (const auto& [name, value] : impl_->defaults)
+        render_bindings[name] = value;
     for (const auto& [name, value] : context.bindings_)
-        render_bindings[name] = std::make_shared<json::Document>(ValueAccess::doc(value));
+        render_bindings[name] = std::make_shared<RuntimeValue>(ValueAccess::runtime(value));
 
     ProjectHost host(*snapshot, &render_bindings, impl_->environment_provider);
     Parser parser(host, info);
@@ -355,9 +401,10 @@ RenderResult Engine::render(std::string_view page_name) {
     return render(page_name, Context{});
 }
 
-void Engine::set_root(std::filesystem::path root) { impl_->root = std::move(root); }
+void Engine::set_root(std::filesystem::path root) { impl_->root = std::move(root); impl_->clear_read_caches(); }
 void Engine::set_loader(std::function<nift::HostResult(std::string_view path)> loader) {
     impl_->loader = std::move(loader);
+    impl_->clear_read_caches();
 }
 
 void Engine::set_loader(std::function<std::optional<std::string>(std::string_view path)> loader) {
@@ -366,6 +413,7 @@ void Engine::set_loader(std::function<std::optional<std::string>(std::string_vie
         if (value) return {nift::HostStatus::Found, std::move(*value), ""};
         return {nift::HostStatus::NotFound, "", ""};
     };
+    impl_->clear_read_caches();
 }
 
 void Engine::set_environment_provider(std::function<nift::HostResult(std::string_view name)> provider) {
@@ -383,7 +431,7 @@ void Engine::set_environment_provider(std::function<std::optional<std::string>(s
 bool Engine::set(std::string name, Value value) {
     if (!nift::detail::valid_binding_identifier(name) || nift::detail::structural_builtin_name(name))
         return false;
-    impl_->defaults[std::move(name)] = std::make_shared<json::Document>(ValueAccess::doc(value));
+    impl_->defaults[std::move(name)] = std::make_shared<RuntimeValue>(ValueAccess::runtime(value));
     return true;
 }
 bool Engine::set(std::string name, std::string value) {
@@ -401,7 +449,7 @@ bool Engine::set_json(std::string name, std::string_view json_text) {
     auto document = std::make_shared<json::Document>();
     std::string error;
     if (!nift_json::parse(std::string(json_text), *document, error)) return false;
-    impl_->defaults[std::move(name)] = std::move(document);
+    impl_->defaults[std::move(name)] = std::make_shared<RuntimeValue>(runtime_from_json(*document));
     return true;
 }
 
@@ -411,9 +459,9 @@ RenderResult Engine::render(const Source& page, const Source& page_template, con
     TrackedInfo info;
     info.name = context.page_name_;
     info.title = context.title_;
-    std::unordered_map<std::string, std::shared_ptr<const json::Document>> render_bindings;
+    std::unordered_map<std::string, std::shared_ptr<const RuntimeValue>> render_bindings;
     for (const auto& [name, value] : context.bindings_)
-        render_bindings[name] = std::make_shared<json::Document>(ValueAccess::doc(value));
+        render_bindings[name] = std::make_shared<RuntimeValue>(ValueAccess::runtime(value));
     EngineHost host(*impl_, &render_bindings, context.current_output_);
     Parser parser(host, info);
     return RenderResultBuilder::build(parser.render_composed(template_render_source, page_render_source,
@@ -429,9 +477,9 @@ RenderResult Engine::render(const Source& partial, const Context& context) {
     TrackedInfo info;
     info.name = context.page_name_;
     info.title = context.title_;
-    std::unordered_map<std::string, std::shared_ptr<const json::Document>> render_bindings;
+    std::unordered_map<std::string, std::shared_ptr<const RuntimeValue>> render_bindings;
     for (const auto& [name, value] : context.bindings_)
-        render_bindings[name] = std::make_shared<json::Document>(ValueAccess::doc(value));
+        render_bindings[name] = std::make_shared<RuntimeValue>(ValueAccess::runtime(value));
     EngineHost host(*impl_, &render_bindings, context.current_output_);
     Parser parser(host, info);
     return RenderResultBuilder::build(parser.render_composed(partial_render_source, std::nullopt,

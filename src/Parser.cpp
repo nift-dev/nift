@@ -1,4 +1,5 @@
 #include "JsonFile.h"
+#include "RuntimeJson.h"
 #include "Parser.h"
 #include "FrontMatter.h"
 #include "Console.h"
@@ -45,6 +46,20 @@
 
 namespace fs = std::filesystem;
 
+static bool parse_runtime_json(const std::string& text, nift::RuntimeValue& value,
+                               std::string& error) {
+    json::Document document;
+    if (!nift_json::parse(text, document, error)) return false;
+    value = nift::runtime_from_json(document);
+    return true;
+}
+
+static bool call_runtime_host(const RenderHost& host, const std::string& name,
+                               const std::vector<nift::RuntimeValue>& args,
+                               nift::RuntimeValue& out, std::string& error) {
+    return host.call_host_callable(name, args, out, error);
+}
+
 Parser::FfiLibraryInstance::~FfiLibraryInstance() {
     if (!handle || closed) return;
 #ifdef _WIN32
@@ -53,7 +68,7 @@ Parser::FfiLibraryInstance::~FfiLibraryInstance() {
     dlclose(handle);
 #endif
 }
-static int nift_binding_type(const json::Document& value) {
+static int nift_binding_type(const nift::RuntimeValue& value) {
     if (value.is_null()) return 0;
     if (value.is_bool()) return 1;
     if (value.is_number()) return std::trunc(value.num) == value.num ? 2 : 3;
@@ -233,7 +248,7 @@ bool strip_presentation_chain(const std::string& text, std::string& base, bool& 
 // (computed expressions, JSON, injection) keeps value-based classification; a
 // parsed JSON number keeps its established representation.
 int Parser::nift_binding_type_from_text(const std::string& source,
-                                        const json::Document& value) const {
+                                        const nift::RuntimeValue& value) const {
     const int t = expression_type(source);
     if (t == 3) return 3;
     if (t == 2) return nift_binding_type(value);
@@ -467,23 +482,23 @@ bool parse_for_collection_clause(const std::string& clause,
     const auto space=tail.find_last_of(" \t"); if(space==std::string::npos){error="@for sorting syntax is @for(item : collection by item.field asc|desc){...}";return false;}
     sort_expression=tail.substr(0,space); const std::string direction=tail.substr(space+1); if(direction!="asc"&&direction!="desc"){error="@for sorting syntax is @for(item : collection by item.field asc|desc){...}";return false;} descending=direction=="desc"; return true;
 }
-std::shared_ptr<const json::Document> make_loop_metadata(std::size_t index,
+std::shared_ptr<const nift::RuntimeValue> make_loop_metadata(std::size_t index,
                                                          std::size_t length) {
-    auto loop = std::make_shared<json::Document>(json::Document::make_object());
-    (*loop)["index"] = json::Document(static_cast<double>(index + 1));
-    (*loop)["index0"] = json::Document(static_cast<double>(index));
-    (*loop)["first"] = json::Document(index == 0);
-    (*loop)["last"] = json::Document(index + 1 == length);
-    (*loop)["length"] = json::Document(static_cast<double>(length));
+    auto loop = std::make_shared<nift::RuntimeValue>(nift::RuntimeValue::make_object());
+    (*loop)["index"] = nift::RuntimeValue(static_cast<double>(index + 1));
+    (*loop)["index0"] = nift::RuntimeValue(static_cast<double>(index));
+    (*loop)["first"] = nift::RuntimeValue(index == 0);
+    (*loop)["last"] = nift::RuntimeValue(index + 1 == length);
+    (*loop)["length"] = nift::RuntimeValue(static_cast<double>(length));
     return loop;
 }
 
-bool sortable_scalar(const json::Document& value) {
+bool sortable_scalar(const nift::RuntimeValue& value) {
     return value.is_number() || value.is_string();
 }
 
-int compare_sort_keys(const json::Document& left, const json::Document& right) {
-    if (left.is_number()) return left.num < right.num ? -1 : (left.num > right.num ? 1 : 0);
+int compare_sort_keys(const nift::RuntimeValue& left, const nift::RuntimeValue& right) {
+    if (left.is_number()) return nift::runtime_compare_numbers(left, right);
     return left.string < right.string ? -1 : (left.string > right.string ? 1 : 0);
 }
 
@@ -673,20 +688,20 @@ Parser::Parser(RenderHost& host, TrackedInfo& tracked_info)
     : host_(host), tracked_info_(tracked_info) {
     variable_scopes_.emplace_back();
     if (!tracked_info_.name.empty()) {
-        json::Document m=json::Document::make_object(); bool from_project=false; std::string page_metadata_error;
+        nift::RuntimeValue metadata=nift::RuntimeValue::make_object(); bool from_project=false; std::string page_metadata_error;
         // Per-page model-equivalent metadata (front matter + type + schema
         // validation) computed without constructing the project-wide query
         // model, so an ordinary build never pays for project features it does
         // not use. Hosts without the content model fall back to direct parsing.
-        if (host_.page_project_metadata(tracked_info_, m, page_metadata_error)) from_project = true;
-        if(!from_project){std::string e;auto cp=host_.content_path(tracked_info_);if(filesystem::file_exists(cp)){auto parsed=frontmatter::parse_inline(filesystem::read_file(cp));if(tracked_info_.frontmatter&&parsed.present)m["_error"]=json::Document("multiple front matter sources");else if(tracked_info_.frontmatter){frontmatter::load_external(host_.root(),*tracked_info_.frontmatter,m,e);if(!e.empty())m["_error"]=json::Document(e);}else if(parsed.present&&!parsed.error.empty())m["_error"]=json::Document(parsed.error);else if(parsed.present)m=parsed.value;}}
-        json_bindings_["frontmatter"]=std::make_shared<const json::Document>(std::move(m));
+        if (host_.page_project_metadata(tracked_info_, metadata, page_metadata_error)) from_project = true;
+        if(!from_project){json::Document metadata_document=json::Document::make_object();std::string e;auto cp=host_.content_path(tracked_info_);if(filesystem::file_exists(cp)){auto parsed=frontmatter::parse_inline(filesystem::read_file(cp));if(tracked_info_.frontmatter&&parsed.present)metadata_document["_error"]=json::Document("multiple front matter sources");else if(tracked_info_.frontmatter){frontmatter::load_external(host_.root(),*tracked_info_.frontmatter,metadata_document,e);if(!e.empty())metadata_document["_error"]=json::Document(e);}else if(parsed.present&&!parsed.error.empty())metadata_document["_error"]=json::Document(parsed.error);else if(parsed.present)metadata_document=parsed.value;}metadata=nift::runtime_from_json(metadata_document);}
+        json_bindings_["frontmatter"]=std::make_shared<const nift::RuntimeValue>(std::move(metadata));
         // Current page for hierarchy composition (page.parent etc.). The
         // reference is constructed directly without touching the hierarchy
         // index, which is built lazily only when a hierarchy member is
         // actually accessed (pay-for-use).
         if (!tracked_info_.name.empty()) {
-            auto page_sp=std::make_shared<json::Document>(json::Document(std::string("\x1fnift:page:")+tracked_info_.name));
+            auto page_sp=std::make_shared<nift::RuntimeValue>(nift::RuntimeValue(std::string("\x1fnift:page:")+tracked_info_.name));
             variable_scopes_.back().emplace("page", VariableBinding{page_sp, nift_binding_type(*page_sp), false, false});
         }
     }
@@ -697,7 +712,7 @@ Parser::~Parser() {
     for(auto& st:owned_thread_instances_){std::lock_guard<std::mutex> guard(st->join_mutex);if(st->worker.joinable())st->worker.join();}
 }
 
-bool Parser::eval_expression(const std::string& expression, json::Document& value, std::string& error) {
+bool Parser::eval_expression(const std::string& expression, nift::RuntimeValue& value, std::string& error) {
     standalone_script_host_ = true;
     return evaluate_expression(expression, value, error);
 }
@@ -896,7 +911,7 @@ bool Parser::find_balanced(const std::string& source,
 }
 
 bool Parser::resolve_json_value(const std::string& expression,
-                                std::shared_ptr<const json::Document>& value,
+                                std::shared_ptr<const nift::RuntimeValue>& value,
                                 std::string& error) {
     std::size_t position = 0;
 
@@ -917,7 +932,7 @@ bool Parser::resolve_json_value(const std::string& expression,
     std::string root_name;
     if (!identifier(root_name)) return false;
 
-    std::shared_ptr<const json::Document> current;
+    std::shared_ptr<const nift::RuntimeValue> current;
     bool contract_binding = false;
     // Host-supplied bindings (Embedded Nift engine defaults / Context overlays)
     // resolve before @json bindings, contracts and built-in metadata.
@@ -969,7 +984,7 @@ bool Parser::resolve_json_value(const std::string& expression,
                 current = cached->second;
             } else {
                 std::string contract_error;
-                auto document = host_.read_shared_json(contract_path, contract_error);
+                auto document = host_.read_shared_runtime_json(contract_path, contract_error);
                 if (!document) {
                     error = "contract '" + root_name + "': failed to parse " + contract_path_argument +
                             (contract_error.empty() ? "" : " (" + contract_error + ")");
@@ -994,12 +1009,12 @@ bool Parser::resolve_json_value(const std::string& expression,
             }
             if (current->is_string() && current->string.rfind("\x1fnift:page:",0)==0) {
                 result_.dependencies.insert(host_.relative(host_.root() / ".nift/hierarchy.fingerprint"));
-                json::Document resolved; std::string perr;
+                nift::RuntimeValue resolved; std::string perr;
                 if (!host_.resolve_page_member(current->string.substr(11), member, resolved, perr)) {
                     error = perr.empty() ? ("page has no member: " + member) : perr;
                     return true;
                 }
-                current = std::make_shared<const json::Document>(std::move(resolved));
+                current = std::make_shared<const nift::RuntimeValue>(std::move(resolved));
                 continue;
             }
             if (!current->is_object()) {
@@ -1018,8 +1033,8 @@ bool Parser::resolve_json_value(const std::string& expression,
                 return true;
             }
 
-            const json::Document* child = &(*current)[member];
-            current = std::shared_ptr<const json::Document>(current, child);
+            const nift::RuntimeValue* child = &(*current)[member];
+            current = std::shared_ptr<const nift::RuntimeValue>(current, child);
             continue;
         }
 
@@ -1033,21 +1048,21 @@ bool Parser::resolve_json_value(const std::string& expression,
                     if(quoted||token.empty()){
                         error="JSON array indices must be non-negative integers in '"+expression+"'";return true;
                     }
-                    json::Document computed;
+                    nift::RuntimeValue computed;
                     if(!evaluate_expression(token,computed,error)||!computed.is_number()||computed.num<0||std::trunc(computed.num)!=computed.num){
                         if(error.empty())error="JSON array indices must be non-negative integers in '"+expression+"'";
                         return true;
                     }
                     index=(std::size_t)computed.num;
                 }else{try{index=(std::size_t)std::stoull(token);}catch(...){error="JSON array index is out of range in '"+expression+"'";return true;}}
-                if(index>=current->array.size()){error="JSON array index "+std::to_string(index)+" is out of range in '"+expression+"'";return true;}const json::Document* child=&(*current)[index];current=std::shared_ptr<const json::Document>(current,child);continue;
+                if(index>=current->array.size()){error="JSON array index "+std::to_string(index)+" is out of range in '"+expression+"'";return true;}const nift::RuntimeValue* child=&(*current)[index];current=std::shared_ptr<const nift::RuntimeValue>(current,child);continue;
             }
             if(current->is_object()){
                 std::string key;if(quoted){if(token.size()<2){error="invalid JSON object key";return true;}key=token.substr(1,token.size()-2);}else{VariableBinding* kb=nullptr;for(auto scope=variable_scopes_.rbegin();scope!=variable_scopes_.rend();++scope){auto it=scope->find(token);if(it!=scope->end()){kb=&it->second;break;}}if(!kb||!kb->value||!kb->value->is_string()){
-                    json::Document computed;
+                    nift::RuntimeValue computed;
                     if(!evaluate_expression(token,computed,error)||!computed.is_string()){if(error.empty())error="JSON object index must be a quoted string, string binding, or string expression in '"+expression+"'";return true;}
                     key=computed.string;
-                }else{key=kb->value->string;}}if(!current->has(key)){error="JSON object has no key '"+key+"'";return true;}const json::Document* child=&(*current)[key];current=std::shared_ptr<const json::Document>(current,child);continue;
+                }else{key=kb->value->string;}}if(!current->has(key)){error="JSON object has no key '"+key+"'";return true;}const nift::RuntimeValue* child=&(*current)[key];current=std::shared_ptr<const nift::RuntimeValue>(current,child);continue;
             }
             error="cannot index JSON value in '"+expression+"'";return true;
         }
@@ -1061,7 +1076,7 @@ bool Parser::resolve_json_value(const std::string& expression,
 }
 
 bool Parser::json_value(const std::string& expression, std::string& value, std::string& error) {
-    std::shared_ptr<const json::Document> document;
+    std::shared_ptr<const nift::RuntimeValue> document;
     if (!resolve_json_value(expression, document, error)) return false;
     if (!error.empty()) return true;
 
@@ -1113,7 +1128,7 @@ bool Parser::interpolate_parameter(const std::string& parameter,
         }
 
         const std::string expression = parameter.substr(i + 2, end - i - 2);
-        json::Document expression_value;
+        nift::RuntimeValue expression_value;
         std::string expression_error;
         if (evaluate_expression(expression, expression_value, expression_error)) {
             if (expression_value.is_array() || expression_value.is_object()) {
@@ -1145,15 +1160,15 @@ bool Parser::interpolate_parameter(const std::string& parameter,
 }
 
 bool Parser::resolve_pagination_value(const std::string& expression,
-                                      std::shared_ptr<const json::Document>& value) const {
+                                      std::shared_ptr<const nift::RuntimeValue>& value) const {
     if (!pagination_context_active_) return false;
-    if (expression == "paginate.items") value = std::make_shared<const json::Document>(pagination_items_text_);
-    else if (expression == "paginate.current") value = std::make_shared<const json::Document>(static_cast<double>(pagination_current_));
-    else if (expression == "paginate.total") value = std::make_shared<const json::Document>(static_cast<double>(pagination_total_));
-    else if (expression == "paginate.first") value = std::make_shared<const json::Document>(pagination_current_ == 1);
-    else if (expression == "paginate.last") value = std::make_shared<const json::Document>(pagination_current_ == pagination_total_);
-    else if (expression == "paginate.previous") value = std::make_shared<const json::Document>(static_cast<double>(pagination_current_ > 1 ? pagination_current_ - 1 : 1));
-    else if (expression == "paginate.next") value = std::make_shared<const json::Document>(static_cast<double>(pagination_current_ < pagination_total_ ? pagination_current_ + 1 : pagination_total_));
+    if (expression == "paginate.items") value = std::make_shared<const nift::RuntimeValue>(pagination_items_text_);
+    else if (expression == "paginate.current") value = std::make_shared<const nift::RuntimeValue>(static_cast<double>(pagination_current_));
+    else if (expression == "paginate.total") value = std::make_shared<const nift::RuntimeValue>(static_cast<double>(pagination_total_));
+    else if (expression == "paginate.first") value = std::make_shared<const nift::RuntimeValue>(pagination_current_ == 1);
+    else if (expression == "paginate.last") value = std::make_shared<const nift::RuntimeValue>(pagination_current_ == pagination_total_);
+    else if (expression == "paginate.previous") value = std::make_shared<const nift::RuntimeValue>(static_cast<double>(pagination_current_ > 1 ? pagination_current_ - 1 : 1));
+    else if (expression == "paginate.next") value = std::make_shared<const nift::RuntimeValue>(static_cast<double>(pagination_current_ < pagination_total_ ? pagination_current_ + 1 : pagination_total_));
     else return false;
     return true;
 }
@@ -1186,7 +1201,7 @@ std::string Parser::path_to_page(std::size_t page) {
     return relative;
 }
 
-bool Parser::scalar_literal(const std::string& text, json::Document& value, std::string& error) const {
+bool Parser::scalar_literal(const std::string& text, nift::RuntimeValue& value, std::string& error) const {
     const std::string trimmed = trim_copy(text);
     if (trimmed.empty()) {
         error = "expected a value in @if condition";
@@ -1226,22 +1241,22 @@ bool Parser::scalar_literal(const std::string& text, json::Document& value, std:
                 result += trimmed[i];
             }
         }
-        value = json::Document(result);
+        value = nift::RuntimeValue(result);
         return true;
     }
 
-    if (trimmed == "true") { value = json::Document(true); return true; }
-    if (trimmed == "false") { value = json::Document(false); return true; }
-    if (trimmed == "null") { value = json::Document(nullptr); return true; }
+    if (trimmed == "true") { value = nift::RuntimeValue(true); return true; }
+    if (trimmed == "false") { value = nift::RuntimeValue(false); return true; }
+    if (trimmed == "null") { value = nift::RuntimeValue(nullptr); return true; }
 
     const bool floating_literal = trimmed.find('.') != std::string::npos || trimmed.find('e') != std::string::npos || trimmed.find('E') != std::string::npos;
     if (!floating_literal) {
         std::int64_t integer = 0;
         const auto parsed = std::from_chars(trimmed.data(), trimmed.data() + trimmed.size(), integer);
         if (parsed.ec == std::errc() && parsed.ptr == trimmed.data() + trimmed.size()) {
-            value = json::Document(static_cast<double>(integer));
+            value = nift::RuntimeValue(static_cast<double>(integer));
             if (integer > 9007199254740992LL || integer < -9007199254740992LL) {
-                value.type = json::Type::StrNumber;
+                value.type = nift::RuntimeType::StrNumber;
                 value.string = trimmed;
             }
             return true;
@@ -1250,25 +1265,25 @@ bool Parser::scalar_literal(const std::string& text, json::Document& value, std:
     }
     char* end = nullptr;
     const double number = std::strtod(trimmed.c_str(), &end);
-    if (floating_literal && end && *end == '\0' && std::isfinite(number)) { value = json::Document(number); return true; }
+    if (floating_literal && end && *end == '\0' && std::isfinite(number)) { value = nift::RuntimeValue(number); return true; }
 
     error = "expected JSON path or scalar literal in @if condition: " + trimmed;
     return false;
 }
 
-std::string Parser::render_expression_value(const json::Document& value) const {
+std::string Parser::render_expression_value(const nift::RuntimeValue& value) const {
     if (value.is_string() && value.string.rfind("\x1fnift:enum:",0)==0) { const auto last=value.string.rfind(':'); const auto prev=last==std::string::npos?last:value.string.rfind(':',last-1); if(prev!=std::string::npos&&last!=std::string::npos)return value.string.substr(prev+1,last-prev-1); }
     if (value.is_string() && value.string.rfind("\x1fnift:atomic:",0)==0) { auto it=atomic_instances_.find(value.string.substr(13)); if(it!=atomic_instances_.end()){ if(it->second->kind==AtomicInstance::Kind::Bool) return it->second->bool_value.load()?"true":"false"; const auto v=it->second->int_value.load(); return std::to_string(v); } }
     if (value.is_string()) return value.string;
     return value.dump(0);
 }
 
-bool Parser::serialize_value(const json::Document& value, bool pretty, std::string& output, std::string& error, int depth) const {
+bool Parser::serialize_value(const nift::RuntimeValue& value, bool pretty, std::string& output, std::string& error, int depth) const {
     if(value.is_string()&&value.string.rfind("\x1fnift:enum:",0)==0){const auto p=value.string.rfind(':');if(p==std::string::npos){error="invalid enum value";return false;}output+=value.string.substr(p+1);return true;}
     if (depth > 128) { error = "value serialization depth exceeded"; return false; }
     const std::string pad(pretty ? static_cast<std::size_t>(depth * 2) : 0, ' ');
     const std::string child_pad(pretty ? static_cast<std::size_t>((depth + 1) * 2) : 0, ' ');
-    auto append_sequence = [&](const std::vector<json::Document>& values, const std::string& open, const std::string& close, std::string& dst)->bool {
+    auto append_sequence = [&](const std::vector<nift::RuntimeValue>& values, const std::string& open, const std::string& close, std::string& dst)->bool {
         dst += open;
         if (pretty && !values.empty()) dst += "\n";
         for (std::size_t i = 0; i < values.size(); ++i) {
@@ -1290,7 +1305,7 @@ bool Parser::serialize_value(const json::Document& value, bool pretty, std::stri
         if (pretty && !value.object.empty()) output += "\n";
         for (std::size_t i = 0; i < value.object.size(); ++i) {
             if (pretty) output += child_pad;
-            output += json::Document(value.object[i].first).dump(0);
+            output += nift::RuntimeValue(value.object[i].first).dump(0);
             output += pretty ? ": " : ":";
             std::string item;
             if (!serialize_value(value.object[i].second, pretty, item, error, depth + 1)) return false;
@@ -1362,7 +1377,7 @@ bool Parser::serialize_value(const json::Document& value, bool pretty, std::stri
     return true;
 }
 
-bool Parser::evaluate_collection_value(const std::string& expression, json::Document& value, std::string& error) {
+bool Parser::evaluate_collection_value(const std::string& expression, nift::RuntimeValue& value, std::string& error) {
     const std::string text = trim_copy(expression);
     if (text.empty()) { error = "collection expression cannot be empty"; return false; }
     if (text.front() != '@') return evaluate_expression(text, value, error);
@@ -1380,7 +1395,7 @@ bool Parser::evaluate_collection_value(const std::string& expression, json::Docu
     if (!find_balanced(text, name_end, '(', ')', close) || close + 1 != text.size()) { error = "malformed @" + function + " call"; return false; }
     const std::string body = trim_copy(text.substr(name_end + 1, close - name_end - 1));
 
-    auto truthy = [](const json::Document& d) {
+    auto truthy = [](const nift::RuntimeValue& d) {
         if (d.is_bool()) return d.boolean;
         if (d.is_null()) return false;
         if (d.is_number()) return d.num != 0.0;
@@ -1389,7 +1404,7 @@ bool Parser::evaluate_collection_value(const std::string& expression, json::Docu
         if (d.is_object()) return !d.object.empty();
         return false;
     };
-    auto collection_arg = [&](const std::string& raw, json::Document& out) {
+    auto collection_arg = [&](const std::string& raw, nift::RuntimeValue& out) {
         if (!evaluate_collection_value(raw, out, error)) return false;
         if (!out.is_array()) { error = function + ": collection must resolve to an array"; return false; }
         return true;
@@ -1433,9 +1448,9 @@ bool Parser::evaluate_collection_value(const std::string& expression, json::Docu
         }
         return true;
     };
-    auto with_bindings = [&](const std::vector<std::string>& bindings, const std::shared_ptr<const json::Document>& root,
-                             const json::Document* element, const std::function<bool()>& action) {
-        std::vector<std::pair<bool, std::shared_ptr<const json::Document>>> previous;
+    auto with_bindings = [&](const std::vector<std::string>& bindings, const std::shared_ptr<const nift::RuntimeValue>& root,
+                             const nift::RuntimeValue* element, const std::function<bool()>& action) {
+        std::vector<std::pair<bool, std::shared_ptr<const nift::RuntimeValue>>> previous;
         previous.reserve(bindings.size());
         auto restore = [&]() {
             for (std::size_t i = 0; i < bindings.size(); ++i) {
@@ -1448,25 +1463,25 @@ bool Parser::evaluate_collection_value(const std::string& expression, json::Docu
             previous.push_back({it != json_bindings_.end(), it != json_bindings_.end() ? it->second : nullptr});
         }
         if (bindings.size() == 1) {
-            json_bindings_[bindings[0]] = std::shared_ptr<const json::Document>(root, element);
+            json_bindings_[bindings[0]] = std::shared_ptr<const nift::RuntimeValue>(root, element);
         } else {
             if (!element->is_array() || element->array.size() != bindings.size()) {
                 error = function + ": tuple binding arity must match each array item";
                 return false;
             }
             for (std::size_t i = 0; i < bindings.size(); ++i)
-                json_bindings_[bindings[i]] = std::shared_ptr<const json::Document>(root, &element->array[i]);
+                json_bindings_[bindings[i]] = std::shared_ptr<const nift::RuntimeValue>(root, &element->array[i]);
         }
         const bool ok = action();
         restore();
         return ok;
     };
-    auto comparable = [&](const json::Document& a, const json::Document& b, int& result) {
+    auto comparable = [&](const nift::RuntimeValue& a, const nift::RuntimeValue& b, int& result) {
         if (a.type != b.type || (!a.is_number() && !a.is_string())) {
             error = function + ": values must be numbers or strings of the same type";
             return false;
         }
-        if (a.is_number()) result = a.num < b.num ? -1 : (a.num > b.num ? 1 : 0);
+        if (a.is_number()) result = nift::runtime_compare_numbers(a, b);
         else result = a.string < b.string ? -1 : (a.string > b.string ? 1 : 0);
         return true;
     };
@@ -1476,14 +1491,14 @@ bool Parser::evaluate_collection_value(const std::string& expression, json::Docu
         bool params_ok = false;
         auto params = parse_parameters(body, params_ok);
         if (!params_ok || params.size() != 3) { error = "slice: expected collection, position and length"; return false; }
-        json::Document source; if (!collection_arg(params[0], source)) return false;
+        nift::RuntimeValue source; if (!collection_arg(params[0], source)) return false;
         auto index = [&](const std::string& raw, std::size_t& out, const char* label) {
-            json::Document v; if (!evaluate_expression(raw, v, error)) return false;
+            nift::RuntimeValue v; if (!evaluate_expression(raw, v, error)) return false;
             if (!v.is_number() || v.num < 0 || std::trunc(v.num) != v.num) { error = std::string("slice: ") + label + " must be a non-negative integer"; return false; }
             out = static_cast<std::size_t>(v.num); return true;
         };
         std::size_t pos = 0, len = 0; if (!index(params[1], pos, "position") || !index(params[2], len, "length")) return false;
-        value = json::Document::make_array();
+        value = nift::RuntimeValue::make_array();
         const std::size_t end = std::min(source.array.size(), pos > source.array.size() ? source.array.size() : pos + std::min(len, source.array.size() - pos));
         if (pos < source.array.size()) value.array.insert(value.array.end(), source.array.begin() + pos, source.array.begin() + end);
         return true;
@@ -1491,23 +1506,30 @@ bool Parser::evaluate_collection_value(const std::string& expression, json::Docu
     if (function == "reverse" || function == "distinct") {
         bool params_ok = false; auto params = parse_parameters(body, params_ok);
         if (!params_ok || params.size() != 1) { error = function + ": expected one collection"; return false; }
-        json::Document source; if (!collection_arg(params[0], source)) return false;
-        value = json::Document::make_array();
+        nift::RuntimeValue source; if (!collection_arg(params[0], source)) return false;
+        value = nift::RuntimeValue::make_array();
         if (function == "reverse") { value.array.assign(source.array.rbegin(), source.array.rend()); return true; }
-        std::unordered_set<std::string> seen;
-        for (const auto& item : source.array) { const std::string key = item.dump(0); if (seen.insert(key).second) value.array.push_back(item); }
+        std::unordered_map<std::string, std::vector<nift::RuntimeValue>> seen;
+        for (const auto& item : source.array) {
+            auto& bucket = seen[nift::runtime_fingerprint(item)];
+            bool duplicate = false;
+            for (const auto& prior : bucket) {
+                if (nift::runtime_equal(prior, item)) { duplicate = true; break; }
+            }
+            if (!duplicate) { bucket.push_back(item); value.array.push_back(item); }
+        }
         return true;
     }
     if ((function == "sort" || function == "sum" || function == "prod" || function == "min" || function == "max") && find_top_level(body, "=>") == std::string::npos) {
         bool params_ok = false; auto params = parse_parameters(body, params_ok);
         if (!params_ok || params.size() != 1) { error = function + ": expected one collection or binding : collection => expression"; return false; }
-        json::Document source; if (!collection_arg(params[0], source)) return false;
+        nift::RuntimeValue source; if (!collection_arg(params[0], source)) return false;
         if (function == "sort") {
             value = source; if (value.array.empty()) return true;
             const auto type = value.array.front().type;
-            if (type != json::Type::Number && type != json::Type::String) { error = "sort: simple form requires an array of numbers or strings"; return false; }
+            if (type != nift::RuntimeType::Number && type != nift::RuntimeType::String) { error = "sort: simple form requires an array of numbers or strings"; return false; }
             for (const auto& item : value.array) if (item.type != type) { error = "sort: values must all have the same sortable type"; return false; }
-            std::stable_sort(value.array.begin(), value.array.end(), [](const auto& a, const auto& b) { return a.is_number() ? a.num < b.num : a.string < b.string; });
+            std::stable_sort(value.array.begin(), value.array.end(), [](const auto& a, const auto& b) { return a.is_number() ? nift::runtime_compare_numbers(a, b) < 0 : a.string < b.string; });
             return true;
         }
         if (function == "sum" || function == "prod") {
@@ -1517,7 +1539,7 @@ bool Parser::evaluate_collection_value(const std::string& expression, json::Docu
                 aggregate = function == "sum" ? aggregate + item.num : aggregate * item.num;
                 if (!std::isfinite(aggregate)) { error = function + ": result is not finite"; return false; }
             }
-            value = json::Document(aggregate); return true;
+            value = nift::RuntimeValue(aggregate); return true;
         }
         if (source.array.empty()) { error = function + ": cannot aggregate an empty collection"; return false; }
         value = source.array.front();
@@ -1553,14 +1575,14 @@ bool Parser::evaluate_collection_value(const std::string& expression, json::Docu
         if (!parse_bindings(binding_text, bindings)) return false;
         if (!valid_binding_identifier(accumulator) || reserved_binding_name(accumulator) || host_.is_contract_name(accumulator)) { error = "reduce: accumulator must be a non-reserved identifier"; return false; }
         if (std::find(bindings.begin(), bindings.end(), accumulator) != bindings.end()) { error = "reduce: accumulator must be distinct from item bindings"; return false; }
-        json::Document source; if (!collection_arg(source_text, source)) return false;
-        json::Document accumulator_value; if (!evaluate_expression(initial, accumulator_value, error)) return false;
-        auto root = std::make_shared<const json::Document>(source);
+        nift::RuntimeValue source; if (!collection_arg(source_text, source)) return false;
+        nift::RuntimeValue accumulator_value; if (!evaluate_expression(initial, accumulator_value, error)) return false;
+        auto root = std::make_shared<const nift::RuntimeValue>(source);
         const auto old_acc = json_bindings_.find(accumulator); const bool had_acc = old_acc != json_bindings_.end(); const auto previous_acc = had_acc ? old_acc->second : nullptr;
         for (std::size_t i = 0; i < root->array.size(); ++i) {
-            auto acc_root = std::make_shared<const json::Document>(accumulator_value);
+            auto acc_root = std::make_shared<const nift::RuntimeValue>(accumulator_value);
             json_bindings_[accumulator] = acc_root;
-            json::Document next;
+            nift::RuntimeValue next;
             const bool ok = with_bindings(bindings, root, &root->array[i], [&] { return evaluate_expression(expr, next, error); });
             if (!ok) { if (had_acc) json_bindings_[accumulator] = previous_acc; else json_bindings_.erase(accumulator); return false; }
             accumulator_value = std::move(next);
@@ -1573,31 +1595,31 @@ bool Parser::evaluate_collection_value(const std::string& expression, json::Docu
     if (!split_binding(left, binding_text, source_text)) { error = function + ": expected binding : collection => expression"; return false; }
     std::vector<std::string> bindings;
     if (!parse_bindings(binding_text, bindings)) return false;
-    json::Document source; if (!collection_arg(source_text, source)) return false;
-    auto root = std::make_shared<const json::Document>(source);
+    nift::RuntimeValue source; if (!collection_arg(source_text, source)) return false;
+    auto root = std::make_shared<const nift::RuntimeValue>(source);
 
     bool descending = false;
     if (function == "sort") {
         if (expr.size() > 5 && expr.compare(expr.size() - 5, 5, " desc") == 0) { descending = true; expr = trim_copy(expr.substr(0, expr.size() - 5)); }
         else if (expr.size() > 4 && expr.compare(expr.size() - 4, 4, " asc") == 0) expr = trim_copy(expr.substr(0, expr.size() - 4));
     }
-    if (function == "filter" || function == "map") value = json::Document::make_array();
-    if (function == "some") value = json::Document(false);
-    if (function == "every") value = json::Document(true);
-    if (function == "find") value = json::Document(nullptr);
-    if (function == "sum" || function == "prod") value = json::Document(function == "sum" ? 0.0 : 1.0);
+    if (function == "filter" || function == "map") value = nift::RuntimeValue::make_array();
+    if (function == "some") value = nift::RuntimeValue(false);
+    if (function == "every") value = nift::RuntimeValue(true);
+    if (function == "find") value = nift::RuntimeValue(nullptr);
+    if (function == "sum" || function == "prod") value = nift::RuntimeValue(function == "sum" ? 0.0 : 1.0);
     bool have_extreme = false;
-    std::vector<json::Document> keys; if (function == "sort") keys.reserve(root->array.size());
+    std::vector<nift::RuntimeValue> keys; if (function == "sort") keys.reserve(root->array.size());
 
     for (std::size_t i = 0; i < root->array.size(); ++i) {
-        json::Document evaluated;
+        nift::RuntimeValue evaluated;
         const bool ok = with_bindings(bindings, root, &root->array[i], [&] { return evaluate_expression(expr, evaluated, error); });
         if (!ok) return false;
         if (function == "filter") { if (truthy(evaluated)) value.array.push_back(root->array[i]); }
         else if (function == "map") value.array.push_back(std::move(evaluated));
         else if (function == "find") { if (truthy(evaluated)) { value = root->array[i]; return true; } }
-        else if (function == "some") { if (truthy(evaluated)) { value = json::Document(true); return true; } }
-        else if (function == "every") { if (!truthy(evaluated)) { value = json::Document(false); return true; } }
+        else if (function == "some") { if (truthy(evaluated)) { value = nift::RuntimeValue(true); return true; } }
+        else if (function == "every") { if (!truthy(evaluated)) { value = nift::RuntimeValue(false); return true; } }
         else if (function == "sum" || function == "prod") {
             if (!evaluated.is_number()) { error = function + ": expression must produce numeric values"; return false; }
             const double next = function == "sum" ? value.num + evaluated.num : value.num * evaluated.num;
@@ -1615,20 +1637,20 @@ bool Parser::evaluate_collection_value(const std::string& expression, json::Docu
     }
     if (keys.empty()) { value = source; return true; }
     const auto type = keys.front().type;
-    if (type != json::Type::Number && type != json::Type::String) { error = "sort: keys must be numbers or strings"; return false; }
+    if (type != nift::RuntimeType::Number && type != nift::RuntimeType::String) { error = "sort: keys must be numbers or strings"; return false; }
     for (const auto& key : keys) if (key.type != type) { error = "sort: keys must all have the same type"; return false; }
     std::vector<std::size_t> order(keys.size()); for (std::size_t i = 0; i < order.size(); ++i) order[i] = i;
     std::stable_sort(order.begin(), order.end(), [&](auto a, auto b) {
-        const bool less = type == json::Type::Number ? keys[a].num < keys[b].num : keys[a].string < keys[b].string;
-        const bool greater = type == json::Type::Number ? keys[a].num > keys[b].num : keys[a].string > keys[b].string;
+        const bool less = type == nift::RuntimeType::Number ? nift::runtime_compare_numbers(keys[a], keys[b]) < 0 : keys[a].string < keys[b].string;
+        const bool greater = type == nift::RuntimeType::Number ? nift::runtime_compare_numbers(keys[a], keys[b]) > 0 : keys[a].string > keys[b].string;
         return descending ? greater : less;
     });
-    value = json::Document::make_array(); for (auto index : order) value.array.push_back(root->array[index]); return true;
+    value = nift::RuntimeValue::make_array(); for (auto index : order) value.array.push_back(root->array[index]); return true;
 }
 
-bool Parser::evaluate_expression(const std::string& expression, json::Document& value, std::string& error) {
+bool Parser::evaluate_expression(const std::string& expression, nift::RuntimeValue& value, std::string& error) {
     last_expression_mutation_ = false;
-    auto resolve_direct = [&](const std::string& raw, json::Document& out) -> bool {
+    auto resolve_direct = [&](const std::string& raw, nift::RuntimeValue& out) -> bool {
         const std::string text = trim_copy(raw);
         for (auto scope = variable_scopes_.rbegin(); scope != variable_scopes_.rend(); ++scope) {
             const auto it = scope->find(text); if (it != scope->end()) { it->second.sync(); if(!it->second.value){error="reference target no longer exists: "+text;return false;} out = *it->second.value; return true; }
@@ -1640,7 +1662,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             if (root_it == scope->end()) continue;
             root_it->second.sync(); if(!root_it->second.value){error="reference target no longer exists: "+text;return false;}
             if (root_it->second.value && root_it->second.value->is_string() && root_it->second.value->string.rfind("\x1fnift:struct:",0)==0 && text[root_len]=='.') {
-                json::Document current=*root_it->second.value; std::size_t mp=root_len+1;
+                nift::RuntimeValue current=*root_it->second.value; std::size_t mp=root_len+1;
                 while(mp<text.size()){
                     std::size_t me=mp;while(me<text.size()&&(std::isalnum((unsigned char)text[me])||text[me]=='_'))++me;
                     const std::string member=text.substr(mp,me-mp);
@@ -1667,14 +1689,14 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                 // page.children[0].url, page.ancestors.map(...). Only the
                 // dot/index walk happens here; method calls on the resulting
                 // collections are dispatched by the postfix machinery.
-                json::Document current=*root_it->second.value; std::size_t mp=root_len+1;
+                nift::RuntimeValue current=*root_it->second.value; std::size_t mp=root_len+1;
                 while(mp<text.size()){
                     std::size_t me=mp; while(me<text.size()&&(std::isalnum((unsigned char)text[me])||text[me]=='_'))++me;
                     if(me==mp){ if(text[mp]=='.'||text[mp]=='['){break;} error="invalid page member path: "+text;return false; }
                     const std::string member=text.substr(mp,me-mp);
                     if(current.is_string()&&current.string.rfind("\x1fnift:page:",0)==0){
                         result_.dependencies.insert(host_.relative(host_.root() / ".nift/hierarchy.fingerprint"));
-                        json::Document resolved; std::string perr;
+                        nift::RuntimeValue resolved; std::string perr;
                         if(!host_.resolve_page_member(current.string.substr(11),member,resolved,perr)){error=perr.empty()?("page has no member: "+member):perr;return false;}
                         current=std::move(resolved);
                     } else if(current.is_object()){
@@ -1713,7 +1735,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             }
             root_it->second.sync();
             if(!root_it->second.value){ error="reference target no longer exists: "+text.substr(0,root_len); return false; }
-            const json::Document* cur = root_it->second.value.get();
+            const nift::RuntimeValue* cur = root_it->second.value.get();
             std::size_t pos = root_len;
             bool walk_ok = true;
             while (pos < text.size()) {
@@ -1749,7 +1771,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             if (root_len > 0 && root_len < text.size()) {
                 auto rf = receiver_stack_.back()->fields.find(text.substr(0, root_len));
                 if (rf != receiver_stack_.back()->fields.end() && rf->second.value) {
-                    json::Document current = *rf->second.value;
+                    nift::RuntimeValue current = *rf->second.value;
                     std::size_t pos = root_len;
                     bool walk_ok = true;
                     while (pos < text.size()) {
@@ -1796,7 +1818,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                 }
             }
         }
-        std::shared_ptr<const json::Document> document;
+        std::shared_ptr<const nift::RuntimeValue> document;
         if (resolve_pagination_value(text, document)) { out = *document; return true; }
         std::string local_error;
         if (resolve_json_value(text, document, local_error)) {
@@ -1811,8 +1833,8 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                 if (!compound) { error = local_error; return false; }
             } else { out = *document; return true; }
         }
-        if (built_in_metadata_name(text)) { out = json::Document(metadata(text)); return true; }
-        json::Document literal;
+        if (built_in_metadata_name(text)) { out = nift::RuntimeValue(metadata(text)); return true; }
+        nift::RuntimeValue literal;
         std::string literal_error;
         if (!text.empty() && (text.front() == '{' || text.front() == '[')) {
             // Only treat a self-contained balanced literal as a structured
@@ -1823,13 +1845,13 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             const char closec = openc == '{' ? '}' : ']';
             std::size_t balanced = 0;
             if (find_balanced(text, 0, openc, closec, balanced) && balanced == text.size() - 1) {
-                if (nift_json::parse(text, literal, literal_error)) { out = std::move(literal); return true; }
+                if (parse_runtime_json(text, literal, literal_error)) { out = std::move(literal); return true; }
                 error = "invalid structured literal: " + literal_error;
                 return false;
             }
             return false;
         }
-        if (scalar_literal(text, literal, literal_error)) { if(literal.is_string()&&literal.string.find("$[")!=std::string::npos){std::string r,e;if(!interpolate_parameter(literal.string,r,e)){error=e;return false;}literal=json::Document(r);} out = std::move(literal); return true; }
+        if (scalar_literal(text, literal, literal_error)) { if(literal.is_string()&&literal.string.find("$[")!=std::string::npos){std::string r,e;if(!interpolate_parameter(literal.string,r,e)){error=e;return false;}literal=nift::RuntimeValue(r);} out = std::move(literal); return true; }
         // A numeric-looking literal that failed only because its magnitude is
         // outside the signed 64-bit range deserves its precise diagnostic rather
         // than the generic unknown-expression fallback.
@@ -1853,8 +1875,8 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
         return parens==0 && !quoted;
     };
 
-    std::function<bool(const std::string&, json::Document&, int)> eval;
-    eval = [&](const std::string& raw, json::Document& out, int depth) -> bool {
+    std::function<bool(const std::string&, nift::RuntimeValue&, int)> eval;
+    eval = [&](const std::string& raw, nift::RuntimeValue& out, int depth) -> bool {
         std::string text=trim_copy(raw);
         if (text.empty()) { error="expression cannot be empty"; return false; }
         while (encloses(text)) text=trim_copy(text.substr(1,text.size()-2));
@@ -1865,14 +1887,24 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             return nullptr;
         };
 
+        auto bind_temporary = [&](nift::RuntimeValue value) {
+            if (variable_scopes_.empty()) variable_scopes_.emplace_back();
+            std::string name;
+            do { name = "__nift_runtime_value_" + std::to_string(next_runtime_temporary_id_++); }
+            while (find_binding(name));
+            auto stored = std::make_shared<nift::RuntimeValue>(std::move(value));
+            variable_scopes_.back().emplace(name, VariableBinding{stored, nift_binding_type(*stored), false, false});
+            return name;
+        };
+
         auto try_location_ref = [&](const std::string& source, VariableBinding& dst) -> bool {
             const std::string ref_source=trim_copy(source);auto parsed=nift::ast::parse_expression(ref_source);if(!parsed.supported||!parsed.expr)return false;
-            std::shared_ptr<std::shared_ptr<json::Document>> root;std::vector<PathComponent> path;
+            std::shared_ptr<std::shared_ptr<nift::RuntimeValue>> root;std::vector<PathComponent> path;
             std::function<bool(const nift::ast::Expr&)> walk;
             walk=[&](const nift::ast::Expr& ex)->bool{
                 if(ex.kind==nift::ast::Kind::Binding){auto* b=find_binding(ex.name);if(!b||!b->value)return false;if(b->is_location_ref()){root=b->ref_root_slot;path=b->ref_path;}else root=b->slot;return true;}
                 if(ex.kind==nift::ast::Kind::Member){if(!ex.left||!walk(*ex.left))return false;path.push_back(PathComponent::member(ex.name));return true;}
-                if(ex.kind==nift::ast::Kind::Index){if(!ex.left||!walk(*ex.left))return false;json::Document idx;if(!eval(ex.right->text.empty()?ref_source.substr(ex.right->span.begin,ex.right->span.end-ex.right->span.begin):ex.right->text,idx,depth+1))return false;if(idx.is_number()&&idx.num>=0&&std::trunc(idx.num)==idx.num)path.push_back(PathComponent::at((std::size_t)idx.num));else if(idx.is_string())path.push_back(PathComponent::member(idx.string));else return false;return true;}
+                if(ex.kind==nift::ast::Kind::Index){if(!ex.left||!walk(*ex.left))return false;nift::RuntimeValue idx;if(!eval(ex.right->text.empty()?ref_source.substr(ex.right->span.begin,ex.right->span.end-ex.right->span.begin):ex.right->text,idx,depth+1))return false;if(idx.is_number()&&idx.num>=0&&std::trunc(idx.num)==idx.num)path.push_back(PathComponent::at((std::size_t)idx.num));else if(idx.is_string())path.push_back(PathComponent::member(idx.string));else return false;return true;}
                 return false;
             };
             if(!walk(*parsed.expr)||path.empty())return false;
@@ -1885,7 +1917,7 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
         // denotes an aggregate location (root+path), otherwise bind an independent
         // value copy. Shared by the named-callable and lambda call paths so both
         // implement identical function-boundary location semantics.
-        auto bind_call_param = [&](const std::string& arg_text, bool quoted, json::Document& value) -> VariableBinding {
+        auto bind_call_param = [&](const std::string& arg_text, bool quoted, nift::RuntimeValue& value) -> VariableBinding {
             if (!quoted) {
                 VariableBinding loc;
                 if (try_location_ref(arg_text, loc) && loc.is_location_ref() && loc.value) {
@@ -1894,11 +1926,11 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                     return loc;
                 }
             }
-            auto sp = std::make_shared<json::Document>(std::move(value));
+            auto sp = std::make_shared<nift::RuntimeValue>(std::move(value));
             return VariableBinding{sp, nift_binding_type_from_text(arg_text, *sp), true, false};
         };
 
-        auto truthy_value = [&](const json::Document& document) {
+        auto truthy_value = [&](const nift::RuntimeValue& document) {
             if(document.is_string()&&document.string.rfind("\x1fnift:atomic:",0)==0){auto it=atomic_instances_.find(document.string.substr(13));if(it!=atomic_instances_.end())return it->second->kind==AtomicInstance::Kind::Bool?it->second->bool_value.load():it->second->int_value.load()!=0;}
             if (document.is_bool()) return document.boolean;
             if (document.is_null()) return false;
@@ -1926,35 +1958,15 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
             }
             return std::string::npos;
         };
-        // Exact int64-vs-double comparison across the complete supported range.
-        // An integer is compared without converting it to a lossy double; a
-        // fractional or out-of-int64 double is compared by magnitude so no pair
-        // can report contradictory equality and ordering relationships.
-        auto exact_i64 = [](const json::Document& d, std::int64_t& v)->bool {
-            if(d.type==json::Type::StrNumber){auto r=std::from_chars(d.string.data(),d.string.data()+d.string.size(),v);return r.ec==std::errc()&&r.ptr==d.string.data()+d.string.size();}
+        // Exact int64 extraction for atomic operations; general numeric equality
+        // and ordering use RuntimeValue's arbitrary-decimal comparison below.
+        auto exact_i64 = [](const nift::RuntimeValue& d, std::int64_t& v)->bool {
+            if(d.type==nift::RuntimeType::StrNumber){auto r=std::from_chars(d.string.data(),d.string.data()+d.string.size(),v);return r.ec==std::errc()&&r.ptr==d.string.data()+d.string.size();}
             if(d.is_number()&&std::isfinite(d.num)&&std::trunc(d.num)==d.num&&d.num>=-9223372036854775808.0&&d.num<9223372036854775808.0){v=static_cast<std::int64_t>(d.num);return true;}return false;};
-        auto compare_i64_double = [](std::int64_t i, double d)->int {
-            if(d>=9223372036854775808.0) return -1;      // d >= 2^63 > any int64
-            if(d<-9223372036854775808.0) return 1;       // d < -2^63 < any int64
-            if(std::trunc(d)==d){std::int64_t di=static_cast<std::int64_t>(d);return i<di?-1:(i>di?1:0);}
-            std::int64_t fl=static_cast<std::int64_t>(std::floor(d));
-            if(i<fl)return -1;
-            if(i>fl)return 1;
-            return -1;  // i==floor(d) < d (d fractional)
-        };
-        auto numeric_compare = [&](const json::Document& a, const json::Document& b)->int {
-            std::int64_t ai=0,bi=0; const bool a_i=exact_i64(a,ai), b_i=exact_i64(b,bi);
-            if(a_i&&b_i)return ai<bi?-1:(ai>bi?1:0);
-            if(a_i)return compare_i64_double(ai,b.num);
-            if(b_i)return -compare_i64_double(bi,a.num);
-            return a.num<b.num?-1:(a.num>b.num?1:0);
-        };
-        auto structural_equal = [&](const json::Document& a, const json::Document& b) -> bool {
-            std::function<bool(const json::Document&,const json::Document&)> eq;
-            eq = [&](const json::Document& x,const json::Document& y)->bool {
-                if(x.is_number() && y.is_number()) {
-                    return numeric_compare(x,y)==0;
-                }
+        auto structural_equal = [&](const nift::RuntimeValue& a, const nift::RuntimeValue& b) -> bool {
+            std::function<bool(const nift::RuntimeValue&,const nift::RuntimeValue&)> eq;
+            eq = [&](const nift::RuntimeValue& x,const nift::RuntimeValue& y)->bool {
+                if(x.is_number() && y.is_number()) return nift::runtime_numbers_equal(x,y);
                 if(x.type!=y.type)return false;
                 if(x.is_null())return true;
                 if(x.is_bool())return x.boolean==y.boolean;
@@ -1976,40 +1988,40 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                     return x.string==y.string;
                 }
                 if(x.is_array()){if(x.array.size()!=y.array.size())return false;for(size_t i=0;i<x.array.size();++i)if(!eq(x.array[i],y.array[i]))return false;return true;}
-                if(x.is_object()){if(x.object.size()!=y.object.size())return false;for(const auto& e:x.object){auto it=std::find_if(y.object.begin(),y.object.end(),[&](const auto& z){return z.first==e.first;});if(it==y.object.end()||!eq(e.second,it->second))return false;}return true;}
+                if(x.is_object()){if(x.object.size()!=y.object.size())return false;std::vector<bool> matched(y.object.size(),false);for(const auto& e:x.object){bool found=false;for(std::size_t i=0;i<y.object.size();++i)if(!matched[i]&&e.first==y.object[i].first&&eq(e.second,y.object[i].second)){matched[i]=true;found=true;break;}if(!found)return false;}return true;}
                 return false;
             }; return eq(a,b);
         };
 
 
-        auto spawn_future = [&](const json::Document& cb, const std::vector<json::Document>& av, json::Document& future_out)->bool {
+        auto spawn_future = [&](const nift::RuntimeValue& cb, const std::vector<nift::RuntimeValue>& av, nift::RuntimeValue& future_out)->bool {
             if(!cb.is_string()||cb.string.rfind("\x1fnift:callable:",0)!=0){error="async function is not callable";return false;}
-            auto transferable=[&](const json::Document& root){std::function<bool(const json::Document&)> ok;ok=[&](const json::Document& v){if(v.is_string()&&v.string.rfind("\x1fnift:",0)==0&&v.string.rfind("\x1fnift:enum:",0)!=0&&v.string.rfind("\x1fnift:callable:",0)!=0&&v.string.rfind("\x1fnift:thread:",0)!=0&&v.string.rfind("\x1fnift:mutex:",0)!=0&&v.string.rfind("\x1fnift:atomic:",0)!=0&&v.string.rfind("\x1fnift:async:",0)!=0)return false;if(v.is_array())for(const auto&x:v.array)if(!ok(x))return false;if(v.is_object())for(const auto&kv:v.object)if(!ok(kv.second))return false;return true;};return ok(root);};
+            auto transferable=[&](const nift::RuntimeValue& root){std::function<bool(const nift::RuntimeValue&)> ok;ok=[&](const nift::RuntimeValue& v){if(v.is_string()&&v.string.rfind("\x1fnift:",0)==0&&v.string.rfind("\x1fnift:enum:",0)!=0&&v.string.rfind("\x1fnift:callable:",0)!=0&&v.string.rfind("\x1fnift:thread:",0)!=0&&v.string.rfind("\x1fnift:mutex:",0)!=0&&v.string.rfind("\x1fnift:atomic:",0)!=0&&v.string.rfind("\x1fnift:async:",0)!=0)return false;if(v.is_array())for(const auto&x:v.array)if(!ok(x))return false;if(v.is_object())for(const auto&kv:v.object)if(!ok(kv.second))return false;return true;};return ok(root);};
             for(const auto& v:av) if(!transferable(v)){error="async function argument contains a non-transferable resource";return false;}
             auto inherited_asyncs=async_instances_;auto state=std::make_shared<AsyncInstance>();static std::atomic<std::uint64_t> async_ids{1};const std::string id=std::to_string(async_ids.fetch_add(1));async_instances_[id]=state;owned_async_instances_.push_back(state);
-            std::unordered_map<std::string,VariableBinding> vars;for(const auto& scope:variable_scopes_)for(const auto&kv:scope)if(kv.second.value&&transferable(*kv.second.value)){auto sp=std::make_shared<json::Document>(*kv.second.value);vars[kv.first]=VariableBinding{sp,kv.second.type,kv.second.mutable_binding,kv.second.deep_readonly};}
+            std::unordered_map<std::string,VariableBinding> vars;for(const auto& scope:variable_scopes_)for(const auto&kv:scope)if(kv.second.value&&transferable(*kv.second.value)){auto sp=std::make_shared<nift::RuntimeValue>(*kv.second.value);vars[kv.first]=VariableBinding{sp,kv.second.type,kv.second.mutable_binding,kv.second.deep_readonly};}
             auto funcs=callables_;auto threads=thread_instances_;auto mutexes=mutex_instances_;auto atomics=atomic_instances_;auto asyncs=std::move(inherited_asyncs);
-            std::unordered_map<std::string,std::shared_ptr<LambdaInstance>> lambdas;for(const auto&kv:lambda_instances_){auto li=std::make_shared<LambdaInstance>(*kv.second);li->captures.clear();for(const auto&cv:kv.second->captures)if(cv.second.value&&transferable(*cv.second.value)){auto sp=std::make_shared<json::Document>(*cv.second.value);li->captures[cv.first]=VariableBinding{sp,cv.second.type,cv.second.mutable_binding,cv.second.deep_readonly};}lambdas[kv.first]=std::move(li);}
+            std::unordered_map<std::string,std::shared_ptr<LambdaInstance>> lambdas;for(const auto&kv:lambda_instances_){auto li=std::make_shared<LambdaInstance>(*kv.second);li->captures.clear();for(const auto&cv:kv.second->captures)if(cv.second.value&&transferable(*cv.second.value)){auto sp=std::make_shared<nift::RuntimeValue>(*cv.second.value);li->captures[cv.first]=VariableBinding{sp,cv.second.type,cv.second.mutable_binding,cv.second.deep_readonly};}lambdas[kv.first]=std::move(li);}
             const std::string callable_tag=cb.string;
             if(callable_tag.rfind("\x1fnift:callable:named:",0)==0){auto it=funcs.find(callable_tag.substr(21));if(it!=funcs.end())it->second.async=false;}
             else if(callable_tag.rfind("\x1fnift:callable:lambda:",0)==0){auto it=lambdas.find(callable_tag.substr(22));if(it!=lambdas.end())it->second->async=false;}
             RenderHost* hp=&host_;TrackedInfo* tp=&tracked_info_;
             nift_async_pool().submit([state,hp,tp,vars=std::move(vars),funcs=std::move(funcs),lambdas=std::move(lambdas),threads=std::move(threads),mutexes=std::move(mutexes),atomics=std::move(atomics),asyncs=std::move(asyncs),callable_tag,av]() mutable {
-                json::Document result;std::string e;try{Parser worker(*hp,*tp);worker.standalone_script_host_=true;worker.callables_=std::move(funcs);worker.lambda_instances_=std::move(lambdas);worker.thread_instances_=std::move(threads);worker.mutex_instances_=std::move(mutexes);worker.atomic_instances_=std::move(atomics);worker.async_instances_=std::move(asyncs);worker.variable_scopes_.back()=std::move(vars);auto csp=std::make_shared<json::Document>(callable_tag);worker.variable_scopes_.back()["__future_callable"]=VariableBinding{csp,nift_binding_type(*csp),false,false};std::string expr="__future_callable(";for(size_t i=0;i<av.size();++i){auto sp=std::make_shared<json::Document>(av[i]);std::string n="__future_arg"+std::to_string(i);worker.variable_scopes_.back()[n]=VariableBinding{sp,nift_binding_type(*sp),false,false};if(i)expr+=",";expr+=n;}expr+=")";if(!worker.evaluate_expression(expr,result,e)&&e.empty())e="async function failed";}catch(const std::exception& ex){e=ex.what();}catch(...){e="unknown async worker exception";}
-                {std::lock_guard<std::mutex> lk(state->mutex);state->result=std::make_shared<json::Document>(std::move(result));state->error=std::move(e);state->done=true;}state->cv.notify_all();
+                nift::RuntimeValue result;std::string e;try{Parser worker(*hp,*tp);worker.standalone_script_host_=true;worker.callables_=std::move(funcs);worker.lambda_instances_=std::move(lambdas);worker.thread_instances_=std::move(threads);worker.mutex_instances_=std::move(mutexes);worker.atomic_instances_=std::move(atomics);worker.async_instances_=std::move(asyncs);worker.variable_scopes_.back()=std::move(vars);auto csp=std::make_shared<nift::RuntimeValue>(callable_tag);worker.variable_scopes_.back()["__future_callable"]=VariableBinding{csp,nift_binding_type(*csp),false,false};std::string expr="__future_callable(";for(size_t i=0;i<av.size();++i){auto sp=std::make_shared<nift::RuntimeValue>(av[i]);std::string n="__future_arg"+std::to_string(i);worker.variable_scopes_.back()[n]=VariableBinding{sp,nift_binding_type(*sp),false,false};if(i)expr+=",";expr+=n;}expr+=")";if(!worker.evaluate_expression(expr,result,e)&&e.empty())e="async function failed";}catch(const std::exception& ex){e=ex.what();}catch(...){e="unknown async worker exception";}
+                {std::lock_guard<std::mutex> lk(state->mutex);state->result=std::make_shared<nift::RuntimeValue>(std::move(result));state->error=std::move(e);state->done=true;}state->cv.notify_all();
             });
-            future_out=json::Document(std::string("\x1fnift:async:")+id);return true;
+            future_out=nift::RuntimeValue(std::string("\x1fnift:async:")+id);return true;
         };
 
-        auto await_future = [&](const json::Document& h, json::Document& result)->bool {
-            if(!h.is_string()||h.string.rfind("\x1fnift:async:",0)!=0){error="await: expected future";return false;}auto ai=async_instances_.find(h.string.substr(12));if(ai==async_instances_.end()){error="await: invalid future";return false;}auto st=ai->second;std::unique_lock<std::mutex> lk(st->mutex);while(!st->done){lk.unlock();if(nift_async_pool_worker&&nift_async_pool().run_one()){lk.lock();continue;}lk.lock();st->cv.wait_for(lk,std::chrono::milliseconds(1),[&]{return st->done;});}if(!st->error.empty()){error="future: "+st->error;return false;}result=st->result?*st->result:json::Document(nullptr);return true;
+        auto await_future = [&](const nift::RuntimeValue& h, nift::RuntimeValue& result)->bool {
+            if(!h.is_string()||h.string.rfind("\x1fnift:async:",0)!=0){error="await: expected future";return false;}auto ai=async_instances_.find(h.string.substr(12));if(ai==async_instances_.end()){error="await: invalid future";return false;}auto st=ai->second;std::unique_lock<std::mutex> lk(st->mutex);while(!st->done){lk.unlock();if(nift_async_pool_worker&&nift_async_pool().run_one()){lk.lock();continue;}lk.lock();st->cv.wait_for(lk,std::chrono::milliseconds(1),[&]{return st->done;});}if(!st->error.empty()){error="future: "+st->error;return false;}result=st->result?*st->result:nift::RuntimeValue(nullptr);return true;
         };
 
-        if(text.rfind("await ",0)==0){json::Document f;if(!eval(trim_copy(text.substr(6)),f,depth+1))return false;return await_future(f,out);}
+        if(text.rfind("await ",0)==0){nift::RuntimeValue f;if(!eval(trim_copy(text.substr(6)),f,depth+1))return false;return await_future(f,out);}
 
         // v4.3 first-class callable values and lambda expressions.
         if (auto ci = callables_.find(text); ci != callables_.end()) {
-            out = json::Document(std::string("\x1fnift:callable:named:") + text);
+            out = nift::RuntimeValue(std::string("\x1fnift:callable:named:") + text);
             return true;
         }
         {
@@ -2040,12 +2052,13 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                     li->module_env=std::move(env);
                 }
                 const std::string id=std::to_string(next_lambda_instance_id_++); lambda_instances_[id]=li;
-                out=json::Document(std::string("\x1fnift:callable:lambda:")+id); return true;
+                out=nift::RuntimeValue(std::string("\x1fnift:callable:lambda:")+id); return true;
             }
         }
 
         // v4.3 native scripting filesystem, console and stream primitives.
         {
+            std::vector<nift::RuntimeValue> spread_values;
             auto call_args=[&](const std::string& name,std::vector<std::string>& args,std::vector<bool>& quoted)->bool{
                 if(text.rfind(name+"(",0)!=0||text.back()!=')')return false;
                 std::size_t close=0;if(!find_balanced(text,name.size(),'(',')',close)||close!=text.size()-1)return false;
@@ -2053,17 +2066,19 @@ bool Parser::evaluate_expression(const std::string& expression, json::Document& 
                 if(!ok){error=name+": malformed arguments";return false;}
                 std::vector<std::string> expanded; std::vector<bool> expanded_q;
                 for(std::size_t ai=0;ai<args.size();++ai){
-                    if(!(ai<quoted.size()&&quoted[ai])&&trim_copy(args[ai]).rfind("...",0)==0){json::Document sv;if(!eval(trim_copy(args[ai]).substr(3),sv,depth+1))return false;if(!sv.is_array()){error=name+": spread value must be an array";return false;}for(const auto& item:sv.array){std::string encoded;if(!serialize_value(item,false,encoded,error))return false;expanded.push_back(encoded);expanded_q.push_back(false);}}
+                    if(!(ai<quoted.size()&&quoted[ai])&&trim_copy(args[ai]).rfind("...",0)==0){nift::RuntimeValue sv;if(!eval(trim_copy(args[ai]).substr(3),sv,depth+1))return false;if(!sv.is_array()){error=name+": spread value must be an array";return false;}for(const auto& item:sv.array){expanded.push_back("\x1fnift:spread:"+std::to_string(spread_values.size()));spread_values.push_back(item);expanded_q.push_back(false);}}
                     else {expanded.push_back(args[ai]);expanded_q.push_back(ai<quoted.size()&&quoted[ai]);}
                 }
                 args.swap(expanded);quoted.swap(expanded_q);return true;
             };
-            auto arg_value=[&](const std::vector<std::string>& args,const std::vector<bool>& q,size_t i,json::Document& v)->bool{
+            auto arg_value=[&](const std::vector<std::string>& args,const std::vector<bool>& q,size_t i,nift::RuntimeValue& v)->bool{
                 if(i>=args.size())return false;
-                if(i<q.size()&&q[i]){v=json::Document(args[i]);return true;}return eval(args[i],v,depth+1);
+                if(i<q.size()&&q[i]){v=nift::RuntimeValue(args[i]);return true;}
+                if(args[i].rfind("\x1fnift:spread:",0)==0){const auto index=static_cast<std::size_t>(std::stoull(args[i].substr(13)));if(index>=spread_values.size())return false;v=spread_values[index];return true;}
+                return eval(args[i],v,depth+1);
             };
             auto string_arg=[&](const std::string& name,const std::vector<std::string>& args,const std::vector<bool>& q,size_t i,std::string& v)->bool{
-                json::Document d;if(!arg_value(args,q,i,d)||!d.is_string()){error=name+": expected string path";return false;}v=d.string;return true;
+                nift::RuntimeValue d;if(!arg_value(args,q,i,d)||!d.is_string()){error=name+": expected string path";return false;}v=d.string;return true;
             };
             auto resolve_path=[&](const std::string& raw)->fs::path{std::string expanded=raw;if(standalone_script_host_&&!expanded.empty()&&expanded[0]=='~'&&(expanded.size()==1||expanded[1]=='/'||expanded[1]=='\\')){const char* home=std::getenv("HOME");
 #ifdef _WIN32
@@ -2074,75 +2089,75 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             std::vector<std::string> args;std::vector<bool> q;
             if(call_args("cmd",args,q)){
                 if(args.empty()){error="cmd: expected executable and optional arguments";return false;}std::vector<std::string> vals;
-                for(std::size_t ai=0;ai<args.size();++ai){json::Document v;if(!arg_value(args,q,ai,v))return false;if(v.is_array()){for(const auto&x:v.array){if(!(x.is_string()||x.is_number()||x.is_bool())){error="cmd: arguments must be scalar";return false;}vals.push_back(render_expression_value(x));}}else if(v.is_string()||v.is_number()||v.is_bool())vals.push_back(render_expression_value(v));else{error="cmd: arguments must be scalar";return false;}}
-                auto c=std::make_shared<CommandInstance>();ProcessSpec ps;ps.program=vals.front();ps.args.assign(vals.begin()+1,vals.end());c->stages.push_back(std::move(ps));auto id=std::to_string(next_command_instance_id_++);command_instances_[id]=c;out=json::Document(std::string("\x1fnift:cmd:")+id);return true;
+                for(std::size_t ai=0;ai<args.size();++ai){nift::RuntimeValue v;if(!arg_value(args,q,ai,v))return false;if(v.is_array()){for(const auto&x:v.array){if(!(x.is_string()||x.is_number()||x.is_bool())){error="cmd: arguments must be scalar";return false;}vals.push_back(render_expression_value(x));}}else if(v.is_string()||v.is_number()||v.is_bool())vals.push_back(render_expression_value(v));else{error="cmd: arguments must be scalar";return false;}}
+                auto c=std::make_shared<CommandInstance>();ProcessSpec ps;ps.program=vals.front();ps.args.assign(vals.begin()+1,vals.end());c->stages.push_back(std::move(ps));auto id=std::to_string(next_command_instance_id_++);command_instances_[id]=c;out=nift::RuntimeValue(std::string("\x1fnift:cmd:")+id);return true;
             }
             if(call_args("run",args,q)){
                 if(std::getenv("NIFT_NO_PROCESS")){error="run: external process execution disabled";return false;}
                 if(args.empty()){error="run: expected executable and optional arguments";return false;}
                 std::vector<std::string> vals;
-                for(std::size_t ai=0;ai<args.size();++ai){json::Document v;if(!arg_value(args,q,ai,v))return false;if(v.is_array()){for(const auto& x:v.array){if(!x.is_string()&&!x.is_number()&&!x.is_bool()){error="run: arguments must be scalar";return false;}vals.push_back(render_expression_value(x));}}else if(v.is_string()||v.is_number()||v.is_bool())vals.push_back(render_expression_value(v));else{error="run: arguments must be scalar";return false;}}
+                for(std::size_t ai=0;ai<args.size();++ai){nift::RuntimeValue v;if(!arg_value(args,q,ai,v))return false;if(v.is_array()){for(const auto& x:v.array){if(!x.is_string()&&!x.is_number()&&!x.is_bool()){error="run: arguments must be scalar";return false;}vals.push_back(render_expression_value(x));}}else if(v.is_string()||v.is_number()||v.is_bool())vals.push_back(render_expression_value(v));else{error="run: arguments must be scalar";return false;}}
                 ProcessSpec spec;spec.program=vals.front();spec.args.assign(vals.begin()+1,vals.end());auto pr=nift_run_process(spec,true,false);
-                out=json::Document::make_object();out["exit_code"]=json::Document((double)pr.exit_code);out["stdout"]=json::Document(pr.out);out["stderr"]=json::Document(pr.err);out["launched"]=json::Document(pr.launched);if(!pr.error.empty())out["error"]=json::Document(pr.error);return true;
+                out=nift::RuntimeValue::make_object();out["exit_code"]=nift::RuntimeValue((double)pr.exit_code);out["stdout"]=nift::RuntimeValue(pr.out);out["stderr"]=nift::RuntimeValue(pr.err);out["launched"]=nift::RuntimeValue(pr.launched);if(!pr.error.empty())out["error"]=nift::RuntimeValue(pr.error);return true;
             }
-            if(call_args("which",args,q)){if(args.size()!=1){error="which: expected command name";return false;}std::string n;if(!string_arg("which",args,q,0,n))return false;static const std::unordered_set<std::string> builtins={"ls","cd","pwd","cat","touch","exists","cp","mv","rm","mkdir","copy","move","remove","make_dir","run","cmd"};if(builtins.count(n)){out=json::Document("nift:"+n);return true;}std::string p;if(nift_find_executable(n,p)){out=json::Document(p);return true;}out=json::Document(nullptr);return true;}
+            if(call_args("which",args,q)){if(args.size()!=1){error="which: expected command name";return false;}std::string n;if(!string_arg("which",args,q,0,n))return false;static const std::unordered_set<std::string> builtins={"ls","cd","pwd","cat","touch","exists","cp","mv","rm","mkdir","copy","move","remove","make_dir","run","cmd"};if(builtins.count(n)){out=nift::RuntimeValue("nift:"+n);return true;}std::string p;if(nift_find_executable(n,p)){out=nift::RuntimeValue(p);return true;}out=nift::RuntimeValue(nullptr);return true;}
             // Native project/build automation (v4.4 CP23/CP24). Direct ProjectInfo
             // calls, never a subprocess. Script-land only.
-            auto automation_result=[&](NiftOperationResult r)->json::Document{json::Document d=json::Document::make_object();d["ok"]=json::Document(r.ok);d["exit_code"]=json::Document((double)r.exit_code);json::Document aff=json::Document::make_array();for(const auto& a:r.affected)aff.array.emplace_back(a);d["affected"]=std::move(aff);json::Document errs=json::Document::make_array();for(const auto& e:r.errors)errs.array.emplace_back(e);d["errors"]=std::move(errs);d["duration_seconds"]=json::Document(r.duration_seconds);return d;};
+            auto automation_result=[&](NiftOperationResult r)->nift::RuntimeValue{nift::RuntimeValue d=nift::RuntimeValue::make_object();d["ok"]=nift::RuntimeValue(r.ok);d["exit_code"]=nift::RuntimeValue((double)r.exit_code);nift::RuntimeValue aff=nift::RuntimeValue::make_array();for(const auto& a:r.affected)aff.array.emplace_back(a);d["affected"]=std::move(aff);nift::RuntimeValue errs=nift::RuntimeValue::make_array();for(const auto& e:r.errors)errs.array.emplace_back(e);d["errors"]=std::move(errs);d["duration_seconds"]=nift::RuntimeValue(r.duration_seconds);return d;};
             auto ensure_project=[&](const std::string& fn,ProjectInfo*& proj)->bool{if(!standalone_script_host_){error=fn+": only available in standalone Nift scripts/shell";return false;}const fs::path cwd=fs::absolute(fs::current_path()).lexically_normal();if(!automation_project_||automation_root_.empty()||!filesystem::path_within(automation_root_,cwd)){auto p=std::make_shared<ProjectInfo>();std::string oe;if(!automation_open_project(cwd,*p,oe)){automation_project_.reset();automation_root_.clear();error=fn+": "+oe;return false;}automation_project_=p;automation_root_=fs::absolute(automation_project_->root).lexically_normal();}proj=automation_project_.get();return true;};
             if(call_args("build",args,q)||call_args("build_all",args,q)||call_args("build_repair",args,q)){const std::string fn=text.rfind("build_all",0)==0?"build_all":(text.rfind("build_repair",0)==0?"build_repair":"build");if(!args.empty()){error=fn+": expected no arguments";return false;}ProjectInfo* proj=nullptr;if(!ensure_project(fn,proj))return false;NiftBuildRequest req;req.mode=fn=="build_all"?NiftBuildRequest::Mode::All:(fn=="build_repair"?NiftBuildRequest::Mode::Repair:NiftBuildRequest::Mode::Updated);out=automation_result(automation_build(*proj,req));return true;}
             if(call_args("build_names",args,q)){if(args.empty()){error="build_names: expected at least one name";return false;}ProjectInfo* proj=nullptr;if(!ensure_project("build_names",proj))return false;NiftBuildRequest req;req.mode=NiftBuildRequest::Mode::Names;for(size_t ai=0;ai<args.size();++ai){std::string n;if(!string_arg("build_names",args,q,ai,n))return false;req.names.push_back(n);}out=automation_result(automation_build(*proj,req));return true;}
             if(call_args("track",args,q)){if(args.size()<1||args.size()>3){error="track: expected name, optional title and template";return false;}std::string name,title,template_path;if(!string_arg("track",args,q,0,name))return false;if(args.size()>=2&&!string_arg("track",args,q,1,title))return false;if(args.size()>=3&&!string_arg("track",args,q,2,template_path))return false;ProjectInfo* proj=nullptr;if(!ensure_project("track",proj))return false;out=automation_result(automation_track(*proj,name,title,template_path));return true;}
             if(call_args("untrack",args,q)){if(args.empty()){error="untrack: expected at least one name";return false;}ProjectInfo* proj=nullptr;if(!ensure_project("untrack",proj))return false;std::vector<std::string> names;for(size_t ai=0;ai<args.size();++ai){std::string n;if(!string_arg("untrack",args,q,ai,n))return false;names.push_back(n);}out=automation_result(automation_untrack(*proj,names,false));return true;}
-            if(call_args("status",args,q)){if(!args.empty()){error="status: expected no arguments";return false;}ProjectInfo* proj=nullptr;if(!ensure_project("status",proj))return false;auto names=automation_status(*proj);out=json::Document::make_array();for(const auto& n:names)out.array.emplace_back(n);return true;}
-            if(call_args("tracked",args,q)){if(!args.empty()){error="tracked: expected no arguments";return false;}ProjectInfo* proj=nullptr;if(!ensure_project("tracked",proj))return false;auto names=automation_tracked_names(*proj);out=json::Document::make_array();for(const auto& n:names)out.array.emplace_back(n);return true;}
-            if(call_args("project_root",args,q)){if(!args.empty()){error="project_root: expected no arguments";return false;}ProjectInfo* proj=nullptr;if(!ensure_project("project_root",proj))return false;out=json::Document(fs::absolute(proj->root).generic_string());return true;}
-            if(call_args("getenv",args,q)){if(args.size()!=1){error="getenv: expected name";return false;}std::string k;if(!string_arg("getenv",args,q,0,k))return false;auto v=host_.environment(k);if(v.status==nift::HostStatus::Error){error="getenv: "+v.error;return false;}out=v.status==nift::HostStatus::Found?json::Document(v.value):json::Document(nullptr);return true;}
-            if(call_args("env",args,q)){if(!args.empty()){error="env: expected no arguments";return false;}json::Document snapshot; if(!host_.environment_snapshot(snapshot,error))return false; out=std::move(snapshot);return true;}
-            if(call_args("os",args,q)){if(!args.empty()){error="os: expected no arguments";return false;}out=json::Document(std::string(nift_environment::host_os()));return true;}
-            if(call_args("arch",args,q)){if(!args.empty()){error="arch: expected no arguments";return false;}out=json::Document(std::string(nift_environment::host_arch()));return true;}
-            if(call_args("platform",args,q)){if(!args.empty()){error="platform: expected no arguments";return false;}out=json::Document(host_.platform());return true;}
-            if(call_args("hardware_concurrency",args,q)){if(!args.empty()){error="hardware_concurrency: expected no arguments";return false;}out=json::Document((double)std::max(1u,std::thread::hardware_concurrency()));return true;}
+            if(call_args("status",args,q)){if(!args.empty()){error="status: expected no arguments";return false;}ProjectInfo* proj=nullptr;if(!ensure_project("status",proj))return false;auto names=automation_status(*proj);out=nift::RuntimeValue::make_array();for(const auto& n:names)out.array.emplace_back(n);return true;}
+            if(call_args("tracked",args,q)){if(!args.empty()){error="tracked: expected no arguments";return false;}ProjectInfo* proj=nullptr;if(!ensure_project("tracked",proj))return false;auto names=automation_tracked_names(*proj);out=nift::RuntimeValue::make_array();for(const auto& n:names)out.array.emplace_back(n);return true;}
+            if(call_args("project_root",args,q)){if(!args.empty()){error="project_root: expected no arguments";return false;}ProjectInfo* proj=nullptr;if(!ensure_project("project_root",proj))return false;out=nift::RuntimeValue(fs::absolute(proj->root).generic_string());return true;}
+            if(call_args("getenv",args,q)){if(args.size()!=1){error="getenv: expected name";return false;}std::string k;if(!string_arg("getenv",args,q,0,k))return false;auto v=host_.environment(k);if(v.status==nift::HostStatus::Error){error="getenv: "+v.error;return false;}out=v.status==nift::HostStatus::Found?nift::RuntimeValue(v.value):nift::RuntimeValue(nullptr);return true;}
+            if(call_args("env",args,q)){if(!args.empty()){error="env: expected no arguments";return false;}return host_.environment_snapshot(out,error);}
+            if(call_args("os",args,q)){if(!args.empty()){error="os: expected no arguments";return false;}out=nift::RuntimeValue(std::string(nift_environment::host_os()));return true;}
+            if(call_args("arch",args,q)){if(!args.empty()){error="arch: expected no arguments";return false;}out=nift::RuntimeValue(std::string(nift_environment::host_arch()));return true;}
+            if(call_args("platform",args,q)){if(!args.empty()){error="platform: expected no arguments";return false;}out=nift::RuntimeValue(host_.platform());return true;}
+            if(call_args("hardware_concurrency",args,q)){if(!args.empty()){error="hardware_concurrency: expected no arguments";return false;}out=nift::RuntimeValue((double)std::max(1u,std::thread::hardware_concurrency()));return true;}
             const bool atomic_int_ctor=call_args("atomic<int>",args,q);
             const bool atomic_bool_ctor=!atomic_int_ctor&&call_args("atomic<bool>",args,q);
             if(atomic_int_ctor||atomic_bool_ctor){
                 const std::string name=atomic_int_ctor?"atomic<int>":"atomic<bool>";
                 if(args.size()!=1){error=name+": expected one initial value";return false;}
-                json::Document initial;if(!arg_value(args,q,0,initial))return false;
+                nift::RuntimeValue initial;if(!arg_value(args,q,0,initial))return false;
                 auto st=std::make_shared<AtomicInstance>();
                 if(atomic_int_ctor){std::int64_t v=0;if(!exact_i64(initial,v)){error=name+": initial value must be a signed 64-bit integer";return false;}st->kind=AtomicInstance::Kind::Int;st->int_value.store(v);}
                 else {if(!initial.is_bool()){error=name+": initial value must be bool";return false;}st->kind=AtomicInstance::Kind::Bool;st->bool_value.store(initial.boolean);}
-                static std::atomic<std::uint64_t> atomic_ids{1};const std::string id=std::to_string(atomic_ids.fetch_add(1));atomic_instances_[id]=st;out=json::Document(std::string("\x1fnift:atomic:")+id);return true;
+                static std::atomic<std::uint64_t> atomic_ids{1};const std::string id=std::to_string(atomic_ids.fetch_add(1));atomic_instances_[id]=st;out=nift::RuntimeValue(std::string("\x1fnift:atomic:")+id);return true;
             }
             if(call_args("thread",args,q)){
                 if(args.empty()){error="thread: expected callable and optional arguments";return false;}
-                json::Document cb;if((q.size()>0&&q[0])||!eval(args[0],cb,depth+1)||!cb.is_string()||cb.string.rfind("\x1fnift:callable:",0)!=0){error="thread: first argument must be callable";return false;}
-                auto transferable=[&](const json::Document& root){std::function<bool(const json::Document&)> ok;ok=[&](const json::Document& v){if(v.is_string()&&v.string.rfind("\x1fnift:",0)==0&&v.string.rfind("\x1fnift:enum:",0)!=0&&v.string.rfind("\x1fnift:callable:",0)!=0&&v.string.rfind("\x1fnift:thread:",0)!=0&&v.string.rfind("\x1fnift:mutex:",0)!=0&&v.string.rfind("\x1fnift:atomic:",0)!=0&&v.string.rfind("\x1fnift:async:",0)!=0)return false;if(v.is_array())for(const auto&x:v.array)if(!ok(x))return false;if(v.is_object())for(const auto&kv:v.object)if(!ok(kv.second))return false;return true;};return ok(root);};
-                std::vector<json::Document> av;for(size_t ai=1;ai<args.size();++ai){json::Document v;if(ai<q.size()&&q[ai])v=json::Document(args[ai]);else if(!eval(args[ai],v,depth+1))return false;if(!transferable(v)){error="thread: argument contains a non-transferable resource";return false;}av.push_back(v);}
+                nift::RuntimeValue cb;if((q.size()>0&&q[0])||!eval(args[0],cb,depth+1)||!cb.is_string()||cb.string.rfind("\x1fnift:callable:",0)!=0){error="thread: first argument must be callable";return false;}
+                auto transferable=[&](const nift::RuntimeValue& root){std::function<bool(const nift::RuntimeValue&)> ok;ok=[&](const nift::RuntimeValue& v){if(v.is_string()&&v.string.rfind("\x1fnift:",0)==0&&v.string.rfind("\x1fnift:enum:",0)!=0&&v.string.rfind("\x1fnift:callable:",0)!=0&&v.string.rfind("\x1fnift:thread:",0)!=0&&v.string.rfind("\x1fnift:mutex:",0)!=0&&v.string.rfind("\x1fnift:atomic:",0)!=0&&v.string.rfind("\x1fnift:async:",0)!=0)return false;if(v.is_array())for(const auto&x:v.array)if(!ok(x))return false;if(v.is_object())for(const auto&kv:v.object)if(!ok(kv.second))return false;return true;};return ok(root);};
+                std::vector<nift::RuntimeValue> av;for(size_t ai=1;ai<args.size();++ai){nift::RuntimeValue v;if(ai<q.size()&&q[ai])v=nift::RuntimeValue(args[ai]);else if(!eval(args[ai],v,depth+1))return false;if(!transferable(v)){error="thread: argument contains a non-transferable resource";return false;}av.push_back(v);}
                 auto state=std::make_shared<ThreadInstance>();static std::atomic<std::uint64_t> thread_ids{1};const std::string id=std::to_string(thread_ids.fetch_add(1));thread_instances_[id]=state;owned_thread_instances_.push_back(state);
                 // Snapshot ordinary root bindings and callable/lambda definitions. Opaque
                 // values are intentionally omitted from the worker environment.
                 std::unordered_map<std::string,VariableBinding> vars;
-                for(const auto& scope:variable_scopes_)for(const auto&kv:scope)if(kv.second.value&&transferable(*kv.second.value)){auto sp=std::make_shared<json::Document>(*kv.second.value);vars[kv.first]=VariableBinding{sp,kv.second.type,kv.second.mutable_binding,kv.second.deep_readonly};}
+                for(const auto& scope:variable_scopes_)for(const auto&kv:scope)if(kv.second.value&&transferable(*kv.second.value)){auto sp=std::make_shared<nift::RuntimeValue>(*kv.second.value);vars[kv.first]=VariableBinding{sp,kv.second.type,kv.second.mutable_binding,kv.second.deep_readonly};}
                 auto funcs=callables_;auto threads=thread_instances_;auto mutexes=mutex_instances_;auto atomics=atomic_instances_;auto asyncs=async_instances_;
                 std::unordered_map<std::string,std::shared_ptr<LambdaInstance>> lambdas;
-                for(const auto&kv:lambda_instances_){auto li=std::make_shared<LambdaInstance>(*kv.second);li->captures.clear();for(const auto&cv:kv.second->captures)if(cv.second.value&&transferable(*cv.second.value)){auto sp=std::make_shared<json::Document>(*cv.second.value);li->captures[cv.first]=VariableBinding{sp,cv.second.type,cv.second.mutable_binding,cv.second.deep_readonly};}lambdas[kv.first]=std::move(li);}
+                for(const auto&kv:lambda_instances_){auto li=std::make_shared<LambdaInstance>(*kv.second);li->captures.clear();for(const auto&cv:kv.second->captures)if(cv.second.value&&transferable(*cv.second.value)){auto sp=std::make_shared<nift::RuntimeValue>(*cv.second.value);li->captures[cv.first]=VariableBinding{sp,cv.second.type,cv.second.mutable_binding,cv.second.deep_readonly};}lambdas[kv.first]=std::move(li);}
                 RenderHost* hp=&host_;TrackedInfo* tp=&tracked_info_;const std::string callable_tag=cb.string;
                 state->worker=std::thread([state,hp,tp,vars=std::move(vars),funcs=std::move(funcs),lambdas=std::move(lambdas),threads=std::move(threads),mutexes=std::move(mutexes),atomics=std::move(atomics),asyncs=std::move(asyncs),callable_tag,av=std::move(av)]() mutable {
-                    json::Document result;std::string e;
-                    try{Parser worker(*hp,*tp);worker.standalone_script_host_=true;worker.callables_=std::move(funcs);worker.lambda_instances_=std::move(lambdas);worker.thread_instances_=std::move(threads);worker.mutex_instances_=std::move(mutexes);worker.atomic_instances_=std::move(atomics);worker.async_instances_=std::move(asyncs);worker.variable_scopes_.back()=std::move(vars);auto csp=std::make_shared<json::Document>(callable_tag);worker.variable_scopes_.back()["__thread_callable"]=VariableBinding{csp,nift_binding_type(*csp),false,false};std::string expr="__thread_callable(";for(size_t i=0;i<av.size();++i){auto sp=std::make_shared<json::Document>(av[i]);std::string n="__thread_arg"+std::to_string(i);worker.variable_scopes_.back()[n]=VariableBinding{sp,nift_binding_type(*sp),false,false};if(i)expr+=",";expr+=n;}expr+=")";if(!worker.evaluate_expression(expr,result,e)&&e.empty())e="thread callable failed";}catch(const std::exception& ex){e=ex.what();}catch(...){e="unknown worker exception";}
-                    std::lock_guard<std::mutex> lock(state->mutex);state->result=std::make_shared<json::Document>(std::move(result));state->error=std::move(e);state->done=true;
+                    nift::RuntimeValue result;std::string e;
+                    try{Parser worker(*hp,*tp);worker.standalone_script_host_=true;worker.callables_=std::move(funcs);worker.lambda_instances_=std::move(lambdas);worker.thread_instances_=std::move(threads);worker.mutex_instances_=std::move(mutexes);worker.atomic_instances_=std::move(atomics);worker.async_instances_=std::move(asyncs);worker.variable_scopes_.back()=std::move(vars);auto csp=std::make_shared<nift::RuntimeValue>(callable_tag);worker.variable_scopes_.back()["__thread_callable"]=VariableBinding{csp,nift_binding_type(*csp),false,false};std::string expr="__thread_callable(";for(size_t i=0;i<av.size();++i){auto sp=std::make_shared<nift::RuntimeValue>(av[i]);std::string n="__thread_arg"+std::to_string(i);worker.variable_scopes_.back()[n]=VariableBinding{sp,nift_binding_type(*sp),false,false};if(i)expr+=",";expr+=n;}expr+=")";if(!worker.evaluate_expression(expr,result,e)&&e.empty())e="thread callable failed";}catch(const std::exception& ex){e=ex.what();}catch(...){e="unknown worker exception";}
+                    std::lock_guard<std::mutex> lock(state->mutex);state->result=std::make_shared<nift::RuntimeValue>(std::move(result));state->error=std::move(e);state->done=true;
                 });
-                out=json::Document(std::string("\x1fnift:thread:")+id);return true;
+                out=nift::RuntimeValue(std::string("\x1fnift:thread:")+id);return true;
             }
             if(call_args("async",args,q)){error="async(callable, ...) was removed; declare an async function/lambda and call it directly";return false;}
             if(call_args("await",args,q)){error="await(...) was removed; use 'await future' or 'await async_fn(args)'";return false;}
             if(call_args("mutex",args,q)){
                 if(args.size()>1){error="mutex: expected zero or one initial value";return false;}
-                json::Document initial(nullptr);if(args.size()==1&&!arg_value(args,q,0,initial))return false;
-                std::function<bool(const json::Document&)> ok;ok=[&](const json::Document& v){if(v.is_string()&&v.string.rfind("\x1fnift:",0)==0&&v.string.rfind("\x1fnift:enum:",0)!=0&&v.string.rfind("\x1fnift:callable:",0)!=0&&v.string.rfind("\x1fnift:thread:",0)!=0&&v.string.rfind("\x1fnift:mutex:",0)!=0&&v.string.rfind("\x1fnift:atomic:",0)!=0&&v.string.rfind("\x1fnift:async:",0)!=0)return false;if(v.is_array())for(const auto&x:v.array)if(!ok(x))return false;if(v.is_object())for(const auto&kv:v.object)if(!ok(kv.second))return false;return true;};
+                nift::RuntimeValue initial(nullptr);if(args.size()==1&&!arg_value(args,q,0,initial))return false;
+                std::function<bool(const nift::RuntimeValue&)> ok;ok=[&](const nift::RuntimeValue& v){if(v.is_string()&&v.string.rfind("\x1fnift:",0)==0&&v.string.rfind("\x1fnift:enum:",0)!=0&&v.string.rfind("\x1fnift:callable:",0)!=0&&v.string.rfind("\x1fnift:thread:",0)!=0&&v.string.rfind("\x1fnift:mutex:",0)!=0&&v.string.rfind("\x1fnift:atomic:",0)!=0&&v.string.rfind("\x1fnift:async:",0)!=0)return false;if(v.is_array())for(const auto&x:v.array)if(!ok(x))return false;if(v.is_object())for(const auto&kv:v.object)if(!ok(kv.second))return false;return true;};
                 if(!ok(initial)){error="mutex: initial value contains a non-transferable resource";return false;}
-                auto st=std::make_shared<MutexInstance>();st->value=std::move(initial);static std::atomic<std::uint64_t> mutex_ids{1};const std::string id=std::to_string(mutex_ids.fetch_add(1));mutex_instances_[id]=st;out=json::Document(std::string("\x1fnift:mutex:")+id);return true;
+                auto st=std::make_shared<MutexInstance>();st->value=std::move(initial);static std::atomic<std::uint64_t> mutex_ids{1};const std::string id=std::to_string(mutex_ids.fetch_add(1));mutex_instances_[id]=st;out=nift::RuntimeValue(std::string("\x1fnift:mutex:")+id);return true;
             }
             if(call_args("ffi_open",args,q)){
                 if(args.size()!=1){error="ffi_open: expected library path";return false;}
@@ -2161,32 +2176,32 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
 #endif
                     return false;
                 }
-                auto st=std::make_shared<FfiLibraryInstance>();st->handle=handle;const std::string id=std::to_string(next_ffi_library_id_++);ffi_libraries_[id]=st;out=json::Document(std::string("\x1fnift:ffi-lib:")+id);return true;
+                auto st=std::make_shared<FfiLibraryInstance>();st->handle=handle;const std::string id=std::to_string(next_ffi_library_id_++);ffi_libraries_[id]=st;out=nift::RuntimeValue(std::string("\x1fnift:ffi-lib:")+id);return true;
             }
             if(call_args("ffi_close",args,q)){
-                if(args.size()!=1){error="ffi_close: expected library handle";return false;}json::Document h;if(!arg_value(args,q,0,h)||!h.is_string()||h.string.rfind("\x1fnift:ffi-lib:",0)!=0){error="ffi_close: expected library handle";return false;}auto it=ffi_libraries_.find(h.string.substr(14));if(it==ffi_libraries_.end()||it->second->closed){error="ffi_close: invalid or closed library handle";return false;}
+                if(args.size()!=1){error="ffi_close: expected library handle";return false;}nift::RuntimeValue h;if(!arg_value(args,q,0,h)||!h.is_string()||h.string.rfind("\x1fnift:ffi-lib:",0)!=0){error="ffi_close: expected library handle";return false;}auto it=ffi_libraries_.find(h.string.substr(14));if(it==ffi_libraries_.end()||it->second->closed){error="ffi_close: invalid or closed library handle";return false;}
 #ifdef _WIN32
                 if(!FreeLibrary(static_cast<HMODULE>(it->second->handle))){error="ffi_close: unload failed";return false;}
 #else
                 if(dlclose(it->second->handle)!=0){const char* e=dlerror();error=std::string("ffi_close: ")+(e?e:"unload failed");return false;}
 #endif
-                it->second->handle=nullptr;it->second->closed=true;out=json::Document(nullptr);return true;
+                it->second->handle=nullptr;it->second->closed=true;out=nift::RuntimeValue(nullptr);return true;
             }
             if(call_args("ffi_buffer",args,q)){
-                if(args.size()!=1){error="ffi_buffer: expected string or byte array";return false;}json::Document d;if(!arg_value(args,q,0,d))return false;auto st=std::make_shared<FfiBufferInstance>();if(d.is_string())st->bytes.assign(d.string.begin(),d.string.end());else if(d.is_array()){for(const auto&x:d.array){if(!x.is_number()||std::trunc(x.num)!=x.num||x.num<0||x.num>255){error="ffi_buffer: array values must be bytes";return false;}st->bytes.push_back(static_cast<unsigned char>(x.num));}}else{error="ffi_buffer: expected string or byte array";return false;}const std::string id=std::to_string(next_ffi_buffer_id_++);ffi_buffers_[id]=st;out=json::Document(std::string("\x1fnift:ffi-buffer:")+id);return true;
+                if(args.size()!=1){error="ffi_buffer: expected string or byte array";return false;}nift::RuntimeValue d;if(!arg_value(args,q,0,d))return false;auto st=std::make_shared<FfiBufferInstance>();if(d.is_string())st->bytes.assign(d.string.begin(),d.string.end());else if(d.is_array()){for(const auto&x:d.array){if(!x.is_number()||std::trunc(x.num)!=x.num||x.num<0||x.num>255){error="ffi_buffer: array values must be bytes";return false;}st->bytes.push_back(static_cast<unsigned char>(x.num));}}else{error="ffi_buffer: expected string or byte array";return false;}const std::string id=std::to_string(next_ffi_buffer_id_++);ffi_buffers_[id]=st;out=nift::RuntimeValue(std::string("\x1fnift:ffi-buffer:")+id);return true;
             }
             if(call_args("ffi_bytes",args,q)){
-                if(args.size()!=1){error="ffi_bytes: expected buffer handle";return false;}json::Document h;if(!arg_value(args,q,0,h)||!h.is_string()||h.string.rfind("\x1fnift:ffi-buffer:",0)!=0){error="ffi_bytes: expected buffer handle";return false;}auto bi=ffi_buffers_.find(h.string.substr(17));if(bi==ffi_buffers_.end()){error="ffi_bytes: invalid buffer handle";return false;}out=json::Document::make_array();for(unsigned char b:bi->second->bytes)out.array.emplace_back(static_cast<int>(b));return true;
+                if(args.size()!=1){error="ffi_bytes: expected buffer handle";return false;}nift::RuntimeValue h;if(!arg_value(args,q,0,h)||!h.is_string()||h.string.rfind("\x1fnift:ffi-buffer:",0)!=0){error="ffi_bytes: expected buffer handle";return false;}auto bi=ffi_buffers_.find(h.string.substr(17));if(bi==ffi_buffers_.end()){error="ffi_bytes: invalid buffer handle";return false;}out=nift::RuntimeValue::make_array();for(unsigned char b:bi->second->bytes)out.array.emplace_back(static_cast<int>(b));return true;
             }
             if(call_args("ffi_sizeof",args,q)||call_args("ffi_struct",args,q)){
-                const bool make_struct=text.rfind("ffi_struct(",0)==0;if((make_struct&&args.size()!=2)||(!make_struct&&args.size()!=1)){error=make_struct?"ffi_struct: expected layout and values":"ffi_sizeof: expected layout";return false;}std::string layout;if(!string_arg(make_struct?"ffi_struct":"ffi_sizeof",args,q,0,layout))return false;std::vector<std::string> fields;std::size_t pos=0;while(pos<=layout.size()){auto c=layout.find(',',pos);auto t=trim_copy(layout.substr(pos,c==std::string::npos?std::string::npos:c-pos));if(t.empty()){error="ffi struct: empty field type";return false;}fields.push_back(t);if(c==std::string::npos)break;pos=c+1;}auto sa=[&](const std::string&t,std::size_t&sz,std::size_t&al){if(t=="i8"||t=="u8"||t=="bool"){sz=al=1;return true;}if(t=="i16"||t=="u16"){sz=al=2;return true;}if(t=="i32"||t=="u32"||t=="f32"){sz=al=4;return true;}if(t=="i64"||t=="u64"||t=="f64"){sz=al=8;return true;}if(t=="ptr"||t=="cstr"){sz=al=sizeof(void*);return true;}return false;};std::vector<std::size_t> offs;std::size_t total=0,maxa=1;for(const auto&t:fields){std::size_t z,a;if(!sa(t,z,a)){error="ffi struct: unsupported field type '"+t+"'";return false;}total=(total+a-1)/a*a;offs.push_back(total);total+=z;maxa=std::max(maxa,a);}total=(total+maxa-1)/maxa*maxa;if(!make_struct){out=json::Document(static_cast<double>(total));return true;}json::Document vals;if(!arg_value(args,q,1,vals)||!vals.is_array()||vals.array.size()!=fields.size()){error="ffi_struct: values must be array matching layout";return false;}auto st=std::make_shared<FfiBufferInstance>();st->bytes.assign(total,0);for(size_t i=0;i<fields.size();++i){const auto&t=fields[i];const auto&v=vals.array[i];unsigned char* p=st->bytes.data()+offs[i];if(t=="f32"||t=="f64"){if(!v.is_number()){error="ffi_struct: floating field must be numeric";return false;}if(t=="f32"){float x=static_cast<float>(v.num);std::memcpy(p,&x,4);}else{double x=v.num;std::memcpy(p,&x,8);}continue;}if(t=="ptr"||t=="cstr"){error="ffi_struct: pointer/string fields require explicit pointer ownership and are not supported in v4.5";return false;}if(t=="bool"){if(!v.is_bool()){error="ffi_struct: bool field must be bool";return false;}unsigned char x=v.boolean?1:0;std::memcpy(p,&x,1);continue;}if(!v.is_number()||std::trunc(v.num)!=v.num){error="ffi_struct: integer field must be integral";return false;}std::int64_t x=static_cast<std::int64_t>(v.num);std::size_t z=t=="i8"||t=="u8"?1:t=="i16"||t=="u16"?2:t=="i32"||t=="u32"?4:8;std::memcpy(p,&x,z);}const std::string id=std::to_string(next_ffi_buffer_id_++);ffi_buffers_[id]=st;out=json::Document(std::string("\x1fnift:ffi-buffer:")+id);return true;
+                const bool make_struct=text.rfind("ffi_struct(",0)==0;if((make_struct&&args.size()!=2)||(!make_struct&&args.size()!=1)){error=make_struct?"ffi_struct: expected layout and values":"ffi_sizeof: expected layout";return false;}std::string layout;if(!string_arg(make_struct?"ffi_struct":"ffi_sizeof",args,q,0,layout))return false;std::vector<std::string> fields;std::size_t pos=0;while(pos<=layout.size()){auto c=layout.find(',',pos);auto t=trim_copy(layout.substr(pos,c==std::string::npos?std::string::npos:c-pos));if(t.empty()){error="ffi struct: empty field type";return false;}fields.push_back(t);if(c==std::string::npos)break;pos=c+1;}auto sa=[&](const std::string&t,std::size_t&sz,std::size_t&al){if(t=="i8"||t=="u8"||t=="bool"){sz=al=1;return true;}if(t=="i16"||t=="u16"){sz=al=2;return true;}if(t=="i32"||t=="u32"||t=="f32"){sz=al=4;return true;}if(t=="i64"||t=="u64"||t=="f64"){sz=al=8;return true;}if(t=="ptr"||t=="cstr"){sz=al=sizeof(void*);return true;}return false;};std::vector<std::size_t> offs;std::size_t total=0,maxa=1;for(const auto&t:fields){std::size_t z,a;if(!sa(t,z,a)){error="ffi struct: unsupported field type '"+t+"'";return false;}total=(total+a-1)/a*a;offs.push_back(total);total+=z;maxa=std::max(maxa,a);}total=(total+maxa-1)/maxa*maxa;if(!make_struct){out=nift::RuntimeValue(static_cast<double>(total));return true;}nift::RuntimeValue vals;if(!arg_value(args,q,1,vals)||!vals.is_array()||vals.array.size()!=fields.size()){error="ffi_struct: values must be array matching layout";return false;}auto st=std::make_shared<FfiBufferInstance>();st->bytes.assign(total,0);for(size_t i=0;i<fields.size();++i){const auto&t=fields[i];const auto&v=vals.array[i];unsigned char* p=st->bytes.data()+offs[i];if(t=="f32"||t=="f64"){if(!v.is_number()){error="ffi_struct: floating field must be numeric";return false;}if(t=="f32"){float x=static_cast<float>(v.num);std::memcpy(p,&x,4);}else{double x=v.num;std::memcpy(p,&x,8);}continue;}if(t=="ptr"||t=="cstr"){error="ffi_struct: pointer/string fields require explicit pointer ownership and are not supported in v4.5";return false;}if(t=="bool"){if(!v.is_bool()){error="ffi_struct: bool field must be bool";return false;}unsigned char x=v.boolean?1:0;std::memcpy(p,&x,1);continue;}if(!v.is_number()||std::trunc(v.num)!=v.num){error="ffi_struct: integer field must be integral";return false;}std::int64_t x=static_cast<std::int64_t>(v.num);std::size_t z=t=="i8"||t=="u8"?1:t=="i16"||t=="u16"?2:t=="i32"||t=="u32"?4:8;std::memcpy(p,&x,z);}const std::string id=std::to_string(next_ffi_buffer_id_++);ffi_buffers_[id]=st;out=nift::RuntimeValue(std::string("\x1fnift:ffi-buffer:")+id);return true;
             }
             if(call_args("ffi_callback",args,q)){
-                if(args.size()!=2){error="ffi_callback: expected callable and signature";return false;}json::Document cb;if(!arg_value(args,q,0,cb)||!cb.is_string()||cb.string.rfind("\x1fnift:callable:",0)!=0){error="ffi_callback: first argument must be callable";return false;}std::string sig;if(!string_arg("ffi_callback",args,q,1,sig))return false;sig.erase(std::remove_if(sig.begin(),sig.end(),[](unsigned char c){return std::isspace(c);}),sig.end());if(sig!="i64(i64)"){error="ffi_callback: v4.5 supports only i64(i64) callbacks";return false;}const std::string id=std::to_string(next_ffi_callback_id_++);ffi_callbacks_i64_[id]=cb.string;out=json::Document(std::string("\x1fnift:ffi-callback-i64:")+id);return true;
+                if(args.size()!=2){error="ffi_callback: expected callable and signature";return false;}nift::RuntimeValue cb;if(!arg_value(args,q,0,cb)||!cb.is_string()||cb.string.rfind("\x1fnift:callable:",0)!=0){error="ffi_callback: first argument must be callable";return false;}std::string sig;if(!string_arg("ffi_callback",args,q,1,sig))return false;sig.erase(std::remove_if(sig.begin(),sig.end(),[](unsigned char c){return std::isspace(c);}),sig.end());if(sig!="i64(i64)"){error="ffi_callback: v4.5 supports only i64(i64) callbacks";return false;}const std::string id=std::to_string(next_ffi_callback_id_++);ffi_callbacks_i64_[id]=cb.string;out=nift::RuntimeValue(std::string("\x1fnift:ffi-callback-i64:")+id);return true;
             }
             if(call_args("ffi_call",args,q)){
                 if(args.size()<3){error="ffi_call: expected library, symbol, signature and optional arguments";return false;}
-                json::Document lh;if(!arg_value(args,q,0,lh)||!lh.is_string()||lh.string.rfind("\x1fnift:ffi-lib:",0)!=0){error="ffi_call: expected library handle";return false;}auto li=ffi_libraries_.find(lh.string.substr(14));if(li==ffi_libraries_.end()||li->second->closed||!li->second->handle){error="ffi_call: invalid or closed library handle";return false;}
+                nift::RuntimeValue lh;if(!arg_value(args,q,0,lh)||!lh.is_string()||lh.string.rfind("\x1fnift:ffi-lib:",0)!=0){error="ffi_call: expected library handle";return false;}auto li=ffi_libraries_.find(lh.string.substr(14));if(li==ffi_libraries_.end()||li->second->closed||!li->second->handle){error="ffi_call: invalid or closed library handle";return false;}
                 std::string symbol,signature;if(!string_arg("ffi_call",args,q,1,symbol)||!string_arg("ffi_call",args,q,2,signature))return false;if(symbol.empty()){error="ffi_call: symbol must not be empty";return false;}
                 signature.erase(std::remove_if(signature.begin(),signature.end(),[](unsigned char c){return std::isspace(c);}),signature.end());auto lp=signature.find('(');if(lp==std::string::npos||signature.empty()||signature.back()!=')'||signature.find('(',lp+1)!=std::string::npos){error="ffi_call: malformed signature";return false;}std::string rt=signature.substr(0,lp),inside=signature.substr(lp+1,signature.size()-lp-2);std::vector<std::string> types;if(!inside.empty()){std::size_t p=0;while(p<=inside.size()){auto c=inside.find(',',p);types.push_back(inside.substr(p,c==std::string::npos?std::string::npos:c-p));if(c==std::string::npos)break;p=c+1;}}
                 auto valid_type=[](const std::string&t){static const std::unordered_set<std::string> ok={"void","bool","i8","i16","i32","i64","u8","u16","u32","u64","f32","f64","ptr","cstr","buffer","callback_i64"};return ok.count(t)!=0;};if(!valid_type(rt)){error="ffi_call: unsupported return type";return false;}for(const auto&t:types)if(!valid_type(t)||t=="void"){error="ffi_call: unsupported argument type '"+t+"'";return false;}if(types.size()!=args.size()-3){error="ffi_call: signature argument count mismatch";return false;}if(types.size()>6){error="ffi_call: v4.5 supports at most 6 arguments";return false;}
@@ -2198,13 +2213,13 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
 #endif
                 if(!sym){error="ffi_call: symbol not found: "+symbol;return false;}
                 auto is_float=[](const std::string&t){return t=="f32"||t=="f64";};bool any_float=is_float(rt);for(const auto&t:types)any_float=any_float||is_float(t);if(any_float){bool all32=(rt=="f32");bool all64=(rt=="f64");for(const auto&t:types){all32=all32&&t=="f32";all64=all64&&t=="f64";}if(!(all32||all64)){error="ffi_call: mixed floating/integer signatures are not supported by the built-in v4.5 dispatcher";return false;}if(rt=="void"){error="ffi_call: floating arguments with void return are not supported";return false;}
-                    if(all64){std::vector<double> v;for(size_t i=0;i<types.size();++i){json::Document d;if(!arg_value(args,q,i+3,d)||!d.is_number()){error="ffi_call: f64 argument must be numeric";return false;}v.push_back(d.num);}double r=0;switch(v.size()){case 0:r=reinterpret_cast<double(*)()>(sym)();break;case 1:r=reinterpret_cast<double(*)(double)>(sym)(v[0]);break;case 2:r=reinterpret_cast<double(*)(double,double)>(sym)(v[0],v[1]);break;case 3:r=reinterpret_cast<double(*)(double,double,double)>(sym)(v[0],v[1],v[2]);break;case 4:r=reinterpret_cast<double(*)(double,double,double,double)>(sym)(v[0],v[1],v[2],v[3]);break;default:error="ffi_call: f64 dispatcher supports up to 4 arguments";return false;}out=json::Document(r);return true;}
-                    std::vector<float> v;for(size_t i=0;i<types.size();++i){json::Document d;if(!arg_value(args,q,i+3,d)||!d.is_number()){error="ffi_call: f32 argument must be numeric";return false;}v.push_back(static_cast<float>(d.num));}float r=0;switch(v.size()){case 0:r=reinterpret_cast<float(*)()>(sym)();break;case 1:r=reinterpret_cast<float(*)(float)>(sym)(v[0]);break;case 2:r=reinterpret_cast<float(*)(float,float)>(sym)(v[0],v[1]);break;case 3:r=reinterpret_cast<float(*)(float,float,float)>(sym)(v[0],v[1],v[2]);break;case 4:r=reinterpret_cast<float(*)(float,float,float,float)>(sym)(v[0],v[1],v[2],v[3]);break;default:error="ffi_call: f32 dispatcher supports up to 4 arguments";return false;}out=json::Document(static_cast<double>(r));return true;
+                    if(all64){std::vector<double> v;for(size_t i=0;i<types.size();++i){nift::RuntimeValue d;if(!arg_value(args,q,i+3,d)||!d.is_number()){error="ffi_call: f64 argument must be numeric";return false;}v.push_back(d.num);}double r=0;switch(v.size()){case 0:r=reinterpret_cast<double(*)()>(sym)();break;case 1:r=reinterpret_cast<double(*)(double)>(sym)(v[0]);break;case 2:r=reinterpret_cast<double(*)(double,double)>(sym)(v[0],v[1]);break;case 3:r=reinterpret_cast<double(*)(double,double,double)>(sym)(v[0],v[1],v[2]);break;case 4:r=reinterpret_cast<double(*)(double,double,double,double)>(sym)(v[0],v[1],v[2],v[3]);break;default:error="ffi_call: f64 dispatcher supports up to 4 arguments";return false;}out=nift::RuntimeValue(r);return true;}
+                    std::vector<float> v;for(size_t i=0;i<types.size();++i){nift::RuntimeValue d;if(!arg_value(args,q,i+3,d)||!d.is_number()){error="ffi_call: f32 argument must be numeric";return false;}v.push_back(static_cast<float>(d.num));}float r=0;switch(v.size()){case 0:r=reinterpret_cast<float(*)()>(sym)();break;case 1:r=reinterpret_cast<float(*)(float)>(sym)(v[0]);break;case 2:r=reinterpret_cast<float(*)(float,float)>(sym)(v[0],v[1]);break;case 3:r=reinterpret_cast<float(*)(float,float,float)>(sym)(v[0],v[1],v[2]);break;case 4:r=reinterpret_cast<float(*)(float,float,float,float)>(sym)(v[0],v[1],v[2],v[3]);break;default:error="ffi_call: f32 dispatcher supports up to 4 arguments";return false;}out=nift::RuntimeValue(static_cast<double>(r));return true;
                 }
-                std::vector<std::string> string_storage;string_storage.reserve(types.size());std::vector<std::uintptr_t> v;v.reserve(types.size());for(size_t i=0;i<types.size();++i){json::Document d;if(!arg_value(args,q,i+3,d))return false;const auto&t=types[i];if(t=="cstr"){if(d.is_null()){v.push_back(0);continue;}if(!d.is_string()){error="ffi_call: cstr argument must be string or null";return false;}if(d.string.find('\0')!=std::string::npos){error="ffi_call: cstr contains embedded NUL";return false;}string_storage.push_back(d.string);v.push_back(reinterpret_cast<std::uintptr_t>(string_storage.back().c_str()));continue;}if(t=="buffer"){if(!d.is_string()||d.string.rfind("\x1fnift:ffi-buffer:",0)!=0){error="ffi_call: buffer argument must be FFI buffer handle";return false;}auto bi=ffi_buffers_.find(d.string.substr(17));if(bi==ffi_buffers_.end()){error="ffi_call: invalid buffer handle";return false;}v.push_back(reinterpret_cast<std::uintptr_t>(bi->second->bytes.empty()?nullptr:bi->second->bytes.data()));continue;}if(t=="callback_i64"){if(!d.is_string()||d.string.rfind("\x1fnift:ffi-callback-i64:",0)!=0){error="ffi_call: callback_i64 argument must be callback handle";return false;}auto ci=ffi_callbacks_i64_.find(d.string.substr(23));if(ci==ffi_callbacks_i64_.end()){error="ffi_call: invalid callback handle";return false;}if(nift_ffi_callback_parser){error="ffi_call: nested native callback activation is not supported";return false;}nift_ffi_callback_parser=this;nift_ffi_callback_tag=ci->second;nift_ffi_callback_error.clear();v.push_back(reinterpret_cast<std::uintptr_t>(&nift_ffi_callback_i64_trampoline));continue;}if(t=="ptr"){if(d.is_null()){v.push_back(0);continue;}if(!d.is_string()||d.string.rfind("\x1fnift:ffi-ptr:",0)!=0){error="ffi_call: ptr argument must be pointer handle or null";return false;}auto pi=ffi_pointers_.find(d.string.substr(14));if(pi==ffi_pointers_.end()){error="ffi_call: invalid pointer handle";return false;}v.push_back(reinterpret_cast<std::uintptr_t>(pi->second));continue;}if(t=="bool"){if(!d.is_bool()){error="ffi_call: bool argument must be bool";return false;}v.push_back(d.boolean?1:0);continue;}if(!d.is_number()){error="ffi_call: integer argument must be numeric";return false;}long double x=d.num;bool uns=!t.empty()&&t[0]=='u';int bits=t=="i8"||t=="u8"?8:t=="i16"||t=="u16"?16:t=="i32"||t=="u32"?32:64;if(std::trunc(x)!=x){error="ffi_call: integer argument is fractional";return false;}long double lo=uns?0.0L:-std::ldexp(1.0L,bits-1),hi=uns?std::ldexp(1.0L,bits)-1.0L:std::ldexp(1.0L,bits-1)-1.0L;if(x<lo||x>hi){error="ffi_call: integer argument out of range for "+t;return false;}v.push_back(static_cast<std::uintptr_t>(static_cast<std::uint64_t>(static_cast<std::int64_t>(x))));}
+                std::vector<std::string> string_storage;string_storage.reserve(types.size());std::vector<std::uintptr_t> v;v.reserve(types.size());for(size_t i=0;i<types.size();++i){nift::RuntimeValue d;if(!arg_value(args,q,i+3,d))return false;const auto&t=types[i];if(t=="cstr"){if(d.is_null()){v.push_back(0);continue;}if(!d.is_string()){error="ffi_call: cstr argument must be string or null";return false;}if(d.string.find('\0')!=std::string::npos){error="ffi_call: cstr contains embedded NUL";return false;}string_storage.push_back(d.string);v.push_back(reinterpret_cast<std::uintptr_t>(string_storage.back().c_str()));continue;}if(t=="buffer"){if(!d.is_string()||d.string.rfind("\x1fnift:ffi-buffer:",0)!=0){error="ffi_call: buffer argument must be FFI buffer handle";return false;}auto bi=ffi_buffers_.find(d.string.substr(17));if(bi==ffi_buffers_.end()){error="ffi_call: invalid buffer handle";return false;}v.push_back(reinterpret_cast<std::uintptr_t>(bi->second->bytes.empty()?nullptr:bi->second->bytes.data()));continue;}if(t=="callback_i64"){if(!d.is_string()||d.string.rfind("\x1fnift:ffi-callback-i64:",0)!=0){error="ffi_call: callback_i64 argument must be callback handle";return false;}auto ci=ffi_callbacks_i64_.find(d.string.substr(23));if(ci==ffi_callbacks_i64_.end()){error="ffi_call: invalid callback handle";return false;}if(nift_ffi_callback_parser){error="ffi_call: nested native callback activation is not supported";return false;}nift_ffi_callback_parser=this;nift_ffi_callback_tag=ci->second;nift_ffi_callback_error.clear();v.push_back(reinterpret_cast<std::uintptr_t>(&nift_ffi_callback_i64_trampoline));continue;}if(t=="ptr"){if(d.is_null()){v.push_back(0);continue;}if(!d.is_string()||d.string.rfind("\x1fnift:ffi-ptr:",0)!=0){error="ffi_call: ptr argument must be pointer handle or null";return false;}auto pi=ffi_pointers_.find(d.string.substr(14));if(pi==ffi_pointers_.end()){error="ffi_call: invalid pointer handle";return false;}v.push_back(reinterpret_cast<std::uintptr_t>(pi->second));continue;}if(t=="bool"){if(!d.is_bool()){error="ffi_call: bool argument must be bool";return false;}v.push_back(d.boolean?1:0);continue;}if(!d.is_number()){error="ffi_call: integer argument must be numeric";return false;}long double x=d.num;bool uns=!t.empty()&&t[0]=='u';int bits=t=="i8"||t=="u8"?8:t=="i16"||t=="u16"?16:t=="i32"||t=="u32"?32:64;if(std::trunc(x)!=x){error="ffi_call: integer argument is fractional";return false;}long double lo=uns?0.0L:-std::ldexp(1.0L,bits-1),hi=uns?std::ldexp(1.0L,bits)-1.0L:std::ldexp(1.0L,bits-1)-1.0L;if(x<lo||x>hi){error="ffi_call: integer argument out of range for "+t;return false;}v.push_back(static_cast<std::uintptr_t>(static_cast<std::uint64_t>(static_cast<std::int64_t>(x))));}
                 using W=std::uintptr_t;W r=0;switch(v.size()){case 0:r=reinterpret_cast<W(*)()>(sym)();break;case 1:r=reinterpret_cast<W(*)(W)>(sym)(v[0]);break;case 2:r=reinterpret_cast<W(*)(W,W)>(sym)(v[0],v[1]);break;case 3:r=reinterpret_cast<W(*)(W,W,W)>(sym)(v[0],v[1],v[2]);break;case 4:r=reinterpret_cast<W(*)(W,W,W,W)>(sym)(v[0],v[1],v[2],v[3]);break;case 5:r=reinterpret_cast<W(*)(W,W,W,W,W)>(sym)(v[0],v[1],v[2],v[3],v[4]);break;case 6:r=reinterpret_cast<W(*)(W,W,W,W,W,W)>(sym)(v[0],v[1],v[2],v[3],v[4],v[5]);break;}
                 if(nift_ffi_callback_parser==this){nift_ffi_callback_parser=nullptr;nift_ffi_callback_tag.clear();if(!nift_ffi_callback_error.empty()){error="ffi callback: "+nift_ffi_callback_error;nift_ffi_callback_error.clear();return false;}}
-                if(rt=="void"){out=json::Document(nullptr);return true;}if(rt=="cstr"){const char* p=reinterpret_cast<const char*>(r);out=p?json::Document(std::string(p)):json::Document(nullptr);return true;}if(rt=="ptr"){if(!r){out=json::Document(nullptr);return true;}const std::string id=std::to_string(next_ffi_pointer_id_++);ffi_pointers_[id]=reinterpret_cast<void*>(r);out=json::Document(std::string("\x1fnift:ffi-ptr:")+id);return true;}if(rt=="bool"){out=json::Document(r!=0);return true;}bool uns=!rt.empty()&&rt[0]=='u';int bits=rt=="i8"||rt=="u8"?8:rt=="i16"||rt=="u16"?16:rt=="i32"||rt=="u32"?32:64;if(uns){std::uint64_t x=static_cast<std::uint64_t>(r);if(bits<64)x&=((std::uint64_t(1)<<bits)-1);json::Document nd;nd.type=json::Type::StrNumber;nd.string=std::to_string(x);out=std::move(nd);return true;}std::int64_t x=0;if(bits==8)x=static_cast<std::int8_t>(r);else if(bits==16)x=static_cast<std::int16_t>(r);else if(bits==32)x=static_cast<std::int32_t>(r);else x=static_cast<std::int64_t>(r);json::Document nd;nd.type=json::Type::StrNumber;nd.string=std::to_string(x);out=std::move(nd);return true;
+                if(rt=="void"){out=nift::RuntimeValue(nullptr);return true;}if(rt=="cstr"){const char* p=reinterpret_cast<const char*>(r);out=p?nift::RuntimeValue(std::string(p)):nift::RuntimeValue(nullptr);return true;}if(rt=="ptr"){if(!r){out=nift::RuntimeValue(nullptr);return true;}const std::string id=std::to_string(next_ffi_pointer_id_++);ffi_pointers_[id]=reinterpret_cast<void*>(r);out=nift::RuntimeValue(std::string("\x1fnift:ffi-ptr:")+id);return true;}if(rt=="bool"){out=nift::RuntimeValue(r!=0);return true;}bool uns=!rt.empty()&&rt[0]=='u';int bits=rt=="i8"||rt=="u8"?8:rt=="i16"||rt=="u16"?16:rt=="i32"||rt=="u32"?32:64;if(uns){std::uint64_t x=static_cast<std::uint64_t>(r);if(bits<64)x&=((std::uint64_t(1)<<bits)-1);nift::RuntimeValue nd;nd.type=nift::RuntimeType::StrNumber;nd.string=std::to_string(x);out=std::move(nd);return true;}std::int64_t x=0;if(bits==8)x=static_cast<std::int8_t>(r);else if(bits==16)x=static_cast<std::int16_t>(r);else if(bits==32)x=static_cast<std::int32_t>(r);else x=static_cast<std::int64_t>(r);nift::RuntimeValue nd;nd.type=nift::RuntimeType::StrNumber;nd.string=std::to_string(x);out=std::move(nd);return true;
             }
             if(call_args("setenv",args,q)){if(!standalone_script_host_){error="setenv: only available in standalone Nift scripts/shell";return false;}if(args.size()!=2){error="setenv: expected name and value";return false;}std::string k,v;if(!string_arg("setenv",args,q,0,k)||!string_arg("setenv",args,q,1,v))return false;
 #ifdef _WIN32
@@ -2212,25 +2227,25 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
 #else
                 if(::setenv(k.c_str(),v.c_str(),1)!=0){error="setenv: failed";return false;}
 #endif
-                out=json::Document(nullptr);return true;}
+                out=nift::RuntimeValue(nullptr);return true;}
             if(call_args("unsetenv",args,q)){if(!standalone_script_host_){error="unsetenv: only available in standalone Nift scripts/shell";return false;}if(args.size()!=1){error="unsetenv: expected name";return false;}std::string k;if(!string_arg("unsetenv",args,q,0,k))return false;
 #ifdef _WIN32
                 _putenv_s(k.c_str(),"");
 #else
                 ::unsetenv(k.c_str());
 #endif
-                out=json::Document(nullptr);return true;}
-            if(call_args("pwd",args,q)){if(!args.empty()){error="pwd: expected no arguments";return false;}out=json::Document((standalone_script_host_?fs::current_path():host_.root()).generic_string());return true;}
-            if(call_args("cd",args,q)){if(!standalone_script_host_){error="cd: only available in standalone Nift scripts/shell";return false;}fs::path p;if(args.size()!=1||!checked_path("cd",args,q,0,p))return false;std::error_code ec;fs::current_path(p,ec);if(ec){error="cd: "+ec.message();return false;}out=json::Document(nullptr);return true;}
-            if(call_args("exists",args,q)){fs::path p;if(args.size()!=1||!checked_path("exists",args,q,0,p))return false;std::error_code ec;out=json::Document(fs::exists(p,ec)&&!ec);return true;}
-            if(call_args("make_dir",args,q)||call_args("mkdir",args,q)){fs::path p;if(args.size()!=1||!checked_path("make_dir",args,q,0,p))return false;std::error_code ec;fs::create_directories(p,ec);if(ec){error="make_dir: "+ec.message();return false;}out=json::Document(nullptr);return true;}
-            if(call_args("touch",args,q)){fs::path p;if(args.size()!=1||!checked_path("touch",args,q,0,p))return false;std::ofstream f(p,std::ios::app);if(!f){error="touch: cannot open path";return false;}out=json::Document(nullptr);return true;}
-            auto path_values=[&](const std::string& name,const std::vector<std::string>& aa,const std::vector<bool>& qq,std::size_t begin,std::size_t end,std::vector<fs::path>& paths)->bool{for(std::size_t ai=begin;ai<end;++ai){json::Document v;if(!arg_value(aa,qq,ai,v))return false;std::vector<std::string> raws;if(v.is_string())raws.push_back(v.string);else if(v.is_array()){for(const auto& x:v.array){if(!x.is_string()){error=name+": path arrays must contain strings";return false;}raws.push_back(x.string);}}else{error=name+": expected string path or array of paths";return false;}for(const auto& raw:raws){fs::path p=resolve_path(raw);if(!standalone_script_host_&&!host_.root().empty()&&!filesystem::path_within(fs::absolute(host_.root()).lexically_normal(),p)){error=name+": path must stay inside the Nift project";return false;}if(!nift_fs_root_allowed(p,standalone_script_host_,error)){error=name+": "+error;return false;}if(nift_glob_has_magic(raw)){auto matches=nift_glob_expand(p);paths.insert(paths.end(),matches.begin(),matches.end());}else paths.push_back(std::move(p));}}return true;};
-            if(call_args("remove",args,q)||call_args("rm",args,q)){if(args.empty()){error="remove: expected at least one path";return false;}std::vector<fs::path> paths;if(!path_values("remove",args,q,0,args.size(),paths))return false;for(const auto& rp:paths){std::error_code ec;if(fs::is_directory(rp,ec)){error="remove: directories are not removed recursively";return false;}if(!fs::remove(rp,ec)&&ec){error="remove: "+ec.message();return false;}}out=json::Document(nullptr);return true;}
-            if(call_args("copy",args,q)||call_args("cp",args,q)||call_args("move",args,q)||call_args("mv",args,q)){const bool mv=text.rfind("move(",0)==0||text.rfind("mv(",0)==0;const std::string name=mv?"move":"copy";if(text.rfind("copy(",0)==0&&args.size()<2){args.clear();q.clear();}else if(args.size()<2){error=name+": expected source(s) and destination";return false;}else{std::vector<fs::path> sources;if(!path_values(name,args,q,0,args.size()-1,sources))return false;if(sources.empty()){error=name+": glob matched no source files";return false;}std::vector<fs::path> dests;if(!path_values(name,args,q,args.size()-1,args.size(),dests)||dests.size()!=1){error=name+": destination must be one path";return false;}fs::path dest=dests.front();std::error_code dec;const bool dest_dir=fs::is_directory(dest,dec);if(sources.size()>1&&!dest_dir){error=name+": destination must be an existing directory for multiple sources";return false;}for(const auto& src:sources){fs::path target=dest_dir?dest/src.filename():dest;std::error_code ec;if(mv)fs::rename(src,target,ec);else fs::copy_file(src,target,fs::copy_options::overwrite_existing,ec);if(ec){error=name+": "+ec.message();return false;}}out=json::Document(nullptr);return true;}}
-            if(call_args("cat",args,q)){fs::path p;if(args.size()!=1||!checked_path("cat",args,q,0,p))return false;std::error_code ec;if(fs::is_directory(p,ec)){error="cat: path is a directory";return false;}std::ifstream f(p,std::ios::binary);if(!f){error="cat: cannot open path";return false;}std::ostringstream ss;ss<<f.rdbuf();{static std::mutex cat_mutex;std::lock_guard<std::mutex> lock(cat_mutex);std::cout<<ss.str();std::cout.flush();}out=json::Document(nullptr);return true;}
-            if(call_args("ls",args,q)){if(args.size()>1){error="ls: expected zero or one path/pattern";return false;}out=json::Document::make_array();if(args.empty()){fs::path p=standalone_script_host_?fs::current_path():host_.root();std::error_code ec;std::vector<std::string> names;for(fs::directory_iterator it(p,ec),end;!ec&&it!=end;it.increment(ec))names.push_back(it->path().filename().generic_string());if(ec){error="ls: "+ec.message();return false;}std::sort(names.begin(),names.end());for(const auto& n:names)out.array.emplace_back(n);return true;}std::string raw;if(!string_arg("ls",args,q,0,raw))return false;fs::path p=resolve_path(raw);if(!standalone_script_host_&&!host_.root().empty()&&!filesystem::path_within(fs::absolute(host_.root()).lexically_normal(),p)){error="ls: path must stay inside the Nift project";return false;}if(!nift_fs_root_allowed(p,standalone_script_host_,error)){error="ls: "+error;return false;}if(nift_glob_has_magic(raw)){auto matches=nift_glob_expand(p);const fs::path base=standalone_script_host_?fs::current_path():host_.root();const bool absolute=fs::path(raw).is_absolute();for(const auto&m:matches){std::error_code rec;auto shown=absolute?m:fs::relative(m,base,rec);out.array.emplace_back((rec?m:shown).generic_string());}return true;}std::error_code ec;if(!fs::is_directory(p,ec)||ec){error="ls: path is not a readable directory";return false;}std::vector<std::string> names;for(fs::directory_iterator it(p,ec),end;!ec&&it!=end;it.increment(ec))names.push_back(it->path().filename().generic_string());if(ec){error="ls: "+ec.message();return false;}std::sort(names.begin(),names.end());for(const auto& n:names)out.array.emplace_back(n);return true;}
-            if(call_args("open",args,q)){fs::path p;if(args.size()!=1||!checked_path("open",args,q,0,p))return false;std::error_code ec;if(fs::is_directory(p,ec)){error="open: path is a directory";return false;}std::ifstream f(p,std::ios::binary);if(!f){error="open: cannot open path";return false;}std::ostringstream ss;ss<<f.rdbuf();out=json::Document(ss.str());return true;}
+                out=nift::RuntimeValue(nullptr);return true;}
+            if(call_args("pwd",args,q)){if(!args.empty()){error="pwd: expected no arguments";return false;}out=nift::RuntimeValue((standalone_script_host_?fs::current_path():host_.root()).generic_string());return true;}
+            if(call_args("cd",args,q)){if(!standalone_script_host_){error="cd: only available in standalone Nift scripts/shell";return false;}fs::path p;if(args.size()!=1||!checked_path("cd",args,q,0,p))return false;std::error_code ec;fs::current_path(p,ec);if(ec){error="cd: "+ec.message();return false;}out=nift::RuntimeValue(nullptr);return true;}
+            if(call_args("exists",args,q)){fs::path p;if(args.size()!=1||!checked_path("exists",args,q,0,p))return false;std::error_code ec;out=nift::RuntimeValue(fs::exists(p,ec)&&!ec);return true;}
+            if(call_args("make_dir",args,q)||call_args("mkdir",args,q)){fs::path p;if(args.size()!=1||!checked_path("make_dir",args,q,0,p))return false;std::error_code ec;fs::create_directories(p,ec);if(ec){error="make_dir: "+ec.message();return false;}out=nift::RuntimeValue(nullptr);return true;}
+            if(call_args("touch",args,q)){fs::path p;if(args.size()!=1||!checked_path("touch",args,q,0,p))return false;std::ofstream f(p,std::ios::app);if(!f){error="touch: cannot open path";return false;}out=nift::RuntimeValue(nullptr);return true;}
+            auto path_values=[&](const std::string& name,const std::vector<std::string>& aa,const std::vector<bool>& qq,std::size_t begin,std::size_t end,std::vector<fs::path>& paths)->bool{for(std::size_t ai=begin;ai<end;++ai){nift::RuntimeValue v;if(!arg_value(aa,qq,ai,v))return false;std::vector<std::string> raws;if(v.is_string())raws.push_back(v.string);else if(v.is_array()){for(const auto& x:v.array){if(!x.is_string()){error=name+": path arrays must contain strings";return false;}raws.push_back(x.string);}}else{error=name+": expected string path or array of paths";return false;}for(const auto& raw:raws){fs::path p=resolve_path(raw);if(!standalone_script_host_&&!host_.root().empty()&&!filesystem::path_within(fs::absolute(host_.root()).lexically_normal(),p)){error=name+": path must stay inside the Nift project";return false;}if(!nift_fs_root_allowed(p,standalone_script_host_,error)){error=name+": "+error;return false;}if(nift_glob_has_magic(raw)){auto matches=nift_glob_expand(p);paths.insert(paths.end(),matches.begin(),matches.end());}else paths.push_back(std::move(p));}}return true;};
+            if(call_args("remove",args,q)||call_args("rm",args,q)){if(args.empty()){error="remove: expected at least one path";return false;}std::vector<fs::path> paths;if(!path_values("remove",args,q,0,args.size(),paths))return false;for(const auto& rp:paths){std::error_code ec;if(fs::is_directory(rp,ec)){error="remove: directories are not removed recursively";return false;}if(!fs::remove(rp,ec)&&ec){error="remove: "+ec.message();return false;}}out=nift::RuntimeValue(nullptr);return true;}
+            if(call_args("copy",args,q)||call_args("cp",args,q)||call_args("move",args,q)||call_args("mv",args,q)){const bool mv=text.rfind("move(",0)==0||text.rfind("mv(",0)==0;const std::string name=mv?"move":"copy";if(text.rfind("copy(",0)==0&&args.size()<2){args.clear();q.clear();}else if(args.size()<2){error=name+": expected source(s) and destination";return false;}else{std::vector<fs::path> sources;if(!path_values(name,args,q,0,args.size()-1,sources))return false;if(sources.empty()){error=name+": glob matched no source files";return false;}std::vector<fs::path> dests;if(!path_values(name,args,q,args.size()-1,args.size(),dests)||dests.size()!=1){error=name+": destination must be one path";return false;}fs::path dest=dests.front();std::error_code dec;const bool dest_dir=fs::is_directory(dest,dec);if(sources.size()>1&&!dest_dir){error=name+": destination must be an existing directory for multiple sources";return false;}for(const auto& src:sources){fs::path target=dest_dir?dest/src.filename():dest;std::error_code ec;if(mv)fs::rename(src,target,ec);else fs::copy_file(src,target,fs::copy_options::overwrite_existing,ec);if(ec){error=name+": "+ec.message();return false;}}out=nift::RuntimeValue(nullptr);return true;}}
+            if(call_args("cat",args,q)){fs::path p;if(args.size()!=1||!checked_path("cat",args,q,0,p))return false;std::error_code ec;if(fs::is_directory(p,ec)){error="cat: path is a directory";return false;}std::ifstream f(p,std::ios::binary);if(!f){error="cat: cannot open path";return false;}std::ostringstream ss;ss<<f.rdbuf();{static std::mutex cat_mutex;std::lock_guard<std::mutex> lock(cat_mutex);std::cout<<ss.str();std::cout.flush();}out=nift::RuntimeValue(nullptr);return true;}
+            if(call_args("ls",args,q)){if(args.size()>1){error="ls: expected zero or one path/pattern";return false;}out=nift::RuntimeValue::make_array();if(args.empty()){fs::path p=standalone_script_host_?fs::current_path():host_.root();std::error_code ec;std::vector<std::string> names;for(fs::directory_iterator it(p,ec),end;!ec&&it!=end;it.increment(ec))names.push_back(it->path().filename().generic_string());if(ec){error="ls: "+ec.message();return false;}std::sort(names.begin(),names.end());for(const auto& n:names)out.array.emplace_back(n);return true;}std::string raw;if(!string_arg("ls",args,q,0,raw))return false;fs::path p=resolve_path(raw);if(!standalone_script_host_&&!host_.root().empty()&&!filesystem::path_within(fs::absolute(host_.root()).lexically_normal(),p)){error="ls: path must stay inside the Nift project";return false;}if(!nift_fs_root_allowed(p,standalone_script_host_,error)){error="ls: "+error;return false;}if(nift_glob_has_magic(raw)){auto matches=nift_glob_expand(p);const fs::path base=standalone_script_host_?fs::current_path():host_.root();const bool absolute=fs::path(raw).is_absolute();for(const auto&m:matches){std::error_code rec;auto shown=absolute?m:fs::relative(m,base,rec);out.array.emplace_back((rec?m:shown).generic_string());}return true;}std::error_code ec;if(!fs::is_directory(p,ec)||ec){error="ls: path is not a readable directory";return false;}std::vector<std::string> names;for(fs::directory_iterator it(p,ec),end;!ec&&it!=end;it.increment(ec))names.push_back(it->path().filename().generic_string());if(ec){error="ls: "+ec.message();return false;}std::sort(names.begin(),names.end());for(const auto& n:names)out.array.emplace_back(n);return true;}
+            if(call_args("open",args,q)){fs::path p;if(args.size()!=1||!checked_path("open",args,q,0,p))return false;std::error_code ec;if(fs::is_directory(p,ec)){error="open: path is a directory";return false;}std::ifstream f(p,std::ios::binary);if(!f){error="open: cannot open path";return false;}std::ostringstream ss;ss<<f.rdbuf();out=nift::RuntimeValue(ss.str());return true;}
             // Native script-land Minify++ (v4.4 package campaign CP19-CP24).
             // Delegates to the same embedded Minify++ the CLI uses; never a
             // subprocess, so it also works under --no-process. Overloads:
@@ -2249,9 +2264,9 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 switch(f){case minify::Format::Html:return "html";case minify::Format::Css:return "css";case minify::Format::JavaScript:return "js";case minify::Format::Jsx:return "jsx";case minify::Format::Json:return "json";case minify::Format::Xml:return "xml";case minify::Format::Svg:return "svg";}return "?";};
             if(call_args("minify",args,q)){
                 if(args.empty()||args.size()>2){error="minify: expected source or path plus optional format string or options object";return false;}
-                json::Document first;if(!arg_value(args,q,0,first))return false;
+                nift::RuntimeValue first;if(!arg_value(args,q,0,first))return false;
                 if(!first.is_string()){error="minify: source or path must be a string";return false;}
-                std::string format_name;bool explicit_format=false;bool has_opts=false;json::Document opts;
+                std::string format_name;bool explicit_format=false;bool has_opts=false;nift::RuntimeValue opts;
                 if(args.size()==2){
                     if(!arg_value(args,q,1,opts))return false;
                     if(opts.is_string()){format_name=opts.string;explicit_format=true;}
@@ -2262,11 +2277,11 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 // is a source string (string->string). A bare path or an
                 // options object means the first argument is a file path.
                 const std::string arg0=first.string;
-                auto minify_fail=[&](const std::string& msg,const std::string& fmt,const std::string& written)->json::Document{json::Document r=json::Document::make_object();r["ok"]=json::Document(false);r["output"]=json::Document("");r["error"]=json::Document(msg);r["format"]=json::Document(fmt);r["written"]=json::Document(written);return r;};
+                auto minify_fail=[&](const std::string& msg,const std::string& fmt,const std::string& written)->nift::RuntimeValue{nift::RuntimeValue r=nift::RuntimeValue::make_object();r["ok"]=nift::RuntimeValue(false);r["output"]=nift::RuntimeValue("");r["error"]=nift::RuntimeValue(msg);r["format"]=nift::RuntimeValue(fmt);r["written"]=nift::RuntimeValue(written);return r;};
                 if(explicit_format&&!has_opts){
                     minify::Format fmt;if(!minify_format_from_name(format_name,fmt)){out=minify_fail("unsupported format '"+format_name+"'",format_name,"");return true;}
                     std::string out_text,merr;if(!minify::run(fmt,arg0,out_text,merr)){out=minify_fail(merr,format_name,"");return true;}
-                    json::Document r=json::Document::make_object();r["ok"]=json::Document(true);r["output"]=json::Document(out_text);r["error"]=json::Document("");r["format"]=json::Document(format_name);r["written"]=json::Document("");out=std::move(r);return true;
+                    nift::RuntimeValue r=nift::RuntimeValue::make_object();r["ok"]=nift::RuntimeValue(true);r["output"]=nift::RuntimeValue(out_text);r["error"]=nift::RuntimeValue("");r["format"]=nift::RuntimeValue(format_name);r["written"]=nift::RuntimeValue("");out=std::move(r);return true;
                 }
                 fs::path p0=resolve_path(arg0);
                 const bool arg0_is_file=fs::is_regular_file(p0);
@@ -2289,17 +2304,17 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 else if(want_output){fs::path od=resolve_path(opts["output"].string);if(!standalone_script_host_&&!host_.root().empty()&&!filesystem::path_within(fs::absolute(host_.root()).lexically_normal(),od)){error="minify: output must stay inside the Nift project";return false;}if(!nift_fs_root_allowed(od,standalone_script_host_,error)){error="minify: "+error;return false;}dest=od;}
                 else dest=in.parent_path()/(in.stem().string()+".min"+in.extension().string());
                 if(!filesystem::write_file(dest,out_text)){out=minify_fail("failed to write "+dest.generic_string(),format_name,"");return true;}
-                json::Document r=json::Document::make_object();r["ok"]=json::Document(true);r["output"]=json::Document(out_text);r["error"]=json::Document("");r["format"]=json::Document(format_name);r["written"]=json::Document(dest.generic_string());out=std::move(r);return true;
+                nift::RuntimeValue r=nift::RuntimeValue::make_object();r["ok"]=nift::RuntimeValue(true);r["output"]=nift::RuntimeValue(out_text);r["error"]=nift::RuntimeValue("");r["format"]=nift::RuntimeValue(format_name);r["written"]=nift::RuntimeValue(dest.generic_string());out=std::move(r);return true;
             }
-            if(call_args("file",args,q)){fs::path p;if(args.size()!=1||!checked_path("file",args,q,0,p))return false;auto f=std::make_shared<FileInstance>();f->path=p;auto id=std::to_string(next_file_instance_id_++);file_instances_[id]=f;out=json::Document(std::string("\x1fnift:file:")+id);return true;}
-            if(call_args("page",args,q)){if(args.size()!=1){error="page: expected one page name";return false;}json::Document d;if(!arg_value(args,q,0,d)||!d.is_string()){error="page: name must be a string";return false;}std::string ref;if(!host_.page_ref_for(d.string,ref)){error="page: unknown tracked page '"+d.string+"'";return false;}out=json::Document(ref);return true;}
-            if(call_args("min",args,q)||call_args("max",args,q)){const bool want_min=text.rfind("min(",0)==0;const std::string name=want_min?"min":"max";std::vector<json::Document> vals;if(args.size()==1){json::Document v;if(!arg_value(args,q,0,v))return false;if(v.is_array())vals=v.array;else vals.push_back(std::move(v));}else for(std::size_t ai=0;ai<args.size();++ai){json::Document v;if(!arg_value(args,q,ai,v))return false;vals.push_back(std::move(v));}if(vals.empty()){error=name+": expected at least one value";return false;}out=vals.front();for(std::size_t ai=1;ai<vals.size();++ai){const auto& v=vals[ai];bool take=false;if(out.is_number()&&v.is_number())take=want_min?v.num<out.num:v.num>out.num;else if(out.is_string()&&v.is_string())take=want_min?v.string<out.string:v.string>out.string;else{error=name+": values must be comparable and homogeneous";return false;}if(take)out=v;}return true;}
+            if(call_args("file",args,q)){fs::path p;if(args.size()!=1||!checked_path("file",args,q,0,p))return false;auto f=std::make_shared<FileInstance>();f->path=p;auto id=std::to_string(next_file_instance_id_++);file_instances_[id]=f;out=nift::RuntimeValue(std::string("\x1fnift:file:")+id);return true;}
+            if(call_args("page",args,q)){if(args.size()!=1){error="page: expected one page name";return false;}nift::RuntimeValue d;if(!arg_value(args,q,0,d)||!d.is_string()){error="page: name must be a string";return false;}std::string ref;if(!host_.page_ref_for(d.string,ref)){error="page: unknown tracked page '"+d.string+"'";return false;}out=nift::RuntimeValue(ref);return true;}
+            if(call_args("min",args,q)||call_args("max",args,q)){const bool want_min=text.rfind("min(",0)==0;const std::string name=want_min?"min":"max";std::vector<nift::RuntimeValue> vals;if(args.size()==1){nift::RuntimeValue v;if(!arg_value(args,q,0,v))return false;if(v.is_array())vals=v.array;else vals.push_back(std::move(v));}else for(std::size_t ai=0;ai<args.size();++ai){nift::RuntimeValue v;if(!arg_value(args,q,ai,v))return false;vals.push_back(std::move(v));}if(vals.empty()){error=name+": expected at least one value";return false;}out=vals.front();for(std::size_t ai=1;ai<vals.size();++ai){const auto& v=vals[ai];bool take=false;if(out.is_number()&&v.is_number()){const int cmp=nift::runtime_compare_numbers(v,out);take=want_min?cmp<0:cmp>0;}else if(out.is_string()&&v.is_string())take=want_min?v.string<out.string:v.string>out.string;else{error=name+": values must be comparable and homogeneous";return false;}if(take)out=v;}return true;}
             // CP204-205: stable public runtime introspection. Internal marker
             // encodings are mapped to public language categories, not exposed.
-            auto public_type=[&](const json::Document& v)->std::string{
+            auto public_type=[&](const nift::RuntimeValue& v)->std::string{
                 if(v.is_null()) return "null";
                 if(v.is_bool()) return "bool";
-                if(v.type==json::Type::StrNumber) return "int";
+                if(v.type==nift::RuntimeType::StrNumber) return "int";
                 if(v.is_number()) return std::trunc(v.num)==v.num ? "int" : "float";
                 if(v.is_array()) return "array";
                 if(v.is_object()) return "object";
@@ -2321,30 +2336,30 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             };
             if(call_args("type",args,q)){
                 if(args.size()!=1){error="type: expected one value";return false;}
-                json::Document v;if(!arg_value(args,q,0,v))return false;out=json::Document(public_type(v));return true;
+                nift::RuntimeValue v;if(!arg_value(args,q,0,v))return false;out=nift::RuntimeValue(public_type(v));return true;
             }
             for(const std::string pred:{"is_null","is_bool","is_number","is_int","is_float","is_string","is_array","is_object","is_struct","is_function","is_collection","is_enum"}){
                 if(call_args(pred,args,q)){
                     if(args.size()!=1){error=pred+": expected one value";return false;}
-                    json::Document v;if(!arg_value(args,q,0,v))return false;const std::string t=public_type(v);
+                    nift::RuntimeValue v;if(!arg_value(args,q,0,v))return false;const std::string t=public_type(v);
                     bool yes=pred=="is_null"?t=="null":pred=="is_bool"?t=="bool":pred=="is_number"?(t=="int"||t=="float"):pred=="is_int"?t=="int":pred=="is_float"?t=="float":pred=="is_string"?t=="string":pred=="is_array"?t=="array":pred=="is_object"?t=="object":pred=="is_struct"?t=="struct":pred=="is_function"?t=="function":pred=="is_collection"?t=="collection":t=="enum";
-                    out=json::Document(yes);return true;
+                    out=nift::RuntimeValue(yes);return true;
                 }
             }
             // CP210: Python-style integer ranges, stop-exclusive and materialized.
             if(call_args("range",args,q)){
                 if(args.empty()||args.size()>3){error="range: expected stop, start/stop, or start/stop/step";return false;}
-                std::vector<std::int64_t> n; for(std::size_t ai=0;ai<args.size();++ai){json::Document v;if(!arg_value(args,q,ai,v)||!v.is_number()||std::trunc(v.num)!=v.num||v.num<(double)std::numeric_limits<std::int64_t>::min()||v.num>=9223372036854775808.0){error="range: arguments must be signed 64-bit integers";return false;}n.push_back((std::int64_t)v.num);}
+                std::vector<std::int64_t> n; for(std::size_t ai=0;ai<args.size();++ai){nift::RuntimeValue v;if(!arg_value(args,q,ai,v)||!v.is_number()||std::trunc(v.num)!=v.num||v.num<(double)std::numeric_limits<std::int64_t>::min()||v.num>=9223372036854775808.0){error="range: arguments must be signed 64-bit integers";return false;}n.push_back((std::int64_t)v.num);}
                 std::int64_t start=args.size()==1?0:n[0], stop=args.size()==1?n[0]:n[1], step=args.size()==3?n[2]:1;
                 if(step==0){error="range: step must not be zero";return false;}
-                out=json::Document::make_array(); constexpr std::size_t limit=10000000;
+                out=nift::RuntimeValue::make_array(); constexpr std::size_t limit=10000000;
                 for(std::int64_t x=start; step>0?x<stop:x>stop;){if(out.array.size()>=limit){error="range: result exceeds 10000000 items";return false;}out.array.emplace_back((double)x);if((step>0&&x>std::numeric_limits<std::int64_t>::max()-step)||(step<0&&x<std::numeric_limits<std::int64_t>::min()-step)){error="range: integer overflow";return false;}x+=step;}
                 return true;
             }
             if(call_args("html_escape",args,q)||call_args("attr_escape",args,q)||call_args("url_encode",args,q)){
                 const bool is_attr=text.rfind("attr_escape(",0)==0; const bool is_url=text.rfind("url_encode(",0)==0; const char* fname=is_attr?"attr_escape":(is_url?"url_encode":"html_escape");
                 if(args.size()!=1){error=std::string(fname)+": expected one value";return false;}
-                json::Document v;if(!arg_value(args,q,0,v))return false;
+                nift::RuntimeValue v;if(!arg_value(args,q,0,v))return false;
                 std::string s;
                 if(v.is_string())s=v.string;
                 else if(v.is_number()||v.is_bool())s=render_expression_value(v);
@@ -2367,12 +2382,12 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         else r+=c;
                     }
                 }
-                out=json::Document(std::move(r));return true;
+                out=nift::RuntimeValue(std::move(r));return true;
             }
-            if(call_args("ifstream",args,q)||call_args("ofstream",args,q)){const bool output=text.rfind("ofstream(",0)==0;fs::path p;if(args.size()!=1||!checked_path(output?"ofstream":"ifstream",args,q,0,p))return false;auto st=std::make_shared<StreamInstance>();st->kind=output?StreamInstance::Kind::Output:StreamInstance::Kind::Input;if(output){st->output=std::make_shared<std::ofstream>(p,std::ios::binary|std::ios::trunc);if(!*st->output){error="ofstream: cannot open path";return false;}}else{st->input=std::make_shared<std::ifstream>(p,std::ios::binary);if(!*st->input){error="ifstream: cannot open path";return false;}}auto id=std::to_string(next_stream_instance_id_++);stream_instances_[id]=st;out=json::Document(std::string("\x1fnift:stream:")+id);return true;}
-            if(call_args("close",args,q)){if(args.size()!=1){error="close: expected stream";return false;}json::Document d;if(!arg_value(args,q,0,d)||!d.is_string()||d.string.rfind("\x1fnift:stream:",0)!=0){error="close: expected stream";return false;}auto it=stream_instances_.find(d.string.substr(13));if(it==stream_instances_.end()){error="close: invalid stream";return false;}if(it->second->closed){error="close: stream already closed";return false;}if(it->second->input)it->second->input->close();if(it->second->output)it->second->output->close();it->second->closed=true;out=json::Document(nullptr);return true;}
-            if(call_args("print",args,q)){if(args.size()!=1){error="print: expected one value";return false;}json::Document d;if(!arg_value(args,q,0,d))return false;if(d.is_string()&&q.size()>0&&q[0]&&d.string.find("$[")!=std::string::npos){std::string r,e;if(!interpolate_parameter(d.string,r,e)){error="print: "+e;return false;}d=json::Document(r);}if(d.is_array()||d.is_object()||(d.is_string()&&d.string.rfind("\x1fnift:",0)==0&&d.string.rfind("\x1fnift:enum:",0)!=0&&d.string.rfind("\x1fnift:atomic:",0)!=0)){error="print: value is not directly renderable";return false;}const std::string rendered=render_expression_value(d);{static std::mutex print_mutex;std::lock_guard<std::mutex> lock(print_mutex);std::cout<<rendered<<'\n';std::cout.flush();}out=json::Document(nullptr);return true;}
-            if(call_args("read",args,q)){if(!args.empty()){error="read: expected no arguments";return false;}if(!standalone_script_host_){error="read: interactive input is only available in standalone Nift scripts/shell";return false;}std::string line;if(!std::getline(std::cin,line)){if(std::cin.eof()){std::cin.clear();out=json::Document(nullptr);return true;}error="read: input failure";return false;}out=json::Document(line);return true;}
+            if(call_args("ifstream",args,q)||call_args("ofstream",args,q)){const bool output=text.rfind("ofstream(",0)==0;fs::path p;if(args.size()!=1||!checked_path(output?"ofstream":"ifstream",args,q,0,p))return false;auto st=std::make_shared<StreamInstance>();st->kind=output?StreamInstance::Kind::Output:StreamInstance::Kind::Input;if(output){st->output=std::make_shared<std::ofstream>(p,std::ios::binary|std::ios::trunc);if(!*st->output){error="ofstream: cannot open path";return false;}}else{st->input=std::make_shared<std::ifstream>(p,std::ios::binary);if(!*st->input){error="ifstream: cannot open path";return false;}}auto id=std::to_string(next_stream_instance_id_++);stream_instances_[id]=st;out=nift::RuntimeValue(std::string("\x1fnift:stream:")+id);return true;}
+            if(call_args("close",args,q)){if(args.size()!=1){error="close: expected stream";return false;}nift::RuntimeValue d;if(!arg_value(args,q,0,d)||!d.is_string()||d.string.rfind("\x1fnift:stream:",0)!=0){error="close: expected stream";return false;}auto it=stream_instances_.find(d.string.substr(13));if(it==stream_instances_.end()){error="close: invalid stream";return false;}if(it->second->closed){error="close: stream already closed";return false;}if(it->second->input)it->second->input->close();if(it->second->output)it->second->output->close();it->second->closed=true;out=nift::RuntimeValue(nullptr);return true;}
+            if(call_args("print",args,q)){if(args.size()!=1){error="print: expected one value";return false;}nift::RuntimeValue d;if(!arg_value(args,q,0,d))return false;if(d.is_string()&&q.size()>0&&q[0]&&d.string.find("$[")!=std::string::npos){std::string r,e;if(!interpolate_parameter(d.string,r,e)){error="print: "+e;return false;}d=nift::RuntimeValue(r);}if(d.is_array()||d.is_object()||(d.is_string()&&d.string.rfind("\x1fnift:",0)==0&&d.string.rfind("\x1fnift:enum:",0)!=0&&d.string.rfind("\x1fnift:atomic:",0)!=0)){error="print: value is not directly renderable";return false;}const std::string rendered=render_expression_value(d);{static std::mutex print_mutex;std::lock_guard<std::mutex> lock(print_mutex);std::cout<<rendered<<'\n';std::cout.flush();}out=nift::RuntimeValue(nullptr);return true;}
+            if(call_args("read",args,q)){if(!args.empty()){error="read: expected no arguments";return false;}if(!standalone_script_host_){error="read: interactive input is only available in standalone Nift scripts/shell";return false;}std::string line;if(!std::getline(std::cin,line)){if(std::cin.eof()){std::cin.clear();out=nift::RuntimeValue(nullptr);return true;}error="read: input failure";return false;}out=nift::RuntimeValue(line);return true;}
         }
 
         // v4.3 canonical value presentation. Presentation modifiers compose over the
@@ -2383,9 +2398,9 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
         {
             std::string target; bool pretty=false, highlight=false;
             if (strip_presentation_chain(text, target, pretty, highlight)) {
-                json::Document v;if(!eval(target,v,depth+1))return false;
+                nift::RuntimeValue v;if(!eval(target,v,depth+1))return false;
                 std::string rendered;if(!serialize_value(v,pretty,rendered,error))return false;
-                out=json::Document(rendered);return true;
+                out=nift::RuntimeValue(rendered);return true;
             }
         }
 
@@ -2453,12 +2468,12 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                          (rb2->value->is_string() && rb2->value->string.rfind("\x1fnift:struct:", 0) == 0)));
                     if (!receiver_is_module) { /* array/collection/scalar receiver cannot be a module */ }
                     else {
-                    json::Document base;
+                    nift::RuntimeValue base;
                     if (eval(receiver, base, depth + 1) && base.is_object()) {
                         for (const auto& kv : base.object) {
                             if (kv.first == method && kv.second.is_string() && kv.second.string.rfind("\x1fnift:callable:",0)==0) {
                                 push_variable_scope(); auto& sc=variable_scopes_.back();
-                                auto csp=std::make_shared<json::Document>(kv.second);
+                                auto csp=std::make_shared<nift::RuntimeValue>(kv.second);
                                 sc["__nift_module_field"]=VariableBinding{csp,nift_binding_type(*csp),false,false};
                                 bool ok=eval("__nift_module_field("+arg_text+")",out,depth+1);
                                 pop_variable_scope();
@@ -2475,71 +2490,71 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     // so large host-binding collections are not copied per page.
                     if (method=="size"||method=="length"||method=="empty"||method=="first"||method=="last"||
                         method=="keys"||method=="values"||method=="entries") {
-                        std::shared_ptr<const json::Document> path_value;
+                        std::shared_ptr<const nift::RuntimeValue> path_value;
                         std::string path_error;
                         if (resolve_json_value(receiver, path_value, path_error) && path_error.empty() && path_value) {
-                            const json::Document& pv = *path_value;
+                            const nift::RuntimeValue& pv = *path_value;
                             if (pv.is_array()) {
-                                if (method=="size"||method=="length"){out=json::Document((double)pv.array.size());return true;}
-                                if (method=="empty"){out=json::Document(pv.array.empty());return true;}
+                                if (method=="size"||method=="length"){out=nift::RuntimeValue((double)pv.array.size());return true;}
+                                if (method=="empty"){out=nift::RuntimeValue(pv.array.empty());return true;}
                                 if (method=="first"||method=="last"){if(pv.array.empty()){error=method+": array is empty";return false;}out=method=="first"?pv.array.front():pv.array.back();return true;}
                             } else if (pv.is_object()) {
-                                if (method=="size"){out=json::Document((double)pv.object.size());return true;}
-                                if (method=="empty"){out=json::Document(pv.object.empty());return true;}
-                                if (method=="keys"||method=="values"||method=="entries"){out=json::Document::make_array();for(const auto&kv:pv.object){if(method=="keys")out.array.emplace_back(kv.first);else if(method=="values")out.array.push_back(kv.second);else{json::Document e=json::Document::make_object();e["key"]=json::Document(kv.first);e["value"]=kv.second;out.array.push_back(std::move(e));}}return true;}
+                                if (method=="size"){out=nift::RuntimeValue((double)pv.object.size());return true;}
+                                if (method=="empty"){out=nift::RuntimeValue(pv.object.empty());return true;}
+                                if (method=="keys"||method=="values"||method=="entries"){out=nift::RuntimeValue::make_array();for(const auto&kv:pv.object){if(method=="keys")out.array.emplace_back(kv.first);else if(method=="values")out.array.push_back(kv.second);else{nift::RuntimeValue e=nift::RuntimeValue::make_object();e["key"]=nift::RuntimeValue(kv.first);e["value"]=kv.second;out.array.push_back(std::move(e));}}return true;}
                             }
                         }
                     }
-                    json::Document base;
+                    nift::RuntimeValue base;
                     if (!eval(receiver,base,depth+1)) return false;
                     bool aok=false; std::vector<bool> aq;
                     auto args=parse_parameters(arg_text,aok,&aq);
                     if(!aok){error=method+": malformed arguments";return false;}
-                    auto eval_arg=[&](std::size_t i,json::Document& v)->bool{
+                    auto eval_arg=[&](std::size_t i,nift::RuntimeValue& v)->bool{
                         if(i>=args.size())return false;
-                        if(i<aq.size()&&aq[i]){v=json::Document(args[i]);return true;}
+                        if(i<aq.size()&&aq[i]){v=nift::RuntimeValue(args[i]);return true;}
                         return eval(args[i],v,depth+1);
                     };
                     auto no_args=[&]()->bool{if(!args.empty()){error=method+": expected no arguments";return false;}return true;};
                     if(base.is_string() && base.string.rfind("\x1fnift:thread:",0)==0){
                         auto ti=thread_instances_.find(base.string.substr(13));if(ti==thread_instances_.end()){error="thread: invalid handle";return false;}auto st=ti->second;
-                        if(method=="done"){if(!no_args())return false;std::lock_guard<std::mutex> lock(st->mutex);out=json::Document(st->done);return true;}
-                        if(method=="status"){if(!no_args())return false;std::lock_guard<std::mutex> lock(st->mutex);out=json::Document(st->done?(st->error.empty()?"done":"error"):"running");return true;}
-                        if(method=="join"){if(!no_args())return false;{std::lock_guard<std::mutex> guard(st->join_mutex);if(st->worker.joinable())st->worker.join();}std::lock_guard<std::mutex> lock(st->mutex);st->joined=true;if(!st->error.empty()){error="thread: "+st->error;return false;}out=st->result?*st->result:json::Document(nullptr);return true;}
+                        if(method=="done"){if(!no_args())return false;std::lock_guard<std::mutex> lock(st->mutex);out=nift::RuntimeValue(st->done);return true;}
+                        if(method=="status"){if(!no_args())return false;std::lock_guard<std::mutex> lock(st->mutex);out=nift::RuntimeValue(st->done?(st->error.empty()?"done":"error"):"running");return true;}
+                        if(method=="join"){if(!no_args())return false;{std::lock_guard<std::mutex> guard(st->join_mutex);if(st->worker.joinable())st->worker.join();}std::lock_guard<std::mutex> lock(st->mutex);st->joined=true;if(!st->error.empty()){error="thread: "+st->error;return false;}out=st->result?*st->result:nift::RuntimeValue(nullptr);return true;}
                     }
                     if(base.is_string() && base.string.rfind("\x1fnift:async:",0)==0){
                         auto ai=async_instances_.find(base.string.substr(12));if(ai==async_instances_.end()){error="future: invalid handle";return false;}auto st=ai->second;
-                        if(method=="done"){if(!no_args())return false;std::lock_guard<std::mutex> lk(st->mutex);out=json::Document(st->done);return true;}
-                        if(method=="status"){if(!no_args())return false;std::lock_guard<std::mutex> lk(st->mutex);out=json::Document(st->done?(st->error.empty()?"done":"error"):"running");return true;}
+                        if(method=="done"){if(!no_args())return false;std::lock_guard<std::mutex> lk(st->mutex);out=nift::RuntimeValue(st->done);return true;}
+                        if(method=="status"){if(!no_args())return false;std::lock_guard<std::mutex> lk(st->mutex);out=nift::RuntimeValue(st->done?(st->error.empty()?"done":"error"):"running");return true;}
                     }
                     if(base.is_string() && base.string.rfind("\x1fnift:atomic:",0)==0){
                         auto ai=atomic_instances_.find(base.string.substr(13));if(ai==atomic_instances_.end()){error="atomic: invalid handle";return false;}auto st=ai->second;
-                        auto int_doc=[](std::int64_t v){json::Document d(static_cast<double>(v));if(v>9007199254740992LL||v<-9007199254740992LL){d.type=json::Type::StrNumber;d.string=std::to_string(v);}return d;};
-                        if(method=="load"){if(!no_args())return false;if(st->kind==AtomicInstance::Kind::Int)out=int_doc(st->int_value.load());else out=json::Document(st->bool_value.load());return true;}
-                        if(method=="store"||method=="exchange"){if(args.size()!=1){error=method+": expected one value";return false;}json::Document v;if(!eval_arg(0,v))return false;if(st->kind==AtomicInstance::Kind::Int){std::int64_t x=0;if(!exact_i64(v,x)){error=method+": atomic<int> requires a signed 64-bit integer";return false;}if(method=="store"){st->int_value.store(x);out=json::Document(nullptr);}else out=int_doc(st->int_value.exchange(x));}else{if(!v.is_bool()){error=method+": atomic<bool> requires bool";return false;}if(method=="store"){st->bool_value.store(v.boolean);out=json::Document(nullptr);}else out=json::Document(st->bool_value.exchange(v.boolean));}return true;}
-                        if(method=="fetch_add"||method=="fetch_sub"){if(st->kind!=AtomicInstance::Kind::Int){error=method+": only valid for atomic<int>";return false;}if(args.size()!=1){error=method+": expected one integer";return false;}json::Document v;if(!eval_arg(0,v))return false;std::int64_t x=0;if(!exact_i64(v,x)){error=method+": expected signed 64-bit integer";return false;}out=int_doc(method=="fetch_add"?st->int_value.fetch_add(x):st->int_value.fetch_sub(x));return true;}
-                        if(method=="compare_exchange"){if(args.size()!=2){error="compare_exchange: expected expected and desired values";return false;}json::Document ev,dv;if(!eval_arg(0,ev)||!eval_arg(1,dv))return false;if(st->kind==AtomicInstance::Kind::Int){std::int64_t e=0,d=0;if(!exact_i64(ev,e)||!exact_i64(dv,d)){error="compare_exchange: atomic<int> requires signed 64-bit integers";return false;}out=json::Document(st->int_value.compare_exchange_strong(e,d));}else{if(!ev.is_bool()||!dv.is_bool()){error="compare_exchange: atomic<bool> requires bool values";return false;}bool e=ev.boolean;out=json::Document(st->bool_value.compare_exchange_strong(e,dv.boolean));}return true;}
+                        auto int_doc=[](std::int64_t v){nift::RuntimeValue d(static_cast<double>(v));if(v>9007199254740992LL||v<-9007199254740992LL){d.type=nift::RuntimeType::StrNumber;d.string=std::to_string(v);}return d;};
+                        if(method=="load"){if(!no_args())return false;if(st->kind==AtomicInstance::Kind::Int)out=int_doc(st->int_value.load());else out=nift::RuntimeValue(st->bool_value.load());return true;}
+                        if(method=="store"||method=="exchange"){if(args.size()!=1){error=method+": expected one value";return false;}nift::RuntimeValue v;if(!eval_arg(0,v))return false;if(st->kind==AtomicInstance::Kind::Int){std::int64_t x=0;if(!exact_i64(v,x)){error=method+": atomic<int> requires a signed 64-bit integer";return false;}if(method=="store"){st->int_value.store(x);out=nift::RuntimeValue(nullptr);}else out=int_doc(st->int_value.exchange(x));}else{if(!v.is_bool()){error=method+": atomic<bool> requires bool";return false;}if(method=="store"){st->bool_value.store(v.boolean);out=nift::RuntimeValue(nullptr);}else out=nift::RuntimeValue(st->bool_value.exchange(v.boolean));}return true;}
+                        if(method=="fetch_add"||method=="fetch_sub"){if(st->kind!=AtomicInstance::Kind::Int){error=method+": only valid for atomic<int>";return false;}if(args.size()!=1){error=method+": expected one integer";return false;}nift::RuntimeValue v;if(!eval_arg(0,v))return false;std::int64_t x=0;if(!exact_i64(v,x)){error=method+": expected signed 64-bit integer";return false;}out=int_doc(method=="fetch_add"?st->int_value.fetch_add(x):st->int_value.fetch_sub(x));return true;}
+                        if(method=="compare_exchange"){if(args.size()!=2){error="compare_exchange: expected expected and desired values";return false;}nift::RuntimeValue ev,dv;if(!eval_arg(0,ev)||!eval_arg(1,dv))return false;if(st->kind==AtomicInstance::Kind::Int){std::int64_t e=0,d=0;if(!exact_i64(ev,e)||!exact_i64(dv,d)){error="compare_exchange: atomic<int> requires signed 64-bit integers";return false;}out=nift::RuntimeValue(st->int_value.compare_exchange_strong(e,d));}else{if(!ev.is_bool()||!dv.is_bool()){error="compare_exchange: atomic<bool> requires bool values";return false;}bool e=ev.boolean;out=nift::RuntimeValue(st->bool_value.compare_exchange_strong(e,dv.boolean));}return true;}
                     }
                     if(base.is_string() && base.string.rfind("\x1fnift:mutex:",0)==0){
                         auto mi=mutex_instances_.find(base.string.substr(12));if(mi==mutex_instances_.end()){error="mutex: invalid handle";return false;}auto st=mi->second;const auto self=std::this_thread::get_id();
-                        if(method=="lock"){if(!no_args())return false;std::unique_lock<std::mutex> lk(st->state_mutex);if(st->locked&&st->owner==self){error="mutex: recursive lock is not supported";return false;}st->cv.wait(lk,[&]{return !st->locked;});st->locked=true;st->owner=self;out=json::Document(nullptr);return true;}
-                        if(method=="try_lock"){if(!no_args())return false;std::lock_guard<std::mutex> lk(st->state_mutex);if(st->locked){out=json::Document(false);return true;}st->locked=true;st->owner=self;out=json::Document(true);return true;}
-                        if(method=="unlock"){if(!no_args())return false;{std::lock_guard<std::mutex> lk(st->state_mutex);if(!st->locked){error="mutex: unlock of unlocked mutex";return false;}if(st->owner!=self){error="mutex: unlock by non-owner";return false;}st->locked=false;st->owner=std::thread::id{};}st->cv.notify_one();out=json::Document(nullptr);return true;}
-                        if(method=="locked"){if(!no_args())return false;std::lock_guard<std::mutex> lk(st->state_mutex);out=json::Document(st->locked);return true;}
+                        if(method=="lock"){if(!no_args())return false;std::unique_lock<std::mutex> lk(st->state_mutex);if(st->locked&&st->owner==self){error="mutex: recursive lock is not supported";return false;}st->cv.wait(lk,[&]{return !st->locked;});st->locked=true;st->owner=self;out=nift::RuntimeValue(nullptr);return true;}
+                        if(method=="try_lock"){if(!no_args())return false;std::lock_guard<std::mutex> lk(st->state_mutex);if(st->locked){out=nift::RuntimeValue(false);return true;}st->locked=true;st->owner=self;out=nift::RuntimeValue(true);return true;}
+                        if(method=="unlock"){if(!no_args())return false;{std::lock_guard<std::mutex> lk(st->state_mutex);if(!st->locked){error="mutex: unlock of unlocked mutex";return false;}if(st->owner!=self){error="mutex: unlock by non-owner";return false;}st->locked=false;st->owner=std::thread::id{};}st->cv.notify_one();out=nift::RuntimeValue(nullptr);return true;}
+                        if(method=="locked"){if(!no_args())return false;std::lock_guard<std::mutex> lk(st->state_mutex);out=nift::RuntimeValue(st->locked);return true;}
                         if(method=="get"){if(!no_args())return false;std::lock_guard<std::mutex> lk(st->state_mutex);if(!st->locked||st->owner!=self){error="mutex: get requires the current thread to hold the lock";return false;}out=st->value;return true;}
-                        if(method=="set"){if(args.size()!=1){error="set: expected one value";return false;}json::Document v;if(!eval_arg(0,v))return false;std::function<bool(const json::Document&)> ok;ok=[&](const json::Document& x){if(x.is_string()&&x.string.rfind("\x1fnift:",0)==0&&x.string.rfind("\x1fnift:enum:",0)!=0&&x.string.rfind("\x1fnift:callable:",0)!=0&&x.string.rfind("\x1fnift:thread:",0)!=0&&x.string.rfind("\x1fnift:mutex:",0)!=0&&x.string.rfind("\x1fnift:async:",0)!=0)return false;if(x.is_array())for(const auto&e:x.array)if(!ok(e))return false;if(x.is_object())for(const auto&kv:x.object)if(!ok(kv.second))return false;return true;};if(!ok(v)){error="mutex: set value contains a non-transferable resource";return false;}std::lock_guard<std::mutex> lk(st->state_mutex);if(!st->locked||st->owner!=self){error="mutex: set requires the current thread to hold the lock";return false;}st->value=std::move(v);out=json::Document(nullptr);return true;}
+                        if(method=="set"){if(args.size()!=1){error="set: expected one value";return false;}nift::RuntimeValue v;if(!eval_arg(0,v))return false;std::function<bool(const nift::RuntimeValue&)> ok;ok=[&](const nift::RuntimeValue& x){if(x.is_string()&&x.string.rfind("\x1fnift:",0)==0&&x.string.rfind("\x1fnift:enum:",0)!=0&&x.string.rfind("\x1fnift:callable:",0)!=0&&x.string.rfind("\x1fnift:thread:",0)!=0&&x.string.rfind("\x1fnift:mutex:",0)!=0&&x.string.rfind("\x1fnift:async:",0)!=0)return false;if(x.is_array())for(const auto&e:x.array)if(!ok(e))return false;if(x.is_object())for(const auto&kv:x.object)if(!ok(kv.second))return false;return true;};if(!ok(v)){error="mutex: set value contains a non-transferable resource";return false;}std::lock_guard<std::mutex> lk(st->state_mutex);if(!st->locked||st->owner!=self){error="mutex: set requires the current thread to hold the lock";return false;}st->value=std::move(v);out=nift::RuntimeValue(nullptr);return true;}
                     }
                     if(base.is_string()&&base.string.rfind("\x1fnift:enum:",0)==0&&(method=="to_int"||method=="to_string")){
                         if(!no_args())return false;
                         const auto last=base.string.rfind(':');const auto prev=last==std::string::npos?last:base.string.rfind(':',last-1);if(last==std::string::npos||prev==std::string::npos){error="invalid enum value";return false;}
-                        if(method=="to_string"){out=json::Document(base.string.substr(prev+1,last-prev-1));return true;}
-                        std::int64_t v=0;auto r=std::from_chars(base.string.data()+last+1,base.string.data()+base.string.size(),v);if(r.ec!=std::errc()){error="invalid enum backing value";return false;}out=json::Document((double)v);if(v>9007199254740992LL||v<-9007199254740992LL){out.type=json::Type::StrNumber;out.string=std::to_string(v);}return true;
+                        if(method=="to_string"){out=nift::RuntimeValue(base.string.substr(prev+1,last-prev-1));return true;}
+                        std::int64_t v=0;auto r=std::from_chars(base.string.data()+last+1,base.string.data()+base.string.size(),v);if(r.ec!=std::errc()){error="invalid enum backing value";return false;}out=nift::RuntimeValue((double)v);if(v>9007199254740992LL||v<-9007199254740992LL){out.type=nift::RuntimeType::StrNumber;out.string=std::to_string(v);}return true;
                     }
                     // CP171: all operations that construct object keys from values
                     // share one conversion rule. JSON objects ultimately have string
                     // keys, so Nift accepts only renderable scalar key values and
                     // checks uniqueness after canonical rendering.
-                    auto generated_object_key=[&](const json::Document& key,std::string& rendered)->bool{
+                    auto generated_object_key=[&](const nift::RuntimeValue& key,std::string& rendered)->bool{
                         if(!(key.is_string()||key.is_number()||key.is_bool())){error=method+": generated key must be string, number, or bool";return false;}
                         rendered=key.is_string()?key.string:render_expression_value(key);
                         return true;
@@ -2547,11 +2562,11 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     if(base.is_string() && base.string.rfind("\x1fnift:cmd:",0)==0) {
                         auto ci=command_instances_.find(base.string.substr(10));if(ci==command_instances_.end()){error="invalid command";return false;}auto c=ci->second;
                         auto& aa=args; auto& qq=aq;
-                        auto sval=[&](size_t i,std::string&v){if(i>=aa.size())return false;json::Document d;if(i<qq.size()&&qq[i])d=json::Document(aa[i]);else if(!eval(aa[i],d,depth+1))return false;if(!d.is_string()){error=method+": expected string";return false;}v=d.string;return true;};
-                        if(method=="pipe"){if(aa.size()!=1){error="pipe: expected command";return false;}json::Document d;if(!eval(aa[0],d,depth+1)||!d.is_string()||d.string.rfind("\x1fnift:cmd:",0)!=0){error="pipe: expected cmd(...)";return false;}auto oi=command_instances_.find(d.string.substr(10));if(oi==command_instances_.end()){error="pipe: invalid command";return false;}c->stages.insert(c->stages.end(),oi->second->stages.begin(),oi->second->stages.end());out=base;return true;}
+                        auto sval=[&](size_t i,std::string&v){if(i>=aa.size())return false;nift::RuntimeValue d;if(i<qq.size()&&qq[i])d=nift::RuntimeValue(aa[i]);else if(!eval(aa[i],d,depth+1))return false;if(!d.is_string()){error=method+": expected string";return false;}v=d.string;return true;};
+                        if(method=="pipe"){if(aa.size()!=1){error="pipe: expected command";return false;}nift::RuntimeValue d;if(!eval(aa[0],d,depth+1)||!d.is_string()||d.string.rfind("\x1fnift:cmd:",0)!=0){error="pipe: expected cmd(...)";return false;}auto oi=command_instances_.find(d.string.substr(10));if(oi==command_instances_.end()){error="pipe: invalid command";return false;}c->stages.insert(c->stages.end(),oi->second->stages.begin(),oi->second->stages.end());out=base;return true;}
                         if(method=="stdin"||method=="stdout"||method=="stderr"||method=="cwd"){std::string v;if((aa.size()<1||aa.size()>2)||!sval(0,v))return false;auto&st=(method=="stdin"?c->stages.front():c->stages.back());if(method=="stdin")st.stdin_path=v;else if(method=="stdout"){st.stdout_path=v;if(aa.size()==2){std::string m;if(!sval(1,m))return false;st.append_stdout=m=="append";}}else if(method=="stderr"){st.stderr_path=v;if(aa.size()==2){std::string m;if(!sval(1,m))return false;st.append_stderr=m=="append";}}else for(auto&x:c->stages)x.cwd=v;out=base;return true;}
                         if(method=="env"){if(aa.size()!=2){error="env: expected name and value";return false;}std::string k,v;if(!sval(0,k)||!sval(1,v))return false;for(auto&x:c->stages)x.env[k]=v;out=base;return true;}
-                        if(method=="run"){if(!aa.empty()){error="run: command method takes no arguments";return false;}if(std::getenv("NIFT_NO_PROCESS")){error="run: external process execution disabled";return false;}auto pr=nift_run_pipeline(c->stages,true,false);out=json::Document::make_object();out["exit_code"]=json::Document((double)pr.exit_code);out["stdout"]=json::Document(pr.out);out["stderr"]=json::Document(pr.err);out["launched"]=json::Document(pr.launched);return true;}
+                        if(method=="run"){if(!aa.empty()){error="run: command method takes no arguments";return false;}if(std::getenv("NIFT_NO_PROCESS")){error="run: external process execution disabled";return false;}auto pr=nift_run_pipeline(c->stages,true,false);out=nift::RuntimeValue::make_object();out["exit_code"]=nift::RuntimeValue((double)pr.exit_code);out["stdout"]=nift::RuntimeValue(pr.out);out["stderr"]=nift::RuntimeValue(pr.err);out["launched"]=nift::RuntimeValue(pr.launched);return true;}
                     }
                     if(base.is_string() && base.string.rfind("\x1fnift:file:",0)==0) {
                         auto fit=file_instances_.find(base.string.substr(11)); if(fit==file_instances_.end()){error="file: invalid FileValue";return false;} auto f=fit->second;
@@ -2559,106 +2574,106 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         auto need_open=[&](){if(!f->open){error=method+": file is not open";return false;}return true;};
                         auto need_read=[&](){if(!need_open())return false;if(!can_read()){error=method+": file is not open for reading";return false;}return true;};
                         auto need_write=[&](){if(!need_open())return false;if(!can_write()){error=method+": file is not open for writing";return false;}return true;};
-                        auto sarg=[&](size_t i,std::string& x){json::Document v;if(!eval_arg(i,v)||!v.is_string()){error=method+": expected string argument";return false;}x=v.string;return true;};
+                        auto sarg=[&](size_t i,std::string& x){nift::RuntimeValue v;if(!eval_arg(i,v)||!v.is_string()){error=method+": expected string argument";return false;}x=v.string;return true;};
                         auto dirty=[&](){f->dirty=f->working!=f->saved;};
-                        if(method=="path"){if(!no_args())return false;out=json::Document(f->path.generic_string());return true;}
-                        if(method=="exists"){if(!no_args())return false;std::error_code ec;out=json::Document(fs::exists(f->path,ec)&&!ec);return true;}
+                        if(method=="path"){if(!no_args())return false;out=nift::RuntimeValue(f->path.generic_string());return true;}
+                        if(method=="exists"){if(!no_args())return false;std::error_code ec;out=nift::RuntimeValue(fs::exists(f->path,ec)&&!ec);return true;}
                         if(method=="open"){
                             if(f->open){error="open: file is already open";return false;}if(args.size()>1){error="open: expected zero or one mode";return false;}std::string m="r";if(args.size()==1&&!sarg(0,m))return false;
                             if(m!="r"&&m!="w"&&m!="a"&&m!="rw"){error="open: mode must be r, w, a or rw";return false;}std::error_code ec;bool ex=fs::exists(f->path,ec)&&!ec;
                             if((m=="r"||m=="rw")&&!ex){error="open: file does not exist";return false;}if(ex&&fs::is_directory(f->path,ec)){error="open: path is a directory";return false;}
                             std::string data;if(ex){std::ifstream in(f->path,std::ios::binary);if(!in){error="open: cannot read path";return false;}std::ostringstream ss;ss<<in.rdbuf();data=ss.str();}
-                            f->mode=m;f->existed_at_open=ex;f->saved=data;f->working=m=="w"?std::string():data;f->cursor=m=="a"?f->working.size():0;f->dirty=(m=="w")||(m=="a"&&!ex);f->open=true;out=json::Document(nullptr);return true;
+                            f->mode=m;f->existed_at_open=ex;f->saved=data;f->working=m=="w"?std::string():data;f->cursor=m=="a"?f->working.size():0;f->dirty=(m=="w")||(m=="a"&&!ex);f->open=true;out=nift::RuntimeValue(nullptr);return true;
                         }
-                        if(method=="close"){if(!no_args()||!need_open())return false;if(f->dirty){error="close: file has unsaved changes; save() or revert() first";return false;}f->open=false;f->mode.clear();f->working.clear();f->saved.clear();f->cursor=0;out=json::Document(nullptr);return true;}
-                        if(method=="modified"){if(!no_args()||!need_open())return false;out=json::Document(f->dirty);return true;}
-                        if(method=="tell"){if(!no_args()||!need_open())return false;out=json::Document((double)f->cursor);return true;}
-                        if(method=="seek"){if(args.size()!=1||!need_open()){if(args.size()!=1&&error.empty())error="seek: expected byte position";return false;}json::Document n;if(!eval_arg(0,n)||!n.is_number()||std::trunc(n.num)!=n.num||n.num<0||n.num>(double)f->working.size()){error="seek: byte position out of range";return false;}f->cursor=(size_t)n.num;out=json::Document(nullptr);return true;}
-                        if(method=="eof"){if(!no_args()||!need_read())return false;out=json::Document(f->cursor>=f->working.size());return true;}
-                        if(method=="read"||method=="read_all"){if(!need_read())return false;size_t base=std::min(f->cursor,f->working.size());size_t n=f->working.size()-base;if(method=="read"&&!args.empty()){if(args.size()!=1){error="read: expected zero or one byte count";return false;}json::Document d;if(!eval_arg(0,d)||!d.is_number()||std::trunc(d.num)!=d.num||d.num<0){error="read: invalid byte count";return false;}n=std::min(n,(size_t)d.num);}else if(method=="read_all"&&!args.empty()){error="read_all: expected no arguments";return false;}out=json::Document(f->working.substr(base,n));f->cursor=base+n;return true;}
-                        if(method=="read_line"){if(!no_args()||!need_read())return false;if(f->cursor>=f->working.size()){out=json::Document(nullptr);return true;}auto e=f->working.find('\n',f->cursor);size_t z=e==std::string::npos?f->working.size():e;std::string line=f->working.substr(f->cursor,z-f->cursor);if(!line.empty()&&line.back()=='\r')line.pop_back();f->cursor=e==std::string::npos?f->working.size():e+1;out=json::Document(line);return true;}
-                        if(method=="read_val"){if(!no_args()||!need_read())return false;while(f->cursor<f->working.size()&&std::isspace((unsigned char)f->working[f->cursor]))++f->cursor;if(f->cursor>=f->working.size()){out=json::Document(nullptr);return true;}size_t st=f->cursor;char first=f->working[f->cursor];if(first=='"'||first=='['||first=='{'){char op=first,cl=first=='['?']':first=='{'?'}':'"';int dep=0;bool qd=false,esc=false;while(f->cursor<f->working.size()){char c=f->working[f->cursor++];if(op=='"'){if(esc){esc=false;continue;}if(c=='\\'){esc=true;continue;}if(f->cursor>st+1&&c=='"')break;}else{if(qd){if(esc)esc=false;else if(c=='\\')esc=true;else if(c=='"')qd=false;}else if(c=='"')qd=true;else if(c==op)++dep;else if(c==cl&&--dep==0)break;}}}else while(f->cursor<f->working.size()&&!std::isspace((unsigned char)f->working[f->cursor]))++f->cursor;std::string tok=f->working.substr(st,f->cursor-st);json::Document v;if(!eval(tok,v,depth+1)){error="read_val: "+error;return false;}out=v;return true;}
-                        if(method=="write_val"){if(args.size()!=1||!need_write()){if(args.size()!=1&&error.empty())error="write_val: expected one value";return false;}json::Document v;if(!eval_arg(0,v))return false;std::string d;if(!serialize_value(v,false,d,error))return false;d+="\n";size_t base=std::min(f->cursor,f->working.size());size_t ov=std::min(d.size(),f->working.size()-base);f->working.replace(base,ov,d);f->cursor=base+d.size();dirty();out=json::Document(nullptr);return true;}
-                        if(method=="write"||method=="write_line"){if(args.size()!=1||!need_write()){if(args.size()!=1&&error.empty())error=method+": expected one value";return false;}json::Document v;if(!eval_arg(0,v))return false;if(v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0)){error=method+": value is not directly renderable";return false;}std::string d=render_expression_value(v);if(method=="write_line")d+='\n';size_t base=std::min(f->cursor,f->working.size());size_t ov=std::min(d.size(),f->working.size()-base);f->working.replace(base,ov,d);f->cursor=base+d.size();dirty();out=json::Document(nullptr);return true;}
-                        if(method=="flush"){if(!no_args()||!need_write())return false;out=json::Document(nullptr);return true;}
-                        if(method=="replace"||method=="replace_once"){if(args.size()!=2||!need_write()){if(args.size()!=2&&error.empty())error=method+": expected old and replacement strings";return false;}std::string a,b;if(!sarg(0,a)||!sarg(1,b))return false;if(a.empty()){error=method+": old string must not be empty";return false;}size_t count=0,pos=0;while((pos=f->working.find(a,pos))!=std::string::npos){++count;pos+=a.size();}if(method=="replace_once"&&count!=1){error="replace_once: expected exactly one match, found "+std::to_string(count);return false;}pos=0;while((pos=f->working.find(a,pos))!=std::string::npos){f->working.replace(pos,a.size(),b);pos+=b.size();if(method=="replace_once")break;}if(f->cursor>f->working.size())f->cursor=f->working.size();dirty();out=method=="replace"?json::Document((double)count):json::Document(nullptr);return true;}
-                        if(method=="insert"||method=="insert"||method=="insert_before"||method=="insert_after"||method=="prepend"||method=="append"){if(!need_write())return false;size_t pos=0;std::string d;if(method=="prepend"||method=="append"){if(args.size()!=1||!sarg(0,d)){if(args.size()!=1&&error.empty())error=method+": expected text";return false;}pos=method=="prepend"?0:f->working.size();}else if(method=="insert"){if(args.size()!=2){error="insert: expected byte position and text";return false;}json::Document n;if(!eval_arg(0,n)||!n.is_number()||std::trunc(n.num)!=n.num||n.num<0||n.num>(double)f->working.size()||!sarg(1,d)){error="insert: invalid byte position or text";return false;}pos=(size_t)n.num;}else{if(args.size()!=2){error=method+": expected anchor and text";return false;}std::string a;if(!sarg(0,a)||!sarg(1,d))return false;if(a.empty()){error=method+": anchor must not be empty";return false;}auto at=f->working.find(a);if(at==std::string::npos||f->working.find(a,at+a.size())!=std::string::npos){error=method+": expected exactly one anchor";return false;}pos=at+(method=="insert_after"?a.size():0);}f->working.insert(pos,d);if(f->cursor>f->working.size())f->cursor=f->working.size();dirty();out=json::Document(nullptr);return true;}
-                        if(method=="revert"){if(!no_args()||!need_write())return false;f->working=f->saved;f->cursor=0;f->dirty=false;out=json::Document(nullptr);return true;}
-                        if(method=="save"){if(!no_args()||!need_write())return false;if(!f->dirty){out=json::Document(nullptr);return true;}std::error_code ec;auto parent=f->path.parent_path();if(!parent.empty()&&!fs::exists(parent,ec)){error="save: parent directory does not exist";return false;}fs::perms perms=fs::perms::unknown;if(fs::exists(f->path,ec)&&!ec)perms=fs::status(f->path,ec).permissions();fs::path tmp=f->path;tmp+=".nift-tmp-"+std::to_string((unsigned long long)std::chrono::steady_clock::now().time_since_epoch().count());{std::ofstream o(tmp,std::ios::binary|std::ios::trunc);if(!o){error="save: cannot create temporary file";return false;}o.write(f->working.data(),(std::streamsize)f->working.size());o.flush();if(!o){o.close();fs::remove(tmp,ec);error="save: temporary write failed";return false;}}if(perms!=fs::perms::unknown)fs::permissions(tmp,perms,ec);ec.clear();fs::rename(tmp,f->path,ec);if(ec){fs::remove(tmp);error="save: atomic replace failed: "+ec.message();return false;}f->saved=f->working;f->dirty=false;f->existed_at_open=true;out=json::Document(nullptr);return true;}
-                        if(method=="cat"){if(!no_args()||!need_read())return false;{static std::mutex file_cat_mutex;std::lock_guard<std::mutex> lock(file_cat_mutex);std::cout<<f->working;std::cout.flush();}out=json::Document(nullptr);return true;}
-                        if(method=="copy"||method=="move"||method=="remove"){if(f->open){error=method+": file must be closed";return false;}if((method=="remove"&&!args.empty())||(method!="remove"&&args.size()!=1)){error=method+": invalid arguments";return false;}std::error_code ec;if(method=="remove"){if(fs::is_directory(f->path,ec)){error="remove: directories are not removed recursively";return false;}if(!fs::remove(f->path,ec)&&ec){error="remove: "+ec.message();return false;}out=json::Document(nullptr);return true;}std::string raw;if(!sarg(0,raw))return false;fs::path dest(raw);if(dest.is_relative())dest=(standalone_script_host_?fs::current_path():host_.root())/dest;dest=fs::absolute(dest).lexically_normal();if(!standalone_script_host_&&!host_.root().empty()&&!filesystem::path_within(fs::absolute(host_.root()).lexically_normal(),dest)){error=method+": path must stay inside the Nift project";return false;}if(method=="move")fs::rename(f->path,dest,ec);else fs::copy_file(f->path,dest,fs::copy_options::overwrite_existing,ec);if(ec){error=method+": "+ec.message();return false;}if(method=="move")f->path=dest;auto nf=std::make_shared<FileInstance>();nf->path=dest;auto id=std::to_string(next_file_instance_id_++);file_instances_[id]=nf;out=json::Document(std::string("\x1fnift:file:")+id);return true;}
+                        if(method=="close"){if(!no_args()||!need_open())return false;if(f->dirty){error="close: file has unsaved changes; save() or revert() first";return false;}f->open=false;f->mode.clear();f->working.clear();f->saved.clear();f->cursor=0;out=nift::RuntimeValue(nullptr);return true;}
+                        if(method=="modified"){if(!no_args()||!need_open())return false;out=nift::RuntimeValue(f->dirty);return true;}
+                        if(method=="tell"){if(!no_args()||!need_open())return false;out=nift::RuntimeValue((double)f->cursor);return true;}
+                        if(method=="seek"){if(args.size()!=1||!need_open()){if(args.size()!=1&&error.empty())error="seek: expected byte position";return false;}nift::RuntimeValue n;if(!eval_arg(0,n)||!n.is_number()||std::trunc(n.num)!=n.num||n.num<0||n.num>(double)f->working.size()){error="seek: byte position out of range";return false;}f->cursor=(size_t)n.num;out=nift::RuntimeValue(nullptr);return true;}
+                        if(method=="eof"){if(!no_args()||!need_read())return false;out=nift::RuntimeValue(f->cursor>=f->working.size());return true;}
+                        if(method=="read"||method=="read_all"){if(!need_read())return false;size_t base=std::min(f->cursor,f->working.size());size_t n=f->working.size()-base;if(method=="read"&&!args.empty()){if(args.size()!=1){error="read: expected zero or one byte count";return false;}nift::RuntimeValue d;if(!eval_arg(0,d)||!d.is_number()||std::trunc(d.num)!=d.num||d.num<0){error="read: invalid byte count";return false;}n=std::min(n,(size_t)d.num);}else if(method=="read_all"&&!args.empty()){error="read_all: expected no arguments";return false;}out=nift::RuntimeValue(f->working.substr(base,n));f->cursor=base+n;return true;}
+                        if(method=="read_line"){if(!no_args()||!need_read())return false;if(f->cursor>=f->working.size()){out=nift::RuntimeValue(nullptr);return true;}auto e=f->working.find('\n',f->cursor);size_t z=e==std::string::npos?f->working.size():e;std::string line=f->working.substr(f->cursor,z-f->cursor);if(!line.empty()&&line.back()=='\r')line.pop_back();f->cursor=e==std::string::npos?f->working.size():e+1;out=nift::RuntimeValue(line);return true;}
+                        if(method=="read_val"){if(!no_args()||!need_read())return false;while(f->cursor<f->working.size()&&std::isspace((unsigned char)f->working[f->cursor]))++f->cursor;if(f->cursor>=f->working.size()){out=nift::RuntimeValue(nullptr);return true;}size_t st=f->cursor;char first=f->working[f->cursor];if(first=='"'||first=='['||first=='{'){char op=first,cl=first=='['?']':first=='{'?'}':'"';int dep=0;bool qd=false,esc=false;while(f->cursor<f->working.size()){char c=f->working[f->cursor++];if(op=='"'){if(esc){esc=false;continue;}if(c=='\\'){esc=true;continue;}if(f->cursor>st+1&&c=='"')break;}else{if(qd){if(esc)esc=false;else if(c=='\\')esc=true;else if(c=='"')qd=false;}else if(c=='"')qd=true;else if(c==op)++dep;else if(c==cl&&--dep==0)break;}}}else while(f->cursor<f->working.size()&&!std::isspace((unsigned char)f->working[f->cursor]))++f->cursor;std::string tok=f->working.substr(st,f->cursor-st);nift::RuntimeValue v;if(!eval(tok,v,depth+1)){error="read_val: "+error;return false;}out=v;return true;}
+                        if(method=="write_val"){if(args.size()!=1||!need_write()){if(args.size()!=1&&error.empty())error="write_val: expected one value";return false;}nift::RuntimeValue v;if(!eval_arg(0,v))return false;std::string d;if(!serialize_value(v,false,d,error))return false;d+="\n";size_t base=std::min(f->cursor,f->working.size());size_t ov=std::min(d.size(),f->working.size()-base);f->working.replace(base,ov,d);f->cursor=base+d.size();dirty();out=nift::RuntimeValue(nullptr);return true;}
+                        if(method=="write"||method=="write_line"){if(args.size()!=1||!need_write()){if(args.size()!=1&&error.empty())error=method+": expected one value";return false;}nift::RuntimeValue v;if(!eval_arg(0,v))return false;if(v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0)){error=method+": value is not directly renderable";return false;}std::string d=render_expression_value(v);if(method=="write_line")d+='\n';size_t base=std::min(f->cursor,f->working.size());size_t ov=std::min(d.size(),f->working.size()-base);f->working.replace(base,ov,d);f->cursor=base+d.size();dirty();out=nift::RuntimeValue(nullptr);return true;}
+                        if(method=="flush"){if(!no_args()||!need_write())return false;out=nift::RuntimeValue(nullptr);return true;}
+                        if(method=="replace"||method=="replace_once"){if(args.size()!=2||!need_write()){if(args.size()!=2&&error.empty())error=method+": expected old and replacement strings";return false;}std::string a,b;if(!sarg(0,a)||!sarg(1,b))return false;if(a.empty()){error=method+": old string must not be empty";return false;}size_t count=0,pos=0;while((pos=f->working.find(a,pos))!=std::string::npos){++count;pos+=a.size();}if(method=="replace_once"&&count!=1){error="replace_once: expected exactly one match, found "+std::to_string(count);return false;}pos=0;while((pos=f->working.find(a,pos))!=std::string::npos){f->working.replace(pos,a.size(),b);pos+=b.size();if(method=="replace_once")break;}if(f->cursor>f->working.size())f->cursor=f->working.size();dirty();out=method=="replace"?nift::RuntimeValue((double)count):nift::RuntimeValue(nullptr);return true;}
+                        if(method=="insert"||method=="insert"||method=="insert_before"||method=="insert_after"||method=="prepend"||method=="append"){if(!need_write())return false;size_t pos=0;std::string d;if(method=="prepend"||method=="append"){if(args.size()!=1||!sarg(0,d)){if(args.size()!=1&&error.empty())error=method+": expected text";return false;}pos=method=="prepend"?0:f->working.size();}else if(method=="insert"){if(args.size()!=2){error="insert: expected byte position and text";return false;}nift::RuntimeValue n;if(!eval_arg(0,n)||!n.is_number()||std::trunc(n.num)!=n.num||n.num<0||n.num>(double)f->working.size()||!sarg(1,d)){error="insert: invalid byte position or text";return false;}pos=(size_t)n.num;}else{if(args.size()!=2){error=method+": expected anchor and text";return false;}std::string a;if(!sarg(0,a)||!sarg(1,d))return false;if(a.empty()){error=method+": anchor must not be empty";return false;}auto at=f->working.find(a);if(at==std::string::npos||f->working.find(a,at+a.size())!=std::string::npos){error=method+": expected exactly one anchor";return false;}pos=at+(method=="insert_after"?a.size():0);}f->working.insert(pos,d);if(f->cursor>f->working.size())f->cursor=f->working.size();dirty();out=nift::RuntimeValue(nullptr);return true;}
+                        if(method=="revert"){if(!no_args()||!need_write())return false;f->working=f->saved;f->cursor=0;f->dirty=false;out=nift::RuntimeValue(nullptr);return true;}
+                        if(method=="save"){if(!no_args()||!need_write())return false;if(!f->dirty){out=nift::RuntimeValue(nullptr);return true;}std::error_code ec;auto parent=f->path.parent_path();if(!parent.empty()&&!fs::exists(parent,ec)){error="save: parent directory does not exist";return false;}fs::perms perms=fs::perms::unknown;if(fs::exists(f->path,ec)&&!ec)perms=fs::status(f->path,ec).permissions();fs::path tmp=f->path;tmp+=".nift-tmp-"+std::to_string((unsigned long long)std::chrono::steady_clock::now().time_since_epoch().count());{std::ofstream o(tmp,std::ios::binary|std::ios::trunc);if(!o){error="save: cannot create temporary file";return false;}o.write(f->working.data(),(std::streamsize)f->working.size());o.flush();if(!o){o.close();fs::remove(tmp,ec);error="save: temporary write failed";return false;}}if(perms!=fs::perms::unknown)fs::permissions(tmp,perms,ec);ec.clear();fs::rename(tmp,f->path,ec);if(ec){fs::remove(tmp);error="save: atomic replace failed: "+ec.message();return false;}f->saved=f->working;f->dirty=false;f->existed_at_open=true;out=nift::RuntimeValue(nullptr);return true;}
+                        if(method=="cat"){if(!no_args()||!need_read())return false;{static std::mutex file_cat_mutex;std::lock_guard<std::mutex> lock(file_cat_mutex);std::cout<<f->working;std::cout.flush();}out=nift::RuntimeValue(nullptr);return true;}
+                        if(method=="copy"||method=="move"||method=="remove"){if(f->open){error=method+": file must be closed";return false;}if((method=="remove"&&!args.empty())||(method!="remove"&&args.size()!=1)){error=method+": invalid arguments";return false;}std::error_code ec;if(method=="remove"){if(fs::is_directory(f->path,ec)){error="remove: directories are not removed recursively";return false;}if(!fs::remove(f->path,ec)&&ec){error="remove: "+ec.message();return false;}out=nift::RuntimeValue(nullptr);return true;}std::string raw;if(!sarg(0,raw))return false;fs::path dest(raw);if(dest.is_relative())dest=(standalone_script_host_?fs::current_path():host_.root())/dest;dest=fs::absolute(dest).lexically_normal();if(!standalone_script_host_&&!host_.root().empty()&&!filesystem::path_within(fs::absolute(host_.root()).lexically_normal(),dest)){error=method+": path must stay inside the Nift project";return false;}if(method=="move")fs::rename(f->path,dest,ec);else fs::copy_file(f->path,dest,fs::copy_options::overwrite_existing,ec);if(ec){error=method+": "+ec.message();return false;}if(method=="move")f->path=dest;auto nf=std::make_shared<FileInstance>();nf->path=dest;auto id=std::to_string(next_file_instance_id_++);file_instances_[id]=nf;out=nift::RuntimeValue(std::string("\x1fnift:file:")+id);return true;}
                     }
                     if(base.is_string() && base.string.rfind("\x1fnift:",0)!=0) {
                         const std::string& str=base.string;
                         auto utf8_parts=[&](std::vector<std::string>& parts)->bool{
                             for(std::size_t i=0;i<str.size();){unsigned char c=(unsigned char)str[i];std::size_t n=c<0x80?1:(c>=0xC2&&c<=0xDF?2:(c>=0xE0&&c<=0xEF?3:(c>=0xF0&&c<=0xF4?4:0)));if(!n||i+n>str.size()){error="split: invalid UTF-8";return false;}for(std::size_t j=1;j<n;++j)if(((unsigned char)str[i+j]&0xC0)!=0x80){error="split: invalid UTF-8";return false;}parts.push_back(str.substr(i,n));i+=n;}return true;};
                         auto utf8_length=[&](std::size_t& count)->bool{std::vector<std::string> p;if(!utf8_parts(p))return false;count=p.size();return true;};
-                        if(method=="length"){if(!no_args())return false;std::size_t n=0;if(!utf8_length(n))return false;out=json::Document((double)n);return true;}
-                        if(method=="empty"){if(!no_args())return false;out=json::Document(str.empty());return true;}
+                        if(method=="length"){if(!no_args())return false;std::size_t n=0;if(!utf8_length(n))return false;out=nift::RuntimeValue((double)n);return true;}
+                        if(method=="empty"){if(!no_args())return false;out=nift::RuntimeValue(str.empty());return true;}
                         if(method=="split"){
-                            if(args.size()!=1){error="split: expected one delimiter";return false;}json::Document d;if(!eval_arg(0,d)||!d.is_string()){error="split: delimiter must be a string";return false;}out=json::Document::make_array();
+                            if(args.size()!=1){error="split: expected one delimiter";return false;}nift::RuntimeValue d;if(!eval_arg(0,d)||!d.is_string()){error="split: delimiter must be a string";return false;}out=nift::RuntimeValue::make_array();
                             if(d.string.empty()){std::vector<std::string> parts;if(!utf8_parts(parts))return false;for(auto& x:parts)out.array.emplace_back(x);return true;}
                             std::size_t pos=0;while(true){auto at=str.find(d.string,pos);if(at==std::string::npos){out.array.emplace_back(str.substr(pos));break;}out.array.emplace_back(str.substr(pos,at-pos));pos=at+d.string.size();}return true;
                         }
                         if(method=="index_of"||method=="last_index_of"||method=="contains"||method=="starts_with"||method=="ends_with"){
-                            if(args.size()!=1){error=method+": expected one string";return false;}json::Document n;if(!eval_arg(0,n)||!n.is_string()){error=method+": argument must be a string";return false;}
-                            if(method=="contains"){out=json::Document(str.find(n.string)!=std::string::npos);return true;}
-                            if(method=="starts_with"){out=json::Document(str.rfind(n.string,0)==0);return true;}
-                            if(method=="ends_with"){out=json::Document(n.string.size()<=str.size()&&str.compare(str.size()-n.string.size(),n.string.size(),n.string)==0);return true;}
-                            auto at=method=="index_of"?str.find(n.string):str.rfind(n.string);out=json::Document(at==std::string::npos?-1.0:(double)at);return true;
+                            if(args.size()!=1){error=method+": expected one string";return false;}nift::RuntimeValue n;if(!eval_arg(0,n)||!n.is_string()){error=method+": argument must be a string";return false;}
+                            if(method=="contains"){out=nift::RuntimeValue(str.find(n.string)!=std::string::npos);return true;}
+                            if(method=="starts_with"){out=nift::RuntimeValue(str.rfind(n.string,0)==0);return true;}
+                            if(method=="ends_with"){out=nift::RuntimeValue(n.string.size()<=str.size()&&str.compare(str.size()-n.string.size(),n.string.size(),n.string)==0);return true;}
+                            auto at=method=="index_of"?str.find(n.string):str.rfind(n.string);out=nift::RuntimeValue(at==std::string::npos?-1.0:(double)at);return true;
                         }
                         if(method=="trim"||method=="trim_start"||method=="trim_end"){
                             if(!no_args())return false;
-                            std::size_t a=0,b=str.size();if(method!="trim_end")while(a<b&&std::isspace((unsigned char)str[a]))++a;if(method!="trim_start")while(b>a&&std::isspace((unsigned char)str[b-1]))--b;out=json::Document(str.substr(a,b-a));return true;
+                            std::size_t a=0,b=str.size();if(method!="trim_end")while(a<b&&std::isspace((unsigned char)str[a]))++a;if(method!="trim_start")while(b>a&&std::isspace((unsigned char)str[b-1]))--b;out=nift::RuntimeValue(str.substr(a,b-a));return true;
                         }
                         if(method=="to_lower"||method=="to_upper"){
                             if(!no_args())return false;
-                            std::string r=str;for(char& c:r)c=(char)(method=="to_lower"?std::tolower((unsigned char)c):std::toupper((unsigned char)c));out=json::Document(r);return true;
+                            std::string r=str;for(char& c:r)c=(char)(method=="to_lower"?std::tolower((unsigned char)c):std::toupper((unsigned char)c));out=nift::RuntimeValue(r);return true;
                         }
                         if(method=="replace"){
-                            if(args.size()!=2){error="replace: expected old and replacement strings";return false;}json::Document a,b;if(!eval_arg(0,a)||!eval_arg(1,b)||!a.is_string()||!b.is_string()){error="replace: arguments must be strings";return false;}if(a.string.empty()){error="replace: old string must not be empty";return false;}std::string r=str;std::size_t pos=0;while((pos=r.find(a.string,pos))!=std::string::npos){r.replace(pos,a.string.size(),b.string);pos+=b.string.size();}out=json::Document(r);return true;
+                            if(args.size()!=2){error="replace: expected old and replacement strings";return false;}nift::RuntimeValue a,b;if(!eval_arg(0,a)||!eval_arg(1,b)||!a.is_string()||!b.is_string()){error="replace: arguments must be strings";return false;}if(a.string.empty()){error="replace: old string must not be empty";return false;}std::string r=str;std::size_t pos=0;while((pos=r.find(a.string,pos))!=std::string::npos){r.replace(pos,a.string.size(),b.string);pos+=b.string.size();}out=nift::RuntimeValue(r);return true;
                         }
                         if(method=="to_int"){
                             if(!no_args())return false;
-                            if(str.empty()){error="to_int: invalid integer";return false;}const char* data=str.data();std::size_t size=str.size();if(str[0]=='+'){data+=1;size-=1;}if(size==0){error="to_int: invalid integer";return false;}std::int64_t v=0;auto pr=std::from_chars(data,data+size,v);if(pr.ec!=std::errc()||pr.ptr!=data+size){error="to_int: invalid or out-of-range integer";return false;}out=json::Document((double)v);if(v>9007199254740992LL||v<-9007199254740992LL){out.type=json::Type::StrNumber;out.string=std::to_string(v);}return true;
+                            if(str.empty()){error="to_int: invalid integer";return false;}const char* data=str.data();std::size_t size=str.size();if(str[0]=='+'){data+=1;size-=1;}if(size==0){error="to_int: invalid integer";return false;}std::int64_t v=0;auto pr=std::from_chars(data,data+size,v);if(pr.ec!=std::errc()||pr.ptr!=data+size){error="to_int: invalid or out-of-range integer";return false;}out=nift::RuntimeValue((double)v);if(v>9007199254740992LL||v<-9007199254740992LL){out.type=nift::RuntimeType::StrNumber;out.string=std::to_string(v);}return true;
                         }
-                        if(method=="to_string"){if(!no_args())return false;out=json::Document(str);return true;}
+                        if(method=="to_string"){if(!no_args())return false;out=nift::RuntimeValue(str);return true;}
                         if(method=="to_double"){
                             if(!no_args())return false;
-                            if(str.empty()||std::isspace((unsigned char)str.front())||std::isspace((unsigned char)str.back())){error="to_double: invalid number";return false;}if(str.find("0x")!=std::string::npos||str.find("0X")!=std::string::npos){error="to_double: invalid number";return false;}char* end=nullptr;errno=0;double v=std::strtod(str.c_str(),&end);if(errno==ERANGE||!end||end!=str.c_str()+str.size()||!std::isfinite(v)){error="to_double: invalid or out-of-range number";return false;}out=json::Document(v);return true;
+                            if(str.empty()||std::isspace((unsigned char)str.front())||std::isspace((unsigned char)str.back())){error="to_double: invalid number";return false;}if(str.find("0x")!=std::string::npos||str.find("0X")!=std::string::npos){error="to_double: invalid number";return false;}char* end=nullptr;errno=0;double v=std::strtod(str.c_str(),&end);if(errno==ERANGE||!end||end!=str.c_str()+str.size()||!std::isfinite(v)){error="to_double: invalid or out-of-range number";return false;}out=nift::RuntimeValue(v);return true;
                         }
                         if(method=="substr"){
-                            if(args.empty()||args.size()>2){error="substr: expected pos and optional length";return false;}json::Document p,n;if(!eval_arg(0,p)||!p.is_number()||std::trunc(p.num)!=p.num||p.num<0){error="substr: invalid pos";return false;}std::size_t at=(std::size_t)p.num;if(at>str.size())at=str.size();std::size_t len=std::string::npos;if(args.size()==2){if(!eval_arg(1,n)||!n.is_number()||std::trunc(n.num)!=n.num||n.num<0){error="substr: invalid length";return false;}len=(std::size_t)n.num;}out=json::Document(str.substr(at,len));return true;
+                            if(args.empty()||args.size()>2){error="substr: expected pos and optional length";return false;}nift::RuntimeValue p,n;if(!eval_arg(0,p)||!p.is_number()||std::trunc(p.num)!=p.num||p.num<0){error="substr: invalid pos";return false;}std::size_t at=(std::size_t)p.num;if(at>str.size())at=str.size();std::size_t len=std::string::npos;if(args.size()==2){if(!eval_arg(1,n)||!n.is_number()||std::trunc(n.num)!=n.num||n.num<0){error="substr: invalid length";return false;}len=(std::size_t)n.num;}out=nift::RuntimeValue(str.substr(at,len));return true;
                         }
                     }
-                    if(method=="to_string" && base.is_number()) { if(!no_args())return false;out=json::Document(render_expression_value(base));return true; }
-                    if(method=="to_string" && base.is_bool()) { if(!no_args())return false;out=json::Document(base.boolean?"true":"false");return true; }
-                    if(method=="to_string" && base.is_null()) { if(!no_args())return false;out=json::Document("null");return true; }
+                    if(method=="to_string" && base.is_number()) { if(!no_args())return false;out=nift::RuntimeValue(render_expression_value(base));return true; }
+                    if(method=="to_string" && base.is_bool()) { if(!no_args())return false;out=nift::RuntimeValue(base.boolean?"true":"false");return true; }
+                    if(method=="to_string" && base.is_null()) { if(!no_args())return false;out=nift::RuntimeValue("null");return true; }
                     if(base.is_number()) {
-                        if(method=="abs"){if(!no_args())return false;out=json::Document(std::fabs(base.num));return true;}
-                        if(method=="floor"){if(!no_args())return false;out=json::Document(std::floor(base.num));return true;}
-                        if(method=="ceil"){if(!no_args())return false;out=json::Document(std::ceil(base.num));return true;}
-                        if(method=="round"){if(!no_args())return false;out=json::Document(std::round(base.num));return true;}
+                        if(method=="abs"){if(!no_args())return false;out=nift::RuntimeValue(std::fabs(base.num));return true;}
+                        if(method=="floor"){if(!no_args())return false;out=nift::RuntimeValue(std::floor(base.num));return true;}
+                        if(method=="ceil"){if(!no_args())return false;out=nift::RuntimeValue(std::ceil(base.num));return true;}
+                        if(method=="round"){if(!no_args())return false;out=nift::RuntimeValue(std::round(base.num));return true;}
                     }
                     if(base.is_object()) {
                         if(method=="size"||method=="empty"||method=="keys"||method=="values"||method=="entries") {
                             if(!no_args())return false;
-                            if(method=="size"){out=json::Document((double)base.object.size());return true;}
-                            if(method=="empty"){out=json::Document(base.object.empty());return true;}
-                            out=json::Document::make_array();
+                            if(method=="size"){out=nift::RuntimeValue((double)base.object.size());return true;}
+                            if(method=="empty"){out=nift::RuntimeValue(base.object.empty());return true;}
+                            out=nift::RuntimeValue::make_array();
                             for(const auto& kv:base.object){
                                 if(method=="keys")out.array.emplace_back(kv.first);
                                 else if(method=="values")out.array.push_back(kv.second);
-                                else { json::Document e=json::Document::make_object(); e["key"]=json::Document(kv.first); e["value"]=kv.second; out.array.push_back(std::move(e)); }
+                                else { nift::RuntimeValue e=nift::RuntimeValue::make_object(); e["key"]=nift::RuntimeValue(kv.first); e["value"]=kv.second; out.array.push_back(std::move(e)); }
                             }
                             return true;
                         }
                         if(method=="pick"||method=="omit") {
                             if(args.size()!=1){error=method+": expected one array of keys";return false;}
-                            json::Document keys;if(!eval_arg(0,keys)||!keys.is_array()){error=method+": keys must be an array";return false;}
+                            nift::RuntimeValue keys;if(!eval_arg(0,keys)||!keys.is_array()){error=method+": keys must be an array";return false;}
                             std::vector<std::string> wanted;
                             for(const auto& k:keys.array){if(!k.is_string()){error=method+": keys must be strings";return false;}if(std::find(wanted.begin(),wanted.end(),k.string)==wanted.end())wanted.push_back(k.string);}
-                            json::Document result=json::Document::make_object();
+                            nift::RuntimeValue result=nift::RuntimeValue::make_object();
                             auto wanted_key=[&](const std::string& key){for(const auto& pat:wanted){if(nift_glob_has_magic(pat)?nift_glob_component_match(pat,key):pat==key)return true;}return false;};
                             if(method=="pick"){std::vector<std::string> picked;for(const auto& pat:wanted){auto pat_match=[&](const std::string& key){return nift_glob_has_magic(pat)?nift_glob_component_match(pat,key):pat==key;};for(const auto& kv:base.object){if(std::find(picked.begin(),picked.end(),kv.first)==picked.end()&&pat_match(kv.first)){result[kv.first]=kv.second;picked.push_back(kv.first);}}}}
                             else {for(const auto& kv:base.object)if(!wanted_key(kv.first))result[kv.first]=kv.second;}
@@ -2666,32 +2681,32 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         }
                         if(method=="has"||method=="get") {
                             if((method=="has"&&args.size()!=1)||(method=="get"&&(args.empty()||args.size()>2))){error=method+": expected key"+(method=="get"?" and optional default":"");return false;}
-                            json::Document k;if(!eval_arg(0,k)||!k.is_string()){error=method+": key must be a string";return false;}
+                            nift::RuntimeValue k;if(!eval_arg(0,k)||!k.is_string()){error=method+": key must be a string";return false;}
                             auto it=std::find_if(base.object.begin(),base.object.end(),[&](const auto& kv){return kv.first==k.string;});
-                            if(method=="has"){out=json::Document(it!=base.object.end());return true;}
+                            if(method=="has"){out=nift::RuntimeValue(it!=base.object.end());return true;}
                             if(it!=base.object.end()){out=it->second;return true;}
                             if(args.size()==2)return eval_arg(1,out);
-                            out=json::Document(nullptr);return true;
+                            out=nift::RuntimeValue(nullptr);return true;
                         }
                         if(method=="merge_deep") {
                             if(args.size()!=1){error="merge_deep: expected one object";return false;}
-                            json::Document rhs;if(!eval_arg(0,rhs)||!rhs.is_object()){error="merge_deep: argument must be an object";return false;}
-                            std::function<bool(const json::Document&,const json::Document&,json::Document&,int)> merge_rec;
-                            merge_rec=[&](const json::Document& lhs,const json::Document& r,json::Document& result,int level)->bool{
+                            nift::RuntimeValue rhs;if(!eval_arg(0,rhs)||!rhs.is_object()){error="merge_deep: argument must be an object";return false;}
+                            std::function<bool(const nift::RuntimeValue&,const nift::RuntimeValue&,nift::RuntimeValue&,int)> merge_rec;
+                            merge_rec=[&](const nift::RuntimeValue& lhs,const nift::RuntimeValue& r,nift::RuntimeValue& result,int level)->bool{
                                 if(level>64){error="merge_deep: maximum merge depth exceeded";return false;}
                                 if(!(lhs.is_object()&&r.is_object())){result=r;return true;}
                                 result=lhs;
                                 for(const auto& kv:r.object){
                                     auto it=std::find_if(result.object.begin(),result.object.end(),[&](const auto& x){return x.first==kv.first;});
-                                    if(it!=result.object.end()&&it->second.is_object()&&kv.second.is_object()){json::Document merged;if(!merge_rec(it->second,kv.second,merged,level+1))return false;it->second=std::move(merged);}
+                                    if(it!=result.object.end()&&it->second.is_object()&&kv.second.is_object()){nift::RuntimeValue merged;if(!merge_rec(it->second,kv.second,merged,level+1))return false;it->second=std::move(merged);}
                                     else result[kv.first]=kv.second;
                                 }
                                 return true;
                             };
-                            json::Document result;if(!merge_rec(base,rhs,result,0))return false;out=std::move(result);return true;
+                            nift::RuntimeValue result;if(!merge_rec(base,rhs,result,0))return false;out=std::move(result);return true;
                         }
                         if(method=="merge") {
-                            if(args.size()!=1){error="merge: expected one object";return false;}json::Document rhs;if(!eval_arg(0,rhs)||!rhs.is_object()){error="merge: argument must be an object";return false;}
+                            if(args.size()!=1){error="merge: expected one object";return false;}nift::RuntimeValue rhs;if(!eval_arg(0,rhs)||!rhs.is_object()){error="merge: argument must be an object";return false;}
                             out=base;for(const auto& kv:rhs.object)out[kv.first]=kv.second;return true;
                         }
                     }
@@ -2699,13 +2714,13 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         const auto& a=base.array;
                         if(method=="from_entries"){
                             if(!no_args())return false;
-                            json::Document result=json::Document::make_object();
+                            nift::RuntimeValue result=nift::RuntimeValue::make_object();
                             // O(n) construction: order-preserving vector plus a hash map
                             // for duplicate detection instead of linear object scans.
                             std::unordered_map<std::string,std::size_t> seen_keys; result.object.reserve(a.size());
                             for(const auto& entry:a){
                                 if(!entry.is_object()||entry.object.size()!=2||!entry.has("key")||!entry.has("value")){error="from_entries: each entry must be an object containing exactly key and value";return false;}
-                                const json::Document *key=nullptr,*value=nullptr;
+                                const nift::RuntimeValue *key=nullptr,*value=nullptr;
                                 for(const auto& kv:entry.object){if(kv.first=="key")key=&kv.second;else if(kv.first=="value")value=&kv.second;}
                                 std::string rendered;if(!key||!value||!generated_object_key(*key,rendered))return false;
                                 if(seen_keys.count(rendered)){error="from_entries: duplicate generated key '"+rendered+"'";return false;}
@@ -2713,7 +2728,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                             }
                             out=std::move(result);return true;
                         }
-                        auto invoke_value_cb=[&](const json::Document& cb,const std::vector<json::Document>& av,json::Document& result)->bool{
+                        auto invoke_value_cb=[&](const nift::RuntimeValue& cb,const std::vector<nift::RuntimeValue>& av,nift::RuntimeValue& result)->bool{
                             if(!cb.is_string()||cb.string.rfind("\x1fnift:callable:",0)!=0){error="transformation: callback must be callable";return false;}
                             const std::string tag=cb.string;
                             if(tag.rfind("\x1fnift:callable:lambda:",0)==0){
@@ -2722,10 +2737,10 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                                 if(fn->variadic_param.empty()?av.size()!=fn->params.size():av.size()<fn->params.size()){--callable_call_depth_;error="callback argument count mismatch";return false;}
                                 const auto saved_lambda_env=active_module_env_;if(fn->module_env)active_module_env_=fn->module_env;
                                 push_variable_scope();auto& sc=variable_scopes_.back();for(const auto& kv:fn->captures)sc[kv.first]=kv.second;
-                                for(std::size_t ai=0;ai<fn->params.size();++ai){auto sp=std::make_shared<json::Document>(av[ai]);sc[fn->params[ai]]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
-                                if(!fn->variadic_param.empty()){json::Document rest=json::Document::make_array();for(std::size_t ai=fn->params.size();ai<av.size();++ai)rest.array.push_back(av[ai]);auto sp=std::make_shared<json::Document>(std::move(rest));sc[fn->variadic_param]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
+                                for(std::size_t ai=0;ai<fn->params.size();++ai){auto sp=std::make_shared<nift::RuntimeValue>(av[ai]);sc[fn->params[ai]]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
+                                if(!fn->variadic_param.empty()){nift::RuntimeValue rest=nift::RuntimeValue::make_array();for(std::size_t ai=fn->params.size();ai<av.size();++ai)rest.array.push_back(av[ai]);auto sp=std::make_shared<nift::RuntimeValue>(std::move(rest));sc[fn->variadic_param]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
                                 bool okcall=true;
-                                if(fn->block){std::string bt=trim_copy(fn->body);const bool rendered=!bt.empty()&&bt.front()=='<';if(rendered){auto nested=parse(fn->body,fn->source_path,1);if(!nested.ok){error=nested.error.message;okcall=false;}else result=json::Document(nested.output);}else{okcall=eval(fn->body,result,depth+1);if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0)error="lambda body error: "+error;}}
+                                if(fn->block){std::string bt=trim_copy(fn->body);const bool rendered=!bt.empty()&&bt.front()=='<';if(rendered){auto nested=parse(fn->body,fn->source_path,1);if(!nested.ok){error=nested.error.message;okcall=false;}else result=nift::RuntimeValue(nested.output);}else{okcall=eval(fn->body,result,depth+1);if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0)error="lambda body error: "+error;}}
                                 else{okcall=eval(fn->body,result,depth+1);if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0)error="lambda body error: "+error;}
                                 pop_variable_scope();active_module_env_=saved_lambda_env;--callable_call_depth_;return okcall;
                             }
@@ -2735,25 +2750,25 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                                 if(callee.variadic_param.empty()?av.size()!=callee.params.size():av.size()<callee.params.size()){--callable_call_depth_;error="callback argument count mismatch";return false;}
                                 const auto saved_env=active_module_env_;if(callee.module_env)active_module_env_=callee.module_env;
                                 push_variable_scope();auto& scope=variable_scopes_.back();if(active_module_env_){for(const auto& kv:active_module_env_->vars){if(!scope.count(kv.first))scope[kv.first]=kv.second;}}
-                                for(std::size_t ai=0;ai<callee.params.size();++ai){auto sp=std::make_shared<json::Document>(av[ai]);scope.emplace(callee.params[ai],VariableBinding{sp,nift_binding_type(*sp),true,false});}
-                                if(!callee.variadic_param.empty()){json::Document rest=json::Document::make_array();for(std::size_t ai=callee.params.size();ai<av.size();++ai)rest.array.push_back(av[ai]);auto sp=std::make_shared<json::Document>(std::move(rest));scope.emplace(callee.variadic_param,VariableBinding{sp,nift_binding_type(*sp),true,false});}
+                                for(std::size_t ai=0;ai<callee.params.size();++ai){auto sp=std::make_shared<nift::RuntimeValue>(av[ai]);scope.emplace(callee.params[ai],VariableBinding{sp,nift_binding_type(*sp),true,false});}
+                                if(!callee.variadic_param.empty()){nift::RuntimeValue rest=nift::RuntimeValue::make_array();for(std::size_t ai=callee.params.size();ai<av.size();++ai)rest.array.push_back(av[ai]);auto sp=std::make_shared<nift::RuntimeValue>(std::move(rest));scope.emplace(callee.variadic_param,VariableBinding{sp,nift_binding_type(*sp),true,false});}
                                 const int caller_loop_depth=loop_depth_;loop_depth_=0;pending_control_={};
                                 bool call_ok=true;std::string call_error;
-                                if(callee.fragment){const bool saved_fragment=in_fragment_body_;in_fragment_body_=true;auto nested=parse(callee.body,callee.source_path,1);in_fragment_body_=saved_fragment;if(!nested.ok){call_ok=false;call_error=nested.error.message;}else result=json::Document(nested.output);}
-                                else{++function_call_depth_;auto body_result=execute_native_program(callee.body,callee.source_path,1);--function_call_depth_;if(!body_result.ok){call_ok=false;call_error=body_result.error.message;}else if(pending_control_.kind==ControlFlow::None)result=json::Document(nullptr);else consume_return(result);}
+                                if(callee.fragment){const bool saved_fragment=in_fragment_body_;in_fragment_body_=true;auto nested=parse(callee.body,callee.source_path,1);in_fragment_body_=saved_fragment;if(!nested.ok){call_ok=false;call_error=nested.error.message;}else result=nift::RuntimeValue(nested.output);}
+                                else{++function_call_depth_;auto body_result=execute_native_program(callee.body,callee.source_path,1);--function_call_depth_;if(!body_result.ok){call_ok=false;call_error=body_result.error.message;}else if(pending_control_.kind==ControlFlow::None)result=nift::RuntimeValue(nullptr);else consume_return(result);}
                                 loop_depth_=caller_loop_depth;pop_variable_scope();active_module_env_=saved_env;--callable_call_depth_;
                                 if(!call_ok){error=call_error;return false;}return true;
                             }
                             error="callback is not a callable";return false;};
-                        auto invoke_value_callback=[&](const std::string& cbexpr,const std::vector<json::Document>& av,json::Document& result)->bool{
-                            json::Document cb;if(!eval(cbexpr,cb,depth+1))return false;if(!cb.is_string()||cb.string.rfind("\x1fnift:callable:",0)!=0){error="transformation: callback must be callable";return false;}
+                        auto invoke_value_callback=[&](const std::string& cbexpr,const std::vector<nift::RuntimeValue>& av,nift::RuntimeValue& result)->bool{
+                            nift::RuntimeValue cb;if(!eval(cbexpr,cb,depth+1))return false;if(!cb.is_string()||cb.string.rfind("\x1fnift:callable:",0)!=0){error="transformation: callback must be callable";return false;}
                             return invoke_value_cb(cb,av,result);};
                         if(method=="index_by"){
                             if(args.size()!=1){error="index_by: expected one selector";return false;}
-                            json::Document result=json::Document::make_object();
+                            nift::RuntimeValue result=nift::RuntimeValue::make_object();
                             std::unordered_map<std::string,std::size_t> seen_keys; result.object.reserve(a.size());
                             for(const auto& v:a){
-                                json::Document key;if(!invoke_value_callback(args[0],{v},key))return false;
+                                nift::RuntimeValue key;if(!invoke_value_callback(args[0],{v},key))return false;
                                 std::string rendered;if(!generated_object_key(key,rendered))return false;
                                 if(seen_keys.count(rendered)){error="index_by: duplicate generated key '"+rendered+"'";return false;}
                                 seen_keys[rendered]=result.object.size(); result.object.emplace_back(rendered,v);
@@ -2762,24 +2777,24 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         }
                         if(method=="partition"){
                             if(args.size()!=1){error="partition: expected one predicate";return false;}
-                            json::Document result=json::Document::make_object(); result["matched"]=json::Document::make_array(); result["unmatched"]=json::Document::make_array();
-                            for(const auto& v:a){json::Document r;if(!invoke_value_callback(args[0],{v},r))return false;if(!r.is_bool()){error="partition: callback must return bool";return false;}(r.boolean?result["matched"]:result["unmatched"]).push_back(v);}out=std::move(result);return true;
+                            nift::RuntimeValue result=nift::RuntimeValue::make_object(); result["matched"]=nift::RuntimeValue::make_array(); result["unmatched"]=nift::RuntimeValue::make_array();
+                            for(const auto& v:a){nift::RuntimeValue r;if(!invoke_value_callback(args[0],{v},r))return false;if(!r.is_bool()){error="partition: callback must return bool";return false;}(r.boolean?result["matched"]:result["unmatched"]).push_back(v);}out=std::move(result);return true;
                         }
                         if(method=="unique_by"){
-                            if(args.size()!=1){error="unique_by: expected one selector";return false;} out=json::Document::make_array(); std::unordered_set<std::string> seen;
+                            if(args.size()!=1){error="unique_by: expected one selector";return false;} out=nift::RuntimeValue::make_array(); std::unordered_map<std::string,std::vector<nift::RuntimeValue>> seen;
                             // Canonical structural form exactly mirroring structural_equal,
                             // so O(n) dedup preserves the same semantics as the previous
-                            // linear structural scan (numbers by exact double equality,
+                            // linear structural scan (numbers by semantic JSON equality,
                             // object keys order-insensitive, arrays order-sensitive).
-                            std::function<void(const json::Document&,std::string&)> canonical_key;
-                            canonical_key=[&](const json::Document& v,std::string& out){
+                            std::function<void(const nift::RuntimeValue&,std::string&)> canonical_key;
+                            canonical_key=[&](const nift::RuntimeValue& v,std::string& out){
                                 if(v.is_null()){out+="z";return;}
                                 if(v.is_bool()){out+=v.boolean?"bt":"bf";return;}
-                                if(v.is_number()){out+="n";char buf[64];auto r=std::to_chars(buf,buf+sizeof(buf),v.num);out.append(buf,r.ptr);return;}
+                                if(v.is_number()){out+="n";out+=nift::runtime_numeric_fingerprint(v);return;}
                                 if(v.is_string()){if(v.string.rfind("\x1fnift:",0)==0){out+="i";out+=v.string;return;}out+="s";out+=std::to_string(v.string.size());out+=':';out+=v.string;return;}
                                 if(v.is_array()){out+="a(";for(const auto& e:v.array){canonical_key(e,out);out+=',';}out+=')';return;}
                                 if(v.is_object()){
-                                    out+="o(";std::vector<std::pair<std::string,const json::Document*>> pairs;
+                                    out+="o(";std::vector<std::pair<std::string,const nift::RuntimeValue*>> pairs;
                                     for(const auto& kv:v.object)pairs.push_back({kv.first,&kv.second});
                                     std::sort(pairs.begin(),pairs.end(),[&](const auto& x,const auto& y){return x.first<y.first;});
                                     for(const auto& p:pairs){out+=std::to_string(p.first.size());out+=':';out+=p.first;out+='=';canonical_key(*p.second,out);out+=',';}
@@ -2787,25 +2802,25 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                                 }
                                 out+='?';
                             };
-                            for(const auto& v:a){json::Document k;if(!invoke_value_callback(args[0],{v},k))return false;std::string ck;canonical_key(k,ck);if(seen.insert(ck).second)out.array.push_back(v);}return true;
+                            for(const auto& v:a){nift::RuntimeValue k;if(!invoke_value_callback(args[0],{v},k))return false;std::string ck;canonical_key(k,ck);auto& bucket=seen[ck];bool duplicate=false;for(const auto& prior:bucket)if(structural_equal(prior,k)){duplicate=true;break;}if(!duplicate){bucket.push_back(std::move(k));out.array.push_back(v);}}return true;
                         }
                         if(method=="min_by"||method=="max_by"){
-                            if(args.size()!=1){error=method+": expected one selector";return false;}if(a.empty()){error=method+": cannot select from an empty array";return false;}json::Document best_key;if(!invoke_value_callback(args[0],{a.front()},best_key))return false;if(!(best_key.is_number()||best_key.is_string()||best_key.is_bool())){error=method+": key must be scalar";return false;}out=a.front();
-                            for(size_t i=1;i<a.size();++i){json::Document k;if(!invoke_value_callback(args[0],{a[i]},k))return false;if(k.type!=best_key.type && !(k.is_number()&&best_key.is_number())){error=method+": keys must be comparable and homogeneous";return false;}bool take=false;if(k.is_number())take=method=="min_by"?k.num<best_key.num:k.num>best_key.num;else if(k.is_string())take=method=="min_by"?k.string<best_key.string:k.string>best_key.string;else if(k.is_bool())take=method=="min_by"?k.boolean<best_key.boolean:k.boolean>best_key.boolean;else{error=method+": key must be scalar";return false;}if(take){best_key=k;out=a[i];}}return true;
+                            if(args.size()!=1){error=method+": expected one selector";return false;}if(a.empty()){error=method+": cannot select from an empty array";return false;}nift::RuntimeValue best_key;if(!invoke_value_callback(args[0],{a.front()},best_key))return false;if(!(best_key.is_number()||best_key.is_string()||best_key.is_bool())){error=method+": key must be scalar";return false;}out=a.front();
+                            for(size_t i=1;i<a.size();++i){nift::RuntimeValue k;if(!invoke_value_callback(args[0],{a[i]},k))return false;if(k.type!=best_key.type && !(k.is_number()&&best_key.is_number())){error=method+": keys must be comparable and homogeneous";return false;}bool take=false;if(k.is_number()){const int cmp=nift::runtime_compare_numbers(k,best_key);take=method=="min_by"?cmp<0:cmp>0;}else if(k.is_string())take=method=="min_by"?k.string<best_key.string:k.string>best_key.string;else if(k.is_bool())take=method=="min_by"?k.boolean<best_key.boolean:k.boolean>best_key.boolean;else{error=method+": key must be scalar";return false;}if(take){best_key=k;out=a[i];}}return true;
                         }
                         if(method=="count_by"){
-                            if(args.size()!=1){error="count_by: expected one selector";return false;}json::Document result=json::Document::make_object();
+                            if(args.size()!=1){error="count_by: expected one selector";return false;}nift::RuntimeValue result=nift::RuntimeValue::make_object();
                             std::unordered_map<std::string,std::size_t> pos; result.object.reserve(a.size());
-                            for(const auto& v:a){json::Document k;if(!invoke_value_callback(args[0],{v},k))return false;std::string rendered;if(!generated_object_key(k,rendered))return false;auto it=pos.find(rendered);if(it==pos.end()){pos[rendered]=result.object.size();result.object.emplace_back(rendered,json::Document(0.0));result.object.back().second.num+=1;}else result.object[it->second].second.num+=1;}
+                            for(const auto& v:a){nift::RuntimeValue k;if(!invoke_value_callback(args[0],{v},k))return false;std::string rendered;if(!generated_object_key(k,rendered))return false;auto it=pos.find(rendered);if(it==pos.end()){pos[rendered]=result.object.size();result.object.emplace_back(rendered,nift::RuntimeValue(0.0));result.object.back().second.num+=1;}else result.object[it->second].second.num+=1;}
                             out=std::move(result);return true;
                         }
                         if(method=="take"||method=="drop"||method=="chunk"){
-                            if(args.size()!=1){error=method+": expected one count";return false;}json::Document n;if(!eval_arg(0,n)||!n.is_number()||std::trunc(n.num)!=n.num||n.num<0||(method=="chunk"&&n.num==0)){error=method+": count must be "+std::string(method=="chunk"?"a positive":"a non-negative")+" integer";return false;}size_t z=(size_t)n.num;out=json::Document::make_array();if(method=="take"){size_t e=std::min(z,a.size());out.array.assign(a.begin(),a.begin()+e);}else if(method=="drop"){size_t b=std::min(z,a.size());out.array.assign(a.begin()+b,a.end());}else{for(size_t b=0;b<a.size();b+=z){json::Document c=json::Document::make_array();size_t e=std::min(b+z,a.size());c.array.assign(a.begin()+b,a.begin()+e);out.array.push_back(std::move(c));}}return true;
+                            if(args.size()!=1){error=method+": expected one count";return false;}nift::RuntimeValue n;if(!eval_arg(0,n)||!n.is_number()||std::trunc(n.num)!=n.num||n.num<0||(method=="chunk"&&n.num==0)){error=method+": count must be "+std::string(method=="chunk"?"a positive":"a non-negative")+" integer";return false;}size_t z=(size_t)n.num;out=nift::RuntimeValue::make_array();if(method=="take"){size_t e=std::min(z,a.size());out.array.assign(a.begin(),a.begin()+e);}else if(method=="drop"){size_t b=std::min(z,a.size());out.array.assign(a.begin()+b,a.end());}else{for(size_t b=0;b<a.size();b+=z){nift::RuntimeValue c=nift::RuntimeValue::make_array();size_t e=std::min(b+z,a.size());c.array.assign(a.begin()+b,a.begin()+e);out.array.push_back(std::move(c));}}return true;
                         }
                         if(method=="group_by_each"){
-                            if(args.size()!=1){error="group_by_each: expected one selector";return false;}json::Document result=json::Document::make_object();
+                            if(args.size()!=1){error="group_by_each: expected one selector";return false;}nift::RuntimeValue result=nift::RuntimeValue::make_object();
                             std::unordered_map<std::string,std::size_t> pos;
-                            for(const auto& v:a){json::Document ks;if(!invoke_value_callback(args[0],{v},ks))return false;if(!ks.is_array()){error="group_by_each: selector must return an array";return false;}std::vector<std::string> item_keys;for(const auto& k:ks.array){std::string rendered;if(!generated_object_key(k,rendered))return false;if(std::find(item_keys.begin(),item_keys.end(),rendered)!=item_keys.end())continue;item_keys.push_back(rendered);auto it=pos.find(rendered);if(it==pos.end()){pos[rendered]=result.object.size();result.object.emplace_back(rendered,json::Document::make_array());result.object.back().second.array.push_back(v);}else result.object[it->second].second.array.push_back(v);}}
+                            for(const auto& v:a){nift::RuntimeValue ks;if(!invoke_value_callback(args[0],{v},ks))return false;if(!ks.is_array()){error="group_by_each: selector must return an array";return false;}std::vector<std::string> item_keys;for(const auto& k:ks.array){std::string rendered;if(!generated_object_key(k,rendered))return false;if(std::find(item_keys.begin(),item_keys.end(),rendered)!=item_keys.end())continue;item_keys.push_back(rendered);auto it=pos.find(rendered);if(it==pos.end()){pos[rendered]=result.object.size();result.object.emplace_back(rendered,nift::RuntimeValue::make_array());result.object.back().second.array.push_back(v);}else result.object[it->second].second.array.push_back(v);}}
                             out=std::move(result);return true;
                         }
                         if(method=="sort_by"){
@@ -2814,25 +2829,25 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                             if(args.size()==1) specs.push_back({args[0],false}); else {
                                 for(size_t si=0;si<args.size();si+=2){if(si+1>=args.size()||si+1>=aq.size()||!aq[si+1]){error="sort_by: direction must be quoted 'asc' or 'desc'";return false;}std::string d=args[si+1];if(d!="asc"&&d!="desc"){error="sort_by: direction must be 'asc' or 'desc'";return false;}specs.push_back({args[si],d=="desc"});}
                             }
-                            struct Decorated { std::vector<json::Document> keys; json::Document value; }; std::vector<Decorated> decorated; decorated.reserve(a.size());
-                            for(const auto& v:a){Decorated d;d.value=v;for(const auto& sp:specs){json::Document k;if(!invoke_value_callback(sp.selector,{v},k))return false;if(!(k.is_string()||k.is_number()||k.is_bool())){error="sort_by: key must be scalar";return false;}d.keys.push_back(std::move(k));}decorated.push_back(std::move(d));}
-                            auto cmp_key=[&](const json::Document& x,const json::Document& y,int& c)->bool{if(x.is_number()&&y.is_number())c=x.num<y.num?-1:x.num>y.num?1:0;else if(x.is_string()&&y.is_string())c=x.string<y.string?-1:x.string>y.string?1:0;else if(x.is_bool()&&y.is_bool())c=x.boolean<y.boolean?-1:x.boolean>y.boolean?1:0;else{error="sort_by: keys must be comparable and homogeneous";return false;}return true;};
-                            bool compare_error=false;std::stable_sort(decorated.begin(),decorated.end(),[&](const Decorated& x,const Decorated& y){for(size_t si=0;si<specs.size();++si){int c=0;if(!cmp_key(x.keys[si],y.keys[si],c)){compare_error=true;return false;}if(c)return specs[si].desc?c>0:c<0;}return false;});if(compare_error)return false;out=json::Document::make_array();for(auto& d:decorated)out.array.push_back(std::move(d.value));return true;
+                            struct Decorated { std::vector<nift::RuntimeValue> keys; nift::RuntimeValue value; }; std::vector<Decorated> decorated; decorated.reserve(a.size());
+                            for(const auto& v:a){Decorated d;d.value=v;for(const auto& sp:specs){nift::RuntimeValue k;if(!invoke_value_callback(sp.selector,{v},k))return false;if(!(k.is_string()||k.is_number()||k.is_bool())){error="sort_by: key must be scalar";return false;}d.keys.push_back(std::move(k));}decorated.push_back(std::move(d));}
+                            auto cmp_key=[&](const nift::RuntimeValue& x,const nift::RuntimeValue& y,int& c)->bool{if(x.is_number()&&y.is_number())c=nift::runtime_compare_numbers(x,y);else if(x.is_string()&&y.is_string())c=x.string<y.string?-1:x.string>y.string?1:0;else if(x.is_bool()&&y.is_bool())c=x.boolean<y.boolean?-1:x.boolean>y.boolean?1:0;else{error="sort_by: keys must be comparable and homogeneous";return false;}return true;};
+                            bool compare_error=false;std::stable_sort(decorated.begin(),decorated.end(),[&](const Decorated& x,const Decorated& y){for(size_t si=0;si<specs.size();++si){int c=0;if(!cmp_key(x.keys[si],y.keys[si],c)){compare_error=true;return false;}if(c)return specs[si].desc?c>0:c<0;}return false;});if(compare_error)return false;out=nift::RuntimeValue::make_array();for(auto& d:decorated)out.array.push_back(std::move(d.value));return true;
                         }
                         if(method=="map"||method=="filter"||method=="reduce"||method=="any"||method=="all"||method=="find"||method=="find_index"||method=="count"||method=="group_by"){
-                            if((method=="reduce"&&args.size()!=2)||(method!="reduce"&&args.size()!=1)){error=method+": invalid arguments";return false;}json::Document arr=json::Document::make_array(),acc;if(method=="reduce"&&!eval_arg(1,acc))return false;double cnt=0;std::vector<std::pair<json::Document,json::Document>> keyed;
-                            json::Document cbv;if(!eval(args[0],cbv,depth+1))return false;if(!cbv.is_string()||cbv.string.rfind("\x1fnift:callable:",0)!=0){error="transformation: callback must be callable";return false;}
-                            for(size_t vi=0;vi<a.size();++vi){const auto&v=a[vi];json::Document r;if(!invoke_value_cb(cbv,method=="reduce"?std::vector<json::Document>{acc,v}:std::vector<json::Document>{v},r))return false;if(method=="map")arr.array.push_back(r);else if(method=="filter"){if(!r.is_bool()){error="filter: callback must return bool";return false;}if(r.boolean)arr.array.push_back(v);}else if(method=="reduce")acc=r;else if(method=="group_by"){if(!(r.is_string()||r.is_number()||r.is_bool())){error=method+": key must be scalar";return false;}keyed.push_back({r,v});}else{if(!r.is_bool()){error=method+": callback must return bool";return false;}if(method=="any"&&r.boolean){out=json::Document(true);return true;}if(method=="all"&&!r.boolean){out=json::Document(false);return true;}if(method=="find"&&r.boolean){out=v;return true;}if(method=="find_index"&&r.boolean){out=json::Document((double)vi);return true;}if(method=="count"&&r.boolean)cnt+=1;}}
-                            if(method=="group_by"){out=json::Document::make_object();for(auto&kv:keyed){std::string k=kv.first.is_string()?kv.first.string:render_expression_value(kv.first);if(!out.has(k))out[k]=json::Document::make_array();out[k].push_back(kv.second);}return true;}
-                            if(method=="map"||method=="filter")out=arr;else if(method=="reduce")out=acc;else if(method=="any")out=json::Document(false);else if(method=="all")out=json::Document(true);else if(method=="find"||method=="find_index")out=json::Document(method=="find"?json::Document(nullptr):json::Document(-1.0));else out=json::Document(cnt);return true;}
-                        if(method=="unique"||method=="flatten"||method=="sum"||method=="min"||method=="max"){if(!args.empty()){error=method+": expected no arguments";return false;}if(method=="unique"){out=json::Document::make_array();for(const auto&v:a){bool seen=false;for(const auto&w:out.array)if(structural_equal(v,w)){seen=true;break;}if(!seen)out.array.push_back(v);}return true;}if(method=="flatten"){out=json::Document::make_array();for(const auto&v:a){if(v.is_array())out.array.insert(out.array.end(),v.array.begin(),v.array.end());else out.array.push_back(v);}return true;}if(a.empty()){if(method=="sum"){out=json::Document(0.0);return true;}error=method+": cannot aggregate an empty array";return false;}if(method=="sum"){double total=0;for(const auto&v:a){if(!v.is_number()){error="sum: values must be numeric";return false;}total+=v.num;}out=json::Document(total);return true;}out=a.front();for(size_t ai=1;ai<a.size();++ai){const auto&v=a[ai];bool take=false;if(out.is_number()&&v.is_number())take=method=="min"?v.num<out.num:v.num>out.num;else if(out.is_string()&&v.is_string())take=method=="min"?v.string<out.string:v.string>out.string;else{error=method+": values must be comparable and homogeneous";return false;}if(take)out=v;}return true;}
-                        if(method=="size"||method=="length"){if(!no_args())return false;out=json::Document((double)a.size());return true;}
-                        if(method=="empty"){if(!no_args())return false;out=json::Document(a.empty());return true;}
+                            if((method=="reduce"&&args.size()!=2)||(method!="reduce"&&args.size()!=1)){error=method+": invalid arguments";return false;}nift::RuntimeValue arr=nift::RuntimeValue::make_array(),acc;if(method=="reduce"&&!eval_arg(1,acc))return false;double cnt=0;std::vector<std::pair<nift::RuntimeValue,nift::RuntimeValue>> keyed;
+                            nift::RuntimeValue cbv;if(!eval(args[0],cbv,depth+1))return false;if(!cbv.is_string()||cbv.string.rfind("\x1fnift:callable:",0)!=0){error="transformation: callback must be callable";return false;}
+                            for(size_t vi=0;vi<a.size();++vi){const auto&v=a[vi];nift::RuntimeValue r;if(!invoke_value_cb(cbv,method=="reduce"?std::vector<nift::RuntimeValue>{acc,v}:std::vector<nift::RuntimeValue>{v},r))return false;if(method=="map")arr.array.push_back(r);else if(method=="filter"){if(!r.is_bool()){error="filter: callback must return bool";return false;}if(r.boolean)arr.array.push_back(v);}else if(method=="reduce")acc=r;else if(method=="group_by"){if(!(r.is_string()||r.is_number()||r.is_bool())){error=method+": key must be scalar";return false;}keyed.push_back({r,v});}else{if(!r.is_bool()){error=method+": callback must return bool";return false;}if(method=="any"&&r.boolean){out=nift::RuntimeValue(true);return true;}if(method=="all"&&!r.boolean){out=nift::RuntimeValue(false);return true;}if(method=="find"&&r.boolean){out=v;return true;}if(method=="find_index"&&r.boolean){out=nift::RuntimeValue((double)vi);return true;}if(method=="count"&&r.boolean)cnt+=1;}}
+                            if(method=="group_by"){out=nift::RuntimeValue::make_object();for(auto&kv:keyed){std::string k=kv.first.is_string()?kv.first.string:render_expression_value(kv.first);if(!out.has(k))out[k]=nift::RuntimeValue::make_array();out[k].push_back(kv.second);}return true;}
+                            if(method=="map"||method=="filter")out=arr;else if(method=="reduce")out=acc;else if(method=="any")out=nift::RuntimeValue(false);else if(method=="all")out=nift::RuntimeValue(true);else if(method=="find"||method=="find_index")out=nift::RuntimeValue(method=="find"?nift::RuntimeValue(nullptr):nift::RuntimeValue(-1.0));else out=nift::RuntimeValue(cnt);return true;}
+                        if(method=="unique"||method=="flatten"||method=="sum"||method=="min"||method=="max"){if(!args.empty()){error=method+": expected no arguments";return false;}if(method=="unique"){out=nift::RuntimeValue::make_array();for(const auto&v:a){bool seen=false;for(const auto&w:out.array)if(structural_equal(v,w)){seen=true;break;}if(!seen)out.array.push_back(v);}return true;}if(method=="flatten"){out=nift::RuntimeValue::make_array();for(const auto&v:a){if(v.is_array())out.array.insert(out.array.end(),v.array.begin(),v.array.end());else out.array.push_back(v);}return true;}if(a.empty()){if(method=="sum"){out=nift::RuntimeValue(0.0);return true;}error=method+": cannot aggregate an empty array";return false;}if(method=="sum"){double total=0;for(const auto&v:a){if(!v.is_number()){error="sum: values must be numeric";return false;}total+=v.num;}out=nift::RuntimeValue(total);return true;}out=a.front();for(size_t ai=1;ai<a.size();++ai){const auto&v=a[ai];bool take=false;if(out.is_number()&&v.is_number()){const int cmp=nift::runtime_compare_numbers(v,out);take=method=="min"?cmp<0:cmp>0;}else if(out.is_string()&&v.is_string())take=method=="min"?v.string<out.string:v.string>out.string;else{error=method+": values must be comparable and homogeneous";return false;}if(take)out=v;}return true;}
+                        if(method=="size"||method=="length"){if(!no_args())return false;out=nift::RuntimeValue((double)a.size());return true;}
+                        if(method=="empty"){if(!no_args())return false;out=nift::RuntimeValue(a.empty());return true;}
                         if(method=="first"||method=="last"){if(!no_args())return false;if(a.empty()){error=method+": array is empty";return false;}out=method=="first"?a.front():a.back();return true;}
-                        if(method=="indexOf"){if(args.size()!=1){error="indexOf: expected one value";return false;}json::Document v;if(!eval_arg(0,v))return false;std::size_t i=0;for(;i<a.size();++i)if(structural_equal(a[i],v))break;out=json::Document(i<a.size()?static_cast<double>(i):-1.0);return true;}
-                        if(method=="contains"){if(args.size()!=1){error="contains: expected one value";return false;}json::Document v;if(!eval_arg(0,v))return false;for(const auto& x:a)if(structural_equal(x,v)){out=json::Document(true);return true;}out=json::Document(false);return true;}
-                        if(method=="join"){if(args.size()!=1){error="join: expected separator";return false;}json::Document sep;if(!eval_arg(0,sep)||!sep.is_string()){error="join: separator must be a string";return false;}std::string r;for(std::size_t i=0;i<a.size();++i){if(i)r+=sep.string;if(a[i].is_array()||a[i].is_object()||(a[i].is_string()&&a[i].string.rfind("\x1fnift:",0)==0)){error="join: elements must be renderable scalar values";return false;}r+=render_expression_value(a[i]);}out=json::Document(r);return true;}
-                        if(method=="slice"){if(args.empty()||args.size()>2){error="slice: expected start and optional end";return false;}json::Document st,en;if(!eval_arg(0,st)||!st.is_number()||std::trunc(st.num)!=st.num||st.num<0){error="slice: invalid start";return false;}std::size_t b=(std::size_t)st.num,e=a.size();if(args.size()==2){if(!eval_arg(1,en)||!en.is_number()||std::trunc(en.num)!=en.num||en.num<0){error="slice: invalid end";return false;}e=(std::size_t)en.num;}b=std::min(b,a.size());e=std::min(e,a.size());if(e<b)e=b;out=json::Document::make_array();out.array.assign(a.begin()+b,a.begin()+e);return true;}
+                        if(method=="indexOf"){if(args.size()!=1){error="indexOf: expected one value";return false;}nift::RuntimeValue v;if(!eval_arg(0,v))return false;std::size_t i=0;for(;i<a.size();++i)if(structural_equal(a[i],v))break;out=nift::RuntimeValue(i<a.size()?static_cast<double>(i):-1.0);return true;}
+                        if(method=="contains"){if(args.size()!=1){error="contains: expected one value";return false;}nift::RuntimeValue v;if(!eval_arg(0,v))return false;for(const auto& x:a)if(structural_equal(x,v)){out=nift::RuntimeValue(true);return true;}out=nift::RuntimeValue(false);return true;}
+                        if(method=="join"){if(args.size()!=1){error="join: expected separator";return false;}nift::RuntimeValue sep;if(!eval_arg(0,sep)||!sep.is_string()){error="join: separator must be a string";return false;}std::string r;for(std::size_t i=0;i<a.size();++i){if(i)r+=sep.string;if(a[i].is_array()||a[i].is_object()||(a[i].is_string()&&a[i].string.rfind("\x1fnift:",0)==0)){error="join: elements must be renderable scalar values";return false;}r+=render_expression_value(a[i]);}out=nift::RuntimeValue(r);return true;}
+                        if(method=="slice"){if(args.empty()||args.size()>2){error="slice: expected start and optional end";return false;}nift::RuntimeValue st,en;if(!eval_arg(0,st)||!st.is_number()||std::trunc(st.num)!=st.num||st.num<0){error="slice: invalid start";return false;}std::size_t b=(std::size_t)st.num,e=a.size();if(args.size()==2){if(!eval_arg(1,en)||!en.is_number()||std::trunc(en.num)!=en.num||en.num<0){error="slice: invalid end";return false;}e=(std::size_t)en.num;}b=std::min(b,a.size());e=std::min(e,a.size());if(e<b)e=b;out=nift::RuntimeValue::make_array();out.array.assign(a.begin()+b,a.begin()+e);return true;}
                     }
                     if(method=="to_string" && (base.is_array()||base.is_object())){error="to_string: use stringify() for composite values";return false;}
                     if(method=="to_string" && !(base.is_string() && base.string.rfind("\x1fnift:",0)==0)){error="to_string: expected int, double, bool, null or string";return false;}
@@ -2850,7 +2865,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 else if(ctor=="prique")c->kind=CollectionKind::PriQue; else if(ctor=="map")c->kind=CollectionKind::Map;
                 else if(ctor=="sorted_map")c->kind=CollectionKind::SortedMap; else if(ctor=="set")c->kind=CollectionKind::Set; else c->kind=CollectionKind::SortedSet;
                 const std::string id=std::to_string(next_collection_instance_id_++);collection_instances_[id]=c;
-                out=json::Document(std::string("\x1fnift:collection:")+id);return true;
+                out=nift::RuntimeValue(std::string("\x1fnift:collection:")+id);return true;
             }
         }
         if (text.rfind("same(",0)==0 && text.back()==')') {
@@ -2858,19 +2873,19 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             const std::string an=trim_copy(args[0]),bn=trim_copy(args[1]);
             VariableBinding la,lb;bool a_loc=false,b_loc=false;
             if(try_location_ref(an,la)&&la.is_location_ref()&&la.value){a_loc=true;}
-            else{json::Document av;if(!eval(args[0],av,depth+1))return false;if(last_call_return_loc_root_&&(av.is_array()||av.is_object()||(av.is_string()&&av.string.rfind("\x1fnift:",0)==0))){la.ref_root_slot=last_call_return_loc_root_;la.ref_path=last_call_return_loc_path_;la.sync();if(la.value)a_loc=true;}}
+            else{nift::RuntimeValue av;if(!eval(args[0],av,depth+1))return false;if(last_call_return_loc_root_&&(av.is_array()||av.is_object()||(av.is_string()&&av.string.rfind("\x1fnift:",0)==0))){la.ref_root_slot=last_call_return_loc_root_;la.ref_path=last_call_return_loc_path_;la.sync();if(la.value)a_loc=true;}}
             if(try_location_ref(bn,lb)&&lb.is_location_ref()&&lb.value){b_loc=true;}
-            else{json::Document bv;if(!eval(args[1],bv,depth+1))return false;if(last_call_return_loc_root_&&(bv.is_array()||bv.is_object()||(bv.is_string()&&bv.string.rfind("\x1fnift:",0)==0))){lb.ref_root_slot=last_call_return_loc_root_;lb.ref_path=last_call_return_loc_path_;lb.sync();if(lb.value)b_loc=true;}}
+            else{nift::RuntimeValue bv;if(!eval(args[1],bv,depth+1))return false;if(last_call_return_loc_root_&&(bv.is_array()||bv.is_object()||(bv.is_string()&&bv.string.rfind("\x1fnift:",0)==0))){lb.ref_root_slot=last_call_return_loc_root_;lb.ref_path=last_call_return_loc_path_;lb.sync();if(lb.value)b_loc=true;}}
             if(a_loc&&b_loc){
                 const bool same_root=(la.ref_root_slot&&lb.ref_root_slot&&la.ref_root_slot==lb.ref_root_slot);
                 const bool same_path=(la.ref_path==lb.ref_path);
-                out=json::Document(same_root&&same_path);return true;
+                out=nift::RuntimeValue(same_root&&same_path);return true;
             }
             VariableBinding* ab=find_binding(an);VariableBinding* bb=find_binding(bn);
-            if(ab&&bb&&ab->value&&bb->value&&ab->value->is_array()&&bb->value->is_array()){ab->sync();bb->sync();out=json::Document(ab->value==bb->value);return true;}
-            json::Document a,b;if(!eval(args[0],a,depth+1)||!eval(args[1],b,depth+1))return false;
-            auto identity=[](const json::Document& v)->std::string{if(!v.is_string())return {}; if(v.string.rfind("\x1fnift:struct:",0)==0||v.string.rfind("\x1fnift:callable:",0)==0||v.string.rfind("\x1fnift:collection:",0)==0||v.string.rfind("\x1fnift:file:",0)==0||v.string.rfind("\x1fnift:stream:",0)==0)return v.string;return {};};
-            const auto ai=identity(a),bi=identity(b); if(ai.empty()||bi.empty()){error="same: operands must be identity-bearing values";return false;} out=json::Document(ai==bi);return true;
+            if(ab&&bb&&ab->value&&bb->value&&ab->value->is_array()&&bb->value->is_array()){ab->sync();bb->sync();out=nift::RuntimeValue(ab->value==bb->value);return true;}
+            nift::RuntimeValue a,b;if(!eval(args[0],a,depth+1)||!eval(args[1],b,depth+1))return false;
+            auto identity=[](const nift::RuntimeValue& v)->std::string{if(!v.is_string())return {}; if(v.string.rfind("\x1fnift:struct:",0)==0||v.string.rfind("\x1fnift:callable:",0)==0||v.string.rfind("\x1fnift:collection:",0)==0||v.string.rfind("\x1fnift:file:",0)==0||v.string.rfind("\x1fnift:stream:",0)==0)return v.string;return {};};
+            const auto ai=identity(a),bi=identity(b); if(ai.empty()||bi.empty()){error="same: operands must be identity-bearing values";return false;} out=nift::RuntimeValue(ai==bi);return true;
         }
 
         {
@@ -2881,66 +2896,66 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     auto ci=collection_instances_.find(rb->value->string.substr(17));if(ci==collection_instances_.end()){error="invalid collection";return false;}auto c=ci->second;
                     bool ok=false;std::vector<bool> quoted_args;auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),ok,&quoted_args);if(!ok){error="malformed collection method arguments";return false;}
                     auto need_mut=[&](){if(!rb->mutable_binding){error="cannot mutate const collection: "+root;return false;}return true;};
-                    auto scalar_order=[](const json::Document&a,const json::Document&b,int& cmp){if(a.is_number()&&b.is_number()){cmp=a.num<b.num?-1:a.num>b.num?1:0;return true;}if(a.is_string()&&b.is_string()){cmp=a.string<b.string?-1:a.string>b.string?1:0;return true;}return false;};
-                    auto invoke_callback=[&](const std::string& cbexpr,const std::vector<json::Document>& av,json::Document& result)->bool{
-                        json::Document cb;if(!eval(cbexpr,cb,depth+1))return false;
+                    auto scalar_order=[](const nift::RuntimeValue&a,const nift::RuntimeValue&b,int& cmp){if(a.is_number()&&b.is_number()){cmp=nift::runtime_compare_numbers(a,b);return true;}if(a.is_string()&&b.is_string()){cmp=a.string<b.string?-1:a.string>b.string?1:0;return true;}return false;};
+                    auto invoke_callback=[&](const std::string& cbexpr,const std::vector<nift::RuntimeValue>& av,nift::RuntimeValue& result)->bool{
+                        nift::RuntimeValue cb;if(!eval(cbexpr,cb,depth+1))return false;
                         if(!cb.is_string()||cb.string.rfind("\x1fnift:callable:",0)!=0){error="transformation: callback must be callable";return false;}
                         push_variable_scope();auto& sc=variable_scopes_.back();
-                        auto csp=std::make_shared<json::Document>(cb);sc["__nift_cb"]=VariableBinding{csp,nift_binding_type(*csp),false,false};
+                        auto csp=std::make_shared<nift::RuntimeValue>(cb);sc["__nift_cb"]=VariableBinding{csp,nift_binding_type(*csp),false,false};
                         std::string call="__nift_cb(";
-                        for(size_t i=0;i<av.size();++i){if(i)call+=",";std::string n="__nift_arg"+std::to_string(i);auto sp=std::make_shared<json::Document>(av[i]);sc[n]=VariableBinding{sp,nift_binding_type(*sp),false,false};call+=n;}call+=")";
+                        for(size_t i=0;i<av.size();++i){if(i)call+=",";std::string n="__nift_arg"+std::to_string(i);auto sp=std::make_shared<nift::RuntimeValue>(av[i]);sc[n]=VariableBinding{sp,nift_binding_type(*sp),false,false};call+=n;}call+=")";
                         bool r=eval(call,result,depth+1);pop_variable_scope();return r;
                     };
                     if(method=="map"||method=="filter"||method=="reduce"||method=="any"||method=="all"||method=="find"||method=="find_index"||method=="count"||method=="sort_by"||method=="group_by"){
                         if((method=="reduce"&&args.size()!=2)||(method!="reduce"&&args.size()!=1)){error=method+": invalid arguments";return false;}
-                        std::vector<std::vector<json::Document>> rows;
+                        std::vector<std::vector<nift::RuntimeValue>> rows;
                         if(c->kind==CollectionKind::Map||c->kind==CollectionKind::SortedMap){for(const auto&e:c->entries)rows.push_back({e.first,e.second});}
                         else {auto vals=c->values;if(c->kind==CollectionKind::Stack)std::reverse(vals.begin(),vals.end());for(const auto&v:vals)rows.push_back({v});}
-                        json::Document arr=json::Document::make_array();json::Document acc;
+                        nift::RuntimeValue arr=nift::RuntimeValue::make_array();nift::RuntimeValue acc;
                         if(method=="reduce"&&!eval(args[1],acc,depth+1))return false;
-                        if(method=="all"&&rows.empty()){out=json::Document(true);return true;} if(method=="any"&&rows.empty()){out=json::Document(false);return true;}
+                        if(method=="all"&&rows.empty()){out=nift::RuntimeValue(true);return true;} if(method=="any"&&rows.empty()){out=nift::RuntimeValue(false);return true;}
                         double cnt=0;
-                        for(const auto&row:rows){json::Document r;std::vector<json::Document> ca=row;if(method=="reduce")ca.insert(ca.begin(),acc);if(!invoke_callback(args[0],ca,r))return false;
+                        for(const auto&row:rows){nift::RuntimeValue r;std::vector<nift::RuntimeValue> ca=row;if(method=="reduce")ca.insert(ca.begin(),acc);if(!invoke_callback(args[0],ca,r))return false;
                             if(method=="map")arr.array.push_back(r);
-                            else if(method=="filter"){if(!r.is_bool()){error="filter: callback must return bool";return false;}if(r.boolean)arr.array.push_back(row.size()==1?row[0]:json::Document::make_array());if(r.boolean&&row.size()==2){arr.array.back().array=row;}}
+                            else if(method=="filter"){if(!r.is_bool()){error="filter: callback must return bool";return false;}if(r.boolean)arr.array.push_back(row.size()==1?row[0]:nift::RuntimeValue::make_array());if(r.boolean&&row.size()==2){arr.array.back().array=row;}}
                             else if(method=="reduce")acc=r;
-                            else {if(!r.is_bool()){error=method+": callback must return bool";return false;}if(method=="any"&&r.boolean){out=json::Document(true);return true;}if(method=="all"&&!r.boolean){out=json::Document(false);return true;}if(method=="find"&&r.boolean){out=row.size()==1?row[0]:row[1];return true;}if(method=="count"&&r.boolean)cnt+=1;}
+                            else {if(!r.is_bool()){error=method+": callback must return bool";return false;}if(method=="any"&&r.boolean){out=nift::RuntimeValue(true);return true;}if(method=="all"&&!r.boolean){out=nift::RuntimeValue(false);return true;}if(method=="find"&&r.boolean){out=row.size()==1?row[0]:row[1];return true;}if(method=="count"&&r.boolean)cnt+=1;}
                         }
-                        if(method=="map"||method=="filter")out=arr;else if(method=="reduce")out=acc;else if(method=="any")out=json::Document(false);else if(method=="all")out=json::Document(true);else if(method=="find")out=json::Document(nullptr);else out=json::Document(cnt);return true;
+                        if(method=="map"||method=="filter")out=arr;else if(method=="reduce")out=acc;else if(method=="any")out=nift::RuntimeValue(false);else if(method=="all")out=nift::RuntimeValue(true);else if(method=="find")out=nift::RuntimeValue(nullptr);else out=nift::RuntimeValue(cnt);return true;
                     }
-                    if(method=="size"||method=="empty"||method=="clear"){if(!args.empty()){error=method+": expected no arguments";return false;}size_t n=(c->kind==CollectionKind::Map||c->kind==CollectionKind::SortedMap)?c->entries.size():c->values.size();if(method=="size")out=json::Document((double)n);else if(method=="empty")out=json::Document(n==0);else{if(!need_mut())return false;c->values.clear();c->entries.clear();c->scalar_keys.clear();c->has_huge_int=false;out=json::Document(nullptr);last_expression_mutation_=true;}return true;}
+                    if(method=="size"||method=="empty"||method=="clear"){if(!args.empty()){error=method+": expected no arguments";return false;}size_t n=(c->kind==CollectionKind::Map||c->kind==CollectionKind::SortedMap)?c->entries.size():c->values.size();if(method=="size")out=nift::RuntimeValue((double)n);else if(method=="empty")out=nift::RuntimeValue(n==0);else{if(!need_mut())return false;c->values.clear();c->entries.clear();c->scalar_keys.clear();c->has_huge_int=false;out=nift::RuntimeValue(nullptr);last_expression_mutation_=true;}return true;}
                     if(c->kind==CollectionKind::Stack||c->kind==CollectionKind::Queue||c->kind==CollectionKind::PriQue){
-                        if(method=="push"){if(args.size()!=1){error="push: expected one value";return false;}if(!need_mut())return false;json::Document v;if(quoted_args.size()>0&&quoted_args[0])v=json::Document(args[0]);else if(!eval(args[0],v,depth+1))return false;if(v.is_string()&&(v.string.rfind("\x1fnift:struct:",0)==0||v.string.rfind("\x1fnift:collection:",0)==0)){if(reference_would_cycle(v.string,rb->value->string)){error="push would create a cyclic reference";return false;}}c->values.push_back(v);if(c->kind==CollectionKind::PriQue){std::stable_sort(c->values.begin(),c->values.end(),[&](const auto&a,const auto&b){int z=0;return scalar_order(a,b,z)&&z<0;});}out=v;last_expression_mutation_=true;return true;}
+                        if(method=="push"){if(args.size()!=1){error="push: expected one value";return false;}if(!need_mut())return false;nift::RuntimeValue v;if(quoted_args.size()>0&&quoted_args[0])v=nift::RuntimeValue(args[0]);else if(!eval(args[0],v,depth+1))return false;if(v.is_string()&&(v.string.rfind("\x1fnift:struct:",0)==0||v.string.rfind("\x1fnift:collection:",0)==0)){if(reference_would_cycle(v.string,rb->value->string)){error="push would create a cyclic reference";return false;}}c->values.push_back(v);if(c->kind==CollectionKind::PriQue){std::stable_sort(c->values.begin(),c->values.end(),[&](const auto&a,const auto&b){int z=0;return scalar_order(a,b,z)&&z<0;});}out=v;last_expression_mutation_=true;return true;}
                         if(method=="pop"||method=="top"||method=="front"){if(!args.empty()){error=method+": expected no arguments";return false;}if(c->values.empty()){error=method+": collection is empty";return false;}size_t i=(c->kind==CollectionKind::Stack&&(method=="pop"||method=="top"))?c->values.size()-1:0;out=c->values[i];if(method=="pop"){if(!need_mut())return false;c->values.erase(c->values.begin()+i);last_expression_mutation_=true;}return true;}
-                        if(method=="contains"){if(args.size()!=1){error="contains: expected one value";return false;}json::Document v;if(quoted_args.size()>0&&quoted_args[0])v=json::Document(args[0]);else if(!eval(args[0],v,depth+1))return false;bool f=false;for(auto&w:c->values)if(structural_equal(v,w)){f=true;break;}out=json::Document(f);return true;}
+                        if(method=="contains"){if(args.size()!=1){error="contains: expected one value";return false;}nift::RuntimeValue v;if(quoted_args.size()>0&&quoted_args[0])v=nift::RuntimeValue(args[0]);else if(!eval(args[0],v,depth+1))return false;bool f=false;for(auto&w:c->values)if(structural_equal(v,w)){f=true;break;}out=nift::RuntimeValue(f);return true;}
                     }
                     if(c->kind==CollectionKind::Set||c->kind==CollectionKind::SortedSet){
-                        if(method=="add"||method=="contains"||method=="remove"){if(args.size()!=1){error=method+": expected one value";return false;}json::Document v;if(quoted_args.size()>0&&quoted_args[0])v=json::Document(args[0]);else if(!eval(args[0],v,depth+1))return false;if(!(v.is_bool()||v.is_number()||v.is_string())){error=method+": set values must be bool, number, or string";return false;}
-                        auto set_scalar_key=[&](const json::Document& x)->std::string{if(x.is_bool())return std::string("b")+(x.boolean?"1":"0");if(x.is_string()){if(x.string.rfind("\x1fnift:",0)==0)return "";return std::string("s")+x.string;}if(x.type==json::Type::StrNumber)return std::string("N")+x.string;double nn=x.num;if(nn==0.0)nn=0.0;uint64_t bits=0;std::memcpy(&bits,&nn,sizeof(bits));return std::string("n")+std::to_string(bits);};
-                        auto set_indexed=[&](const json::Document& x)->bool{const std::string k=set_scalar_key(x);return !k.empty()&&c->scalar_keys.count(k)!=0;};
-                        auto set_find=[&](const json::Document& x)->size_t{size_t j=0;for(;j<c->values.size();++j)if(structural_equal(c->values[j],x))break;return j;};
+                        if(method=="add"||method=="contains"||method=="remove"){if(args.size()!=1){error=method+": expected one value";return false;}nift::RuntimeValue v;if(quoted_args.size()>0&&quoted_args[0])v=nift::RuntimeValue(args[0]);else if(!eval(args[0],v,depth+1))return false;if(!(v.is_bool()||v.is_number()||v.is_string())){error=method+": set values must be bool, number, or string";return false;}
+                        auto set_scalar_key=[&](const nift::RuntimeValue& x)->std::string{if(x.is_bool())return std::string("b")+(x.boolean?"1":"0");if(x.is_string()){if(x.string.rfind("\x1fnift:",0)==0)return "";return std::string("s")+x.string;}if(x.type==nift::RuntimeType::StrNumber)return std::string("N")+x.string;double nn=x.num;if(nn==0.0)nn=0.0;uint64_t bits=0;std::memcpy(&bits,&nn,sizeof(bits));return std::string("n")+std::to_string(bits);};
+                        auto set_indexed=[&](const nift::RuntimeValue& x)->bool{const std::string k=set_scalar_key(x);return !k.empty()&&c->scalar_keys.count(k)!=0;};
+                        auto set_find=[&](const nift::RuntimeValue& x)->size_t{size_t j=0;for(;j<c->values.size();++j)if(structural_equal(c->values[j],x))break;return j;};
                         // Fast path: plain scalars use the O(1) index. A Number
                         // add consults the linear scan when the set holds any
                         // big integer (StrNumber), because a Number and a
                         // StrNumber can be numerically equal despite different
                         // canonical keys.
-                        const bool indexed=!set_scalar_key(v).empty() && !(v.is_number()&&v.type!=json::Type::StrNumber&&c->has_huge_int);
+                        const bool indexed=!set_scalar_key(v).empty() && !(v.is_number()&&v.type!=nift::RuntimeType::StrNumber&&c->has_huge_int);
                         const size_t i=indexed?(set_indexed(v)?set_find(v):c->values.size()):set_find(v);
-                        if(method=="contains"){out=json::Document(i<c->values.size());return true;}if(!need_mut())return false;
-                        if(method=="add"&&i==c->values.size()){c->values.push_back(v);const std::string k=set_scalar_key(v);if(!k.empty())c->scalar_keys.insert(k);if(v.type==json::Type::StrNumber)c->has_huge_int=true;if(c->kind==CollectionKind::SortedSet)std::stable_sort(c->values.begin(),c->values.end(),[&](const auto&a,const auto&b){int z=0;if(!scalar_order(a,b,z)){error="sorted_set: incomparable values";return false;}return z<0;});}
+                        if(method=="contains"){out=nift::RuntimeValue(i<c->values.size());return true;}if(!need_mut())return false;
+                        if(method=="add"&&i==c->values.size()){c->values.push_back(v);const std::string k=set_scalar_key(v);if(!k.empty())c->scalar_keys.insert(k);if(v.type==nift::RuntimeType::StrNumber)c->has_huge_int=true;if(c->kind==CollectionKind::SortedSet)std::stable_sort(c->values.begin(),c->values.end(),[&](const auto&a,const auto&b){int z=0;if(!scalar_order(a,b,z)){error="sorted_set: incomparable values";return false;}return z<0;});}
                         else if(method=="remove"&&i<c->values.size()){const std::string k=set_scalar_key(v);if(!k.empty())c->scalar_keys.erase(k);c->values.erase(c->values.begin()+i);}
                         out=v;last_expression_mutation_=true;return true;}
                     }
                     if(c->kind==CollectionKind::Map||c->kind==CollectionKind::SortedMap){
-                        auto mkey=[&](const json::Document& x)->std::string{if(x.is_bool())return std::string("b")+(x.boolean?"1":"0");if(x.is_string()){if(x.string.rfind("\x1fnift:",0)==0)return "";return std::string("s")+x.string;}if(x.type==json::Type::StrNumber)return std::string("N")+x.string;double nn=x.num;if(nn==0.0)nn=0.0;uint64_t bits=0;std::memcpy(&bits,&nn,sizeof(bits));return std::string("n")+std::to_string(bits);};
-                        if(method=="set"){if(args.size()!=2){error="set: expected key and value";return false;}if(!need_mut())return false;json::Document k,v;if(quoted_args.size()>0&&quoted_args[0])k=json::Document(args[0]);else if(!eval(args[0],k,depth+1))return false;if(quoted_args.size()>1&&quoted_args[1])v=json::Document(args[1]);else if(!eval(args[1],v,depth+1))return false;if(!(k.is_bool()||k.is_number()||k.is_string())){error="map: key must be bool, number, or string";return false;}if(v.is_string()&&(v.string.rfind("\x1fnift:struct:",0)==0||v.string.rfind("\x1fnift:collection:",0)==0)){if(reference_would_cycle(v.string,rb->value->string)){error="set would create a cyclic reference";return false;}}
-                        const std::string mk=mkey(k);const bool mind=!mk.empty()&&!(k.is_number()&&k.type!=json::Type::StrNumber&&c->has_huge_int);
+                        auto mkey=[&](const nift::RuntimeValue& x)->std::string{if(x.is_bool())return std::string("b")+(x.boolean?"1":"0");if(x.is_string()){if(x.string.rfind("\x1fnift:",0)==0)return "";return std::string("s")+x.string;}if(x.type==nift::RuntimeType::StrNumber)return std::string("N")+x.string;double nn=x.num;if(nn==0.0)nn=0.0;uint64_t bits=0;std::memcpy(&bits,&nn,sizeof(bits));return std::string("n")+std::to_string(bits);};
+                        if(method=="set"){if(args.size()!=2){error="set: expected key and value";return false;}if(!need_mut())return false;nift::RuntimeValue k,v;if(quoted_args.size()>0&&quoted_args[0])k=nift::RuntimeValue(args[0]);else if(!eval(args[0],k,depth+1))return false;if(quoted_args.size()>1&&quoted_args[1])v=nift::RuntimeValue(args[1]);else if(!eval(args[1],v,depth+1))return false;if(!(k.is_bool()||k.is_number()||k.is_string())){error="map: key must be bool, number, or string";return false;}if(v.is_string()&&(v.string.rfind("\x1fnift:struct:",0)==0||v.string.rfind("\x1fnift:collection:",0)==0)){if(reference_would_cycle(v.string,rb->value->string)){error="set would create a cyclic reference";return false;}}
+                        const std::string mk=mkey(k);const bool mind=!mk.empty()&&!(k.is_number()&&k.type!=nift::RuntimeType::StrNumber&&c->has_huge_int);
                         size_t i;if(mind&&c->scalar_keys.count(mk)){for(i=0;i<c->entries.size();++i)if(structural_equal(c->entries[i].first,k))break;}else if(mind){i=c->entries.size();}else{for(i=0;i<c->entries.size();++i)if(structural_equal(c->entries[i].first,k))break;}
-                        if(i<c->entries.size())c->entries[i].second=v;else{c->entries.push_back({k,v});if(mind)c->scalar_keys.insert(mk);}if(k.type==json::Type::StrNumber)c->has_huge_int=true;if(c->kind==CollectionKind::SortedMap)std::stable_sort(c->entries.begin(),c->entries.end(),[&](const auto&a,const auto&b){int z=0;if(!scalar_order(a.first,b.first,z)){error="sorted_map: incomparable keys";return false;}return z<0;});out=v;last_expression_mutation_=true;return true;}
-                        if(method=="contains"||method=="get"||method=="remove"){if(args.size()!=1){error=method+": expected one key";return false;}json::Document k;if(quoted_args.size()>0&&quoted_args[0])k=json::Document(args[0]);else if(!eval(args[0],k,depth+1))return false;
-                        const std::string mk=mkey(k);const bool mind=!mk.empty()&&!(k.is_number()&&k.type!=json::Type::StrNumber&&c->has_huge_int);
+                        if(i<c->entries.size())c->entries[i].second=v;else{c->entries.push_back({k,v});if(mind)c->scalar_keys.insert(mk);}if(k.type==nift::RuntimeType::StrNumber)c->has_huge_int=true;if(c->kind==CollectionKind::SortedMap)std::stable_sort(c->entries.begin(),c->entries.end(),[&](const auto&a,const auto&b){int z=0;if(!scalar_order(a.first,b.first,z)){error="sorted_map: incomparable keys";return false;}return z<0;});out=v;last_expression_mutation_=true;return true;}
+                        if(method=="contains"||method=="get"||method=="remove"){if(args.size()!=1){error=method+": expected one key";return false;}nift::RuntimeValue k;if(quoted_args.size()>0&&quoted_args[0])k=nift::RuntimeValue(args[0]);else if(!eval(args[0],k,depth+1))return false;
+                        const std::string mk=mkey(k);const bool mind=!mk.empty()&&!(k.is_number()&&k.type!=nift::RuntimeType::StrNumber&&c->has_huge_int);
                         size_t i;if(mind&&c->scalar_keys.count(mk)){for(i=0;i<c->entries.size();++i)if(structural_equal(c->entries[i].first,k))break;}else{for(i=0;i<c->entries.size();++i)if(structural_equal(c->entries[i].first,k))break;}
-                        if(method=="contains"){out=json::Document(i<c->entries.size());return true;}if(i==c->entries.size()){error=method+": key not found";return false;}out=c->entries[i].second;if(method=="remove"){if(!need_mut())return false;if(mind)c->scalar_keys.erase(mk);c->entries.erase(c->entries.begin()+i);last_expression_mutation_=true;}return true;}
+                        if(method=="contains"){out=nift::RuntimeValue(i<c->entries.size());return true;}if(i==c->entries.size()){error=method+": key not found";return false;}out=c->entries[i].second;if(method=="remove"){if(!need_mut())return false;if(mind)c->scalar_keys.erase(mk);c->entries.erase(c->entries.begin()+i);last_expression_mutation_=true;}return true;}
                     }
                 }
             }}
@@ -2950,41 +2965,41 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             const auto lp=text.find('(');
             if(lp!=std::string::npos&&text.back()==')'){std::size_t call_close=0;const std::string target=trim_copy(text.substr(0,lp));const auto dot=target.rfind('.');if(dot!=std::string::npos&&find_balanced(text,lp,'(',')',call_close)&&call_close==text.size()-1){
                 const std::string root=target.substr(0,dot), method=target.substr(dot+1); VariableBinding* rb=find_binding(root);
-                if(rb&&rb->value&&rb->value->is_array()){bool ok=false;std::vector<bool> quoted_args;auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),ok,&quoted_args);if(!ok){error="malformed array method arguments";return false;}auto eval_arg=[&](size_t n,json::Document& v){if(n<quoted_args.size()&&quoted_args[n]){v=json::Document(args[n]);return true;}return eval(args[n],v,depth+1);};auto& a=rb->value->array;
-                    auto invoke_callback=[&](const std::string& cbexpr,const std::vector<json::Document>& av,json::Document& result)->bool{
-                        json::Document cb;if(!eval(cbexpr,cb,depth+1))return false;if(!cb.is_string()||cb.string.rfind("\x1fnift:callable:",0)!=0){error="transformation: callback must be callable";return false;}
-                        push_variable_scope();auto& sc=variable_scopes_.back();auto csp=std::make_shared<json::Document>(cb);sc["__nift_cb"]=VariableBinding{csp,nift_binding_type(*csp),false,false};std::string call="__nift_cb(";
-                        for(size_t i=0;i<av.size();++i){if(i)call+=",";std::string n="__nift_arg"+std::to_string(i);auto sp=std::make_shared<json::Document>(av[i]);sc[n]=VariableBinding{sp,nift_binding_type(*sp),false,false};call+=n;}call+=")";bool r=eval(call,result,depth+1);pop_variable_scope();return r;};
+                if(rb&&rb->value&&rb->value->is_array()){bool ok=false;std::vector<bool> quoted_args;auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),ok,&quoted_args);if(!ok){error="malformed array method arguments";return false;}auto eval_arg=[&](size_t n,nift::RuntimeValue& v){if(n<quoted_args.size()&&quoted_args[n]){v=nift::RuntimeValue(args[n]);return true;}return eval(args[n],v,depth+1);};auto& a=rb->value->array;
+                    auto invoke_callback=[&](const std::string& cbexpr,const std::vector<nift::RuntimeValue>& av,nift::RuntimeValue& result)->bool{
+                        nift::RuntimeValue cb;if(!eval(cbexpr,cb,depth+1))return false;if(!cb.is_string()||cb.string.rfind("\x1fnift:callable:",0)!=0){error="transformation: callback must be callable";return false;}
+                        push_variable_scope();auto& sc=variable_scopes_.back();auto csp=std::make_shared<nift::RuntimeValue>(cb);sc["__nift_cb"]=VariableBinding{csp,nift_binding_type(*csp),false,false};std::string call="__nift_cb(";
+                        for(size_t i=0;i<av.size();++i){if(i)call+=",";std::string n="__nift_arg"+std::to_string(i);auto sp=std::make_shared<nift::RuntimeValue>(av[i]);sc[n]=VariableBinding{sp,nift_binding_type(*sp),false,false};call+=n;}call+=")";bool r=eval(call,result,depth+1);pop_variable_scope();return r;};
                     if(method=="map"||method=="filter"||method=="reduce"||method=="any"||method=="all"||method=="find"||method=="find_index"||method=="count"||method=="sort_by"||method=="group_by"){
-                        if((method=="reduce"&&args.size()!=2)||(method!="reduce"&&args.size()!=1)){error=method+": invalid arguments";return false;}json::Document arr=json::Document::make_array(),acc;if(method=="reduce"&&!eval(args[1],acc,depth+1))return false;double cnt=0;std::vector<std::pair<json::Document,json::Document>> keyed;
-                        for(size_t vi=0;vi<a.size();++vi){const auto&v=a[vi];json::Document r;if(!invoke_callback(args[0],method=="reduce"?std::vector<json::Document>{acc,v}:std::vector<json::Document>{v},r))return false;if(method=="map")arr.array.push_back(r);else if(method=="filter"){if(!r.is_bool()){error="filter: callback must return bool";return false;}if(r.boolean)arr.array.push_back(v);}else if(method=="reduce")acc=r;else if(method=="group_by"){if(!(r.is_string()||r.is_number()||r.is_bool())){error=method+": key must be scalar";return false;}keyed.push_back({r,v});}else{if(!r.is_bool()){error=method+": callback must return bool";return false;}if(method=="any"&&r.boolean){out=json::Document(true);return true;}if(method=="all"&&!r.boolean){out=json::Document(false);return true;}if(method=="find"&&r.boolean){out=v;return true;}if(method=="find_index"&&r.boolean){out=json::Document((double)vi);return true;}if(method=="count"&&r.boolean)cnt+=1;}}
-                        if(method=="sort_by"){std::stable_sort(keyed.begin(),keyed.end(),[&](const auto&x,const auto&y){if(x.first.is_number()&&y.first.is_number())return x.first.num<y.first.num;if(x.first.is_string()&&y.first.is_string())return x.first.string<y.first.string;if(x.first.is_bool()&&y.first.is_bool())return x.first.boolean<y.first.boolean;return (int)x.first.type<(int)y.first.type;});out=json::Document::make_array();for(auto&kv:keyed)out.array.push_back(kv.second);return true;}
-                        if(method=="group_by"){out=json::Document::make_object();for(auto&kv:keyed){std::string k=kv.first.is_string()?kv.first.string:render_expression_value(kv.first);json::Document* bucket=nullptr;for(auto&e:out.object)if(e.first==k){bucket=&e.second;break;}if(!bucket){out[k]=json::Document::make_array();for(auto&e:out.object)if(e.first==k){bucket=&e.second;break;}}bucket->array.push_back(kv.second);}return true;}
-                        if(method=="map"||method=="filter")out=arr;else if(method=="reduce")out=acc;else if(method=="any")out=json::Document(false);else if(method=="all")out=json::Document(true);else if(method=="find"||method=="find_index")out=json::Document(method=="find"?json::Document(nullptr):json::Document(-1.0));else out=json::Document(cnt);return true;}
+                        if((method=="reduce"&&args.size()!=2)||(method!="reduce"&&args.size()!=1)){error=method+": invalid arguments";return false;}nift::RuntimeValue arr=nift::RuntimeValue::make_array(),acc;if(method=="reduce"&&!eval(args[1],acc,depth+1))return false;double cnt=0;std::vector<std::pair<nift::RuntimeValue,nift::RuntimeValue>> keyed;
+                        for(size_t vi=0;vi<a.size();++vi){const auto&v=a[vi];nift::RuntimeValue r;if(!invoke_callback(args[0],method=="reduce"?std::vector<nift::RuntimeValue>{acc,v}:std::vector<nift::RuntimeValue>{v},r))return false;if(method=="map")arr.array.push_back(r);else if(method=="filter"){if(!r.is_bool()){error="filter: callback must return bool";return false;}if(r.boolean)arr.array.push_back(v);}else if(method=="reduce")acc=r;else if(method=="group_by"){if(!(r.is_string()||r.is_number()||r.is_bool())){error=method+": key must be scalar";return false;}keyed.push_back({r,v});}else{if(!r.is_bool()){error=method+": callback must return bool";return false;}if(method=="any"&&r.boolean){out=nift::RuntimeValue(true);return true;}if(method=="all"&&!r.boolean){out=nift::RuntimeValue(false);return true;}if(method=="find"&&r.boolean){out=v;return true;}if(method=="find_index"&&r.boolean){out=nift::RuntimeValue((double)vi);return true;}if(method=="count"&&r.boolean)cnt+=1;}}
+                        if(method=="sort_by"){std::stable_sort(keyed.begin(),keyed.end(),[&](const auto&x,const auto&y){if(x.first.is_number()&&y.first.is_number())return nift::runtime_compare_numbers(x.first,y.first)<0;if(x.first.is_string()&&y.first.is_string())return x.first.string<y.first.string;if(x.first.is_bool()&&y.first.is_bool())return x.first.boolean<y.first.boolean;return (int)x.first.type<(int)y.first.type;});out=nift::RuntimeValue::make_array();for(auto&kv:keyed)out.array.push_back(kv.second);return true;}
+                        if(method=="group_by"){out=nift::RuntimeValue::make_object();for(auto&kv:keyed){std::string k=kv.first.is_string()?kv.first.string:render_expression_value(kv.first);nift::RuntimeValue* bucket=nullptr;for(auto&e:out.object)if(e.first==k){bucket=&e.second;break;}if(!bucket){out[k]=nift::RuntimeValue::make_array();for(auto&e:out.object)if(e.first==k){bucket=&e.second;break;}}bucket->array.push_back(kv.second);}return true;}
+                        if(method=="map"||method=="filter")out=arr;else if(method=="reduce")out=acc;else if(method=="any")out=nift::RuntimeValue(false);else if(method=="all")out=nift::RuntimeValue(true);else if(method=="find"||method=="find_index")out=nift::RuntimeValue(method=="find"?nift::RuntimeValue(nullptr):nift::RuntimeValue(-1.0));else out=nift::RuntimeValue(cnt);return true;}
                     if(method=="unique"||method=="flatten"||method=="sum"||method=="min"||method=="max"){
                         if(!args.empty()){error=method+": expected no arguments";return false;}
-                        if(method=="unique"){out=json::Document::make_array();for(const auto&v:a){bool seen=false;for(const auto&w:out.array)if(structural_equal(v,w)){seen=true;break;}if(!seen)out.array.push_back(v);}return true;}
-                        if(method=="flatten"){out=json::Document::make_array();for(const auto&v:a){if(v.is_array())out.array.insert(out.array.end(),v.array.begin(),v.array.end());else out.array.push_back(v);}return true;}
-                        if(a.empty()){if(method=="sum"){out=json::Document(0.0);return true;}error=method+": cannot aggregate an empty array";return false;}
-                        if(method=="sum"){double total=0;for(const auto&v:a){if(!v.is_number()){error="sum: values must be numeric";return false;}total+=v.num;}out=json::Document(total);return true;}
-                        out=a.front();for(size_t i=1;i<a.size();++i){const auto&v=a[i];bool take=false;if(out.is_number()&&v.is_number())take=method=="min"?v.num<out.num:v.num>out.num;else if(out.is_string()&&v.is_string())take=method=="min"?v.string<out.string:v.string>out.string;else{error=method+": values must be comparable and homogeneous";return false;}if(take)out=v;}return true;
+                        if(method=="unique"){out=nift::RuntimeValue::make_array();for(const auto&v:a){bool seen=false;for(const auto&w:out.array)if(structural_equal(v,w)){seen=true;break;}if(!seen)out.array.push_back(v);}return true;}
+                        if(method=="flatten"){out=nift::RuntimeValue::make_array();for(const auto&v:a){if(v.is_array())out.array.insert(out.array.end(),v.array.begin(),v.array.end());else out.array.push_back(v);}return true;}
+                        if(a.empty()){if(method=="sum"){out=nift::RuntimeValue(0.0);return true;}error=method+": cannot aggregate an empty array";return false;}
+                        if(method=="sum"){double total=0;for(const auto&v:a){if(!v.is_number()){error="sum: values must be numeric";return false;}total+=v.num;}out=nift::RuntimeValue(total);return true;}
+                        out=a.front();for(size_t i=1;i<a.size();++i){const auto&v=a[i];bool take=false;if(out.is_number()&&v.is_number()){const int cmp=nift::runtime_compare_numbers(v,out);take=method=="min"?cmp<0:cmp>0;}else if(out.is_string()&&v.is_string())take=method=="min"?v.string<out.string:v.string>out.string;else{error=method+": values must be comparable and homogeneous";return false;}if(take)out=v;}return true;
                     }
                     if(method=="sort"){
                         if(args.size()>1){error="sort: expected zero or one comparator";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}bool failed=false;std::string ferr;
-                        std::stable_sort(a.begin(),a.end(),[&](const auto&x,const auto&y){if(failed)return false;if(args.empty()){if(x.is_number()&&y.is_number())return x.num<y.num;if(x.is_string()&&y.is_string())return x.string<y.string;failed=true;ferr="sort: incomparable values";return false;}json::Document r;if(!invoke_callback(args[0],{x,y},r)){failed=true;ferr=error;return false;}if(!r.is_bool()){failed=true;ferr="sort: comparator must return bool";return false;}return r.boolean;});if(failed){error=ferr;return false;}out=*rb->value;last_expression_mutation_=true;return true;}
+                        std::stable_sort(a.begin(),a.end(),[&](const auto&x,const auto&y){if(failed)return false;if(args.empty()){if(x.is_number()&&y.is_number())return nift::runtime_compare_numbers(x,y)<0;if(x.is_string()&&y.is_string())return x.string<y.string;failed=true;ferr="sort: incomparable values";return false;}nift::RuntimeValue r;if(!invoke_callback(args[0],{x,y},r)){failed=true;ferr=error;return false;}if(!r.is_bool()){failed=true;ferr="sort: comparator must return bool";return false;}return r.boolean;});if(failed){error=ferr;return false;}out=*rb->value;last_expression_mutation_=true;return true;}
                     if(method=="size"||method=="empty"||method=="first"||method=="last"||method=="pop"||method=="clear"||method=="push"||method=="insert"||method=="remove"||method=="indexOf"||method=="contains"||method=="join"||method=="slice"||method=="splice"||method=="reverse"){
                         if((method=="size"||method=="empty"||method=="first"||method=="last"||method=="pop"||method=="clear")&&!args.empty()){error=method+": expected no arguments";return false;}
-                        if(method=="join"){if(args.size()!=1){error="join: expected separator";return false;}json::Document sep;if(!eval_arg(0,sep)||!sep.is_string()){error="join: separator must be a string";return false;}std::string joined;for(size_t j=0;j<a.size();++j){if(j)joined+=sep.string;if(a[j].is_array()||a[j].is_object()||(a[j].is_string()&&(a[j].string.rfind("\x1fnift:",0)==0))){error="join: elements must be renderable scalar values";return false;}joined+=render_expression_value(a[j]);}out=json::Document(joined);return true;}
-                        if(method=="slice"){if(args.empty()||args.size()>2){error="slice: expected start and optional end";return false;}json::Document st,en;if(!eval(args[0],st,depth+1)||!st.is_number()||std::trunc(st.num)!=st.num||st.num<0){error="slice: invalid start";return false;}size_t b=(size_t)st.num,e=a.size();if(args.size()==2){if(!eval(args[1],en,depth+1)||!en.is_number()||std::trunc(en.num)!=en.num||en.num<0){error="slice: invalid end";return false;}e=(size_t)en.num;}if(b>a.size())b=a.size();if(e>a.size())e=a.size();if(e<b)e=b;out=json::Document::make_array();out.array.assign(a.begin()+b,a.begin()+e);return true;}
-                        if(method=="splice"){if(args.size()<2||args.size()>3){error="splice: expected start, delete_count, optional replacement array";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}json::Document st,dc,repl;if(!eval(args[0],st,depth+1)||!eval(args[1],dc,depth+1)||!st.is_number()||!dc.is_number()||std::trunc(st.num)!=st.num||std::trunc(dc.num)!=dc.num||st.num<0||dc.num<0){error="splice: invalid index/count";return false;}size_t b=(size_t)st.num;if(b>a.size())b=a.size();size_t n=std::min((size_t)dc.num,a.size()-b);out=json::Document::make_array();out.array.assign(a.begin()+b,a.begin()+b+n);a.erase(a.begin()+b,a.begin()+b+n);if(args.size()==3){if(!eval(args[2],repl,depth+1)||!repl.is_array()){error="splice: replacements must be an array";return false;}a.insert(a.begin()+b,repl.array.begin(),repl.array.end());}last_expression_mutation_=true;return true;}
+                        if(method=="join"){if(args.size()!=1){error="join: expected separator";return false;}nift::RuntimeValue sep;if(!eval_arg(0,sep)||!sep.is_string()){error="join: separator must be a string";return false;}std::string joined;for(size_t j=0;j<a.size();++j){if(j)joined+=sep.string;if(a[j].is_array()||a[j].is_object()||(a[j].is_string()&&(a[j].string.rfind("\x1fnift:",0)==0))){error="join: elements must be renderable scalar values";return false;}joined+=render_expression_value(a[j]);}out=nift::RuntimeValue(joined);return true;}
+                        if(method=="slice"){if(args.empty()||args.size()>2){error="slice: expected start and optional end";return false;}nift::RuntimeValue st,en;if(!eval(args[0],st,depth+1)||!st.is_number()||std::trunc(st.num)!=st.num||st.num<0){error="slice: invalid start";return false;}size_t b=(size_t)st.num,e=a.size();if(args.size()==2){if(!eval(args[1],en,depth+1)||!en.is_number()||std::trunc(en.num)!=en.num||en.num<0){error="slice: invalid end";return false;}e=(size_t)en.num;}if(b>a.size())b=a.size();if(e>a.size())e=a.size();if(e<b)e=b;out=nift::RuntimeValue::make_array();out.array.assign(a.begin()+b,a.begin()+e);return true;}
+                        if(method=="splice"){if(args.size()<2||args.size()>3){error="splice: expected start, delete_count, optional replacement array";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}nift::RuntimeValue st,dc,repl;if(!eval(args[0],st,depth+1)||!eval(args[1],dc,depth+1)||!st.is_number()||!dc.is_number()||std::trunc(st.num)!=st.num||std::trunc(dc.num)!=dc.num||st.num<0||dc.num<0){error="splice: invalid index/count";return false;}size_t b=(size_t)st.num;if(b>a.size())b=a.size();size_t n=std::min((size_t)dc.num,a.size()-b);out=nift::RuntimeValue::make_array();out.array.assign(a.begin()+b,a.begin()+b+n);a.erase(a.begin()+b,a.begin()+b+n);if(args.size()==3){if(!eval(args[2],repl,depth+1)||!repl.is_array()){error="splice: replacements must be an array";return false;}a.insert(a.begin()+b,repl.array.begin(),repl.array.end());}last_expression_mutation_=true;return true;}
                         if(method=="reverse"){if(!args.empty()){error="reverse: expected no arguments";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}std::reverse(a.begin(),a.end());out=*rb->value;last_expression_mutation_=true;return true;}
-                        if(method=="size"){out=json::Document(static_cast<double>(a.size()));return true;} if(method=="empty"){out=json::Document(a.empty());return true;}
+                        if(method=="size"){out=nift::RuntimeValue(static_cast<double>(a.size()));return true;} if(method=="empty"){out=nift::RuntimeValue(a.empty());return true;}
                         if(method=="first"||method=="last"||method=="pop"){if(a.empty()){error=method+": array is empty";return false;}out=method=="first"?a.front():a.back();if(method=="pop"){if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}a.pop_back();last_expression_mutation_=true;}return true;}
-                        if(method=="clear"){if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}a.clear();out=json::Document(nullptr);last_expression_mutation_=true;return true;}
-                        if(method=="push"){if(args.size()!=1){error="push: expected one argument";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}json::Document v;if(quoted_args.size()>0&&quoted_args[0])v=json::Document(args[0]);else if(!eval(args[0],v,depth+1))return false;a.push_back(v);out=v;last_expression_mutation_=true;return true;}
-                        if(method=="insert"){if(args.size()!=2){error="insert: expected index and value";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}json::Document ix,v;if(!eval(args[0],ix,depth+1)||!eval(args[1],v,depth+1)||!ix.is_number()){error="insert: invalid index";return false;}size_t i=static_cast<size_t>(ix.num);if(i>a.size()){error="insert: index out of range";return false;}a.insert(a.begin()+i,v);out=v;last_expression_mutation_=true;return true;}
-                        if(method=="remove"){if(args.size()!=1){error="remove: expected index";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}json::Document ix;if(!eval(args[0],ix,depth+1)||!ix.is_number()){error="remove: invalid index";return false;}size_t i=static_cast<size_t>(ix.num);if(i>=a.size()){error="remove: index out of range";return false;}out=a[i];a.erase(a.begin()+i);last_expression_mutation_=true;return true;}
-                        if(method=="indexOf"||method=="contains"){if(args.size()!=1){error=method+": expected one value";return false;}json::Document v;if(!eval(args[0],v,depth+1))return false;std::size_t i=0;for(;i<a.size();++i)if(structural_equal(a[i],v))break;if(method=="contains")out=json::Document(i<a.size());else out=json::Document(i<a.size()?static_cast<double>(i):-1.0);return true;}
+                        if(method=="clear"){if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}a.clear();out=nift::RuntimeValue(nullptr);last_expression_mutation_=true;return true;}
+                        if(method=="push"){if(args.size()!=1){error="push: expected one argument";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}nift::RuntimeValue v;if(quoted_args.size()>0&&quoted_args[0])v=nift::RuntimeValue(args[0]);else if(!eval(args[0],v,depth+1))return false;a.push_back(v);out=v;last_expression_mutation_=true;return true;}
+                        if(method=="insert"){if(args.size()!=2){error="insert: expected index and value";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}nift::RuntimeValue ix,v;if(!eval(args[0],ix,depth+1)||!eval(args[1],v,depth+1)||!ix.is_number()){error="insert: invalid index";return false;}size_t i=static_cast<size_t>(ix.num);if(i>a.size()){error="insert: index out of range";return false;}a.insert(a.begin()+i,v);out=v;last_expression_mutation_=true;return true;}
+                        if(method=="remove"){if(args.size()!=1){error="remove: expected index";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}nift::RuntimeValue ix;if(!eval(args[0],ix,depth+1)||!ix.is_number()){error="remove: invalid index";return false;}size_t i=static_cast<size_t>(ix.num);if(i>=a.size()){error="remove: index out of range";return false;}out=a[i];a.erase(a.begin()+i);last_expression_mutation_=true;return true;}
+                        if(method=="indexOf"||method=="contains"){if(args.size()!=1){error=method+": expected one value";return false;}nift::RuntimeValue v;if(!eval(args[0],v,depth+1))return false;std::size_t i=0;for(;i<a.size();++i)if(structural_equal(a[i],v))break;if(method=="contains")out=nift::RuntimeValue(i<a.size());else out=nift::RuntimeValue(i<a.size()?static_cast<double>(i):-1.0);return true;}
                     }
                 }
             }}
@@ -2995,19 +3010,19 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             if(lp!=std::string::npos&&text.back()==')'){std::size_t call_close=0;const std::string target=trim_copy(text.substr(0,lp));const auto dot=target.rfind('.');if(dot!=std::string::npos&&find_balanced(text,lp,'(',')',call_close)&&call_close==text.size()-1){
                 const std::string root=target.substr(0,dot),method=target.substr(dot+1);VariableBinding* rb=find_binding(root);
                 if(rb&&rb->value&&rb->value->is_string()&&rb->value->string.rfind("\x1fnift:stream:",0)==0){auto it=stream_instances_.find(rb->value->string.substr(13));if(it==stream_instances_.end()||it->second->closed){error="stream is closed or invalid";return false;}auto st=it->second;bool ok=false;std::vector<bool> qq;auto aa=parse_parameters(text.substr(lp+1,text.size()-lp-2),ok,&qq);if(!ok){error="malformed stream method arguments";return false;}
-                    if(method=="eof"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Input){error="eof: expected input stream and no arguments";return false;}out=json::Document(st->input->peek()==std::char_traits<char>::eof());return true;}
-                    if(method=="read_line"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Input){error="read_line: expected input stream and no arguments";return false;}std::string line;if(!std::getline(*st->input,line)){if(st->input->eof()){st->input->clear();out=json::Document(nullptr);return true;}error="read_line: input failure";return false;}out=json::Document(line);return true;}
-                    if(method=="read_all"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Input){error="read_all: expected input stream and no arguments";return false;}std::ostringstream ss;ss<<st->input->rdbuf();out=json::Document(ss.str());return true;}
-                    if(method=="read"){if(aa.size()!=1||st->kind!=StreamInstance::Kind::Input){error="read: expected byte count on input stream";return false;}json::Document n;if(!eval(aa[0],n,depth+1)||!n.is_number()||std::trunc(n.num)!=n.num||n.num<0){error="read: invalid byte count";return false;}std::string b((size_t)n.num,'\0');st->input->read(b.data(),(std::streamsize)b.size());b.resize((size_t)st->input->gcount());out=json::Document(b);return true;}
-                    if(method=="read_val"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Input){error="read_val: expected input stream and no arguments";return false;}*st->input>>std::ws;if(st->input->peek()==std::char_traits<char>::eof()){out=json::Document(nullptr);return true;}std::string token;char first=(char)st->input->peek();if(first=='"'||first=='['||first=='{'){char open=first,close=first=='['?']':first=='{'?'}':'"';int dep=0;bool quoted=false,esc=false;char c;while(st->input->get(c)){token+=c;if(open=='"'){if(esc){esc=false;continue;}if(c=='\\'){esc=true;continue;}if(token.size()>1&&c=='"')break;}else{if(quoted){if(esc)esc=false;else if(c=='\\')esc=true;else if(c=='"')quoted=false;}else if(c=='"')quoted=true;else if(c==open)++dep;else if(c==close&&--dep==0)break;}}}else{while(st->input->peek()!=std::char_traits<char>::eof()&&!std::isspace((unsigned char)st->input->peek()))token+=(char)st->input->get();}json::Document v;std::string ee;if(!eval(token,v,depth+1)){error=std::string("read_val: ")+(error.empty()?("cannot parse value '"+token+"'"):error);return false;}out=v;return true;}
-                    if(method=="write_val"){if(aa.size()!=1||st->kind!=StreamInstance::Kind::Output){error="write_val: expected one value on output stream";return false;}json::Document v;if(!((!qq.empty()&&qq[0])?(v=json::Document(aa[0]),true):eval(aa[0],v,depth+1)))return false;if(v.is_string()&&!qq.empty()&&qq[0]&&v.string.find("$[")!=std::string::npos){std::string r,e;if(!interpolate_parameter(v.string,r,e)){error="write_val: "+e;return false;}v=json::Document(r);}std::string serialized;if(!serialize_value(v,false,serialized,error))return false;*st->output<<serialized<<'\n';if(!*st->output){error="write_val: output failure";return false;}out=json::Document(nullptr);return true;}
-                    if(method=="write"||method=="write_line"){if(aa.size()!=1||st->kind!=StreamInstance::Kind::Output){error=method+": expected one value on output stream";return false;}json::Document v;if(!((!qq.empty()&&qq[0])?(v=json::Document(aa[0]),true):eval(aa[0],v,depth+1)))return false;if(v.is_string()&&!qq.empty()&&qq[0]&&v.string.find("$[")!=std::string::npos){std::string r,e;if(!interpolate_parameter(v.string,r,e)){error=method+": "+e;return false;}v=json::Document(r);}if(v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0)){error=method+": value is not directly renderable";return false;}*st->output<<render_expression_value(v);if(method=="write_line")*st->output<<'\n';if(!*st->output){error=method+": output failure";return false;}out=json::Document(nullptr);return true;}
-                    if(method=="flush"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Output){error="flush: expected output stream and no arguments";return false;}st->output->flush();if(!*st->output){error="flush: output failure";return false;}out=json::Document(nullptr);return true;}
+                    if(method=="eof"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Input){error="eof: expected input stream and no arguments";return false;}out=nift::RuntimeValue(st->input->peek()==std::char_traits<char>::eof());return true;}
+                    if(method=="read_line"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Input){error="read_line: expected input stream and no arguments";return false;}std::string line;if(!std::getline(*st->input,line)){if(st->input->eof()){st->input->clear();out=nift::RuntimeValue(nullptr);return true;}error="read_line: input failure";return false;}out=nift::RuntimeValue(line);return true;}
+                    if(method=="read_all"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Input){error="read_all: expected input stream and no arguments";return false;}std::ostringstream ss;ss<<st->input->rdbuf();out=nift::RuntimeValue(ss.str());return true;}
+                    if(method=="read"){if(aa.size()!=1||st->kind!=StreamInstance::Kind::Input){error="read: expected byte count on input stream";return false;}nift::RuntimeValue n;if(!eval(aa[0],n,depth+1)||!n.is_number()||std::trunc(n.num)!=n.num||n.num<0){error="read: invalid byte count";return false;}std::string b((size_t)n.num,'\0');st->input->read(b.data(),(std::streamsize)b.size());b.resize((size_t)st->input->gcount());out=nift::RuntimeValue(b);return true;}
+                    if(method=="read_val"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Input){error="read_val: expected input stream and no arguments";return false;}*st->input>>std::ws;if(st->input->peek()==std::char_traits<char>::eof()){out=nift::RuntimeValue(nullptr);return true;}std::string token;char first=(char)st->input->peek();if(first=='"'||first=='['||first=='{'){char open=first,close=first=='['?']':first=='{'?'}':'"';int dep=0;bool quoted=false,esc=false;char c;while(st->input->get(c)){token+=c;if(open=='"'){if(esc){esc=false;continue;}if(c=='\\'){esc=true;continue;}if(token.size()>1&&c=='"')break;}else{if(quoted){if(esc)esc=false;else if(c=='\\')esc=true;else if(c=='"')quoted=false;}else if(c=='"')quoted=true;else if(c==open)++dep;else if(c==close&&--dep==0)break;}}}else{while(st->input->peek()!=std::char_traits<char>::eof()&&!std::isspace((unsigned char)st->input->peek()))token+=(char)st->input->get();}nift::RuntimeValue v;std::string ee;if(!eval(token,v,depth+1)){error=std::string("read_val: ")+(error.empty()?("cannot parse value '"+token+"'"):error);return false;}out=v;return true;}
+                    if(method=="write_val"){if(aa.size()!=1||st->kind!=StreamInstance::Kind::Output){error="write_val: expected one value on output stream";return false;}nift::RuntimeValue v;if(!((!qq.empty()&&qq[0])?(v=nift::RuntimeValue(aa[0]),true):eval(aa[0],v,depth+1)))return false;if(v.is_string()&&!qq.empty()&&qq[0]&&v.string.find("$[")!=std::string::npos){std::string r,e;if(!interpolate_parameter(v.string,r,e)){error="write_val: "+e;return false;}v=nift::RuntimeValue(r);}std::string serialized;if(!serialize_value(v,false,serialized,error))return false;*st->output<<serialized<<'\n';if(!*st->output){error="write_val: output failure";return false;}out=nift::RuntimeValue(nullptr);return true;}
+                    if(method=="write"||method=="write_line"){if(aa.size()!=1||st->kind!=StreamInstance::Kind::Output){error=method+": expected one value on output stream";return false;}nift::RuntimeValue v;if(!((!qq.empty()&&qq[0])?(v=nift::RuntimeValue(aa[0]),true):eval(aa[0],v,depth+1)))return false;if(v.is_string()&&!qq.empty()&&qq[0]&&v.string.find("$[")!=std::string::npos){std::string r,e;if(!interpolate_parameter(v.string,r,e)){error=method+": "+e;return false;}v=nift::RuntimeValue(r);}if(v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0)){error=method+": value is not directly renderable";return false;}*st->output<<render_expression_value(v);if(method=="write_line")*st->output<<'\n';if(!*st->output){error=method+": output failure";return false;}out=nift::RuntimeValue(nullptr);return true;}
+                    if(method=="flush"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Output){error="flush: expected output stream and no arguments";return false;}st->output->flush();if(!*st->output){error="flush: output failure";return false;}out=nift::RuntimeValue(nullptr);return true;}
                 }
             }}
             if(lp!=std::string::npos&&text.back()==')'){std::size_t call_close=0;const std::string target=trim_copy(text.substr(0,lp));const auto dot=target.rfind('.');if(dot!=std::string::npos&&find_balanced(text,lp,'(',')',call_close)&&call_close==text.size()-1){
                 const std::string root=target.substr(0,dot),method=target.substr(dot+1);VariableBinding* rb=find_binding(root);
-                if(rb&&rb->value&&rb->value->is_string()&&method=="substr") { bool ok=false;auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),ok);if(!ok||args.empty()||args.size()>2){error="substr: expected pos and optional length";return false;}json::Document pos,len;if(!eval(args[0],pos,depth+1)||!pos.is_number()||std::trunc(pos.num)!=pos.num||pos.num<0){error="substr: invalid pos";return false;}size_t p=(size_t)pos.num;if(p>rb->value->string.size())p=rb->value->string.size();size_t n=std::string::npos;if(args.size()==2){if(!eval(args[1],len,depth+1)||!len.is_number()||std::trunc(len.num)!=len.num||len.num<0){error="substr: invalid length";return false;}n=(size_t)len.num;}out=json::Document(rb->value->string.substr(p,n));return true;}
+                if(rb&&rb->value&&rb->value->is_string()&&method=="substr") { bool ok=false;auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),ok);if(!ok||args.empty()||args.size()>2){error="substr: expected pos and optional length";return false;}nift::RuntimeValue pos,len;if(!eval(args[0],pos,depth+1)||!pos.is_number()||std::trunc(pos.num)!=pos.num||pos.num<0){error="substr: invalid pos";return false;}size_t p=(size_t)pos.num;if(p>rb->value->string.size())p=rb->value->string.size();size_t n=std::string::npos;if(args.size()==2){if(!eval(args[1],len,depth+1)||!len.is_number()||std::trunc(len.num)!=len.num||len.num<0){error="substr: invalid length";return false;}n=(size_t)len.num;}out=nift::RuntimeValue(rb->value->string.substr(p,n));return true;}
             }}
         }
 
@@ -3029,10 +3044,10 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     // so inner quotes/backslashes/control characters survive).
                     auto reescape_parameter=[&](const std::string& raw)->std::string{std::string o;o.reserve(raw.size());for(char c:raw){if(c=='\\'){o+="\\\\";}else if(c=='"'){o+="\\\"";}else if(c=='\n'){o+="\\n";}else if(c=='\r'){o+="\\r";}else if(c=='\t'){o+="\\t";}else{o+=c;}}return o;};
                     std::string call = "("; bool ok=false; std::vector<bool> qq; auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),ok,&qq); if(!ok){error="malformed arguments";return false;} for(size_t i=0;i<ar.size();++i){if(i)call+=","; if(i<qq.size()&&qq[i])call+="\""+reescape_parameter(ar[i])+"\""; else call+=ar[i];} call+=")";
-                    json::Document cb=*ff->second.value; push_variable_scope(); auto& sc=variable_scopes_.back(); auto csp=std::make_shared<json::Document>(std::move(cb)); sc["__nift_module_field"]=VariableBinding{csp,nift_binding_type(*csp),false,false};
+                    nift::RuntimeValue cb=*ff->second.value; push_variable_scope(); auto& sc=variable_scopes_.back(); auto csp=std::make_shared<nift::RuntimeValue>(std::move(cb)); sc["__nift_module_field"]=VariableBinding{csp,nift_binding_type(*csp),false,false};
                     bool r=eval("__nift_module_field"+call,out,depth+1); pop_variable_scope(); return r;
                 }
-                error="struct has no method: "+mn;return false;}if(mi->second.private_member&&(receiver_stack_.empty()||receiver_stack_.back()!=inst->second)){error="private struct method: "+mn;return false;}bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(!aok){error="malformed method arguments";return false;}std::vector<json::Document> av;for(std::size_t ai=0;ai<ar.size();++ai){json::Document v;if(ai<aq.size()&&aq[ai])v=json::Document(ar[ai]);else if(!eval(ar[ai],v,depth+1))return false;av.push_back(std::move(v));}return invoke_struct_method(inst->second,mi->second,av,ar,out,error);}
+                error="struct has no method: "+mn;return false;}if(mi->second.private_member&&(receiver_stack_.empty()||receiver_stack_.back()!=inst->second)){error="private struct method: "+mn;return false;}bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(!aok){error="malformed method arguments";return false;}std::vector<nift::RuntimeValue> av;for(std::size_t ai=0;ai<ar.size();++ai){nift::RuntimeValue v;if(ai<aq.size()&&aq[ai])v=nift::RuntimeValue(ar[ai]);else if(!eval(ar[ai],v,depth+1))return false;av.push_back(std::move(v));}return invoke_struct_method(inst->second,mi->second,av,ar,out,error);}
             }
             if (terminal_call && valid_binding_identifier(trim_copy(text.substr(0, lp)))) {
                 const std::string call_name = trim_copy(text.substr(0, lp));
@@ -3042,13 +3057,13 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     auto ctor=si->second.methods.find(call_name); const std::size_t expected=ctor==si->second.methods.end()?0:ctor->second.callable.params.size();
                     if(!args_ok||args.size()!=expected){error="struct constructor argument count mismatch: "+call_name;return false;}
                     auto instance=std::make_shared<StructInstance>(); instance->type_name=call_name;
-                    for(const auto& field:si->second.fields){ json::Document fv; if(!eval(field.initializer,fv,depth+1))return false; auto sp=std::make_shared<json::Document>(std::move(fv)); instance->fields.emplace(field.name,VariableBinding{sp,nift_binding_type_from_text(field.initializer,*sp),true,false}); }
+                    for(const auto& field:si->second.fields){ nift::RuntimeValue fv; if(!eval(field.initializer,fv,depth+1))return false; auto sp=std::make_shared<nift::RuntimeValue>(std::move(fv)); instance->fields.emplace(field.name,VariableBinding{sp,nift_binding_type_from_text(field.initializer,*sp),true,false}); }
                     const std::string id=std::to_string(next_struct_instance_id_++); struct_instances_[id]=instance;
-                    if(ctor!=si->second.methods.end()){std::vector<json::Document> av;for(std::size_t ai=0;ai<args.size();++ai){json::Document v;if(ai<q.size()&&q[ai])v=json::Document(args[ai]);else if(!eval(args[ai],v,depth+1))return false;av.push_back(std::move(v));}json::Document ignored;if(!invoke_struct_method(instance,ctor->second,av,args,ignored,error))return false;}
-                    out=json::Document(std::string("\x1fnift:struct:")+id); return true;
+                    if(ctor!=si->second.methods.end()){std::vector<nift::RuntimeValue> av;for(std::size_t ai=0;ai<args.size();++ai){nift::RuntimeValue v;if(ai<q.size()&&q[ai])v=nift::RuntimeValue(args[ai]);else if(!eval(args[ai],v,depth+1))return false;av.push_back(std::move(v));}nift::RuntimeValue ignored;if(!invoke_struct_method(instance,ctor->second,av,args,ignored,error))return false;}
+                    out=nift::RuntimeValue(std::string("\x1fnift:struct:")+id); return true;
                 }
                 auto ci = callables_.find(call_name);
-                if(ci==callables_.end()&&!receiver_stack_.empty()){auto sd=structs_.find(receiver_stack_.back()->type_name);if(sd!=structs_.end()){auto mi=sd->second.methods.find(call_name);if(mi!=sd->second.methods.end()&&!mi->second.constructor){bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(!aok){error="malformed method arguments";return false;}std::vector<json::Document> av;for(std::size_t ai=0;ai<ar.size();++ai){json::Document v;if(ai<aq.size()&&aq[ai])v=json::Document(ar[ai]);else if(!eval(ar[ai],v,depth+1))return false;av.push_back(std::move(v));}return invoke_struct_method(receiver_stack_.back(),mi->second,av,ar,out,error);}}}
+                if(ci==callables_.end()&&!receiver_stack_.empty()){auto sd=structs_.find(receiver_stack_.back()->type_name);if(sd!=structs_.end()){auto mi=sd->second.methods.find(call_name);if(mi!=sd->second.methods.end()&&!mi->second.constructor){bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(!aok){error="malformed method arguments";return false;}std::vector<nift::RuntimeValue> av;for(std::size_t ai=0;ai<ar.size();++ai){nift::RuntimeValue v;if(ai<aq.size()&&aq[ai])v=nift::RuntimeValue(ar[ai]);else if(!eval(ar[ai],v,depth+1))return false;av.push_back(std::move(v));}return invoke_struct_method(receiver_stack_.back(),mi->second,av,ar,out,error);}}}
                 // Indirect first-class callable invocation.
                 if (ci == callables_.end()) {
                     VariableBinding* cb=find_binding(call_name);
@@ -3059,13 +3074,13 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                             auto li=lambda_instances_.find(tag.substr(22));if(li==lambda_instances_.end()){error="invalid lambda";return false;}auto fn=li->second;
                             if (callable_call_depth_ >= kMaxCallableDepth) { error = "callable recursion depth exceeded"; return false; }
                             ++callable_call_depth_;
-                            bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(aok){std::vector<std::string> ex;std::vector<bool> eq;for(size_t ai=0;ai<ar.size();++ai){if(!(ai<aq.size()&&aq[ai])&&trim_copy(ar[ai]).rfind("...",0)==0){json::Document sv;if(!eval(trim_copy(ar[ai]).substr(3),sv,depth+1)){--callable_call_depth_;return false;}if(!sv.is_array()){error="spread value must be an array";--callable_call_depth_;return false;}for(const auto& item:sv.array){std::string enc;if(!serialize_value(item,false,enc,error)){--callable_call_depth_;return false;}ex.push_back(enc);eq.push_back(false);}}else{ex.push_back(ar[ai]);eq.push_back(ai<aq.size()&&aq[ai]);}}ar.swap(ex);aq.swap(eq);}if(!aok||(!fn->variadic_param.empty()?ar.size()<fn->params.size():ar.size()!=fn->params.size())){error="lambda argument count mismatch";--callable_call_depth_;return false;}
-                            std::vector<json::Document> av;for(size_t ai=0;ai<ar.size();++ai){json::Document v;if(ai<aq.size()&&aq[ai])v=json::Document(ar[ai]);else if(!eval(ar[ai],v,depth+1)){--callable_call_depth_;return false;}av.push_back(std::move(v));}
+                            std::vector<nift::RuntimeValue> spread_args;bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(aok){std::vector<std::string> ex;std::vector<bool> eq;for(size_t ai=0;ai<ar.size();++ai){if(!(ai<aq.size()&&aq[ai])&&trim_copy(ar[ai]).rfind("...",0)==0){nift::RuntimeValue sv;if(!eval(trim_copy(ar[ai]).substr(3),sv,depth+1)){--callable_call_depth_;return false;}if(!sv.is_array()){error="spread value must be an array";--callable_call_depth_;return false;}for(const auto& item:sv.array){ex.push_back("\x1fnift:spread:"+std::to_string(spread_args.size()));spread_args.push_back(item);eq.push_back(false);}}else{ex.push_back(ar[ai]);eq.push_back(ai<aq.size()&&aq[ai]);}}ar.swap(ex);aq.swap(eq);}if(!aok||(!fn->variadic_param.empty()?ar.size()<fn->params.size():ar.size()!=fn->params.size())){error="lambda argument count mismatch";--callable_call_depth_;return false;}
+                            std::vector<nift::RuntimeValue> av;for(size_t ai=0;ai<ar.size();++ai){nift::RuntimeValue v;if(ai<aq.size()&&aq[ai])v=nift::RuntimeValue(ar[ai]);else if(ar[ai].rfind("\x1fnift:spread:",0)==0)v=spread_args[static_cast<std::size_t>(std::stoull(ar[ai].substr(13)))];else if(!eval(ar[ai],v,depth+1)){--callable_call_depth_;return false;}av.push_back(std::move(v));}
                             if(fn->async){for(std::size_t ai=0;ai<ar.size();++ai){const std::string an=trim_copy(ar[ai]);if(valid_binding_identifier(an)){if(auto* ab=find_binding(an)){ab->sync();if(ab->value&&ab->value->is_string()&&ab->value->string.rfind("\x1fnift:atomic:",0)==0)av[ai]=*ab->value;}}}--callable_call_depth_;return spawn_future(*cb->value,av,out);}
                             const auto saved_lambda_env=active_module_env_; if(fn->module_env) active_module_env_=fn->module_env;
-                            push_variable_scope();auto& sc=variable_scopes_.back();for(const auto& kv:fn->captures)sc[kv.first]=kv.second;for(size_t ai=0;ai<fn->params.size();++ai){sc[fn->params[ai]]=bind_call_param(ar[ai],ai<aq.size()&&aq[ai],av[ai]);}if(!fn->variadic_param.empty()){json::Document rest=json::Document::make_array();for(size_t ai=fn->params.size();ai<av.size();++ai)rest.array.push_back(std::move(av[ai]));auto sp=std::make_shared<json::Document>(std::move(rest));sc[fn->variadic_param]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
+                            push_variable_scope();auto& sc=variable_scopes_.back();for(const auto& kv:fn->captures)sc[kv.first]=kv.second;for(size_t ai=0;ai<fn->params.size();++ai){sc[fn->params[ai]]=bind_call_param(ar[ai],ai<aq.size()&&aq[ai],av[ai]);}if(!fn->variadic_param.empty()){nift::RuntimeValue rest=nift::RuntimeValue::make_array();for(size_t ai=fn->params.size();ai<av.size();++ai)rest.array.push_back(std::move(av[ai]));auto sp=std::make_shared<nift::RuntimeValue>(std::move(rest));sc[fn->variadic_param]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
                             bool okcall=true;
-                            if(fn->block){std::string bt=trim_copy(fn->body);const bool rendered=!bt.empty()&&bt.front()=='<';if(rendered){auto nested=parse(fn->body,fn->source_path,1);if(!nested.ok){error=nested.error.message;okcall=false;}else out=json::Document(nested.output);}else{++function_call_depth_;auto nested=execute_native_program(fn->body,fn->source_path,1);--function_call_depth_;if(!nested.ok){error=nested.error.message;okcall=false;}else if(pending_control_.kind==ControlFlow::Return){consume_return(out);}else out=json::Document(nullptr);}}
+                            if(fn->block){std::string bt=trim_copy(fn->body);const bool rendered=!bt.empty()&&bt.front()=='<';if(rendered){auto nested=parse(fn->body,fn->source_path,1);if(!nested.ok){error=nested.error.message;okcall=false;}else out=nift::RuntimeValue(nested.output);}else{++function_call_depth_;auto nested=execute_native_program(fn->body,fn->source_path,1);--function_call_depth_;if(!nested.ok){error=nested.error.message;okcall=false;}else if(pending_control_.kind==ControlFlow::Return){consume_return(out);}else out=nift::RuntimeValue(nullptr);}}
                             else { okcall=eval(fn->body,out,depth+1); if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0) error="lambda body error: "+error; VariableBinding lr; if(try_location_ref(fn->body,lr)&&lr.is_location_ref()&&lr.value){last_call_return_loc_root_=lr.ref_root_slot;last_call_return_loc_path_=lr.ref_path;} }
                             pop_variable_scope();active_module_env_=saved_lambda_env;--callable_call_depth_;return okcall;
                         }
@@ -3079,15 +3094,15 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 if (!callee && active_module_env_) { auto mit=active_module_env_->callables.find(call_name); if (mit!=active_module_env_->callables.end()) callee=&mit->second; }
                 if (callee) {
                     if (callable_call_depth_ >= kMaxCallableDepth) { error = "callable recursion depth exceeded: " + call_name; return false; }
-                    bool args_ok=false; std::vector<bool> quoted_args; auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),args_ok,&quoted_args); if(args_ok){std::vector<std::string> ex;std::vector<bool> eq;for(size_t ai=0;ai<args.size();++ai){if(!(ai<quoted_args.size()&&quoted_args[ai])&&trim_copy(args[ai]).rfind("...",0)==0){json::Document sv;if(!eval(trim_copy(args[ai]).substr(3),sv,depth+1))return false;if(!sv.is_array()){error="spread value must be an array";return false;}for(const auto& item:sv.array){std::string enc;if(!serialize_value(item,false,enc,error))return false;ex.push_back(enc);eq.push_back(false);}}else{ex.push_back(args[ai]);eq.push_back(ai<quoted_args.size()&&quoted_args[ai]);}}args.swap(ex);quoted_args.swap(eq);}if(!args_ok||(!callee->variadic_param.empty()?args.size()<callee->params.size():args.size()!=callee->params.size())){error="callable argument count mismatch: "+call_name;return false;}
-                    std::vector<json::Document> values; for(std::size_t ai=0;ai<args.size();++ai){json::Document v;if(ai<quoted_args.size()&&quoted_args[ai])v=json::Document(args[ai]);else if(!eval(args[ai],v,depth+1))return false;values.push_back(std::move(v));}
-                    if(callee->async){for(std::size_t ai=0;ai<args.size();++ai){const std::string an=trim_copy(args[ai]);if(valid_binding_identifier(an)){if(auto* ab=find_binding(an)){ab->sync();if(ab->value&&ab->value->is_string()&&ab->value->string.rfind("\x1fnift:atomic:",0)==0)values[ai]=*ab->value;}}}json::Document cb(std::string("\x1fnift:callable:named:")+call_name);return spawn_future(cb,values,out);}
+                    std::vector<nift::RuntimeValue> spread_args;bool args_ok=false; std::vector<bool> quoted_args; auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),args_ok,&quoted_args); if(args_ok){std::vector<std::string> ex;std::vector<bool> eq;for(size_t ai=0;ai<args.size();++ai){if(!(ai<quoted_args.size()&&quoted_args[ai])&&trim_copy(args[ai]).rfind("...",0)==0){nift::RuntimeValue sv;if(!eval(trim_copy(args[ai]).substr(3),sv,depth+1))return false;if(!sv.is_array()){error="spread value must be an array";return false;}for(const auto& item:sv.array){ex.push_back("\x1fnift:spread:"+std::to_string(spread_args.size()));spread_args.push_back(item);eq.push_back(false);}}else{ex.push_back(args[ai]);eq.push_back(ai<quoted_args.size()&&quoted_args[ai]);}}args.swap(ex);quoted_args.swap(eq);}if(!args_ok||(!callee->variadic_param.empty()?args.size()<callee->params.size():args.size()!=callee->params.size())){error="callable argument count mismatch: "+call_name;return false;}
+                    std::vector<nift::RuntimeValue> values; for(std::size_t ai=0;ai<args.size();++ai){nift::RuntimeValue v;if(ai<quoted_args.size()&&quoted_args[ai])v=nift::RuntimeValue(args[ai]);else if(args[ai].rfind("\x1fnift:spread:",0)==0)v=spread_args[static_cast<std::size_t>(std::stoull(args[ai].substr(13)))];else if(!eval(args[ai],v,depth+1))return false;values.push_back(std::move(v));}
+                    if(callee->async){for(std::size_t ai=0;ai<args.size();++ai){const std::string an=trim_copy(args[ai]);if(valid_binding_identifier(an)){if(auto* ab=find_binding(an)){ab->sync();if(ab->value&&ab->value->is_string()&&ab->value->string.rfind("\x1fnift:atomic:",0)==0)values[ai]=*ab->value;}}}nift::RuntimeValue cb(std::string("\x1fnift:callable:named:")+call_name);return spawn_future(cb,values,out);}
                     ++callable_call_depth_;
                     const int caller_loop_depth = loop_depth_;
                     loop_depth_ = 0;
                     const auto saved_env = active_module_env_;
                     if (callee->module_env) active_module_env_ = callee->module_env;
-                    push_variable_scope(); auto& scope=variable_scopes_.back(); if(active_module_env_){for(const auto& kv:active_module_env_->vars){if(!scope.count(kv.first))scope[kv.first]=kv.second;}} for(std::size_t ai=0;ai<callee->params.size();++ai){scope.emplace(callee->params[ai],bind_call_param(args[ai],ai<quoted_args.size()&&quoted_args[ai],values[ai]));}if(!callee->variadic_param.empty()){json::Document rest=json::Document::make_array();for(std::size_t ai=callee->params.size();ai<values.size();++ai)rest.array.push_back(std::move(values[ai]));auto sp=std::make_shared<json::Document>(std::move(rest));scope.emplace(callee->variadic_param,VariableBinding{sp,nift_binding_type(*sp),true,false});}
+                    push_variable_scope(); auto& scope=variable_scopes_.back(); if(active_module_env_){for(const auto& kv:active_module_env_->vars){if(!scope.count(kv.first))scope[kv.first]=kv.second;}} for(std::size_t ai=0;ai<callee->params.size();++ai){scope.emplace(callee->params[ai],bind_call_param(args[ai],ai<quoted_args.size()&&quoted_args[ai],values[ai]));}if(!callee->variadic_param.empty()){nift::RuntimeValue rest=nift::RuntimeValue::make_array();for(std::size_t ai=callee->params.size();ai<values.size();++ai)rest.array.push_back(std::move(values[ai]));auto sp=std::make_shared<nift::RuntimeValue>(std::move(rest));scope.emplace(callee->variadic_param,VariableBinding{sp,nift_binding_type(*sp),true,false});}
                     const bool saved_mutation = last_expression_mutation_;
                     bool call_ok = true; std::string call_error;
                     if (callee->fragment) {
@@ -3095,14 +3110,14 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         auto nested = parse(callee->body, callee->source_path, 1);
                         in_fragment_body_ = saved_fragment;
                         if (!nested.ok) { call_ok = false; call_error = nested.error.message; }
-                        else { out = json::Document(nested.output); if (pending_control_.kind == ControlFlow::Return) pending_control_ = {}; }
+                        else { out = nift::RuntimeValue(nested.output); if (pending_control_.kind == ControlFlow::Return) pending_control_ = {}; }
                     } else {
                         ++function_call_depth_;
                         if (pending_control_.kind != ControlFlow::None) { pending_control_ = {}; }
                         auto body_result = execute_native_program(callee->body, callee->source_path, 1);
                         --function_call_depth_;
                         if (!body_result.ok) { call_ok = false; call_error = body_result.error.message; }
-                        else if (pending_control_.kind == ControlFlow::None) { out = json::Document(nullptr); }
+                        else if (pending_control_.kind == ControlFlow::None) { out = nift::RuntimeValue(nullptr); }
                         else consume_return(out);
                     }
                     last_expression_mutation_ = saved_mutation;
@@ -3113,7 +3128,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     if (!call_ok) { error = call_error; return false; }
                     return true;
                 }
-                if(host_.has_host_callable(call_name)){bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(!aok){error="malformed host callable arguments";return false;}std::vector<json::Document> av;for(size_t ai=0;ai<ar.size();++ai){json::Document v;if(ai<aq.size()&&aq[ai])v=json::Document(ar[ai]);else if(!eval(ar[ai],v,depth+1))return false;av.push_back(std::move(v));}return host_.call_host_callable(call_name,av,out,error);}
+                if(host_.has_host_callable(call_name)){bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(!aok){error="malformed host callable arguments";return false;}std::vector<nift::RuntimeValue> av;for(size_t ai=0;ai<ar.size();++ai){nift::RuntimeValue v;if(ai<aq.size()&&aq[ai])v=nift::RuntimeValue(ar[ai]);else if(!eval(ar[ai],v,depth+1))return false;av.push_back(std::move(v));}return call_runtime_host(host_, call_name, av, out, error);}
                 if (call_name != "inject" && call_name != "validate" && call_name != "copy" && call_name != "deepcopy") { error = "undefined callable: " + call_name; return false; }
             }
         }
@@ -3127,13 +3142,13 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
         }
 
         if (text.rfind("deepcopy(",0)==0 && text.back()==')') {
-            json::Document source; if(!eval(text.substr(9,text.size()-10),source,depth+1))return false;
+            nift::RuntimeValue source; if(!eval(text.substr(9,text.size()-10),source,depth+1))return false;
             std::unordered_map<std::string,std::string> seen;
-            std::function<bool(const json::Document&,json::Document&)> clone;
-            clone=[&](const json::Document& in,json::Document& dst)->bool{
-                if(in.is_string()&&in.string.rfind("\x1fnift:collection:",0)==0){auto it=collection_instances_.find(in.string.substr(17));if(it==collection_instances_.end()){error="deepcopy: invalid collection";return false;}auto nc=std::make_shared<CollectionInstance>();nc->kind=it->second->kind;for(const auto& v:it->second->values){json::Document cv;if(!clone(v,cv))return false;nc->values.push_back(std::move(cv));if(nc->kind==CollectionKind::Set||nc->kind==CollectionKind::SortedSet){auto ck=[&](const json::Document& x)->std::string{if(x.is_bool())return std::string("b")+(x.boolean?"1":"0");if(x.is_string()){if(x.string.rfind("\x1fnift:",0)==0)return "";return std::string("s")+x.string;}if(x.type==json::Type::StrNumber)return std::string("N")+x.string;double nn=x.num;if(nn==0.0)nn=0.0;uint64_t bits=0;std::memcpy(&bits,&nn,sizeof(bits));return std::string("n")+std::to_string(bits);};std::string k=ck(cv);if(!k.empty())nc->scalar_keys.insert(k);if(cv.type==json::Type::StrNumber)nc->has_huge_int=true;}}for(const auto& e:it->second->entries){json::Document ck,cv;if(!clone(e.first,ck)||!clone(e.second,cv))return false;nc->entries.push_back({std::move(ck),std::move(cv)});if(nc->kind==CollectionKind::Map||nc->kind==CollectionKind::SortedMap){auto ck2=[&](const json::Document& x)->std::string{if(x.is_bool())return std::string("b")+(x.boolean?"1":"0");if(x.is_string()){if(x.string.rfind("\x1fnift:",0)==0)return "";return std::string("s")+x.string;}if(x.type==json::Type::StrNumber)return std::string("N")+x.string;double nn=x.num;if(nn==0.0)nn=0.0;uint64_t bits=0;std::memcpy(&bits,&nn,sizeof(bits));return std::string("n")+std::to_string(bits);};std::string kk=ck2(nc->entries.back().first);if(!kk.empty())nc->scalar_keys.insert(kk);if(nc->entries.back().first.type==json::Type::StrNumber)nc->has_huge_int=true;}}const std::string id=std::to_string(next_collection_instance_id_++);collection_instances_[id]=nc;dst=json::Document(std::string("\x1fnift:collection:")+id);return true;}
-                if(in.is_string()&&in.string.rfind("\x1fnift:struct:",0)==0){const std::string old=in.string.substr(13);auto sit=seen.find(old);if(sit!=seen.end()){dst=json::Document(std::string("\x1fnift:struct:")+sit->second);return true;}auto it=struct_instances_.find(old);if(it==struct_instances_.end()){error="deepcopy: invalid struct instance";return false;}auto ni=std::make_shared<StructInstance>();ni->type_name=it->second->type_name;const std::string id=std::to_string(next_struct_instance_id_++);seen[old]=id;struct_instances_[id]=ni;for(const auto& f:it->second->fields){json::Document cv;if(!clone(*f.second.value,cv))return false;auto sp=std::make_shared<json::Document>(std::move(cv));ni->fields.emplace(f.first,VariableBinding{sp,f.second.type,f.second.mutable_binding,f.second.deep_readonly});}dst=json::Document(std::string("\x1fnift:struct:")+id);return true;}
-                dst=in;if(in.is_array()){dst.array.clear();for(const auto& v:in.array){json::Document cv;if(!clone(v,cv))return false;dst.array.push_back(std::move(cv));}}else if(in.is_object()){dst.object.clear();for(const auto& e:in.object){json::Document cv;if(!clone(e.second,cv))return false;dst.object.emplace_back(e.first,std::move(cv));}}return true;
+            std::function<bool(const nift::RuntimeValue&,nift::RuntimeValue&)> clone;
+            clone=[&](const nift::RuntimeValue& in,nift::RuntimeValue& dst)->bool{
+                if(in.is_string()&&in.string.rfind("\x1fnift:collection:",0)==0){auto it=collection_instances_.find(in.string.substr(17));if(it==collection_instances_.end()){error="deepcopy: invalid collection";return false;}auto nc=std::make_shared<CollectionInstance>();nc->kind=it->second->kind;for(const auto& v:it->second->values){nift::RuntimeValue cv;if(!clone(v,cv))return false;nc->values.push_back(std::move(cv));if(nc->kind==CollectionKind::Set||nc->kind==CollectionKind::SortedSet){auto ck=[&](const nift::RuntimeValue& x)->std::string{if(x.is_bool())return std::string("b")+(x.boolean?"1":"0");if(x.is_string()){if(x.string.rfind("\x1fnift:",0)==0)return "";return std::string("s")+x.string;}if(x.type==nift::RuntimeType::StrNumber)return std::string("N")+x.string;double nn=x.num;if(nn==0.0)nn=0.0;uint64_t bits=0;std::memcpy(&bits,&nn,sizeof(bits));return std::string("n")+std::to_string(bits);};std::string k=ck(cv);if(!k.empty())nc->scalar_keys.insert(k);if(cv.type==nift::RuntimeType::StrNumber)nc->has_huge_int=true;}}for(const auto& e:it->second->entries){nift::RuntimeValue ck,cv;if(!clone(e.first,ck)||!clone(e.second,cv))return false;nc->entries.push_back({std::move(ck),std::move(cv)});if(nc->kind==CollectionKind::Map||nc->kind==CollectionKind::SortedMap){auto ck2=[&](const nift::RuntimeValue& x)->std::string{if(x.is_bool())return std::string("b")+(x.boolean?"1":"0");if(x.is_string()){if(x.string.rfind("\x1fnift:",0)==0)return "";return std::string("s")+x.string;}if(x.type==nift::RuntimeType::StrNumber)return std::string("N")+x.string;double nn=x.num;if(nn==0.0)nn=0.0;uint64_t bits=0;std::memcpy(&bits,&nn,sizeof(bits));return std::string("n")+std::to_string(bits);};std::string kk=ck2(nc->entries.back().first);if(!kk.empty())nc->scalar_keys.insert(kk);if(nc->entries.back().first.type==nift::RuntimeType::StrNumber)nc->has_huge_int=true;}}const std::string id=std::to_string(next_collection_instance_id_++);collection_instances_[id]=nc;dst=nift::RuntimeValue(std::string("\x1fnift:collection:")+id);return true;}
+                if(in.is_string()&&in.string.rfind("\x1fnift:struct:",0)==0){const std::string old=in.string.substr(13);auto sit=seen.find(old);if(sit!=seen.end()){dst=nift::RuntimeValue(std::string("\x1fnift:struct:")+sit->second);return true;}auto it=struct_instances_.find(old);if(it==struct_instances_.end()){error="deepcopy: invalid struct instance";return false;}auto ni=std::make_shared<StructInstance>();ni->type_name=it->second->type_name;const std::string id=std::to_string(next_struct_instance_id_++);seen[old]=id;struct_instances_[id]=ni;for(const auto& f:it->second->fields){nift::RuntimeValue cv;if(!clone(*f.second.value,cv))return false;auto sp=std::make_shared<nift::RuntimeValue>(std::move(cv));ni->fields.emplace(f.first,VariableBinding{sp,f.second.type,f.second.mutable_binding,f.second.deep_readonly});}dst=nift::RuntimeValue(std::string("\x1fnift:struct:")+id);return true;}
+                dst=in;if(in.is_array()){dst.array.clear();for(const auto& v:in.array){nift::RuntimeValue cv;if(!clone(v,cv))return false;dst.array.push_back(std::move(cv));}}else if(in.is_object()){dst.object.clear();for(const auto& e:in.object){nift::RuntimeValue cv;if(!clone(e.second,cv))return false;dst.object.emplace_back(e.first,std::move(cv));}}return true;
             };
             return clone(source,out);
         }
@@ -3141,15 +3156,17 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
         if (text.rfind("validate(", 0) == 0 && text.back() == ')') {
             bool ok_params = false; auto args = parse_parameters(text.substr(9, text.size() - 10), ok_params);
             if (!ok_params || args.size() != 2) { error = "validate: expected schema and value"; return false; }
-            json::Document schema, candidate; if (!eval(args[0], schema, depth + 1) || !eval(args[1], candidate, depth + 1)) return false;
-            std::string validation_error; if (!jsonschema::validate(candidate, schema, validation_error)) { error = "validate: " + validation_error; return false; }
+            nift::RuntimeValue schema, candidate; if (!eval(args[0], schema, depth + 1) || !eval(args[1], candidate, depth + 1)) return false;
+            const json::Document schema_document = nift::runtime_to_json(schema);
+            const json::Document candidate_document = nift::runtime_to_json(candidate);
+            std::string validation_error; if (!jsonschema::validate(candidate_document, schema_document, validation_error)) { error = "validate: " + validation_error; return false; }
             out = std::move(candidate); return true;
         }
 
         if (text.rfind("inject(", 0) == 0 && text.back() == ')') {
             std::string arg = trim_copy(text.substr(7, text.size() - 8));
             if (arg.size() >= 2 && ((arg.front() == '"' && arg.back() == '"') || (arg.front() == '\'' && arg.back() == '\''))) arg = arg.substr(1, arg.size() - 2);
-            else { json::Document av; if (!eval(arg, av, depth + 1) || !av.is_string()) { error = "inject: expected string path"; return false; } arg = av.string; }
+            else { nift::RuntimeValue av; if (!eval(arg, av, depth + 1) || !av.is_string()) { error = "inject: expected string path"; return false; } arg = av.string; }
             fs::path path = fs::absolute(host_.root() / arg).lexically_normal();
             if (!standalone_script_host_ && !host_.root().empty() && !filesystem::path_within(fs::absolute(host_.root()).lexically_normal(), path)) { error = "inject: path must stay inside the Nift project"; return false; }
             if (!nift_fs_root_allowed(path,standalone_script_host_,error)) { error = "inject: " + error; return false; }
@@ -3163,8 +3180,8 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             // Parse valid JSON directly into the runtime Document and retain the
             // expression evaluator as the compatibility path for .expr files and
             // Nift expression-valued object/array literals.
-            json::Document injected_value; std::string direct_json_error;
-            if (nift_json::parse(*injected, injected_value, direct_json_error) && !injected_value.is_string()) {
+            nift::RuntimeValue injected_value; std::string direct_json_error;
+            if (parse_runtime_json(*injected, injected_value, direct_json_error) && !injected_value.is_string()) {
                 // A top-level JSON string must stay on the expression path: the
                 // legacy scalar-literal evaluator interpolates $[...] inside it
                 // (inject of a bare-string .expr), which strict JSON parsing
@@ -3184,11 +3201,11 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             std::size_t close=0;
             if(find_balanced(text,0,'[',']',close)&&close==text.size()-1){
                 const std::string inner=trim_copy(text.substr(1,text.size()-2));
-                out=json::Document::make_array();
+                out=nift::RuntimeValue::make_array();
                 if(inner.empty())return true;
                 bool ok=false;std::vector<bool> quoted;auto elements=parse_parameters(inner,ok,&quoted);
                 if(!ok){error="array literal: malformed elements";return false;}
-                for(std::size_t i=0;i<elements.size();++i){json::Document v;if(i<quoted.size()&&quoted[i])v=json::Document(elements[i]);else if(!eval(elements[i],v,depth+1))return false;out.array.push_back(std::move(v));}
+                for(std::size_t i=0;i<elements.size();++i){nift::RuntimeValue v;if(i<quoted.size()&&quoted[i])v=nift::RuntimeValue(elements[i]);else if(!eval(elements[i],v,depth+1))return false;out.array.push_back(std::move(v));}
                 return true;
             }
         }
@@ -3203,9 +3220,9 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             std::size_t close=0;
             if(find_balanced(text,0,'{','}',close)&&close==text.size()-1){
                 std::string json_error;
-                if(nift_json::parse(text,out,json_error))return true;
+                if(parse_runtime_json(text,out,json_error))return true;
                 const std::string inner=trim_copy(text.substr(1,text.size()-2));
-                out=json::Document::make_object();
+                out=nift::RuntimeValue::make_object();
                 if(inner.empty())return true;
                 if(inner.back()==','){error="object literal: trailing comma";return false;}
                 bool ok=false;auto members=parse_parameters(inner,ok);
@@ -3220,8 +3237,8 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     if(key.size()<2||key.front()!='"'||key.back()!='"'){error="object literal: keys must be double-quoted strings";return false;}
                     key=unescape_parameter_string(key.substr(1,key.size()-2));
                     if(out.has(key)){error="object literal: duplicate object key '"+key+"'";return false;}
-                    json::Document v;
-                    if(value.size()>=2&&((value.front()=='"'&&value.back()=='"')||(value.front()=='\''&&value.back()=='\''))){v=json::Document(unescape_parameter_string(value.substr(1,value.size()-2)));}
+                    nift::RuntimeValue v;
+                    if(value.size()>=2&&((value.front()=='"'&&value.back()=='"')||(value.front()=='\''&&value.back()=='\''))){v=nift::RuntimeValue(unescape_parameter_string(value.substr(1,value.size()-2)));}
                     else{if(value.empty()){error="object literal: missing value for key '"+key+"'";return false;}if(!eval(value,v,depth+1))return false;}
                     out[key]=std::move(v);
                 }
@@ -3246,7 +3263,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             // `[index]` postfixes on call results (and parenthesized primaries),
             // so e.g. posts.filter(...).first().title composes naturally instead
             // of stopping at an artificial parser boundary.
-            auto compose_postfix = [&](const std::string& raw, json::Document& out) -> bool {
+            auto compose_postfix = [&](const std::string& raw, nift::RuntimeValue& out) -> bool {
                 const std::string text = trim_copy(raw);
                 if (text.size() < 2) return false;
                 char last = text.back();
@@ -3314,12 +3331,12 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     }
                     if (toplevel_operator) return false;
                 }
-                json::Document base;
+                nift::RuntimeValue base;
                 if (!eval(receiver, base, depth + 1)) return false;
                 if (kind == 1) {
                     if (base.is_string() && base.string.rfind("\x1fnift:page:", 0) == 0) {
                         result_.dependencies.insert(host_.relative(host_.root() / ".nift/hierarchy.fingerprint"));
-                        json::Document resolved; std::string perr;
+                        nift::RuntimeValue resolved; std::string perr;
                         if (!host_.resolve_page_member(base.string.substr(11), operand, resolved, perr)) {
                             error = perr.empty() ? ("page has no member: " + operand) : perr;
                             return false;
@@ -3347,7 +3364,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         } else {
                             // Computed index from a binding or resolvable
                             // expression (e.g. a[i], a[i + 1]).
-                            json::Document computed;
+                            nift::RuntimeValue computed;
                             if (!resolve_direct(token, computed) || !computed.is_number() ||
                                 computed.num < 0 || std::trunc(computed.num) != computed.num) {
                                 error = "JSON array indices must be non-negative integers in '" + text + "'";
@@ -3375,7 +3392,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                             else {
                                 // Computed key from a resolvable expression
                                 // (e.g. info[page.name], obj[tag.to_lower()]).
-                                json::Document computed;
+                                nift::RuntimeValue computed;
                                 if (!resolve_direct(token, computed) || !computed.is_string()) {
                                     error = "JSON object index must be a quoted string, string binding, or string expression in '" + text + "'";
                                     return false;
@@ -3416,7 +3433,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     }
                     if (c==':' && question!=std::string::npos) {
                         if (nested>0) { --nested; continue; }
-                        json::Document cond;
+                        nift::RuntimeValue cond;
                         if(!eval(text.substr(0,question),cond,depth+1)) return false;
                         const std::string selected = truthy_value(cond) ? text.substr(question+1,z-question-1) : text.substr(z+1);
                         return eval(selected,out,depth+1);
@@ -3428,7 +3445,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             // RHS evaluation is deliberately lazy. Handled before safe access so
             // (a?.b ?? c) resolves to c when a is null.
             if (const auto p=find_top_level_op("??"); p!=std::string::npos) {
-                json::Document left;if(!eval(text.substr(0,p),left,depth+1))return false;
+                nift::RuntimeValue left;if(!eval(text.substr(0,p),left,depth+1))return false;
                 if(!left.is_null()){out=std::move(left);return true;}
                 return eval(text.substr(p+2),out,depth+1);
             }
@@ -3438,7 +3455,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             {
                 bool quoted=false;char quote=0;int pa=0,br=0,bc=0;std::size_t sp=std::string::npos;
                 for(std::size_t z=0;z+1<text.size();++z){char c=text[z];if(quoted){if(c=='\\'&&z+1<text.size())++z;else if(c==quote)quoted=false;continue;}if(c=='\''||c=='"'){quoted=true;quote=c;continue;}if(c=='(')++pa;else if(c==')'&&pa)--pa;else if(c=='[')++br;else if(c==']'&&br)--br;else if(c=='{')++bc;else if(c=='}'&&bc)--bc;if(!pa&&!br&&!bc&&(text.compare(z,2,"?.")==0||text.compare(z,2,"?[")==0)){sp=z;break;}}
-                if(sp!=std::string::npos){json::Document recv;if(!eval(text.substr(0,sp),recv,depth+1))return false;if(recv.is_null()){out=json::Document(nullptr);return true;}std::string ordinary=text;ordinary.erase(sp,1);return eval(ordinary,out,depth+1);}
+                if(sp!=std::string::npos){nift::RuntimeValue recv;if(!eval(text.substr(0,sp),recv,depth+1))return false;if(recv.is_null()){out=nift::RuntimeValue(nullptr);return true;}std::string ordinary=text;ordinary.erase(sp,1);return eval(ordinary,out,depth+1);}
             }
             if (compose_postfix(text, out)) return true;
             if (!error.empty()) return false;
@@ -3464,22 +3481,22 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             return std::string::npos;
         };
 
-        auto atomic_scalar = [&](const json::Document& in, json::Document& scalar)->bool {
+        auto atomic_scalar = [&](const nift::RuntimeValue& in, nift::RuntimeValue& scalar)->bool {
             if(!(in.is_string()&&in.string.rfind("\x1fnift:atomic:",0)==0)){scalar=in;return true;}
             auto it=atomic_instances_.find(in.string.substr(13));if(it==atomic_instances_.end()){error="atomic: invalid handle";return false;}
-            if(it->second->kind==AtomicInstance::Kind::Bool)scalar=json::Document(it->second->bool_value.load());
-            else{auto v=it->second->int_value.load();scalar=json::Document(static_cast<double>(v));if(v>9007199254740992LL||v<-9007199254740992LL){scalar.type=json::Type::StrNumber;scalar.string=std::to_string(v);}}return true;
+            if(it->second->kind==AtomicInstance::Kind::Bool)scalar=nift::RuntimeValue(it->second->bool_value.load());
+            else{auto v=it->second->int_value.load();scalar=nift::RuntimeValue(static_cast<double>(v));if(v>9007199254740992LL||v<-9007199254740992LL){scalar.type=nift::RuntimeType::StrNumber;scalar.string=std::to_string(v);}}return true;
         };
 
-        auto numeric_binary = [&](const json::Document& left_in, const json::Document& right_in, char op, json::Document& result)->bool {
-            json::Document left,right;if(!atomic_scalar(left_in,left)||!atomic_scalar(right_in,right))return false;
-            auto as_i64=[](const json::Document& d,std::int64_t& v)->bool{
-                if(d.type==json::Type::StrNumber){auto r=std::from_chars(d.string.data(),d.string.data()+d.string.size(),v);return r.ec==std::errc()&&r.ptr==d.string.data()+d.string.size();}
+        auto numeric_binary = [&](const nift::RuntimeValue& left_in, const nift::RuntimeValue& right_in, char op, nift::RuntimeValue& result)->bool {
+            nift::RuntimeValue left,right;if(!atomic_scalar(left_in,left)||!atomic_scalar(right_in,right))return false;
+            auto as_i64=[](const nift::RuntimeValue& d,std::int64_t& v)->bool{
+                if(d.type==nift::RuntimeType::StrNumber){auto r=std::from_chars(d.string.data(),d.string.data()+d.string.size(),v);return r.ec==std::errc()&&r.ptr==d.string.data()+d.string.size();}
                 if(d.is_number()&&std::trunc(d.num)==d.num&&d.num>=static_cast<double>(std::numeric_limits<std::int64_t>::min())&&d.num<9223372036854775808.0){v=static_cast<std::int64_t>(d.num);return true;}return false;};
             std::int64_t a=0,b=0; if(as_i64(left,a)&&as_i64(right,b)&&op!='/'){std::int64_t r=0;bool overflow=false;
                 if(op=='+')overflow=__builtin_add_overflow(a,b,&r);else if(op=='-')overflow=__builtin_sub_overflow(a,b,&r);else if(op=='*')overflow=__builtin_mul_overflow(a,b,&r);else if(op=='%'){if(b==0){error="modulo by zero";return false;}if(a==std::numeric_limits<std::int64_t>::min()&&b==-1)r=0;else r=a%b;}else return false;
-                if(overflow){error="signed 64-bit integer overflow";return false;}result=json::Document(static_cast<double>(r));if(r>9007199254740992LL||r<-9007199254740992LL){result.type=json::Type::StrNumber;result.string=std::to_string(r);}return true;}
-            if(!left.is_number()||!right.is_number()){error="arithmetic operators require numeric operands";return false;}double r=0;if(op=='+')r=left.num+right.num;else if(op=='-')r=left.num-right.num;else if(op=='*')r=left.num*right.num;else if(op=='/'){if(right.num==0){error="division by zero";return false;}r=left.num/right.num;}else if(op=='%'){if(right.num==0){error="modulo by zero";return false;}if(std::trunc(left.num)!=left.num||std::trunc(right.num)!=right.num){error="modulo requires integer-valued operands";return false;}r=std::fmod(left.num,right.num);}if(!std::isfinite(r)){error="arithmetic result is not finite";return false;}result=json::Document(r);return true;
+                if(overflow){error="signed 64-bit integer overflow";return false;}result=nift::RuntimeValue(static_cast<double>(r));if(r>9007199254740992LL||r<-9007199254740992LL){result.type=nift::RuntimeType::StrNumber;result.string=std::to_string(r);}return true;}
+            if(!left.is_number()||!right.is_number()){error="arithmetic operators require numeric operands";return false;}double r=0;if(op=='+')r=left.num+right.num;else if(op=='-')r=left.num-right.num;else if(op=='*')r=left.num*right.num;else if(op=='/'){if(right.num==0){error="division by zero";return false;}r=left.num/right.num;}else if(op=='%'){if(right.num==0){error="modulo by zero";return false;}if(std::trunc(left.num)!=left.num||std::trunc(right.num)!=right.num){error="modulo requires integer-valued operands";return false;}r=std::fmod(left.num,right.num);}if(!std::isfinite(r)){error="arithmetic result is not finite";return false;}result=nift::RuntimeValue(r);return true;
         };
 
         // Compound assignment is a true mutation expression. Current assignable
@@ -3488,7 +3505,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
         // identifier target, assign directly instead of rebuilding "name = value"
         // and re-parsing it through the evaluator (a full string round-trip on
         // every += in a hot loop).
-        auto assign_identifier = [&](const std::string& name, json::Document&& value) -> bool {
+        auto assign_identifier = [&](const std::string& name, nift::RuntimeValue&& value) -> bool {
             VariableBinding* tb = find_binding(name);
             if (!tb) { error = "assignment to undefined binding: " + name; return false; }
             if (!tb->mutable_binding) { error = "cannot assign to const binding: " + name; return false; }
@@ -3498,35 +3515,41 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         " to " + std::string(nift_binding_type_name(tb->type)) + " binding '" + name + "'";
                 return false;
             }
-            auto rebound = std::make_shared<json::Document>(std::move(value));
+            auto rebound = std::make_shared<nift::RuntimeValue>(std::move(value));
             tb->rebind(rebound);
             out = *rebound;
             return true;
         };
         for(const std::string cop:{"+=","-=","*=","/=","%=","&=","|=","^="}){const auto p=find_top_level_op(cop);if(p!=std::string::npos){const std::string target=trim_copy(text.substr(0,p));
             {bool decl=false;bool iq=false;char iqc=0;int ip=0,ib=0;for(std::size_t k=0;k+1<target.size();++k){char cc=target[k];if(iq){if(cc=='\\')++k;else if(cc==iqc)iq=false;continue;}if(cc=='\''||cc=='"'){iq=true;iqc=cc;continue;}if(cc=='(')++ip;else if(cc==')')--ip;else if(cc=='[')++ib;else if(cc==']')--ib;if(ip||ib)continue;if(target.compare(k,2,":=")==0||target.compare(k,2,"=>")==0){decl=true;break;}}if(decl)break;}
-            json::Document oldv,rhs,next;if(!eval(target,oldv,depth+1)||!eval(text.substr(p+2),rhs,depth+1))return false;
-            if(target.find_first_of(".([")==std::string::npos&&oldv.is_string()&&oldv.string.rfind("\x1fnift:atomic:",0)==0){auto ai=atomic_instances_.find(oldv.string.substr(13));if(ai==atomic_instances_.end()){error="atomic: invalid handle";return false;}if(ai->second->kind!=AtomicInstance::Kind::Int){error=cop+": only valid for atomic<int>";return false;}std::int64_t v=0;if(!exact_i64(rhs,v)){error=cop+": atomic<int> requires signed 64-bit integer";return false;}auto st=ai->second;std::int64_t nv=0;if(cop=="+=")nv=st->int_value.fetch_add(v)+v;else if(cop=="-=")nv=st->int_value.fetch_sub(v)-v;else if(cop=="&=")nv=st->int_value.fetch_and(v)&v;else if(cop=="|=")nv=st->int_value.fetch_or(v)|v;else if(cop=="^=")nv=st->int_value.fetch_xor(v)^v;else if(cop=="%="){if(v==0){error="modulo by zero";return false;}auto cur=st->int_value.load();for(;;){std::int64_t desired=(cur==std::numeric_limits<std::int64_t>::min()&&v==-1)?0:cur%v;if(st->int_value.compare_exchange_weak(cur,desired)){nv=desired;break;}}}else{error=cop+": not supported for atomic<int>";return false;}out=json::Document(static_cast<double>(nv));if(nv>9007199254740992LL||nv<-9007199254740992LL){out.type=json::Type::StrNumber;out.string=std::to_string(nv);}if(depth==0)last_expression_mutation_=true;return true;}
-            if(cop=="+="&&oldv.is_string()&&rhs.is_string())next=json::Document(oldv.string+rhs.string);else if(cop=="+="&&oldv.is_array()&&rhs.is_array()){next=json::Document::make_array();next.array.reserve(oldv.array.size()+rhs.array.size());next.array.insert(next.array.end(),oldv.array.begin(),oldv.array.end());next.array.insert(next.array.end(),rhs.array.begin(),rhs.array.end());}else if(cop=="&="||cop=="|="||cop=="^="){error=cop+": requires atomic<int>";return false;}else if(!numeric_binary(oldv,rhs,cop[0],next))return false;
+            nift::RuntimeValue oldv,rhs,next;if(!eval(target,oldv,depth+1)||!eval(text.substr(p+2),rhs,depth+1))return false;
+            if(target.find_first_of(".([")==std::string::npos&&oldv.is_string()&&oldv.string.rfind("\x1fnift:atomic:",0)==0){auto ai=atomic_instances_.find(oldv.string.substr(13));if(ai==atomic_instances_.end()){error="atomic: invalid handle";return false;}if(ai->second->kind!=AtomicInstance::Kind::Int){error=cop+": only valid for atomic<int>";return false;}std::int64_t v=0;if(!exact_i64(rhs,v)){error=cop+": atomic<int> requires signed 64-bit integer";return false;}auto st=ai->second;std::int64_t nv=0;if(cop=="+=")nv=st->int_value.fetch_add(v)+v;else if(cop=="-=")nv=st->int_value.fetch_sub(v)-v;else if(cop=="&=")nv=st->int_value.fetch_and(v)&v;else if(cop=="|=")nv=st->int_value.fetch_or(v)|v;else if(cop=="^=")nv=st->int_value.fetch_xor(v)^v;else if(cop=="%="){if(v==0){error="modulo by zero";return false;}auto cur=st->int_value.load();for(;;){std::int64_t desired=(cur==std::numeric_limits<std::int64_t>::min()&&v==-1)?0:cur%v;if(st->int_value.compare_exchange_weak(cur,desired)){nv=desired;break;}}}else{error=cop+": not supported for atomic<int>";return false;}out=nift::RuntimeValue(static_cast<double>(nv));if(nv>9007199254740992LL||nv<-9007199254740992LL){out.type=nift::RuntimeType::StrNumber;out.string=std::to_string(nv);}if(depth==0)last_expression_mutation_=true;return true;}
+            if(cop=="+="&&oldv.is_string()&&rhs.is_string())next=nift::RuntimeValue(oldv.string+rhs.string);else if(cop=="+="&&oldv.is_array()&&rhs.is_array()){next=nift::RuntimeValue::make_array();next.array.reserve(oldv.array.size()+rhs.array.size());next.array.insert(next.array.end(),oldv.array.begin(),oldv.array.end());next.array.insert(next.array.end(),rhs.array.begin(),rhs.array.end());}else if(cop=="&="||cop=="|="||cop=="^="){error=cop+": requires atomic<int>";return false;}else if(!numeric_binary(oldv,rhs,cop[0],next))return false;
             if (target.find_first_of(".([") == std::string::npos) {
                 if (!assign_identifier(target, std::move(next))) return false;
             } else {
-                const std::string assignment=target+" = "+next.dump(0);
-                if(!eval(assignment,out,depth+1))return false;
+                const std::string temporary = bind_temporary(std::move(next));
+                const bool assigned = eval(target+" = "+temporary,out,depth+1);
+                variable_scopes_.back().erase(temporary);
+                if(!assigned)return false;
             }
             if(depth==0)last_expression_mutation_=true;
             return true;}}
 
         const bool prefix_inc=(text.rfind("++",0)==0||text.rfind("--",0)==0);
         const bool postfix_inc=(text.size()>2&&(text.compare(text.size()-2,2,"++")==0||text.compare(text.size()-2,2,"--")==0) && find_top_level_op(":=")==std::string::npos && find_top_level_assignment()==std::string::npos);
-        if(prefix_inc||postfix_inc){const bool inc=prefix_inc?text[0]=='+':text[text.size()-2]=='+';const std::string target=trim_copy(prefix_inc?text.substr(2):text.substr(0,text.size()-2));json::Document oldv,one(1.0),next;if(!eval(target,oldv,depth+1))return false;
-            if(target.find_first_of(".([")==std::string::npos&&oldv.is_string()&&oldv.string.rfind("\x1fnift:atomic:",0)==0){auto ai=atomic_instances_.find(oldv.string.substr(13));if(ai==atomic_instances_.end()){error="atomic: invalid handle";return false;}if(ai->second->kind!=AtomicInstance::Kind::Int){error="increment/decrement requires atomic<int> or numeric lvalue";return false;}auto before=inc?ai->second->int_value.fetch_add(1):ai->second->int_value.fetch_sub(1);auto value=prefix_inc?(inc?before+1:before-1):before;out=json::Document(static_cast<double>(value));if(value>9007199254740992LL||value<-9007199254740992LL){out.type=json::Type::StrNumber;out.string=std::to_string(value);}if(depth==0)last_expression_mutation_=true;return true;}
+        if(prefix_inc||postfix_inc){const bool inc=prefix_inc?text[0]=='+':text[text.size()-2]=='+';const std::string target=trim_copy(prefix_inc?text.substr(2):text.substr(0,text.size()-2));nift::RuntimeValue oldv,one(1.0),next;if(!eval(target,oldv,depth+1))return false;
+            if(target.find_first_of(".([")==std::string::npos&&oldv.is_string()&&oldv.string.rfind("\x1fnift:atomic:",0)==0){auto ai=atomic_instances_.find(oldv.string.substr(13));if(ai==atomic_instances_.end()){error="atomic: invalid handle";return false;}if(ai->second->kind!=AtomicInstance::Kind::Int){error="increment/decrement requires atomic<int> or numeric lvalue";return false;}auto before=inc?ai->second->int_value.fetch_add(1):ai->second->int_value.fetch_sub(1);auto value=prefix_inc?(inc?before+1:before-1):before;out=nift::RuntimeValue(static_cast<double>(value));if(value>9007199254740992LL||value<-9007199254740992LL){out.type=nift::RuntimeType::StrNumber;out.string=std::to_string(value);}if(depth==0)last_expression_mutation_=true;return true;}
             if(!oldv.is_number()){error="increment/decrement requires a numeric lvalue";return false;}if(!numeric_binary(oldv,one,inc?'+':'-',next))return false;
             if (target.find_first_of(".([") == std::string::npos) {
                 if (!assign_identifier(target, std::move(next))) return false;
                 if (!prefix_inc) out = oldv; // postfix yields the pre-increment value
             } else {
-                json::Document assigned;if(!eval(target+" = "+next.dump(0),assigned,depth+1))return false;out=prefix_inc?assigned:oldv;
+                const std::string temporary = bind_temporary(std::move(next));
+                nift::RuntimeValue assigned;const bool assigned_ok=eval(target+" = "+temporary,assigned,depth+1);
+                variable_scopes_.back().erase(temporary);
+                if(!assigned_ok)return false;
+                out=prefix_inc?assigned:oldv;
             }
             if(depth==0)last_expression_mutation_=true;
             return true;}
@@ -3540,14 +3563,14 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             if(lhs.size()<2||!((lhs.front()=='['&&lhs.back()==']')||(lhs.front()=='{'&&lhs.back()=='}')))return false;
             bool pok=false;auto names=parse_parameters(lhs.substr(1,lhs.size()-2),pok);if(!pok||names.empty()){error="destructuring pattern must contain identifiers";return true;}
             for(auto& n:names){n=trim_copy(n);if(!valid_binding_identifier(n)){error="destructuring patterns support only flat identifiers";return true;}}
-            json::Document rhs;if(!eval(text.substr(p+(declaration?2:1)),rhs,depth+1))return true;
-            std::vector<json::Document> values;
+            nift::RuntimeValue rhs;if(!eval(text.substr(p+(declaration?2:1)),rhs,depth+1))return true;
+            std::vector<nift::RuntimeValue> values;
             if(lhs.front()=='['){if(!rhs.is_array()){error="array destructuring requires an array";return true;}if(rhs.array.size()!=names.size()){error="array destructuring requires exactly "+std::to_string(names.size())+" items";return true;}values=rhs.array;}
             else{if(!rhs.is_object()){error="object destructuring requires an object";return true;}for(const auto& n:names){if(!rhs.has(n)){error="object destructuring missing key: "+n;return true;}values.push_back(rhs[n]);}}
             if(variable_scopes_.empty())variable_scopes_.emplace_back();
             if(declaration){std::set<std::string> seen;for(const auto& n:names){if(!seen.insert(n).second){error="duplicate destructuring target: "+n;return true;}if(reserved_binding_name(n)||host_.is_contract_name(n)){error="destructuring name is reserved: "+n;return true;}if(variable_scopes_.back().count(n)){error="binding already declared in this scope: "+n;return true;}}
-                for(std::size_t j=0;j<names.size();++j){auto sp=std::make_shared<json::Document>(values[j]);variable_scopes_.back().emplace(names[j],VariableBinding{sp,nift_binding_type_from_text(values[j].dump(0),values[j]),true,false});}}
-            else{std::vector<VariableBinding*> targets;for(std::size_t j=0;j<names.size();++j){VariableBinding* b=nullptr;for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(names[j]);if(it!=sc->end()){b=&it->second;break;}}if(!b){error="assignment to undefined binding: "+names[j];return true;}if(!b->mutable_binding){error="cannot assign to const binding: "+names[j];return true;}const int at=nift_binding_type_from_text(values[j].dump(0),values[j]);if(!nift_type_assignable(at,b->type)){error="cannot change binding type in destructuring: "+names[j];return true;}targets.push_back(b);}for(std::size_t j=0;j<targets.size();++j)targets[j]->rebind(std::make_shared<json::Document>(values[j]));}
+                for(std::size_t j=0;j<names.size();++j){auto sp=std::make_shared<nift::RuntimeValue>(values[j]);variable_scopes_.back().emplace(names[j],VariableBinding{sp,nift_binding_type(values[j]),true,false});}}
+            else{std::vector<VariableBinding*> targets;for(std::size_t j=0;j<names.size();++j){VariableBinding* b=nullptr;for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(names[j]);if(it!=sc->end()){b=&it->second;break;}}if(!b){error="assignment to undefined binding: "+names[j];return true;}if(!b->mutable_binding){error="cannot assign to const binding: "+names[j];return true;}const int at=nift_binding_type(values[j]);if(!nift_type_assignable(at,b->type)){error="cannot change binding type in destructuring: "+names[j];return true;}targets.push_back(b);}for(std::size_t j=0;j<targets.size();++j)targets[j]->rebind(std::make_shared<nift::RuntimeValue>(values[j]));}
             out=rhs;if(depth==0)last_expression_mutation_=true;return true;
         };
         if(const auto dp=find_top_level_op(":=");dp!=std::string::npos){std::string lhs=trim_copy(text.substr(0,dp));if(!lhs.empty()&&(lhs.front()=='['||lhs.front()=='{')){if(destructure(true,dp))return error.empty();}}
@@ -3569,12 +3592,12 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 auto& existing = variable_scopes_.back().find(name)->second;
                 if (!existing.is_script_invocation) { error = "binding already declared in this scope: " + name; return false; }
             }
-            json::Document assigned;
+            nift::RuntimeValue assigned;
             last_call_return_loc_root_.reset(); last_call_return_loc_path_.clear();
             if (!eval(text.substr(p + 2), assigned, depth + 1)) return false;
-            std::shared_ptr<json::Document> stored;
+            std::shared_ptr<nift::RuntimeValue> stored;
             const std::string rhs_name=trim_copy(text.substr(p+2)); VariableBinding* alias=find_binding(rhs_name);
-            if(alias&&alias->value&&alias->value->is_array()) stored=alias->value; else stored=std::make_shared<json::Document>(assigned);
+            if(alias&&alias->value&&alias->value->is_array()) stored=alias->value; else stored=std::make_shared<nift::RuntimeValue>(assigned);
             variable_scopes_.back()[name] = VariableBinding{stored, nift_binding_type_from_text(text.substr(p + 2), assigned), mutable_binding, deep_readonly};
             auto& declared_binding=variable_scopes_.back()[name];
             // Aggregate extraction is a persistent location reference.  If the
@@ -3604,12 +3627,12 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 for(auto scope=variable_scopes_.rbegin();scope!=variable_scopes_.rend();++scope){auto it=scope->find(root);if(it!=scope->end()){rb=&it->second;break;}}
                 if(!rb&&!receiver_stack_.empty()){auto rf=receiver_stack_.back()->fields.find(root);if(rf!=receiver_stack_.back()->fields.end())rb=&rf->second;}
                 if(!rb||!rb->value->is_string()||rb->value->string.rfind("\x1fnift:struct:",0)!=0){error="member assignment requires a struct instance: "+root;return false;}
-                json::Document current=*rb->value;std::size_t mp=dot+1;std::shared_ptr<StructInstance> parent;std::string member;
+                nift::RuntimeValue current=*rb->value;std::size_t mp=dot+1;std::shared_ptr<StructInstance> parent;std::string member;
                 while(mp<name.size()){std::size_t me=name.find('.',mp);member=name.substr(mp,me==std::string::npos?std::string::npos:me-mp);auto ii=struct_instances_.find(current.string.substr(13));if(ii==struct_instances_.end()){error="invalid struct instance";return false;}parent=ii->second;auto fit=parent->fields.find(member);if(fit==parent->fields.end()){error="struct has no field: "+member;return false;}if(me==std::string::npos)break;current=*fit->second.value;if(!current.is_string()||current.string.rfind("\x1fnift:struct:",0)!=0){error="member path is not a struct: "+member;return false;}mp=me+1;}
                 auto fit=parent->fields.find(member);auto sd=structs_.find(parent->type_name);bool priv=false;if(sd!=structs_.end())for(const auto& f:sd->second.fields)if(f.name==member)priv=f.private_member;if(priv&&(receiver_stack_.empty()||receiver_stack_.back()!=parent)){error="private struct field: "+member;return false;}
-                json::Document assigned;if(!eval(text.substr(p+1),assigned,depth+1))return false;const int at=nift_binding_type_from_text(text.substr(p+1),assigned);if(!nift_type_assignable(at,fit->second.type)){error="cannot change struct field type: "+member;return false;}
+                nift::RuntimeValue assigned;if(!eval(text.substr(p+1),assigned,depth+1))return false;const int at=nift_binding_type_from_text(text.substr(p+1),assigned);if(!nift_type_assignable(at,fit->second.type)){error="cannot change struct field type: "+member;return false;}
                 if(assigned.is_string()&&(assigned.string.rfind("\x1fnift:struct:",0)==0||assigned.string.rfind("\x1fnift:collection:",0)==0)){std::string parent_id;for(const auto& e:struct_instances_)if(e.second==parent){parent_id=e.first;break;}if(reference_would_cycle(assigned.string,std::string("\x1fnift:struct:")+parent_id)){error="assignment would create a cyclic reference: "+member;return false;}}
-                fit->second.value=std::make_shared<json::Document>(std::move(assigned));out=*fit->second.value;if(depth==0)last_expression_mutation_=true;return true;
+                fit->second.value=std::make_shared<nift::RuntimeValue>(std::move(assigned));out=*fit->second.value;if(depth==0)last_expression_mutation_=true;return true;
             }
             if (name.find('[') != std::string::npos) {
                 // Bracket-indexed assignment: a[i] = v, m["k"] = v, grid[r][c] = v.
@@ -3638,11 +3661,11 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     if (name[q] != '[') { error = "invalid assignment target: " + name; return false; }
                     pos = q;
                 }
-                json::Document assigned;
+                nift::RuntimeValue assigned;
                 if (!eval(text.substr(p + 1), assigned, depth + 1)) return false;
-                json::Document* node = rb->value.get();
+                nift::RuntimeValue* node = rb->value.get();
                 for (std::size_t k = 0; k + 1 < indexes.size(); ++k) {
-                    json::Document idx;
+                    nift::RuntimeValue idx;
                     if (!eval(indexes[k], idx, depth + 1)) return false;
                     if (idx.is_number() && node->is_array()) {
                         if (idx.num < 0) { error = "negative index in assignment: " + indexes[k]; return false; }
@@ -3657,7 +3680,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         return false;
                     }
                 }
-                json::Document last;
+                nift::RuntimeValue last;
                 if (!eval(indexes.back(), last, depth + 1)) return false;
                 if (last.is_number() && node->is_array()) {
                     if (last.num < 0) { error = "negative index in assignment: " + indexes.back(); return false; }
@@ -3684,7 +3707,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             if (!binding && !receiver_stack_.empty()) {
                 auto rec = receiver_stack_.back()->fields.find(name);
                 if (rec != receiver_stack_.back()->fields.end()) {
-                    json::Document assigned;
+                    nift::RuntimeValue assigned;
                     if (!eval(text.substr(p + 1), assigned, depth + 1)) return false;
                     const int assigned_type = nift_binding_type_from_text(text.substr(p + 1), assigned);
                     if (!nift_type_assignable(assigned_type, rec->second.type)) {
@@ -3693,7 +3716,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         return false;
                     }
                     if (assigned.is_string()&&(assigned.string.rfind("\x1fnift:struct:",0)==0||assigned.string.rfind("\x1fnift:collection:",0)==0)){std::string recv_id;for(const auto& e:struct_instances_)if(e.second==receiver_stack_.back()){recv_id=e.first;break;}if(reference_would_cycle(assigned.string,std::string("\x1fnift:struct:")+recv_id)){error="assignment would create a cyclic reference: "+name;return false;}}
-                    auto rebound = std::make_shared<json::Document>(std::move(assigned));
+                    auto rebound = std::make_shared<nift::RuntimeValue>(std::move(assigned));
                     rec->second.value = rebound;
                     if (depth == 0) last_expression_mutation_ = true;
                     out = *rebound;
@@ -3702,7 +3725,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             }
             if (!binding) { error = "assignment to undefined binding: " + name; return false; }
             if (!binding->mutable_binding) { error = "cannot assign to const binding: " + name; return false; }
-            json::Document assigned;
+            nift::RuntimeValue assigned;
             if (!eval(text.substr(p + 1), assigned, depth + 1)) return false;
             if(binding->value&&binding->value->is_string()&&binding->value->string.rfind("\x1fnift:atomic:",0)==0&&!(assigned.is_string()&&assigned.string.rfind("\x1fnift:atomic:",0)==0)){auto ai=atomic_instances_.find(binding->value->string.substr(13));if(ai==atomic_instances_.end()){error="atomic: invalid handle";return false;}if(ai->second->kind==AtomicInstance::Kind::Int){std::int64_t v=0;if(!exact_i64(assigned,v)){error="assignment to atomic<int> requires signed 64-bit integer";return false;}ai->second->int_value.store(v);}else{if(!assigned.is_bool()){error="assignment to atomic<bool> requires bool";return false;}ai->second->bool_value.store(assigned.boolean);}out=assigned;if(depth==0)last_expression_mutation_=true;return true;}
             const int assigned_type = nift_binding_type_from_text(text.substr(p + 1), assigned);
@@ -3711,7 +3734,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         " to " + nift_binding_type_name(binding->type) + " binding '" + name + "'";
                 return false;
             }
-            auto rebound = std::make_shared<json::Document>(std::move(assigned));
+            auto rebound = std::make_shared<nift::RuntimeValue>(std::move(assigned));
             binding->rebind(rebound);
             if (depth == 0) last_expression_mutation_ = true;
             out = *rebound;
@@ -3719,25 +3742,25 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
         }
 
         if (const auto p=find_top_level_op("||"); p!=std::string::npos) {
-            json::Document left;
+            nift::RuntimeValue left;
             if (!eval(text.substr(0,p),left,depth+1)) return false;
-            if (truthy_value(left)) { out=json::Document(true); return true; }
-            json::Document right; if (!eval(text.substr(p+2),right,depth+1)) return false;
-            out=json::Document(truthy_value(right)); return true;
+            if (truthy_value(left)) { out=nift::RuntimeValue(true); return true; }
+            nift::RuntimeValue right; if (!eval(text.substr(p+2),right,depth+1)) return false;
+            out=nift::RuntimeValue(truthy_value(right)); return true;
         }
         if (const auto p=find_top_level_op("&&"); p!=std::string::npos) {
-            json::Document left;
+            nift::RuntimeValue left;
             if (!eval(text.substr(0,p),left,depth+1)) return false;
-            if (!truthy_value(left)) { out=json::Document(false); return true; }
-            json::Document right; if (!eval(text.substr(p+2),right,depth+1)) return false;
-            out=json::Document(truthy_value(right)); return true;
+            if (!truthy_value(left)) { out=nift::RuntimeValue(false); return true; }
+            nift::RuntimeValue right; if (!eval(text.substr(p+2),right,depth+1)) return false;
+            out=nift::RuntimeValue(truthy_value(right)); return true;
         }
         for (const std::string op : {"==","!=","<=",">=","<",">"}) {
             const auto p=find_top_level_op(op);
             if (p==std::string::npos) continue;
-            json::Document left,right;
+            nift::RuntimeValue left,right;
             if (!eval(text.substr(0,p),left,depth+1) || !eval(text.substr(p+op.size()),right,depth+1)) return false;
-            json::Document ls,rs;if(!atomic_scalar(left,ls)||!atomic_scalar(right,rs))return false;left=std::move(ls);right=std::move(rs);
+            nift::RuntimeValue ls,rs;if(!atomic_scalar(left,ls)||!atomic_scalar(right,rs))return false;left=std::move(ls);right=std::move(rs);
             bool result=false;
             if (op=="==" || op=="!=") {
                 bool equal=false;
@@ -3748,18 +3771,20 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 if ((!left.is_number() || !right.is_number()) && !(left.is_string() && right.is_string())) { error="ordering comparisons require two numbers or two strings"; return false; }
                 int ordering=0;
                 if (left.is_number() && right.is_number()) {
-                    ordering=numeric_compare(left,right);
+                    if (!nift::runtime_compare_numbers_relational(left,right,ordering)) {
+                        out=nift::RuntimeValue(false); return true;
+                    }
                 } else ordering=left.string<right.string?-1:(left.string>right.string?1:0);
                 if (op=="<") result=ordering<0; else if (op=="<=") result=ordering<=0; else if (op==">") result=ordering>0; else result=ordering>=0;
             }
-            out=json::Document(result); return true;
+            out=nift::RuntimeValue(result); return true;
         }
         if (text.front()=='!' && (text.size()<2 || text[1]!='=')) {
-            json::Document operand; if (!eval(text.substr(1),operand,depth+1)) return false;
-            out=json::Document(!truthy_value(operand)); return true;
+            nift::RuntimeValue operand; if (!eval(text.substr(1),operand,depth+1)) return false;
+            out=nift::RuntimeValue(!truthy_value(operand)); return true;
         }
 
-        { std::size_t cp=std::string::npos;bool q=false;char qc=0;int pa=0,br=0,bc=0;for(size_t z=text.size();z-- >0;){char c=text[z];if(q){if(c==qc&&(z==0||text[z-1]!='\\'))q=false;continue;}if(c=='\''||c=='"'){q=true;qc=c;continue;}if(c==')')++pa;else if(c=='(')--pa;else if(c==']')++br;else if(c=='[')--br;else if(c=='}')++bc;else if(c=='{')--bc;else if(c=='+'&&!pa&&!br&&!bc){if(z>0&&std::string("+-*/%(<>=!&|?:,").find(text[z-1])!=std::string::npos)continue;cp=z;break;}}if(cp!=std::string::npos){json::Document l,r;if(!eval(text.substr(0,cp),l,depth+1)||!eval(text.substr(cp+1),r,depth+1))return false;json::Document ls,rs;if(!atomic_scalar(l,ls)||!atomic_scalar(r,rs))return false;l=std::move(ls);r=std::move(rs);if(l.is_array()&&r.is_array()){out=json::Document::make_array();out.array.reserve(l.array.size()+r.array.size());out.array.insert(out.array.end(),l.array.begin(),l.array.end());out.array.insert(out.array.end(),r.array.begin(),r.array.end());return true;}if(l.is_string()||r.is_string()){auto safe=[&](const json::Document& v,std::string& z){if(v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0))return false;z=render_expression_value(v);return true;};std::string a,b;if(!safe(l,a)||!safe(r,b)){error="string concatenation requires renderable scalar values";return false;}out=json::Document(a+b);return true;}return numeric_binary(l,r,'+',out);}}
+        { std::size_t cp=std::string::npos;bool q=false;char qc=0;int pa=0,br=0,bc=0;for(size_t z=text.size();z-- >0;){char c=text[z];if(q){if(c==qc&&(z==0||text[z-1]!='\\'))q=false;continue;}if(c=='\''||c=='"'){q=true;qc=c;continue;}if(c==')')++pa;else if(c=='(')--pa;else if(c==']')++br;else if(c=='[')--br;else if(c=='}')++bc;else if(c=='{')--bc;else if(c=='+'&&!pa&&!br&&!bc){if(z>0&&std::string("+-*/%(<>=!&|?:,").find(text[z-1])!=std::string::npos)continue;cp=z;break;}}if(cp!=std::string::npos){nift::RuntimeValue l,r;if(!eval(text.substr(0,cp),l,depth+1)||!eval(text.substr(cp+1),r,depth+1))return false;nift::RuntimeValue ls,rs;if(!atomic_scalar(l,ls)||!atomic_scalar(r,rs))return false;l=std::move(ls);r=std::move(rs);if(l.is_array()&&r.is_array()){out=nift::RuntimeValue::make_array();out.array.reserve(l.array.size()+r.array.size());out.array.insert(out.array.end(),l.array.begin(),l.array.end());out.array.insert(out.array.end(),r.array.begin(),r.array.end());return true;}if(l.is_string()||r.is_string()){auto safe=[&](const nift::RuntimeValue& v,std::string& z){if(v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0))return false;z=render_expression_value(v);return true;};std::string a,b;if(!safe(l,a)||!safe(r,b)){error="string concatenation requires renderable scalar values";return false;}out=nift::RuntimeValue(a+b);return true;}return numeric_binary(l,r,'+',out);}}
 
         auto find_binary = [&](const std::string& ops) -> std::size_t {
             bool quoted=false; char quote=0; int parens=0; int brackets=0;
@@ -3782,22 +3807,22 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
         std::size_t pos=find_binary("+-");
         if (pos==std::string::npos) pos=find_binary("*/%");
         if (pos!=std::string::npos) {
-            json::Document left,right;
+            nift::RuntimeValue left,right;
             if (!eval(text.substr(0,pos),left,depth+1) || !eval(text.substr(pos+1),right,depth+1)) return false;
-            json::Document ls,rs;if(!atomic_scalar(left,ls)||!atomic_scalar(right,rs))return false;left=std::move(ls);right=std::move(rs);
+            nift::RuntimeValue ls,rs;if(!atomic_scalar(left,ls)||!atomic_scalar(right,rs))return false;left=std::move(ls);right=std::move(rs);
             const char op=text[pos];
-            if(op=='+' && left.is_array() && right.is_array()){out=json::Document::make_array();out.array.reserve(left.array.size()+right.array.size());out.array.insert(out.array.end(),left.array.begin(),left.array.end());out.array.insert(out.array.end(),right.array.begin(),right.array.end());return true;}
-            if(op=='+' && (left.is_string()||right.is_string())) { auto safe=[&](const json::Document& v,std::string& r){if(v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0))return false;r=render_expression_value(v);return true;};std::string l,r;if(!safe(left,l)||!safe(right,r)){error="string concatenation requires renderable scalar values";return false;}out=json::Document(l+r);return true; }
+            if(op=='+' && left.is_array() && right.is_array()){out=nift::RuntimeValue::make_array();out.array.reserve(left.array.size()+right.array.size());out.array.insert(out.array.end(),left.array.begin(),left.array.end());out.array.insert(out.array.end(),right.array.begin(),right.array.end());return true;}
+            if(op=='+' && (left.is_string()||right.is_string())) { auto safe=[&](const nift::RuntimeValue& v,std::string& r){if(v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0))return false;r=render_expression_value(v);return true;};std::string l,r;if(!safe(left,l)||!safe(right,r)){error="string concatenation requires renderable scalar values";return false;}out=nift::RuntimeValue(l+r);return true; }
             if (!left.is_number() || !right.is_number()) { error="arithmetic operators require numeric operands"; return false; }
             return numeric_binary(left,right,op,out);
         }
 
         if ((text.front()=='+' || text.front()=='-') && text.size()>1) {
-            json::Document operand;
+            nift::RuntimeValue operand;
             if (!eval(text.substr(1),operand,depth+1)) return false;
-            json::Document scalar;if(!atomic_scalar(operand,scalar))return false;operand=std::move(scalar);
+            nift::RuntimeValue scalar;if(!atomic_scalar(operand,scalar))return false;operand=std::move(scalar);
             if (!operand.is_number()) { error="unary arithmetic operators require a numeric operand"; return false; }
-            out=json::Document(text.front()=='-' ? -operand.num : operand.num); return true;
+            out=nift::RuntimeValue(text.front()=='-' ? -operand.num : operand.num); return true;
         }
 
         error="unknown value or malformed expression: " + text;
@@ -3808,14 +3833,14 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
 
 bool Parser::evaluate_condition(const std::string& expression, bool& value, std::string& error) {
     auto resolve_operand = [&](const std::string& operand,
-                               std::shared_ptr<const json::Document>& document) -> bool {
-        json::Document evaluated;
+                               std::shared_ptr<const nift::RuntimeValue>& document) -> bool {
+        nift::RuntimeValue evaluated;
         if (!evaluate_expression(operand, evaluated, error)) return false;
-        document = std::make_shared<const json::Document>(std::move(evaluated));
+        document = std::make_shared<const nift::RuntimeValue>(std::move(evaluated));
         return true;
     };
 
-    auto truthy = [](const json::Document& document) {
+    auto truthy = [](const nift::RuntimeValue& document) {
         if (document.is_bool()) return document.boolean;
         if (document.is_null()) return false;
         if (document.is_number()) return document.num != 0.0;
@@ -3908,16 +3933,16 @@ bool Parser::evaluate_condition(const std::string& expression, bool& value, std:
         }
 
         if (!op.empty()) {
-            std::shared_ptr<const json::Document> left, right;
+            std::shared_ptr<const nift::RuntimeValue> left, right;
             if (!resolve_operand(condition.substr(0, op_position), left) ||
                 !resolve_operand(condition.substr(op_position + op.size()), right)) return false;
 
             if (op == "==" || op == "!=") {
                 bool equal = false;
-                if (left->type == right->type) {
+                if (left->is_number() && right->is_number()) equal = nift::runtime_numbers_equal(*left, *right);
+                else if (left->type == right->type) {
                     if (left->is_null()) equal = true;
                     else if (left->is_bool()) equal = left->boolean == right->boolean;
-                    else if (left->is_number()) equal = left->num == right->num;
                     else if (left->is_string()) equal = left->string == right->string;
                     else { error = "@if comparisons are only supported for scalar JSON values"; return false; }
                 }
@@ -3925,12 +3950,18 @@ bool Parser::evaluate_condition(const std::string& expression, bool& value, std:
                 return true;
             }
 
-            if (left->type != right->type || (!left->is_number() && !left->is_string())) {
+            if ((!left->is_number() || !right->is_number()) &&
+                (left->type != right->type || !left->is_string())) {
                 error = "@if ordering comparisons require two numbers or two strings of the same type";
                 return false;
             }
             int ordering = 0;
-            if (left->is_number()) ordering = left->num < right->num ? -1 : (left->num > right->num ? 1 : 0);
+            if (left->is_number()) {
+                if (!nift::runtime_compare_numbers_relational(*left, *right, ordering)) {
+                    result = false;
+                    return true;
+                }
+            }
             else ordering = left->string < right->string ? -1 : (left->string > right->string ? 1 : 0);
             if (op == "<") result = ordering < 0;
             else if (op == "<=") result = ordering <= 0;
@@ -3939,7 +3970,7 @@ bool Parser::evaluate_condition(const std::string& expression, bool& value, std:
             return true;
         }
 
-        std::shared_ptr<const json::Document> document;
+        std::shared_ptr<const nift::RuntimeValue> document;
         if (!resolve_operand(condition, document)) return false;
         result = truthy(*document);
         return true;
@@ -4216,15 +4247,15 @@ std::vector<std::string> Parser::shell_completions(const std::string& prefix) co
 bool Parser::invoke_ffi_callback_i64(const std::string& callable_tag, std::int64_t arg, std::int64_t& out_value, std::string& error) {
     if (variable_scopes_.empty()) variable_scopes_.emplace_back();
     const std::string name="__nift_ffi_callback_internal"; auto old=variable_scopes_.back().find(name); std::optional<VariableBinding> saved; if(old!=variable_scopes_.back().end()) saved=old->second;
-    auto sp=std::make_shared<json::Document>(callable_tag); variable_scopes_.back()[name]=VariableBinding{sp,nift_binding_type(*sp),false,false};
-    json::Document result; bool ok=evaluate_expression(name+"("+std::to_string(arg)+")",result,error);
+    auto sp=std::make_shared<nift::RuntimeValue>(callable_tag); variable_scopes_.back()[name]=VariableBinding{sp,nift_binding_type(*sp),false,false};
+    nift::RuntimeValue result; bool ok=evaluate_expression(name+"("+std::to_string(arg)+")",result,error);
     if(saved) variable_scopes_.back()[name]=*saved; else variable_scopes_.back().erase(name);
     if(!ok)return false;
     if(!result.is_number()||std::trunc(result.num)!=result.num){error="callback result must be an integer";return false;}out_value=static_cast<std::int64_t>(result.num);return true;
 }
 
-bool Parser::invoke_callable(const std::string& name, const std::vector<json::Document>& args, json::Document& value, std::string& error) {
-    if(!valid_binding_identifier(name)){error="invalid callable name";return false;}if(variable_scopes_.empty())variable_scopes_.emplace_back();std::vector<std::string> names;names.reserve(args.size());for(size_t i=0;i<args.size();++i){std::string n="__nift_host_arg_"+std::to_string(i);auto sp=std::make_shared<json::Document>(args[i]);variable_scopes_.back()[n]=VariableBinding{sp,nift_binding_type(*sp),false,false};names.push_back(n);}std::string expr=name+"(";for(size_t i=0;i<names.size();++i){if(i)expr+=",";expr+=names[i];}expr+=")";bool ok=evaluate_expression(expr,value,error);for(const auto& n:names)variable_scopes_.back().erase(n);return ok;
+bool Parser::invoke_callable(const std::string& name, const std::vector<nift::RuntimeValue>& args, nift::RuntimeValue& value, std::string& error) {
+    if(!valid_binding_identifier(name)){error="invalid callable name";return false;}if(variable_scopes_.empty())variable_scopes_.emplace_back();std::vector<std::string> names;names.reserve(args.size());for(size_t i=0;i<args.size();++i){std::string n="__nift_host_arg_"+std::to_string(i);auto sp=std::make_shared<nift::RuntimeValue>(args[i]);variable_scopes_.back()[n]=VariableBinding{sp,nift_binding_type(*sp),false,false};names.push_back(n);}std::string expr=name+"(";for(size_t i=0;i<names.size();++i){if(i)expr+=",";expr+=names[i];}expr+=")";bool ok=evaluate_expression(expr,value,error);for(const auto& n:names)variable_scopes_.back().erase(n);return ok;
 }
 
 void Parser::set_script_invocation(std::string cmd, std::vector<std::string> args) {
@@ -4235,12 +4266,12 @@ void Parser::set_script_invocation(std::string cmd, std::vector<std::string> arg
 
 void Parser::install_script_invocation_bindings() {
     if (variable_scopes_.empty()) variable_scopes_.emplace_back();
-    auto cmd = std::make_shared<json::Document>(script_cmd_);
+    auto cmd = std::make_shared<nift::RuntimeValue>(script_cmd_);
     VariableBinding cmd_binding{cmd, nift_binding_type(*cmd), false, true};
     cmd_binding.is_script_invocation = true;
     variable_scopes_.front()["cmd"] = std::move(cmd_binding);
 
-    auto arr = std::make_shared<json::Document>(json::Document::make_array());
+    auto arr = std::make_shared<nift::RuntimeValue>(nift::RuntimeValue::make_array());
     for (const auto& a : script_args_) arr->array.emplace_back(a);
     VariableBinding args_binding{arr, nift_binding_type(*arr), false, true};
     args_binding.is_script_invocation = true;
@@ -4267,11 +4298,11 @@ RenderResult Parser::run_script(const std::string& source, const fs::path& sourc
     return rr;
 }
 
-bool Parser::run_embedded_script(const std::string& source, const fs::path& source_path, json::Document& value, std::string& error) {
+bool Parser::run_embedded_script(const std::string& source, const fs::path& source_path, nift::RuntimeValue& value, std::string& error) {
     result_=RenderResult{};variable_scopes_.clear();variable_scopes_.emplace_back();install_script_invocation_bindings();callables_.clear();structs_.clear();requested_exports_.clear();pending_control_={};in_import_program_=false;standalone_script_host_=false;strict_script_mode_=true;function_call_depth_=1;
     auto rr=execute_native_program(source,source_path,0);function_call_depth_=0;strict_script_mode_=false;
     if(!rr.ok){error=rr.error.message;pending_control_={};return false;}
-    value=json::Document(nullptr);if(pending_control_.kind==ControlFlow::Return&&pending_control_.value)value=*pending_control_.value;pending_control_={};std::string resource_error;if(!finalize_script_resources(resource_error)){error=resource_error;return false;}return true;
+    value=nift::RuntimeValue(nullptr);if(pending_control_.kind==ControlFlow::Return&&pending_control_.value)value=*pending_control_.value;pending_control_={};std::string resource_error;if(!finalize_script_resources(resource_error)){error=resource_error;return false;}return true;
 }
 
 RenderResult Parser::run_statement(const std::string& source, const fs::path& source_path) {
@@ -4286,7 +4317,7 @@ RenderResult Parser::run_statement(const std::string& source, const fs::path& so
     bool assignment=false; bool quoted=false; char qc=0; int par=0,br=0,bc=0;
     for(std::size_t i=0;i<t.size();++i){char c=t[i];if(quoted){if(c=='\\')++i;else if(c==qc)quoted=false;continue;}if(c=='\''||c=='"'){quoted=true;qc=c;continue;}if(c=='(')++par;else if(c==')')--par;else if(c=='[')++br;else if(c==']')--br;else if(c=='{')++bc;else if(c=='}')--bc;else if(!par&&!br&&!bc&&c=='='){char a=i?t[i-1]:0,b=i+1<t.size()?t[i+1]:0;if(a!='='&&a!='!'&&a!='<'&&a!='>'&&b!='='){assignment=true;break;}}}
     if(!declaration&&!assignment&&!t.empty()){
-        json::Document v; std::string error;
+        nift::RuntimeValue v; std::string error;
         if(evaluate_expression(t,v,error)){
             RenderResult rr; std::string shown;
             // REPL commands commonly return null (for example cd()) and an empty
@@ -4543,7 +4574,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
 
         if (source.compare(i, 8, "@import(") == 0) {
             std::size_t ec=0; if(!find_balanced(source,i+7,'(',')',ec)){fail(source_path,source,i,"@import has no matching ')'");break;}
-            std::string arg=trim_copy(source.substr(i+8,ec-(i+8))); json::Document pv; std::string pe;
+            std::string arg=trim_copy(source.substr(i+8,ec-(i+8))); nift::RuntimeValue pv; std::string pe;
             if(!evaluate_expression(arg,pv,pe)||!pv.is_string()){fail(source_path,source,i,"@import path must be a string expression");break;}
             if(!execute_import_file(pv.string,source_path,depth+1,pe)){fail(source_path,source,i,"@import: "+pe);break;}
             i=ec+1; continue;
@@ -4553,11 +4584,11 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             std::size_t hc=0;if(!find_balanced(source,i+5,'(',')',hc)){fail(source_path,source,i,"enum definition has no matching ')'");break;}const std::string name=trim_copy(source.substr(i+6,hc-(i+6)));if(!valid_binding_identifier(name)){fail(source_path,source,i,"invalid enum name");break;}std::size_t bo=hc+1;while(bo<source.size()&&std::isspace((unsigned char)source[bo]))++bo;std::size_t bc=0;if(bo>=source.size()||source[bo]!='{'||!find_balanced(source,bo,'{','}',bc)){fail(source_path,source,i,"enum definition requires a block");break;}
             if(variable_scopes_.empty())variable_scopes_.emplace_back();
             if(variable_scopes_.back().count(name)){fail(source_path,source,i,"binding already declared in this scope: "+name);break;}
-            std::string body=source.substr(bo+1,bc-bo-1);for(char& c:body)if(c=='\n'||c==';')c=',';bool ok=false;auto items=parse_parameters(body,ok);if(!ok||items.empty()){fail(source_path,source,i,"enum requires at least one member");break;}json::Document ns=json::Document::make_object();std::set<std::int64_t> used;std::int64_t next=0;bool good=true;
-            for(auto raw:items){raw=trim_copy(raw);if(raw.empty())continue;auto eq=raw.find('=');std::string member=trim_copy(eq==std::string::npos?raw:raw.substr(0,eq));if(!valid_binding_identifier(member)||ns.has(member)){fail(source_path,source,i,"invalid or duplicate enum member: "+member);good=false;break;}std::int64_t val=next;if(eq!=std::string::npos){std::string vs=trim_copy(raw.substr(eq+1));auto pr=std::from_chars(vs.data(),vs.data()+vs.size(),val);if(pr.ec!=std::errc()||pr.ptr!=vs.data()+vs.size()){fail(source_path,source,i,"enum values must be signed integer literals");good=false;break;}}if(!used.insert(val).second){fail(source_path,source,i,"duplicate enum integer value: "+std::to_string(val));good=false;break;}ns[member]=json::Document(std::string("\x1fnift:enum:")+name+":"+member+":"+std::to_string(val));if(val==std::numeric_limits<std::int64_t>::max()){next=val;}else next=val+1;}
+            std::string body=source.substr(bo+1,bc-bo-1);for(char& c:body)if(c=='\n'||c==';')c=',';bool ok=false;auto items=parse_parameters(body,ok);if(!ok||items.empty()){fail(source_path,source,i,"enum requires at least one member");break;}nift::RuntimeValue ns=nift::RuntimeValue::make_object();std::set<std::int64_t> used;std::int64_t next=0;bool good=true;
+            for(auto raw:items){raw=trim_copy(raw);if(raw.empty())continue;auto eq=raw.find('=');std::string member=trim_copy(eq==std::string::npos?raw:raw.substr(0,eq));if(!valid_binding_identifier(member)||ns.has(member)){fail(source_path,source,i,"invalid or duplicate enum member: "+member);good=false;break;}std::int64_t val=next;if(eq!=std::string::npos){std::string vs=trim_copy(raw.substr(eq+1));auto pr=std::from_chars(vs.data(),vs.data()+vs.size(),val);if(pr.ec!=std::errc()||pr.ptr!=vs.data()+vs.size()){fail(source_path,source,i,"enum values must be signed integer literals");good=false;break;}}if(!used.insert(val).second){fail(source_path,source,i,"duplicate enum integer value: "+std::to_string(val));good=false;break;}ns[member]=nift::RuntimeValue(std::string("\x1fnift:enum:")+name+":"+member+":"+std::to_string(val));if(val==std::numeric_limits<std::int64_t>::max()){next=val;}else next=val+1;}
             if(ns.object.empty()){fail(source_path,source,i,"enum requires at least one member");good=false;}
             if(!good)break;
-            auto sp=std::make_shared<json::Document>(std::move(ns));variable_scopes_.back().emplace(name,VariableBinding{sp,nift_binding_type_from_text("{}",*sp),false,true});i=bc+1;continue;
+            auto sp=std::make_shared<nift::RuntimeValue>(std::move(ns));variable_scopes_.back().emplace(name,VariableBinding{sp,nift_binding_type_from_text("{}",*sp),false,true});i=bc+1;continue;
         }
 
         if (source.compare(i, 8, "@struct(") == 0) {
@@ -4636,7 +4667,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             std::size_t block_open = header_close + 1; while (block_open < source.size() && std::isspace(static_cast<unsigned char>(source[block_open]))) ++block_open;
             std::size_t block_close = 0;
             if (block_open >= source.size() || source[block_open] != '{' || !find_balanced(source, block_open, '{', '}', block_close)) { fail(source_path, source, i, "@:= requires a balanced '{...}' expression block"); break; }
-            json::Document declared; std::string declaration_error;
+            nift::RuntimeValue declared; std::string declaration_error;
             if (!evaluate_expression(name + " := " + source.substr(block_open + 1, block_close - block_open - 1), declared, declaration_error)) { fail(source_path, source, i, "@:= " + declaration_error); break; }
             i = block_close + 1; continue;
         }
@@ -4736,7 +4767,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     // consistent with the scalar-value semantics used elsewhere in
                     // $[...] while preserving lazy source parsing for non-literal
                     // branches.
-                    json::Document selected_literal;
+                    nift::RuntimeValue selected_literal;
                     std::string selected_literal_error;
                     if (scalar_literal(trim_copy(selected), selected_literal, selected_literal_error) &&
                         selected_literal.is_string()) {
@@ -4754,7 +4785,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     break;
                 }
 
-                json::Document expression_value;
+                nift::RuntimeValue expression_value;
                 std::string expression_error;
                 if (evaluate_expression(trim_copy(key), expression_value, expression_error)) {
                     if (last_expression_mutation_) { i = end + 1; continue; }
@@ -4792,7 +4823,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     break;
                 }
                 // A direct legacy lookup below preserves its established diagnostics.
-                std::shared_ptr<const json::Document> pagination_value;
+                std::shared_ptr<const nift::RuntimeValue> pagination_value;
                 if (resolve_pagination_value(trim_copy(key), pagination_value)) {
                     output += pagination_value->is_string() ? pagination_value->string : pagination_value->dump(0);
                     i = end + 1;
@@ -5055,7 +5086,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             return true;};
         std::function<bool(const std::vector<std::unique_ptr<nift::ast::Stmt>>&,std::string&)> execute_body;
         std::function<bool(const nift::ast::Stmt&,std::string&)> execute_prepared;
-        auto ast_context=[&](){nift::ast::Context c;c.resolve=[&](const std::string& name,json::Document& out,std::string& e){for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(name);if(it!=sc->end()){it->second.sync();if(!it->second.value){e="reference target no longer exists: "+name;return false;}out=*it->second.value;if(out.is_string()&&out.string.rfind("\x1fnift:atomic:",0)==0){auto ai=atomic_instances_.find(out.string.substr(13));if(ai==atomic_instances_.end()){e="atomic: invalid handle";return false;}if(ai->second->kind==AtomicInstance::Kind::Bool)out=json::Document(ai->second->bool_value.load());else{auto v=ai->second->int_value.load();out=json::Document((double)v);if(v>9007199254740992LL||v<-9007199254740992LL){out.type=json::Type::StrNumber;out.string=std::to_string(v);}}}return true;}}e="unknown value or malformed expression: "+name;return false;};c.legacy=[&](const std::string& x,json::Document& out,std::string& e){return evaluate_expression(x,out,e);};c.arg_is_location=[&](const std::string& arg)->bool{VariableBinding loc;const std::string ref_source=trim_copy(arg);if(valid_binding_identifier(ref_source)){for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(ref_source);if(it!=sc->end()){it->second.sync();if(it->second.value&&it->second.value->is_string()&&it->second.value->string.rfind("\x1fnift:atomic:",0)==0)return true;break;}}}auto parsed=nift::ast::parse_expression(ref_source);if(!parsed.supported||!parsed.expr)return false;std::shared_ptr<std::shared_ptr<json::Document>> root;std::vector<PathComponent> path;std::function<bool(const nift::ast::Expr&)> walk;walk=[&](const nift::ast::Expr& ex)->bool{if(ex.kind==nift::ast::Kind::Binding){VariableBinding* b=nullptr;for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(ex.name);if(it!=sc->end()){it->second.sync();b=&it->second;break;}}if(!b||!b->value)return false;if(b->is_location_ref()){root=b->ref_root_slot;path=b->ref_path;}else root=b->slot;return true;}if(ex.kind==nift::ast::Kind::Member){if(!ex.left||!walk(*ex.left))return false;path.push_back(PathComponent::member(ex.name));return true;}if(ex.kind==nift::ast::Kind::Index){if(!ex.left||!walk(*ex.left))return false;json::Document idx;std::string index_error;if(!evaluate_expression(ex.right->text.empty()?ref_source.substr(ex.right->span.begin,ex.right->span.end-ex.right->span.begin):ex.right->text,idx,index_error))return false;if(idx.is_number()&&idx.num>=0&&std::trunc(idx.num)==idx.num)path.push_back(PathComponent::at((std::size_t)idx.num));else if(idx.is_string())path.push_back(PathComponent::member(idx.string));else return false;return true;}return false;};if(!walk(*parsed.expr)||path.empty())return false;loc.ref_root_slot=std::move(root);loc.ref_path=std::move(path);loc.sync();if(!loc.value)return false;return loc.value->is_array()||loc.value->is_object()||(loc.value->is_string()&&loc.value->string.rfind("\x1fnift:",0)==0);};c.call=[&](const std::string& name,std::vector<json::Document>&& args,json::Document& out,std::string& e)->bool{
+        auto ast_context=[&](){nift::ast::Context c;c.resolve=[&](const std::string& name,nift::RuntimeValue& out,std::string& e){for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(name);if(it!=sc->end()){it->second.sync();if(!it->second.value){e="reference target no longer exists: "+name;return false;}out=*it->second.value;if(out.is_string()&&out.string.rfind("\x1fnift:atomic:",0)==0){auto ai=atomic_instances_.find(out.string.substr(13));if(ai==atomic_instances_.end()){e="atomic: invalid handle";return false;}if(ai->second->kind==AtomicInstance::Kind::Bool)out=nift::RuntimeValue(ai->second->bool_value.load());else{auto v=ai->second->int_value.load();out=nift::RuntimeValue((double)v);if(v>9007199254740992LL||v<-9007199254740992LL){out.type=nift::RuntimeType::StrNumber;out.string=std::to_string(v);}}}return true;}}e="unknown value or malformed expression: "+name;return false;};c.legacy=[&](const std::string& x,nift::RuntimeValue& out,std::string& e){return evaluate_expression(x,out,e);};c.arg_is_location=[&](const std::string& arg)->bool{VariableBinding loc;const std::string ref_source=trim_copy(arg);if(valid_binding_identifier(ref_source)){for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(ref_source);if(it!=sc->end()){it->second.sync();if(it->second.value&&it->second.value->is_string()&&it->second.value->string.rfind("\x1fnift:atomic:",0)==0)return true;break;}}}auto parsed=nift::ast::parse_expression(ref_source);if(!parsed.supported||!parsed.expr)return false;std::shared_ptr<std::shared_ptr<nift::RuntimeValue>> root;std::vector<PathComponent> path;std::function<bool(const nift::ast::Expr&)> walk;walk=[&](const nift::ast::Expr& ex)->bool{if(ex.kind==nift::ast::Kind::Binding){VariableBinding* b=nullptr;for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(ex.name);if(it!=sc->end()){it->second.sync();b=&it->second;break;}}if(!b||!b->value)return false;if(b->is_location_ref()){root=b->ref_root_slot;path=b->ref_path;}else root=b->slot;return true;}if(ex.kind==nift::ast::Kind::Member){if(!ex.left||!walk(*ex.left))return false;path.push_back(PathComponent::member(ex.name));return true;}if(ex.kind==nift::ast::Kind::Index){if(!ex.left||!walk(*ex.left))return false;nift::RuntimeValue idx;std::string index_error;if(!evaluate_expression(ex.right->text.empty()?ref_source.substr(ex.right->span.begin,ex.right->span.end-ex.right->span.begin):ex.right->text,idx,index_error))return false;if(idx.is_number()&&idx.num>=0&&std::trunc(idx.num)==idx.num)path.push_back(PathComponent::at((std::size_t)idx.num));else if(idx.is_string())path.push_back(PathComponent::member(idx.string));else return false;return true;}return false;};if(!walk(*parsed.expr)||path.empty())return false;loc.ref_root_slot=std::move(root);loc.ref_path=std::move(path);loc.sync();if(!loc.value)return false;return loc.value->is_array()||loc.value->is_object()||(loc.value->is_string()&&loc.value->string.rfind("\x1fnift:",0)==0);};c.call=[&](const std::string& name,std::vector<nift::RuntimeValue>&& args,nift::RuntimeValue& out,std::string& e)->bool{
             // Prepared dispatch for user callables: bind args, run the prepared
             // body once, propagate the return value. Any failure falls back to
             // the legacy evaluator (the oracle) via the Call handler.
@@ -5063,7 +5094,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             auto ci=callables_.find(name);
             if(ci!=callables_.end())callee=&ci->second;
             if(!callee&&active_module_env_){auto mit=active_module_env_->callables.find(name);if(mit!=active_module_env_->callables.end())callee=&mit->second;}
-            if(!callee&&host_.has_host_callable(name))return host_.call_host_callable(name,args,out,e);
+            if(!callee&&host_.has_host_callable(name))return call_runtime_host(host_, name, args, out, e);
             if(!callee||callee->fragment)return false;
             if(callee->async)return false; // legacy evaluator schedules async call and returns a future
             if(callee->variadic_param.empty()?args.size()!=callee->params.size():args.size()<callee->params.size())return false;
@@ -5076,49 +5107,49 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             }
             if(callable_call_depth_>=kMaxCallableDepth){e="callable recursion depth exceeded: "+name;return false;}
             push_variable_scope();auto& scope=variable_scopes_.back();
-            for(std::size_t ai=0;ai<callee->params.size()&&ai<args.size();++ai){auto sp=std::make_shared<json::Document>(std::move(args[ai]));scope.emplace(callee->params[ai],VariableBinding{sp,nift_binding_type(*sp),true,false});}
-            if(!callee->variadic_param.empty()){json::Document rest=json::Document::make_array();for(std::size_t ai=callee->params.size();ai<args.size();++ai)rest.array.push_back(std::move(args[ai]));auto sp=std::make_shared<json::Document>(std::move(rest));scope.emplace(callee->variadic_param,VariableBinding{sp,nift_binding_type(*sp),true,false});}
+            for(std::size_t ai=0;ai<callee->params.size()&&ai<args.size();++ai){auto sp=std::make_shared<nift::RuntimeValue>(std::move(args[ai]));scope.emplace(callee->params[ai],VariableBinding{sp,nift_binding_type(*sp),true,false});}
+            if(!callee->variadic_param.empty()){nift::RuntimeValue rest=nift::RuntimeValue::make_array();for(std::size_t ai=callee->params.size();ai<args.size();++ai)rest.array.push_back(std::move(args[ai]));auto sp=std::make_shared<nift::RuntimeValue>(std::move(rest));scope.emplace(callee->variadic_param,VariableBinding{sp,nift_binding_type(*sp),true,false});}
             ++callable_call_depth_;const int saved_loop_depth=loop_depth_;loop_depth_=0;pending_control_={};
             std::string pe;const bool ok=execute_body(prep.stmts,pe);
             loop_depth_=saved_loop_depth;--callable_call_depth_;
             pop_variable_scope();
             if(!ok){e=pe;return false;}
             if(pending_control_.kind==ControlFlow::Return)consume_return(out);
-            else out=json::Document(nullptr);
-            return true;};c.resolve_ref=[&](const std::string& name,std::shared_ptr<const json::Document>& out,std::string& e){for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(name);if(it!=sc->end()){it->second.sync();if(!it->second.value){e="reference target no longer exists: "+name;return false;}out=it->second.value;return true;}}e="unknown value or malformed expression: "+name;return false;};c.native_method=[&](const json::Document& recv,const std::string& method,std::vector<json::Document>&& args,json::Document& out,std::string& e)->bool{
+            else out=nift::RuntimeValue(nullptr);
+            return true;};c.resolve_ref=[&](const std::string& name,std::shared_ptr<const nift::RuntimeValue>& out,std::string& e){for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(name);if(it!=sc->end()){it->second.sync();if(!it->second.value){e="reference target no longer exists: "+name;return false;}out=it->second.value;return true;}}e="unknown value or malformed expression: "+name;return false;};c.native_method=[&](const nift::RuntimeValue& recv,const std::string& method,std::vector<nift::RuntimeValue>&& args,nift::RuntimeValue& out,std::string& e)->bool{
             if(recv.is_string()&&recv.string.rfind("\x1fnift:atomic:",0)==0){
                 auto ai=atomic_instances_.find(recv.string.substr(13));if(ai==atomic_instances_.end()){e="atomic: invalid handle";return false;}auto st=ai->second;
-                auto int_doc=[](std::int64_t v){json::Document d(static_cast<double>(v));if(v>9007199254740992LL||v<-9007199254740992LL){d.type=json::Type::StrNumber;d.string=std::to_string(v);}return d;};
-                auto as_int=[&](const json::Document& v,std::int64_t& x){if(v.type==json::Type::StrNumber){auto r=std::from_chars(v.string.data(),v.string.data()+v.string.size(),x);if(r.ec==std::errc()&&r.ptr==v.string.data()+v.string.size())return true;}else if(v.is_number()&&std::isfinite(v.num)&&std::trunc(v.num)==v.num&&v.num>=-9223372036854775808.0&&v.num<9223372036854775808.0){x=static_cast<std::int64_t>(v.num);return true;}e="atomic<int>: expected signed 64-bit integer";return false;};
-                if(method=="load"){if(!args.empty()){e="load: expected no arguments";return false;}if(st->kind==AtomicInstance::Kind::Int)out=int_doc(st->int_value.load());else out=json::Document(st->bool_value.load());return true;}
-                if(method=="store"||method=="exchange"){if(args.size()!=1){e=method+": expected one value";return false;}if(st->kind==AtomicInstance::Kind::Int){std::int64_t x=0;if(!as_int(args[0],x))return false;if(method=="store"){st->int_value.store(x);out=json::Document(nullptr);}else out=int_doc(st->int_value.exchange(x));}else{if(!args[0].is_bool()){e=method+": atomic<bool> requires bool";return false;}if(method=="store"){st->bool_value.store(args[0].boolean);out=json::Document(nullptr);}else out=json::Document(st->bool_value.exchange(args[0].boolean));}return true;}
+                auto int_doc=[](std::int64_t v){nift::RuntimeValue d(static_cast<double>(v));if(v>9007199254740992LL||v<-9007199254740992LL){d.type=nift::RuntimeType::StrNumber;d.string=std::to_string(v);}return d;};
+                auto as_int=[&](const nift::RuntimeValue& v,std::int64_t& x){if(v.type==nift::RuntimeType::StrNumber){auto r=std::from_chars(v.string.data(),v.string.data()+v.string.size(),x);if(r.ec==std::errc()&&r.ptr==v.string.data()+v.string.size())return true;}else if(v.is_number()&&std::isfinite(v.num)&&std::trunc(v.num)==v.num&&v.num>=-9223372036854775808.0&&v.num<9223372036854775808.0){x=static_cast<std::int64_t>(v.num);return true;}e="atomic<int>: expected signed 64-bit integer";return false;};
+                if(method=="load"){if(!args.empty()){e="load: expected no arguments";return false;}if(st->kind==AtomicInstance::Kind::Int)out=int_doc(st->int_value.load());else out=nift::RuntimeValue(st->bool_value.load());return true;}
+                if(method=="store"||method=="exchange"){if(args.size()!=1){e=method+": expected one value";return false;}if(st->kind==AtomicInstance::Kind::Int){std::int64_t x=0;if(!as_int(args[0],x))return false;if(method=="store"){st->int_value.store(x);out=nift::RuntimeValue(nullptr);}else out=int_doc(st->int_value.exchange(x));}else{if(!args[0].is_bool()){e=method+": atomic<bool> requires bool";return false;}if(method=="store"){st->bool_value.store(args[0].boolean);out=nift::RuntimeValue(nullptr);}else out=nift::RuntimeValue(st->bool_value.exchange(args[0].boolean));}return true;}
                 if(method=="fetch_add"||method=="fetch_sub"){if(st->kind!=AtomicInstance::Kind::Int){e=method+": only valid for atomic<int>";return false;}if(args.size()!=1){e=method+": expected one integer";return false;}std::int64_t x=0;if(!as_int(args[0],x))return false;out=int_doc(method=="fetch_add"?st->int_value.fetch_add(x):st->int_value.fetch_sub(x));return true;}
-                if(method=="compare_exchange"){if(args.size()!=2){e="compare_exchange: expected expected and desired values";return false;}if(st->kind==AtomicInstance::Kind::Int){std::int64_t expected=0,desired=0;if(!as_int(args[0],expected)||!as_int(args[1],desired))return false;out=json::Document(st->int_value.compare_exchange_strong(expected,desired));}else{if(!args[0].is_bool()||!args[1].is_bool()){e="compare_exchange: atomic<bool> requires bool values";return false;}bool expected=args[0].boolean;out=json::Document(st->bool_value.compare_exchange_strong(expected,args[1].boolean));}return true;}
+                if(method=="compare_exchange"){if(args.size()!=2){e="compare_exchange: expected expected and desired values";return false;}if(st->kind==AtomicInstance::Kind::Int){std::int64_t expected=0,desired=0;if(!as_int(args[0],expected)||!as_int(args[1],desired))return false;out=nift::RuntimeValue(st->int_value.compare_exchange_strong(expected,desired));}else{if(!args[0].is_bool()||!args[1].is_bool()){e="compare_exchange: atomic<bool> requires bool values";return false;}bool expected=args[0].boolean;out=nift::RuntimeValue(st->bool_value.compare_exchange_strong(expected,args[1].boolean));}return true;}
             }
-            if(method=="to_string"&&recv.is_number()){out=json::Document(render_expression_value(recv));return true;}
+            if(method=="to_string"&&recv.is_number()){out=nift::RuntimeValue(render_expression_value(recv));return true;}
             if(method=="to_string"&&recv.is_string()){out=recv;return true;}
-            if(method=="to_int"&&recv.is_number()){out=json::Document((double)(long long)recv.num);return true;}
+            if(method=="to_int"&&recv.is_number()){out=nift::RuntimeValue((double)(long long)recv.num);return true;}
             if(method=="to_double"&&recv.is_number()){out=recv;return true;}
-            if(method=="abs"&&recv.is_number()){out=json::Document(std::fabs(recv.num));return true;}
-            if(method=="floor"&&recv.is_number()){out=json::Document(std::floor(recv.num));return true;}
-            if(method=="ceil"&&recv.is_number()){out=json::Document(std::ceil(recv.num));return true;}
-            if(method=="round"&&recv.is_number()){out=json::Document(std::round(recv.num));return true;}
-            if(method=="length"&&recv.is_string()){out=json::Document((double)recv.string.size());return true;}
-            if(method=="trim"&&recv.is_string()){std::string s=recv.string;auto b=s.find_first_not_of(" \t\r\n");if(b==std::string::npos)s.clear();else{s=s.substr(b);auto epos=s.find_last_not_of(" \t\r\n");s=s.substr(0,epos+1);}out=json::Document(s);return true;}
-            if(method=="to_lower"&&recv.is_string()){std::string s=recv.string;for(auto&ch:s)ch=(char)std::tolower((unsigned char)ch);out=json::Document(s);return true;}
-            if(method=="to_upper"&&recv.is_string()){std::string s=recv.string;for(auto&ch:s)ch=(char)std::toupper((unsigned char)ch);out=json::Document(s);return true;}
-            if(method=="size"){if(recv.is_array()){out=json::Document((double)recv.array.size());return true;}if(recv.is_object()){out=json::Document((double)recv.object.size());return true;}}
-            if(method=="length"){if(recv.is_array()){out=json::Document((double)recv.array.size());return true;}if(recv.is_string()){out=json::Document((double)recv.string.size());return true;}if(recv.is_object()){out=json::Document((double)recv.object.size());return true;}}
-            if(method=="empty"){if(recv.is_array()){out=json::Document(recv.array.empty());return true;}if(recv.is_string()){out=json::Document(recv.string.empty());return true;}if(recv.is_object()){out=json::Document(recv.object.empty());return true;}}
+            if(method=="abs"&&recv.is_number()){out=nift::RuntimeValue(std::fabs(recv.num));return true;}
+            if(method=="floor"&&recv.is_number()){out=nift::RuntimeValue(std::floor(recv.num));return true;}
+            if(method=="ceil"&&recv.is_number()){out=nift::RuntimeValue(std::ceil(recv.num));return true;}
+            if(method=="round"&&recv.is_number()){out=nift::RuntimeValue(std::round(recv.num));return true;}
+            if(method=="length"&&recv.is_string()){out=nift::RuntimeValue((double)recv.string.size());return true;}
+            if(method=="trim"&&recv.is_string()){std::string s=recv.string;auto b=s.find_first_not_of(" \t\r\n");if(b==std::string::npos)s.clear();else{s=s.substr(b);auto epos=s.find_last_not_of(" \t\r\n");s=s.substr(0,epos+1);}out=nift::RuntimeValue(s);return true;}
+            if(method=="to_lower"&&recv.is_string()){std::string s=recv.string;for(auto&ch:s)ch=(char)std::tolower((unsigned char)ch);out=nift::RuntimeValue(s);return true;}
+            if(method=="to_upper"&&recv.is_string()){std::string s=recv.string;for(auto&ch:s)ch=(char)std::toupper((unsigned char)ch);out=nift::RuntimeValue(s);return true;}
+            if(method=="size"){if(recv.is_array()){out=nift::RuntimeValue((double)recv.array.size());return true;}if(recv.is_object()){out=nift::RuntimeValue((double)recv.object.size());return true;}}
+            if(method=="length"){if(recv.is_array()){out=nift::RuntimeValue((double)recv.array.size());return true;}if(recv.is_string()){out=nift::RuntimeValue((double)recv.string.size());return true;}if(recv.is_object()){out=nift::RuntimeValue((double)recv.object.size());return true;}}
+            if(method=="empty"){if(recv.is_array()){out=nift::RuntimeValue(recv.array.empty());return true;}if(recv.is_string()){out=nift::RuntimeValue(recv.string.empty());return true;}if(recv.is_object()){out=nift::RuntimeValue(recv.object.empty());return true;}}
             if(method=="first"&&recv.is_array()){if(recv.array.empty()){e="first: array is empty";return false;}out=recv.array.front();return true;}
             if(method=="last"&&recv.is_array()){if(recv.array.empty()){e="last: array is empty";return false;}out=recv.array.back();return true;}
-            return false;};c.render=[&](const json::Document& v){return render_expression_value(v);};return c;};
+            return false;};c.render=[&](const nift::RuntimeValue& v){return render_expression_value(v);};return c;};
         auto find_binding=[&](const std::string& name)->VariableBinding*{for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(name);if(it!=sc->end())return &it->second;}return nullptr;};
         // Build a persistent logical location from an AST Binding/Index/Member
         // chain.  Indices/keys are evaluated once when the reference is formed;
         // subsequent reads/writes re-resolve that path from the live root slot.
-        std::function<bool(const nift::ast::Expr&,std::shared_ptr<std::shared_ptr<json::Document>>&,std::vector<PathComponent>&,std::string&)> build_location_ref;
-        build_location_ref=[&](const nift::ast::Expr& ex,std::shared_ptr<std::shared_ptr<json::Document>>& root,std::vector<PathComponent>& path,std::string& e)->bool{
+        std::function<bool(const nift::ast::Expr&,std::shared_ptr<std::shared_ptr<nift::RuntimeValue>>&,std::vector<PathComponent>&,std::string&)> build_location_ref;
+        build_location_ref=[&](const nift::ast::Expr& ex,std::shared_ptr<std::shared_ptr<nift::RuntimeValue>>& root,std::vector<PathComponent>& path,std::string& e)->bool{
             if(ex.kind==nift::ast::Kind::Binding){
                 auto* b=find_binding(ex.name);if(!b)return false;b->sync();if(!b->value){e="reference target no longer exists: "+ex.name;return false;}
                 if(b->is_location_ref()){root=b->ref_root_slot;path=b->ref_path;}else root=b->slot;
@@ -5127,7 +5158,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             if(ex.kind==nift::ast::Kind::Member){if(!ex.left||!build_location_ref(*ex.left,root,path,e))return false;path.push_back(PathComponent::member(ex.name));return true;}
             if(ex.kind==nift::ast::Kind::Index){
                 if(!ex.left||!build_location_ref(*ex.left,root,path,e))return false;
-                json::Document idx;auto cc=ast_context();if(!nift::ast::evaluate(*ex.right,cc,idx,e))return false;
+                nift::RuntimeValue idx;auto cc=ast_context();if(!nift::ast::evaluate(*ex.right,cc,idx,e))return false;
                 if(idx.is_number()&&idx.num>=0&&std::trunc(idx.num)==idx.num)path.push_back(PathComponent::at((std::size_t)idx.num));
                 else if(idx.is_string())path.push_back(PathComponent::member(idx.string));
                 else{e="invalid reference index";return false;}return true;
@@ -5135,31 +5166,31 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             return false;
         };
         auto bind_location=[&](VariableBinding& dst,const nift::ast::Expr& ex,std::string& e)->bool{
-            std::shared_ptr<std::shared_ptr<json::Document>> root;std::vector<PathComponent> path;if(!build_location_ref(ex,root,path,e)||path.empty())return false;
+            std::shared_ptr<std::shared_ptr<nift::RuntimeValue>> root;std::vector<PathComponent> path;if(!build_location_ref(ex,root,path,e)||path.empty())return false;
             dst.ref_root_slot=std::move(root);dst.ref_path=std::move(path);dst.sync();if(!dst.value){e="reference target no longer exists";return false;}dst.type=nift_binding_type(*dst.value);return dst.value->is_array()||dst.value->is_object()||(dst.value->is_string()&&dst.value->string.rfind("\x1fnift:",0)==0);
         };
-        auto assign_plain=[&](const std::string& name,json::Document v,std::string& e)->bool{for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(name);if(it==sc->end())continue;if(!it->second.mutable_binding){e="cannot assign to const binding: "+name;return false;}it->second.sync();if(it->second.value&&it->second.value->is_string()&&it->second.value->string.rfind("\x1fnift:atomic:",0)==0&&!(v.is_string()&&v.string.rfind("\x1fnift:atomic:",0)==0)){auto ai=atomic_instances_.find(it->second.value->string.substr(13));if(ai==atomic_instances_.end()){e="atomic: invalid handle";return false;}if(ai->second->kind==AtomicInstance::Kind::Int){std::int64_t x=0;if(v.type==json::Type::StrNumber){auto r=std::from_chars(v.string.data(),v.string.data()+v.string.size(),x);if(r.ec!=std::errc()||r.ptr!=v.string.data()+v.string.size()){e="assignment to atomic<int> requires signed 64-bit integer";return false;}}else if(v.is_number()&&std::isfinite(v.num)&&std::trunc(v.num)==v.num&&v.num>=-9223372036854775808.0&&v.num<9223372036854775808.0)x=(std::int64_t)v.num;else{e="assignment to atomic<int> requires signed 64-bit integer";return false;}ai->second->int_value.store(x);}else{if(!v.is_bool()){e="assignment to atomic<bool> requires bool";return false;}ai->second->bool_value.store(v.boolean);}last_expression_mutation_=true;return true;}const int at=nift_binding_type(v);if(!nift_type_assignable(at,it->second.type)){e="cannot change binding type: "+name;return false;}it->second.rebind(std::make_shared<json::Document>(std::move(v)));return true;}e="assignment to undefined binding: "+name;return false;};
+        auto assign_plain=[&](const std::string& name,nift::RuntimeValue v,std::string& e)->bool{for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(name);if(it==sc->end())continue;if(!it->second.mutable_binding){e="cannot assign to const binding: "+name;return false;}it->second.sync();if(it->second.value&&it->second.value->is_string()&&it->second.value->string.rfind("\x1fnift:atomic:",0)==0&&!(v.is_string()&&v.string.rfind("\x1fnift:atomic:",0)==0)){auto ai=atomic_instances_.find(it->second.value->string.substr(13));if(ai==atomic_instances_.end()){e="atomic: invalid handle";return false;}if(ai->second->kind==AtomicInstance::Kind::Int){std::int64_t x=0;if(v.type==nift::RuntimeType::StrNumber){auto r=std::from_chars(v.string.data(),v.string.data()+v.string.size(),x);if(r.ec!=std::errc()||r.ptr!=v.string.data()+v.string.size()){e="assignment to atomic<int> requires signed 64-bit integer";return false;}}else if(v.is_number()&&std::isfinite(v.num)&&std::trunc(v.num)==v.num&&v.num>=-9223372036854775808.0&&v.num<9223372036854775808.0)x=(std::int64_t)v.num;else{e="assignment to atomic<int> requires signed 64-bit integer";return false;}ai->second->int_value.store(x);}else{if(!v.is_bool()){e="assignment to atomic<bool> requires bool";return false;}ai->second->bool_value.store(v.boolean);}last_expression_mutation_=true;return true;}const int at=nift_binding_type(v);if(!nift_type_assignable(at,it->second.type)){e="cannot change binding type: "+name;return false;}it->second.rebind(std::make_shared<nift::RuntimeValue>(std::move(v)));return true;}e="assignment to undefined binding: "+name;return false;};
             // Resolve an Index/Member chain to a non-const Document reference so
             // that assignment mutates the aliased collection element in place
             // (json-mutate's e["total"] = e.v * 2 must write back into arr).
-            std::function<bool(const nift::ast::Expr&,json::Document*&,std::string&)> resolve_target_ref;
-            resolve_target_ref=[&](const nift::ast::Expr& t,json::Document*& out,std::string& e)->bool{
+            std::function<bool(const nift::ast::Expr&,nift::RuntimeValue*&,std::string&)> resolve_target_ref;
+            resolve_target_ref=[&](const nift::ast::Expr& t,nift::RuntimeValue*& out,std::string& e)->bool{
                 if(t.kind==nift::ast::Kind::Binding){for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(t.name);if(it!=sc->end()){it->second.sync();if(!it->second.mutable_binding){e="cannot assign to const binding: "+t.name;return false;}if(!it->second.value){e="reference target no longer exists: "+t.name;return false;}out=it->second.is_location_ref()?it->second.resolve_location():it->second.value.get();if(!out){e="reference target no longer exists: "+t.name;return false;}return true;}}e="assignment to undefined binding: "+t.name;return false;}
-                if(t.kind==nift::ast::Kind::Index){json::Document* b=nullptr;if(!resolve_target_ref(*t.left,b,e))return false;json::Document i;auto c=ast_context();if(!nift::ast::evaluate(*t.right,c,i,e))return false;if(b->is_array()&&i.is_number()&&i.num>=0&&std::trunc(i.num)==i.num&&(std::size_t)i.num<b->array.size()){out=&b->array[(std::size_t)i.num];return true;}if(b->is_object()&&i.is_string()){out=&(*b)[i.string];return true;}e="invalid index target";return false;}
-                if(t.kind==nift::ast::Kind::Member){json::Document* b=nullptr;if(!resolve_target_ref(*t.left,b,e))return false;if(!b->is_object()){e="value has no member: "+t.name;return false;}out=&(*b)[t.name];return true;}
+                if(t.kind==nift::ast::Kind::Index){nift::RuntimeValue* b=nullptr;if(!resolve_target_ref(*t.left,b,e))return false;nift::RuntimeValue i;auto c=ast_context();if(!nift::ast::evaluate(*t.right,c,i,e))return false;if(b->is_array()&&i.is_number()&&i.num>=0&&std::trunc(i.num)==i.num&&(std::size_t)i.num<b->array.size()){out=&b->array[(std::size_t)i.num];return true;}if(b->is_object()&&i.is_string()){out=&(*b)[i.string];return true;}e="invalid index target";return false;}
+                if(t.kind==nift::ast::Kind::Member){nift::RuntimeValue* b=nullptr;if(!resolve_target_ref(*t.left,b,e))return false;if(!b->is_object()){e="value has no member: "+t.name;return false;}out=&(*b)[t.name];return true;}
                 e="unsupported assignment target";return false;};
-            auto assign_indexed=[&](const nift::ast::Expr& target,json::Document rhs,std::string& e)->bool{json::Document* slot=nullptr;if(!resolve_target_ref(target,slot,e))return false;*slot=std::move(rhs);last_expression_mutation_=true;return true;};
-        auto large_num=[&](const json::Document& d)->bool{return d.is_number()&&(d.type==json::Type::StrNumber||d.num>=9007199254740992.0||d.num<=-9007199254740992.0);};
+            auto assign_indexed=[&](const nift::ast::Expr& target,nift::RuntimeValue rhs,std::string& e)->bool{nift::RuntimeValue* slot=nullptr;if(!resolve_target_ref(target,slot,e))return false;*slot=std::move(rhs);last_expression_mutation_=true;return true;};
+        auto large_num=[&](const nift::RuntimeValue& d)->bool{return d.is_number()&&(d.type==nift::RuntimeType::StrNumber||d.num>=9007199254740992.0||d.num<=-9007199254740992.0);};
             // Execute a prepared native collection call (push/size/pop/empty/etc.)
             // against the live receiver binding. Falls back to the legacy evaluator
             // when the receiver is not a plain array or the method is unsupported.
             auto execute_native_call=[&](const nift::ast::Stmt& st,std::string& e)->bool{
-                auto c=ast_context();std::vector<json::Document> av;
+                auto c=ast_context();std::vector<nift::RuntimeValue> av;
                 VariableBinding* rb=nullptr;
                 for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(st.name);if(it!=sc->end()){rb=&it->second;break;}}
-                for(const auto& a:st.call_args){json::Document v;if(!nift::ast::evaluate(*a,c,v,e))return false;av.push_back(std::move(v));}
+                for(const auto& a:st.call_args){nift::RuntimeValue v;if(!nift::ast::evaluate(*a,c,v,e))return false;av.push_back(std::move(v));}
                 if(rb)rb->sync();
-                if(!rb||!rb->value){json::Document lege;return c.legacy(st.text,lege,e);}
+                if(!rb||!rb->value){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}
                 if(rb->value->is_string()&&rb->value->string.rfind("\x1fnift:file:",0)==0){
                     auto fid=rb->value->string.substr(11);
                     auto fi=file_instances_.find(fid);
@@ -5167,7 +5198,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     auto& f=fi->second;
                     if(st.op=="write"||st.op=="write_line"){
                         if(av.size()!=1||!f->open||!(f->mode=="w"||f->mode=="a"||f->mode=="rw")){if(av.size()!=1&&e.empty())e=st.op+": expected one value";return false;}
-                        json::Document v=std::move(av[0]);
+                        nift::RuntimeValue v=std::move(av[0]);
                         if(v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0)){e=st.op+": value is not directly renderable";return false;}
                         std::string d=render_expression_value(v);
                         if(st.op=="write_line")d+='\n';
@@ -5178,7 +5209,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                         f->dirty=f->working!=f->saved;
                         return true;
                     }
-                    {json::Document lege;return c.legacy(st.text,lege,e);}
+                    {nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}
                 }
                 if(rb->value->is_string()&&rb->value->string.rfind("\x1fnift:collection:",0)==0){
                     auto cid=rb->value->string.substr(17);
@@ -5186,39 +5217,39 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     if(ci==collection_instances_.end()){e="invalid collection handle";return false;}
                     auto& cc=ci->second;
                     const bool is_map=cc->kind==CollectionKind::Map||cc->kind==CollectionKind::SortedMap;
-                    auto ckey=[&](const json::Document& x)->std::string{if(x.is_bool())return std::string("b")+(x.boolean?"1":"0");if(x.is_string()){if(x.string.rfind("\x1fnift:",0)==0)return "";return std::string("s")+x.string;}if(x.type==json::Type::StrNumber)return std::string("N")+x.string;double nn=x.num;if(nn==0.0)nn=0.0;uint64_t bits=0;std::memcpy(&bits,&nn,sizeof(bits));return std::string("n")+std::to_string(bits);};
+                    auto ckey=[&](const nift::RuntimeValue& x)->std::string{if(x.is_bool())return std::string("b")+(x.boolean?"1":"0");if(x.is_string()){if(x.string.rfind("\x1fnift:",0)==0)return "";return std::string("s")+x.string;}if(x.type==nift::RuntimeType::StrNumber)return std::string("N")+x.string;double nn=x.num;if(nn==0.0)nn=0.0;uint64_t bits=0;std::memcpy(&bits,&nn,sizeof(bits));return std::string("n")+std::to_string(bits);};
                     if(!is_map&&(st.op=="add"||st.op=="contains"||st.op=="size"||st.op=="empty")){
                         if(st.op=="size"){if(!av.empty()){e="size: expected no arguments";return false;}return true;}
                         if(st.op=="empty"){if(!av.empty()){e="empty: expected no arguments";return false;}return true;}
                         if(st.op=="add"||st.op=="contains"){
                             if(av.size()!=1){e=st.op+": expected one value";return false;}
-                            const json::Document& v=av[0];
+                            const nift::RuntimeValue& v=av[0];
                             const std::string k=ckey(v);
-                            const bool indexed=!k.empty()&&!(v.is_number()&&v.type!=json::Type::StrNumber&&cc->has_huge_int);
-                            if(!indexed){json::Document lege;return c.legacy(st.text,lege,e);}
+                            const bool indexed=!k.empty()&&!(v.is_number()&&v.type!=nift::RuntimeType::StrNumber&&cc->has_huge_int);
+                            if(!indexed){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}
                             const bool present=cc->scalar_keys.count(k)!=0;
                             if(st.op=="contains"){return true;}
                             if(!rb->mutable_binding){e="cannot mutate const collection: "+st.name;return false;}
                             if(st.op=="add"&&!present){cc->values.push_back(v);cc->scalar_keys.insert(k);}else if(st.op=="add"&&present){/* already present: no-op */}last_expression_mutation_=true;return true;
                         }
                     }
-                    {json::Document lege;return c.legacy(st.text,lege,e);}
+                    {nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}
                 }
-                if(!rb->value->is_array()){json::Document lege;return c.legacy(st.text,lege,e);}
+                if(!rb->value->is_array()){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}
                 auto& arr=rb->value->array;
                 if(st.op=="push"){if(av.size()!=1){e="push: expected one argument";return false;}if(!rb->mutable_binding){e="cannot mutate const array: "+st.name;return false;}arr.push_back(std::move(av[0]));last_expression_mutation_=true;return true;}
                 if(st.op=="size"||st.op=="length"){if(!av.empty()){e=st.op+": expected no arguments";return false;}last_expression_mutation_=false;return true;}
                 if(st.op=="empty"){if(!av.empty()){e="empty: expected no arguments";return false;}last_expression_mutation_=false;return true;}
                 if(st.op=="first"||st.op=="last"||st.op=="pop"){if(!av.empty()){e=st.op+": expected no arguments";return false;}if(arr.empty()){e=st.op+": array is empty";return false;}if(st.op=="pop"){if(!rb->mutable_binding){e="cannot mutate const array: "+st.name;return false;}arr.pop_back();last_expression_mutation_=true;}else last_expression_mutation_=false;return true;}
                 if(st.op=="clear"){if(!av.empty()){e="clear: expected no arguments";return false;}if(!rb->mutable_binding){e="cannot mutate const array: "+st.name;return false;}arr.clear();last_expression_mutation_=true;return true;}
-                {json::Document lege;return c.legacy(st.text,lege,e);}};
+                {nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}};
         execute_body=[&](const std::vector<std::unique_ptr<nift::ast::Stmt>>& body,std::string& e)->bool{for(const auto& s:body){if(pending_control_.kind!=ControlFlow::None)return true;if(!execute_prepared(*s,e))return false;}return true;};
-        execute_prepared=[&](const nift::ast::Stmt& st,std::string& e)->bool{auto c=ast_context();json::Document rhs,oldv,next;if(st.kind==nift::ast::StmtKind::If){json::Document cv;if(!st.condition){e="unsupported prepared if condition";return false;}if(!nift::ast::evaluate(*st.condition,c,cv,e))return false;if(!nift::ast::truthy(cv))return true;return execute_body(st.body,e);}if(st.kind==nift::ast::StmtKind::While){json::Document cv;while(true){if(pending_control_.kind!=ControlFlow::None)return true;if(!st.condition){e="unsupported prepared while condition";return false;}if(!nift::ast::evaluate(*st.condition,c,cv,e))return false;if(!nift::ast::truthy(cv))return true;push_json_scope();++loop_depth_;const bool wok=execute_body(st.body,e);--loop_depth_;pop_json_scope();if(!wok)return false;if(pending_control_.kind==ControlFlow::Break){pending_control_={};return true;}if(pending_control_.kind==ControlFlow::Continue){pending_control_={};continue;}}return true;}if(st.kind==nift::ast::StmtKind::For){std::shared_ptr<const json::Document> col;json::Document colv;if(st.iterable&&st.iterable->kind==nift::ast::Kind::Binding){if(!c.resolve_ref(st.iterable->name,col,e))return false;}else if(st.iterable){if(!nift::ast::evaluate(*st.iterable,c,colv,e))return false;col=std::make_shared<const json::Document>(std::move(colv));}else{e="unsupported prepared for iterable";return false;}if(!col->is_array()){e="for iteration requires an array";return false;}for(std::size_t k=0;k<col->array.size();++k){if(pending_control_.kind!=ControlFlow::None)break;push_json_scope();VariableBinding lb{std::make_shared<json::Document>(col->array[k]),nift_binding_type(col->array[k]),true,false};
+        execute_prepared=[&](const nift::ast::Stmt& st,std::string& e)->bool{auto c=ast_context();nift::RuntimeValue rhs,oldv,next;if(st.kind==nift::ast::StmtKind::If){nift::RuntimeValue cv;if(!st.condition){e="unsupported prepared if condition";return false;}if(!nift::ast::evaluate(*st.condition,c,cv,e))return false;if(!nift::ast::truthy(cv))return true;return execute_body(st.body,e);}if(st.kind==nift::ast::StmtKind::While){nift::RuntimeValue cv;while(true){if(pending_control_.kind!=ControlFlow::None)return true;if(!st.condition){e="unsupported prepared while condition";return false;}if(!nift::ast::evaluate(*st.condition,c,cv,e))return false;if(!nift::ast::truthy(cv))return true;push_json_scope();++loop_depth_;const bool wok=execute_body(st.body,e);--loop_depth_;pop_json_scope();if(!wok)return false;if(pending_control_.kind==ControlFlow::Break){pending_control_={};return true;}if(pending_control_.kind==ControlFlow::Continue){pending_control_={};continue;}}return true;}if(st.kind==nift::ast::StmtKind::For){std::shared_ptr<const nift::RuntimeValue> col;nift::RuntimeValue colv;if(st.iterable&&st.iterable->kind==nift::ast::Kind::Binding){if(!c.resolve_ref(st.iterable->name,col,e))return false;}else if(st.iterable){if(!nift::ast::evaluate(*st.iterable,c,colv,e))return false;col=std::make_shared<const nift::RuntimeValue>(std::move(colv));}else{e="unsupported prepared for iterable";return false;}if(!col->is_array()){e="for iteration requires an array";return false;}for(std::size_t k=0;k<col->array.size();++k){if(pending_control_.kind!=ControlFlow::None)break;push_json_scope();VariableBinding lb{std::make_shared<nift::RuntimeValue>(col->array[k]),nift_binding_type(col->array[k]),true,false};
             // Loop elements are location references rooted at the iterated
             // aggregate binding, so in-body mutation of the parent (push/pop/
             // replace) cannot dangle the element (no interior pointer retained).
             if(st.iterable&&st.iterable->kind==nift::ast::Kind::Binding){auto* src=find_binding(st.iterable->name);if(src){src->sync();if(src->value&&(src->value->is_array()||src->value->is_object())){lb.ref_root_slot=src->slot;std::vector<PathComponent> pc;pc.push_back(PathComponent::at(k));lb.ref_path=std::move(pc);}}}
-            variable_scopes_.back().emplace(st.name,std::move(lb));++loop_depth_;const bool bok=execute_body(st.body,e);--loop_depth_;pop_json_scope();if(!bok)return false;if(pending_control_.kind==ControlFlow::Break){pending_control_={};break;}if(pending_control_.kind==ControlFlow::Continue){pending_control_={};continue;}}return true;}if(st.kind==nift::ast::StmtKind::Break){pending_control_.kind=ControlFlow::Break;pending_control_.value.reset();return true;}if(st.kind==nift::ast::StmtKind::Continue){pending_control_.kind=ControlFlow::Continue;pending_control_.value.reset();return true;}if(st.kind==nift::ast::StmtKind::Return){json::Document rv;pending_control_.ref_root_slot.reset();pending_control_.ref_path.clear();if(st.expr){if(!nift::ast::evaluate(*st.expr,c,rv,e))return false;VariableBinding rl;std::string locerr;if(bind_location(rl,*st.expr,locerr)&&rl.is_location_ref()&&rl.value){pending_control_.ref_root_slot=rl.ref_root_slot;pending_control_.ref_path=rl.ref_path;}else if(last_call_return_loc_root_&&(rv.is_array()||rv.is_object()||(rv.is_string()&&rv.string.rfind("\x1fnift:",0)==0))){pending_control_.ref_root_slot=last_call_return_loc_root_;pending_control_.ref_path=last_call_return_loc_path_;}pending_control_.value=std::make_shared<json::Document>(std::move(rv));}else pending_control_.value.reset();pending_control_.kind=ControlFlow::Return;return true;}if(st.kind==nift::ast::StmtKind::Expression){return execute_native_call(st,e);}if(st.kind==nift::ast::StmtKind::Declaration){last_call_return_loc_root_.reset();last_call_return_loc_path_.clear();if(!nift::ast::evaluate(*st.expr,c,rhs,e))return false;if(large_num(rhs)){json::Document lege;return c.legacy(st.text,lege,e);}if(variable_scopes_.empty()){e="no scope for declaration: "+st.name;return false;}auto& scope=variable_scopes_.back();if(scope.count(st.name)){e="binding already declared in this scope: "+st.name;return false;}if(last_call_return_loc_root_&&(rhs.is_array()||rhs.is_object()||(rhs.is_string()&&rhs.string.rfind("\x1fnift:",0)==0))){VariableBinding dloc;dloc.ref_root_slot=last_call_return_loc_root_;dloc.ref_path=last_call_return_loc_path_;dloc.sync();if(!dloc.value){e="reference target no longer exists";return false;}dloc.type=nift_binding_type(*dloc.value);dloc.mutable_binding=true;last_call_return_loc_root_.reset();last_call_return_loc_path_.clear();scope.emplace(st.name,std::move(dloc));return true;}auto sp=std::make_shared<json::Document>(std::move(rhs));const int dt=st.decl_type;const int bt=(dt==3)?3:((dt==2)?nift_binding_type(*sp):((dt>=0&&dt!=2&&dt!=3)?dt:nift_binding_type(*sp)));auto ins=scope.emplace(st.name,VariableBinding{sp,bt,true,false});if(st.expr&&(st.expr->kind==nift::ast::Kind::Index||st.expr->kind==nift::ast::Kind::Member)){std::string re;if(!bind_location(ins.first->second,*st.expr,re)&&!re.empty()){e=re;scope.erase(ins.first);return false;}}else if(st.expr&&st.expr->kind==nift::ast::Kind::Binding&&(sp->is_array()||sp->is_object())){auto* src=find_binding(st.expr->name);if(src){src->sync();if(src->value){ins.first->second.value=src->value;*ins.first->second.slot=src->value;}}}return true;}if(st.kind==nift::ast::StmtKind::Assignment){if(!nift::ast::evaluate(*st.expr,c,rhs,e))return false;if(large_num(rhs)){json::Document lege;return c.legacy(st.text,lege,e);}if(st.target)return assign_indexed(*st.target,std::move(rhs),e);return assign_plain(st.name,std::move(rhs),e);}VariableBinding* cb=nullptr;for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(st.name);if(it!=sc->end()){cb=&it->second;break;}}if(!cb){e="assignment to undefined binding: "+st.name;return false;}cb->sync();if(!cb->mutable_binding){e="cannot assign to const binding: "+st.name;return false;}if(cb->value&&cb->value->is_string()&&cb->value->string.rfind("\x1fnift:atomic:",0)==0){json::Document lege;return c.legacy(st.text,lege,e);}if(st.kind==nift::ast::StmtKind::Increment){if(!cb->value->is_number()){e="increment/decrement requires a numeric lvalue";return false;}oldv=*cb->value;if(large_num(oldv)){json::Document lege;return c.legacy(st.text,lege,e);}next=json::Document(oldv.num+(st.op=="++"?1.0:-1.0));return assign_plain(st.name,std::move(next),e);}if(!nift::ast::evaluate(*st.expr,c,rhs,e))return false;if(st.op=="+="&&cb->value->is_string()&&rhs.is_string()){if(cb->value.use_count()==2){cb->value->string.append(rhs.string);last_expression_mutation_=true;return true;}oldv=*cb->value;next=json::Document(oldv.string+rhs.string);}else if(st.op=="+="&&cb->value->is_array()&&rhs.is_array()){oldv=*cb->value;next=json::Document::make_array();next.array.reserve(oldv.array.size()+rhs.array.size());next.array.insert(next.array.end(),oldv.array.begin(),oldv.array.end());next.array.insert(next.array.end(),rhs.array.begin(),rhs.array.end());}else{oldv=*cb->value;if(!oldv.is_number()||!rhs.is_number()){e="arithmetic operators require numeric operands";return false;}if(large_num(oldv)||large_num(rhs)){json::Document lege;return c.legacy(st.text,lege,e);}if(st.op=="+=")next=json::Document(oldv.num+rhs.num);else if(st.op=="-=")next=json::Document(oldv.num-rhs.num);else if(st.op=="*=")next=json::Document(oldv.num*rhs.num);else if(st.op=="/="){if(rhs.num==0){e="division by zero";return false;}next=json::Document(oldv.num/rhs.num);}else{if(rhs.num==0){e="modulo by zero";return false;}next=json::Document(std::fmod(oldv.num,rhs.num));}}return assign_plain(st.name,std::move(next),e);};
+            variable_scopes_.back().emplace(st.name,std::move(lb));++loop_depth_;const bool bok=execute_body(st.body,e);--loop_depth_;pop_json_scope();if(!bok)return false;if(pending_control_.kind==ControlFlow::Break){pending_control_={};break;}if(pending_control_.kind==ControlFlow::Continue){pending_control_={};continue;}}return true;}if(st.kind==nift::ast::StmtKind::Break){pending_control_.kind=ControlFlow::Break;pending_control_.value.reset();return true;}if(st.kind==nift::ast::StmtKind::Continue){pending_control_.kind=ControlFlow::Continue;pending_control_.value.reset();return true;}if(st.kind==nift::ast::StmtKind::Return){nift::RuntimeValue rv;pending_control_.ref_root_slot.reset();pending_control_.ref_path.clear();if(st.expr){if(!nift::ast::evaluate(*st.expr,c,rv,e))return false;VariableBinding rl;std::string locerr;if(bind_location(rl,*st.expr,locerr)&&rl.is_location_ref()&&rl.value){pending_control_.ref_root_slot=rl.ref_root_slot;pending_control_.ref_path=rl.ref_path;}else if(last_call_return_loc_root_&&(rv.is_array()||rv.is_object()||(rv.is_string()&&rv.string.rfind("\x1fnift:",0)==0))){pending_control_.ref_root_slot=last_call_return_loc_root_;pending_control_.ref_path=last_call_return_loc_path_;}pending_control_.value=std::make_shared<nift::RuntimeValue>(std::move(rv));}else pending_control_.value.reset();pending_control_.kind=ControlFlow::Return;return true;}if(st.kind==nift::ast::StmtKind::Expression){return execute_native_call(st,e);}if(st.kind==nift::ast::StmtKind::Declaration){last_call_return_loc_root_.reset();last_call_return_loc_path_.clear();if(!nift::ast::evaluate(*st.expr,c,rhs,e))return false;if(large_num(rhs)){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}if(variable_scopes_.empty()){e="no scope for declaration: "+st.name;return false;}auto& scope=variable_scopes_.back();if(scope.count(st.name)){e="binding already declared in this scope: "+st.name;return false;}if(last_call_return_loc_root_&&(rhs.is_array()||rhs.is_object()||(rhs.is_string()&&rhs.string.rfind("\x1fnift:",0)==0))){VariableBinding dloc;dloc.ref_root_slot=last_call_return_loc_root_;dloc.ref_path=last_call_return_loc_path_;dloc.sync();if(!dloc.value){e="reference target no longer exists";return false;}dloc.type=nift_binding_type(*dloc.value);dloc.mutable_binding=true;last_call_return_loc_root_.reset();last_call_return_loc_path_.clear();scope.emplace(st.name,std::move(dloc));return true;}auto sp=std::make_shared<nift::RuntimeValue>(std::move(rhs));const int dt=st.decl_type;const int bt=(dt==3)?3:((dt==2)?nift_binding_type(*sp):((dt>=0&&dt!=2&&dt!=3)?dt:nift_binding_type(*sp)));auto ins=scope.emplace(st.name,VariableBinding{sp,bt,true,false});if(st.expr&&(st.expr->kind==nift::ast::Kind::Index||st.expr->kind==nift::ast::Kind::Member)){std::string re;if(!bind_location(ins.first->second,*st.expr,re)&&!re.empty()){e=re;scope.erase(ins.first);return false;}}else if(st.expr&&st.expr->kind==nift::ast::Kind::Binding&&(sp->is_array()||sp->is_object())){auto* src=find_binding(st.expr->name);if(src){src->sync();if(src->value){ins.first->second.value=src->value;*ins.first->second.slot=src->value;}}}return true;}if(st.kind==nift::ast::StmtKind::Assignment){if(!nift::ast::evaluate(*st.expr,c,rhs,e))return false;if(large_num(rhs)){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}if(st.target)return assign_indexed(*st.target,std::move(rhs),e);return assign_plain(st.name,std::move(rhs),e);}VariableBinding* cb=nullptr;for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(st.name);if(it!=sc->end()){cb=&it->second;break;}}if(!cb){e="assignment to undefined binding: "+st.name;return false;}cb->sync();if(!cb->mutable_binding){e="cannot assign to const binding: "+st.name;return false;}if(cb->value&&cb->value->is_string()&&cb->value->string.rfind("\x1fnift:atomic:",0)==0){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}if(st.kind==nift::ast::StmtKind::Increment){if(!cb->value->is_number()){e="increment/decrement requires a numeric lvalue";return false;}oldv=*cb->value;if(large_num(oldv)){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}next=nift::RuntimeValue(oldv.num+(st.op=="++"?1.0:-1.0));return assign_plain(st.name,std::move(next),e);}if(!nift::ast::evaluate(*st.expr,c,rhs,e))return false;if(st.op=="+="&&cb->value->is_string()&&rhs.is_string()){if(cb->value.use_count()==2){cb->value->string.append(rhs.string);last_expression_mutation_=true;return true;}oldv=*cb->value;next=nift::RuntimeValue(oldv.string+rhs.string);}else if(st.op=="+="&&cb->value->is_array()&&rhs.is_array()){oldv=*cb->value;next=nift::RuntimeValue::make_array();next.array.reserve(oldv.array.size()+rhs.array.size());next.array.insert(next.array.end(),oldv.array.begin(),oldv.array.end());next.array.insert(next.array.end(),rhs.array.begin(),rhs.array.end());}else{oldv=*cb->value;if(!oldv.is_number()||!rhs.is_number()){e="arithmetic operators require numeric operands";return false;}if(large_num(oldv)||large_num(rhs)){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}if(st.op=="+=")next=nift::RuntimeValue(oldv.num+rhs.num);else if(st.op=="-=")next=nift::RuntimeValue(oldv.num-rhs.num);else if(st.op=="*=")next=nift::RuntimeValue(oldv.num*rhs.num);else if(st.op=="/="){if(rhs.num==0){e="division by zero";return false;}next=nift::RuntimeValue(oldv.num/rhs.num);}else{if(rhs.num==0){e="modulo by zero";return false;}next=nift::RuntimeValue(std::fmod(oldv.num,rhs.num));}}return assign_plain(st.name,std::move(next),e);};
         if (source.compare(i, 7, "@while(") == 0) {
             std::size_t hc=0;if(!find_balanced(source,i+6,'(',')',hc)){fail(source_path,source,i,"@while has no matching ')' for its condition");break;}
             std::size_t bo=hc+1;while(bo<source.size()&&std::isspace((unsigned char)source[bo]))++bo;std::size_t bc=0;
@@ -5228,7 +5259,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             auto prepared_condition=nift::ast::parse_expression(condition);
             std::vector<std::unique_ptr<nift::ast::Stmt>> prepared_body; const bool prepared_body_ok=prepare_loop_body(body.text,prepared_body);
             
-            while(result_.ok){bool yes=false;std::string e;if(prepared_condition.supported){auto c=ast_context();json::Document cv;if(!nift::ast::evaluate(*prepared_condition.expr,c,cv,e)){fail(source_path,source,i,e);break;}yes=nift::ast::truthy(cv);last_expression_mutation_=false;}else if(!evaluate_condition(condition,yes,e)){fail(source_path,source,i,e);break;}if(!yes)break;
+            while(result_.ok){bool yes=false;std::string e;if(prepared_condition.supported){auto c=ast_context();nift::RuntimeValue cv;if(!nift::ast::evaluate(*prepared_condition.expr,c,cv,e)){fail(source_path,source,i,e);break;}yes=nift::ast::truthy(cv);last_expression_mutation_=false;}else if(!evaluate_condition(condition,yes,e)){fail(source_path,source,i,e);break;}if(!yes)break;
                 push_json_scope(); ++loop_depth_; RenderResult nested;if(prepared_body_ok){if(!execute_body(prepared_body,e)){nested.ok=false;nested.error.message=e;}}else nested=parse(body.text,source_path,depth+1); --loop_depth_; pop_json_scope();if(!nested.ok){fail(source_path,source,i,nested.error.message);break;}append_indented(output,nested.output,"",code_block_depth_);
                 if (pending_control_.kind == ControlFlow::Continue) { pending_control_ = {}; continue; }
                 if (pending_control_.kind == ControlFlow::Break) { pending_control_ = {}; break; }
@@ -5306,7 +5337,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 break;
             }
 
-            std::shared_ptr<const json::Document> collection;
+            std::shared_ptr<const nift::RuntimeValue> collection;
             if (sort_expression.empty() && valid_binding_identifier(collection_expression)) {
                 for (auto scope = variable_scopes_.rbegin(); scope != variable_scopes_.rend(); ++scope) {
                     auto found = scope->find(collection_expression);
@@ -5314,9 +5345,9 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 }
             }
             if (!collection) {
-                json::Document collection_value; std::string collection_error;
+                nift::RuntimeValue collection_value; std::string collection_error;
                 if (!evaluate_collection_value(collection_expression, collection_value, collection_error)) { fail(source_path, source, i, "@for collection: " + collection_error); break; }
-                collection = std::make_shared<const json::Document>(std::move(collection_value));
+                collection = std::make_shared<const nift::RuntimeValue>(std::move(collection_value));
             }
 
             // Materialize internal v4.3 sequential/set collections for the
@@ -5328,8 +5359,8 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 if(ci->second->kind==CollectionKind::Map||ci->second->kind==CollectionKind::SortedMap){
                     // keep the collection reference; the dedicated map branch below iterates entries.
                 }else{
-                    json::Document materialized=json::Document::make_array();materialized.array=ci->second->values;if(ci->second->kind==CollectionKind::Stack)std::reverse(materialized.array.begin(),materialized.array.end());
-                    collection=std::make_shared<const json::Document>(std::move(materialized));
+                    nift::RuntimeValue materialized=nift::RuntimeValue::make_array();materialized.array=ci->second->values;if(ci->second->kind==CollectionKind::Stack)std::reverse(materialized.array.begin(),materialized.array.end());
+                    collection=std::make_shared<const nift::RuntimeValue>(std::move(materialized));
                 }
             }
 
@@ -5368,24 +5399,24 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 const auto old_value_it=json_bindings_.find(value_name);
                 const bool had_old_key=old_key_it!=json_bindings_.end();
                 const bool had_old_value=old_value_it!=json_bindings_.end();
-                std::shared_ptr<const json::Document> old_key,old_value;
+                std::shared_ptr<const nift::RuntimeValue> old_key,old_value;
                 if(had_old_key)old_key=old_key_it->second;
                 if(had_old_value)old_value=old_value_it->second;
                 const auto previous_loop=json_bindings_.find("loop");
                 const bool had_previous_loop=previous_loop!=json_bindings_.end();
-                std::shared_ptr<const json::Document> previous_loop_value;
+                std::shared_ptr<const nift::RuntimeValue> previous_loop_value;
                 if(had_previous_loop)previous_loop_value=previous_loop->second;
 
                 std::vector<std::size_t> order(entries.size());
                 for(std::size_t n=0;n<order.size();++n)order[n]=n;
-                std::vector<json::Document> sort_keys;
+                std::vector<nift::RuntimeValue> sort_keys;
                 if(!sort_expression.empty()){
                     sort_keys.reserve(entries.size());
-                    json::Type key_type=json::Type::Null;bool have_key_type=false;
+                    nift::RuntimeType key_type=nift::RuntimeType::Null;bool have_key_type=false;
                     for(std::size_t n=0;n<entries.size();++n){
-                        json_bindings_[key_name]=std::make_shared<const json::Document>(entries[n].first);
-                        json_bindings_[value_name]=std::make_shared<const json::Document>(entries[n].second);
-                        std::shared_ptr<const json::Document> key;std::string key_error;
+                        json_bindings_[key_name]=std::make_shared<const nift::RuntimeValue>(entries[n].first);
+                        json_bindings_[value_name]=std::make_shared<const nift::RuntimeValue>(entries[n].second);
+                        std::shared_ptr<const nift::RuntimeValue> key;std::string key_error;
                         if(!resolve_json_value(sort_expression,key,key_error)||!key_error.empty()){fail(source_path,source,i,key_error.empty()?"@for sort key is not a bound JSON path: "+sort_expression:key_error);break;}
                         if(!sortable_scalar(*key)){fail(source_path,source,i,"@for sort keys must all be numbers or all be strings: "+sort_expression);break;}
                         if(!have_key_type){key_type=key->type;have_key_type=true;}
@@ -5398,12 +5429,12 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
 
                 for(std::size_t position=0;position<order.size()&&result_.ok;++position){
                     const auto& entry=entries[order[position]];
-                    json_bindings_[key_name]=std::make_shared<const json::Document>(entry.first);
-                    json_bindings_[value_name]=std::make_shared<const json::Document>(entry.second);
+                    json_bindings_[key_name]=std::make_shared<const nift::RuntimeValue>(entry.first);
+                    json_bindings_[value_name]=std::make_shared<const nift::RuntimeValue>(entry.second);
                     json_bindings_["loop"]=make_loop_metadata(position,order.size());
                     push_json_scope();
-                    variable_scopes_.back().emplace(key_name,VariableBinding{std::make_shared<json::Document>(entry.first),nift_binding_type(entry.first),true,false});
-                    variable_scopes_.back().emplace(value_name,VariableBinding{std::make_shared<json::Document>(entry.second),nift_binding_type(entry.second),true,false});
+                    variable_scopes_.back().emplace(key_name,VariableBinding{std::make_shared<nift::RuntimeValue>(entry.first),nift_binding_type(entry.first),true,false});
+                    variable_scopes_.back().emplace(value_name,VariableBinding{std::make_shared<nift::RuntimeValue>(entry.second),nift_binding_type(entry.second),true,false});
                     ++loop_depth_;
                     const auto nested=parse(body.text,source_path,depth+1);
                     --loop_depth_;
@@ -5449,25 +5480,25 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
 
                 const auto previous = json_bindings_.find(binding_part);
                 const bool had_previous = previous != json_bindings_.end();
-                std::shared_ptr<const json::Document> previous_value;
+                std::shared_ptr<const nift::RuntimeValue> previous_value;
                 if (had_previous) previous_value = previous->second;
                 const auto previous_loop = json_bindings_.find("loop");
                 const bool had_previous_loop = previous_loop != json_bindings_.end();
-                std::shared_ptr<const json::Document> previous_loop_value;
+                std::shared_ptr<const nift::RuntimeValue> previous_loop_value;
                 if (had_previous_loop) previous_loop_value = previous_loop->second;
 
                 std::vector<std::size_t> order(collection->array.size());
                 for (std::size_t n = 0; n < order.size(); ++n) order[n] = n;
-                std::vector<json::Document> sort_keys;
+                std::vector<nift::RuntimeValue> sort_keys;
                 if (!sort_expression.empty()) {
                     sort_keys.reserve(collection->array.size());
-                    json::Type key_type = json::Type::Null;
+                    nift::RuntimeType key_type = nift::RuntimeType::Null;
                     bool have_key_type = false;
                     for (std::size_t n = 0; n < collection->array.size(); ++n) {
-                        const json::Document* element = &collection->array[n];
+                        const nift::RuntimeValue* element = &collection->array[n];
                         json_bindings_[binding_part] =
-                            std::shared_ptr<const json::Document>(collection, element);
-                        std::shared_ptr<const json::Document> key;
+                            std::shared_ptr<const nift::RuntimeValue>(collection, element);
+                        std::shared_ptr<const nift::RuntimeValue> key;
                         std::string key_error;
                         if (!resolve_json_value(sort_expression, key, key_error) || !key_error.empty()) {
                             fail(source_path, source, i, key_error.empty()
@@ -5501,12 +5532,12 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
 
                 for (std::size_t position = 0; position < order.size() && result_.ok; ++position) {
                     const std::size_t index = order[position];
-                    const json::Document* element = &collection->array[index];
-                    json_bindings_[binding_part] = std::make_shared<const json::Document>(*element);
+                    const nift::RuntimeValue* element = &collection->array[index];
+                    json_bindings_[binding_part] = std::make_shared<const nift::RuntimeValue>(*element);
                     json_bindings_["loop"] = make_loop_metadata(position, order.size());
 
                     push_json_scope();
-                    VariableBinding lb{std::make_shared<json::Document>(*element),
+                    VariableBinding lb{std::make_shared<nift::RuntimeValue>(*element),
                         nift_binding_type(*element), true, false};
                     // @for element is a location reference rooted at the iterated
                     // aggregate binding so in-body parent mutation cannot dangle it.
@@ -5586,27 +5617,27 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 const auto old_value_it = json_bindings_.find(value_name);
                 const bool had_old_key = old_key_it != json_bindings_.end();
                 const bool had_old_value = old_value_it != json_bindings_.end();
-                std::shared_ptr<const json::Document> old_key;
-                std::shared_ptr<const json::Document> old_value;
+                std::shared_ptr<const nift::RuntimeValue> old_key;
+                std::shared_ptr<const nift::RuntimeValue> old_value;
                 if (had_old_key) old_key = old_key_it->second;
                 if (had_old_value) old_value = old_value_it->second;
                 const auto previous_loop = json_bindings_.find("loop");
                 const bool had_previous_loop = previous_loop != json_bindings_.end();
-                std::shared_ptr<const json::Document> previous_loop_value;
+                std::shared_ptr<const nift::RuntimeValue> previous_loop_value;
                 if (had_previous_loop) previous_loop_value = previous_loop->second;
 
                 std::vector<std::size_t> order(collection->object.size());
                 for (std::size_t n = 0; n < order.size(); ++n) order[n] = n;
-                std::vector<json::Document> sort_keys;
+                std::vector<nift::RuntimeValue> sort_keys;
                 if (!sort_expression.empty()) {
                     sort_keys.reserve(collection->object.size());
-                    json::Type key_type = json::Type::Null;
+                    nift::RuntimeType key_type = nift::RuntimeType::Null;
                     bool have_key_type = false;
                     for (std::size_t n = 0; n < collection->object.size(); ++n) {
                         const auto& entry = collection->object[n];
-                        json_bindings_[key_name] = std::make_shared<const json::Document>(entry.first);
-                        json_bindings_[value_name] = std::make_shared<const json::Document>(entry.second);
-                        std::shared_ptr<const json::Document> key;
+                        json_bindings_[key_name] = std::make_shared<const nift::RuntimeValue>(entry.first);
+                        json_bindings_[value_name] = std::make_shared<const nift::RuntimeValue>(entry.second);
+                        std::shared_ptr<const nift::RuntimeValue> key;
                         std::string key_error;
                         if (!resolve_json_value(sort_expression, key, key_error) || !key_error.empty()) {
                             fail(source_path, source, i, key_error.empty()
@@ -5640,15 +5671,15 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
 
                 for (std::size_t position = 0; position < order.size() && result_.ok; ++position) {
                     const auto& entry = collection->object[order[position]];
-                    json_bindings_[key_name] = std::make_shared<const json::Document>(entry.first);
-                    json_bindings_[value_name] = std::make_shared<const json::Document>(entry.second);
+                    json_bindings_[key_name] = std::make_shared<const nift::RuntimeValue>(entry.first);
+                    json_bindings_[value_name] = std::make_shared<const nift::RuntimeValue>(entry.second);
                     json_bindings_["loop"] = make_loop_metadata(position, order.size());
 
                     push_json_scope();
                     variable_scopes_.back().emplace(key_name, VariableBinding{
-                        std::make_shared<json::Document>(entry.first),
-                        nift_binding_type(json::Document(entry.first)), true, false});
-                    VariableBinding vb{std::make_shared<json::Document>(entry.second),
+                        std::make_shared<nift::RuntimeValue>(entry.first),
+                        nift_binding_type(nift::RuntimeValue(entry.first)), true, false});
+                    VariableBinding vb{std::make_shared<nift::RuntimeValue>(entry.second),
                         nift_binding_type(entry.second), true, false};
                     // Map @for value is a location reference (key path) so
                     // in-body map mutation cannot dangle the retained value.
@@ -5720,7 +5751,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     break;
                 }
                 const std::string return_expr = trim_copy(source.substr(call_start + 1, return_close - call_start - 1));
-                json::Document return_value(nullptr);
+                nift::RuntimeValue return_value(nullptr);
                 if (!return_expr.empty()) {
                     std::string return_error;
                     if (!evaluate_expression(return_expr, return_value, return_error)) {
@@ -5744,7 +5775,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                         pending_control_.ref_path=last_call_return_loc_path_;
                     }
                 }
-                pending_control_.value = std::make_shared<json::Document>(std::move(return_value));
+                pending_control_.value = std::make_shared<nift::RuntimeValue>(std::move(return_value));
                 pending_control_.kind = ControlFlow::Return;
                 break;
             }
@@ -5844,7 +5875,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 function == "find" || function == "some" || function == "every" || function == "distinct" || function == "reverse" ||
                 function == "sum" || function == "prod" || function == "min" || function == "max" || function == "reduce") {
                 if (!has_parameters) { fail(source_path, source, i, function + ": expected parameters"); break; }
-                json::Document collection_result; std::string collection_error;
+                nift::RuntimeValue collection_result; std::string collection_error;
                 const std::size_t call_end = (end > call_start && source[end - 1] == ';') ? end - 1 : end;
                 const std::string call = "@" + function + source.substr(call_start, call_end - call_start);
                 if (!evaluate_collection_value(call, collection_result, collection_error)) { fail(source_path, source, i, collection_error); break; }
@@ -5910,12 +5941,12 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 if (expression.size() >= 3 && expression.rfind("$[", 0) == 0 && expression.back() == ']') {
                     expression = expression.substr(2, expression.size() - 3);
                 }
-                json::Document array_value;
+                nift::RuntimeValue array_value;
                 std::string join_error;
                 if (!evaluate_collection_value(expression, array_value, join_error)) {
                     fail(source_path, source, i, "join: " + join_error); break;
                 }
-                auto array = std::make_shared<const json::Document>(std::move(array_value));
+                auto array = std::make_shared<const nift::RuntimeValue>(std::move(array_value));
                 if (!array->is_array()) { fail(source_path, source, i, "join: first parameter must resolve to a JSON array"); break; }
                 std::string separator, interpolation_error;
                 if (!interpolate_parameter(parameters[1], separator, interpolation_error)) {
@@ -6229,7 +6260,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     break;
                 }
 
-                std::shared_ptr<const json::Document> document;
+                std::shared_ptr<const nift::RuntimeValue> document;
                 std::string instance_label = "inline JSON";
                 std::size_t directive_end = end;
                 std::string interpolation_error;
@@ -6243,13 +6274,13 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                         source.substr(block_open + 1, block_close - block_open - 1));
                     const auto templated = parse(body.text, source_path, depth + 1);
                     if (!templated.ok) break;
-                    json::Document parsed;
+                    nift::RuntimeValue parsed;
                     std::string parse_error;
-                    if (!nift_json::parse(templated.output, parsed, parse_error)) {
+                    if (!parse_runtime_json(templated.output, parsed, parse_error)) {
                         fail(source_path, source, i, "json: failed to parse inline JSON (" + parse_error + ")");
                         break;
                     }
-                    document = std::make_shared<const json::Document>(std::move(parsed));
+                    document = std::make_shared<const nift::RuntimeValue>(std::move(parsed));
                     directive_end = block_close + 1;
                 } else {
                     const std::size_t path_index = parameters.size() - 1;
@@ -6270,12 +6301,13 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                         break;
                     }
                     std::string parse_error;
-                    document = host_.read_shared_json(json_path, parse_error);
-                    if (!document) {
+                    auto runtime_document = host_.read_shared_runtime_json(json_path, parse_error);
+                    if (!runtime_document) {
                         fail(source_path, source, i, "json: failed to parse " + json_path_argument +
                              (parse_error.empty() ? "" : " (" + parse_error + ")"));
                         break;
                     }
+                    document = std::move(runtime_document);
                     instance_label = json_path_argument;
                     result_.dependencies.insert(host_.relative(json_path));
                 }
@@ -6299,7 +6331,8 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                             break;
                         }
                         std::string binding_error;
-                        if (!resolve_json_value(schema_reference, schema, binding_error)) {
+                        std::shared_ptr<const nift::RuntimeValue> runtime_schema;
+                        if (!resolve_json_value(schema_reference, runtime_schema, binding_error)) {
                             fail(source_path, source, i,
                                  "json: schema name '" + schema_reference +
                                  "' is not bound (quote the argument to use a schema path)");
@@ -6309,6 +6342,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                             fail(source_path, source, i, "json: " + binding_error);
                             break;
                         }
+                        schema = std::make_shared<const json::Document>(nift::runtime_to_json(*runtime_schema));
                         schema_label = schema_reference;
                     } else {
                         std::string schema_path_argument;
@@ -6340,7 +6374,8 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                         result_.dependencies.insert(host_.relative(schema_path));
                     }
                     std::string validation_error;
-                    if (!jsonschema::validate(*document, *schema, validation_error)) {
+                    const json::Document instance_document = nift::runtime_to_json(*document);
+                    if (!jsonschema::validate(instance_document, *schema, validation_error)) {
                         fail(source_path, source, i, "json: " + instance_label+
                              " does not satisfy schema " + schema_label + " (" + validation_error + ")");
                         break;
@@ -6632,19 +6667,19 @@ RenderResult Parser::render() {
 
 bool Parser::invoke_struct_method(std::shared_ptr<StructInstance> instance,
                                   const StructMethod& method,
-                                  const std::vector<json::Document>& args,
+                                  const std::vector<nift::RuntimeValue>& args,
                                   const std::vector<std::string>& arg_sources,
-                                  json::Document& out,
+                                  nift::RuntimeValue& out,
                                   std::string& error) {
     if (args.size() != method.callable.params.size()) { error = "struct method argument count mismatch"; return false; }
     if (callable_call_depth_ >= kMaxCallableDepth) { error = "callable recursion depth exceeded"; return false; }
     ++callable_call_depth_;
     const int caller_loop_depth = loop_depth_; loop_depth_ = 0;
     push_variable_scope(); const std::size_t scope_index=variable_scopes_.size()-1;
-    for(std::size_t i=0;i<args.size();++i){auto sp=std::make_shared<json::Document>(args[i]);variable_scopes_[scope_index][method.callable.params[i]]=VariableBinding{sp,nift_binding_type_from_text(arg_sources[i],*sp),true,false};}
+    for(std::size_t i=0;i<args.size();++i){auto sp=std::make_shared<nift::RuntimeValue>(args[i]);variable_scopes_[scope_index][method.callable.params[i]]=VariableBinding{sp,nift_binding_type_from_text(arg_sources[i],*sp),true,false};}
     std::string id;
     for(const auto& e:struct_instances_) if(e.second==instance){id=e.first;break;}
-    auto thisv=std::make_shared<json::Document>(std::string("\x1fnift:struct:")+id); variable_scopes_[scope_index]["this"]=VariableBinding{thisv,nift_binding_type(*thisv),false,false};
+    auto thisv=std::make_shared<nift::RuntimeValue>(std::string("\x1fnift:struct:")+id); variable_scopes_[scope_index]["this"]=VariableBinding{thisv,nift_binding_type(*thisv),false,false};
     receiver_stack_.push_back(instance); ++function_call_depth_; pending_control_={};
     RenderResult rr=execute_native_program(method.callable.body,method.callable.source_path,1);
     --function_call_depth_; receiver_stack_.pop_back();

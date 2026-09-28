@@ -120,6 +120,18 @@ int main() {
         CHECK(r.output() == "<html><main>hello</main></html>");
     }
 
+    // 8. Replacing a loader starts a new shared runtime-JSON cache generation.
+    {
+        nift::Engine engine;
+        engine.set_root(root);
+        engine.set_loader(memory_loader({{"data.json", R"({"value": 7})"}}));
+        auto first = engine.render(nift::Source::text("@json(data, \"data.json\")$[data.value]"));
+        CHECK(first.ok() && first.output() == "7");
+        engine.set_loader(memory_loader({{"data.json", R"({"value": 8})"}}));
+        auto second = engine.render(nift::Source::text("@json(data, \"data.json\")$[data.value]"));
+        CHECK(second.ok() && second.output() == "8");
+    }
+
     if (failures == 0) {
         std::printf("engine loaders test passed\n");
         return 0;

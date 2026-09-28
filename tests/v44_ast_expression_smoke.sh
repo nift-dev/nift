@@ -10,7 +10,7 @@ timed() {
 }
 cxx=${CXX:-g++}
 t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
-"$cxx" -std=c++17 -O2 -Isrc -Ijsonic/include tests/ast_expression_unit.cpp src/Ast.cpp -o "$t/ast-test"
+"$cxx" -std=c++17 -O2 -Isrc -Ijsonic/include tests/ast_expression_unit.cpp src/Ast.cpp src/RuntimeValue.cpp -o "$t/ast-test"
 "$t/ast-test"
 
 nift=${NIFT:-"$(cd "$(dirname "$0")/.." && pwd)/nift"}

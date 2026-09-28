@@ -1,6 +1,7 @@
 #include "nift/context.h"
 
 #include "Json.h"
+#include "RuntimeJson.h"
 #include "ValueInternal.h"
 
 #include <string>
@@ -32,7 +33,9 @@ bool Context::set_json(std::string name, std::string_view json_text) {
     if (!detail::valid_binding_identifier(name) || detail::structural_builtin_name(name)) return false;
     Value value;
     std::string error;
-    if (!nift_json::parse(std::string(json_text), ValueAccess::doc(value), error)) return false;
+    json::Document document;
+    if (!nift_json::parse(std::string(json_text), document, error)) return false;
+    ValueAccess::runtime(value) = runtime_from_json(document);
     bindings_[std::move(name)] = std::move(value);
     return true;
 }

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Json.h"
+#include "RuntimeValue.h"
 
 #include <algorithm>
 #include <cctype>
@@ -17,9 +17,9 @@ extern char** environ;
 
 namespace nift_environment {
 
-inline bool process_snapshot(json::Document& out, std::string& error) {
+inline bool process_snapshot(nift::RuntimeValue& out, std::string& error) {
     (void)error;
-    out = json::Document::make_object();
+    out = nift::RuntimeValue::make_object();
 #if defined(_WIN32)
     char** current = _environ;
     std::map<std::string, std::pair<std::string, std::string>> values;

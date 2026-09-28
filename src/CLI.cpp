@@ -826,7 +826,7 @@ static int run_eval(int argc, char** argv) {
     for(int i=2;i<argc;++i){std::string a=argv[i];if(a=="--json")json_output=true;else if(a=="--capabilities")capabilities=true;else if(expression.empty())expression=a;else{std::cerr<<"eval: expected one expression\n";return 2;}}
     if(capabilities){if(!expression.empty()){std::cerr<<"eval: --capabilities does not take an expression\n";return 2;}std::cout<<"{\"command\":\"eval\",\"contract\":1,\"json_output\":true,\"project_context\":true,\"value_methods\":[\"keys\",\"values\",\"entries\",\"has\",\"get\",\"merge\",\"map\",\"filter\",\"find\",\"find_index\",\"sort_by\",\"unique\",\"flatten\",\"sum\",\"min\",\"max\",\"group_by\"]}\n";return 0;}
     if(expression.empty()){std::cerr<<"eval: expression required\n";return 2;}
-    ScriptRenderHost host(fs::current_path());TrackedInfo info;Parser parser(host,info);json::Document value;std::string error;
+    ScriptRenderHost host(fs::current_path());TrackedInfo info;Parser parser(host,info);nift::RuntimeValue value;std::string error;
     if(!parser.eval_expression(expression,value,error)){std::cerr<<"eval: "<<error<<'\n';return 2;}
     if(json_output)std::cout<<value.dump()<<'\n';else if(value.is_string())std::cout<<value.string<<'\n';else std::cout<<value.dump()<<'\n';
     return 0;
@@ -854,7 +854,7 @@ static bool shell_glob_expand(const std::string& token,std::vector<std::string>&
             const std::size_t close = token.find(']', i + 2);
             if (close == std::string::npos) { err = "unterminated $[...] in command argument: " + token; return false; }
             const std::string expr = token.substr(i + 2, close - i - 2);
-            json::Document v; std::string ee;
+            nift::RuntimeValue v; std::string ee;
             if (!p.eval_expression(expr, v, ee)) { err = "command interpolation failed: $[" + expr + "]: " + ee; return false; }
             const std::string rendered = p.render_expression_value(v);
             token.replace(i, close - i + 1, rendered);
