@@ -7,8 +7,8 @@ individual implementations evolve.
 
 ## Status
 
-- Current checkpoint: CP10 complete; bounded concurrent one-shot workers are
-  implemented and measured. CP11 persistent workers are next.
+- Current checkpoint: CP11 complete; bounded concurrent persistent workers are
+  implemented and measured. CP12 operational hardening/review is next.
 - Last review gate: Review Gate 3 selected qualified A (the process architecture
   may proceed to persistent-worker design after explicit resumption, but CP09 is
   only a development/low-traffic prototype backend, not a production server).
@@ -899,3 +899,82 @@ CP10 success criterion: met. Independent requests execute concurrently and the
 entire admitted lifecycle remains bounded. Proceed to CP11 to measure worker
 persistence independently; do not describe persistence as the source of the
 concurrency gain already demonstrated here.
+
+### CP11 - persistent concurrent Nift worker pool
+
+Implementation commit: `nift-packages/http`
+`5bb076f4a6d837297b38d069cdf303d23127d810`.
+
+Accepted:
+
+- `worker_mode: "persistent"` selects a fixed pool;
+  `worker_pool_size` must equal `max_concurrency`, and every worker handles at
+  most one request at a time. One-shot remains the compatibility default.
+- Each worker starts the application and registers routes once, publishes a
+  private readiness file, then blocks on newline-delimited helper-generated
+  exchange-directory paths from stdin. Request/response protocol-1 JSON and
+  binary spool semantics are shared with one-shot mode.
+- Responses are written to `response.tmp`, closed and atomically renamed to
+  `response.json`. Worker stdout/stderr remains a separately drained bounded
+  diagnostic channel; worker stdin is reserved for package control.
+- Worker acquisition, startup and execution share the configured worker
+  deadline. The pool health-checks idle workers before checkout and repairs an
+  undersized pool before dispatch.
+- Crash, timeout, invalid protocol and finite `worker_max_requests` recycling
+  replace only the affected worker. Replacement is asynchronous and bounded by
+  pool slots, uses synchronized unique worker IDs and never replays a request
+  whose side effects are uncertain.
+- Startup and replacement readiness waits observe shutdown. Finite and
+  abortive shutdown close control pipes and terminate/reap every persistent
+  POSIX worker group, including ordinary descendants.
+- Request body/upload logical tokens are explicitly removed after each
+  successful dispatch; retaining a descriptor in worker-local state cannot
+  access a later request's deleted helper spool.
+
+State semantics:
+
+- Four concurrent first requests against a four-worker top-level counter return
+  `[1,1,1,1]`; the next wave returns `[2,2,2,2]`. Persistent state therefore
+  belongs to one worker, not to the application or pool globally.
+- A one-worker pool with `worker_max_requests: 2` returns `[1,2,1,2]`, proving
+  recycling also resets worker-local state.
+- Worker-local state is appropriate only for caches/setup whose partitioning
+  and loss are acceptable. Sessions, records, counters and other coherent
+  shared state require a synchronized filesystem/database/service mechanism.
+
+Evidence:
+
+- `python3 tests/persistent.py /home/nick/Repositories/nift/nift/nift
+  /home/nick/Repositories/nift/nift-packages/http` passed repeatedly on Linux.
+- The test covers independent worker-local counters, slow/fast overlap, output
+  larger than retained diagnostics, request-count recycling, simultaneous
+  repair of two dead idle workers, crash/timeout isolation and replacement,
+  append-only no-replay side effects, upload/body token expiry, byte-exact file
+  and range responses, and four-worker shutdown with descendants.
+- The complete CP04-CP11 regression sequence passed after implementation.
+- Three defect-focused review rounds found and corrected deadline-external
+  worker waits, permanent pool deficits, startup/shutdown races, unsynchronized
+  worker IDs, replacement-accounting exceptional paths and weak/flaky proof.
+  The final focused review reported no current finding or blocking issue.
+
+Same-workload steady-state comparison (`max_concurrency: 32`, warmed server):
+
+| Clients | Sequential one-shot | Concurrent one-shot | Persistent pool | One-shot p95 | Persistent p95 |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 14.957 req/s | 14.472 req/s | 18.723 req/s | 66.603 ms | 53.137 ms |
+| 8 | 15.178 req/s | 110.683 req/s | 149.697 req/s | 70.184 ms | 52.485 ms |
+| 32 | 15.168 req/s | 308.059 req/s | 428.428 req/s | 100.121 ms | 65.636 ms |
+
+Persistent medians were 53.137, 52.070 and 57.085 ms; the 32-client maximum
+was 68.635 ms. The 32-worker idle topology was 34 processes and 305,300 KiB,
+versus approximately 30 MiB for the idle one-shot parent/helper. At 32 active
+clients the representative workload still reached 98 processes and 620,276
+KiB because each of the 32 persistent Nift workers launched the handler's shell
+and sleep processes. Persistence reduces steady-state latency and process churn,
+but a fully preallocated 32-worker pool does not reduce peak memory for 32
+simultaneously active workers and substantially raises idle memory.
+
+CP11 conclusion: concurrency supplied the dominant architectural gain;
+persistence is a measurable initialization/steady-state optimization with a
+significant fixed-memory and lifecycle-complexity cost. Proceed to CP12
+operational hardening and the controlled three-mode Gate 4 comparison.
