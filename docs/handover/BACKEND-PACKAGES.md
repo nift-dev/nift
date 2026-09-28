@@ -7,9 +7,9 @@ individual implementations evolve.
 
 ## Status
 
-- Current checkpoint: CP06 complete; stop at Review Gate 2.
-- Last review gate: Review Gate 1 approved Recommendation B with its corrections
-  already incorporated. Review Gate 2 follows CP06.
+- Current checkpoint: Review Gate 2 complete; hard stop before CP07.
+- Last review gate: Review Gate 2 selected A (continue process backend) after
+  incorporating the correctness and lifecycle corrections found by the gate.
 - Packages adopting this contract first: `curl` and `sqlite`.
 - Review Gate 1 approved later package prototypes with the documented stateful
   handle constraint; none has started in this checkpoint.
@@ -427,7 +427,8 @@ Next approved checkpoint: CP06 minimum HTTP semantics, followed by Review Gate
 ### CP06 - minimum HTTP semantics
 
 Implementation commit: `nift-packages/http`
-`d000621670e2a5715760e9fdc498f7a623ba509a`.
+`d000621670e2a5715760e9fdc498f7a623ba509a`, followed by Gate 2 correction and
+measurement commit `1df68b663e5f378f84c797429f5b5bc4c8bf2216`.
 
 Accepted:
 
@@ -449,9 +450,10 @@ Accepted:
 - The helper monitors its Nift parent, closes and removes its private temporary
   root when that parent disappears, and removes each request directory on
   ordinary success and failure paths.
-- Helper launch/bind failure and disabled process execution remain package-level
-  structured errors (`helper_failed` and `backend_unavailable`) rather than
-  exposing helper-specific control flow to applications.
+- Helper process-launch, startup/bind and disabled execution failures remain
+  package-level structured errors (`helper_launch`, `helper_failed` and
+  `backend_unavailable`) rather than exposing helper-specific control flow to
+  applications.
 
 Evidence:
 
@@ -460,9 +462,12 @@ Evidence:
 - `tests/dogfood.py` covers GET, POST echo, JSON request/response, multiple and
   parameterized routes, query/header access, custom 201/header, 404, 405,
   repeated requests, malformed request syntax, duplicate framing, malformed
-  JSON, body limit, worker error, worker timeout, clean finite shutdown, forced
-  parent shutdown, temporary-root cleanup, helper bind failure and disabled
-  process execution.
+  JSON, non-finite JSON, request-line/header/body limits, invalid path/query
+  escapes, Host and transfer/framing rules, binary rejection, explicit HEAD and
+  HEAD error framing, 204 framing, invalid response metadata, disconnected
+  clients, worker error/timeout/descendant cleanup, clean finite shutdown,
+  forced parent shutdown, temporary-root cleanup, helper bind failure and
+  disabled process execution.
 - Private helper leakage and post-server backend locking remain covered by the
   CP04 regression.
 
@@ -473,12 +478,119 @@ Known limitations:
   binary/file APIs and streaming are not implemented or advertised.
 - The server is sequential and starts one complete Nift process per dispatched
   request. This is intentionally unoptimized until Review Gate 2 measurements.
-- HTTP parsing is a deliberately strict HTTP/1.x subset: one request per
+- HTTP parsing is a deliberately strict HTTP/1.1 subset: one request per
   connection, `Connection: close`, Content-Length only. Chunking, keep-alive,
   TLS, multipart and WebSockets are deferred.
 - POSIX process groups are implemented and tested on Linux. Windows Job Object
   ownership is not implemented, and neither macOS nor Windows has execution
   evidence.
 
-Hard stop: perform Review Gate 2 and select process-backend decision A, B or C.
-Do not begin CP07 automatically.
+### Review Gate 2 - minimum HTTP backend
+
+Reviewed HTTP revision:
+`1df68b663e5f378f84c797429f5b5bc4c8bf2216`. Nift core was not modified for
+HTTP, and no `net`, `process`, `websocket` or `openssl` repository was created.
+
+Actual application source:
+
+```nift
+@import("http")
+
+app := http.server({"host":"127.0.0.1","port":8080})
+
+http.get(app, "/", (request) => http.text("Hello from Nift"))
+http.post(app, "/echo", (request) => http.text(request.body.text))
+http.post(app, "/json", (request) => http.json({
+    "received": request.json.value
+}))
+http.get(app, "/users/:id", (request) => http.json({
+    "id": request.params.id,
+    "query": request.query.q,
+    "header": request.headers.get("x-test")[0]
+}, {"status":201,"headers":{"x-created":"yes"}}))
+
+result := http.listen(app)
+```
+
+API ergonomics:
+
+- The facade form `http.get(app, ...)` is less fluent than `app.get(...)`, but
+  it is direct and consistent with the Gate 1 stateful-package finding. It does
+  not leak helper, IPC, process ID or temporary-file details.
+- `listen()` is blocking because Nift has no package-visible persistent process
+  handle. This is acceptable for the initial server entry point.
+- Each worker reruns the application script to reconstruct route callables.
+  Route registration must therefore be deterministic and any other top-level
+  side effect must be guarded or moved elsewhere. This is the most important
+  current application/helper separation cost.
+- The helper parses JSON because Nift has no runtime JSON-string parser. The
+  application receives ordinary Nift values and produces backend-neutral body
+  descriptors, so this does not become public process-backend API.
+
+Final CP06 topology:
+
+```text
+Nift server application (blocking http.listen)
+  -> Python HTTP/1.1 helper (socket, limits, lifecycle)
+      -> one fresh Nift application process per dispatched request
+          -> private request/response JSON envelope
+      -> serialized HTTP response
+  -> client
+```
+
+The helper handles clients sequentially. Each connection is closed after one
+request. Worker stdout/stderr are isolated from protocol framing. Request IDs
+pair envelopes, and private request directories are removed after every
+ordinary success/failure path.
+
+Linux measurements on 2026-09-28:
+
+| Measurement | Result |
+|---|---:|
+| User-visible listen startup, 10 runs | 61.213 ms median (57.079-80.112 ms) |
+| Standalone one-shot worker, 20 runs | 8.973 ms median, 9.709 ms p95 |
+| Cold launch through first response | 81.479 ms |
+| Repeated sequential requests, 30 runs | 14.230 ms median, 17.702 ms p95 |
+| Idle Nift parent + helper RSS | 27,164 KiB |
+| Active parent + helper + worker RSS | 35,052 KiB |
+
+These are local architectural measurements, not a competitive benchmark or
+service-level guarantee. Gate interpretation used deliberately modest criteria:
+no lifecycle/correctness blocker after recertification, median startup below
+100 ms, repeated p95 below 20 ms and active topology RSS below 64 MiB. The
+observed one-worker model is costly compared with an in-process server but
+sufficiently practical for the next package semantics checkpoints.
+
+Correctness and lifecycle:
+
+- The corrected strict parser rejects malformed request lines/headers, invalid
+  percent encoding, missing/duplicate Host, transfer encoding, duplicate or
+  malformed Content-Length, non-standard/malformed JSON and configured limit
+  violations without terminating the listener.
+- Methods remain case-sensitive. Explicit HEAD routes take precedence over GET
+  fallback, implicit HEAD appears in `Allow`, and HEAD errors suppress bodies.
+  204/304 and invalid application response metadata are bounded correctly.
+- Worker runtime failure returns 500, timeout returns 504, and POSIX worker
+  groups are terminated after success, failure or timeout so descendants do not
+  escape. Broken clients do not terminate the helper.
+- Normal finite shutdown, Nift-parent death, bind failure and worker failures
+  leave no observed helper, worker or `nift-http-*` temporary root on Linux.
+- One slow client or handler can occupy the sequential helper until its finite
+  elapsed deadline. Concurrency and persistent workers remain later work.
+
+Portability evidence:
+
+- Linux: implemented and tested locally, including POSIX process groups,
+  lifecycle tests and `/proc` RSS/process checks.
+- macOS: not tested. No support claim beyond source-level intent.
+- Windows: not tested. Job Object descendant ownership is not implemented, so
+  Windows lifecycle support is specifically unproven.
+
+Decision: **A - CONTINUE PROCESS BACKEND**. The gate initially found parser,
+framing, pinning and descendant-cleanup defects; all blocking findings were
+corrected and regression-tested before this decision. The measured helper and
+one-worker-per-request model is sufficiently useful to proceed to CP07-CP09
+when explicitly resumed. Do not infer that FFI/native comparison, persistent
+workers, streaming, TLS or hostile-input certification is complete.
+
+Hard stop: Review Gate 2 is complete. Do not begin CP07 automatically.
