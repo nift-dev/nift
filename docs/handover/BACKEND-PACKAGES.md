@@ -7,7 +7,7 @@ individual implementations evolve.
 
 ## Status
 
-- Current checkpoint: CP01, backend package contract defined.
+- Current checkpoint: CP02, curl backend facade stabilized.
 - Last review gate: none; Review Gate 1 follows CP03.
 - Packages adopting this contract first: `curl` and `sqlite`.
 - New backend packages must wait until Review Gate 1 approves the convention.
@@ -164,5 +164,40 @@ Known limitations:
 - Review Gate 1 must validate this design against both stateless curl requests
   and stateful SQLite logical handles before a new HTTP package is created.
 
-Next approved checkpoints: CP02 (`curl`) and CP03 (`sqlite`), followed by Review
-Gate 1. HTTP work is not approved before that gate.
+Next approved checkpoint: CP03 (`sqlite`), followed by Review Gate 1. HTTP work
+is not approved before that gate.
+
+### CP02 - curl backend facade
+
+Implementation commit: `nift-packages/curl` `578285a`.
+
+Accepted:
+
+- `curl` owns the durable request and verb API; direct verb exports remain
+  deprecated v0.x compatibility aliases.
+- `auto` resolves to the sole usable `process` backend and freezes on the first
+  request.
+- HTTP responses, including 4xx/5xx, remain successful transfers. Backend,
+  timeout, transport and file failures use stable package error codes.
+- Header values are arrays so repeated fields remain distinct, and redirect
+  header blocks do not leak into the final response.
+- `output` is the binary/file path and no longer reloads the completed file into
+  `body`; buffered bodies remain text-oriented.
+
+Evidence:
+
+- The offline dogfood covers all verb helpers, JSON PUT/PATCH preservation,
+  redirects, repeated headers, output files, backend locking, missing/disabled
+  process execution and the fallback path without `mktemp`.
+- `python3 tests/dogfood.py <nift> <curl-package>` passed on Linux during CP02.
+
+Known limitations:
+
+- Nift has no atomic package-visible temporary-file primitive. The process
+  backend prefers `mktemp` or Windows PowerShell and otherwise uses a checked
+  counter fallback with a documented cross-process race.
+- Streaming, multipart, connection reuse and libcurl remain deferred.
+- macOS and Windows execution still require CI evidence; CP02's local evidence
+  is Linux-only.
+
+Next approved checkpoint: CP03 (`sqlite`), followed by Review Gate 1.
