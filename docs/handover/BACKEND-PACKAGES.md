@@ -7,7 +7,7 @@ individual implementations evolve.
 
 ## Status
 
-- Current checkpoint: CP04 complete; HTTP process helper bootstrapped.
+- Current checkpoint: CP05 complete; HTTP methods and routing implemented.
 - Last review gate: Review Gate 1 approved Recommendation B with its corrections
   already incorporated. Review Gate 2 follows CP06.
 - Packages adopting this contract first: `curl` and `sqlite`.
@@ -375,3 +375,51 @@ Known limitations and decisions affecting later checkpoints:
 
 Next approved checkpoints: CP05 routing and CP06 minimum HTTP semantics,
 followed by Review Gate 2. Do not begin CP07 before that gate.
+
+### CP05 - HTTP methods and routing
+
+Implementation commit: `nift-packages/http`
+`a9c2a1c9a2a651ebdb33e418c482cb7cf25db9b9`.
+
+Accepted:
+
+- The actual stateful API is facade-oriented:
+  `http.get(app, path, handler)`, with corresponding POST, PUT, PATCH, DELETE,
+  HEAD and generic `route()` registration. This follows the Gate 1 package
+  encapsulation finding rather than simulating methods on an imported struct.
+- Server state and callable routes are package-owned maps keyed by a logical
+  server ID. The application script rebuilds this table in each fresh worker.
+- Static routes and `:name` segments are matched in Nift. Decoded parameters
+  are exposed as `request.params`; HEAD falls back to GET while the helper
+  suppresses response bytes and retains the GET `Content-Length`.
+- Request objects expose method, target, decoded path/segments, query values,
+  lowercase array-valued headers, buffered body metadata, parsed JSON when
+  available and remote address.
+- `http.text()` and `http.json()` produce backend-neutral body descriptors.
+  The helper, not the application, owns HTTP wire framing.
+
+Evidence:
+
+- CP04 bootstrap regression passed after routing replaced the intentional 501
+  with normal 404 behavior for an empty route table.
+- `python3 tests/routing.py /home/nick/Repositories/nift/nift/nift
+  /home/nick/Repositories/nift/nift-packages/http` passed on Linux.
+- Coverage includes GET, POST, PUT, PATCH, DELETE, HEAD fallback, multiple
+  routes, a decoded path parameter, query access, request-header access, JSON
+  response serialization and 404.
+
+Discovered constraints:
+
+- A facade callable cannot mutate a plain object argument by reference, while
+  Nift's built-in map has identity and supports package-owned mutation. The
+  public server handle therefore remains a small object while private mutable
+  state lives in package maps, matching SQLite's accepted logical-handle model.
+- Route parameter object keys can be computed, but the key expression must be
+  bound before bracket assignment. This affects implementation style only; the
+  application still receives natural `request.params.id` access.
+- Worker diagnostics remain outside protocol framing. On a nonzero worker exit
+  the helper emits at most the first 8 KiB of captured diagnostics to its own
+  stderr and returns a clean 500 to the client.
+
+Next approved checkpoint: CP06 minimum HTTP semantics, followed by Review Gate
+2. Do not begin CP07 before that gate.
