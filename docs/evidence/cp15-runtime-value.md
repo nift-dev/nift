@@ -2,9 +2,9 @@
 
 Date: 2026-09-29
 
-Status: failed Review Gate 6A repair and local verification in progress. The
-pre-existing direct FFI dispatcher prototype mismatch remains an unresolved
-Gate 6A High blocker. CP16 and bytes APIs have not started.
+Status: CP15 implementation and repair commits complete. Review Gate 6A is
+blocked by the pre-existing direct FFI dispatcher prototype mismatch described
+below. CP16 and bytes APIs have not started.
 
 ## Architecture
 
@@ -160,7 +160,7 @@ to the immutable host/project cache, after which the complete wall passed.
 - Restored HEAD public Value mutation exception text and made numeric object
   index diagnostics independent of local, host, contract or `@json` provenance.
 
-Review Gate 6A remains pending. Remaining `json::Document` uses in
+Review Gate 6A remains blocked. Remaining `json::Document` uses in
 evaluator-adjacent code are strict parse, persistence, schema, project-model or
 explicit JSON output boundaries. Jsonic and Minify++ have no source changes.
 
@@ -174,7 +174,7 @@ release-level coverage rather than local Gate 6A evidence.
 The post-`7b97ae1` Gate 6A review found that exact decimal comparison had been
 centralized while truthiness, integer classification, conversion and unary
 operators still consumed the lossy `RuntimeValue::num` cache. The separate
-uncommitted repair adds canonical RuntimeValue helpers for exact zero/truth,
+repair commit `64d57cb` adds canonical RuntimeValue helpers for exact zero/truth,
 integer classification, overflow-checked non-negative `size_t` conversion,
 exact width-aware signed/unsigned conversion and spelling-preserving StrNumber
 negation. The unsigned path preserves the complete `uint64_t` range; Number
