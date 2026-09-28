@@ -7,7 +7,7 @@ individual implementations evolve.
 
 ## Status
 
-- Current checkpoint: CP05 complete; HTTP methods and routing implemented.
+- Current checkpoint: CP06 complete; stop at Review Gate 2.
 - Last review gate: Review Gate 1 approved Recommendation B with its corrections
   already incorporated. Review Gate 2 follows CP06.
 - Packages adopting this contract first: `curl` and `sqlite`.
@@ -423,3 +423,62 @@ Discovered constraints:
 
 Next approved checkpoint: CP06 minimum HTTP semantics, followed by Review Gate
 2. Do not begin CP07 before that gate.
+
+### CP06 - minimum HTTP semantics
+
+Implementation commit: `nift-packages/http`
+`d000621670e2a5715760e9fdc498f7a623ba509a`.
+
+Accepted:
+
+- GET and POST application paths, buffered text bodies, helper-parsed JSON
+  requests, JSON/text responses, custom status and response headers, 404, 405
+  with `Allow`, multiple routes and repeated sequential requests work through
+  the real helper/worker topology.
+- `http.server_backend(app)` reports the concrete backend pinned when the
+  server was created. Post-resource package selection remains locked.
+- Parser and worker limits are finite and can be lowered per server:
+  request-line bytes, total header bytes/count, body bytes, client deadline,
+  worker deadline and listen backlog.
+- HTTP/1.1 requires exactly one non-empty Host header. Transfer encoding,
+  duplicate Content-Length, folded/invalid headers, invalid target encoding,
+  malformed JSON and oversized bodies fail before application dispatch.
+- Application `print()` output is isolated from protocol framing. Worker
+  runtime failure returns a bounded 500; worker timeout terminates the POSIX
+  process group and returns 504.
+- The helper monitors its Nift parent, closes and removes its private temporary
+  root when that parent disappears, and removes each request directory on
+  ordinary success and failure paths.
+- Helper launch/bind failure and disabled process execution remain package-level
+  structured errors (`helper_failed` and `backend_unavailable`) rather than
+  exposing helper-specific control flow to applications.
+
+Evidence:
+
+- The CP04 bootstrap, CP05 routing and CP06 dogfood suites all passed
+  sequentially on Linux.
+- `tests/dogfood.py` covers GET, POST echo, JSON request/response, multiple and
+  parameterized routes, query/header access, custom 201/header, 404, 405,
+  repeated requests, malformed request syntax, duplicate framing, malformed
+  JSON, body limit, worker error, worker timeout, clean finite shutdown, forced
+  parent shutdown, temporary-root cleanup, helper bind failure and disabled
+  process execution.
+- Private helper leakage and post-server backend locking remain covered by the
+  CP04 regression.
+
+Known limitations:
+
+- Request and response bodies implemented in CP06 are buffered UTF-8 text/JSON.
+  The protocol reserves file and stream body descriptors, but route-level
+  binary/file APIs and streaming are not implemented or advertised.
+- The server is sequential and starts one complete Nift process per dispatched
+  request. This is intentionally unoptimized until Review Gate 2 measurements.
+- HTTP parsing is a deliberately strict HTTP/1.x subset: one request per
+  connection, `Connection: close`, Content-Length only. Chunking, keep-alive,
+  TLS, multipart and WebSockets are deferred.
+- POSIX process groups are implemented and tested on Linux. Windows Job Object
+  ownership is not implemented, and neither macOS nor Windows has execution
+  evidence.
+
+Hard stop: perform Review Gate 2 and select process-backend decision A, B or C.
+Do not begin CP07 automatically.
