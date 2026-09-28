@@ -7,7 +7,7 @@ individual implementations evolve.
 
 ## Status
 
-- Current checkpoint: CP07 complete; forms and cookies implemented.
+- Current checkpoint: CP08 complete; body spools and multipart implemented.
 - Last review gate: Review Gate 2 selected A (continue process backend) after
   incorporating the correctness and lifecycle corrections found by the gate.
 - Packages adopting this contract first: `curl` and `sqlite`.
@@ -639,3 +639,51 @@ maintenance evidence.
 
 Next approved checkpoints: CP08 body storage/multipart and CP09 files/ranges/
 CRUD dogfood, followed by Review Gate 3. Do not begin CP10 before that gate.
+
+### CP08 - body storage and multipart uploads
+
+Implementation commit: `nift-packages/http`
+`6f310f070582bb2c7f1a3fc5804d92811c72edff`.
+
+Accepted:
+
+- Small UTF-8 and JSON bodies retain buffered convenience. Arbitrary non-UTF-8
+  bodies become opaque `spooled` descriptors and can be copied during the
+  request with `http.save_body()`.
+- `multipart/form-data` populates `request.form`, `request.uploads` and
+  `request.files`. Single file fields are upload objects and repeated names are
+  ordered arrays.
+- Public upload descriptors expose logical identity plus field name, client
+  filename, content type and size. Helper-generated spool paths are removed
+  from the request before handler dispatch.
+- `http.save_upload(upload, destination)` copies bytes to an explicit
+  application-selected destination while the request worker is alive. Supplied
+  filenames are metadata only and never select spool/save paths.
+- The bounded parser rejects invalid/missing/unfinished boundaries, folded or
+  duplicate part headers, transfer encoding, nested multipart, missing/invalid
+  disposition/name and invalid text-field UTF-8.
+- Finite limits cover aggregate body, total temporary bytes, parts, files,
+  per-part header bytes/count, individual file bytes, filename bytes and text
+  field bytes. Request cleanup owns every original spool on all ordinary paths.
+
+Evidence:
+
+- `python3 tests/multipart.py /home/nick/Repositories/nift/nift/nift
+  /home/nick/Repositories/nift/nift-packages/http` passed on Linux.
+- Coverage includes binary NUL/non-UTF-8 data, ordinary and repeated fields,
+  one/multiple/repeated files, empty and repeated filenames, `../`, absolute and
+  encoded-separator filename metadata, explicit byte-preserving saves, generic
+  binary-body save, forged handle, boundary-like payload bytes, malformed and
+  missing closing boundaries, part/file/header/body limits, partial disconnect,
+  handler failure, timeout and final temporary-root cleanup.
+- CP07 forms/cookies and the adjusted CP06 dogfood regressions passed after the
+  body model changed from rejecting binary to opaque spooling.
+
+Known limitation retained for Gate 3: the helper currently receives the bounded
+aggregate request body in memory before writing raw/per-file spools. The public
+contract does not expose this and remains compatible with incremental receive,
+but upload peak-memory behavior must be measured and reported rather than
+described as streaming.
+
+Next approved checkpoint: CP09 files, ranges, limits and CRUD dogfood, followed
+by Review Gate 3. Do not begin CP10 before that gate.
