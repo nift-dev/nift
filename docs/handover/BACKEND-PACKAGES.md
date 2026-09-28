@@ -7,7 +7,8 @@ individual implementations evolve.
 
 ## Status
 
-- Current checkpoint: CP09 and Review Gate 3 complete; hard stop before CP10.
+- Current checkpoint: CP10 complete; bounded concurrent one-shot workers are
+  implemented and measured. CP11 persistent workers are next.
 - Last review gate: Review Gate 3 selected qualified A (the process architecture
   may proceed to persistent-worker design after explicit resumption, but CP09 is
   only a development/low-traffic prototype backend, not a production server).
@@ -827,3 +828,74 @@ ready. A compiled/native socket-side implementation remains the likely
 long-term direction.
 
 Hard stop: Review Gate 3 is complete. Do not begin CP10 automatically.
+
+### CP10 - bounded concurrent one-shot workers
+
+Gate 3 was accepted as a qualified continuation with an explicit correction:
+concurrent fresh workers must be measured before worker persistence so the two
+effects are not conflated.
+
+Implementation commit: `nift-packages/http`
+`71331e3aa99a2cff332a7acf77454ac98dd025ad`.
+
+Accepted:
+
+- `max_concurrency` defaults to 1 and bounds each admitted socket from request
+  receive through worker execution, response send and request-directory
+  cleanup. Values are finite and capped at 128.
+- The coordinator allocates monotonic request IDs and unique directories before
+  starting one fresh handler thread/Nift process per admitted request. There is
+  no unbounded executor queue or thread/process creation.
+- A full server grants a 20 ms admission grace for response/cleanup races, then
+  returns an empty 503 with `Retry-After: 1`. Rejected connections create no
+  request directory and launch no worker. `max_requests` continues to count
+  accepted connections, including overload rejection.
+- Lock-protected socket, thread and worker registries allow independent request
+  failure and coordinated shutdown. External shutdown closes active sockets,
+  sends TERM to all POSIX worker groups under one shared grace period, then
+  sends KILL and waits for every request handler before removing the root.
+- Worker stdout/stderr is no longer an unbounded temporary log. A private drain
+  retains at most 8 KiB for failure diagnosis and discards excess bytes without
+  using protocol framing.
+- Default-one compatibility preserves the existing file-backed CRUD test. Any
+  application enabling greater concurrency must use synchronized/transactional
+  shared persistence; one-shot top-level state remains reconstructed per worker.
+
+Behavior evidence:
+
+- `python3 tests/concurrency.py /home/nick/Repositories/nift/nift/nift
+  /home/nick/Repositories/nift/nift-packages/http` passed on Linux.
+- A slow request and fast request overlap, and the fast response completes in
+  under 500 ms while the one-second request remains active. This test fails
+  under the CP09 serialized architecture.
+- The two-slot case continuously observed exactly two workers/directories while
+  an overload request received 503. Crash, timeout and disconnected-client
+  requests each overlapped an independent successful request.
+- Eight simultaneous uploads observed eight workers and eight directories,
+  produced unique request IDs and preserved distinct 64 KiB binary payloads.
+  Eight delayed file responses likewise observed eight simultaneous workers and
+  preserved the shared 256 KiB file exactly.
+- Shutdown with four active infinite workers and four background descendants
+  terminated every process/client and removed the helper temporary root.
+- The complete CP04-CP10 regression sequence passed after implementation.
+
+The Gate 3 workload was rerun unchanged except for `max_concurrency: 32`:
+
+| Clients | CP09 throughput | CP10 throughput | CP09 p95 | CP10 p95 | CP10 peak workers | CP10 topology RSS |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 14.957 req/s | 14.472 req/s | 66.603 ms | 66.603 ms | 1 | 48,356 KiB |
+| 8 | 15.178 req/s | 110.683 req/s | 525.137 ms | 70.184 ms | 8 | 175,340 KiB |
+| 32 | 15.168 req/s | 308.059 req/s | 2,041.160 ms | 100.121 ms | 32 | 613,168 KiB |
+
+CP10 medians were 66.603, 68.672 and 82.180 ms; the 32-client maximum was
+100.739 ms. There were no response errors or rejections in the measurement.
+Peak process counts were 5, 26 and 98 because the representative handler adds a
+shell and sleep process to each fresh Nift worker. The result conclusively shows
+that helper serialization, not inability to launch Nift concurrently, caused
+Gate 3 queueing. It also exposes the fresh-worker cost: process churn and
+approximately 599 MiB peak topology RSS at 32-way concurrency.
+
+CP10 success criterion: met. Independent requests execute concurrently and the
+entire admitted lifecycle remains bounded. Proceed to CP11 to measure worker
+persistence independently; do not describe persistence as the source of the
+concurrency gain already demonstrated here.
