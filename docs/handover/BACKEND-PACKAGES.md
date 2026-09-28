@@ -7,11 +7,12 @@ individual implementations evolve.
 
 ## Status
 
-- Current checkpoint: CP11 complete; bounded concurrent persistent workers are
-  implemented and measured. CP12 operational hardening/review is next.
-- Last review gate: Review Gate 3 selected qualified A (the process architecture
-  may proceed to persistent-worker design after explicit resumption, but CP09 is
-  only a development/low-traffic prototype backend, not a production server).
+- Current checkpoint: CP12 and Review Gate 4 complete. The HTTP process backend
+  is operationally hardened and measured across all three retained topologies.
+- Last review gate: Review Gate 4 selected qualified A: retain the process
+  implementation as a development/compatibility backend, keep concurrent
+  one-shot as the low-idle-cost default and persistent pools as an explicit
+  throughput tradeoff, but do not present either as a production server.
 - Packages adopting this contract first: `curl` and `sqlite`.
 - Review Gate 1 approved later package prototypes with the documented stateful
   handle constraint; HTTP is now implemented through CP09.
@@ -978,3 +979,142 @@ CP11 conclusion: concurrency supplied the dominant architectural gain;
 persistence is a measurable initialization/steady-state optimization with a
 significant fixed-memory and lifecycle-complexity cost. Proceed to CP12
 operational hardening and the controlled three-mode Gate 4 comparison.
+
+### CP12 - operational hardening and observability
+
+Implementation commit: `nift-packages/http`
+`97e7bdf`.
+
+Accepted:
+
+- The first SIGTERM/SIGINT stops admission and enters graceful drain. Existing
+  requests retain their sockets/workers until completion or the finite
+  `shutdown_grace_ms` deadline. A separately delivered second signal, deadline
+  expiry or parent death performs forced cancellation and process-group cleanup.
+- Python signal callbacks only increment a scalar notification count. Locking,
+  status writes, socket closure, pool shutdown and process termination occur in
+  ordinary control flow rather than in signal context.
+- Parent identity is captured before helper configuration and checked during
+  persistent startup, admission, accept and thread drain. Startup cancellation
+  owns partially launched workers and never publishes listener readiness.
+- `admission_timeout_ms` controls the finite slot wait before 503. Admission
+  remains bounded by the listen backlog and concurrency limit rather than one
+  queued helper thread per waiting connection.
+- Optional `status_path` is atomically replaced and exposes phase/readiness,
+  active requests/workers, worker-process count, queue depth and monotonic
+  accepted/admitted/rejected/completed/error/start/restart/recycle counters.
+- Optional `event_log_path` contains bounded NDJSON request/overload records
+  with request and worker IDs where available. Rotation-by-truncation occurs
+  before `max_event_log_bytes` would be exceeded; oversized variable metadata
+  is reduced to an identifier-preserving record.
+- Canonical path and existing-inode checks reject status/event/temp aliases,
+  including hard links. A pre-existing oversized event log is truncated before
+  readiness.
+- Worker starts/processes are updated atomically after persistent readiness and
+  decremented exactly once. Failed-before-ready workers are never counted,
+  shutdown does not trigger replacement, and final `stopped` status is written
+  only after request threads and pools have unwound.
+
+Evidence:
+
+- `python3 tests/operations.py /home/nick/Repositories/nift/nift/nift
+  /home/nick/Repositories/nift/nift-packages/http` passed on Linux.
+- Coverage includes graceful completion, grace-deadline cancellation, a second
+  signal immediately cancelling a one-shot worker, parent death during
+  persistent startup, failed-before-ready accounting, queue depth, counters,
+  request/worker correlation, bounded event rotation and oversized metadata.
+- The complete CP04-CP12 behavior sequence passed: `bootstrap.py`, `routing.py`,
+  `forms_cookies.py`, `multipart.py`, `files_ranges.py`, `crud.py`, `dogfood.py`,
+  `concurrency.py`, `persistent.py` and `operations.py`.
+- Four focused review rounds corrected signal-context lock/I/O, one-shot
+  second-signal handling, startup parent-death observation, worker accounting,
+  drain-time replacement cancellation, forced cleanup ordering, output aliasing
+  and shutdown replacement races. The final review reported no concrete code
+  finding; ordinary POSIX standard-signal coalescing remains a platform fact.
+
+Known boundaries:
+
+- The status and event files are local operational aids, not a remote admin or
+  metrics protocol. Event truncation is intentionally simple and does not
+  promise durable audit logging.
+- Linux remains the only execution/lifecycle evidence. Windows still lacks Job
+  Object descendant ownership, and macOS behavior is untested.
+- CP12 does not add TLS, keep-alive, chunking, streaming handlers, WebSockets,
+  real HTTP+SQLite evidence or hostile-input security certification.
+
+### Review Gate 4 - process topology decision
+
+Gate command:
+
+```text
+python3 tests/gate4.py /home/nick/Repositories/nift/nift/nift \
+  /home/nick/Repositories/nift/nift-packages/http
+```
+
+The retained Linux run used the same 40 ms handler, one warmed listener and
+simultaneous batches of 1, 8 and 32 clients in every mode:
+
+| Topology | Clients | Throughput | Median | p95 | Startup | Idle topology RSS | Peak topology RSS |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Sequential one-shot | 1 | 14.923 req/s | 66.446 ms | 66.446 ms | 91.467 ms | 31,860 KiB | 50,180 KiB |
+| Sequential one-shot | 8 | 15.033 req/s | 298.978 ms | 530.488 ms | 80.430 ms | 31,884 KiB | 50,336 KiB |
+| Sequential one-shot | 32 | 14.716 req/s | 1,090.088 ms | 2,105.235 ms | 81.900 ms | 32,000 KiB | 55,604 KiB |
+| Concurrent one-shot | 1 | 14.476 req/s | 66.664 ms | 66.664 ms | 91.245 ms | 32,028 KiB | 50,304 KiB |
+| Concurrent one-shot | 8 | 65.413 req/s | 69.140 ms | 120.147 ms | 91.483 ms | 31,780 KiB | 179,508 KiB |
+| Concurrent one-shot | 32 | 264.288 req/s | 91.838 ms | 116.126 ms | 82.466 ms | 31,828 KiB | 561,396 KiB |
+| Persistent pool | 1 | 17.431 req/s | 53.750 ms | 53.750 ms | 355.635 ms | 305,932 KiB | 315,680 KiB |
+| Persistent pool | 8 | 139.536 req/s | 53.320 ms | 54.093 ms | 345.964 ms | 306,852 KiB | 384,380 KiB |
+| Persistent pool | 32 | 383.825 req/s | 75.803 ms | 81.857 ms | 333.409 ms | 306,560 KiB | 621,840 KiB |
+
+All 123 measured batch responses succeeded. CPU was not reported because this
+probe cannot reliably attribute transient descendant CPU without cgroup/process
+accounting. Process/RSS peaks include the handler's shell and sleep descendants,
+so the matrix describes complete topology cost rather than only direct workers.
+
+Interpretation:
+
+- Sequential one-shot is retained only as `max_concurrency: 1` compatibility
+  behavior. Flat throughput and linearly increasing tail latency make it the
+  wrong deliberate topology for concurrent traffic.
+- Concurrent one-shot supplies the dominant gain while preserving approximately
+  32 MiB idle topology RSS and fast startup. Its costs are fresh-process churn
+  and roughly 548 MiB peak topology RSS at 32 active requests in this workload.
+- Persistence adds about 45% throughput over this retained 32-client one-shot
+  run and lowers p95 by about 29%, but startup rises to about 333 ms and a
+  32-worker idle pool consumes about 299 MiB. Peak active topology memory is not
+  reduced. It is therefore an explicit workload/deployment tradeoff, not an
+  unconditional successor to one-shot mode.
+
+Current responsibility classification:
+
+| Responsibility | Current owner | Direction |
+|---|---|---|
+| Routes, handler invocation, application values/state and response descriptors | Nift package/application | Keep in Nift. |
+| Strict HTTP framing, multipart/cookie/range validation, rooted descriptor opens and socket/file transfer | Python helper | Keep at a hardened helper/native OS boundary rather than duplicating security-sensitive parsing in facade code. |
+| Listener, admission, client deadlines and bounded concurrent socket lifecycle | Python helper | A future generic socket/concurrency substrate could move this, but no HTTP-specific core API is justified. |
+| Fresh/persistent worker spawn, bidirectional control, process-group ownership, recycling and cancellation | Python helper | The clearest candidate for a generic process capability and later compiled helper. |
+| Exchange directories, upload spools, atomic envelopes, status and event files | Python helper with Nift protocol consumers | Keep private; implementation may change without changing the facade. |
+| Shared durable application data | Application-selected filesystem/database/service | Never treat worker-local state as coherent shared persistence. |
+
+The smallest generic missing capability for a mostly-Nift process backend is a
+package-visible durable child-process/session handle: explicit stdin/stdout
+channels, bounded non-deadlocking reads/writes, poll/wait, terminate/kill and
+process-tree ownership. Today `run()` is blocking and returns only after exit,
+so package code cannot own the persistent framed control loop or lifecycle. This
+is generic process functionality, not an HTTP primitive. It should be designed
+from broader package evidence; CP12 does not approve a core change, external
+future, retained callback or cooperative-await mechanism.
+
+Python classification remains **acceptable prototype/compatibility backend but
+probably replace later**. CP12 improves lifecycle confidence but does not remove
+the deployment dependency, approximately 23-24 MiB helper RSS, Linux-only
+evidence or the maintenance cost of security-sensitive code in a second runtime.
+
+Decision: **qualified A - RETAIN THE PROCESS COMPATIBILITY BACKEND**. Keep
+bounded concurrent one-shot as the default low-idle topology and persistent
+pools as explicit opt-in when measured throughput justifies startup, idle memory
+and lifecycle cost. Do not market the helper as a production HTTP server and do
+not make an HTTP-specific Nift core change from this evidence. A compiled helper
+or future native socket-side implementation remains the likely long-term path.
+
+Hard stop: Review Gate 4 is complete. Do not begin CP13 automatically.
