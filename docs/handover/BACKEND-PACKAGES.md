@@ -7,12 +7,11 @@ individual implementations evolve.
 
 ## Status
 
-- Current checkpoint: CP12 and Review Gate 4 complete. The HTTP process backend
-  is operationally hardened and measured across all three retained topologies.
-- Last review gate: Review Gate 4 selected qualified A: retain the process
-  implementation as a development/compatibility backend, keep concurrent
-  one-shot as the low-idle-cost default and persistent pools as an explicit
-  throughput tradeoff, but do not present either as a production server.
+- Current checkpoint: CP13 and Review Gate 5 complete. Bounded POSIX dynamic
+  streaming works in concurrent one-shot and persistent process modes.
+- Last review gate: Review Gate 5 selected B: process streaming is useful with
+  explicit platform, cancellation and binary-generation limitations. Retain it
+  without treating the current helper as a production/realtime server.
 - Packages adopting this contract first: `curl` and `sqlite`.
 - Review Gate 1 approved later package prototypes with the documented stateful
   handle constraint; HTTP is now implemented through CP09.
@@ -1118,3 +1117,170 @@ not make an HTTP-specific Nift core change from this evidence. A compiled helper
 or future native socket-side implementation remains the likely long-term path.
 
 Hard stop: Review Gate 4 is complete. Do not begin CP13 automatically.
+
+Gate 4 was accepted and HTTP history through CP12 was published to
+`https://github.com/nift-packages/http.git` before CP13 began. The public backend
+remains `process`; one-shot and persistent workers remain internal execution
+modes rather than separate package backends.
+
+### CP13 - bounded dynamic streaming spike
+
+Implementation commits: `nift-packages/http` `baf095a` and the retained queue
+capacity measurement `c8fecbb`.
+
+Public shape:
+
+```nift
+http.get(app, "/events", (request) => http.stream((write) => {
+    write("first\n")
+    run("sh", "-c", "sleep 0.2")
+    write("second\n")
+}, {"content_type":"text/plain; charset=utf-8"}))
+```
+
+Accepted mechanism:
+
+- On POSIX the helper creates a mode-0600 FIFO and completion-marker path in the
+  private request directory before worker launch. Both are removed from the
+  request before application dispatch and never enter the response envelope.
+- `http.stream()` atomically publishes ordinary protocol-1 status/header
+  metadata, opens the FIFO and synchronously invokes the producer. `write()`
+  writes raw bytes and flushes; kernel FIFO and socket capacity make it block
+  when the helper/client cannot consume data.
+- The helper reads at most `max_stream_chunk_bytes` (64 KiB by default), applies
+  `max_stream_response_bytes` (64 MiB by default), and owns HTTP/1.1 chunked
+  framing. Application writes are not promised to map one-to-one to wire chunks.
+- A separate marker is created only after the producer and outer route handler
+  return. The helper retains the one-shot process or persistent pool lease until
+  that marker and all FIFO bytes are consumed. HEAD skips the producer but still
+  waits for outer handler completion.
+- Disconnect, worker failure, timeout, response limit, forced shutdown or
+  handler error before completion closes an incomplete chunked response and
+  cancels/replaces the worker. Once status/body bytes are committed, no false
+  500 is appended. Stream outcome is recorded separately from wire status.
+- Streamed 204, 205 and 304 responses are rejected. TCP request-side half-close
+  is intentionally unsupported under the current one-request,
+  `Connection: close` contract and is treated as cancellation.
+- FIFO creation failure does not regress buffered/file responses. Dynamic
+  streaming reports unavailable behavior for that request, and
+  `capabilities().streaming` is false on Windows.
+
+Alternative assessment:
+
+| Mechanism | Assessment |
+|---|---|
+| Append-only spool plus polling | Rejected before implementation: storage grows with total output, no current Nift primitive supplies clean acknowledgement/backpressure, managed-file save rewrites an in-memory image, and plain stream readers lack seek/tell. |
+| Single/ring chunk files plus acknowledgement | Bounded in principle but requires polling, sequence/crash recovery and file churn; Nift has no lightweight wait primitive, so it is materially more complex than a FIFO. |
+| Worker stdout | Rejected because application `print()` is an established independent diagnostics channel. |
+| Persistent stdin/stdout extension | Does not support one-shot symmetrically, cannot asynchronously cancel arbitrary running handler code, and would compromise stdout isolation. |
+| Anonymous inherited pipe | Nift cannot safely open an inherited descriptor through a package API. `/proc/self/fd` would be Linux-specific and fragile. |
+| POSIX named FIFO plus completion marker | Selected: one package-private channel works in both modes, provides kernel-bounded flow control, carries arbitrary file bytes, and requires no core/runtime change. |
+
+Evidence:
+
+- `python3 tests/streaming.py /home/nick/Repositories/nift/nift/nift
+  /home/nick/Repositories/nift/nift-packages/http` passed on Linux for one-shot
+  and persistent workers.
+- The first text chunk arrives before a 350 ms producer delay and before handler
+  completion. A separate handler-tail case proves the terminal chunk is withheld
+  until code after `http.stream()` returns; streamed HEAD likewise retains the
+  worker without invoking the producer.
+- Coverage includes ordered NDJSON, a multi-megabyte generated response,
+  arbitrary NUL/non-UTF-8 file bytes, application-print isolation, slow-reader
+  backpressure, ordinary FIN and reset disconnects before/after metadata,
+  post-partial handler failure, worker deadline, per-read/aggregate limits,
+  204/205/304 rejection, recovery/replacement, graceful drain and forced abort.
+- Partial failures increment `stream_failed` and `errors`; completed streams
+  increment `stream_completed`. Bounded events retain `stream_complete` even
+  when variable metadata is truncated.
+- The complete CP04-CP13 regression sequence passed serially. Focused review
+  corrected premature persistent reuse, orderly-disconnect cancellation,
+  buffered-response FIFO dependency, HEAD lease lifetime, partial observability,
+  platform capability reporting and bodyless status framing. Final review found
+  no current CP13 implementation defect.
+
+### Review Gate 5 - process streaming viability
+
+Gate command:
+
+```text
+python3 tests/gate5.py /home/nick/Repositories/nift/nift/nift \
+  /home/nick/Repositories/nift/nift-packages/http
+```
+
+Retained Linux results:
+
+| Measurement | Concurrent one-shot | Persistent worker |
+|---|---:|---:|
+| Listen startup | 88.559 ms | 85.319 ms |
+| First response byte | 19.434 ms | 3.750 ms |
+| First application chunk | 19.465 ms | 3.776 ms |
+| Timed stream completion (200 ms producer delay) | 244.857 ms | 229.115 ms |
+| 8 MiB generated stream completion | 68.061 ms | 59.544 ms |
+| 8 MiB throughput | 117.542 MiB/s | 134.354 MiB/s |
+| Idle topology RSS | 33,008 KiB | 42,284 KiB |
+| Backpressured topology RSS | 43,492 KiB | 43,520 KiB |
+| Backpressured helper RSS | 24,396 KiB | 24,372 KiB |
+| Backpressured worker RSS | 9,636 KiB | 9,748 KiB |
+| Disconnect cleanup | 31.007 ms | 11.178 ms |
+
+The slow client requested a 4 KiB receive buffer (Linux reported 8 KiB), while
+the measured FIFO capacity was 65,536 bytes. After one second a 64 MiB producer
+had not reached its completion marker, proving flow control rather than merely a
+slow producer: the same run generated and delivered 8 MiB in 68/60 ms. Helper
+RSS rose by less than 1 MiB, complete topology RSS by about 10.5/1.2 MiB, and
+helper temporary files occupied 635 bytes; FIFO-resident bytes are kernel memory,
+not filesystem payload storage. Both modes recovered after disconnect and ended
+with zero observed descendants, temporary bytes, files or roots. CPU attribution
+was not reported because transient descendants cannot be assigned reliably
+without cgroup/process accounting.
+
+Streaming proof and failure semantics:
+
+- The first application chunk precedes producer completion by about 200 ms in
+  both modes. This is dynamic production, not a completed-file response.
+- A handler error or deadline after a partial 200 produces no terminal HTTP
+  chunk and no appended 500. The wire response is observably incomplete; status
+  snapshots/events separately record stream failure.
+- Graceful shutdown allows an in-flight stream to finish within its deadline.
+  A second signal or deadline aborts it, closes the client and owns the complete
+  worker process group and request directory.
+- Persistent mode needs additional lease/replacement bookkeeping but uses the
+  same response/FIFO protocol. It is not required for streaming and remains an
+  explicit optimization.
+
+Binary classification: **supported with a file-backed mechanism**. Nift can
+load existing arbitrary bytes and write them through the binary FIFO without
+UTF-8 conversion; NUL and invalid UTF-8 were preserved exactly. Nift still has
+no general byte value for clean dynamic arbitrary-byte construction. This does
+not turn ordinary text strings into a byte-buffer contract, and existing
+`http.file()` remains preferable for completed files.
+
+Blocker classification:
+
+| Boundary | Classification | Evidence/implication |
+|---|---|---|
+| FIFO/channel framing, limits, lease completion and event outcomes | Package implementation issue | Implemented without runtime changes; final focused review found no current defect. |
+| Portable dedicated worker channel, graceful per-request cancellation and durable child ownership | Better generic process API would help | A child/session handle with explicit pipes, poll/wait and process-tree termination could replace named FIFO paths and reduce kill-to-cancel behavior. Database helpers, language servers, build/watch tools and service clients could use the same primitive. |
+| Listener/client socket ownership and direct disconnect/backpressure state in Nift | Socket/net package would help | Not required for this process implementation; only relevant if listener ownership moves into Nift. |
+| Scalable socket scheduling in a mostly-Nift server | Async runtime improvement required | Current helper supplies polling/concurrency. Moving blocking sockets alone into Nift would recreate serialization. |
+| Portable wire parsing, zero-copy transfer and event/poll integration | FFI/native backend likely required | Security-sensitive protocol/OS code remains a better candidate for a small compiled boundary than a dogfood rewrite. |
+
+Python/native-helper implication: CP13 strengthens the case for a **small
+compiled helper** as the likely eventual replacement, not for moving every
+helper responsibility into Nift. Routing, producers, handlers and response
+descriptors remain Nift. The helper naturally owns socket readiness, wire
+framing, bounded byte movement and forceful process supervision. A mostly-Nift
+design would need generic process, net and async capabilities together; this
+gate does not justify creating them solely for HTTP.
+
+Decision: **B - PROCESS STREAMING IS USEFUL WITH LIMITATIONS**. Keep bounded
+POSIX process streaming for suitable text, NDJSON, SSE-like and file-backed
+binary workloads. Bring forward any future investigation of a portable durable
+process channel/child handle and a general byte value only from broader package
+evidence; do not add either to core from CP13 alone. The current Python helper,
+Linux-only lifecycle evidence, kill-based cancellation and unsupported TCP
+half-close prevent an A-level production-quality claim, while the measured
+semantics and cleanup do not support C/rejection.
+
+Hard stop: Review Gate 5 is complete. Do not begin CP14 automatically.
