@@ -169,7 +169,8 @@ is not approved before that gate.
 
 ### CP02 - curl backend facade
 
-Implementation commit: `nift-packages/curl` `578285a`.
+Implementation commits: `nift-packages/curl` `578285a`, followed by the
+selection-pinning correction `ca4469e` discovered before CP03.
 
 Accepted:
 
@@ -177,6 +178,8 @@ Accepted:
   deprecated v0.x compatibility aliases.
 - `auto` resolves to the sole usable `process` backend and freezes on the first
   request.
+- The selected backend is cached, so later executable/PATH changes do not
+  silently retarget an already-used package instance.
 - HTTP responses, including 4xx/5xx, remain successful transfers. Backend,
   timeout, transport and file failures use stable package error codes.
 - Header values are arrays so repeated fields remain distinct, and redirect
