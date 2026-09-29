@@ -6,13 +6,13 @@ NIFT=${NIFT:-$ROOT/nift}
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
-actual=$("$NIFT" -e 'b := bytes([0,65,127,128,255]); print(type(b)); print(is_bytes(b)); print(b.length()); print(b.size()); print(b[1]); print(b?[1]); print(b.slice(1,4)[2]); print((b + bytes([1])).length()); print(b == bytes([0,65,127,128,255])); print(b != bytes([0])); print(b != [0,65,127,128,255]); print(b != ""); print(!bytes()); print(!b); print("hé😀".encode("utf-8").decode("utf-8"))')
-expected=$'bytes\ntrue\n5\n5\n65\n65\n128\n6\ntrue\ntrue\ntrue\ntrue\ntrue\nfalse\nhé😀'
+actual=$("$NIFT" -e 'b := bytes([0,65,127,128,255]); print(type(b)); print(is_bytes(b)); print(b.length()); print(b.size()); print(b[1]); print(b?[1]); print(b.slice(1,4)[2]); print((b + bytes([1])).length()); print(b == bytes([0,65,127,128,255])); print(b != bytes([0])); print(b != [0,65,127,128,255]); print(b != ""); print(!bytes()); print(!b); u := bytes([195,169,240,159,152,128]); print(u.decode("utf-8").encode("utf-8") == u)')
+expected=$'bytes\ntrue\n5\n5\n65\n65\n128\n6\ntrue\ntrue\ntrue\ntrue\ntrue\nfalse\ntrue'
 [[ "$actual" == "$expected" ]]
 
 # The large-integer marker makes the second callable ineligible for prepared
 # execution, so both evaluator paths must produce the same byte semantics.
-parity=$("$NIFT" -e 'fn(prepared_bytes()) { b := bytes([0,65,127,128,255]); return [type(b), is_bytes(b), b.length(), b[1], b?[1], b.slice(1,4)[2], (b + bytes([1])).length(), b == bytes([0,65,127,128,255]), b != bytes([0]), !bytes(), !b, "hé😀".encode("utf-8").decode("utf-8")] }; fn(legacy_bytes()) { 9007199254740993; b := bytes([0,65,127,128,255]); return [type(b), is_bytes(b), b.length(), b[1], b?[1], b.slice(1,4)[2], (b + bytes([1])).length(), b == bytes([0,65,127,128,255]), b != bytes([0]), !bytes(), !b, "hé😀".encode("utf-8").decode("utf-8")] }; print(prepared_bytes() == legacy_bytes())')
+parity=$("$NIFT" -e 'fn(prepared_bytes()) { b := bytes([0,65,127,128,255]); u := bytes([195,169,240,159,152,128]); return [type(b), is_bytes(b), b.length(), b[1], b?[1], b.slice(1,4)[2], (b + bytes([1])).length(), b == bytes([0,65,127,128,255]), b != bytes([0]), !bytes(), !b, u.decode("utf-8").encode("utf-8") == u] }; fn(legacy_bytes()) { 9007199254740993; b := bytes([0,65,127,128,255]); u := bytes([195,169,240,159,152,128]); return [type(b), is_bytes(b), b.length(), b[1], b?[1], b.slice(1,4)[2], (b + bytes([1])).length(), b == bytes([0,65,127,128,255]), b != bytes([0]), !bytes(), !b, u.decode("utf-8").encode("utf-8") == u] }; print(prepared_bytes() == legacy_bytes())')
 [[ "$parity" == "true" ]]
 
 reject_expr() {
