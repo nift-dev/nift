@@ -541,6 +541,31 @@ bool valid_binding_identifier(const std::string& name) {
     });
 }
 
+bool parse_callable_parameters(const std::string& text,
+                               std::vector<std::string>& params,
+                               std::string& variadic_param) {
+    auto trim=[](const std::string& value){const auto first=value.find_first_not_of(" \t\r\n");if(first==std::string::npos)return std::string();const auto last=value.find_last_not_of(" \t\r\n");return value.substr(first,last-first+1);};
+    bool ok = false;
+    params = parse_parameters(text, ok);
+    variadic_param.clear();
+    if (!ok) return false;
+    std::unordered_set<std::string> names;
+    for (std::size_t i = 0; i < params.size(); ++i) {
+        std::string param = trim(params[i]);
+        if (param.rfind("...", 0) == 0) {
+            if (!variadic_param.empty() || i + 1 != params.size() ||
+                !valid_binding_identifier(trim(param.substr(3)))) return false;
+            variadic_param = trim(param.substr(3));
+            if (!names.insert(variadic_param).second) return false;
+            params.pop_back();
+            break;
+        }
+        if (!valid_binding_identifier(param) || !names.insert(param).second) return false;
+        params[i] = std::move(param);
+    }
+    return true;
+}
+
 bool reserved_binding_name(const std::string& name) {
     static const std::unordered_set<std::string> names = {
         "title", "name", "content-path", "output-path", "template-path",
@@ -2150,13 +2175,11 @@ bool Parser::evaluate_expression(const std::string& expression, nift::RuntimeVal
                 bool async_lambda=false;
                 if(lhs.rfind("async ",0)==0){async_lambda=true;lhs=trim_copy(lhs.substr(6));}
                 std::vector<std::string> params;
+                std::string variadic_param;
                 if (!lhs.empty() && lhs.front() == '(' && lhs.back() == ')') {
-                    bool pok=false; params=parse_parameters(lhs.substr(1,lhs.size()-2),pok);
-                    if(!pok){error="lambda: malformed parameter list";return false;}
+                    if(!parse_callable_parameters(lhs.substr(1,lhs.size()-2),params,variadic_param)){error="lambda: malformed parameter list";return false;}
                 } else if (valid_binding_identifier(lhs)) params.push_back(lhs);
                 else { error="lambda: expected identifier or parenthesized parameter list"; return false; }
-                std::string variadic_param;
-                for(std::size_t pi=0;pi<params.size();++pi){auto p=trim_copy(params[pi]);if(p.rfind("...",0)==0){if(!variadic_param.empty()||pi+1!=params.size()||!valid_binding_identifier(trim_copy(p.substr(3)))){error="lambda: invalid variadic parameter";return false;}variadic_param=trim_copy(p.substr(3));params.pop_back();break;}if(!valid_binding_identifier(p)){error="lambda: invalid parameter";return false;}params[pi]=p;}
                 auto li=std::make_shared<LambdaInstance>(); li->params=params; li->variadic_param=variadic_param; li->async=async_lambda;
                 li->block=rhs.size()>=2&&rhs.front()=='{'&&rhs.back()=='}';
                 li->body=li->block?rhs.substr(1,rhs.size()-2):rhs;
@@ -3189,6 +3212,33 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             std::size_t call_close = 0;
             const bool terminal_call = lp != std::string::npos && text.back() == ')' &&
                 find_balanced(text, lp, '(', ')', call_close) && call_close == text.size() - 1;
+            auto method_arguments = [&](const StructMethod& method,
+                                        std::vector<nift::RuntimeValue>& values,
+                                        std::vector<std::string>& sources) -> bool {
+                bool args_ok=false; std::vector<bool> quoted;
+                auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),args_ok,&quoted);
+                if(!args_ok){error="malformed method arguments";return false;}
+                std::vector<nift::RuntimeValue> spread_values;
+                std::vector<std::string> expanded;std::vector<bool> expanded_quoted;
+                for(std::size_t ai=0;ai<args.size();++ai){
+                    if(!(ai<quoted.size()&&quoted[ai])&&trim_copy(args[ai]).rfind("...",0)==0){
+                        nift::RuntimeValue spread;
+                        if(!eval(trim_copy(args[ai]).substr(3),spread,depth+1))return false;
+                        if(!spread.is_array()){error="spread value must be an array";return false;}
+                        for(const auto& item:spread.array){expanded.push_back("\x1fnift:spread:"+std::to_string(spread_values.size()));spread_values.push_back(item);expanded_quoted.push_back(false);}
+                    }else{expanded.push_back(args[ai]);expanded_quoted.push_back(ai<quoted.size()&&quoted[ai]);}
+                }
+                args.swap(expanded);quoted.swap(expanded_quoted);
+                if(method.callable.variadic_param.empty()?args.size()!=method.callable.params.size():args.size()<method.callable.params.size()){error="struct method argument count mismatch";return false;}
+                for(std::size_t ai=0;ai<args.size();++ai){
+                    nift::RuntimeValue value;
+                    if(ai<quoted.size()&&quoted[ai])value=nift::RuntimeValue(args[ai]);
+                    else if(args[ai].rfind("\x1fnift:spread:",0)==0)value=spread_values[static_cast<std::size_t>(std::stoull(args[ai].substr(13)))];
+                    else if(!eval(args[ai],value,depth+1))return false;
+                    values.push_back(std::move(value));sources.push_back(args[ai].rfind("\x1fnift:spread:",0)==0?std::string():args[ai]);
+                }
+                return true;
+            };
             if (terminal_call && text.substr(0,lp).find('.') != std::string::npos) {
                 const std::string target=trim_copy(text.substr(0,lp)); const auto dot=target.rfind('.'); const std::string root=target.substr(0,dot), mn=target.substr(dot+1);
                 VariableBinding* rb=nullptr;for(auto scope=variable_scopes_.rbegin();scope!=variable_scopes_.rend();++scope){auto it=scope->find(root);if(it!=scope->end()){rb=&it->second;break;}}
@@ -3208,7 +3258,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     nift::RuntimeValue cb=*ff->second.value; push_variable_scope(); auto& sc=variable_scopes_.back(); auto csp=std::make_shared<nift::RuntimeValue>(std::move(cb)); sc["__nift_module_field"]=VariableBinding{csp,nift_binding_type(*csp),false,false};
                     bool r=eval("__nift_module_field"+call,out,depth+1); pop_variable_scope(); return r;
                 }
-                error="struct has no method: "+mn;return false;}if(mi->second.private_member&&(receiver_stack_.empty()||receiver_stack_.back()!=inst->second)){error="private struct method: "+mn;return false;}bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(!aok){error="malformed method arguments";return false;}std::vector<nift::RuntimeValue> av;for(std::size_t ai=0;ai<ar.size();++ai){nift::RuntimeValue v;if(ai<aq.size()&&aq[ai])v=nift::RuntimeValue(ar[ai]);else if(!eval(ar[ai],v,depth+1))return false;av.push_back(std::move(v));}return invoke_struct_method(inst->second,mi->second,av,ar,out,error);}
+                error="struct has no method: "+mn;return false;}if(mi->second.private_member&&(receiver_stack_.empty()||receiver_stack_.back()!=inst->second)){error="private struct method: "+mn;return false;}std::vector<nift::RuntimeValue> av;std::vector<std::string> ar;if(!method_arguments(mi->second,av,ar))return false;return invoke_struct_method(inst->second,mi->second,av,ar,out,error);}
             }
             if (terminal_call && valid_binding_identifier(trim_copy(text.substr(0, lp)))) {
                 const std::string call_name = trim_copy(text.substr(0, lp));
@@ -3224,7 +3274,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     out=nift::RuntimeValue(std::string("\x1fnift:struct:")+id); return true;
                 }
                 auto ci = callables_.find(call_name);
-                if(ci==callables_.end()&&!receiver_stack_.empty()){auto sd=structs_.find(receiver_stack_.back()->type_name);if(sd!=structs_.end()){auto mi=sd->second.methods.find(call_name);if(mi!=sd->second.methods.end()&&!mi->second.constructor){bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(!aok){error="malformed method arguments";return false;}std::vector<nift::RuntimeValue> av;for(std::size_t ai=0;ai<ar.size();++ai){nift::RuntimeValue v;if(ai<aq.size()&&aq[ai])v=nift::RuntimeValue(ar[ai]);else if(!eval(ar[ai],v,depth+1))return false;av.push_back(std::move(v));}return invoke_struct_method(receiver_stack_.back(),mi->second,av,ar,out,error);}}}
+                if(ci==callables_.end()&&!receiver_stack_.empty()){auto sd=structs_.find(receiver_stack_.back()->type_name);if(sd!=structs_.end()){auto mi=sd->second.methods.find(call_name);if(mi!=sd->second.methods.end()&&!mi->second.constructor){std::vector<nift::RuntimeValue> av;std::vector<std::string> ar;if(!method_arguments(mi->second,av,ar))return false;return invoke_struct_method(receiver_stack_.back(),mi->second,av,ar,out,error);}}}
                 // Indirect first-class callable invocation.
                 if (ci == callables_.end()) {
                     VariableBinding* cb=find_binding(call_name);
@@ -4794,12 +4844,13 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     std::size_t mhc = 0; if (!find_balanced(body, p + 2, '(', ')', mhc)) { fail(source_path, source, i, "struct method has malformed signature"); struct_ok=false; break; }
                     const std::string sig = trim_copy(body.substr(p + 3, mhc - (p + 3))); const auto lp=sig.find('(');
                     if(lp==std::string::npos||sig.back()!=')'){fail(source_path,source,i,"struct method signature must be name(args)");struct_ok=false;break;}
-                    const std::string mn=trim_copy(sig.substr(0,lp)); bool pok=false; auto ps=parse_parameters(sig.substr(lp+1,sig.size()-lp-2),pok);
+                    const std::string mn=trim_copy(sig.substr(0,lp)); std::vector<std::string> ps; std::string variadic_param; const bool pok=parse_callable_parameters(sig.substr(lp+1,sig.size()-lp-2),ps,variadic_param);
+                    if(variadic_param=="this"||std::find(ps.begin(),ps.end(),"this")!=ps.end()){fail(source_path,source,i,"struct method parameters cannot be named 'this'");struct_ok=false;break;}
                     std::size_t mbo=mhc+1; while(mbo<body.size()&&std::isspace(static_cast<unsigned char>(body[mbo])))++mbo; std::size_t mbc=0;
                     if(!valid_binding_identifier(mn)||!pok||mbo>=body.size()||body[mbo]!='{'||!find_balanced(body,mbo,'{','}',mbc)){fail(source_path,source,i,"invalid struct method");struct_ok=false;break;}
-                    const bool ctor=mn==struct_name; if(ctor && def.methods.find(struct_name)!=def.methods.end()){fail(source_path,source,i,"struct may define at most one constructor");struct_ok=false;break;}
+                    const bool ctor=mn==struct_name; if(ctor&&!variadic_param.empty()){fail(source_path,source,i,"struct constructors cannot be variadic");struct_ok=false;break;}if(ctor && def.methods.find(struct_name)!=def.methods.end()){fail(source_path,source,i,"struct may define at most one constructor");struct_ok=false;break;}
                     const auto mb=normalize_control_block_body(body.substr(mbo+1,mbc-mbo-1));
-                    def.methods[mn]=StructMethod{Callable{ps,"",mb.text,source_path,false,false,{}},priv,ctor}; p=mbc+1; continue;
+                    def.methods[mn]=StructMethod{Callable{ps,variadic_param,mb.text,source_path,false,false,{}},priv,ctor}; p=mbc+1; continue;
                 }
                 // Struct fields are separated by top-level newlines or
                 // semicolons; a ';' or newline inside a nested lambda/block must
@@ -4824,18 +4875,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             std::size_t header_close = 0; if (!find_balanced(source, open, '(', ')', header_close)) { fail(source_path, source, i, "callable definition has no matching ')'"); break; }
             const std::string signature = trim_copy(source.substr(open + 1, header_close - open - 1)); const auto lp = signature.find('(');
             if (lp == std::string::npos || signature.back() != ')') { fail(source_path, source, i, "callable signature must be name(args)"); break; }
-            const std::string name = trim_copy(signature.substr(0, lp)); bool params_ok=false; auto params=parse_parameters(signature.substr(lp+1, signature.size()-lp-2), params_ok);
-            std::string variadic_param;
-            if(params_ok){
-                for(std::size_t pi=0;pi<params.size();++pi){
-                    std::string p=trim_copy(params[pi]);
-                    if(p.rfind("...",0)==0){
-                        if(!variadic_param.empty()||pi+1!=params.size()||!valid_binding_identifier(trim_copy(p.substr(3)))){params_ok=false;break;}
-                        variadic_param=trim_copy(p.substr(3)); params.pop_back(); break;
-                    }
-                    if(!valid_binding_identifier(p)){params_ok=false;break;} params[pi]=p;
-                }
-            }
+            const std::string name = trim_copy(signature.substr(0, lp)); std::vector<std::string> params; std::string variadic_param; const bool params_ok=parse_callable_parameters(signature.substr(lp+1, signature.size()-lp-2),params,variadic_param);
             if (!valid_binding_identifier(name) || !params_ok) { fail(source_path, source, i, "invalid callable signature"); break; }
             std::size_t bo=header_close+1; while(bo<source.size()&&std::isspace(static_cast<unsigned char>(source[bo])))++bo; std::size_t bc=0;
             if(bo>=source.size()||source[bo]!='{'||!find_balanced(source,bo,'{','}',bc)){fail(source_path,source,i,"callable definition requires a block");break;}
@@ -6882,12 +6922,13 @@ bool Parser::invoke_struct_method(std::shared_ptr<StructInstance> instance,
                                   const std::vector<std::string>& arg_sources,
                                   nift::RuntimeValue& out,
                                   std::string& error) {
-    if (args.size() != method.callable.params.size()) { error = "struct method argument count mismatch"; return false; }
+    if (method.callable.variadic_param.empty() ? args.size() != method.callable.params.size() : args.size() < method.callable.params.size()) { error = "struct method argument count mismatch"; return false; }
     if (callable_call_depth_ >= kMaxCallableDepth) { error = "callable recursion depth exceeded"; return false; }
     ++callable_call_depth_;
     const int caller_loop_depth = loop_depth_; loop_depth_ = 0;
     push_variable_scope(); const std::size_t scope_index=variable_scopes_.size()-1;
-    for(std::size_t i=0;i<args.size();++i){auto sp=std::make_shared<nift::RuntimeValue>(args[i]);variable_scopes_[scope_index][method.callable.params[i]]=VariableBinding{sp,nift_binding_type_from_text(arg_sources[i],*sp),true,false};}
+    for(std::size_t i=0;i<method.callable.params.size();++i){auto sp=std::make_shared<nift::RuntimeValue>(args[i]);variable_scopes_[scope_index][method.callable.params[i]]=VariableBinding{sp,nift_binding_type_from_text(arg_sources[i],*sp),true,false};}
+    if(!method.callable.variadic_param.empty()){nift::RuntimeValue rest=nift::RuntimeValue::make_array();for(std::size_t i=method.callable.params.size();i<args.size();++i)rest.array.push_back(args[i]);auto sp=std::make_shared<nift::RuntimeValue>(std::move(rest));variable_scopes_[scope_index].emplace(method.callable.variadic_param,VariableBinding{sp,nift_binding_type(*sp),true,false});}
     std::string id;
     for(const auto& e:struct_instances_) if(e.second==instance){id=e.first;break;}
     auto thisv=std::make_shared<nift::RuntimeValue>(std::string("\x1fnift:struct:")+id); variable_scopes_[scope_index]["this"]=VariableBinding{thisv,nift_binding_type(*thisv),false,false};

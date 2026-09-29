@@ -1138,6 +1138,7 @@ test-v44-language-foundation: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_perf_scaling_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_element_assignment_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp2_variadic_functions_smoke.sh
+	NIFT="$(CURDIR)/$(TARGET)" tests/v44_struct_variadic_methods_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp3_variadic_lambdas_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp4_spread_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp5_generalized_native_smoke.sh

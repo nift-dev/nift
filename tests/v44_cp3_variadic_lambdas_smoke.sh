@@ -18,7 +18,7 @@ out=$($NIFT "$t/ok.f")
 0
 2
 1,1,1" ] || { printf 'unexpected output:\n%s\n' "$out" >&2; exit 1; }
-for expr in '(...a, b) => 1' '(...a, ...b) => 1' '... => 1'; do
+for expr in '(...a, b) => 1' '(...a, ...b) => 1' '... => 1' '(a, a) => 1' '(a, ...a) => 1'; do
   printf '$[x := %s]\n' "$expr" >"$t/bad.f"
   if $NIFT "$t/bad.f" >/dev/null 2>&1; then echo "accepted bad lambda: $expr" >&2; exit 1; fi
 done
