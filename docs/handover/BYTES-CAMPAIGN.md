@@ -43,8 +43,14 @@ rejection are certified without production changes. Evidence is in
 Review Gate 6B result: **pass** on 2026-09-29. Generic bytes value semantics,
 prepared/legacy evaluator parity, text and serialization boundaries, transfer,
 shared-backing amplification behavior, sanitizers and native Linux/macOS/Windows
-execution are certified. Evidence is in `docs/evidence/gate6b-bytes.md`. CP19 is
-next.
+execution are certified. Evidence is in `docs/evidence/gate6b-bytes.md`. This
+cleared CP19 to begin.
+
+CP19 implementation status: complete candidate on 2026-09-29. `open_bytes`,
+stream and managed-file byte reads, and exact raw byte writes are additive;
+existing text I/O remains unchanged. Checked read failures, managed-file cursor
+semantics and atomic replacement on Windows are covered. Evidence is in
+`docs/evidence/cp19-bytes-io.md`. CP20 is next.
 
 Strict JSON remains a separate ingress/egress boundary. The implementation must
 introduce a Nift-owned runtime value model for null, bool, number, string, bytes,

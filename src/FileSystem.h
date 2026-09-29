@@ -15,6 +15,7 @@ std::string read_file(const std::filesystem::path& path);
 std::optional<std::string> read_file_checked(const std::filesystem::path& path);
 void begin_recovery_epoch();
 bool write_file(const std::filesystem::path& path, const std::string& contents);
+bool replace_file_atomic(const std::filesystem::path& temporary, const std::filesystem::path& destination);
 bool write_readonly_file(const std::filesystem::path& path, const std::string& contents,
                          std::filesystem::perms mode = std::filesystem::perms::owner_read |
                                                          std::filesystem::perms::group_read |

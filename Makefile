@@ -165,6 +165,9 @@ test-cp17-bytes: $(TARGET) $(CP17_BYTES_TEST)
 	"$(CP17_BYTES_TEST)"
 	NIFT="$(CURDIR)/$(TARGET)" tests/cp17_bytes.sh
 
+test-cp19-bytes: $(TARGET)
+	NIFT="$(CURDIR)/$(TARGET)" tests/cp19_bytes_io.sh
+
 $(TEST_DIR)/nift-console-smoke$(EXEEXT): tests/console_smoke.cpp src/Console.h
 	mkdir -p "$(TEST_DIR)"
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/console_smoke.cpp -o "$@"
@@ -528,7 +531,7 @@ test-all: test test-embed test-bindings test-build-boundary
 
 # Plain `make test` = the ordinary Nift/CLI regression surface (C++ toolchain
 # only). Embedding and binding suites are run through the focused targets.
-test: test-content test-commands test-comments test-contracts test-json test-runtime-value test-cp15-numeric-repair test-cp17-bytes test-cp18-bytes \
+test: test-content test-commands test-comments test-contracts test-json test-runtime-value test-cp15-numeric-repair test-cp17-bytes test-cp18-bytes test-cp19-bytes \
 	test-json-schema test-console test-diagnostics test-minify \
 	test-json-schema-integration test-markup-json-directives test-pagination test-pagination-ordering \
 	test-template-optional test-requirements test-path-alias test-path-safety test-metadata-safety \
@@ -891,7 +894,7 @@ clean:
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
-.PHONY: FORCE libffi-check san-libffi-check tsan-libffi-check test-ffi-abi test-libffi-source test-gate6ar-ffi test-libffi-static-archive test-libffi-dependencies test-libffi-private-symbols test-pic-depfiles test-node-package-licenses test-v45-adversarial-runtime test-v45-integration-dogfood test-v45-embed-staged-consumer embed go-binding csharp-binding node-binding python-binding bindings test-build-boundary test-embed test-go-binding test-csharp-binding test-node-binding test-python-binding test-bindings test-all test benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-markuppp-sync test-json test-json-schema test-runtime-value test-cp15-numeric-repair test-cp17-bytes test-cp18-bytes test-cp18-bytes-sanitize test-cp18-bytes-tsan test-console test-progress-render test-progress-pty test-snap-contract test-distribution-summary test-version-consistency test-diagnostics test-minify test-json-schema-integration test-markup-json-directives test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke test-host-seam benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-alias test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets test-init-lock test-unreadable-source test-incremental-modified-immediate test-v41-certification test-v42-language test-v42-struct test-v43-language test-macos-runner-policy install uninstall
+.PHONY: FORCE libffi-check san-libffi-check tsan-libffi-check test-ffi-abi test-libffi-source test-gate6ar-ffi test-libffi-static-archive test-libffi-dependencies test-libffi-private-symbols test-pic-depfiles test-node-package-licenses test-v45-adversarial-runtime test-v45-integration-dogfood test-v45-embed-staged-consumer embed go-binding csharp-binding node-binding python-binding bindings test-build-boundary test-embed test-go-binding test-csharp-binding test-node-binding test-python-binding test-bindings test-all test benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-markuppp-sync test-json test-json-schema test-runtime-value test-cp15-numeric-repair test-cp17-bytes test-cp18-bytes test-cp19-bytes test-cp18-bytes-sanitize test-cp18-bytes-tsan test-console test-progress-render test-progress-pty test-snap-contract test-distribution-summary test-version-consistency test-diagnostics test-minify test-json-schema-integration test-markup-json-directives test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke test-host-seam benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-alias test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets test-init-lock test-unreadable-source test-incremental-modified-immediate test-v41-certification test-v42-language test-v42-struct test-v43-language test-macos-runner-policy install uninstall
 
 
 test-cross-feature: $(TARGET)
@@ -987,6 +990,7 @@ test-cp18-bytes-sanitize: $(SAN_TARGET) $(CP18_BYTES_SAN_TEST)
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(CP18_BYTES_SAN_TEST)"
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT="$(CURDIR)/$(SAN_TARGET)" tests/cp17_bytes.sh
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT="$(CURDIR)/$(SAN_TARGET)" tests/cp18_bytes.sh
+	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT="$(CURDIR)/$(SAN_TARGET)" tests/cp19_bytes_io.sh
 
 test-pagination-sanitize: $(SAN_TARGET)
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT_BIN="$(CURDIR)/$(SAN_TARGET)" tests/pagination_sanitizer_smoke.sh
@@ -1015,6 +1019,7 @@ test-cp18-bytes-tsan: $(TSAN_TARGET) $(CP18_BYTES_TSAN_TEST)
 	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 "$(CP18_BYTES_TSAN_TEST)"
 	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 NIFT="$(CURDIR)/$(TSAN_TARGET)" tests/cp17_bytes.sh
 	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 NIFT="$(CURDIR)/$(TSAN_TARGET)" tests/cp18_bytes.sh
+	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 NIFT="$(CURDIR)/$(TSAN_TARGET)" tests/cp19_bytes_io.sh
 
 $(MEMORY_SMOKE): tests/json_smoke.cpp src/Json.h
 	mkdir -p "$(TEST_DIR)"

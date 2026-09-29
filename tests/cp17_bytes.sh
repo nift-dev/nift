@@ -78,12 +78,8 @@ printf '@slice([bytes([65])], 0, 1)\n' >"$TMP/template-collection.nift"
 run_file_reject template-collection 'bytes values cannot be rendered as text'
 printf '@script { return bytes([65]) }\n' >"$TMP/script-return.nift"
 run_file_reject script-return 'not directly renderable'
-printf 'f := file("managed.txt")\nf.open("w")\nf.write(bytes([65]))\n' >"$TMP/managed-write.nift"
-run_file_reject managed-write 'not directly renderable'
 printf 'f := file("managed-line.txt")\nf.open("w")\nf.write_line(bytes([65]))\n' >"$TMP/managed-line.nift"
 run_file_reject managed-line 'not directly renderable'
-printf 's := ofstream("stream.txt")\ns.write(bytes([65]))\n' >"$TMP/stream-write.nift"
-run_file_reject stream-write 'not directly renderable'
 printf 's := ofstream("stream-line.txt")\ns.write_line(bytes([65]))\n' >"$TMP/stream-line.nift"
 run_file_reject stream-line 'not directly renderable'
 printf 's := ofstream("value.txt")\ns.write_val({"nested":[bytes([65])]})\n' >"$TMP/write-val.nift"

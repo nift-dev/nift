@@ -263,15 +263,22 @@ static fs::path temporary_sibling(const fs::path& path) {
     return temp;
 }
 
-static bool replace_file(const fs::path& temp, const fs::path& path) {
+bool replace_file_atomic(const fs::path& temp, const fs::path& path) {
 #ifdef _WIN32
-    if (fs::exists(path)) {
-        std::error_code ignored;
+    std::error_code status_error;
+    const bool existed = fs::exists(path, status_error) && !status_error;
+    const fs::perms original_permissions = existed ? fs::status(path, status_error).permissions() : fs::perms::unknown;
+    if (existed && !status_error) {
+        std::error_code permission_error;
         fs::permissions(path, fs::perms::owner_read | fs::perms::owner_write |
-                              fs::perms::group_read | fs::perms::others_read,
-                        fs::perm_options::replace, ignored);
+                               fs::perms::group_read | fs::perms::others_read,
+                        fs::perm_options::replace, permission_error);
     }
     if (::MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) return true;
+    if (existed && original_permissions != fs::perms::unknown) {
+        std::error_code ignored;
+        fs::permissions(path, original_permissions, fs::perm_options::replace, ignored);
+    }
     std::error_code cleanup;
     fs::remove(temp, cleanup);
     return false;
@@ -329,7 +336,7 @@ bool write_file(const fs::path& path, const std::string& contents) {
         fs::remove(temp, cleanup);
         return false;
     }
-    return replace_file(temp, path);
+    return replace_file_atomic(temp, path);
 }
 
 
@@ -378,7 +385,7 @@ bool write_readonly_file(const fs::path& path, const std::string& contents, fs::
         fs::remove(temp, cleanup);
         return false;
     }
-    return replace_file(temp, path);
+    return replace_file_atomic(temp, path);
 }
 
 bool write_readonly_files(const std::vector<std::pair<fs::path, std::string>>& files, fs::perms mode) {
@@ -420,12 +427,12 @@ bool write_readonly_files(const std::vector<std::pair<fs::path, std::string>>& f
     }
 
     for (std::size_t i = 0; i < staged.size(); ++i) {
-        if (!replace_file(staged[i].temp, staged[i].path)) {
+        if (!replace_file_atomic(staged[i].temp, staged[i].path)) {
             // Best-effort rollback of outputs already replaced in this group.
             for (std::size_t j = 0; j < i; ++j) {
                 if (!staged[j].committed) continue;
                 if (staged[j].had_original) {
-                    replace_file(staged[j].backup, staged[j].path);
+                    replace_file_atomic(staged[j].backup, staged[j].path);
                     staged[j].backup.clear();
                 } else {
                     remove_owned_file(staged[j].path);
