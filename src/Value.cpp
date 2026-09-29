@@ -30,6 +30,9 @@ Value::Value(const char* value) : impl_(std::make_shared<Impl>()) {
 Value::Value(std::string value) : impl_(std::make_shared<Impl>()) {
     impl_->value = RuntimeValue(std::move(value));
 }
+Value::Value(Bytes value) : impl_(std::make_shared<Impl>()) {
+    impl_->value = RuntimeValue(std::move(value));
+}
 
 // Deep-copy value semantics: copying a Value produces an independent
 // equivalent value; copying a Null Value stays Null.
@@ -67,6 +70,7 @@ Value::Type Value::type() const {
         case RuntimeType::String: return Type::String;
         case RuntimeType::Array: return Type::Array;
         case RuntimeType::Object: return Type::Object;
+        case RuntimeType::Bytes: return Type::Bytes;
     }
     return Type::Null;
 }
@@ -76,12 +80,17 @@ bool Value::is_number() const { return impl_ && impl_->value.is_number(); }
 bool Value::is_string() const { return impl_ && impl_->value.is_string(); }
 bool Value::is_array() const { return impl_ && impl_->value.is_array(); }
 bool Value::is_object() const { return impl_ && impl_->value.is_object(); }
+bool Value::is_bytes() const { return impl_ && impl_->value.is_bytes(); }
 
 double Value::number() const { return impl_ ? impl_->value.num : 0.0; }
 bool Value::boolean() const { return impl_ && impl_->value.boolean; }
 const std::string& Value::string() const {
     static const std::string empty;
     return impl_ ? impl_->value.string : empty;
+}
+const Value::Bytes& Value::bytes() const {
+    static const Bytes empty;
+    return impl_ && impl_->value.bytes ? *impl_->value.bytes : empty;
 }
 std::string Value::json() const { return impl_ ? impl_->value.dump(0) : std::string("null"); }
 

@@ -251,7 +251,7 @@ test-engine-render-api: $(ENGINE_RENDER_API_TEST)
 # Public-header consumer probe: compiled with ONLY the public include path, so
 # it proves <nift/nift.h> is self-contained (no -Isrc, no Jsonic++ visibility).
 PUBLIC_HEADER_PROBE := $(TEST_DIR)/public-header-probe$(EXEEXT)
-$(PUBLIC_HEADER_PROBE): tests/public_header_probe.cpp $(ENGINE_CORE_OBJECTS)
+$(PUBLIC_HEADER_PROBE): tests/public_header_probe.cpp $(wildcard include/nift/*.h) $(ENGINE_CORE_OBJECTS)
 	mkdir -p $(TEST_DIR)
 	$(CXX) -std=c++17 -Iinclude tests/public_header_probe.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
@@ -477,7 +477,7 @@ test-build-boundary-nondestructive:
 	bash tests/build_boundary_nondestructive.sh
 
 # Focused embed/binding test targets (mirror the build separation).
-test-embed: test-c-abi test-c-abi-c-smoke test-engine test-engine-bindings \
+test-embed: test-c-abi test-c-abi-c-smoke test-engine test-engine-bindings test-public-header \
 	test-engine-render-api test-conformance test-v45-embed-staged-consumer
 
 test-v45-embed-staged-consumer: embed

@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -9,7 +10,9 @@
 
 namespace nift {
 
-enum class RuntimeType { Null, Boolean, Number, StrNumber, String, Array, Object };
+enum class RuntimeType { Null, Boolean, Number, StrNumber, String, Array, Object, Bytes };
+
+using RuntimeBytes = std::vector<std::uint8_t>;
 
 // Nift-owned recursive runtime substrate. StrNumber retains an exact JSON-number
 // spelling when conversion to double would lose its decimal semantics.
@@ -21,6 +24,7 @@ public:
     std::string string;
     std::vector<RuntimeValue> array;
     std::vector<std::pair<std::string, RuntimeValue>> object;
+    std::shared_ptr<const RuntimeBytes> bytes;
 
     RuntimeValue() = default;
     RuntimeValue(std::nullptr_t) : type(RuntimeType::Null) {}
@@ -30,6 +34,8 @@ public:
     RuntimeValue(const char* value) : type(RuntimeType::String), string(value ? value : "") {}
     RuntimeValue(const std::string& value) : type(RuntimeType::String), string(value) {}
     RuntimeValue(std::string&& value) : type(RuntimeType::String), string(std::move(value)) {}
+    explicit RuntimeValue(RuntimeBytes value)
+        : type(RuntimeType::Bytes), bytes(std::make_shared<const RuntimeBytes>(std::move(value))) {}
 
     static RuntimeValue make_array() { RuntimeValue value; value.type = RuntimeType::Array; return value; }
     static RuntimeValue make_object() { RuntimeValue value; value.type = RuntimeType::Object; return value; }
@@ -40,6 +46,7 @@ public:
     bool is_string() const { return type == RuntimeType::String; }
     bool is_array() const { return type == RuntimeType::Array; }
     bool is_object() const { return type == RuntimeType::Object; }
+    bool is_bytes() const { return type == RuntimeType::Bytes; }
 
     bool has(const std::string& key) const;
     RuntimeValue& operator[](const std::string& key);

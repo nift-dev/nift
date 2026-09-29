@@ -1356,12 +1356,14 @@ std::string Parser::render_expression_value(const nift::RuntimeValue& value) con
     if (value.is_string() && value.string.rfind("\x1fnift:enum:",0)==0) { const auto last=value.string.rfind(':'); const auto prev=last==std::string::npos?last:value.string.rfind(':',last-1); if(prev!=std::string::npos&&last!=std::string::npos)return value.string.substr(prev+1,last-prev-1); }
     if (value.is_string() && value.string.rfind("\x1fnift:atomic:",0)==0) { auto it=atomic_instances_.find(value.string.substr(13)); if(it!=atomic_instances_.end()){ if(it->second->kind==AtomicInstance::Kind::Bool) return it->second->bool_value.load()?"true":"false"; const auto v=it->second->int_value.load(); return std::to_string(v); } }
     if (value.is_string()) return value.string;
+    if (value.is_bytes()) throw std::runtime_error("bytes values cannot be rendered as text");
     return value.dump(0);
 }
 
 bool Parser::serialize_value(const nift::RuntimeValue& value, bool pretty, std::string& output, std::string& error, int depth) const {
     if(value.is_string()&&value.string.rfind("\x1fnift:enum:",0)==0){const auto p=value.string.rfind(':');if(p==std::string::npos){error="invalid enum value";return false;}output+=value.string.substr(p+1);return true;}
     if (depth > 128) { error = "value serialization depth exceeded"; return false; }
+    if (value.is_bytes()) { error = "bytes values are not serializable"; return false; }
     const std::string pad(pretty ? static_cast<std::size_t>(depth * 2) : 0, ' ');
     const std::string child_pad(pretty ? static_cast<std::size_t>((depth + 1) * 2) : 0, ' ');
     auto append_sequence = [&](const std::vector<nift::RuntimeValue>& values, const std::string& open, const std::string& close, std::string& dst)->bool {
@@ -2069,6 +2071,7 @@ bool Parser::evaluate_expression(const std::string& expression, nift::RuntimeVal
                     }
                     return x.string==y.string;
                 }
+                if(x.is_bytes()) return nift::runtime_equal(x,y);
                 if(x.is_array()){if(x.array.size()!=y.array.size())return false;for(size_t i=0;i<x.array.size();++i)if(!eq(x.array[i],y.array[i]))return false;return true;}
                 if(x.is_object()){if(x.object.size()!=y.object.size())return false;std::vector<bool> matched(y.object.size(),false);for(const auto& e:x.object){bool found=false;for(std::size_t i=0;i<y.object.size();++i)if(!matched[i]&&e.first==y.object[i].first&&eq(e.second,y.object[i].second)){matched[i]=true;found=true;break;}if(!found)return false;}return true;}
                 return false;
@@ -3258,8 +3261,13 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             bool ok_params = false; auto args = parse_parameters(text.substr(9, text.size() - 10), ok_params);
             if (!ok_params || args.size() != 2) { error = "validate: expected schema and value"; return false; }
             nift::RuntimeValue schema, candidate; if (!eval(args[0], schema, depth + 1) || !eval(args[1], candidate, depth + 1)) return false;
-            const json::Document schema_document = nift::runtime_to_json(schema);
-            const json::Document candidate_document = nift::runtime_to_json(candidate);
+            json::Document schema_document, candidate_document;
+            std::string conversion_error;
+            if (!nift::runtime_to_json(schema, schema_document, conversion_error) ||
+                !nift::runtime_to_json(candidate, candidate_document, conversion_error)) {
+                error = "validate: " + conversion_error;
+                return false;
+            }
             std::string validation_error; if (!jsonschema::validate(candidate_document, schema_document, validation_error)) { error = "validate: " + validation_error; return false; }
             out = std::move(candidate); return true;
         }
@@ -6433,7 +6441,13 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                             fail(source_path, source, i, "json: " + binding_error);
                             break;
                         }
-                        schema = std::make_shared<const json::Document>(nift::runtime_to_json(*runtime_schema));
+                        json::Document schema_document;
+                        std::string conversion_error;
+                        if (!nift::runtime_to_json(*runtime_schema, schema_document, conversion_error)) {
+                            fail(source_path, source, i, "json: " + conversion_error);
+                            break;
+                        }
+                        schema = std::make_shared<const json::Document>(std::move(schema_document));
                         schema_label = schema_reference;
                     } else {
                         std::string schema_path_argument;
@@ -6465,7 +6479,12 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                         result_.dependencies.insert(host_.relative(schema_path));
                     }
                     std::string validation_error;
-                    const json::Document instance_document = nift::runtime_to_json(*document);
+                    json::Document instance_document;
+                    std::string conversion_error;
+                    if (!nift::runtime_to_json(*document, instance_document, conversion_error)) {
+                        fail(source_path, source, i, "json: " + conversion_error);
+                        break;
+                    }
                     if (!jsonschema::validate(instance_document, *schema, validation_error)) {
                         fail(source_path, source, i, "json: " + instance_label+
                              " does not satisfy schema " + schema_label + " (" + validation_error + ")");

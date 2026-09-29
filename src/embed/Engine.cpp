@@ -321,12 +321,24 @@ void Engine::set_platform(std::string platform) {
 }
 
 ScriptResult Engine::execute(std::string_view script, std::string cmd, std::vector<std::string> args) {
-    std::lock_guard<std::mutex> lock(impl_->script_mutex_); if(!impl_->script_state)impl_->script_state=std::make_unique<Impl::ScriptState>(*impl_);impl_->script_state->parser.set_script_invocation(std::move(cmd),std::move(args));
-    RuntimeValue value;std::string error;ScriptResult out;if(!impl_->script_state->parser.run_embedded_script(std::string(script),"<embed>",value,error)){out.error_.message=std::move(error);out.error_.source="<embed>";return out;}ValueAccess::runtime(out.value_)=std::move(value);out.ok_=true;return out;
+    std::lock_guard<std::mutex> lock(impl_->script_mutex_);
+    ScriptResult out;
+    try {
+        if(!impl_->script_state)impl_->script_state=std::make_unique<Impl::ScriptState>(*impl_);
+        impl_->script_state->parser.set_script_invocation(std::move(cmd),std::move(args));
+        RuntimeValue value;std::string error;if(!impl_->script_state->parser.run_embedded_script(std::string(script),"<embed>",value,error)){out.error_.message=std::move(error);out.error_.source="<embed>";return out;}ValueAccess::runtime(out.value_)=std::move(value);out.ok_=true;return out;
+    } catch (const std::exception& error) {
+        out.error_.message=error.what();out.error_.source="<embed>";return out;
+    }
 }
 
 ScriptResult Engine::evaluate(std::string_view expression) {
-    std::lock_guard<std::mutex> lock(impl_->script_mutex_);if(!impl_->script_state){impl_->script_state=std::make_unique<Impl::ScriptState>(*impl_);RuntimeValue init;std::string ie;impl_->script_state->parser.run_embedded_script("","<embed>",init,ie);}RuntimeValue value;std::string error;ScriptResult out;if(!impl_->script_state->parser.eval_expression(std::string(expression),value,error)){out.error_.message=std::move(error);out.error_.source="<embed>";return out;}ValueAccess::runtime(out.value_)=std::move(value);out.ok_=true;return out;
+    std::lock_guard<std::mutex> lock(impl_->script_mutex_);ScriptResult out;
+    try {
+        if(!impl_->script_state){impl_->script_state=std::make_unique<Impl::ScriptState>(*impl_);RuntimeValue init;std::string ie;impl_->script_state->parser.run_embedded_script("","<embed>",init,ie);}RuntimeValue value;std::string error;if(!impl_->script_state->parser.eval_expression(std::string(expression),value,error)){out.error_.message=std::move(error);out.error_.source="<embed>";return out;}ValueAccess::runtime(out.value_)=std::move(value);out.ok_=true;return out;
+    } catch (const std::exception& error) {
+        out.error_.message=error.what();out.error_.source="<embed>";return out;
+    }
 }
 
 bool Engine::register_function(std::string name, HostFunction function) {
@@ -337,7 +349,12 @@ bool Engine::register_function(std::string name, HostFunction function) {
 }
 
 ScriptResult Engine::call(std::string_view name, const std::vector<Value>& args) {
-    std::lock_guard<std::mutex> lock(impl_->script_mutex_);ScriptResult out;if(!impl_->script_state){out.error_.message="no embedded script has been executed";out.error_.source="<embed>";return out;}std::vector<RuntimeValue> av;av.reserve(args.size());for(const auto& v:args)av.push_back(ValueAccess::runtime(v));RuntimeValue result;std::string error;if(!impl_->script_state->parser.invoke_callable(std::string(name),av,result,error)){out.error_.message=std::move(error);out.error_.source="<embed>";return out;}ValueAccess::runtime(out.value_)=std::move(result);out.ok_=true;return out;
+    std::lock_guard<std::mutex> lock(impl_->script_mutex_);ScriptResult out;
+    try {
+        if(!impl_->script_state){out.error_.message="no embedded script has been executed";out.error_.source="<embed>";return out;}std::vector<RuntimeValue> av;av.reserve(args.size());for(const auto& v:args)av.push_back(ValueAccess::runtime(v));RuntimeValue result;std::string error;if(!impl_->script_state->parser.invoke_callable(std::string(name),av,result,error)){out.error_.message=std::move(error);out.error_.source="<embed>";return out;}ValueAccess::runtime(out.value_)=std::move(result);out.ok_=true;return out;
+    } catch (const std::exception& error) {
+        out.error_.message=error.what();out.error_.source="<embed>";return out;
+    }
 }
 
 bool Engine::reload(std::string* error) {
@@ -394,7 +411,12 @@ RenderResult Engine::render(std::string_view page_name, const Context& context) 
 
     ProjectHost host(*snapshot, &render_bindings, impl_->environment_provider);
     Parser parser(host, info);
-    return RenderResultBuilder::build(parser.render());
+    try {
+        return RenderResultBuilder::build(parser.render());
+    } catch (const std::exception& error) {
+        result.error_.message = error.what();
+        return result;
+    }
 }
 
 RenderResult Engine::render(std::string_view page_name) {
@@ -464,8 +486,14 @@ RenderResult Engine::render(const Source& page, const Source& page_template, con
         render_bindings[name] = std::make_shared<RuntimeValue>(ValueAccess::runtime(value));
     EngineHost host(*impl_, &render_bindings, context.current_output_);
     Parser parser(host, info);
-    return RenderResultBuilder::build(parser.render_composed(template_render_source, page_render_source,
-                                                              /*require_exactly_one_content=*/true));
+    try {
+        return RenderResultBuilder::build(parser.render_composed(template_render_source, page_render_source,
+                                                                  /*require_exactly_one_content=*/true));
+    } catch (const std::exception& error) {
+        RenderResult result;
+        result.error_.message = error.what();
+        return result;
+    }
 }
 
 RenderResult Engine::render(const Source& page, const Source& page_template) {
@@ -482,8 +510,14 @@ RenderResult Engine::render(const Source& partial, const Context& context) {
         render_bindings[name] = std::make_shared<RuntimeValue>(ValueAccess::runtime(value));
     EngineHost host(*impl_, &render_bindings, context.current_output_);
     Parser parser(host, info);
-    return RenderResultBuilder::build(parser.render_composed(partial_render_source, std::nullopt,
-                                                              /*require_exactly_one_content=*/false));
+    try {
+        return RenderResultBuilder::build(parser.render_composed(partial_render_source, std::nullopt,
+                                                                  /*require_exactly_one_content=*/false));
+    } catch (const std::exception& error) {
+        RenderResult result;
+        result.error_.message = error.what();
+        return result;
+    }
 }
 
 RenderResult Engine::render(const Source& partial) {

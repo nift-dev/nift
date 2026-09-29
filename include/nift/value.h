@@ -1,8 +1,10 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace nift {
 
@@ -47,7 +49,8 @@ private:
 //
 // Value semantics (CP7c contract):
 // - copy construction/assignment produce an independent equivalent value;
-//   mutating either copy does not affect the other
+//   immutable bytes backing may be shared, and mutating either aggregate copy
+//   does not affect the other
 // - move construction/assignment transfer ownership without copying and leave
 //   the source as a valid Null Value; moves are nothrow
 // - a default-constructed or moved-from Value is Null
@@ -59,7 +62,8 @@ private:
 //   make_array()) and otherwise throw std::runtime_error.
 class Value {
 public:
-    enum class Type { Null, Boolean, Number, String, Array, Object };
+    using Bytes = std::vector<std::uint8_t>;
+    enum class Type { Null, Boolean, Number, String, Array, Object, Bytes };
 
     Value();
     Value(bool value);
@@ -67,6 +71,7 @@ public:
     Value(double value);
     Value(const char* value);
     Value(std::string value);
+    Value(Bytes value);
     Value(const Value&);
     Value(Value&&) noexcept;
     Value& operator=(const Value&);
@@ -83,10 +88,12 @@ public:
     bool is_string() const;
     bool is_array() const;
     bool is_object() const;
+    bool is_bytes() const;
 
     double number() const;
     bool boolean() const;
     const std::string& string() const;
+    const Bytes& bytes() const;
     std::string json() const;
 
     void push_back(const Value& value);

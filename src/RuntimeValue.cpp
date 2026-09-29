@@ -287,6 +287,7 @@ bool runtime_truthy(const RuntimeValue& value) {
     if (value.is_string()) return !value.string.empty();
     if (value.is_array()) return !value.array.empty();
     if (value.is_object()) return !value.object.empty();
+    if (value.is_bytes()) return value.bytes && !value.bytes->empty();
     return false;
 }
 
@@ -446,6 +447,10 @@ bool runtime_equal(const RuntimeValue& left, const RuntimeValue& right) {
     if (left.is_null()) return true;
     if (left.is_bool()) return left.boolean == right.boolean;
     if (left.is_string()) return left.string == right.string;
+    if (left.is_bytes()) {
+        const RuntimeBytes empty;
+        return (left.bytes ? *left.bytes : empty) == (right.bytes ? *right.bytes : empty);
+    }
     if (left.is_array()) {
         if (left.array.size() != right.array.size()) return false;
         for (std::size_t i = 0; i < left.array.size(); ++i)
@@ -483,6 +488,14 @@ void append_fingerprint(std::string& out, const RuntimeValue& value) {
     if (value.is_bool()) { out += value.boolean ? "1" : "0"; return; }
     if (value.is_string()) {
         out += std::to_string(value.string.size()) + ":" + value.string;
+        return;
+    }
+    if (value.is_bytes()) {
+        const RuntimeBytes empty;
+        const auto& bytes = value.bytes ? *value.bytes : empty;
+        out += std::to_string(bytes.size()) + ":";
+        if (!bytes.empty())
+            out.append(reinterpret_cast<const char*>(bytes.data()), bytes.size());
         return;
     }
     if (value.is_array()) {
@@ -539,7 +552,7 @@ RuntimeValue runtime_from_json(const json::Document& document) {
     return value;
 }
 
-json::Document runtime_to_json(const RuntimeValue& value) {
+bool runtime_to_json(const RuntimeValue& value, json::Document& output, std::string& error) {
     json::Document document;
     switch (value.type) {
         case RuntimeType::Null: break;
@@ -554,15 +567,34 @@ json::Document runtime_to_json(const RuntimeValue& value) {
         case RuntimeType::Array:
             document = json::Document::make_array();
             document.array.reserve(value.array.size());
-            for (const auto& item : value.array) document.array.push_back(runtime_to_json(item));
+            for (const auto& item : value.array) {
+                json::Document converted;
+                if (!runtime_to_json(item, converted, error)) return false;
+                document.array.push_back(std::move(converted));
+            }
             break;
         case RuntimeType::Object:
             document = json::Document::make_object();
             document.object.reserve(value.object.size());
-            for (const auto& entry : value.object)
-                document.object.emplace_back(entry.first, runtime_to_json(entry.second));
+            for (const auto& entry : value.object) {
+                json::Document converted;
+                if (!runtime_to_json(entry.second, converted, error)) return false;
+                document.object.emplace_back(entry.first, std::move(converted));
+            }
             break;
+        case RuntimeType::Bytes:
+            error = "bytes values are not JSON serializable";
+            return false;
     }
+    output = std::move(document);
+    error.clear();
+    return true;
+}
+
+json::Document runtime_to_json(const RuntimeValue& value) {
+    json::Document document;
+    std::string error;
+    if (!runtime_to_json(value, document, error)) throw std::runtime_error(error);
     return document;
 }
 

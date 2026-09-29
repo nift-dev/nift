@@ -36,6 +36,7 @@ int main() {
     nift::Value int_value(1);
     nift::Value double_value(2.5);
     nift::Value string_value(std::string("s"));
+    nift::Value bytes_value(nift::Value::Bytes{0x00, 0x80, 0xff});
     nift::Value array = nift::Value::make_array();
     array.push_back(int_value);
     array[0] = string_value;
@@ -51,6 +52,9 @@ int main() {
     (void)int_value.number();
     (void)bool_value.boolean();
     (void)string_value.string();
+    (void)bytes_value.is_bytes();
+    (void)bytes_value.bytes();
+    if (bytes_value.type() != nift::Value::Type::Bytes || bytes_value.bytes().size() != 3) return 1;
     nift::Value copy = object;
     nift::Value moved = std::move(int_value);
     nift::Value assigned;

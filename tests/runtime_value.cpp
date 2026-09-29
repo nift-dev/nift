@@ -191,4 +191,38 @@ int main() {
     assert(!nift::runtime_equal(duplicate_left, duplicate_different));
     assert(nift::runtime_fingerprint(duplicate_left) ==
            nift::runtime_fingerprint(duplicate_reordered));
+
+    const nift::RuntimeValue empty_bytes(nift::RuntimeBytes{});
+    const nift::RuntimeValue binary(nift::RuntimeBytes{0x00, 0x7f, 0x80, 0xff});
+    const nift::RuntimeValue binary_copy = binary;
+    assert(empty_bytes.is_bytes() && !nift::runtime_truthy(empty_bytes));
+    assert(!nift::runtime_fingerprint(empty_bytes).empty());
+    assert(binary.is_bytes() && nift::runtime_truthy(binary));
+    assert(binary.bytes == binary_copy.bytes);
+    assert(nift::runtime_equal(binary, binary_copy));
+    assert(!nift::runtime_equal(binary, nift::RuntimeValue(std::string("\0\x7f\x80\xff", 4))));
+    nift::RuntimeValue byte_array = nift::RuntimeValue::make_array();
+    byte_array.array = {nift::RuntimeValue(0), nift::RuntimeValue(127),
+                        nift::RuntimeValue(128), nift::RuntimeValue(255)};
+    assert(!nift::runtime_equal(binary, byte_array));
+    assert(nift::runtime_fingerprint(binary) != nift::runtime_fingerprint(
+        nift::RuntimeValue(std::string("\0\x7f\x80\xff", 4))));
+    assert(nift::runtime_fingerprint(binary) != nift::runtime_fingerprint(
+        nift::RuntimeValue(nift::RuntimeBytes{0x00, 0x7f, 0x80, 0xfe})));
+
+    nift::RuntimeValue nested_bytes = nift::RuntimeValue::make_object();
+    nested_bytes["payload"] = binary;
+    assert(nift::runtime_equal(nested_bytes, nested_bytes));
+    json::Document unchanged(true);
+    std::string bytes_error;
+    assert(!nift::runtime_to_json(binary, unchanged, bytes_error));
+    assert(unchanged.is_bool() && unchanged.boolean);
+    assert(bytes_error == "bytes values are not JSON serializable");
+    assert(!nift::runtime_to_json(nested_bytes, unchanged, bytes_error));
+    bool threw = false;
+    try { (void)nift::runtime_to_json(binary); }
+    catch (const std::runtime_error& e) {
+        threw = std::string(e.what()) == "bytes values are not JSON serializable";
+    }
+    assert(threw);
 }

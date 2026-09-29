@@ -497,6 +497,76 @@ int main() {
         CHECK(!engine.render(nift::Source::text("$[ninf.to_int()]"), context).ok());
     }
 
+    // 19. CP16 immutable bytes retain identity through public values and host
+    //     seams, while text and JSON boundaries reject them deterministically.
+    {
+        const nift::Value::Bytes data{0x00, 0x7f, 0x80, 0xff};
+        nift::Value bytes(data);
+        CHECK(bytes.type() == nift::Value::Type::Bytes);
+        CHECK(bytes.is_bytes());
+        CHECK(bytes.bytes() == data);
+        CHECK(nift::Value().bytes().empty());
+
+        nift::Value copy = bytes;
+        CHECK(copy.bytes() == data);
+        nift::Value nested = nift::Value::make_object();
+        nested["payload"] = copy;
+        bool top_level_json_rejected = false;
+        bool nested_json_rejected = false;
+        try { (void)bytes.json(); }
+        catch (const std::runtime_error& error) {
+            top_level_json_rejected = std::string(error.what()) ==
+                "bytes values are not JSON serializable";
+        }
+        try { (void)nested.json(); }
+        catch (const std::runtime_error& error) {
+            nested_json_rejected = std::string(error.what()) ==
+                "bytes values are not JSON serializable";
+        }
+        CHECK(top_level_json_rejected);
+        CHECK(nested_json_rejected);
+
+        nift::Engine engine;
+        CHECK(engine.set("left_bytes", bytes));
+        CHECK(engine.set("right_bytes", copy));
+        auto equal = engine.render(nift::Source::text("$[left_bytes == right_bytes]"));
+        CHECK(equal.ok());
+        CHECK(equal.output() == "true");
+        auto rendered = engine.render(nift::Source::text("$[left_bytes]"));
+        CHECK(!rendered.ok());
+        CHECK(rendered.error().message.find("cannot be rendered as text") != std::string::npos);
+
+        CHECK(engine.register_function("native_bytes", [data](const std::vector<nift::Value>&) {
+            return nift::Value(data);
+        }));
+        auto returned = engine.execute("return native_bytes()\n");
+        CHECK(returned.ok());
+        CHECK(returned.value().is_bytes());
+        CHECK(returned.value().bytes() == data);
+        auto print_rejected = engine.execute("print(native_bytes())\n");
+        CHECK(!print_rejected.ok());
+        CHECK(print_rejected.error().message.find("cannot be rendered as text") != std::string::npos);
+        auto concatenation_rejected = engine.evaluate("\"prefix\" + native_bytes()");
+        CHECK(!concatenation_rejected.ok());
+        CHECK(concatenation_rejected.error().message.find("cannot be rendered as text") != std::string::npos);
+
+        CHECK(engine.register_function("native_schema", [](const std::vector<nift::Value>&) {
+            nift::Value schema = nift::Value::make_object();
+            schema["type"] = nift::Value(std::string("object"));
+            return schema;
+        }));
+        auto validation_rejected = engine.evaluate("validate(native_schema(), native_bytes())");
+        CHECK(!validation_rejected.ok());
+        CHECK(validation_rejected.error().message.find("not JSON serializable") != std::string::npos);
+
+        nift::Context context;
+        CHECK(context.set("nested_bytes", nested));
+        auto nested_equal = engine.render(
+            nift::Source::text("$[nested_bytes.payload == left_bytes]"), context);
+        CHECK(nested_equal.ok());
+        CHECK(nested_equal.output() == "true");
+    }
+
     if (failures == 0) {
         std::printf("engine bindings test passed\n");
         return 0;

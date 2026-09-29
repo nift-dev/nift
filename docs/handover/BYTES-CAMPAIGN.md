@@ -16,7 +16,16 @@ pre-existing generic function-pointer dispatcher with exact-token vendored
 libffi dispatch. Hosted Linux GCC/Clang sanitizer, macOS Clang, Windows MinGW,
 packaging, exact staged-payload audits and integrity walls passed at `7f6fc58`;
 the defect-focused review found no remaining blocker. Evidence is in
-`docs/evidence/gate6ar-libffi.md`. CP16 is next and has not started.
+`docs/evidence/gate6ar-libffi.md`.
+
+CP16 implementation status: complete candidate on 2026-09-29. Runtime values
+now have a genuine bytes tag backed by shared immutable contiguous storage;
+truthiness, sequence equality, nesting and fingerprints preserve bytes identity.
+Checked JSON conversion rejects top-level or nested bytes atomically, text and
+value serialization reject bytes, and public C++ exposes `Value::Type::Bytes`
+and `Value::Bytes`. No language construction/operations, binary I/O, FFI bridge,
+C ABI or maintained-binding bytes API was added. Evidence is in
+`docs/evidence/cp16-bytes-storage.md`. CP17 is next.
 
 Strict JSON remains a separate ingress/egress boundary. The implementation must
 introduce a Nift-owned runtime value model for null, bool, number, string, bytes,
