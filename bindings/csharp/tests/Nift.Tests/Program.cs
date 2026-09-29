@@ -129,7 +129,7 @@ internal static class Program
 
     private static void TestAbiVersion()
     {
-        AssertEq(NiftApi.AbiVersion, "1.1", "abi version");
+        AssertEq(NiftApi.AbiVersion, "1.2", "abi version");
         using (var scriptEngine = Engine.New()) { AssertEq(scriptEngine.ExecuteJson("x := 40; return x + 2;"), "42", "v4.5 execute"); AssertEq(scriptEngine.EvaluateJson("x + 1"), "41", "v4.5 evaluate"); }
     }
 
@@ -138,7 +138,7 @@ internal static class Program
         var engine = Engine.New();
         Assert(!engine.IsOpen(), "standalone engine should not be open");
         engine.Dispose();
-        AssertEq(NiftApi.AbiVersion, "1.1", "abi still reachable");
+        AssertEq(NiftApi.AbiVersion, "1.2", "abi still reachable");
     }
 
     private static void TestProjectOpen()

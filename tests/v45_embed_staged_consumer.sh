@@ -9,11 +9,19 @@ cat > "$tmp/consumer.c" <<'C'
 #include <stdio.h>
 #include <string.h>
 int main(void) {
-  if (strcmp(nift_abi_version(), "1.1") != 0) return 2;
+  if (strcmp(nift_abi_version(), "1.2") != 0) return 2;
   nift_engine *e=nift_engine_new(); nift_script_result *r=NULL; nift_string out={0};
   if (!e || nift_engine_execute(e,"return 40 + 2;",14,"consumer",8,NULL,NULL,0,&r)!=NIFT_OK || !r || !nift_script_result_ok(r)) return 3;
   if (nift_script_result_value_json(r,&out)!=NIFT_OK || out.length!=2 || memcmp(out.data,"42",2)!=0) return 4;
-  nift_script_result_free(r); nift_engine_free(e); puts("staged C consumer: PASS"); return 0;
+  nift_script_result_free(r);
+  { uint8_t input[]={0,65,255}; nift_bytes bytes={0};
+    if (nift_engine_set_bytes(e,"payload",7,input,3)!=NIFT_OK) return 5;
+    input[1]=0; r=NULL;
+    if (nift_engine_evaluate(e,"payload",7,&r)!=NIFT_OK || !r || !nift_script_result_ok(r)) return 6;
+    if (nift_script_result_value_bytes(r,&bytes)!=NIFT_OK || bytes.length!=3 || bytes.data[1]!=65 || bytes.data[2]!=255) return 7;
+    if (nift_script_result_value_json(r,&out)!=NIFT_ERROR_INVALID_ARGUMENT) return 8;
+    nift_script_result_free(r); }
+  nift_engine_free(e); puts("staged C consumer: PASS"); return 0;
 }
 C
 cc "$tmp/consumer.c" $(pkg-config --cflags --libs nift) -o "$tmp/consumer"

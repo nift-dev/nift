@@ -73,7 +73,7 @@ nift_status test_env(void* user_data, const char* name, size_t name_len, nift_st
 void test_version_and_handles() {
     CHECK(std::string(nift_abi_version()) == NIFT_ABI_VERSION);
     CHECK(nift_abi_version_major() == 1);
-    CHECK(nift_abi_version_minor() == 1);
+    CHECK(nift_abi_version_minor() == 2);
 
     nift_engine* engine = nift_engine_new();
     CHECK(engine != nullptr);

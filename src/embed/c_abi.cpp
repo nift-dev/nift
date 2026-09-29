@@ -14,10 +14,13 @@
 #include "nift/value.h"
 
 #include <atomic>
+#include <memory>
 #include <mutex>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <string_view>
+#include <vector>
 
 // The opaque C handles from the header are completed here (global scope, so
 // the definitions match the header's forward declarations). All storage is
@@ -44,7 +47,10 @@ struct nift_render_result {
 
 struct nift_script_result {
     nift::ScriptResult result;
-    std::string json;
+    mutable std::mutex json_mutex;
+    mutable bool json_attempted = false;
+    mutable nift_status json_status = NIFT_ERROR_INTERNAL;
+    mutable std::string json;
 };
 
 namespace {
@@ -54,7 +60,7 @@ bool valid_input(const char* data, size_t length) {
 }
 
 bool valid_binding(const char* name, size_t name_len) {
-    return valid_input(name, name_len);
+    return name != nullptr && name_len != 0;
 }
 
 nift_status set_out(nift_string* out, const std::string& value) {
@@ -246,6 +252,25 @@ nift_status nift_engine_set_bool(nift_engine* engine, const char* name,
     return set_engine_binding(engine, name, name_len, nift::Value(value != 0));
 }
 
+nift_status nift_engine_set_bytes(nift_engine* engine, const char* name,
+                                  size_t name_len, const uint8_t* value,
+                                  size_t value_len) {
+    if (engine == nullptr || !valid_binding(name, name_len) ||
+        (value == nullptr && value_len != 0)) {
+        return NIFT_ERROR_INVALID_ARGUMENT;
+    }
+    try {
+        nift::Value::Bytes bytes;
+        if (value_len != 0) bytes.assign(value, value + value_len);
+        return engine->engine.set(std::string(name, name_len),
+                                  nift::Value(std::move(bytes)))
+                   ? NIFT_OK
+                   : NIFT_ERROR_INVALID_ARGUMENT;
+    } catch (...) {
+        return NIFT_ERROR_INTERNAL;
+    }
+}
+
 nift_status nift_engine_set_json(nift_engine* engine, const char* name,
                                  size_t name_len, const char* json,
                                  size_t json_len) {
@@ -371,6 +396,25 @@ nift_status nift_context_set_bool(nift_context* context, const char* name,
     return set_context_binding(context, name, name_len, nift::Value(value != 0));
 }
 
+nift_status nift_context_set_bytes(nift_context* context, const char* name,
+                                   size_t name_len, const uint8_t* value,
+                                   size_t value_len) {
+    if (context == nullptr || !valid_binding(name, name_len) ||
+        (value == nullptr && value_len != 0)) {
+        return NIFT_ERROR_INVALID_ARGUMENT;
+    }
+    try {
+        nift::Value::Bytes bytes;
+        if (value_len != 0) bytes.assign(value, value + value_len);
+        return context->context.set(std::string(name, name_len),
+                                    nift::Value(std::move(bytes)))
+                   ? NIFT_OK
+                   : NIFT_ERROR_INVALID_ARGUMENT;
+    } catch (...) {
+        return NIFT_ERROR_INTERNAL;
+    }
+}
+
 nift_status nift_context_set_json(nift_context* context, const char* name,
                                   size_t name_len, const char* json,
                                   size_t json_len) {
@@ -405,12 +449,37 @@ nift_status nift_engine_execute(nift_engine* engine, const char* script, size_t 
         return NIFT_ERROR_INVALID_ARGUMENT;
     }
     *out_result = nullptr;
-    try{std::vector<std::string> av;av.reserve(arg_count);for(size_t i=0;i<arg_count;++i){if(!valid_input(args[i],arg_lens[i]))return NIFT_ERROR_INVALID_ARGUMENT;av.emplace_back(args[i]?args[i]:"",arg_lens[i]);}auto* r=new(std::nothrow)nift_script_result{};if(!r)return NIFT_ERROR_INTERNAL;r->result=engine->engine.execute(std::string_view(script?script:"",script_len),std::string(cmd?cmd:"",cmd_len),std::move(av));if(r->result.ok())r->json=r->result.value().json();*out_result=r;return NIFT_OK;}catch(...){return NIFT_ERROR_INTERNAL;}
+    try{std::vector<std::string> av;av.reserve(arg_count);for(size_t i=0;i<arg_count;++i){if(!valid_input(args[i],arg_lens[i]))return NIFT_ERROR_INVALID_ARGUMENT;av.emplace_back(args[i]?args[i]:"",arg_lens[i]);}auto r=std::make_unique<nift_script_result>();r->result=engine->engine.execute(std::string_view(script?script:"",script_len),std::string(cmd?cmd:"",cmd_len),std::move(av));*out_result=r.release();return NIFT_OK;}catch(...){return NIFT_ERROR_INTERNAL;}
 }
-nift_status nift_engine_evaluate(nift_engine* engine,const char* expression,size_t expression_len,nift_script_result** out_result){if(!engine||!out_result||!valid_input(expression,expression_len))return NIFT_ERROR_INVALID_ARGUMENT;*out_result=nullptr;try{auto*r=new(std::nothrow)nift_script_result{};if(!r)return NIFT_ERROR_INTERNAL;r->result=engine->engine.evaluate(std::string_view(expression?expression:"",expression_len));if(r->result.ok())r->json=r->result.value().json();*out_result=r;return NIFT_OK;}catch(...){return NIFT_ERROR_INTERNAL;}}
+nift_status nift_engine_evaluate(nift_engine* engine,const char* expression,size_t expression_len,nift_script_result** out_result){if(!engine||!out_result||!valid_input(expression,expression_len))return NIFT_ERROR_INVALID_ARGUMENT;*out_result=nullptr;try{auto r=std::make_unique<nift_script_result>();r->result=engine->engine.evaluate(std::string_view(expression?expression:"",expression_len));*out_result=r.release();return NIFT_OK;}catch(...){return NIFT_ERROR_INTERNAL;}}
 void nift_script_result_free(nift_script_result* result){delete result;}
 int nift_script_result_ok(const nift_script_result* result){return result&&result->result.ok();}
-nift_status nift_script_result_value_json(const nift_script_result* result,nift_string*out){if(!result||!result->result.ok())return NIFT_ERROR_INVALID_ARGUMENT;return set_out(out,result->json);}
+nift_status nift_script_result_value_json(const nift_script_result* result,nift_string*out){
+    if(out){out->data=nullptr;out->length=0;}
+    if(!result||!result->result.ok())return NIFT_ERROR_INVALID_ARGUMENT;
+    try{
+        std::lock_guard<std::mutex> lock(result->json_mutex);
+        if(!result->json_attempted){
+            result->json_attempted=true;
+            try{result->json=result->result.value().json();result->json_status=NIFT_OK;}
+            catch(const std::runtime_error& error){
+                result->json_status=std::string(error.what())=="bytes values are not JSON serializable"
+                                        ?NIFT_ERROR_INVALID_ARGUMENT:NIFT_ERROR_INTERNAL;
+            }
+            catch(...){result->json_status=NIFT_ERROR_INTERNAL;}
+        }
+        return result->json_status==NIFT_OK?set_out(out,result->json):result->json_status;
+    }catch(...){return NIFT_ERROR_INTERNAL;}
+}
+nift_status nift_script_result_value_bytes(const nift_script_result* result,nift_bytes*out){
+    if(out){out->data=nullptr;out->length=0;}
+    if(!result||!result->result.ok()||!result->result.value().is_bytes())return NIFT_ERROR_INVALID_ARGUMENT;
+    try{
+        const auto& bytes=result->result.value().bytes();
+        if(out){out->data=bytes.empty()?nullptr:bytes.data();out->length=bytes.size();}
+        return NIFT_OK;
+    }catch(...){return NIFT_ERROR_INTERNAL;}
+}
 nift_status nift_script_result_error_message(const nift_script_result* result,nift_string*out){if(!result||result->result.ok())return NIFT_ERROR_INVALID_ARGUMENT;return set_out(out,result->result.error().message);}
 
 nift_status nift_engine_render_page(nift_engine* engine,

@@ -19,7 +19,7 @@
 #include <stdint.h>
 
 #define NIFT_C_ABI_VERSION_MAJOR 1
-#define NIFT_C_ABI_VERSION_MINOR 1
+#define NIFT_C_ABI_VERSION_MINOR 2
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,7 +29,7 @@ extern "C" {
 /* Versioning                                                               */
 /* ------------------------------------------------------------------------ */
 
-#define NIFT_ABI_VERSION "1.1"
+#define NIFT_ABI_VERSION "1.2"
 
 /* ABI version policy:
  *   - additive, backward-compatible ABI changes  -> bump the ABI MINOR;
@@ -79,6 +79,15 @@ typedef struct {
     const char* data;
     size_t length;
 } nift_string;
+
+/* A borrowed immutable byte view. Result-returned views are owned by the
+ * nift_script_result and remain valid until nift_script_result_free. `data`
+ * may be NULL when `length` is 0. Inputs follow the same NULL/length rules as
+ * nift_string and are copied before the setter returns. */
+typedef struct {
+    const uint8_t* data;
+    size_t length;
+} nift_bytes;
 
 typedef enum {
     NIFT_SOURCE_TEXT = 0,
@@ -157,7 +166,10 @@ nift_status nift_engine_set_int(nift_engine* engine, const char* name,
 nift_status nift_engine_set_number(nift_engine* engine, const char* name,
                                    size_t name_len, double value);
 nift_status nift_engine_set_bool(nift_engine* engine, const char* name,
-                                 size_t name_len, int value);
+                                  size_t name_len, int value);
+nift_status nift_engine_set_bytes(nift_engine* engine, const char* name,
+                                  size_t name_len, const uint8_t* value,
+                                  size_t value_len);
 /* JSON text (UTF-8, length). Malformed JSON -> NIFT_ERROR_INVALID_ARGUMENT. */
 nift_status nift_engine_set_json(nift_engine* engine, const char* name,
                                  size_t name_len, const char* json,
@@ -194,14 +206,19 @@ nift_status nift_context_set_int(nift_context* context, const char* name,
 nift_status nift_context_set_number(nift_context* context, const char* name,
                                     size_t name_len, double value);
 nift_status nift_context_set_bool(nift_context* context, const char* name,
-                                  size_t name_len, int value);
+                                   size_t name_len, int value);
+nift_status nift_context_set_bytes(nift_context* context, const char* name,
+                                   size_t name_len, const uint8_t* value,
+                                   size_t value_len);
 nift_status nift_context_set_json(nift_context* context, const char* name,
                                   size_t name_len, const char* json,
                                   size_t json_len);
 
-/* Embedded script execution/evaluation. Script values are exposed as JSON
- * through nift_script_result_value_json; scalar/object/array type information is
- * preserved in that JSON representation. */
+/* Embedded script execution/evaluation. JSON-compatible values are exposed
+ * lazily through nift_script_result_value_json. Top-level bytes are exposed
+ * through nift_script_result_value_bytes; nested typed traversal is not part of
+ * this ABI. A successful result remains successful when a mismatched accessor
+ * returns NIFT_ERROR_INVALID_ARGUMENT. */
 nift_status nift_engine_execute(nift_engine* engine, const char* script, size_t script_len,
                                 const char* cmd, size_t cmd_len,
                                 const char* const* args, const size_t* arg_lens, size_t arg_count,
@@ -211,6 +228,7 @@ nift_status nift_engine_evaluate(nift_engine* engine, const char* expression, si
 void nift_script_result_free(nift_script_result* result);
 int nift_script_result_ok(const nift_script_result* result);
 nift_status nift_script_result_value_json(const nift_script_result* result, nift_string* out);
+nift_status nift_script_result_value_bytes(const nift_script_result* result, nift_bytes* out);
 nift_status nift_script_result_error_message(const nift_script_result* result, nift_string* out);
 
 /* ------------------------------------------------------------------------ */

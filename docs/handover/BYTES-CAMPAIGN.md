@@ -55,7 +55,14 @@ semantics and atomic replacement on Windows are covered. Evidence is in
 CP20 implementation status: complete candidate. `ffi_buffer(bytes)` and
 `ffi_snapshot_bytes(buffer)` are explicit copying bridges; immutable bytes never
 alias mutable native storage and `ffi_bytes()` remains unchanged. Evidence is in
-`docs/evidence/cp20-bytes-ffi.md`. CP21 is next after exact-SHA certification.
+`docs/evidence/cp20-bytes-ffi.md`. Exact-SHA certification passed at `5cc6e2a`
+after a Windows fixture-path portability repair.
+
+CP21 implementation status: complete candidate. C ABI 1.2 adds copied Engine
+and Context byte inputs plus result-owned top-level immutable byte views. Script
+results retain valid bytes without eager JSON conversion; checked JSON
+extraction is lazy and synchronized. Evidence is in
+`docs/evidence/cp21-bytes-embedding.md`. Review Gate 6C is next.
 
 Strict JSON remains a separate ingress/egress boundary. The implementation must
 introduce a Nift-owned runtime value model for null, bool, number, string, bytes,

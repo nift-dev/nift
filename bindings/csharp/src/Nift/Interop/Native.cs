@@ -1,5 +1,5 @@
 // P/Invoke bindings over the frozen Nift C ABI (include/nift/c_abi.h, version
-// "1.1"). This layer is deliberately mechanical: all ownership, lifetime and
+// "1.2"). This layer is deliberately mechanical: all ownership, lifetime and
 // diagnostic logic lives in the managed API (Engine/Context/RenderResult).
 //
 // The zero-`unsafe` gate is scoped to the Rust crates; this FFI interop layer

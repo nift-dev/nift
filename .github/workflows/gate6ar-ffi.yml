@@ -7,8 +7,11 @@ on:
       - 'Makefile'
       - 'src/Parser.cpp'
       - 'src/FfiAbi.h'
+      - 'src/embed/**'
+      - 'include/nift/c_abi.h'
       - 'tests/ffi/**'
       - 'tests/*ffi*'
+      - 'tests/cp21_bytes*'
       - 'third_party/libffi/**'
       - 'bindings/node/**'
       - 'bindings/python/**'
@@ -20,8 +23,11 @@ on:
       - 'Makefile'
       - 'src/Parser.cpp'
       - 'src/FfiAbi.h'
+      - 'src/embed/**'
+      - 'include/nift/c_abi.h'
       - 'tests/ffi/**'
       - 'tests/*ffi*'
+      - 'tests/cp21_bytes*'
       - 'third_party/libffi/**'
       - 'bindings/node/**'
       - 'bindings/python/**'
@@ -65,7 +71,7 @@ jobs:
           make clean
           make test-libffi-source
           make -j2 test-gate6ar-ffi
-          make -j2 test-v45-ffi test-cp20-bytes test-libffi-static-archive embed
+          make -j2 test-v45-ffi test-cp20-bytes test-cp21-bytes test-libffi-static-archive embed
           make test-pic-depfiles
           bash scripts/audit_no_dynamic_libffi.sh nift libnift_c.so
           make node-binding python-binding
@@ -126,7 +132,7 @@ jobs:
           make clean
           make CC=clang CXX=clang++ test-libffi-source
           make -j2 CC=clang CXX=clang++ test-gate6ar-ffi
-          make -j2 CC=clang CXX=clang++ test-v45-ffi test-cp20-bytes test-libffi-static-archive embed
+          make -j2 CC=clang CXX=clang++ test-v45-ffi test-cp20-bytes test-cp21-bytes test-libffi-static-archive embed
           make CC=clang CXX=clang++ test-pic-depfiles
           make CC=clang CXX=clang++ node-binding python-binding
           bash scripts/audit_no_dynamic_libffi.sh nift libnift_c.dylib
@@ -141,7 +147,7 @@ jobs:
           make clean
           make test-libffi-source
           make -j2 test-gate6ar-ffi
-          make -j2 test-v45-ffi test-cp20-bytes test-libffi-static-archive embed
+          make -j2 test-v45-ffi test-cp20-bytes test-cp21-bytes test-libffi-static-archive embed
           make test-pic-depfiles
           make go-binding csharp-binding
           bash scripts/audit_no_dynamic_libffi.sh nift.exe libnift_c.so bindings/go/embed-harness

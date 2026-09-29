@@ -46,6 +46,23 @@ int main(void) {
 
     nift_render_result_free(result);
 
+    /* CP21: copied byte input and result-owned top-level byte view. */
+    {
+        uint8_t input[] = {0, 65, 255};
+        nift_script_result* script_result = NULL;
+        nift_bytes bytes;
+        nift_string json;
+        if (nift_engine_set_bytes(engine, "payload", 7, input, sizeof(input)) != NIFT_OK) return 1;
+        input[1] = 0;
+        if (nift_engine_evaluate(engine, "payload", 7, &script_result) != NIFT_OK) return 1;
+        if (script_result == NULL || nift_script_result_ok(script_result) != 1) return 1;
+        if (nift_script_result_value_bytes(script_result, &bytes) != NIFT_OK) return 1;
+        if (bytes.length != 3 || bytes.data[0] != 0 || bytes.data[1] != 65 || bytes.data[2] != 255) return 1;
+        if (nift_script_result_value_json(script_result, &json) != NIFT_ERROR_INVALID_ARGUMENT) return 1;
+        nift_script_result_free(script_result);
+    }
+    nift_engine_free(engine);
+
     /* Host failure with a supplied diagnostic must be preserved exactly. */
     engine = nift_engine_new();
     if (engine == NULL) return 1;

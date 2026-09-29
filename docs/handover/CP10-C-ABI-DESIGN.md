@@ -361,3 +361,19 @@ now expect the specific supplied diagnostic ("host exploded" / "getenv: host
 exploded"), 29/29 across C++ / nift-rs / C ABI / Go. Exact-preservation tests
 added in the C ABI adversarial battery, the pure-C consumer, and the Go binding
 (including the C++ pagination-worker -> C -> Go callback path under -race).
+
+## CP21 - additive bytes surface (2026-09-30)
+
+C ABI 1.2 adds copied `nift_engine_set_bytes` / `nift_context_set_bytes` inputs
+and a result-owned `nift_bytes` view returned by
+`nift_script_result_value_bytes`. The view is top-level only, immutable and
+valid until `nift_script_result_free`; empty bytes use `{NULL, 0}`. Input bytes
+are caller-owned for the call and cannot alias the stored value after return.
+
+Script execution and evaluation no longer eagerly serialize successful values.
+`nift_script_result_value_json` performs checked conversion on first access and
+caches successful JSON under a result-local mutex. A top-level or nested bytes
+value therefore remains a successful script result while its incompatible JSON
+accessor returns `NIFT_ERROR_INVALID_ARGUMENT`. Results remain independently
+owned and safe for concurrent reads. Recursive typed traversal, mutable views
+and maintained-binding bytes APIs are not part of ABI 1.2.
