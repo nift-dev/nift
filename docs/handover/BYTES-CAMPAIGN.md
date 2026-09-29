@@ -62,7 +62,13 @@ CP21 implementation status: complete candidate. C ABI 1.2 adds copied Engine
 and Context byte inputs plus result-owned top-level immutable byte views. Script
 results retain valid bytes without eager JSON conversion; checked JSON
 extraction is lazy and synchronized. Evidence is in
-`docs/evidence/cp21-bytes-embedding.md`. Review Gate 6C is next.
+`docs/evidence/cp21-bytes-embedding.md`. All exact-SHA hosted workflows passed at
+`1872d4a`.
+
+Review Gate 6C result: **pass** on 2026-09-30. Public C++ and C ABI names,
+versioning, pointer rules, ownership/lifetime, checked JSON errors and copied
+headers are frozen. Independent re-review found no blocker, high or medium
+issue. Evidence is in `docs/evidence/gate6c-bytes-embedding.md`. CP22 is next.
 
 Strict JSON remains a separate ingress/egress boundary. The implementation must
 introduce a Nift-owned runtime value model for null, bool, number, string, bytes,
