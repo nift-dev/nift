@@ -5,27 +5,19 @@ on:
     branches: [main]
     paths:
       - 'Makefile'
-      - 'src/Ast.cpp'
-      - 'src/CLI.cpp'
-      - 'src/Parser.cpp'
-      - 'src/RuntimeValue.cpp'
-      - 'src/RuntimeValue.h'
-      - 'tests/cp17_bytes.sh'
-      - 'tests/cp18_bytes.cpp'
-      - 'tests/cp18_bytes.sh'
+      - 'src/**'
+      - 'include/**'
+      - 'tests/cp17_bytes*'
+      - 'tests/cp18_bytes*'
       - '.github/workflows/gate6b-bytes.yml'
   pull_request:
     branches: [main]
     paths:
       - 'Makefile'
-      - 'src/Ast.cpp'
-      - 'src/CLI.cpp'
-      - 'src/Parser.cpp'
-      - 'src/RuntimeValue.cpp'
-      - 'src/RuntimeValue.h'
-      - 'tests/cp17_bytes.sh'
-      - 'tests/cp18_bytes.cpp'
-      - 'tests/cp18_bytes.sh'
+      - 'src/**'
+      - 'include/**'
+      - 'tests/cp17_bytes*'
+      - 'tests/cp18_bytes*'
       - '.github/workflows/gate6b-bytes.yml'
   workflow_dispatch:
 
