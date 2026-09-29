@@ -67,8 +67,8 @@ if [ ! -f "$BUILD/Makefile" ]; then
       --prefix="$PREFIX"
   )
 fi
-make -C "$BUILD" SHELL=sh AM_MAKEFLAGS=SHELL=sh -j"${NIFT_BUILD_JOBS:-2}"
-make -C "$BUILD" SHELL=sh AM_MAKEFLAGS=SHELL=sh install
+make -C "$BUILD" SHELL=sh "AM_MAKEFLAGS=SHELL=sh AM_MAKEFLAGS=SHELL=sh" -j"${NIFT_BUILD_JOBS:-2}"
+make -C "$BUILD" SHELL=sh "AM_MAKEFLAGS=SHELL=sh AM_MAKEFLAGS=SHELL=sh" install
 printf '%s\n' "$FINGERPRINT" > "$BUILD/.nift-fingerprint"
 if [ "$RECONFIGURED" -eq 1 ] || [ ! -f "$BUILD/.nift-built" ]; then
   touch "$BUILD/.nift-built"
