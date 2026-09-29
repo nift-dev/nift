@@ -74,7 +74,8 @@ compile_object() {
   esac
 }
 for src in $CABI_SOURCES; do
-  obj="$OBJ/$(echo "$src" | tr '/' '_' | sed 's/\.\(cpp\|c\)$/.o/')"
+  obj="$OBJ/$(echo "$src" | tr '/' '_')"
+  obj="${obj%.*}.o"
   compile_object "$src" "$obj"
   PIC_OBJECTS="$PIC_OBJECTS $obj"
 done

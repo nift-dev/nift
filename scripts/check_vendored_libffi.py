@@ -11,7 +11,8 @@ EXPECTED_TREE_SHA256 = "5dbcaaf332ef970cba42bca8e65a0c39c6b72d1550f4ef67bbc35c3e
 
 def tree_digest(root: Path) -> str:
     digest = hashlib.sha256()
-    for path in sorted(root.rglob("*")):
+    paths = sorted(root.rglob("*"), key=lambda path: path.relative_to(root).as_posix())
+    for path in paths:
         if not path.is_file() or path.name == "NIFT-PROVENANCE.md":
             continue
         relative = path.relative_to(root).as_posix().encode("utf-8")
