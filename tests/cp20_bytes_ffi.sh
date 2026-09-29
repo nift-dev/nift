@@ -6,9 +6,13 @@ NIFT=${NIFT:-$ROOT/nift}
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 FIXTURE=$(bash "$ROOT/tests/ffi/build_fixture.sh" "$TMP")
+case "$(uname -s)" in
+    MINGW*|MSYS*) FIXTURE_NIFT=$(cygpath -m "$FIXTURE");;
+    *) FIXTURE_NIFT=$FIXTURE;;
+esac
 
 cat >"$TMP/cp20.f" <<EOF
-lib := ffi_open("$FIXTURE")
+lib := ffi_open("$FIXTURE_NIFT")
 all := []
 i := 0
 while(i < 256) { all.push(i); i += 1 }
@@ -60,6 +64,6 @@ reject() {
 reject buffer-type 'ffi_buffer(1)' 'expected string, bytes, or byte array'
 reject snapshot-arity 'ffi_snapshot_bytes()' 'expected buffer handle'
 reject snapshot-type 'ffi_snapshot_bytes(bytes([1]))' 'expected buffer handle'
-reject no-direct-buffer "lib := ffi_open(\"$FIXTURE\"); ffi_call(lib, \"nift_ffi_buffer_xor\", \"void(buffer,u64,u8)\", bytes([1]), 1, 1)" 'buffer argument must be FFI buffer handle'
+reject no-direct-buffer "lib := ffi_open(\"$FIXTURE_NIFT\"); ffi_call(lib, \"nift_ffi_buffer_xor\", \"void(buffer,u64,u8)\", bytes([1]), 1, 1)" 'buffer argument must be FFI buffer handle'
 
 echo 'CP20 bytes/FFI copying bridges: PASS'
