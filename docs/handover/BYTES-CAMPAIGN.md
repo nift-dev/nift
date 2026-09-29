@@ -38,7 +38,13 @@ closures, nested aggregates, mutex values, threads and async values retain
 shared immutable byte backing with independent aggregate shells. Concurrent
 reads, source lifetime, large-value fan-out and transferred CP17 text/JSON
 rejection are certified without production changes. Evidence is in
-`docs/evidence/cp18-bytes-transfer.md`. Review Gate 6B is next.
+`docs/evidence/cp18-bytes-transfer.md`.
+
+Review Gate 6B result: **pass** on 2026-09-29. Generic bytes value semantics,
+prepared/legacy evaluator parity, text and serialization boundaries, transfer,
+shared-backing amplification behavior, sanitizers and native Linux/macOS/Windows
+execution are certified. Evidence is in `docs/evidence/gate6b-bytes.md`. CP19 is
+next.
 
 Strict JSON remains a separate ingress/egress boundary. The implementation must
 introduce a Nift-owned runtime value model for null, bool, number, string, bytes,
