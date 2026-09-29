@@ -67,8 +67,10 @@ if [ ! -f "$BUILD/Makefile" ]; then
       --prefix="$PREFIX"
   )
 fi
-make -C "$BUILD" SHELL=sh "AM_MAKEFLAGS=SHELL=sh AM_MAKEFLAGS=SHELL=sh" -j"${NIFT_BUILD_JOBS:-2}"
-make -C "$BUILD" SHELL=sh "AM_MAKEFLAGS=SHELL=sh AM_MAKEFLAGS=SHELL=sh" install
+# libffi clears MAKEOVERRIDES, so carry the relative libtool command through both recursive levels.
+LIBFFI_MAKE_FLAGS="LIBTOOL='sh ./libtool' AM_MAKEFLAGS=\"LIBTOOL='sh ./libtool'\""
+make -C "$BUILD" SHELL=sh "AM_MAKEFLAGS=$LIBFFI_MAKE_FLAGS" -j"${NIFT_BUILD_JOBS:-2}"
+make -C "$BUILD" SHELL=sh "AM_MAKEFLAGS=$LIBFFI_MAKE_FLAGS" install
 printf '%s\n' "$FINGERPRINT" > "$BUILD/.nift-fingerprint"
 if [ "$RECONFIGURED" -eq 1 ] || [ ! -f "$BUILD/.nift-built" ]; then
   touch "$BUILD/.nift-built"
