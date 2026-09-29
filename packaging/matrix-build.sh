@@ -40,7 +40,8 @@ case "$OS:$ARCH" in
 esac
 
 # CLI binary (nift or nift.exe).
-if [ -x "$ROOT/nift" ]; then CLI_SOURCE="$ROOT/nift"
+if [ "$OS" = windows ] && [ -f "$ROOT/nift.exe" ]; then CLI_SOURCE="$ROOT/nift.exe"
+elif [ -x "$ROOT/nift" ]; then CLI_SOURCE="$ROOT/nift"
 elif [ -x "$ROOT/nift.exe" ]; then CLI_SOURCE="$ROOT/nift.exe"
 else echo "FAIL: no CLI binary (nift / nift.exe)" >&2; exit 1; fi
 cp "$CLI_SOURCE" "$OUT/nift-$OS-$ARCH"

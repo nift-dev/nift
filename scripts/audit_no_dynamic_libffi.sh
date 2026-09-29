@@ -2,6 +2,18 @@
 set -euo pipefail
 
 [ "$#" -gt 0 ] || { echo "usage: audit_no_dynamic_libffi.sh <binary>..." >&2; exit 2; }
+
+pe_objdump() {
+  local tool
+  for tool in x86_64-w64-mingw32-objdump llvm-objdump objdump; do
+    if command -v "$tool" >/dev/null 2>&1 && "$tool" -f "$artifact" >/dev/null 2>&1; then
+      printf '%s\n' "$tool"
+      return 0
+    fi
+  done
+  return 1
+}
+
 for artifact in "$@"; do
   [ -f "$artifact" ] || { echo "missing audit artifact: $artifact" >&2; exit 1; }
   command -v file >/dev/null 2>&1 || { echo "file(1) is required to identify $artifact" >&2; exit 1; }
@@ -22,9 +34,8 @@ for artifact in "$@"; do
       deps="$(otool -L "$artifact")" || { echo "failed to inspect Mach-O dependencies: $artifact" >&2; exit 1; }
       ;;
     *PE32*)
-      command -v objdump >/dev/null 2>&1 || { echo "objdump is required for PE artifact $artifact" >&2; exit 1; }
-      objdump -f "$artifact" >/dev/null 2>&1 || { echo "invalid PE artifact: $artifact" >&2; exit 1; }
-      deps="$(objdump -p "$artifact")" || { echo "failed to inspect PE dependencies: $artifact" >&2; exit 1; }
+      PE_OBJDUMP="$(pe_objdump)" || { echo "no available objdump can inspect PE artifact $artifact" >&2; exit 1; }
+      deps="$("$PE_OBJDUMP" -p "$artifact")" || { echo "failed to inspect PE dependencies: $artifact" >&2; exit 1; }
       ;;
     *)
       echo "unsupported or unrecognized binary format for $artifact: $format" >&2

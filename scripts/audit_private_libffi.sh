@@ -15,6 +15,28 @@ require_defined_symbols() {
   done
 }
 
+pe_objdump() {
+  local tool
+  for tool in x86_64-w64-mingw32-objdump llvm-objdump objdump; do
+    if command -v "$tool" >/dev/null 2>&1 && "$tool" -f "$artifact" >/dev/null 2>&1; then
+      printf '%s\n' "$tool"
+      return 0
+    fi
+  done
+  return 1
+}
+
+pe_nm() {
+  local tool
+  for tool in x86_64-w64-mingw32-nm llvm-nm nm; do
+    if command -v "$tool" >/dev/null 2>&1 && "$tool" "$artifact" >/dev/null 2>&1; then
+      printf '%s\n' "$tool"
+      return 0
+    fi
+  done
+  return 1
+}
+
 for artifact in "$@"; do
   [ -f "$artifact" ] || { echo "missing private-symbol audit artifact: $artifact" >&2; exit 1; }
   command -v file >/dev/null 2>&1 || { echo "file(1) is required to identify $artifact" >&2; exit 1; }
@@ -50,14 +72,14 @@ for artifact in "$@"; do
       require_defined_symbols "$symbols" "_"
       ;;
     *PE32*)
-      command -v objdump >/dev/null 2>&1 || { echo "objdump is required for PE artifact $artifact" >&2; exit 1; }
-      command -v nm >/dev/null 2>&1 || { echo "nm is required for PE artifact $artifact" >&2; exit 1; }
-      tables="$(objdump -p "$artifact")" || { echo "failed to inspect PE exports/imports: $artifact" >&2; exit 1; }
+      PE_OBJDUMP="$(pe_objdump)" || { echo "no available objdump can inspect PE artifact $artifact" >&2; exit 1; }
+      PE_NM="$(pe_nm)" || { echo "no available nm can inspect PE artifact $artifact" >&2; exit 1; }
+      tables="$("$PE_OBJDUMP" -p "$artifact")" || { echo "failed to inspect PE exports/imports: $artifact" >&2; exit 1; }
       if printf '%s\n' "$tables" | grep -E "$FFI_RE" >/dev/null; then
         echo "exported or imported libffi symbol in $artifact" >&2
         exit 1
       fi
-      symbols="$(nm "$artifact")" || { echo "failed to inspect PE symbols: $artifact" >&2; exit 1; }
+      symbols="$("$PE_NM" "$artifact")" || { echo "failed to inspect PE symbols: $artifact" >&2; exit 1; }
       require_defined_symbols "$symbols" "_?"
       ;;
     *)
