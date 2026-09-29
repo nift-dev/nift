@@ -29,7 +29,7 @@ python3 - "$NPMTMP/package.json" "$TV" <<'PY' || fail "npm stamp"
 import json, sys
 p = json.load(open(sys.argv[1]))
 p["version"] = sys.argv[2]
-p["files"] = ["lib/", "build/nift_node.node", "README.md"]
+p["files"] = ["lib/", "build/nift_node.node", "README.md", "THIRD_PARTY_NOTICES.md", "LICENSE-libffi"]
 json.dump(p, open(sys.argv[1], "w"), indent=2)
 PY
 ( cd "$NPMTMP" && npm pack --pack-destination "$WORK" >/dev/null 2>&1 )
@@ -59,6 +59,10 @@ rm -rf bindings/python/native && mkdir -p bindings/python/native
 cp -r src bindings/python/native/src && cp -r include bindings/python/native/include
 cp -r minifypp bindings/python/native/minifypp && cp -r markuppp bindings/python/native/markuppp
 cp -r jsonic bindings/python/native/jsonic
+mkdir -p bindings/python/native/third_party bindings/python/native/scripts
+cp -r third_party/libffi bindings/python/native/third_party/libffi
+cp scripts/build_vendored_libffi.sh bindings/python/native/scripts/
+cp scripts/check_vendored_libffi.py bindings/python/native/scripts/
 ( cd bindings/python && NIFT_VERSION="$TV" python3 setup.py sdist --dist-dir "$WORK" >/dev/null 2>&1 )
 [ -f "$WORK/nift-$TV.tar.gz" ] || fail "sdist filename lacks $TV"
 SDIST_DIR="$WORK/pysrc" && mkdir -p "$SDIST_DIR" && tar xzf "$WORK/nift-$TV.tar.gz" -C "$SDIST_DIR"

@@ -39,7 +39,7 @@ LIBFFI_A="$TMP/libffi/install/lib/libffi.a"
 case "$(uname -s)" in
   Darwin)
     SHARED_FLAGS=(-bundle -Wl,-undefined,dynamic_lookup)
-    PRIVATE_FFI_LDFLAGS=()
+    PRIVATE_FFI_LDFLAGS=(-Wl,-dead_strip)
     ;;
   MINGW*|MSYS*|CYGWIN*)
     SHARED_FLAGS=(-shared)
