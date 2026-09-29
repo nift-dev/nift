@@ -13,7 +13,7 @@ printf '\377' >>"$TMP/large.bin"
 : >"$TMP/all-octets.bin"
 for i in $(seq 0 255); do printf "\\$(printf '%03o' "$i")" >>"$TMP/all-octets.bin"; done
 
-actual=$("$NIFT" -e "b := open_bytes(\"$TMP/input.bin\"); print(type(b)); print(b.length()); print(b[0]); print(b[1]); print(b[4]); print(b[5]); print(b[6])")
+actual=$(cd "$TMP" && "$NIFT" -e 'b := open_bytes("input.bin"); print(type(b)); print(b.length()); print(b[0]); print(b[1]); print(b[4]); print(b[5]); print(b[6])')
 [[ "$actual" == $'bytes\n7\n0\n65\n128\n255\n90' ]]
 
 cat >"$TMP/stream.nift" <<'EOF'
@@ -64,7 +64,7 @@ actual=$(cd "$TMP" && "$NIFT" managed.nift)
 [[ "$actual" == $'2\n0\n65\n5\n10\n90\n7\ntrue' ]]
 cmp "$TMP/input.bin" "$TMP/managed.bin"
 
-actual=$("$NIFT" -e "e := open_bytes(\"$TMP/empty.bin\"); print(e.length()); s := ifstream(\"$TMP/input.bin\"); print(s.read_bytes(0).length()); print(s.read_bytes(9007199254740993).length()); print(s.read_bytes(1).length()); print(s.read_all_bytes().length()); close(s); l := open_bytes(\"$TMP/large.bin\"); print(l.length()); print(l[131072]); a := open_bytes(\"$TMP/all-octets.bin\"); print(a.length()); print(a[0]); print(a[127]); print(a[128]); print(a[255])")
+actual=$(cd "$TMP" && "$NIFT" -e 'e := open_bytes("empty.bin"); print(e.length()); s := ifstream("input.bin"); print(s.read_bytes(0).length()); print(s.read_bytes(9007199254740993).length()); print(s.read_bytes(1).length()); print(s.read_all_bytes().length()); close(s); l := open_bytes("large.bin"); print(l.length()); print(l[131072]); a := open_bytes("all-octets.bin"); print(a.length()); print(a[0]); print(a[127]); print(a[128]); print(a[255])')
 [[ "$actual" == $'0\n0\n7\n0\n0\n131073\n255\n256\n0\n127\n128\n255' ]]
 
 # Managed writes preserve suffixes in rw mode, extend at EOF, revert in-memory
@@ -144,7 +144,7 @@ reject managed-line-bytes 'f := file("x.bin"); f.open("w"); f.write_line(bytes([
 reject stream-closed 's := ifstream("input.bin"); close(s); s.read_bytes(1)' 'stream is closed or invalid'
 
 mkdir "$TMP/root"
-if NIFT_FS_ROOT="$TMP/root" "$NIFT" -e "open_bytes(\"$TMP/input.bin\")" >"$TMP/root.out" 2>"$TMP/root.err"; then
+if (cd "$TMP" && NIFT_FS_ROOT="$TMP/root" "$NIFT" -e 'open_bytes("input.bin")') >"$TMP/root.out" 2>"$TMP/root.err"; then
     echo 'CP19 expected NIFT_FS_ROOT rejection' >&2
     exit 1
 fi
