@@ -11,13 +11,12 @@ AST, Engine defaults/results and public C++ `Value` internals now use the
 Nift-owned recursive `RuntimeValue`; strict JSON, schema and persisted project
 data remain Jsonic documents with explicit recursive boundary conversion. No
 bytes type or API was added. Evidence is in `docs/evidence/cp15-runtime-value.md`.
-Review Gate 6A is blocked after two CP15 implementation commits. RuntimeValue,
-cache, exact-number, JSON-boundary, AST/legacy, atomic, stream and FFI-value
-conversion findings are repaired, but the pre-existing core FFI dispatcher
-still invokes declared native integer/pointer signatures through generic
-`uintptr_t` function-pointer prototypes. That ABI-dependent C++ undefined
-behavior requires an explicit dispatcher architecture decision outside the
-approved compatibility migration. CP16 has not started.
+Review Gate 6A closed with a pass on 2026-09-29 after Gate 6A-R replaced the
+pre-existing generic function-pointer dispatcher with exact-token vendored
+libffi dispatch. Hosted Linux GCC/Clang sanitizer, macOS Clang, Windows MinGW,
+packaging, exact staged-payload audits and integrity walls passed at `7f6fc58`;
+the defect-focused review found no remaining blocker. Evidence is in
+`docs/evidence/gate6ar-libffi.md`. CP16 is next and has not started.
 
 Strict JSON remains a separate ingress/egress boundary. The implementation must
 introduce a Nift-owned runtime value model for null, bool, number, string, bytes,

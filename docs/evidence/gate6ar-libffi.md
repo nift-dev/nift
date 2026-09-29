@@ -2,9 +2,10 @@
 
 Date: 2026-09-29
 
-Status: **pending**. The Linux implementation and release-package evidence below
-is local. Hosted macOS and Windows workflow evidence and maintainer review have
-not completed, so this report does not close Review Gate 6A.
+Status: **closed, pass**. Gate 6A-R and Review Gate 6A completed on 2026-09-29
+at `7f6fc5860e275b458af1dacb9756c362b8c15e44`. The exact-token dispatcher,
+vendored build, complete `ffi_*` privacy audit, package-payload audits, hosted
+platform walls and defect-focused review passed. CP16 may begin.
 
 ## Architecture
 
@@ -154,12 +155,33 @@ sdist's vendored-source integrity check passes, clean wheel and npm consumers
 load and render successfully, and the staged notices, licenses, provenance,
 build script, integrity checker, and `markuppp` sources are present.
 
-## Pending evidence and blockers
+## Hosted closure evidence
 
-- Clang ASan/UBSan cannot configure locally because this host lacks Clang 21's
-  `libclang_rt.asan_static.a` and `libclang_rt.asan.a`. GCC ASan/UBSan and the
-  GCC TSan-instrumented Gate 6A-R wall pass.
-- Hosted `.github/workflows/gate6ar-ffi.yml` Linux GCC/Clang, macOS Clang, and
-  Windows MinGW results require a push and therefore remain pending.
-- Gate 6A-R and Review Gate 6A remain pending maintainer review even after local
-  walls pass.
+- Gate 6A-R vendored libffi: run
+  [36528388125](https://github.com/nift-dev/nift/actions/runs/36528388125), pass.
+  Linux GCC and Clang sanitizer walls, macOS Clang and Windows MinGW passed.
+- Packaging matrix: run
+  [36528388077](https://github.com/nift-dev/nift/actions/runs/36528388077), pass.
+  Linux x86-64/arm64, macOS Intel/ARM and Windows native packages passed their
+  enforced clean-consumer walls. The exact extracted Python wheel, NuGet and npm
+  native payloads passed dynamic-dependency and private-symbol audits before
+  upload.
+- Test integrity guards: run
+  [36528388061](https://github.com/nift-dev/nift/actions/runs/36528388061), pass.
+  Static guards, deterministic contracts, Linux/macOS aggregate evidence,
+  maintained bindings and the serial build-boundary proof passed.
+
+The final defect-focused review found no blocking, high or medium defect after
+repairs. In particular, the audit now matches the complete `ffi_*` namespace,
+the negative oracle uses the formerly missed `ffi_get_struct_offsets`, and each
+native or language package path audits the exact shared payload it stages or
+uploads. PE audits probe for a tool that can inspect the artifact and fail closed
+when none is available.
+
+## Residual limitations
+
+- This local host lacks Clang 21's ASan runtime archives. Hosted Clang sanitizer
+  coverage passed, so this is not a closure blocker.
+- Compiler commands containing launcher/wrapper words, such as `CC='ccache gcc'`,
+  are not part of the documented certified build contract. Supporting them
+  remains a non-blocking build-system compatibility improvement.
