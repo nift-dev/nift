@@ -65,7 +65,7 @@ jobs:
           make clean
           make test-libffi-source
           make -j2 test-gate6ar-ffi
-          make -j2 test-v45-ffi test-libffi-static-archive embed
+          make -j2 test-v45-ffi test-cp20-bytes test-libffi-static-archive embed
           make test-pic-depfiles
           bash scripts/audit_no_dynamic_libffi.sh nift libnift_c.so
           make node-binding python-binding
@@ -80,6 +80,7 @@ jobs:
         run: |
           make -j2 test-sanitize
           env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT="$PWD/.build/nift-sanitize" bash tests/gate6ar_ffi.sh
+          env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT="$PWD/.build/nift-sanitize" bash tests/cp20_bytes_ffi.sh
 
   portable:
     name: ${{ matrix.id }} complete FFI wall
@@ -125,7 +126,7 @@ jobs:
           make clean
           make CC=clang CXX=clang++ test-libffi-source
           make -j2 CC=clang CXX=clang++ test-gate6ar-ffi
-          make -j2 CC=clang CXX=clang++ test-v45-ffi test-libffi-static-archive embed
+          make -j2 CC=clang CXX=clang++ test-v45-ffi test-cp20-bytes test-libffi-static-archive embed
           make CC=clang CXX=clang++ test-pic-depfiles
           make CC=clang CXX=clang++ node-binding python-binding
           bash scripts/audit_no_dynamic_libffi.sh nift libnift_c.dylib
@@ -140,7 +141,7 @@ jobs:
           make clean
           make test-libffi-source
           make -j2 test-gate6ar-ffi
-          make -j2 test-v45-ffi test-libffi-static-archive embed
+          make -j2 test-v45-ffi test-cp20-bytes test-libffi-static-archive embed
           make test-pic-depfiles
           make go-binding csharp-binding
           bash scripts/audit_no_dynamic_libffi.sh nift.exe libnift_c.so bindings/go/embed-harness

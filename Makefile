@@ -531,7 +531,7 @@ test-all: test test-embed test-bindings test-build-boundary
 
 # Plain `make test` = the ordinary Nift/CLI regression surface (C++ toolchain
 # only). Embedding and binding suites are run through the focused targets.
-test: test-content test-commands test-comments test-contracts test-json test-runtime-value test-cp15-numeric-repair test-cp17-bytes test-cp18-bytes test-cp19-bytes \
+test: test-content test-commands test-comments test-contracts test-json test-runtime-value test-cp15-numeric-repair test-cp17-bytes test-cp18-bytes test-cp19-bytes test-cp20-bytes \
 	test-json-schema test-console test-diagnostics test-minify \
 	test-json-schema-integration test-markup-json-directives test-pagination test-pagination-ordering \
 	test-template-optional test-requirements test-path-alias test-path-safety test-metadata-safety \
@@ -992,6 +992,7 @@ test-cp18-bytes-sanitize: $(SAN_TARGET) $(CP18_BYTES_SAN_TEST)
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT="$(CURDIR)/$(SAN_TARGET)" tests/cp17_bytes.sh
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT="$(CURDIR)/$(SAN_TARGET)" tests/cp18_bytes.sh
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT="$(CURDIR)/$(SAN_TARGET)" tests/cp19_bytes_io.sh
+	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT="$(CURDIR)/$(SAN_TARGET)" tests/cp20_bytes_ffi.sh
 
 test-pagination-sanitize: $(SAN_TARGET)
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT_BIN="$(CURDIR)/$(SAN_TARGET)" tests/pagination_sanitizer_smoke.sh
@@ -1021,6 +1022,7 @@ test-cp18-bytes-tsan: $(TSAN_TARGET) $(CP18_BYTES_TSAN_TEST)
 	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 NIFT="$(CURDIR)/$(TSAN_TARGET)" tests/cp17_bytes.sh
 	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 NIFT="$(CURDIR)/$(TSAN_TARGET)" tests/cp18_bytes.sh
 	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 NIFT="$(CURDIR)/$(TSAN_TARGET)" tests/cp19_bytes_io.sh
+	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 NIFT="$(CURDIR)/$(TSAN_TARGET)" tests/cp20_bytes_ffi.sh
 
 $(MEMORY_SMOKE): tests/json_smoke.cpp src/Json.h
 	mkdir -p "$(TEST_DIR)"
@@ -1171,3 +1173,8 @@ test-v45-host-introspection: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/v45_host_introspection_smoke.sh
 
 .PHONY: test-v45-host-introspection
+
+test-cp20-bytes: $(TARGET)
+	NIFT="$(CURDIR)/$(TARGET)" tests/cp20_bytes_ffi.sh
+
+.PHONY: test-cp20-bytes

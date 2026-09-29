@@ -52,6 +52,11 @@ existing text I/O remains unchanged. Checked read failures, managed-file cursor
 semantics and atomic replacement on Windows are covered. Evidence is in
 `docs/evidence/cp19-bytes-io.md`. CP20 is next.
 
+CP20 implementation status: complete candidate. `ffi_buffer(bytes)` and
+`ffi_snapshot_bytes(buffer)` are explicit copying bridges; immutable bytes never
+alias mutable native storage and `ffi_bytes()` remains unchanged. Evidence is in
+`docs/evidence/cp20-bytes-ffi.md`. CP21 is next after exact-SHA certification.
+
 Strict JSON remains a separate ingress/egress boundary. The implementation must
 introduce a Nift-owned runtime value model for null, bool, number, string, bytes,
 array and object rather than adding a non-JSON type to Jsonic, using marker

@@ -2305,10 +2305,13 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 it->second->handle=nullptr;it->second->closed=true;out=nift::RuntimeValue(nullptr);return true;
             }
             if(call_args("ffi_buffer",args,q)){
-                if(args.size()!=1){error="ffi_buffer: expected string or byte array";return false;}nift::RuntimeValue d;if(!arg_value(args,q,0,d))return false;auto st=std::make_shared<FfiBufferInstance>();if(d.is_string())st->bytes.assign(d.string.begin(),d.string.end());else if(d.is_array()){for(const auto&x:d.array){std::size_t byte=0;if(!nift::runtime_number_to_size(x,byte)||byte>255){error="ffi_buffer: array values must be bytes";return false;}st->bytes.push_back(static_cast<unsigned char>(byte));}}else{error="ffi_buffer: expected string or byte array";return false;}const std::string id=std::to_string(next_ffi_buffer_id_++);ffi_buffers_[id]=st;out=nift::RuntimeValue(std::string("\x1fnift:ffi-buffer:")+id);return true;
+                if(args.size()!=1){error="ffi_buffer: expected string, bytes, or byte array";return false;}nift::RuntimeValue d;if(!arg_value(args,q,0,d))return false;auto st=std::make_shared<FfiBufferInstance>();if(d.is_string())st->bytes.assign(d.string.begin(),d.string.end());else if(d.is_bytes())st->bytes.assign(d.bytes->begin(),d.bytes->end());else if(d.is_array()){for(const auto&x:d.array){std::size_t byte=0;if(!nift::runtime_number_to_size(x,byte)||byte>255){error="ffi_buffer: array values must be bytes";return false;}st->bytes.push_back(static_cast<unsigned char>(byte));}}else{error="ffi_buffer: expected string, bytes, or byte array";return false;}const std::string id=std::to_string(next_ffi_buffer_id_++);ffi_buffers_[id]=st;out=nift::RuntimeValue(std::string("\x1fnift:ffi-buffer:")+id);return true;
             }
             if(call_args("ffi_bytes",args,q)){
                 if(args.size()!=1){error="ffi_bytes: expected buffer handle";return false;}nift::RuntimeValue h;if(!arg_value(args,q,0,h)||!h.is_string()||h.string.rfind("\x1fnift:ffi-buffer:",0)!=0){error="ffi_bytes: expected buffer handle";return false;}auto bi=ffi_buffers_.find(h.string.substr(17));if(bi==ffi_buffers_.end()){error="ffi_bytes: invalid buffer handle";return false;}out=nift::RuntimeValue::make_array();for(unsigned char b:bi->second->bytes)out.array.emplace_back(static_cast<int>(b));return true;
+            }
+            if(call_args("ffi_snapshot_bytes",args,q)){
+                if(args.size()!=1){error="ffi_snapshot_bytes: expected buffer handle";return false;}nift::RuntimeValue h;if(!arg_value(args,q,0,h)||!h.is_string()||h.string.rfind("\x1fnift:ffi-buffer:",0)!=0){error="ffi_snapshot_bytes: expected buffer handle";return false;}auto bi=ffi_buffers_.find(h.string.substr(17));if(bi==ffi_buffers_.end()){error="ffi_snapshot_bytes: invalid buffer handle";return false;}out=nift::RuntimeValue(nift::RuntimeBytes(bi->second->bytes.begin(),bi->second->bytes.end()));return true;
             }
             if(call_args("ffi_sizeof",args,q)||call_args("ffi_struct",args,q)){
                 const bool make_struct=text.rfind("ffi_struct(",0)==0;if((make_struct&&args.size()!=2)||(!make_struct&&args.size()!=1)){error=make_struct?"ffi_struct: expected layout and values":"ffi_sizeof: expected layout";return false;}std::string layout;if(!string_arg(make_struct?"ffi_struct":"ffi_sizeof",args,q,0,layout))return false;
@@ -5271,6 +5274,12 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             // Prepared dispatch for user callables: bind args, run the prepared
             // body once, propagate the return value. Any failure falls back to
             // the legacy evaluator (the oracle) via the Call handler.
+            if(name=="ffi_buffer"){
+                if(args.size()!=1){e="ffi_buffer: expected string, bytes, or byte array";return true;}auto st=std::make_shared<FfiBufferInstance>();const auto& d=args[0];if(d.is_string())st->bytes.assign(d.string.begin(),d.string.end());else if(d.is_bytes())st->bytes.assign(d.bytes->begin(),d.bytes->end());else if(d.is_array()){for(const auto& x:d.array){std::size_t byte=0;if(!nift::runtime_number_to_size(x,byte)||byte>255){e="ffi_buffer: array values must be bytes";return true;}st->bytes.push_back(static_cast<unsigned char>(byte));}}else{e="ffi_buffer: expected string, bytes, or byte array";return true;}const std::string id=std::to_string(next_ffi_buffer_id_++);ffi_buffers_[id]=st;out=nift::RuntimeValue(std::string("\x1fnift:ffi-buffer:")+id);return true;
+            }
+            if(name=="ffi_snapshot_bytes"){
+                if(args.size()!=1||!args[0].is_string()||args[0].string.rfind("\x1fnift:ffi-buffer:",0)!=0){e="ffi_snapshot_bytes: expected buffer handle";return true;}auto bi=ffi_buffers_.find(args[0].string.substr(17));if(bi==ffi_buffers_.end()){e="ffi_snapshot_bytes: invalid buffer handle";return true;}out=nift::RuntimeValue(nift::RuntimeBytes(bi->second->bytes.begin(),bi->second->bytes.end()));return true;
+            }
             const Callable* callee=nullptr;
             auto ci=callables_.find(name);
             if(ci!=callables_.end())callee=&ci->second;

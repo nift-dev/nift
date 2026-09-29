@@ -10,6 +10,7 @@ on:
       - 'tests/cp17_bytes*'
       - 'tests/cp18_bytes*'
       - 'tests/cp19_bytes*'
+      - 'tests/cp20_bytes*'
       - '.github/workflows/gate6b-bytes.yml'
   pull_request:
     branches: [main]
@@ -20,6 +21,7 @@ on:
       - 'tests/cp17_bytes*'
       - 'tests/cp18_bytes*'
       - 'tests/cp19_bytes*'
+      - 'tests/cp20_bytes*'
       - '.github/workflows/gate6b-bytes.yml'
   workflow_dispatch:
 
@@ -47,7 +49,7 @@ jobs:
         env:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
-        run: make -j2 test-cp17-bytes test-cp18-bytes test-cp19-bytes
+        run: make -j2 test-cp17-bytes test-cp18-bytes test-cp19-bytes test-cp20-bytes
 
   portable:
     name: ${{ matrix.id }} bytes semantics
@@ -72,11 +74,11 @@ jobs:
           install: make autoconf automake libtool mingw-w64-ucrt-x86_64-gcc python
       - name: macOS Clang bytes suites
         if: runner.os == 'macOS'
-        run: make -j2 CC=clang CXX=clang++ test-cp17-bytes test-cp18-bytes test-cp19-bytes
+        run: make -j2 CC=clang CXX=clang++ test-cp17-bytes test-cp18-bytes test-cp19-bytes test-cp20-bytes
       - name: Windows MinGW bytes suites
         if: runner.os == 'Windows'
         shell: msys2 {0}
-        run: make -j2 test-cp17-bytes test-cp18-bytes test-cp19-bytes
+        run: make -j2 test-cp17-bytes test-cp18-bytes test-cp19-bytes test-cp20-bytes
 
   sanitizers:
     name: Linux bytes ${{ matrix.id }}
