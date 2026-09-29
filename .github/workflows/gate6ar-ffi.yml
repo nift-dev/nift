@@ -143,6 +143,6 @@ jobs:
           make -j2 test-v45-ffi test-libffi-static-archive embed
           make test-pic-depfiles
           make go-binding csharp-binding
-          bash scripts/audit_no_dynamic_libffi.sh nift.exe libnift_c.so bindings/go/embed-harness.exe
+          bash scripts/audit_no_dynamic_libffi.sh nift.exe libnift_c.so bindings/go/embed-harness
           bash scripts/audit_private_libffi.sh libnift_c.so
           bash tests/libffi_private_audit.sh

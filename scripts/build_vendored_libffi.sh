@@ -63,12 +63,12 @@ if [ ! -f "$BUILD/Makefile" ]; then
   cp -R "$ROOT/third_party/libffi" "$BUILD/source"
   (
     cd "$BUILD"
-    ./source/configure $CONFIGURE_ARGS \
+    CONFIG_SHELL=sh SHELL=sh ./source/configure $CONFIGURE_ARGS \
       --prefix="$PREFIX"
   )
 fi
-make -C "$BUILD" -j"${NIFT_BUILD_JOBS:-2}"
-make -C "$BUILD" install
+make -C "$BUILD" SHELL=sh -j"${NIFT_BUILD_JOBS:-2}"
+make -C "$BUILD" SHELL=sh install
 printf '%s\n' "$FINGERPRINT" > "$BUILD/.nift-fingerprint"
 if [ "$RECONFIGURED" -eq 1 ] || [ ! -f "$BUILD/.nift-built" ]; then
   touch "$BUILD/.nift-built"
