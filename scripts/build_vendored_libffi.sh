@@ -59,9 +59,11 @@ BUILD="$(cd "$BUILD" && pwd)"
 PREFIX="$BUILD/install"
 if [ ! -f "$BUILD/Makefile" ]; then
   RECONFIGURED=1
+  rm -rf "$BUILD/source"
+  cp -R "$ROOT/third_party/libffi" "$BUILD/source"
   (
     cd "$BUILD"
-    "$ROOT/third_party/libffi/configure" $CONFIGURE_ARGS \
+    ./source/configure $CONFIGURE_ARGS \
       --prefix="$PREFIX"
   )
 fi
