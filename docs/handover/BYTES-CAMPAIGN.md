@@ -30,7 +30,15 @@ C ABI or maintained-binding bytes API was added. Evidence is in
 CP17 implementation status: complete candidate on 2026-09-29. Checked language
 construction, immutable byte operations, strict UTF-8 conversion, introspection
 and controlled language-facing text/value serialization rejection are in place.
-Evidence is in `docs/evidence/cp17-bytes-language.md`. CP18 is next.
+Evidence is in `docs/evidence/cp17-bytes-language.md`.
+
+CP18 implementation status: complete candidate on 2026-09-29. Assignment,
+public and language copy/deepcopy, prepared and legacy callable paths, escaped
+closures, nested aggregates, mutex values, threads and async values retain
+shared immutable byte backing with independent aggregate shells. Concurrent
+reads, source lifetime, large-value fan-out and transferred CP17 text/JSON
+rejection are certified without production changes. Evidence is in
+`docs/evidence/cp18-bytes-transfer.md`. Review Gate 6B is next.
 
 Strict JSON remains a separate ingress/egress boundary. The implementation must
 introduce a Nift-owned runtime value model for null, bool, number, string, bytes,
