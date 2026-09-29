@@ -985,6 +985,7 @@ $(CP18_BYTES_SAN_TEST): tests/cp18_bytes.cpp $(filter-out $(TEST_DIR)/san/src/ni
 
 test-cp18-bytes-sanitize: $(SAN_TARGET) $(CP18_BYTES_SAN_TEST)
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(CP18_BYTES_SAN_TEST)"
+	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT="$(CURDIR)/$(SAN_TARGET)" tests/cp17_bytes.sh
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT="$(CURDIR)/$(SAN_TARGET)" tests/cp18_bytes.sh
 
 test-pagination-sanitize: $(SAN_TARGET)
@@ -1012,6 +1013,7 @@ $(CP18_BYTES_TSAN_TEST): tests/cp18_bytes.cpp $(filter-out $(TEST_DIR)/tsan/src/
 
 test-cp18-bytes-tsan: $(TSAN_TARGET) $(CP18_BYTES_TSAN_TEST)
 	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 "$(CP18_BYTES_TSAN_TEST)"
+	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 NIFT="$(CURDIR)/$(TSAN_TARGET)" tests/cp17_bytes.sh
 	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 NIFT="$(CURDIR)/$(TSAN_TARGET)" tests/cp18_bytes.sh
 
 $(MEMORY_SMOKE): tests/json_smoke.cpp src/Json.h

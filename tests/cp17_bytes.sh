@@ -10,6 +10,11 @@ actual=$("$NIFT" -e 'b := bytes([0,65,127,128,255]); print(type(b)); print(is_by
 expected=$'bytes\ntrue\n5\n5\n65\n65\n128\n6\ntrue\ntrue\ntrue\ntrue\ntrue\nfalse\nhé😀'
 [[ "$actual" == "$expected" ]]
 
+# The large-integer marker makes the second callable ineligible for prepared
+# execution, so both evaluator paths must produce the same byte semantics.
+parity=$("$NIFT" -e 'fn(prepared_bytes()) { b := bytes([0,65,127,128,255]); return [type(b), is_bytes(b), b.length(), b[1], b?[1], b.slice(1,4)[2], (b + bytes([1])).length(), b == bytes([0,65,127,128,255]), b != bytes([0]), !bytes(), !b, "hé😀".encode("utf-8").decode("utf-8")] }; fn(legacy_bytes()) { 9007199254740993; b := bytes([0,65,127,128,255]); return [type(b), is_bytes(b), b.length(), b[1], b?[1], b.slice(1,4)[2], (b + bytes([1])).length(), b == bytes([0,65,127,128,255]), b != bytes([0]), !bytes(), !b, "hé😀".encode("utf-8").decode("utf-8")] }; print(prepared_bytes() == legacy_bytes())')
+[[ "$parity" == "true" ]]
+
 reject_expr() {
     local name=$1 expression=$2 pattern=$3
     if "$NIFT" -e "$expression" >"$TMP/$name.out" 2>"$TMP/$name.err"; then
@@ -39,7 +44,11 @@ reject_expr too-large 'bytes([244,144,128,128]).decode("utf-8")' 'invalid UTF-8'
 reject_expr print-bytes 'print(bytes([65]))' 'cannot be rendered as text'
 reject_expr parameter-interpolation 'print("x$[bytes([65])]")' 'scalar value'
 reject_expr stringify-bytes '[1,{"x":bytes([2])}].stringify()' 'bytes values are not serializable'
+reject_expr prettify-bytes 'bytes([1]).prettify()' 'bytes values are not serializable'
+reject_expr highlight-bytes 'bytes([1]).highlight()' 'bytes values are not serializable'
 reject_expr ordered-bytes 'p := prique(); p.push({"nested":bytes([1])})' 'prique: bytes values are not supported'
+reject_expr cmd-bytes 'cmd("printf", bytes([65]))' 'cmd: arguments must be scalar'
+reject_expr run-bytes 'run("printf", bytes([65]))' 'run: arguments must be scalar'
 
 printf '\377' >"$TMP/invalid-utf8"
 reject_expr encode-invalid "open(\"$TMP/invalid-utf8\").encode(\"utf-8\")" 'invalid UTF-8 text'
@@ -79,8 +88,12 @@ printf 's := ofstream("stream-line.txt")\ns.write_line(bytes([65]))\n' >"$TMP/st
 run_file_reject stream-line 'not directly renderable'
 printf 's := ofstream("value.txt")\ns.write_val({"nested":[bytes([65])]})\n' >"$TMP/write-val.nift"
 run_file_reject write-val 'bytes values are not serializable'
+printf 'f := file("managed-value.txt")\nf.open("w")\nf.write_val({"nested":[bytes([65])]})\n' >"$TMP/managed-write-val.nift"
+run_file_reject managed-write-val 'bytes values are not serializable'
 printf '[bytes([65])]' >"$TMP/read-value.txt"
 printf 's := ifstream("read-value.txt")\ns.read_val()\n' >"$TMP/read-val.nift"
 run_file_reject read-val 'read_val: bytes values are not serializable'
+printf 'f := file("read-value.txt")\nf.open("r")\nf.read_val()\n' >"$TMP/managed-read-val.nift"
+run_file_reject managed-read-val 'read_val: bytes values are not serializable'
 
 echo 'CP17 bytes language semantics: PASS'

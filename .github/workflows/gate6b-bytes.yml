@@ -1,0 +1,102 @@
+name: Gate 6B bytes value semantics
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Makefile'
+      - 'src/Ast.cpp'
+      - 'src/CLI.cpp'
+      - 'src/Parser.cpp'
+      - 'src/RuntimeValue.cpp'
+      - 'src/RuntimeValue.h'
+      - 'tests/cp17_bytes.sh'
+      - 'tests/cp18_bytes.cpp'
+      - 'tests/cp18_bytes.sh'
+      - '.github/workflows/gate6b-bytes.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'Makefile'
+      - 'src/Ast.cpp'
+      - 'src/CLI.cpp'
+      - 'src/Parser.cpp'
+      - 'src/RuntimeValue.cpp'
+      - 'src/RuntimeValue.h'
+      - 'tests/cp17_bytes.sh'
+      - 'tests/cp18_bytes.cpp'
+      - 'tests/cp18_bytes.sh'
+      - '.github/workflows/gate6b-bytes.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: Linux ${{ matrix.id }} bytes semantics
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cc: gcc
+            cxx: g++
+            id: gcc
+          - cc: clang
+            cxx: clang++
+            id: clang
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - name: Native bytes suites
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+        run: make -j2 test-cp17-bytes test-cp18-bytes
+
+  portable:
+    name: ${{ matrix.id }} bytes semantics
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            id: macos-clang
+          - runner: windows-latest
+            id: windows-mingw
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: msys2/setup-msys2@v2
+        if: runner.os == 'Windows'
+        with:
+          msystem: UCRT64
+          update: true
+          path-type: inherit
+          install: make autoconf automake libtool mingw-w64-ucrt-x86_64-gcc python
+      - name: macOS Clang bytes suites
+        if: runner.os == 'macOS'
+        run: make -j2 CC=clang CXX=clang++ test-cp17-bytes test-cp18-bytes
+      - name: Windows MinGW bytes suites
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: make -j2 test-cp17-bytes test-cp18-bytes
+
+  sanitizers:
+    name: Linux bytes ${{ matrix.id }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: test-cp18-bytes-sanitize
+            id: ASan-UBSan
+          - target: test-cp18-bytes-tsan
+            id: TSan
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - name: Sanitized bytes suites
+        run: make -j2 ${{ matrix.target }}
