@@ -1808,6 +1808,28 @@ bool Parser::evaluate_expression(const std::string& expression, nift::RuntimeVal
     last_expression_mutation_ = false;
     auto resolve_direct = [&](const std::string& raw, nift::RuntimeValue& out) -> bool {
         const std::string text = trim_copy(raw);
+        const bool path_only = [&] {
+            std::size_t pos = 0;
+            while (pos < text.size() &&
+                   (std::isalnum(static_cast<unsigned char>(text[pos])) || text[pos] == '_')) ++pos;
+            if (pos == 0) return false;
+            while (pos < text.size()) {
+                if (text[pos] == '.') {
+                    ++pos;
+                    const std::size_t member_start = pos;
+                    while (pos < text.size() &&
+                           (std::isalnum(static_cast<unsigned char>(text[pos])) || text[pos] == '_')) ++pos;
+                    if (member_start == pos) return false;
+                } else if (text[pos] == '[') {
+                    std::size_t close = 0;
+                    if (!find_balanced(text, pos, '[', ']', close)) return false;
+                    pos = close + 1;
+                } else {
+                    return false;
+                }
+            }
+            return true;
+        }();
         for (auto scope = variable_scopes_.rbegin(); scope != variable_scopes_.rend(); ++scope) {
             const auto it = scope->find(text); if (it != scope->end()) { it->second.sync(); if(!it->second.value){error="reference target no longer exists: "+text;return false;} out = *it->second.value; return true; }
             std::size_t root_len = 0;
@@ -1899,9 +1921,25 @@ bool Parser::evaluate_expression(const std::string& expression, nift::RuntimeVal
                     ++pos; const std::size_t member_start = pos;
                     while (pos < text.size() &&
                            (std::isalnum(static_cast<unsigned char>(text[pos])) || text[pos] == '_')) ++pos;
-                    if (member_start == pos || !cur->is_object() || !cur->has(text.substr(member_start, pos - member_start))) { walk_ok = false; break; }
-                    cur = &(*cur)[text.substr(member_start, pos - member_start)];
+                    if (member_start == pos) { walk_ok = false; break; }
+                    const std::string member = text.substr(member_start, pos - member_start);
+                    if (!cur->is_object() || !cur->has(member)) {
+                        // Defer compound expressions to the operator/postfix
+                        // machinery, which will resolve this member operand and
+                        // produce the normal missing-member diagnostic.
+                        if (path_only) error = "value has no member: " + member;
+                        walk_ok = false;
+                        break;
+                    }
+                    cur = &(*cur)[member];
                 } else if (text[pos] == '[') {
+                    if (!cur->is_array() && !cur->is_object() && !cur->is_bytes()) {
+                        // Compound expressions retry the indexed operand on its
+                        // own; pure paths should match the prepared AST error.
+                        if (path_only) error = "invalid index";
+                        walk_ok = false;
+                        break;
+                    }
                     ++pos; const std::size_t index_start = pos;
                     while (pos < text.size() && std::isdigit(static_cast<unsigned char>(text[pos]))) ++pos;
                     if (index_start == pos || pos >= text.size() || text[pos] != ']') { walk_ok = false; break; }
@@ -1918,6 +1956,20 @@ bool Parser::evaluate_expression(const std::string& expression, nift::RuntimeVal
                 } else { walk_ok = false; break; }
             }
             if (walk_ok) { out = *cur; return true; }
+            if (error.empty() && path_only && root_it->second.value &&
+                (root_it->second.value->is_object() || root_it->second.value->is_array())) {
+                std::shared_ptr<const nift::RuntimeValue> resolved;
+                std::string path_error;
+                if (resolve_json_value(text, resolved, path_error)) {
+                    if (!path_error.empty()) { error = std::move(path_error); return false; }
+                    out = *resolved;
+                    return true;
+                }
+            }
+            // Finding the root in this scope is authoritative even when the
+            // remainder needs compound/postfix evaluation. Do not continue to
+            // an outer scope, implicit receiver field, or another name source.
+            return false;
         }
         // Inside a method, a bare name that matches a receiver field resolves to
         // that field (live instance storage, not a snapshot), including member

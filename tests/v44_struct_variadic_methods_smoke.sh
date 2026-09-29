@@ -76,6 +76,7 @@ rest := [100]
 seed := 5
 secret := "module-private"
 x := "module-x"
+sqlite_handle_path := {"primary": "module-db"}
 fn(seed_value()) { return seed }
 fn(caller_callback(x)) { return secret }
 fn(private_transform(x)) { return secret + ":" + x.to_string() }
@@ -92,6 +93,8 @@ struct(stateful) {
     fn(values()) { return [initial, derived] }
 }
 struct(method_api) {
+    outer := {"a": 9}
+    indexed := [9]
     fn(eq(first, second)) { return first.x == second.x }
     fn(member(first)) { return first.x }
     fn(bare(first)) { return first }
@@ -107,6 +110,39 @@ struct(method_api) {
     fn(private_call()) { return private_transform(1) }
     fn(private_value()) { return private_transform }
     fn(start_private_async()) { return private_async(1) }
+    fn(same_handle(first_handle, second_handle)) { return first_handle._handle_id == second_handle._handle_id }
+    fn(handle_path(sqlite_handle_path)) { return sqlite_handle_path.get("primary") }
+    fn(module_handle_path()) { return sqlite_handle_path.get("primary") }
+    fn(receiver_direct(outer)) { return outer.a }
+    fn(receiver_compound(outer)) { return outer.a + 1 }
+    fn(receiver_direct_prepared(outer)) {
+        result := 0
+        i := 0
+        while(i < 1) { result = outer.a; i += 1 }
+        return result
+    }
+    fn(receiver_compound_prepared(outer)) {
+        result := 0
+        i := 0
+        while(i < 1) { result = outer.a + 1; i += 1 }
+        return result
+    }
+    fn(index_direct(indexed)) { return indexed[0] }
+    fn(index_compound(indexed)) { return indexed[0] + 1 }
+    fn(index_direct_prepared(indexed)) {
+        result := 0
+        i := 0
+        while(i < 1) { result = indexed[0]; i += 1 }
+        return result
+    }
+    fn(index_compound_prepared(indexed)) {
+        result := 0
+        i := 0
+        while(i < 1) { result = indexed[0] + 1; i += 1 }
+        return result
+    }
+    fn(index_dynamic(indexed, position)) { return indexed[position] }
+    fn(index_postfix(indexed, position)) { return indexed[position].a + 1 }
 }
 api := method_api()
 mutate := (slot) => { slot[0] = 9; return slot[0] }
@@ -157,8 +193,29 @@ print(api.module_value())
 print(api.call_pick())
 print(api.call_sibling())
 local := local_order()
+first_handle := api
+second_handle := api
+sqlite_handle_path := api
+left_handle := {"_handle_id": 11}
+right_handle := {"_handle_id": 11}
+argument_handle_path := {"primary": "argument-db"}
+receiver_argument := {"a": 2}
 print(local.call())
 print(local.explicit())
+print(api.bare(left_handle).stringify())
+print(api.handle_path(argument_handle_path))
+print(api.module_handle_path())
+print(api.same_handle(left_handle, right_handle))
+print(api.receiver_direct(receiver_argument))
+print(api.receiver_compound(receiver_argument))
+print(api.receiver_direct_prepared(receiver_argument))
+print(api.receiver_compound_prepared(receiver_argument))
+print(api.index_direct([2]))
+print(api.index_compound([2]))
+print(api.index_direct_prepared([2]))
+print(api.index_compound_prepared([2]))
+print(api.index_dynamic([2], 0))
+print(api.index_postfix([{"a": 2}], 0))
 print(dynamic_outer())
 print(api.invoke_bound(pick))
 print(prepared_indirect(pick))
@@ -213,6 +270,20 @@ module-global
 sibling
 consumer-global
 local-sibling
+{"_handle_id":11}
+argument-db
+module-db
+true
+2
+3
+2
+3
+2
+3
+2
+3
+2
+3
 17
 consumer-global
 consumer-global
@@ -242,6 +313,31 @@ if $NIFT "$t/private-callable-value.f" >/dev/null 2>"$t/private-callable-value.e
     exit 1
 fi
 grep -q 'private_transform' "$t/private-callable-value.err"
+
+for method in receiver_direct receiver_compound receiver_direct_prepared receiver_compound_prepared; do
+    cat >"$t/receiver-collision-missing.f" <<NIFT
+import("method-module.f")
+argument := {"b": 2}
+print(api.$method(argument))
+NIFT
+    if $NIFT "$t/receiver-collision-missing.f" >/dev/null 2>"$t/receiver-collision-missing.err"; then
+        echo "$method missing lexical member fell through to the implicit receiver field" >&2
+        exit 1
+    fi
+    grep -q 'value has no member: a' "$t/receiver-collision-missing.err"
+done
+
+for method in index_direct index_compound index_direct_prepared index_compound_prepared; do
+    cat >"$t/receiver-index-collision.f" <<NIFT
+import("method-module.f")
+print(api.$method(2))
+NIFT
+    if $NIFT "$t/receiver-index-collision.f" >/dev/null 2>"$t/receiver-index-collision.err"; then
+        echo "$method scalar parameter fell through to the indexable receiver field" >&2
+        exit 1
+    fi
+    grep -q 'invalid index' "$t/receiver-index-collision.err"
+done
 
 cat >"$t/private-async-method.f" <<'NIFT'
 import("method-module.f")

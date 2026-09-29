@@ -60,7 +60,7 @@ check_err missing-member       'has no member'         'posts.first().missing'
 check_err out-of-range         'out of range'          'posts.filter(p => p.published)[5]'
 check_err non-object-member    'not an object'         'posts.map(p => p.published)[0].name'
 check_err nested-nonobject     'not an object'         'posts.first().tags.missing'
-check_err index-scalar         'cannot index'          'posts[0].title[0]'
+check_err index-scalar         'invalid index'         'posts[0].title[0]'
 check_err object-missing-get   'cannot index'          '{"a":1}.get("b")[0]'
 
 echo "postfix-composition smoke passed"
