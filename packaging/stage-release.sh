@@ -41,6 +41,7 @@ chk() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$@"; else shasu
 # 1. CLI binary
 make -j2 nift >/dev/null 2>&1
 cp nift "$STAGE_OUT/nift-$OS-$ARCH"
+STAGED_CLI="$STAGE_OUT/nift-$OS-$ARCH"
 echo "built CLI: $STAGE_OUT/nift-$OS-$ARCH"
 
 # 2. Native embed bundle (per-target .pc stamped) + SHA256SUMS
@@ -57,9 +58,9 @@ CLEANUP="$CLEANUP $BUNDLE_STAGE"
 mkdir -p "$BUNDLE_STAGE/include/nift" "$BUNDLE_STAGE/lib/pkgconfig" "$BUNDLE_STAGE/share/licenses/nift" "$BUNDLE_STAGE/tools"
 cp -r include/nift/. "$BUNDLE_STAGE/include/nift/"
 case "$OS" in
-  linux)   BUNDLE_LIBS="libnift_c.a libnift_c.so" ;;
-  macos)   BUNDLE_LIBS="libnift_c.a libnift_c.dylib" ;;
-  *)       BUNDLE_LIBS="libnift_c.a libnift_c.so" ;;
+  linux)   BUNDLE_LIBS="libnift_c.a libnift_c.so"; BUNDLE_SHARED="libnift_c.so" ;;
+  macos)   BUNDLE_LIBS="libnift_c.a libnift_c.dylib"; BUNDLE_SHARED="libnift_c.dylib" ;;
+  *)       BUNDLE_LIBS="libnift_c.a libnift_c.so"; BUNDLE_SHARED="libnift_c.so" ;;
 esac
 for _f in $BUNDLE_LIBS; do
   [ -f "$_f" ] || { echo "FAIL: required native file missing: $_f" >&2; exit 1; }
@@ -68,6 +69,8 @@ done
 sed -e "s/__VERSION__/$VERSION/" -e "s|__LIBS__|$PC_LIBS|" packaging/nift.pc.in > "$BUNDLE_STAGE/lib/pkgconfig/nift.pc"
 cp packaging/install-embed.sh "$BUNDLE_STAGE/install-embed.sh"
 cp THIRD_PARTY_NOTICES.md third_party/libffi/LICENSE third_party/libffi/LICENSE-BUILDTOOLS third_party/libffi/NIFT-PROVENANCE.md "$BUNDLE_STAGE/share/licenses/nift/"
+bash scripts/audit_no_dynamic_libffi.sh "$STAGED_CLI" "$BUNDLE_STAGE/lib/$BUNDLE_SHARED"
+bash scripts/audit_private_libffi.sh "$BUNDLE_STAGE/lib/$BUNDLE_SHARED"
 tar czf "$STAGE_OUT/nift-embed-$OS-$ARCH.tar.gz" -C "$BUNDLE_STAGE" include lib share install-embed.sh
 echo "built native bundle: $STAGE_OUT/nift-embed-$OS-$ARCH.tar.gz"
 
@@ -91,6 +94,16 @@ WHEEL_TMP="$(mktemp -d /tmp/nift-wheelsrc.XXXXXX)"
 CLEANUP="$CLEANUP $WHEEL_TMP"
 tar xzf "$SDIST" -C "$WHEEL_TMP"
 ( cd "$WHEEL_TMP"/nift-$VERSION && NIFT_VERSION="$VERSION" python3 -m pip wheel --no-deps --no-build-isolation -w "$STAGE_OUT" . >/dev/null 2>&1 )
+WHEEL_ARTIFACT="$(ls "$STAGE_OUT"/nift-$VERSION-*.whl | head -1)"
+WHEEL_AUDIT="$(mktemp -d /tmp/nift-wheel-audit.XXXXXX)"
+CLEANUP="$CLEANUP $WHEEL_AUDIT"
+python3 -m zipfile -e "$WHEEL_ARTIFACT" "$WHEEL_AUDIT"
+shopt -s nullglob
+WHEEL_EXTENSIONS=("$WHEEL_AUDIT"/nift/_nift*.so "$WHEEL_AUDIT"/nift/_nift*.pyd)
+shopt -u nullglob
+[ "${#WHEEL_EXTENSIONS[@]}" -eq 1 ] || { echo "FAIL: expected one wheel native extension" >&2; exit 1; }
+bash scripts/audit_no_dynamic_libffi.sh "${WHEEL_EXTENSIONS[@]}"
+bash scripts/audit_private_libffi.sh "${WHEEL_EXTENSIONS[@]}"
 echo "built sdist + wheel: $(ls "$STAGE_OUT" | grep -E 'nift-.*\.(whl|tar.gz)$' | tr '\n' ' ')"
 
 # 4. npm (stamped package.json in a temp tree). The addon is built in canonical
@@ -100,6 +113,8 @@ NPM_TMP="$(mktemp -d /tmp/nift-npm.XXXXXX)"
 CLEANUP="$CLEANUP $NPM_TMP"
 python3 scripts/check_node_package_licenses.py
 make node-binding >/dev/null 2>&1
+bash scripts/audit_no_dynamic_libffi.sh bindings/node/build/nift_node.node
+bash scripts/audit_private_libffi.sh bindings/node/build/nift_node.node
 cp -r bindings/node/. "$NPM_TMP/"
 python3 - "$NPM_TMP/package.json" "$VERSION" <<'PY'
 import json, sys

@@ -12,9 +12,7 @@ cat > "$TMP/exported.c" <<'C'
 #else
 # define EXPORT __attribute__((visibility("default")))
 #endif
-EXPORT void ffi_call(void) {}
-EXPORT void ffi_prep_cif(void) {}
-EXPORT int ffi_type_void;
+EXPORT void ffi_get_struct_offsets(void) {}
 C
 
 case "$(uname -s)" in

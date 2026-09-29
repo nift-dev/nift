@@ -2,7 +2,7 @@
 set -euo pipefail
 
 [ "$#" -gt 0 ] || { echo "usage: audit_private_libffi.sh <shared-artifact>..." >&2; exit 2; }
-FFI_RE='(^|[[:space:]])_?ffi_(call|prep_cif|type_)'
+FFI_RE='(^|[[:space:]])_?ffi_'
 
 require_defined_symbols() {
   local symbols="$1"

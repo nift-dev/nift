@@ -27,9 +27,9 @@ mkdir -p "$OUT"
 
 # Per-target native library filenames (exact; failure if any is missing).
 case "$OS" in
-  linux)   NATIVE_FILES="libnift_c.a libnift_c.so" ;;
-  macos)   NATIVE_FILES="libnift_c.a libnift_c.dylib" ;;
-  windows) NATIVE_FILES="libnift_c.a libnift_c.so" ;;  # Makefile emits .so names on mingw; DLL/import-lib layout is a release-layout item
+  linux)   NATIVE_FILES="libnift_c.a libnift_c.so"; SHARED_FILE="libnift_c.so" ;;
+  macos)   NATIVE_FILES="libnift_c.a libnift_c.dylib"; SHARED_FILE="libnift_c.dylib" ;;
+  windows) NATIVE_FILES="libnift_c.a libnift_c.so"; SHARED_FILE="libnift_c.so" ;;  # Makefile emits .so names on mingw; DLL/import-lib layout is a release-layout item
   *) echo "unsupported target OS: $OS" >&2; exit 2 ;;
 esac
 case "$OS:$ARCH" in
@@ -40,9 +40,10 @@ case "$OS:$ARCH" in
 esac
 
 # CLI binary (nift or nift.exe).
-if [ -x "$ROOT/nift" ]; then cp "$ROOT/nift" "$OUT/nift-$OS-$ARCH"
-elif [ -x "$ROOT/nift.exe" ]; then cp "$ROOT/nift.exe" "$OUT/nift-$OS-$ARCH"
+if [ -x "$ROOT/nift" ]; then CLI_SOURCE="$ROOT/nift"
+elif [ -x "$ROOT/nift.exe" ]; then CLI_SOURCE="$ROOT/nift.exe"
 else echo "FAIL: no CLI binary (nift / nift.exe)" >&2; exit 1; fi
+cp "$CLI_SOURCE" "$OUT/nift-$OS-$ARCH"
 
 # Native bundle with target-correct .pc; FAIL if any required native file is absent.
 make embed >/dev/null 2>&1
@@ -57,6 +58,8 @@ done
 sed -e "s/__VERSION__/$VERSION/" -e "s|__LIBS__|$PC_LIBS|" packaging/nift.pc.in > "$STAGE/lib/pkgconfig/nift.pc"
 cp packaging/install-embed.sh "$STAGE/install-embed.sh"
 cp THIRD_PARTY_NOTICES.md third_party/libffi/LICENSE third_party/libffi/LICENSE-BUILDTOOLS third_party/libffi/NIFT-PROVENANCE.md "$STAGE/share/licenses/nift/"
+bash scripts/audit_no_dynamic_libffi.sh "$OUT/nift-$OS-$ARCH" "$STAGE/lib/$SHARED_FILE"
+bash scripts/audit_private_libffi.sh "$STAGE/lib/$SHARED_FILE"
 tar czf "$OUT/nift-embed-$OS-$ARCH.tar.gz" -C "$STAGE" include lib share install-embed.sh
 
 # Portable checksum helper (sha256sum on Linux, shasum -a 256 on macOS).

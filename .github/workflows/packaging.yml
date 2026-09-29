@@ -235,6 +235,31 @@ jobs:
           subprocess.run(["npm","pack","--pack-destination","/tmp/npmdist"], cwd=tmp + "/node", check=True, capture_output=True)
           PY
           ls /tmp/nugetdist /tmp/npmdist
+      - name: Audit exact language package native payloads
+        shell: bash
+        run: |
+          shopt -s nullglob
+          WHEELS=(/tmp/pydist/nift-*.whl)
+          NUPKGS=(/tmp/nugetdist/Nift.*.nupkg)
+          NPM_TARBALLS=(/tmp/npmdist/nift-*.tgz)
+          [ "${#WHEELS[@]}" -eq 1 ] || { echo "FAIL: expected one Python wheel" >&2; exit 1; }
+          [ "${#NUPKGS[@]}" -eq 1 ] || { echo "FAIL: expected one NuGet package" >&2; exit 1; }
+          [ "${#NPM_TARBALLS[@]}" -eq 1 ] || { echo "FAIL: expected one npm package" >&2; exit 1; }
+
+          rm -rf /tmp/package-audit
+          mkdir -p /tmp/package-audit/wheel /tmp/package-audit/nuget /tmp/package-audit/npm
+          python3 -m zipfile -e "${WHEELS[0]}" /tmp/package-audit/wheel
+          python3 -m zipfile -e "${NUPKGS[0]}" /tmp/package-audit/nuget
+          tar xzf "${NPM_TARBALLS[0]}" -C /tmp/package-audit/npm
+
+          WHEEL_NATIVE=(/tmp/package-audit/wheel/nift/_nift*.so /tmp/package-audit/wheel/nift/_nift*.pyd)
+          NUGET_NATIVE=(/tmp/package-audit/nuget/runtimes/*/native/libnift_c.*)
+          NPM_NATIVE=(/tmp/package-audit/npm/package/build/nift_node.node)
+          [ "${#WHEEL_NATIVE[@]}" -eq 1 ] || { echo "FAIL: expected one wheel native extension" >&2; exit 1; }
+          [ "${#NUGET_NATIVE[@]}" -eq 1 ] || { echo "FAIL: expected one NuGet native library" >&2; exit 1; }
+          [ "${#NPM_NATIVE[@]}" -eq 1 ] || { echo "FAIL: expected one npm native addon" >&2; exit 1; }
+          bash scripts/audit_no_dynamic_libffi.sh "${WHEEL_NATIVE[@]}" "${NUGET_NATIVE[@]}" "${NPM_NATIVE[@]}"
+          bash scripts/audit_private_libffi.sh "${WHEEL_NATIVE[@]}" "${NUGET_NATIVE[@]}" "${NPM_NATIVE[@]}"
       - name: Durable synchronized-version derivation regression
         run: bash packaging/test-version-derivation.sh
       - name: Clean-consumer Python install/load/render
