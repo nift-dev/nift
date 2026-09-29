@@ -4238,6 +4238,10 @@ bool Parser::translate_function_program(const std::string& source, std::string& 
                 if(p>=in.size()||in[p]!='('||!find_balanced(in,p,'(',')',pc)){error="export requires '(binding)'";return false;}
                 out += "@__export("+in.substr(p+1,pc-p-1)+")"; i=pc+1; if(i<in.size()&&in[i]==';')++i; continue;
             }
+            if(boundary(i,"import")) {
+                std::size_t p=i+6; while(p<in.size()&&std::isspace((unsigned char)in[p]))++p;
+                if(p<in.size()&&in[p]=='('){const auto source_lines=std::count(in.begin(),in.begin()+i,'\n');const auto output_lines=std::count(out.begin(),out.end(),'\n');if(output_lines<source_lines)out.append(source_lines-output_lines,'\n');const auto line_start=in.rfind('\n',i);const auto indent_start=line_start==std::string::npos?0:line_start+1;if(std::all_of(in.begin()+indent_start,in.begin()+i,[](char c){return c==' '||c=='\t';}))out+=in.substr(indent_start,i-indent_start);std::size_t pc=0;if(!find_balanced(in,p,'(',')',pc)){out+=in.substr(i);return true;}out+=in.substr(i,pc-i+1);i=pc+1;if(i<in.size()&&in[i]==';')++i;continue;}
+            }
             // A single-line @// comment must be consumed to end-of-line BEFORE
             // statement splitting, so a ';' inside the comment cannot turn the
             // rest of the comment into a statement.
@@ -4264,7 +4268,8 @@ bool Parser::translate_function_program(const std::string& source, std::string& 
             if (in.compare(i, 2, "/*") == 0) {
                 std::size_t block_end = in.find("*/", i + 2);
                 if (block_end == std::string::npos) { error = "open comment '/*' has no close '*/'"; return false; }
-                out += '\n';
+                const auto line_count=std::count(in.begin()+i,in.begin()+block_end+2,'\n');
+                if(line_count)out.append(line_count,'\n');else out+=' ';
                 i = block_end + 2;
                 continue;
             }
@@ -4472,8 +4477,10 @@ RenderResult Parser::run_statement(const std::string& source, const fs::path& so
     // A REPL is also an inspector: a single expression is evaluated directly so
     // arrays/collections/structs can be safely displayed without routing through
     // template rendering (which intentionally rejects compound values).
+    std::size_t import_open=6; while(import_open<t.size()&&std::isspace(static_cast<unsigned char>(t[import_open])))++import_open;
+    const bool import_statement=t.rfind("import",0)==0&&(t.size()==6||(!std::isalnum(static_cast<unsigned char>(t[6]))&&t[6]!='_'))&&import_open<t.size()&&t[import_open]=='(';
     const bool declaration = t.rfind("fn(",0)==0 || t.rfind("struct(",0)==0 || t.rfind("if(",0)==0 ||
-        t.rfind("for(",0)==0 || t.rfind("while(",0)==0 || t.rfind("return",0)==0 || t.rfind("export(",0)==0;
+        t.rfind("for(",0)==0 || t.rfind("while(",0)==0 || t.rfind("return",0)==0 || t.rfind("export(",0)==0 || import_statement;
     bool assignment=false; bool quoted=false; char qc=0; int par=0,br=0,bc=0;
     for(std::size_t i=0;i<t.size();++i){char c=t[i];if(quoted){if(c=='\\')++i;else if(c==qc)quoted=false;continue;}if(c=='\''||c=='"'){quoted=true;qc=c;continue;}if(c=='(')++par;else if(c==')')--par;else if(c=='[')++br;else if(c==']')--br;else if(c=='{')++bc;else if(c=='}')--bc;else if(!par&&!br&&!bc&&c=='='){char a=i?t[i-1]:0,b=i+1<t.size()?t[i+1]:0;if(a!='='&&a!='!'&&a!='<'&&a!='>'&&b!='='){assignment=true;break;}}}
     if(!declaration&&!assignment&&!t.empty()){
@@ -4509,10 +4516,17 @@ RenderResult Parser::execute_native_program(const std::string& source, const fs:
     if (!translate_function_program(source, program, error)) {
         RenderResult failed; failed.ok=false; failed.error.message=error; return failed;
     }
-    return parse(program, source_path, depth);
+    auto rr=parse(program, source_path, depth);
+    if(!rr.ok&&rr.error.line>0&&rr.error.message.rfind("import",0)==0){
+        auto line_at=[](const std::string& text,std::size_t line){std::size_t begin=0;for(std::size_t n=1;n<line;++n){begin=text.find('\n',begin);if(begin==std::string::npos)return std::string{};++begin;}const auto end=text.find('\n',begin);return text.substr(begin,end==std::string::npos?std::string::npos:end-begin);};
+        auto imports=[](const std::string& line){std::vector<std::size_t> found;bool quoted=false;char quote=0;for(std::size_t p=0;p<line.size();++p){const char c=line[p];if(quoted){if(c=='\\')++p;else if(c==quote)quoted=false;continue;}if(c=='\''||c=='"'){quoted=true;quote=c;continue;}if(line.compare(p,6,"import")!=0)continue;const bool left=p==0||(!std::isalnum(static_cast<unsigned char>(line[p-1]))&&line[p-1]!='_');std::size_t q=p+6;const bool right=q==line.size()||(!std::isalnum(static_cast<unsigned char>(line[q]))&&line[q]!='_');while(q<line.size()&&std::isspace(static_cast<unsigned char>(line[q])))++q;if(left&&right&&q<line.size()&&line[q]=='(')found.push_back(p);}return found;};
+        const std::string original_line=line_at(source,rr.error.line);const auto original_imports=imports(original_line);const auto translated_imports=imports(rr.error.source_line);
+        if(!original_imports.empty()){std::size_t occurrence=0;for(std::size_t n=0;n<translated_imports.size();++n)if(translated_imports[n]+1<=rr.error.column)occurrence=n;occurrence=std::min(occurrence,original_imports.size()-1);const auto position=original_imports[occurrence];rr.error.column=position+1;rr.error.source_line=original_line;std::size_t open=position+6;while(open<original_line.size()&&std::isspace(static_cast<unsigned char>(original_line[open])))++open;std::size_t close=0;rr.error.source_length=open<original_line.size()&&find_balanced(original_line,open,'(',')',close)?close-position+1:6;}
+    }
+    return rr;
 }
 
-bool Parser::execute_import_file(const std::string& argument, const fs::path& caller_path, int depth, std::string& error) {
+bool Parser::execute_import_file(const std::string& argument, const fs::path& caller_path, int depth, bool legacy_syntax, std::string& error) {
     fs::path path=argument;
     const bool package_name = argument.find('/') == std::string::npos && argument.find('\\') == std::string::npos && fs::path(argument).extension().empty();
     if (package_name && standalone_script_host_) {
@@ -4538,11 +4552,11 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
     input_stack_.push_back(path); result_.dependencies.insert(host_.relative(path)); ++function_call_depth_;
     auto rr=execute_native_program(*src.content,path,depth+1);
     --function_call_depth_; input_stack_.pop_back();
-    if(rr.ok){for(auto& kv:file_instances_)if(!pre_import_files.count(kv.first)&&kv.second->open){auto f=kv.second;f->open=false;f->dirty=false;f->mode.clear();f->working.clear();f->saved.clear();f->cursor=0;rr.ok=false;rr.error.message="managed file left open at @import completion: "+f->path.generic_string();break;}}
+    if(rr.ok){for(auto& kv:file_instances_)if(!pre_import_files.count(kv.first)&&kv.second->open){auto f=kv.second;f->open=false;f->dirty=false;f->mode.clear();f->working.clear();f->saved.clear();f->cursor=0;rr.ok=false;rr.error.message="managed file left open at "+std::string(legacy_syntax?"@import":"import")+" completion: "+f->path.generic_string();break;}}
     auto isolated_scope=std::move(variable_scopes_.back()); auto isolated_callables=std::move(callables_); auto isolated_structs=std::move(structs_); auto exports=requested_exports_; auto completion=pending_control_;
     variable_scopes_=std::move(saved_scopes); callables_=std::move(saved_callables); structs_=std::move(saved_structs); requested_exports_=std::move(saved_exports); in_import_program_=saved_import; pending_control_=saved_control; strict_script_mode_=saved_strict;
     if(!rr.ok){error=rr.error.message;return false;}
-    if(completion.kind==ControlFlow::Return && completion.value){error="return with a value is not allowed in @import";return false;}
+    if(completion.kind==ControlFlow::Return && completion.value){error="return with a value is not allowed in "+std::string(legacy_syntax?"@import":"import");return false;}
 
     std::unordered_map<std::string,VariableBinding> vars;
     std::unordered_map<std::string,Callable> funcs;
@@ -4732,11 +4746,14 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             requested_exports_.push_back(name); i=ec+1; continue;
         }
 
-        if (source.compare(i, 8, "@import(") == 0) {
-            std::size_t ec=0; if(!find_balanced(source,i+7,'(',')',ec)){fail(source_path,source,i,"@import has no matching ')'");break;}
-            std::string arg=trim_copy(source.substr(i+8,ec-(i+8))); nift::RuntimeValue pv; std::string pe;
-            if(!evaluate_expression(arg,pv,pe)||!pv.is_string()){fail(source_path,source,i,"@import path must be a string expression");break;}
-            if(!execute_import_file(pv.string,source_path,depth+1,pe)){fail(source_path,source,i,"@import: "+pe);break;}
+        const bool bare_import=strict_script_mode_&&source.compare(i,6,"import")==0&&(i+6==source.size()||(!std::isalnum(static_cast<unsigned char>(source[i+6]))&&source[i+6]!='_'));
+        if (bare_import || source.compare(i, 8, "@import(") == 0) {
+            std::size_t po=bare_import?i+6:i+7;while(po<source.size()&&std::isspace(static_cast<unsigned char>(source[po])))++po;
+            auto import_fail=[&](const std::string& message,std::size_t length){fail(source_path,source,i,message);if(bare_import)result_.error.source_length=length;};
+            std::size_t ec=0; if(po>=source.size()||source[po]!='('||!find_balanced(source,po,'(',')',ec)){import_fail(bare_import?"import has no matching ')'":"@import has no matching ')'",6);break;}
+            std::string arg=trim_copy(source.substr(po+1,ec-(po+1))); nift::RuntimeValue pv; std::string pe;
+            if(!evaluate_expression(arg,pv,pe)||!pv.is_string()){import_fail(bare_import?"import path must be a string expression":"@import path must be a string expression",ec-i+1);break;}
+            if(!execute_import_file(pv.string,source_path,depth+1,!bare_import,pe)){import_fail((bare_import?"import: ":"@import: ")+pe,ec-i+1);break;}
             i=ec+1; continue;
         }
 
@@ -6603,7 +6620,8 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             output.push_back(source[i++]);
         } else {
             const std::size_t next_special = source.find_first_of("\\@<$", i);
-            const std::size_t end = next_special == std::string::npos ? source.size() : next_special;
+            std::size_t end = next_special == std::string::npos ? source.size() : next_special;
+            if(strict_script_mode_){for(std::size_t p=source.find("import",i);p<end;p=source.find("import",p+6)){const bool left=p==0||(!std::isalnum(static_cast<unsigned char>(source[p-1]))&&source[p-1]!='_');const std::size_t after=p+6;const bool right=after==source.size()||(!std::isalnum(static_cast<unsigned char>(source[after]))&&source[after]!='_');if(left&&right){end=p;break;}if(p==std::string::npos)break;}}
             output.append(source, i, end - i);
             i = end;
         }

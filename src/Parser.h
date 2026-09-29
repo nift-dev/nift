@@ -305,7 +305,7 @@ private:
     RenderResult parse(const std::string& source, const std::filesystem::path& source_path, int depth);
     bool translate_function_program(const std::string& source, std::string& translated, std::string& error) const;
     RenderResult execute_native_program(const std::string& source, const std::filesystem::path& source_path, int depth);
-    bool execute_import_file(const std::string& argument, const std::filesystem::path& caller_path, int depth, std::string& error);
+    bool execute_import_file(const std::string& argument, const std::filesystem::path& caller_path, int depth, bool legacy_syntax, std::string& error);
     std::string metadata(const std::string& key) const;
     bool json_value(const std::string& expression, std::string& value, std::string& error);
     bool interpolate_parameter(const std::string& parameter,

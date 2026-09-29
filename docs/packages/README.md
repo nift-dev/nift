@@ -1,10 +1,10 @@
 # Nift package contract v1
 
-A package is a Git/local repository containing `manifest.json`, Nift `.f` sources, tests and documentation. `manifest.json` requires `name`, `version`, and an `.f` `entry`. Package code uses the existing isolated `@import`/explicit `export` semantics.
+A package is a Git/local repository containing `manifest.json`, Nift `.f` sources, tests and documentation. `manifest.json` requires `name`, `version`, and an `.f` `entry`. Package code uses isolated `import`/explicit `export` semantics. Script land retains `@import` as a compatibility spelling; template top level continues to use the `@import` directive.
 
 Resolution contract:
-- `@import("./local.f")` and other path-shaped imports are local files.
-- `@import("sqlite")` is a package import resolved from the installed package root.
+- `import("./local.f")` and other path-shaped imports are local files.
+- `import("sqlite")` is a package import resolved from the installed package root.
 - package imports execute the package manifest `entry` in isolated scope and expose only explicit exports.
 - package-local relative imports/resources resolve relative to the package entry/module that requests them, never the consuming project's current directory.
 - dependencies are declared by package name in `manifest.json`; acquisition/version locking is CP31+ and is intentionally separate from this module contract.

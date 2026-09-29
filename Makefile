@@ -655,6 +655,7 @@ test-v43-language: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp35_cp44_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_review_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp51_cp70_scripting_smoke.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/script_import_syntax.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp71_cp87_native_io_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp78_streams_smoke.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp85_repl_multiline_smoke.sh
