@@ -36,7 +36,7 @@ reject_expr overlong-three 'bytes([224,128,128]).decode("utf-8")' 'invalid UTF-8
 reject_expr overlong-four 'bytes([240,128,128,128]).decode("utf-8")' 'invalid UTF-8'
 reject_expr surrogate 'bytes([237,160,128]).decode("utf-8")' 'invalid UTF-8'
 reject_expr too-large 'bytes([244,144,128,128]).decode("utf-8")' 'invalid UTF-8'
-reject_expr print-bytes 'print(bytes([65]))' 'not directly renderable'
+reject_expr print-bytes 'print(bytes([65]))' 'cannot be rendered as text'
 reject_expr parameter-interpolation 'print("x$[bytes([65])]")' 'scalar value'
 reject_expr stringify-bytes '[1,{"x":bytes([2])}].stringify()' 'bytes values are not serializable'
 reject_expr ordered-bytes 'p := prique(); p.push({"nested":bytes([1])})' 'prique: bytes values are not supported'
@@ -62,7 +62,7 @@ run_file_reject() {
 }
 
 printf 'b := bytes([65])\n$[b]\n' >"$TMP/direct.nift"
-run_file_reject direct 'cannot render bytes'
+run_file_reject direct 'cannot be rendered as text'
 printf '@join([bytes([65])], ",")\n' >"$TMP/template-join.nift"
 run_file_reject template-join 'scalar JSON values'
 printf '@slice([bytes([65])], 0, 1)\n' >"$TMP/template-collection.nift"
