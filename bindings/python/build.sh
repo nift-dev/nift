@@ -11,6 +11,8 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 EMBED="$(cd ../../ && pwd)"
+CC="${CC:-gcc}"
+CXX="${CXX:-g++}"
 
 PYTHON="${PYTHON:-python3}"
 PY_INCLUDES="$("$PYTHON" -c 'import sysconfig; print(sysconfig.get_paths()["include"])')"
@@ -25,6 +27,23 @@ TMP="$(mktemp -d "${TMPDIR:-/tmp}/nift-py-build.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
 OBJ="$TMP/cabi-pic"
 mkdir -p "$OBJ" nift
+CC="$CC" CXX="$CXX" CFLAGS="-O2 -fPIC" bash "$EMBED/scripts/build_vendored_libffi.sh" "$TMP/libffi"
+LIBFFI_INCLUDE="$TMP/libffi/install/include"
+LIBFFI_A="$TMP/libffi/install/lib/libffi.a"
+case "$(uname -s)" in
+  Darwin)
+    SHARED_FLAGS=(-bundle -Wl,-undefined,dynamic_lookup)
+    PRIVATE_FFI_LDFLAGS=()
+    ;;
+  MINGW*|MSYS*|CYGWIN*)
+    SHARED_FLAGS=(-shared)
+    PRIVATE_FFI_LDFLAGS=(-Wl,--exclude-libs,ALL)
+    ;;
+  *)
+    SHARED_FLAGS=(-shared)
+    PRIVATE_FFI_LDFLAGS=(-Wl,--exclude-libs,ALL -Wl,-Bsymbolic)
+    ;;
+esac
 
 CABI_SOURCES="src/ProjectOwnership.cpp src/embed/Engine.cpp src/embed/Context.cpp src/RuntimeValue.cpp src/Value.cpp \
   src/FileSystem.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp \
@@ -39,10 +58,10 @@ compile_object() {
   local obj="$2"
   case "$src" in
     *.c)
-      gcc -std=c99 -O2 -fPIC -I"$EMBED/markuppp/vendor/cmark" -c "$EMBED/$src" -o "$obj"
+      "$CC" -std=c99 -O2 -fPIC -I"$EMBED/markuppp/vendor/cmark" -c "$EMBED/$src" -o "$obj"
       ;;
     *)
-      g++ -std=c++17 -O2 -fPIC -I"$EMBED/include" -I"$EMBED/src" -I"$EMBED/minifypp/include" \
+      "$CXX" -std=c++17 -O2 -fPIC -I"$LIBFFI_INCLUDE" -I"$EMBED/include" -I"$EMBED/src" -I"$EMBED/minifypp/include" \
           -I"$EMBED/minifypp/src" -I"$EMBED/markuppp/include" -I"$EMBED/markuppp/vendor/cmark" \
           -c "$EMBED/$src" -o "$obj"
       ;;
@@ -60,9 +79,9 @@ for name in $MARKUP_C_NAMES; do
   PIC_OBJECTS="$PIC_OBJECTS $obj"
 done
 
-g++ -std=c++17 -O2 -fPIC -shared \
+"$CXX" -std=c++17 -O2 -fPIC "${SHARED_FLAGS[@]}" \
   -I"$PY_INCLUDES" -I"$EMBED/include" \
-  src/nift_module.cc $PIC_OBJECTS -pthread \
+  src/nift_module.cc $PIC_OBJECTS "$LIBFFI_A" "${PRIVATE_FFI_LDFLAGS[@]}" -pthread \
   -o "$TMP/_nift$SUFFIX"
 
 # Fail-fast: the extension must load with all symbols resolved (catches a torn
@@ -75,4 +94,6 @@ spec.loader.exec_module(m)
 " || { echo "error: built extension does not load (torn link?)" >&2; exit 1; }
 
 mv -f "$TMP/_nift$SUFFIX" "nift/_nift$SUFFIX"
+bash "$EMBED/scripts/audit_no_dynamic_libffi.sh" "nift/_nift$SUFFIX"
+bash "$EMBED/scripts/audit_private_libffi.sh" "nift/_nift$SUFFIX"
 echo "built nift/_nift$SUFFIX"

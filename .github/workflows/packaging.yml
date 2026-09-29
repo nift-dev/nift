@@ -6,9 +6,36 @@ on:
       - 'src/**'
       - 'include/**'
       - 'minifypp/**'
+      - 'markuppp/**'
       - 'jsonic/**'
       - 'bindings/**'
       - 'packaging/**'
+      - 'third_party/libffi/**'
+      - 'scripts/build_vendored_libffi.sh'
+      - 'scripts/check_vendored_libffi.py'
+      - 'scripts/audit_no_dynamic_libffi.sh'
+      - 'scripts/audit_private_libffi.sh'
+      - 'scripts/check_node_package_licenses.py'
+      - 'THIRD_PARTY_NOTICES.md'
+      - 'Makefile'
+      - '.github/workflows/packaging.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'include/**'
+      - 'minifypp/**'
+      - 'markuppp/**'
+      - 'jsonic/**'
+      - 'bindings/**'
+      - 'packaging/**'
+      - 'third_party/libffi/**'
+      - 'scripts/build_vendored_libffi.sh'
+      - 'scripts/check_vendored_libffi.py'
+      - 'scripts/audit_no_dynamic_libffi.sh'
+      - 'scripts/audit_private_libffi.sh'
+      - 'scripts/check_node_package_licenses.py'
+      - 'THIRD_PARTY_NOTICES.md'
       - 'Makefile'
       - '.github/workflows/packaging.yml'
   workflow_dispatch:
@@ -180,6 +207,10 @@ jobs:
           cp -r minifypp bindings/python/native/minifypp
           cp -r markuppp bindings/python/native/markuppp
           cp -r jsonic bindings/python/native/jsonic
+          mkdir -p bindings/python/native/third_party bindings/python/native/scripts
+          cp -r third_party/libffi bindings/python/native/third_party/libffi
+          cp scripts/build_vendored_libffi.sh bindings/python/native/scripts/
+          cp scripts/check_vendored_libffi.py bindings/python/native/scripts/
           ( cd bindings/python && NIFT_VERSION="$VERSION" python3 setup.py sdist --dist-dir /tmp/pydist )
           SDIST="$(ls /tmp/pydist/nift-$VERSION.tar.gz | head -1)"
           mkdir -p /tmp/pysrc && tar xzf "$SDIST" -C /tmp/pysrc
@@ -189,6 +220,7 @@ jobs:
         run: |
           make embed
           make node-binding
+          python3 scripts/check_node_package_licenses.py
           VERSION="$(./nift --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
           ( cd bindings/csharp/src/Nift && dotnet pack -v q --nologo -p:Version="$VERSION" -o /tmp/nugetdist )
           python3 - "$VERSION" <<'PY'

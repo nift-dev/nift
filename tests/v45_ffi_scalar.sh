@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 NIFT=${NIFT:-./nift}; mkdir -p .build
-cc -std=c99 -Wall -Wextra -fPIC -shared tests/ffi/fixture.c -o .build/libnift_ffi_fixture.so
+FIXTURE="$(bash tests/ffi/build_fixture.sh .build)"
 cat > .build/ffi-integers.json <<'JSON'
 {"u64":18446744073709551615,"u8_bad":256,"i8_bad":-129,"u16_bad":65536,"i16_bad":-32769,"u32_bad":4294967296,"i32_bad":-2147483649,"u64_bad":18446744073709551616,"i64_bad":9223372036854775808,"negative":-1,"fraction":1.5}
 JSON
-cat > .build/ffi-scalar.f <<'NIFT'
+printf 'lib := ffi_open("%s")\n' "$FIXTURE" > .build/ffi-scalar.f
+cat >> .build/ffi-scalar.f <<'NIFT'
 @json(n, "ffi-integers.json")
-lib := ffi_open(".build/libnift_ffi_fixture.so")
 print(ffi_call(lib, "nift_ffi_add_i64", "i64(i64,i64)", 2, 3))
 print(ffi_call(lib, "nift_ffi_strlen", "i32(cstr)", "hello"))
 print(ffi_call(lib, "nift_ffi_greeting", "cstr()"))
@@ -30,18 +30,18 @@ for call in \
   'ffi_call(lib, "nift_ffi_add_i64", "i64(i64,i64)", n.i64_bad, 0)' \
   'ffi_call(lib, "nift_ffi_xor_u64", "u64(u64,u64)", n.negative, 0)' \
   'ffi_call(lib, "nift_ffi_xor_u64", "u64(u64,u64)", n.fraction, 0)'; do
-  printf '@json(n, "ffi-integers.json")\nlib := ffi_open(".build/libnift_ffi_fixture.so")\n%s\n' "$call" >.build/ffi-range.f
+  printf '@json(n, "ffi-integers.json")\nlib := ffi_open("%s")\n%s\n' "$FIXTURE" "$call" >.build/ffi-range.f
   if $NIFT .build/ffi-range.f >/dev/null 2>.build/ffi-range.err; then exit 1; fi
   grep -q 'integer argument out of range' .build/ffi-range.err
 done
-cat > .build/ffi-bad.f <<'NIFT'
-lib := ffi_open(".build/libnift_ffi_fixture.so")
+printf 'lib := ffi_open("%s")\n' "$FIXTURE" > .build/ffi-bad.f
+cat >> .build/ffi-bad.f <<'NIFT'
 ffi_call(lib, "missing_symbol", "i64()")
 NIFT
 if $NIFT .build/ffi-bad.f >/dev/null 2>.build/ffi-bad.err; then exit 1; fi
 grep -q 'symbol lookup failed\|symbol not found' .build/ffi-bad.err
-cat > .build/ffi-close.f <<'NIFT'
-lib := ffi_open(".build/libnift_ffi_fixture.so")
+printf 'lib := ffi_open("%s")\n' "$FIXTURE" > .build/ffi-close.f
+cat >> .build/ffi-close.f <<'NIFT'
 ffi_close(lib)
 ffi_close(lib)
 NIFT

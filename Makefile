@@ -29,6 +29,7 @@ ifeq ($(OS),Windows_NT)
 	# PATH, so the CLI and every embedded consumer link the runtimes statically.
 	LDFLAGS += -static -static-libgcc -static-libstdc++
 	SHARED_LIB := libnift_c.so
+	LIBFFI_SHARED_LINK_FLAGS := -Wl,--exclude-libs,ALL
 else
 	EXEEXT :=
 	PREFIX ?= /usr/local
@@ -36,9 +37,11 @@ else
 	ifeq ($(shell uname -s),Darwin)
 		# macOS shared library is a Mach-O .dylib with a relocatable install name.
 		SHARED_LIB := libnift_c.dylib
+		LIBFFI_SHARED_LINK_FLAGS :=
 	else
 		SHARED_LIB := libnift_c.so
 		LDLIBS += -ldl
+		LIBFFI_SHARED_LINK_FLAGS := -Wl,--exclude-libs,ALL -Wl,-Bsymbolic
 	endif
 endif
 
@@ -47,12 +50,29 @@ BINDIR ?= $(PREFIX)/bin
 DESTDIR ?=
 
 TEST_DIR := .build
+LIBFFI_TARGET := $(shell $(CC) -dumpmachine 2>/dev/null || uname -m)-$(notdir $(CC))
+LIBFFI_BUILD := $(TEST_DIR)/libffi/$(LIBFFI_TARGET)
+LIBFFI_STAMP := $(LIBFFI_BUILD)/.nift-built
+LIBFFI_A := $(LIBFFI_BUILD)/install/lib/libffi.a
+LIBFFI_INCLUDE := $(LIBFFI_BUILD)/install/include
+LIBFFI_CFLAGS ?= -O2 -fPIC
+CPPFLAGS += -I$(LIBFFI_INCLUDE)
 SANITIZER_FLAGS ?= -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined
 SAN_TARGET := $(TEST_DIR)/nift-sanitize$(EXEEXT)
 SAN_OBJECTS := $(patsubst %.cpp,$(TEST_DIR)/san/%.o,$(SOURCES)) $(patsubst %.c,$(TEST_DIR)/san/%.o,$(MARKUP_C_SOURCES))
+SAN_LIBFFI_BUILD := $(TEST_DIR)/libffi/sanitize-$(LIBFFI_TARGET)
+SAN_LIBFFI_STAMP := $(SAN_LIBFFI_BUILD)/.nift-built
+SAN_LIBFFI_A := $(SAN_LIBFFI_BUILD)/install/lib/libffi.a
+SAN_LIBFFI_INCLUDE := $(SAN_LIBFFI_BUILD)/install/include
+SAN_CPPFLAGS = $(filter-out -I$(LIBFFI_INCLUDE),$(CPPFLAGS)) -I$(SAN_LIBFFI_INCLUDE)
 TSAN_FLAGS ?= -O1 -g -fno-omit-frame-pointer -fsanitize=thread
 TSAN_TARGET := $(TEST_DIR)/nift-tsan$(EXEEXT)
 TSAN_OBJECTS := $(patsubst %.cpp,$(TEST_DIR)/tsan/%.o,$(SOURCES)) $(patsubst %.c,$(TEST_DIR)/tsan/%.o,$(MARKUP_C_SOURCES))
+TSAN_LIBFFI_BUILD := $(TEST_DIR)/libffi/tsan-$(LIBFFI_TARGET)
+TSAN_LIBFFI_STAMP := $(TSAN_LIBFFI_BUILD)/.nift-built
+TSAN_LIBFFI_A := $(TSAN_LIBFFI_BUILD)/install/lib/libffi.a
+TSAN_LIBFFI_INCLUDE := $(TSAN_LIBFFI_BUILD)/install/include
+TSAN_CPPFLAGS = $(filter-out -I$(LIBFFI_INCLUDE),$(CPPFLAGS)) -I$(TSAN_LIBFFI_INCLUDE)
 MEMORY_SMOKE := $(TEST_DIR)/nift-memory-san$(EXEEXT)
 JSON_TEST := $(TEST_DIR)/nift-json-smoke$(EXEEXT)
 JSON_SCHEMA_TEST := $(TEST_DIR)/nift-json-schema-smoke$(EXEEXT)
@@ -61,11 +81,43 @@ RECOVERY_EPOCH_GUARD := $(TEST_DIR)/nift-recovery-epoch-guard$(EXEEXT)
 
 all: $(TARGET)
 
+FORCE:
+
 # The shipped CLI is the REDUCED object set (no src/embed/*). Plain `make`
 # therefore builds only the ordinary Nift CLI; the embedding library and every
 # language binding are explicit, optional targets.
-$(TARGET): $(CLI_OBJECTS)
+$(TARGET): $(CLI_OBJECTS) $(LIBFFI_A)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(CLI_OBJECTS) $(LDLIBS) -o $@
+
+$(LIBFFI_STAMP): scripts/build_vendored_libffi.sh scripts/check_vendored_libffi.py third_party/libffi/NIFT-PROVENANCE.md
+	CC="$(CC)" CXX="$(CXX)" CFLAGS="$(LIBFFI_CFLAGS)" bash scripts/build_vendored_libffi.sh "$(LIBFFI_BUILD)"
+
+libffi-check: $(LIBFFI_STAMP) FORCE
+	CC="$(CC)" CXX="$(CXX)" CFLAGS="$(LIBFFI_CFLAGS)" bash scripts/build_vendored_libffi.sh "$(LIBFFI_BUILD)"
+
+$(LIBFFI_A): | libffi-check
+
+LDLIBS += $(LIBFFI_A)
+
+src/Parser.o $(TEST_DIR)/pic/src/Parser.o: | libffi-check
+
+$(SAN_LIBFFI_STAMP): scripts/build_vendored_libffi.sh scripts/check_vendored_libffi.py third_party/libffi/NIFT-PROVENANCE.md
+	CC="$(CC)" CXX="$(CXX)" CFLAGS="$(LIBFFI_CFLAGS) $(SANITIZER_FLAGS)" bash scripts/build_vendored_libffi.sh "$(SAN_LIBFFI_BUILD)"
+
+san-libffi-check: $(SAN_LIBFFI_STAMP) FORCE
+	CC="$(CC)" CXX="$(CXX)" CFLAGS="$(LIBFFI_CFLAGS) $(SANITIZER_FLAGS)" bash scripts/build_vendored_libffi.sh "$(SAN_LIBFFI_BUILD)"
+
+$(SAN_LIBFFI_A): | san-libffi-check
+$(TEST_DIR)/san/src/Parser.o: | san-libffi-check
+
+$(TSAN_LIBFFI_STAMP): scripts/build_vendored_libffi.sh scripts/check_vendored_libffi.py third_party/libffi/NIFT-PROVENANCE.md
+	CC="$(CC)" CXX="$(CXX)" CFLAGS="$(LIBFFI_CFLAGS) $(TSAN_FLAGS)" bash scripts/build_vendored_libffi.sh "$(TSAN_LIBFFI_BUILD)"
+
+tsan-libffi-check: $(TSAN_LIBFFI_STAMP) FORCE
+	CC="$(CC)" CXX="$(CXX)" CFLAGS="$(LIBFFI_CFLAGS) $(TSAN_FLAGS)" bash scripts/build_vendored_libffi.sh "$(TSAN_LIBFFI_BUILD)"
+
+$(TSAN_LIBFFI_A): | tsan-libffi-check
+$(TEST_DIR)/tsan/src/Parser.o: | tsan-libffi-check
 
 %.o: %.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -MMD -MP -c $< -o $@
@@ -316,17 +368,17 @@ test-engine-concurrency: $(ENGINE_CONCURRENCY_TEST)
 # concurrency test links against them (minus the CLI/main objects).
 TSAN_CORE_OBJECTS := $(filter-out $(TEST_DIR)/tsan/src/nift.o $(TEST_DIR)/tsan/src/CLI.o,$(TSAN_OBJECTS))
 ENGINE_CONCURRENCY_TSAN := $(TEST_DIR)/engine-concurrency-tsan$(EXEEXT)
-$(ENGINE_CONCURRENCY_TSAN): tests/engine_concurrency.cpp $(TSAN_CORE_OBJECTS)
+$(ENGINE_CONCURRENCY_TSAN): tests/engine_concurrency.cpp $(TSAN_CORE_OBJECTS) $(TSAN_LIBFFI_A)
 	mkdir -p $(TEST_DIR)
-	$(CXX) $(CPPFLAGS) -std=c++17 -pthread $(TSAN_FLAGS) tests/engine_concurrency.cpp $(TSAN_CORE_OBJECTS) $(LDLIBS) -o $@
+	$(CXX) $(CPPFLAGS) -std=c++17 -pthread $(TSAN_FLAGS) tests/engine_concurrency.cpp $(TSAN_CORE_OBJECTS) $(TSAN_LIBFFI_A) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o $@
 
 test-engine-concurrency-tsan: $(ENGINE_CONCURRENCY_TSAN)
 	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 $(ENGINE_CONCURRENCY_TSAN)
 
 ENGINE_RELOAD_TSAN := $(TEST_DIR)/engine-reload-tsan$(EXEEXT)
-$(ENGINE_RELOAD_TSAN): tests/engine_reload.cpp $(TSAN_CORE_OBJECTS)
+$(ENGINE_RELOAD_TSAN): tests/engine_reload.cpp $(TSAN_CORE_OBJECTS) $(TSAN_LIBFFI_A)
 	mkdir -p $(TEST_DIR)
-	$(CXX) $(CPPFLAGS) -std=c++17 -pthread $(TSAN_FLAGS) tests/engine_reload.cpp $(TSAN_CORE_OBJECTS) $(LDLIBS) -o $@
+	$(CXX) $(CPPFLAGS) -std=c++17 -pthread $(TSAN_FLAGS) tests/engine_reload.cpp $(TSAN_CORE_OBJECTS) $(TSAN_LIBFFI_A) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o $@
 
 test-engine-reload-tsan: $(ENGINE_RELOAD_TSAN)
 	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 $(ENGINE_RELOAD_TSAN)
@@ -339,22 +391,25 @@ C_ABI_PIC := $(patsubst %.o,$(TEST_DIR)/pic/%.o,$(C_ABI_CORE))
 
 $(TEST_DIR)/pic/%.o: %.cpp
 	mkdir -p $(dir $@)
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -fPIC -c $< -o $@
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -fPIC -MMD -MP -c $< -o $@
 
 $(TEST_DIR)/pic/%.o: %.c
 	mkdir -p $(dir $@)
-	$(CC) -Imarkuppp/vendor/cmark $(CFLAGS) -fPIC -c $< -o $@
+	$(CC) -Imarkuppp/vendor/cmark $(CFLAGS) -fPIC -MMD -MP -c $< -o $@
 
-libnift_c.a: $(C_ABI_CORE)
+-include $(C_ABI_PIC:.o=.d)
+
+libnift_c.a: $(C_ABI_CORE) $(LIBFFI_A)
+	cp $(LIBFFI_A) $@
 	ar rcs $@ $(C_ABI_CORE)
 
-libnift_c.so: $(C_ABI_PIC)
-	$(CXX) $(CXXFLAGS) -shared -o $@ $(C_ABI_PIC)
+libnift_c.so: $(C_ABI_PIC) $(LIBFFI_A)
+	$(CXX) $(CXXFLAGS) -shared $(LIBFFI_SHARED_LINK_FLAGS) -o $@ $(C_ABI_PIC) $(LIBFFI_A)
 
 # macOS dynamic library: relocatable @rpath install name so a consumer that
 # links it can load it from an installed prefix without absolute paths.
-libnift_c.dylib: $(C_ABI_PIC)
-	$(CXX) $(CXXFLAGS) -shared -Wl,-install_name,@rpath/libnift_c.dylib -o $@ $(C_ABI_PIC)
+libnift_c.dylib: $(C_ABI_PIC) $(LIBFFI_A)
+	$(CXX) $(CXXFLAGS) -shared $(LIBFFI_SHARED_LINK_FLAGS) -Wl,-install_name,@rpath/libnift_c.dylib -o $@ $(C_ABI_PIC) $(LIBFFI_A)
 
 C_ABI_TEST := $(TEST_DIR)/c-abi-adversarial$(EXEEXT)
 $(C_ABI_TEST): tests/c_abi_adversarial.cpp libnift_c.a
@@ -467,6 +522,44 @@ test: test-content test-commands test-comments test-contracts test-json test-run
 
 test-cp15-numeric-repair: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/cp15_numeric_repair.sh
+
+FFI_ABI_TEST := $(TEST_DIR)/nift-ffi-abi$(EXEEXT)
+$(FFI_ABI_TEST): tests/ffi_abi.cpp src/FfiAbi.h $(LIBFFI_A)
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/ffi_abi.cpp $(LIBFFI_A) -o $@
+
+test-ffi-abi: $(FFI_ABI_TEST)
+	$(FFI_ABI_TEST)
+
+test-libffi-source:
+	python3 scripts/check_vendored_libffi.py
+
+test-gate6ar-ffi: $(TARGET) test-ffi-abi
+	NIFT="$(CURDIR)/$(TARGET)" bash tests/gate6ar_ffi.sh
+
+test-v45-ffi: $(TARGET)
+	NIFT="$(CURDIR)/$(TARGET)" bash tests/v45_ffi_contract.sh
+	NIFT="$(CURDIR)/$(TARGET)" bash tests/v45_ffi_scalar.sh
+	NIFT="$(CURDIR)/$(TARGET)" bash tests/v45_ffi_memory_callback.sh
+	NIFT="$(CURDIR)/$(TARGET)" bash tests/v45_ffi_package.sh
+	NIFT="$(CURDIR)/$(TARGET)" bash tests/gate6ar_ffi.sh
+
+test-libffi-static-archive: libnift_c.a
+	bash tests/libffi_static_consumer.sh
+
+test-libffi-dependencies: $(TARGET) embed node-binding python-binding
+	bash scripts/audit_no_dynamic_libffi.sh "$(TARGET)" "$(SHARED_LIB)" bindings/node/build/nift_node.node bindings/python/nift/_nift*.so
+	bash scripts/audit_private_libffi.sh "$(SHARED_LIB)" bindings/node/build/nift_node.node bindings/python/nift/_nift*.so
+
+test-libffi-private-symbols: embed node-binding python-binding
+	bash scripts/audit_private_libffi.sh "$(SHARED_LIB)" bindings/node/build/nift_node.node bindings/python/nift/_nift*.so
+	bash tests/libffi_private_audit.sh
+
+test-pic-depfiles: $(TEST_DIR)/pic/src/Parser.o
+	LIBFFI_INCLUDE="$(LIBFFI_INCLUDE)" bash tests/pic_depfiles.sh
+
+test-node-package-licenses:
+	python3 scripts/check_node_package_licenses.py
 
 # CP10.2: Embed host-seam failure contract (C++ Engine level).
 HOST_SEAM_TEST := $(TEST_DIR)/host-seam$(EXEEXT)
@@ -780,7 +873,7 @@ clean:
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
-.PHONY: test-v45-adversarial-runtime test-v45-integration-dogfood test-v45-embed-staged-consumer embed go-binding csharp-binding node-binding python-binding bindings test-build-boundary test-embed test-go-binding test-csharp-binding test-node-binding test-python-binding test-bindings test-all test benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-markuppp-sync test-json test-json-schema test-runtime-value test-cp15-numeric-repair test-console test-progress-render test-progress-pty test-snap-contract test-distribution-summary test-version-consistency test-diagnostics test-minify test-json-schema-integration test-markup-json-directives test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke test-host-seam benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-alias test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets test-init-lock test-unreadable-source test-incremental-modified-immediate test-v41-certification test-v42-language test-v42-struct test-v43-language test-macos-runner-policy install uninstall
+.PHONY: FORCE libffi-check san-libffi-check tsan-libffi-check test-ffi-abi test-libffi-source test-gate6ar-ffi test-libffi-static-archive test-libffi-dependencies test-libffi-private-symbols test-pic-depfiles test-node-package-licenses test-v45-adversarial-runtime test-v45-integration-dogfood test-v45-embed-staged-consumer embed go-binding csharp-binding node-binding python-binding bindings test-build-boundary test-embed test-go-binding test-csharp-binding test-node-binding test-python-binding test-bindings test-all test benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-markuppp-sync test-json test-json-schema test-runtime-value test-cp15-numeric-repair test-console test-progress-render test-progress-pty test-snap-contract test-distribution-summary test-version-consistency test-diagnostics test-minify test-json-schema-integration test-markup-json-directives test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke test-host-seam benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-alias test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets test-init-lock test-unreadable-source test-incremental-modified-immediate test-v41-certification test-v42-language test-v42-struct test-v43-language test-macos-runner-policy install uninstall
 
 
 test-cross-feature: $(TARGET)
@@ -854,15 +947,15 @@ benchmark-cp28: $(TARGET)
 
 $(TEST_DIR)/san/%.o: %.cpp
 	mkdir -p "$(dir $@)"
-	$(CXX) $(CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(SANITIZER_FLAGS) -MMD -MP -c "$<" -o "$@"
+	$(CXX) $(SAN_CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(SANITIZER_FLAGS) -MMD -MP -c "$<" -o "$@"
 
 $(TEST_DIR)/san/%.o: %.c
 	mkdir -p "$(dir $@)"
 	$(CC) -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic $(SANITIZER_FLAGS) -MMD -MP -c "$<" -o "$@"
 
-$(SAN_TARGET): $(SAN_OBJECTS)
+$(SAN_TARGET): $(SAN_OBJECTS) $(SAN_LIBFFI_A)
 	mkdir -p "$(TEST_DIR)"
-	$(CXX) -std=c++17 -pthread $(SANITIZER_FLAGS) $(SAN_OBJECTS) -o "$@"
+	$(CXX) -std=c++17 -pthread $(SANITIZER_FLAGS) $(SAN_OBJECTS) $(SAN_LIBFFI_A) -o "$@"
 
 test-sanitize: $(SAN_TARGET)
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(SAN_TARGET)" --version
@@ -872,15 +965,15 @@ test-pagination-sanitize: $(SAN_TARGET)
 
 $(TEST_DIR)/tsan/%.o: %.cpp
 	mkdir -p "$(dir $@)"
-	$(CXX) $(CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(TSAN_FLAGS) -MMD -MP -c "$<" -o "$@"
+	$(CXX) $(TSAN_CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(TSAN_FLAGS) -MMD -MP -c "$<" -o "$@"
 
 $(TEST_DIR)/tsan/%.o: %.c
 	mkdir -p "$(dir $@)"
 	$(CC) -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic $(TSAN_FLAGS) -MMD -MP -c "$<" -o "$@"
 
-$(TSAN_TARGET): $(TSAN_OBJECTS)
+$(TSAN_TARGET): $(TSAN_OBJECTS) $(TSAN_LIBFFI_A)
 	mkdir -p "$(TEST_DIR)"
-	$(CXX) -std=c++17 -pthread $(TSAN_FLAGS) $(TSAN_OBJECTS) -o "$@"
+	$(CXX) -std=c++17 -pthread $(TSAN_FLAGS) $(TSAN_OBJECTS) $(TSAN_LIBFFI_A) -o "$@"
 
 test-pagination-tsan: $(TSAN_TARGET)
 	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 NIFT_BIN="$(CURDIR)/$(TSAN_TARGET)" tests/pagination_sanitizer_smoke.sh

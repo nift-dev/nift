@@ -10,10 +10,13 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 EMBED="$(cd ../../ && pwd)"
+CC="${CC:-gcc}"
+CXX="${CXX:-g++}"
 
 if [ -z "${NIFT_NODE_INCLUDE:-}" ]; then
+  NODE_DISTRIBUTION_INCLUDE="$(node -p "require('path').resolve(require('path').dirname(process.execPath),'..','include','node')" 2>/dev/null || true)"
   for cand in /usr/include/node /usr/local/include/node \
-    "$(dirname "$(dirname "$(readlink -f "$(command -v node)")")")/include/node"; do
+    "$NODE_DISTRIBUTION_INCLUDE"; do
     if [ -f "$cand/node_api.h" ]; then
       NIFT_NODE_INCLUDE="$cand"
       break
@@ -30,6 +33,23 @@ TMP="$(mktemp -d "${TMPDIR:-/tmp}/nift-node-build.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
 OBJ="$TMP/cabi-pic"
 mkdir -p "$OBJ" build
+CC="$CC" CXX="$CXX" CFLAGS="-O2 -fPIC" bash "$EMBED/scripts/build_vendored_libffi.sh" "$TMP/libffi"
+LIBFFI_INCLUDE="$TMP/libffi/install/include"
+LIBFFI_A="$TMP/libffi/install/lib/libffi.a"
+case "$(uname -s)" in
+  Darwin)
+    SHARED_FLAGS=(-bundle -Wl,-undefined,dynamic_lookup)
+    PRIVATE_FFI_LDFLAGS=()
+    ;;
+  MINGW*|MSYS*|CYGWIN*)
+    SHARED_FLAGS=(-shared)
+    PRIVATE_FFI_LDFLAGS=(-Wl,--exclude-libs,ALL)
+    ;;
+  *)
+    SHARED_FLAGS=(-shared)
+    PRIVATE_FFI_LDFLAGS=(-Wl,--exclude-libs,ALL -Wl,-Bsymbolic)
+    ;;
+esac
 
 CABI_SOURCES="src/ProjectOwnership.cpp src/embed/Engine.cpp src/embed/Context.cpp src/RuntimeValue.cpp src/Value.cpp \
   src/FileSystem.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp \
@@ -44,10 +64,10 @@ compile_object() {
   local obj="$2"
   case "$src" in
     *.c)
-      gcc -std=c99 -O2 -fPIC -I"$EMBED/markuppp/vendor/cmark" -c "$EMBED/$src" -o "$obj"
+      "$CC" -std=c99 -O2 -fPIC -I"$EMBED/markuppp/vendor/cmark" -c "$EMBED/$src" -o "$obj"
       ;;
     *)
-      g++ -std=c++17 -O2 -fPIC -I"$EMBED/include" -I"$EMBED/src" -I"$EMBED/minifypp/include" \
+      "$CXX" -std=c++17 -O2 -fPIC -I"$LIBFFI_INCLUDE" -I"$EMBED/include" -I"$EMBED/src" -I"$EMBED/minifypp/include" \
           -I"$EMBED/minifypp/src" -I"$EMBED/markuppp/include" -I"$EMBED/markuppp/vendor/cmark" \
           -c "$EMBED/$src" -o "$obj"
       ;;
@@ -65,12 +85,14 @@ for name in $MARKUP_C_NAMES; do
   PIC_OBJECTS="$PIC_OBJECTS $obj"
 done
 
-g++ -std=c++17 -O2 -fPIC -shared \
+"$CXX" -std=c++17 -O2 -fPIC "${SHARED_FLAGS[@]}" \
   -I"$NIFT_NODE_INCLUDE" -I"$EMBED/include" \
-  native/nift_node.cc $PIC_OBJECTS -pthread \
+  native/nift_node.cc $PIC_OBJECTS "$LIBFFI_A" "${PRIVATE_FFI_LDFLAGS[@]}" -pthread \
   -o "$TMP/nift_node.node"
 
 node -e "require('$TMP/nift_node.node')" || { echo "error: built addon does not load (torn link?)" >&2; exit 1; }
 
 mv -f "$TMP/nift_node.node" "build/nift_node.node"
+bash "$EMBED/scripts/audit_no_dynamic_libffi.sh" "build/nift_node.node"
+bash "$EMBED/scripts/audit_private_libffi.sh" "build/nift_node.node"
 echo "built build/nift_node.node"

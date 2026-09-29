@@ -1,0 +1,148 @@
+name: Gate 6A-R vendored libffi
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Makefile'
+      - 'src/Parser.cpp'
+      - 'src/FfiAbi.h'
+      - 'tests/ffi/**'
+      - 'tests/*ffi*'
+      - 'third_party/libffi/**'
+      - 'bindings/node/**'
+      - 'bindings/python/**'
+      - 'scripts/*libffi*'
+      - '.github/workflows/gate6ar-ffi.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'Makefile'
+      - 'src/Parser.cpp'
+      - 'src/FfiAbi.h'
+      - 'tests/ffi/**'
+      - 'tests/*ffi*'
+      - 'third_party/libffi/**'
+      - 'bindings/node/**'
+      - 'bindings/python/**'
+      - 'scripts/*libffi*'
+      - '.github/workflows/gate6ar-ffi.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: Linux ${{ matrix.id }} complete FFI wall
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - cc: gcc
+            cxx: g++
+            id: gcc
+          - cc: clang
+            cxx: clang++
+            id: clang
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libtool python3-dev file binutils
+      - name: Clean ABI, v4.5, archive, shared, and binding walls
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+        run: |
+          make clean
+          make test-libffi-source
+          make -j2 test-gate6ar-ffi
+          make -j2 test-v45-ffi test-libffi-static-archive embed
+          make test-pic-depfiles
+          bash scripts/audit_no_dynamic_libffi.sh nift libnift_c.so
+          make node-binding python-binding
+          bash scripts/audit_no_dynamic_libffi.sh bindings/node/build/nift_node.node bindings/python/nift/_nift*.so
+          bash scripts/audit_private_libffi.sh libnift_c.so bindings/node/build/nift_node.node bindings/python/nift/_nift*.so
+          bash tests/libffi_private_audit.sh
+          python3 scripts/check_node_package_licenses.py
+      - name: Sanitized Gate 6A-R wall
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+        run: |
+          make -j2 test-sanitize
+          env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT="$PWD/.build/nift-sanitize" bash tests/gate6ar_ffi.sh
+
+  portable:
+    name: ${{ matrix.id }} complete FFI wall
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            id: macos-clang
+          - runner: windows-latest
+            id: windows-mingw
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v7
+        if: runner.os == 'macOS'
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v6
+        if: runner.os == 'macOS'
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-go@v7
+        if: runner.os == 'Windows'
+        with:
+          go-version-file: bindings/go/go.mod
+          cache: false
+      - uses: actions/setup-dotnet@v6
+        if: runner.os == 'Windows'
+        with:
+          dotnet-version: '10.0.x'
+      - uses: msys2/setup-msys2@v2
+        if: runner.os == 'Windows'
+        with:
+          msystem: UCRT64
+          update: true
+          path-type: inherit
+          install: make autoconf automake libtool file binutils mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-pkgconf python
+      - name: macOS Clang complete FFI wall
+        if: runner.os == 'macOS'
+        run: |
+          make clean
+          make CC=clang CXX=clang++ test-libffi-source
+          make -j2 CC=clang CXX=clang++ test-gate6ar-ffi
+          make -j2 CC=clang CXX=clang++ test-v45-ffi test-libffi-static-archive embed
+          make CC=clang CXX=clang++ test-pic-depfiles
+          make CC=clang CXX=clang++ node-binding python-binding
+          bash scripts/audit_no_dynamic_libffi.sh nift libnift_c.dylib
+          bash scripts/audit_no_dynamic_libffi.sh bindings/node/build/nift_node.node bindings/python/nift/_nift*.so
+          bash scripts/audit_private_libffi.sh libnift_c.dylib bindings/node/build/nift_node.node bindings/python/nift/_nift*.so
+          CC=clang bash tests/libffi_private_audit.sh
+          python3 scripts/check_node_package_licenses.py
+      - name: Windows MinGW complete FFI wall
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: |
+          make clean
+          make test-libffi-source
+          make -j2 test-gate6ar-ffi
+          make -j2 test-v45-ffi test-libffi-static-archive embed
+          make test-pic-depfiles
+          make go-binding csharp-binding
+          bash scripts/audit_no_dynamic_libffi.sh nift.exe libnift_c.so bindings/go/embed-harness.exe
+          bash scripts/audit_private_libffi.sh libnift_c.so
+          bash tests/libffi_private_audit.sh

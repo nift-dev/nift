@@ -48,7 +48,7 @@ else echo "FAIL: no CLI binary (nift / nift.exe)" >&2; exit 1; fi
 make embed >/dev/null 2>&1
 STAGE="$(mktemp -d /tmp/nift-matrix.XXXXXX)"
 trap 'rm -rf "$STAGE"' EXIT
-mkdir -p "$STAGE/include/nift" "$STAGE/lib/pkgconfig"
+mkdir -p "$STAGE/include/nift" "$STAGE/lib/pkgconfig" "$STAGE/share/licenses/nift"
 cp -r include/nift/. "$STAGE/include/nift/"
 for f in $NATIVE_FILES; do
   [ -f "$ROOT/$f" ] || { echo "FAIL: required native file missing: $ROOT/$f" >&2; exit 1; }
@@ -56,7 +56,8 @@ for f in $NATIVE_FILES; do
 done
 sed -e "s/__VERSION__/$VERSION/" -e "s|__LIBS__|$PC_LIBS|" packaging/nift.pc.in > "$STAGE/lib/pkgconfig/nift.pc"
 cp packaging/install-embed.sh "$STAGE/install-embed.sh"
-tar czf "$OUT/nift-embed-$OS-$ARCH.tar.gz" -C "$STAGE" include lib install-embed.sh
+cp THIRD_PARTY_NOTICES.md third_party/libffi/LICENSE third_party/libffi/LICENSE-BUILDTOOLS third_party/libffi/NIFT-PROVENANCE.md "$STAGE/share/licenses/nift/"
+tar czf "$OUT/nift-embed-$OS-$ARCH.tar.gz" -C "$STAGE" include lib share install-embed.sh
 
 # Portable checksum helper (sha256sum on Linux, shasum -a 256 on macOS).
 chk() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$@"; else shasum -a 256 "$@"; fi; }

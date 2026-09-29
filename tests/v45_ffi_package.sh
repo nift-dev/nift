@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 NIFT=${NIFT:-$(pwd)/nift}; TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
-cc -std=c99 -Wall -Wextra -fPIC -shared tests/ffi/fixture.c -o "$TMP/libfixture.so"
-cat > "$TMP/ffi_math.f" <<'NIFT'
-lib := ffi_open("./libfixture.so")
+FIXTURE="$(bash tests/ffi/build_fixture.sh "$TMP" libfixture)"
+printf 'lib := ffi_open("./%s")\n' "${FIXTURE##*/}" > "$TMP/ffi_math.f"
+cat >> "$TMP/ffi_math.f" <<'NIFT'
 add_i64 := (a, b) => ffi_call(lib, "nift_ffi_add_i64", "i64(i64,i64)", a, b)
 add_f64 := (a, b) => ffi_call(lib, "nift_ffi_add_f64", "f64(f64,f64)", a, b)
 pair_sum := (a, b) => ffi_call(lib, "nift_ffi_pair_sum_ptr", "i32(buffer)", ffi_struct("i32,i32", [a, b]))

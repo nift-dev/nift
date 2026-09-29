@@ -9,8 +9,11 @@ canonical checkout. The version is the synchronized canonical Nift release
 version: NIFT_VERSION is REQUIRED.
 """
 import os
+import subprocess
+import sys
 
 from setuptools import Extension, setup
+from setuptools.command.build_ext import build_ext
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 NATIVE = os.path.join(BASE, "native")
@@ -68,6 +71,25 @@ include_dirs = [
     os.path.join(NATIVE, "markuppp", "vendor", "cmark"),
 ]
 
+
+class VendoredBuildExt(build_ext):
+    def build_extensions(self):
+        libffi_build = os.path.abspath(os.path.join(self.build_temp, "libffi"))
+        subprocess.run(
+            ["bash", os.path.join(NATIVE, "scripts", "build_vendored_libffi.sh"), libffi_build],
+            check=True,
+            env={**os.environ, "CFLAGS": "-O2 -fPIC"},
+        )
+        for extension in self.extensions:
+            extension.include_dirs.append(os.path.join(libffi_build, "install", "include"))
+            extension.extra_objects.append(os.path.join(libffi_build, "install", "lib", "libffi.a"))
+            if sys.platform.startswith("linux"):
+                extension.extra_link_args.extend([
+                    "-Wl,--exclude-libs,ALL",
+                    "-Wl,-Bsymbolic",
+                ])
+        super().build_extensions()
+
 setup(
     name="nift",
     version=VERSION,
@@ -85,6 +107,14 @@ setup(
             extra_compile_args=["-std=c++17", "-O2"],
             extra_link_args=["-pthread"],
         )
+    ],
+    cmdclass={"build_ext": VendoredBuildExt},
+    data_files=[
+        ("nift/licenses", [
+            os.path.join(NATIVE, "third_party", "libffi", "LICENSE"),
+            os.path.join(NATIVE, "third_party", "libffi", "LICENSE-BUILDTOOLS"),
+            os.path.join(NATIVE, "third_party", "libffi", "NIFT-PROVENANCE.md"),
+        ]),
     ],
     python_requires=">=3.10",
     license="MIT",

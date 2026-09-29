@@ -2,9 +2,10 @@
 
 Date: 2026-09-29
 
-Status: CP15 implementation and repair commits complete. Review Gate 6A is
-blocked by the pre-existing direct FFI dispatcher prototype mismatch described
-below. CP16 and bytes APIs have not started.
+Status: CP15 implementation and repair commits complete. The later Gate 6A-R
+work resolves the direct FFI dispatcher prototype mismatch; Review Gate 6A still
+awaits hosted portability evidence and maintainer review. CP16 and bytes APIs
+have not started.
 
 ## Architecture
 
@@ -221,20 +222,14 @@ stores immutable source text per normalized path, so nested `@input` and
 simultaneously held pagination template/separator pointers remain stable for the
 host lifetime.
 
-## Unresolved Gate 6A blocker
+## Gate 6A follow-up
 
-The built-in FFI dispatcher still calls resolved symbols through generic
-`std::uintptr_t` function-pointer prototypes rather than prototypes matching
-each declared native signature. That prototype mismatch predates CP15, was not
-introduced by the RuntimeValue migration, and is deliberately unchanged by
-this repair. It remains an unresolved Gate 6A **High** blocker because the calls
-are ABI-dependent even after argument and result value conversion is corrected.
-
-Resolving it requires an explicit architecture decision, such as a reviewed
-typed-dispatch strategy or a foreign-call mechanism, with platform ABI scope
-and compatibility defined first. An ad hoc dispatcher rewrite, libffi adoption,
-CP20 work, and bytes work are outside this repair. Gate 6A must not be reported
-as passed while this blocker remains.
+At CP15 completion, the built-in FFI dispatcher still called resolved symbols
+through generic `std::uintptr_t` function-pointer prototypes. Gate 6A-R later
+replaced that ABI-dependent dispatcher with exact-token vendored libffi calls;
+see `docs/evidence/gate6ar-libffi.md`. This historical CP15 report does not close
+Gate 6A, which remains pending the hosted portability evidence and maintainer
+review recorded there.
 
 Set/map scalar numeric candidate keys now use `runtime_numeric_fingerprint`.
 Equivalent decimal spellings share a bucket and exact unequal values do not.

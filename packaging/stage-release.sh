@@ -54,7 +54,7 @@ else
 fi
 BUNDLE_STAGE="$(mktemp -d /tmp/nift-bundle.XXXXXX)"
 CLEANUP="$CLEANUP $BUNDLE_STAGE"
-mkdir -p "$BUNDLE_STAGE/include/nift" "$BUNDLE_STAGE/lib/pkgconfig" "$BUNDLE_STAGE/tools"
+mkdir -p "$BUNDLE_STAGE/include/nift" "$BUNDLE_STAGE/lib/pkgconfig" "$BUNDLE_STAGE/share/licenses/nift" "$BUNDLE_STAGE/tools"
 cp -r include/nift/. "$BUNDLE_STAGE/include/nift/"
 case "$OS" in
   linux)   BUNDLE_LIBS="libnift_c.a libnift_c.so" ;;
@@ -67,7 +67,8 @@ for _f in $BUNDLE_LIBS; do
 done
 sed -e "s/__VERSION__/$VERSION/" -e "s|__LIBS__|$PC_LIBS|" packaging/nift.pc.in > "$BUNDLE_STAGE/lib/pkgconfig/nift.pc"
 cp packaging/install-embed.sh "$BUNDLE_STAGE/install-embed.sh"
-tar czf "$STAGE_OUT/nift-embed-$OS-$ARCH.tar.gz" -C "$BUNDLE_STAGE" include lib install-embed.sh
+cp THIRD_PARTY_NOTICES.md third_party/libffi/LICENSE third_party/libffi/LICENSE-BUILDTOOLS third_party/libffi/NIFT-PROVENANCE.md "$BUNDLE_STAGE/share/licenses/nift/"
+tar czf "$STAGE_OUT/nift-embed-$OS-$ARCH.tar.gz" -C "$BUNDLE_STAGE" include lib share install-embed.sh
 echo "built native bundle: $STAGE_OUT/nift-embed-$OS-$ARCH.tar.gz"
 
 # 3. Python: self-contained sdist + wheel built from that sdist in a clean dir
@@ -78,6 +79,10 @@ cp -r include bindings/python/native/include
 cp -r minifypp bindings/python/native/minifypp
 cp -r markuppp bindings/python/native/markuppp
 cp -r jsonic bindings/python/native/jsonic
+mkdir -p bindings/python/native/third_party bindings/python/native/scripts
+cp -r third_party/libffi bindings/python/native/third_party/libffi
+cp scripts/build_vendored_libffi.sh bindings/python/native/scripts/
+cp scripts/check_vendored_libffi.py bindings/python/native/scripts/
 ( cd bindings/python && NIFT_VERSION="$VERSION" python3 setup.py sdist --dist-dir "$STAGE_OUT" >/dev/null 2>&1 )
 SDIST="$(ls "$STAGE_OUT"/nift-$VERSION.tar.gz 2>/dev/null | head -1)"
 [ -n "$SDIST" ] || { echo "sdist build failed" >&2; exit 1; }
@@ -93,13 +98,14 @@ echo "built sdist + wheel: $(ls "$STAGE_OUT" | grep -E 'nift-.*\.(whl|tar.gz)$' 
 #    built addon is copied and the version stamped.
 NPM_TMP="$(mktemp -d /tmp/nift-npm.XXXXXX)"
 CLEANUP="$CLEANUP $NPM_TMP"
+python3 scripts/check_node_package_licenses.py
 make node-binding >/dev/null 2>&1
 cp -r bindings/node/. "$NPM_TMP/"
 python3 - "$NPM_TMP/package.json" "$VERSION" <<'PY'
 import json, sys
 p = json.load(open(sys.argv[1]))
 p["version"] = sys.argv[2]
-p["files"] = ["lib/", "build/nift_node.node", "README.md"]
+p["files"] = ["lib/", "build/nift_node.node", "README.md", "THIRD_PARTY_NOTICES.md", "LICENSE-libffi"]
 json.dump(p, open(sys.argv[1], "w"), indent=2)
 PY
 ( cd "$NPM_TMP" && npm pack --pack-destination "$STAGE_OUT" >/dev/null 2>&1 )

@@ -9,11 +9,12 @@ TARGET="${1:?usage: build-native-bundle.sh <os>-<arch>}"
 OUT="${2:-$ROOT/dist}"
 STAGE="$(mktemp -d /tmp/nift-embed-bundle.XXXXXX)"
 trap 'rm -rf "$STAGE"' EXIT
-mkdir -p "$STAGE/include/nift" "$STAGE/lib/pkgconfig" "$STAGE/tools"
+mkdir -p "$STAGE/include/nift" "$STAGE/lib/pkgconfig" "$STAGE/share/licenses/nift" "$STAGE/tools"
 cp -r "$ROOT/include/nift/." "$STAGE/include/nift/"
 cp "$ROOT/libnift_c.a" "$ROOT/libnift_c.so" "$STAGE/lib/"
 cp "$ROOT/packaging/nift.pc" "$STAGE/lib/pkgconfig/nift.pc"
 cp "$ROOT/packaging/install-embed.sh" "$STAGE/install-embed.sh"
+cp "$ROOT/THIRD_PARTY_NOTICES.md" "$ROOT/third_party/libffi/LICENSE" "$ROOT/third_party/libffi/LICENSE-BUILDTOOLS" "$ROOT/third_party/libffi/NIFT-PROVENANCE.md" "$STAGE/share/licenses/nift/"
 mkdir -p "$OUT"
-tar czf "$OUT/nift-embed-$TARGET.tar.gz" -C "$STAGE" include lib install-embed.sh
+tar czf "$OUT/nift-embed-$TARGET.tar.gz" -C "$STAGE" include lib share install-embed.sh
 echo "staged $OUT/nift-embed-$TARGET.tar.gz"

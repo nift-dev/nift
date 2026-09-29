@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 NIFT=${NIFT:-./nift}; mkdir -p .build
-cc -std=c99 -Wall -Wextra -fPIC -shared tests/ffi/fixture.c -o .build/libnift_ffi_fixture.so
+FIXTURE="$(bash tests/ffi/build_fixture.sh .build)"
 cat > .build/ffi-struct-integers.json <<'JSON'
 {"i8":-128,"u8":255,"i16":-32768,"u16":65535,"i32":-2147483648,"u32":4294967295,"i64":-9223372036854775808,"u64":18446744073709551615,"u64_bad":18446744073709551616}
 JSON
-cat > .build/ffi-memory.f <<'NIFT'
+printf 'lib := ffi_open("%s")\n' "$FIXTURE" > .build/ffi-memory.f
+cat >> .build/ffi-memory.f <<'NIFT'
 @json(n, "ffi-struct-integers.json")
-lib := ffi_open(".build/libnift_ffi_fixture.so")
 b := ffi_buffer([1, 2, 3])
 ffi_call(lib, "nift_ffi_buffer_xor", "void(buffer,u64,u8)", b, 3, 255)
 bytes := ffi_bytes(b)
