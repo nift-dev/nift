@@ -147,6 +147,12 @@ private:
     struct ModuleEnv;
     struct Callable { std::vector<std::string> params; std::string variadic_param; std::string body; std::filesystem::path source_path; bool fragment = false; bool async = false; std::shared_ptr<ModuleEnv> module_env; };
     struct ModuleEnv { std::unordered_map<std::string, Callable> callables; std::unordered_map<std::string, VariableBinding> vars; };
+    struct LexicalEnvironmentState {
+        std::shared_ptr<ModuleEnv> module_env;
+        bool active = false;
+    };
+    struct SavedLexicalScopes { std::vector<std::unordered_map<std::string, VariableBinding>> scopes; std::shared_ptr<ModuleEnv> module_env; };
+    std::vector<SavedLexicalScopes> saved_lexical_scopes_;
     std::unordered_map<std::string, Callable> callables_;
     // Prepared AST bodies for user callables, cached on first prepared call.
     struct PreparedCallable { bool ready=false; std::vector<std::unique_ptr<nift::ast::Stmt>> stmts; };
@@ -258,7 +264,7 @@ private:
     std::filesystem::path automation_root_;
     struct StructField { std::string name; std::string initializer; bool private_member = false; };
     struct StructMethod { Callable callable; bool private_member = false; bool constructor = false; };
-    struct StructDefinition { std::string name; std::vector<StructField> fields; std::unordered_map<std::string, StructMethod> methods; };
+    struct StructDefinition { std::string name; std::vector<StructField> fields; std::unordered_map<std::string, StructMethod> methods; std::shared_ptr<ModuleEnv> module_env; };
     struct StructInstance { std::string type_name; std::unordered_map<std::string, VariableBinding> fields; };
     std::unordered_map<std::string, StructDefinition> structs_;
     std::unordered_map<std::string, std::shared_ptr<StructInstance>> struct_instances_;
@@ -326,6 +332,8 @@ private:
     void pop_json_scope();
     void push_variable_scope();
     void pop_variable_scope();
+    LexicalEnvironmentState enter_lexical_environment(std::shared_ptr<ModuleEnv> module_env);
+    void leave_lexical_environment(LexicalEnvironmentState state);
     bool find_balanced(const std::string& source,
                        std::size_t open_position,
                        char open_char,

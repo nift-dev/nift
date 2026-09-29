@@ -932,6 +932,35 @@ std::string Parser::metadata(const std::string& key) const {
 void Parser::push_variable_scope() { variable_scopes_.emplace_back(); }
 void Parser::pop_variable_scope() { if (variable_scopes_.size() > 1) variable_scopes_.pop_back(); }
 
+Parser::LexicalEnvironmentState Parser::enter_lexical_environment(std::shared_ptr<ModuleEnv> module_env) {
+    LexicalEnvironmentState state{active_module_env_, false};
+    if (!module_env && !active_module_env_) return state;
+    if (!module_env) {
+        auto caller=std::find_if(saved_lexical_scopes_.rbegin(),saved_lexical_scopes_.rend(),[](const auto& frame){return !frame.module_env;});
+        if(caller==saved_lexical_scopes_.rend())return state;
+        auto caller_scopes=caller->scopes;
+        saved_lexical_scopes_.push_back(SavedLexicalScopes{std::move(variable_scopes_),active_module_env_});
+        variable_scopes_=std::move(caller_scopes);
+        active_module_env_.reset();
+        state.active=true;
+        return state;
+    }
+    saved_lexical_scopes_.push_back(SavedLexicalScopes{std::move(variable_scopes_),active_module_env_});
+    if (saved_lexical_scopes_.back().scopes.empty()) variable_scopes_.emplace_back();
+    else variable_scopes_.push_back(saved_lexical_scopes_.back().scopes.front());
+    active_module_env_ = std::move(module_env);
+    variable_scopes_.push_back(active_module_env_->vars);
+    state.active=true;
+    return state;
+}
+
+void Parser::leave_lexical_environment(LexicalEnvironmentState state) {
+    if(!state.active)return;
+    variable_scopes_ = std::move(saved_lexical_scopes_.back().scopes);
+    saved_lexical_scopes_.pop_back();
+    active_module_env_ = std::move(state.module_env);
+}
+
 void Parser::push_json_scope() {
     json_binding_scopes_.emplace_back();
     push_variable_scope();
@@ -2918,28 +2947,28 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                                 auto li=lambda_instances_.find(tag.substr(22));if(li==lambda_instances_.end()){error="invalid lambda";return false;}auto fn=li->second;
                                 if(callable_call_depth_>=kMaxCallableDepth){error="callable recursion depth exceeded";return false;}++callable_call_depth_;
                                 if(fn->variadic_param.empty()?av.size()!=fn->params.size():av.size()<fn->params.size()){--callable_call_depth_;error="callback argument count mismatch";return false;}
-                                const auto saved_lambda_env=active_module_env_;if(fn->module_env)active_module_env_=fn->module_env;
+                                auto lexical_env=enter_lexical_environment(fn->module_env);
                                 push_variable_scope();auto& sc=variable_scopes_.back();for(const auto& kv:fn->captures)sc[kv.first]=kv.second;
                                 for(std::size_t ai=0;ai<fn->params.size();++ai){auto sp=std::make_shared<nift::RuntimeValue>(av[ai]);sc[fn->params[ai]]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
                                 if(!fn->variadic_param.empty()){nift::RuntimeValue rest=nift::RuntimeValue::make_array();for(std::size_t ai=fn->params.size();ai<av.size();++ai)rest.array.push_back(av[ai]);auto sp=std::make_shared<nift::RuntimeValue>(std::move(rest));sc[fn->variadic_param]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
                                 bool okcall=true;
                                 if(fn->block){std::string bt=trim_copy(fn->body);const bool rendered=!bt.empty()&&bt.front()=='<';if(rendered){auto nested=parse(fn->body,fn->source_path,1);if(!nested.ok){error=nested.error.message;okcall=false;}else result=nift::RuntimeValue(nested.output);}else{okcall=eval(fn->body,result,depth+1);if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0)error="lambda body error: "+error;}}
                                 else{okcall=eval(fn->body,result,depth+1);if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0)error="lambda body error: "+error;}
-                                pop_variable_scope();active_module_env_=saved_lambda_env;--callable_call_depth_;return okcall;
+                                pop_variable_scope();leave_lexical_environment(std::move(lexical_env));--callable_call_depth_;return okcall;
                             }
                             if(tag.rfind("\x1fnift:callable:named:",0)==0){
                                 auto ci=callables_.find(tag.substr(21));if(ci==callables_.end()){error="invalid callable";return false;}const Callable& callee=ci->second;
                                 if(callable_call_depth_>=kMaxCallableDepth){error="callable recursion depth exceeded";return false;}++callable_call_depth_;
                                 if(callee.variadic_param.empty()?av.size()!=callee.params.size():av.size()<callee.params.size()){--callable_call_depth_;error="callback argument count mismatch";return false;}
-                                const auto saved_env=active_module_env_;if(callee.module_env)active_module_env_=callee.module_env;
-                                push_variable_scope();auto& scope=variable_scopes_.back();if(active_module_env_){for(const auto& kv:active_module_env_->vars){if(!scope.count(kv.first))scope[kv.first]=kv.second;}}
+                                auto lexical_env=enter_lexical_environment(callee.module_env);
+                                push_variable_scope();auto& scope=variable_scopes_.back();
                                 for(std::size_t ai=0;ai<callee.params.size();++ai){auto sp=std::make_shared<nift::RuntimeValue>(av[ai]);scope.emplace(callee.params[ai],VariableBinding{sp,nift_binding_type(*sp),true,false});}
                                 if(!callee.variadic_param.empty()){nift::RuntimeValue rest=nift::RuntimeValue::make_array();for(std::size_t ai=callee.params.size();ai<av.size();++ai)rest.array.push_back(av[ai]);auto sp=std::make_shared<nift::RuntimeValue>(std::move(rest));scope.emplace(callee.variadic_param,VariableBinding{sp,nift_binding_type(*sp),true,false});}
                                 const int caller_loop_depth=loop_depth_;loop_depth_=0;pending_control_={};
                                 bool call_ok=true;std::string call_error;
                                 if(callee.fragment){const bool saved_fragment=in_fragment_body_;in_fragment_body_=true;auto nested=parse(callee.body,callee.source_path,1);in_fragment_body_=saved_fragment;if(!nested.ok){call_ok=false;call_error=nested.error.message;}else result=nift::RuntimeValue(nested.output);}
                                 else{++function_call_depth_;auto body_result=execute_native_program(callee.body,callee.source_path,1);--function_call_depth_;if(!body_result.ok){call_ok=false;call_error=body_result.error.message;}else if(pending_control_.kind==ControlFlow::None)result=nift::RuntimeValue(nullptr);else consume_return(result);}
-                                loop_depth_=caller_loop_depth;pop_variable_scope();active_module_env_=saved_env;--callable_call_depth_;
+                                loop_depth_=caller_loop_depth;pop_variable_scope();leave_lexical_environment(std::move(lexical_env));--callable_call_depth_;
                                 if(!call_ok){error=call_error;return false;}return true;
                             }
                             error="callback is not a callable";return false;};
@@ -3268,19 +3297,23 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     auto ctor=si->second.methods.find(call_name); const std::size_t expected=ctor==si->second.methods.end()?0:ctor->second.callable.params.size();
                     if(!args_ok||args.size()!=expected){error="struct constructor argument count mismatch: "+call_name;return false;}
                     auto instance=std::make_shared<StructInstance>(); instance->type_name=call_name;
-                    for(const auto& field:si->second.fields){ nift::RuntimeValue fv; if(!eval(field.initializer,fv,depth+1))return false; auto sp=std::make_shared<nift::RuntimeValue>(std::move(fv)); instance->fields.emplace(field.name,VariableBinding{sp,nift_binding_type_from_text(field.initializer,*sp),true,false}); }
+                    auto initializer_env=enter_lexical_environment(si->second.module_env);
+                    bool initializers_ok=true;
+                    for(const auto& field:si->second.fields){ nift::RuntimeValue fv; if(!eval(field.initializer,fv,depth+1)){initializers_ok=false;break;} auto sp=std::make_shared<nift::RuntimeValue>(std::move(fv)); instance->fields.emplace(field.name,VariableBinding{sp,nift_binding_type_from_text(field.initializer,*sp),true,false}); }
+                    leave_lexical_environment(std::move(initializer_env));
+                    if(!initializers_ok)return false;
                     const std::string id=std::to_string(next_struct_instance_id_++); struct_instances_[id]=instance;
                     if(ctor!=si->second.methods.end()){std::vector<nift::RuntimeValue> av;for(std::size_t ai=0;ai<args.size();++ai){nift::RuntimeValue v;if(ai<q.size()&&q[ai])v=nift::RuntimeValue(args[ai]);else if(!eval(args[ai],v,depth+1))return false;av.push_back(std::move(v));}nift::RuntimeValue ignored;if(!invoke_struct_method(instance,ctor->second,av,args,ignored,error))return false;}
                     out=nift::RuntimeValue(std::string("\x1fnift:struct:")+id); return true;
                 }
                 auto ci = callables_.find(call_name);
-                if(ci==callables_.end()&&!receiver_stack_.empty()){auto sd=structs_.find(receiver_stack_.back()->type_name);if(sd!=structs_.end()){auto mi=sd->second.methods.find(call_name);if(mi!=sd->second.methods.end()&&!mi->second.constructor){std::vector<nift::RuntimeValue> av;std::vector<std::string> ar;if(!method_arguments(mi->second,av,ar))return false;return invoke_struct_method(receiver_stack_.back(),mi->second,av,ar,out,error);}}}
+                const Callable* module_callee=nullptr;if(active_module_env_){auto mi=active_module_env_->callables.find(call_name);if(mi!=active_module_env_->callables.end())module_callee=&mi->second;}
                 // Indirect first-class callable invocation.
-                if (ci == callables_.end()) {
+                {
                     VariableBinding* cb=find_binding(call_name);
                     if(cb&&cb->value&&cb->value->is_string()&&cb->value->string.rfind("\x1fnift:callable:",0)==0){
                         const std::string tag=cb->value->string;
-                        if(tag.rfind("\x1fnift:callable:named:",0)==0){ci=callables_.find(tag.substr(21));}
+                        if(tag.rfind("\x1fnift:callable:named:",0)==0){ci=callables_.find(tag.substr(21));module_callee=nullptr;}
                         else if(tag.rfind("\x1fnift:callable:lambda:",0)==0){
                             auto li=lambda_instances_.find(tag.substr(22));if(li==lambda_instances_.end()){error="invalid lambda";return false;}auto fn=li->second;
                             if (callable_call_depth_ >= kMaxCallableDepth) { error = "callable recursion depth exceeded"; return false; }
@@ -3288,32 +3321,32 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                             std::vector<nift::RuntimeValue> spread_args;bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(aok){std::vector<std::string> ex;std::vector<bool> eq;for(size_t ai=0;ai<ar.size();++ai){if(!(ai<aq.size()&&aq[ai])&&trim_copy(ar[ai]).rfind("...",0)==0){nift::RuntimeValue sv;if(!eval(trim_copy(ar[ai]).substr(3),sv,depth+1)){--callable_call_depth_;return false;}if(!sv.is_array()){error="spread value must be an array";--callable_call_depth_;return false;}for(const auto& item:sv.array){ex.push_back("\x1fnift:spread:"+std::to_string(spread_args.size()));spread_args.push_back(item);eq.push_back(false);}}else{ex.push_back(ar[ai]);eq.push_back(ai<aq.size()&&aq[ai]);}}ar.swap(ex);aq.swap(eq);}if(!aok||(!fn->variadic_param.empty()?ar.size()<fn->params.size():ar.size()!=fn->params.size())){error="lambda argument count mismatch";--callable_call_depth_;return false;}
                             std::vector<nift::RuntimeValue> av;for(size_t ai=0;ai<ar.size();++ai){nift::RuntimeValue v;if(ai<aq.size()&&aq[ai])v=nift::RuntimeValue(ar[ai]);else if(ar[ai].rfind("\x1fnift:spread:",0)==0)v=spread_args[static_cast<std::size_t>(std::stoull(ar[ai].substr(13)))];else if(!eval(ar[ai],v,depth+1)){--callable_call_depth_;return false;}av.push_back(std::move(v));}
                             if(fn->async){for(std::size_t ai=0;ai<ar.size();++ai){const std::string an=trim_copy(ar[ai]);if(valid_binding_identifier(an)){if(auto* ab=find_binding(an)){ab->sync();if(ab->value&&ab->value->is_string()&&ab->value->string.rfind("\x1fnift:atomic:",0)==0)av[ai]=*ab->value;}}}--callable_call_depth_;return spawn_future(*cb->value,av,out);}
-                            const auto saved_lambda_env=active_module_env_; if(fn->module_env) active_module_env_=fn->module_env;
-                            push_variable_scope();auto& sc=variable_scopes_.back();for(const auto& kv:fn->captures)sc[kv.first]=kv.second;for(size_t ai=0;ai<fn->params.size();++ai){sc[fn->params[ai]]=bind_call_param(ar[ai],ai<aq.size()&&aq[ai],av[ai]);}if(!fn->variadic_param.empty()){nift::RuntimeValue rest=nift::RuntimeValue::make_array();for(size_t ai=fn->params.size();ai<av.size();++ai)rest.array.push_back(std::move(av[ai]));auto sp=std::make_shared<nift::RuntimeValue>(std::move(rest));sc[fn->variadic_param]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
+                            std::vector<VariableBinding> parameter_bindings;parameter_bindings.reserve(fn->params.size());for(size_t ai=0;ai<fn->params.size();++ai)parameter_bindings.push_back(bind_call_param(ar[ai],ai<aq.size()&&aq[ai],av[ai]));
+                            auto lexical_env=enter_lexical_environment(fn->module_env);
+                            push_variable_scope();auto& sc=variable_scopes_.back();for(const auto& kv:fn->captures)sc[kv.first]=kv.second;for(size_t ai=0;ai<fn->params.size();++ai)sc[fn->params[ai]]=std::move(parameter_bindings[ai]);if(!fn->variadic_param.empty()){nift::RuntimeValue rest=nift::RuntimeValue::make_array();for(size_t ai=fn->params.size();ai<av.size();++ai)rest.array.push_back(std::move(av[ai]));auto sp=std::make_shared<nift::RuntimeValue>(std::move(rest));sc[fn->variadic_param]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
                             bool okcall=true;
                             if(fn->block){std::string bt=trim_copy(fn->body);const bool rendered=!bt.empty()&&bt.front()=='<';if(rendered){auto nested=parse(fn->body,fn->source_path,1);if(!nested.ok){error=nested.error.message;okcall=false;}else out=nift::RuntimeValue(nested.output);}else{++function_call_depth_;auto nested=execute_native_program(fn->body,fn->source_path,1);--function_call_depth_;if(!nested.ok){error=nested.error.message;okcall=false;}else if(pending_control_.kind==ControlFlow::Return){consume_return(out);}else out=nift::RuntimeValue(nullptr);}}
                             else { okcall=eval(fn->body,out,depth+1); if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0) error="lambda body error: "+error; VariableBinding lr; if(try_location_ref(fn->body,lr)&&lr.is_location_ref()&&lr.value){last_call_return_loc_root_=lr.ref_root_slot;last_call_return_loc_path_=lr.ref_path;} }
-                            pop_variable_scope();active_module_env_=saved_lambda_env;--callable_call_depth_;return okcall;
+                            pop_variable_scope();leave_lexical_environment(std::move(lexical_env));--callable_call_depth_;return okcall;
                         }
                     }
                 }
-                // A callable exported from an @import module may reference the module's
-                // private callables and top-level bindings. Resolve through the active
-                // module environment when the name is not locally defined; local
-                // callables and indirect callable bindings take precedence.
-                const Callable* callee = (ci != callables_.end()) ? &ci->second : nullptr;
-                if (!callee && active_module_env_) { auto mit=active_module_env_->callables.find(call_name); if (mit!=active_module_env_->callables.end()) callee=&mit->second; }
+                if(ci==callables_.end()&&!module_callee&&!receiver_stack_.empty()){auto sd=structs_.find(receiver_stack_.back()->type_name);if(sd!=structs_.end()){auto mi=sd->second.methods.find(call_name);if(mi!=sd->second.methods.end()&&!mi->second.constructor){std::vector<nift::RuntimeValue> av;std::vector<std::string> ar;if(!method_arguments(mi->second,av,ar))return false;return invoke_struct_method(receiver_stack_.back(),mi->second,av,ar,out,error);}}}
+                // An active module's callable is the lexical binding. Caller globals
+                // remain a fallback, and either still precedes an implicit sibling.
+                const Callable* callee = module_callee ? module_callee : ((ci != callables_.end()) ? &ci->second : nullptr);
                 if (callee) {
+                    const auto callee_env = module_callee ? active_module_env_ : callee->module_env;
                     if (callable_call_depth_ >= kMaxCallableDepth) { error = "callable recursion depth exceeded: " + call_name; return false; }
                     std::vector<nift::RuntimeValue> spread_args;bool args_ok=false; std::vector<bool> quoted_args; auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),args_ok,&quoted_args); if(args_ok){std::vector<std::string> ex;std::vector<bool> eq;for(size_t ai=0;ai<args.size();++ai){if(!(ai<quoted_args.size()&&quoted_args[ai])&&trim_copy(args[ai]).rfind("...",0)==0){nift::RuntimeValue sv;if(!eval(trim_copy(args[ai]).substr(3),sv,depth+1))return false;if(!sv.is_array()){error="spread value must be an array";return false;}for(const auto& item:sv.array){ex.push_back("\x1fnift:spread:"+std::to_string(spread_args.size()));spread_args.push_back(item);eq.push_back(false);}}else{ex.push_back(args[ai]);eq.push_back(ai<quoted_args.size()&&quoted_args[ai]);}}args.swap(ex);quoted_args.swap(eq);}if(!args_ok||(!callee->variadic_param.empty()?args.size()<callee->params.size():args.size()!=callee->params.size())){error="callable argument count mismatch: "+call_name;return false;}
                     std::vector<nift::RuntimeValue> values; for(std::size_t ai=0;ai<args.size();++ai){nift::RuntimeValue v;if(ai<quoted_args.size()&&quoted_args[ai])v=nift::RuntimeValue(args[ai]);else if(args[ai].rfind("\x1fnift:spread:",0)==0)v=spread_args[static_cast<std::size_t>(std::stoull(args[ai].substr(13)))];else if(!eval(args[ai],v,depth+1))return false;values.push_back(std::move(v));}
-                    if(callee->async){for(std::size_t ai=0;ai<args.size();++ai){const std::string an=trim_copy(args[ai]);if(valid_binding_identifier(an)){if(auto* ab=find_binding(an)){ab->sync();if(ab->value&&ab->value->is_string()&&ab->value->string.rfind("\x1fnift:atomic:",0)==0)values[ai]=*ab->value;}}}nift::RuntimeValue cb(std::string("\x1fnift:callable:named:")+call_name);return spawn_future(cb,values,out);}
+                    if(callee->async){if(module_callee){error="module-private async callables are unsupported";return false;}for(std::size_t ai=0;ai<args.size();++ai){const std::string an=trim_copy(args[ai]);if(valid_binding_identifier(an)){if(auto* ab=find_binding(an)){ab->sync();if(ab->value&&ab->value->is_string()&&ab->value->string.rfind("\x1fnift:atomic:",0)==0)values[ai]=*ab->value;}}}nift::RuntimeValue cb(std::string("\x1fnift:callable:named:")+call_name);return spawn_future(cb,values,out);}
                     ++callable_call_depth_;
                     const int caller_loop_depth = loop_depth_;
                     loop_depth_ = 0;
-                    const auto saved_env = active_module_env_;
-                    if (callee->module_env) active_module_env_ = callee->module_env;
-                    push_variable_scope(); auto& scope=variable_scopes_.back(); if(active_module_env_){for(const auto& kv:active_module_env_->vars){if(!scope.count(kv.first))scope[kv.first]=kv.second;}} for(std::size_t ai=0;ai<callee->params.size();++ai){scope.emplace(callee->params[ai],bind_call_param(args[ai],ai<quoted_args.size()&&quoted_args[ai],values[ai]));}if(!callee->variadic_param.empty()){nift::RuntimeValue rest=nift::RuntimeValue::make_array();for(std::size_t ai=callee->params.size();ai<values.size();++ai)rest.array.push_back(std::move(values[ai]));auto sp=std::make_shared<nift::RuntimeValue>(std::move(rest));scope.emplace(callee->variadic_param,VariableBinding{sp,nift_binding_type(*sp),true,false});}
+                    std::vector<VariableBinding> parameter_bindings;parameter_bindings.reserve(callee->params.size());for(std::size_t ai=0;ai<callee->params.size();++ai)parameter_bindings.push_back(bind_call_param(args[ai],ai<quoted_args.size()&&quoted_args[ai],values[ai]));
+                    auto lexical_env=enter_lexical_environment(callee_env);
+                    push_variable_scope(); auto& scope=variable_scopes_.back(); for(std::size_t ai=0;ai<callee->params.size();++ai)scope.emplace(callee->params[ai],std::move(parameter_bindings[ai]));if(!callee->variadic_param.empty()){nift::RuntimeValue rest=nift::RuntimeValue::make_array();for(std::size_t ai=callee->params.size();ai<values.size();++ai)rest.array.push_back(std::move(values[ai]));auto sp=std::make_shared<nift::RuntimeValue>(std::move(rest));scope.emplace(callee->variadic_param,VariableBinding{sp,nift_binding_type(*sp),true,false});}
                     const bool saved_mutation = last_expression_mutation_;
                     bool call_ok = true; std::string call_error;
                     if (callee->fragment) {
@@ -3333,7 +3366,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     }
                     last_expression_mutation_ = saved_mutation;
                     pop_variable_scope();
-                    active_module_env_ = saved_env;
+                    leave_lexical_environment(std::move(lexical_env));
                     loop_depth_ = caller_loop_depth;
                     --callable_call_depth_;
                     if (!call_ok) { error = call_error; return false; }
@@ -4644,7 +4677,10 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
         module_env->callables = isolated_callables;
         module_env->vars = isolated_scope;
         for (auto& kv : funcs) kv.second.module_env = module_env;
-        for (auto& kv : types) for (auto& m : kv.second.methods) m.second.callable.module_env = module_env;
+        for (auto& kv : types) {
+            kv.second.module_env = module_env;
+            for (auto& m : kv.second.methods) m.second.callable.module_env = module_env;
+        }
     }
     // Install only after the complete export set has validated.
     auto& dst=variable_scopes_.back(); for(auto& kv:vars)dst.emplace(kv.first,std::move(kv.second));
@@ -5324,9 +5360,10 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 if(args.size()!=1||!args[0].is_string()||args[0].string.rfind("\x1fnift:ffi-buffer:",0)!=0){e="ffi_snapshot_bytes: expected buffer handle";return true;}auto bi=ffi_buffers_.find(args[0].string.substr(17));if(bi==ffi_buffers_.end()){e="ffi_snapshot_bytes: invalid buffer handle";return true;}out=nift::RuntimeValue(nift::RuntimeBytes(bi->second->bytes.begin(),bi->second->bytes.end()));return true;
             }
             const Callable* callee=nullptr;
-            auto ci=callables_.find(name);
-            if(ci!=callables_.end())callee=&ci->second;
-            if(!callee&&active_module_env_){auto mit=active_module_env_->callables.find(name);if(mit!=active_module_env_->callables.end())callee=&mit->second;}
+            for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto bi=sc->find(name);if(bi!=sc->end()){bi->second.sync();if(bi->second.value&&bi->second.value->is_string()&&bi->second.value->string.rfind("\x1fnift:callable:",0)==0)return false;break;}}
+            std::shared_ptr<ModuleEnv> callee_env;
+            if(active_module_env_){auto mit=active_module_env_->callables.find(name);if(mit!=active_module_env_->callables.end()){callee=&mit->second;callee_env=active_module_env_;}}
+            if(!callee){auto ci=callables_.find(name);if(ci!=callables_.end())callee=&ci->second;}
             if(!callee&&host_.has_host_callable(name))return call_runtime_host(host_, name, args, out, e);
             if(!callee||callee->fragment)return false;
             if(callee->async)return false; // legacy evaluator schedules async call and returns a future
@@ -5339,6 +5376,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 prep.ready=true;
             }
             if(callable_call_depth_>=kMaxCallableDepth){e="callable recursion depth exceeded: "+name;return false;}
+            auto lexical_env=enter_lexical_environment(callee_env ? callee_env : callee->module_env);
             push_variable_scope();auto& scope=variable_scopes_.back();
             for(std::size_t ai=0;ai<callee->params.size()&&ai<args.size();++ai){auto sp=std::make_shared<nift::RuntimeValue>(std::move(args[ai]));scope.emplace(callee->params[ai],VariableBinding{sp,nift_binding_type(*sp),true,false});}
             if(!callee->variadic_param.empty()){nift::RuntimeValue rest=nift::RuntimeValue::make_array();for(std::size_t ai=callee->params.size();ai<args.size();++ai)rest.array.push_back(std::move(args[ai]));auto sp=std::make_shared<nift::RuntimeValue>(std::move(rest));scope.emplace(callee->variadic_param,VariableBinding{sp,nift_binding_type(*sp),true,false});}
@@ -5346,6 +5384,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             std::string pe;const bool ok=execute_body(prep.stmts,pe);
             loop_depth_=saved_loop_depth;--callable_call_depth_;
             pop_variable_scope();
+            leave_lexical_environment(std::move(lexical_env));
             if(!ok){e=pe;return false;}
             if(pending_control_.kind==ControlFlow::Return)consume_return(out);
             else out=nift::RuntimeValue(nullptr);
@@ -6926,6 +6965,7 @@ bool Parser::invoke_struct_method(std::shared_ptr<StructInstance> instance,
     if (callable_call_depth_ >= kMaxCallableDepth) { error = "callable recursion depth exceeded"; return false; }
     ++callable_call_depth_;
     const int caller_loop_depth = loop_depth_; loop_depth_ = 0;
+    auto lexical_env = enter_lexical_environment(method.callable.module_env);
     push_variable_scope(); const std::size_t scope_index=variable_scopes_.size()-1;
     for(std::size_t i=0;i<method.callable.params.size();++i){auto sp=std::make_shared<nift::RuntimeValue>(args[i]);variable_scopes_[scope_index][method.callable.params[i]]=VariableBinding{sp,nift_binding_type_from_text(arg_sources[i],*sp),true,false};}
     if(!method.callable.variadic_param.empty()){nift::RuntimeValue rest=nift::RuntimeValue::make_array();for(std::size_t i=method.callable.params.size();i<args.size();++i)rest.array.push_back(args[i]);auto sp=std::make_shared<nift::RuntimeValue>(std::move(rest));variable_scopes_[scope_index].emplace(method.callable.variadic_param,VariableBinding{sp,nift_binding_type(*sp),true,false});}
@@ -6935,7 +6975,8 @@ bool Parser::invoke_struct_method(std::shared_ptr<StructInstance> instance,
     receiver_stack_.push_back(instance); ++function_call_depth_; pending_control_={};
     RenderResult rr=execute_native_program(method.callable.body,method.callable.source_path,1);
     --function_call_depth_; receiver_stack_.pop_back();
-    pop_variable_scope(); loop_depth_=caller_loop_depth; --callable_call_depth_;
+    pop_variable_scope();
+    leave_lexical_environment(std::move(lexical_env)); loop_depth_=caller_loop_depth; --callable_call_depth_;
     if(!rr.ok){error=rr.error.message;pending_control_={};return false;}
     if(method.constructor && pending_control_.kind==ControlFlow::Return && pending_control_.value && !pending_control_.value->is_null()){error="constructor cannot return a value";pending_control_={};return false;}
     consume_return(out); return true;
