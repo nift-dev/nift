@@ -77,6 +77,7 @@ MEMORY_SMOKE := $(TEST_DIR)/nift-memory-san$(EXEEXT)
 JSON_TEST := $(TEST_DIR)/nift-json-smoke$(EXEEXT)
 JSON_SCHEMA_TEST := $(TEST_DIR)/nift-json-schema-smoke$(EXEEXT)
 RUNTIME_VALUE_TEST := $(TEST_DIR)/nift-runtime-value$(EXEEXT)
+CP17_BYTES_TEST := $(TEST_DIR)/nift-cp17-bytes$(EXEEXT)
 RECOVERY_EPOCH_GUARD := $(TEST_DIR)/nift-recovery-epoch-guard$(EXEEXT)
 
 all: $(TARGET)
@@ -154,6 +155,14 @@ $(RUNTIME_VALUE_TEST): tests/runtime_value.cpp src/RuntimeValue.cpp src/RuntimeV
 
 test-runtime-value: $(RUNTIME_VALUE_TEST)
 	"$(RUNTIME_VALUE_TEST)"
+
+$(CP17_BYTES_TEST): tests/cp17_bytes.cpp src/RuntimeValue.cpp src/RuntimeValue.h
+	mkdir -p "$(TEST_DIR)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/cp17_bytes.cpp src/RuntimeValue.cpp -o "$@"
+
+test-cp17-bytes: $(TARGET) $(CP17_BYTES_TEST)
+	"$(CP17_BYTES_TEST)"
+	NIFT="$(CURDIR)/$(TARGET)" tests/cp17_bytes.sh
 
 $(TEST_DIR)/nift-console-smoke$(EXEEXT): tests/console_smoke.cpp src/Console.h
 	mkdir -p "$(TEST_DIR)"
@@ -510,7 +519,7 @@ test-all: test test-embed test-bindings test-build-boundary
 
 # Plain `make test` = the ordinary Nift/CLI regression surface (C++ toolchain
 # only). Embedding and binding suites are run through the focused targets.
-test: test-content test-commands test-comments test-contracts test-json test-runtime-value test-cp15-numeric-repair \
+test: test-content test-commands test-comments test-contracts test-json test-runtime-value test-cp15-numeric-repair test-cp17-bytes \
 	test-json-schema test-console test-diagnostics test-minify \
 	test-json-schema-integration test-markup-json-directives test-pagination test-pagination-ordering \
 	test-template-optional test-requirements test-path-alias test-path-safety test-metadata-safety \
@@ -873,7 +882,7 @@ clean:
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
-.PHONY: FORCE libffi-check san-libffi-check tsan-libffi-check test-ffi-abi test-libffi-source test-gate6ar-ffi test-libffi-static-archive test-libffi-dependencies test-libffi-private-symbols test-pic-depfiles test-node-package-licenses test-v45-adversarial-runtime test-v45-integration-dogfood test-v45-embed-staged-consumer embed go-binding csharp-binding node-binding python-binding bindings test-build-boundary test-embed test-go-binding test-csharp-binding test-node-binding test-python-binding test-bindings test-all test benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-markuppp-sync test-json test-json-schema test-runtime-value test-cp15-numeric-repair test-console test-progress-render test-progress-pty test-snap-contract test-distribution-summary test-version-consistency test-diagnostics test-minify test-json-schema-integration test-markup-json-directives test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke test-host-seam benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-alias test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets test-init-lock test-unreadable-source test-incremental-modified-immediate test-v41-certification test-v42-language test-v42-struct test-v43-language test-macos-runner-policy install uninstall
+.PHONY: FORCE libffi-check san-libffi-check tsan-libffi-check test-ffi-abi test-libffi-source test-gate6ar-ffi test-libffi-static-archive test-libffi-dependencies test-libffi-private-symbols test-pic-depfiles test-node-package-licenses test-v45-adversarial-runtime test-v45-integration-dogfood test-v45-embed-staged-consumer embed go-binding csharp-binding node-binding python-binding bindings test-build-boundary test-embed test-go-binding test-csharp-binding test-node-binding test-python-binding test-bindings test-all test benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-markuppp-sync test-json test-json-schema test-runtime-value test-cp15-numeric-repair test-cp17-bytes test-console test-progress-render test-progress-pty test-snap-contract test-distribution-summary test-version-consistency test-diagnostics test-minify test-json-schema-integration test-markup-json-directives test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke test-host-seam benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-alias test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets test-init-lock test-unreadable-source test-incremental-modified-immediate test-v41-certification test-v42-language test-v42-struct test-v43-language test-macos-runner-policy install uninstall
 
 
 test-cross-feature: $(TARGET)

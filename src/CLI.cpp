@@ -50,6 +50,17 @@
 namespace fs = std::filesystem;
 
 namespace {
+bool cli_contains_bytes(const nift::RuntimeValue& value) {
+    if (value.is_bytes()) return true;
+    if (value.is_array())
+        return std::any_of(value.array.begin(), value.array.end(), cli_contains_bytes);
+    if (value.is_object())
+        return std::any_of(value.object.begin(), value.object.end(), [](const auto& entry) {
+            return cli_contains_bytes(entry.second);
+        });
+    return false;
+}
+
 // Portable environment assignment (Windows has no setenv()).
 void nift_setenv(const char* name, const char* value, int /*overwrite*/) {
 #ifdef _WIN32
@@ -828,6 +839,7 @@ static int run_eval(int argc, char** argv) {
     if(expression.empty()){std::cerr<<"eval: expression required\n";return 2;}
     ScriptRenderHost host(fs::current_path());TrackedInfo info;Parser parser(host,info);nift::RuntimeValue value;std::string error;
     if(!parser.eval_expression(expression,value,error)){std::cerr<<"eval: "<<error<<'\n';return 2;}
+    if(cli_contains_bytes(value)){std::cerr<<"eval: bytes values are not serializable; decode as UTF-8 first\n";return 2;}
     if(json_output)std::cout<<value.dump()<<'\n';else if(value.is_string())std::cout<<value.string<<'\n';else std::cout<<value.dump()<<'\n';
     return 0;
 }
@@ -856,6 +868,7 @@ static bool shell_glob_expand(const std::string& token,std::vector<std::string>&
             const std::string expr = token.substr(i + 2, close - i - 2);
             nift::RuntimeValue v; std::string ee;
             if (!p.eval_expression(expr, v, ee)) { err = "command interpolation failed: $[" + expr + "]: " + ee; return false; }
+            if (cli_contains_bytes(v)) { err = "command interpolation failed: bytes values must be decoded as UTF-8"; return false; }
             const std::string rendered = p.render_expression_value(v);
             token.replace(i, close - i + 1, rendered);
             i += rendered.size();

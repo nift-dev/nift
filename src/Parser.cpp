@@ -69,6 +69,22 @@ static std::string runtime_scalar_key(const nift::RuntimeValue& value) {
     return {};
 }
 
+static bool runtime_contains_bytes(const nift::RuntimeValue& value) {
+    if (value.is_bytes()) return true;
+    if (value.is_array())
+        return std::any_of(value.array.begin(), value.array.end(), runtime_contains_bytes);
+    if (value.is_object())
+        return std::any_of(value.object.begin(), value.object.end(), [](const auto& entry) {
+            return runtime_contains_bytes(entry.second);
+        });
+    return false;
+}
+
+static std::string runtime_bytes_string(const nift::RuntimeValue& value) {
+    if (!value.bytes || value.bytes->empty()) return {};
+    return std::string(reinterpret_cast<const char*>(value.bytes->data()), value.bytes->size());
+}
+
 Parser::FfiLibraryInstance::~FfiLibraryInstance() {
     if (!handle || closed) return;
 #ifdef _WIN32
@@ -84,11 +100,12 @@ static int nift_binding_type(const nift::RuntimeValue& value) {
     if (value.is_string()) return 4;
     if (value.is_array()) return 5;
     if (value.is_object()) return 6;
+    if (value.is_bytes()) return 7;
     return -1;
 }
 
 static const char* nift_binding_type_name(int type) {
-    switch (type) { case 0:return "null"; case 1:return "bool"; case 2:return "int"; case 3:return "double"; case 4:return "string"; case 5:return "array"; case 6:return "json"; default:return "unknown"; }
+    switch (type) { case 0:return "null"; case 1:return "bool"; case 2:return "int"; case 3:return "double"; case 4:return "string"; case 5:return "array"; case 6:return "json"; case 7:return "bytes"; default:return "unknown"; }
 }
 
 // An int value may be assigned to a double binding (widening: a double binding
@@ -1131,6 +1148,14 @@ bool Parser::resolve_json_value(const std::string& expression,
                 }else{try{index=(std::size_t)std::stoull(token);}catch(...){error="JSON array index is out of range in '"+expression+"'";return true;}}
                 if(index>=current->array.size()){error="JSON array index "+std::to_string(index)+" is out of range in '"+expression+"'";return true;}const nift::RuntimeValue* child=&(*current)[index];current=std::shared_ptr<const nift::RuntimeValue>(current,child);continue;
             }
+            if(current->is_bytes()){
+                std::size_t index=0;
+                if(quoted||token.empty()||!std::all_of(token.begin(),token.end(),[](unsigned char c){return std::isdigit(c);})){
+                    nift::RuntimeValue computed;if(quoted||!evaluate_expression(token,computed,error)||!nift::runtime_number_to_size(computed,index)){if(error.empty())error="bytes indices must be non-negative integers in '"+expression+"'";return true;}
+                }else{try{index=static_cast<std::size_t>(std::stoull(token));}catch(...){error="bytes index is out of range in '"+expression+"'";return true;}}
+                if(!current->bytes||index>=current->bytes->size()){error="bytes index "+std::to_string(index)+" is out of range in '"+expression+"'";return true;}
+                current=std::make_shared<const nift::RuntimeValue>(static_cast<int>((*current->bytes)[index]));continue;
+            }
             if(current->is_object()){
                 std::string key;if(quoted){if(token.size()<2){error="invalid JSON object key";return true;}key=token.substr(1,token.size()-2);}else{VariableBinding* kb=nullptr;for(auto scope=variable_scopes_.rbegin();scope!=variable_scopes_.rend();++scope){auto it=scope->find(token);if(it!=scope->end()){kb=&it->second;break;}}if(!kb||!kb->value||!kb->value->is_string()){
                     nift::RuntimeValue computed;
@@ -1162,6 +1187,8 @@ bool Parser::json_value(const std::string& expression, std::string& value, std::
         error = "cannot render JSON array $[" + expression + "]; select an element first";
     } else if (document->is_object()) {
         error = "cannot render JSON object $[" + expression + "]; select a member first";
+    } else if (document->is_bytes()) {
+        error = "cannot render bytes $[" + expression + "]; decode as UTF-8 first";
     }
     return true;
 }
@@ -1205,7 +1232,7 @@ bool Parser::interpolate_parameter(const std::string& parameter,
         nift::RuntimeValue expression_value;
         std::string expression_error;
         if (evaluate_expression(expression, expression_value, expression_error)) {
-            if (expression_value.is_array() || expression_value.is_object()) {
+            if (expression_value.is_array() || expression_value.is_object() || expression_value.is_bytes()) {
                 error = "parameter expression must resolve to a scalar value";
                 return false;
             }
@@ -1828,6 +1855,10 @@ bool Parser::evaluate_expression(const std::string& expression, nift::RuntimeVal
                     try { index = static_cast<std::size_t>(std::stoull(text.substr(index_start, pos - index_start))); }
                     catch (...) { walk_ok = false; break; }
                     ++pos;
+                    if (cur->is_bytes()) {
+                        if (!cur->bytes || index >= cur->bytes->size() || pos != text.size()) { walk_ok = false; break; }
+                        out = nift::RuntimeValue(static_cast<int>((*cur->bytes)[index])); return true;
+                    }
                     if (!cur->is_array() || index >= cur->array.size()) { walk_ok = false; break; }
                     cur = &(*cur)[index];
                 } else { walk_ok = false; break; }
@@ -2020,6 +2051,7 @@ bool Parser::evaluate_expression(const std::string& expression, nift::RuntimeVal
             if (document.is_null()) return false;
             if (document.is_number()) return nift::runtime_truthy(document);
             if (document.is_string()) return !document.string.empty();
+            if (document.is_bytes()) return nift::runtime_truthy(document);
             if (document.is_array()) return !document.array.empty();
             if (document.is_object()) return !document.object.empty();
             return false;
@@ -2424,6 +2456,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 if(v.is_number()) return nift::runtime_number_is_integer(v) ? "int" : "float";
                 if(v.is_array()) return "array";
                 if(v.is_object()) return "object";
+                if(v.is_bytes()) return "bytes";
                 if(v.is_string()){
                     if(v.string.rfind("\x1fnift:struct:",0)==0) return "struct";
                     if(v.string.rfind("\x1fnift:callable:",0)==0) return "function";
@@ -2444,11 +2477,11 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 if(args.size()!=1){error="type: expected one value";return false;}
                 nift::RuntimeValue v;if(!arg_value(args,q,0,v))return false;out=nift::RuntimeValue(public_type(v));return true;
             }
-            for(const std::string pred:{"is_null","is_bool","is_number","is_int","is_float","is_string","is_array","is_object","is_struct","is_function","is_collection","is_enum"}){
+            for(const std::string pred:{"is_null","is_bool","is_number","is_int","is_float","is_string","is_bytes","is_array","is_object","is_struct","is_function","is_collection","is_enum"}){
                 if(call_args(pred,args,q)){
                     if(args.size()!=1){error=pred+": expected one value";return false;}
                     nift::RuntimeValue v;if(!arg_value(args,q,0,v))return false;const std::string t=public_type(v);
-                    bool yes=pred=="is_null"?t=="null":pred=="is_bool"?t=="bool":pred=="is_number"?(t=="int"||t=="float"):pred=="is_int"?t=="int":pred=="is_float"?t=="float":pred=="is_string"?t=="string":pred=="is_array"?t=="array":pred=="is_object"?t=="object":pred=="is_struct"?t=="struct":pred=="is_function"?t=="function":pred=="is_collection"?t=="collection":t=="enum";
+                    bool yes=pred=="is_null"?t=="null":pred=="is_bool"?t=="bool":pred=="is_number"?(t=="int"||t=="float"):pred=="is_int"?t=="int":pred=="is_float"?t=="float":pred=="is_string"?t=="string":pred=="is_bytes"?t=="bytes":pred=="is_array"?t=="array":pred=="is_object"?t=="object":pred=="is_struct"?t=="struct":pred=="is_function"?t=="function":pred=="is_collection"?t=="collection":t=="enum";
                     out=nift::RuntimeValue(yes);return true;
                 }
             }
@@ -2461,6 +2494,12 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 out=nift::RuntimeValue::make_array(); constexpr std::size_t limit=10000000;
                 for(std::int64_t x=start; step>0?x<stop:x>stop;){if(out.array.size()>=limit){error="range: result exceeds 10000000 items";return false;}out.array.emplace_back((double)x);if((step>0&&x>std::numeric_limits<std::int64_t>::max()-step)||(step<0&&x<std::numeric_limits<std::int64_t>::min()-step)){error="range: integer overflow";return false;}x+=step;}
                 return true;
+            }
+            if(call_args("bytes",args,q)){
+                if(args.size()>1){error="bytes: expected zero arguments or one byte array";return false;}
+                nift::RuntimeBytes data;
+                if(args.size()==1){nift::RuntimeValue source;if(!arg_value(args,q,0,source))return false;if(!source.is_array()){error="bytes: expected an array of integers";return false;}data.reserve(source.array.size());for(const auto& item:source.array){std::uint64_t byte=0;if(!nift::runtime_number_to_unsigned(item,8,byte)){error="bytes: array values must be integers from 0 to 255";return false;}data.push_back(static_cast<std::uint8_t>(byte));}}
+                out=nift::RuntimeValue(std::move(data));return true;
             }
             if(call_args("html_escape",args,q)||call_args("attr_escape",args,q)||call_args("url_encode",args,q)){
                 const bool is_attr=text.rfind("attr_escape(",0)==0; const bool is_url=text.rfind("url_encode(",0)==0; const char* fname=is_attr?"attr_escape":(is_url?"url_encode":"html_escape");
@@ -2492,7 +2531,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             }
             if(call_args("ifstream",args,q)||call_args("ofstream",args,q)){const bool output=text.rfind("ofstream(",0)==0;fs::path p;if(args.size()!=1||!checked_path(output?"ofstream":"ifstream",args,q,0,p))return false;auto st=std::make_shared<StreamInstance>();st->kind=output?StreamInstance::Kind::Output:StreamInstance::Kind::Input;if(output){st->output=std::make_shared<std::ofstream>(p,std::ios::binary|std::ios::trunc);if(!*st->output){error="ofstream: cannot open path";return false;}}else{st->input=std::make_shared<std::ifstream>(p,std::ios::binary);if(!*st->input){error="ifstream: cannot open path";return false;}}auto id=std::to_string(next_stream_instance_id_++);stream_instances_[id]=st;out=nift::RuntimeValue(std::string("\x1fnift:stream:")+id);return true;}
             if(call_args("close",args,q)){if(args.size()!=1){error="close: expected stream";return false;}nift::RuntimeValue d;if(!arg_value(args,q,0,d)||!d.is_string()||d.string.rfind("\x1fnift:stream:",0)!=0){error="close: expected stream";return false;}auto it=stream_instances_.find(d.string.substr(13));if(it==stream_instances_.end()){error="close: invalid stream";return false;}if(it->second->closed){error="close: stream already closed";return false;}if(it->second->input)it->second->input->close();if(it->second->output)it->second->output->close();it->second->closed=true;out=nift::RuntimeValue(nullptr);return true;}
-            if(call_args("print",args,q)){if(args.size()!=1){error="print: expected one value";return false;}nift::RuntimeValue d;if(!arg_value(args,q,0,d))return false;if(d.is_string()&&q.size()>0&&q[0]&&d.string.find("$[")!=std::string::npos){std::string r,e;if(!interpolate_parameter(d.string,r,e)){error="print: "+e;return false;}d=nift::RuntimeValue(r);}if(d.is_array()||d.is_object()||(d.is_string()&&d.string.rfind("\x1fnift:",0)==0&&d.string.rfind("\x1fnift:enum:",0)!=0&&d.string.rfind("\x1fnift:atomic:",0)!=0)){error="print: value is not directly renderable";return false;}const std::string rendered=render_expression_value(d);{static std::mutex print_mutex;std::lock_guard<std::mutex> lock(print_mutex);std::cout<<rendered<<'\n';std::cout.flush();}out=nift::RuntimeValue(nullptr);return true;}
+            if(call_args("print",args,q)){if(args.size()!=1){error="print: expected one value";return false;}nift::RuntimeValue d;if(!arg_value(args,q,0,d))return false;if(d.is_string()&&q.size()>0&&q[0]&&d.string.find("$[")!=std::string::npos){std::string r,e;if(!interpolate_parameter(d.string,r,e)){error="print: "+e;return false;}d=nift::RuntimeValue(r);}if(d.is_bytes()||d.is_array()||d.is_object()||(d.is_string()&&d.string.rfind("\x1fnift:",0)==0&&d.string.rfind("\x1fnift:enum:",0)!=0&&d.string.rfind("\x1fnift:atomic:",0)!=0)){error="print: value is not directly renderable";return false;}const std::string rendered=render_expression_value(d);{static std::mutex print_mutex;std::lock_guard<std::mutex> lock(print_mutex);std::cout<<rendered<<'\n';std::cout.flush();}out=nift::RuntimeValue(nullptr);return true;}
             if(call_args("read",args,q)){if(!args.empty()){error="read: expected no arguments";return false;}if(!standalone_script_host_){error="read: interactive input is only available in standalone Nift scripts/shell";return false;}std::string line;if(!std::getline(std::cin,line)){if(std::cin.eof()){std::cin.clear();out=nift::RuntimeValue(nullptr);return true;}error="read: input failure";return false;}out=nift::RuntimeValue(line);return true;}
         }
 
@@ -2542,7 +2581,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             std::string receiver, method, arg_text;
             if (final_postfix(receiver,method,arg_text)) {
                 const bool known = method=="length"||method=="split"||method=="index_of"||method=="last_index_of"||
-                    method=="contains"||method=="starts_with"||method=="ends_with"||method=="trim"||
+                    method=="contains"||method=="starts_with"||method=="ends_with"||method=="trim"||method=="encode"||method=="decode"||
                     method=="trim_start"||method=="trim_end"||method=="to_lower"||method=="to_upper"||
                     method=="replace"||method=="to_int"||method=="to_double"||method=="to_string"||method=="abs"||method=="floor"||method=="ceil"||method=="round"||
                     method=="substr"||method=="size"||method=="empty"||method=="first"||method=="last"||
@@ -2622,6 +2661,14 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         return eval(args[i],v,depth+1);
                     };
                     auto no_args=[&]()->bool{if(!args.empty()){error=method+": expected no arguments";return false;}return true;};
+                    if(base.is_bytes()){
+                        const nift::RuntimeBytes empty;
+                        const auto& data=base.bytes?*base.bytes:empty;
+                        if(method=="length"||method=="size"){if(!no_args())return false;out=nift::RuntimeValue(static_cast<double>(data.size()));return true;}
+                        if(method=="empty"){if(!no_args())return false;out=nift::RuntimeValue(data.empty());return true;}
+                        if(method=="slice"){if(args.empty()||args.size()>2){error="slice: expected start and optional end";return false;}nift::RuntimeValue st,en;std::size_t begin=0,end=data.size();if(!eval_arg(0,st)||!nift::runtime_number_to_size(st,begin)){error="slice: invalid start";return false;}if(args.size()==2&&(!eval_arg(1,en)||!nift::runtime_number_to_size(en,end))){error="slice: invalid end";return false;}begin=std::min(begin,data.size());end=std::min(end,data.size());if(end<begin)end=begin;out=nift::RuntimeValue(nift::RuntimeBytes(data.begin()+begin,data.begin()+end));return true;}
+                        if(method=="decode"){if(args.size()!=1){error="decode: expected encoding";return false;}nift::RuntimeValue encoding;if(!eval_arg(0,encoding)||!encoding.is_string()||encoding.string!="utf-8"){error="decode: encoding must be exactly 'utf-8'";return false;}std::string decoded=runtime_bytes_string(base);if(!nift::runtime_valid_utf8(decoded)){error="decode: invalid UTF-8";return false;}out=nift::RuntimeValue(std::move(decoded));return true;}
+                    }
                     if(base.is_string() && base.string.rfind("\x1fnift:thread:",0)==0){
                         auto ti=thread_instances_.find(base.string.substr(13));if(ti==thread_instances_.end()){error="thread: invalid handle";return false;}auto st=ti->second;
                         if(method=="done"){if(!no_args())return false;std::lock_guard<std::mutex> lock(st->mutex);out=nift::RuntimeValue(st->done);return true;}
@@ -2698,9 +2745,9 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         if(method=="eof"){if(!no_args()||!need_read())return false;out=nift::RuntimeValue(f->cursor>=f->working.size());return true;}
                         if(method=="read"||method=="read_all"){if(!need_read())return false;size_t base=std::min(f->cursor,f->working.size());size_t n=f->working.size()-base;if(method=="read"&&!args.empty()){if(args.size()!=1){error="read: expected zero or one byte count";return false;}nift::RuntimeValue d;std::size_t count=0;if(!eval_arg(0,d)||!nift::runtime_number_to_size(d,count)){error="read: invalid byte count";return false;}n=std::min(n,count);}else if(method=="read_all"&&!args.empty()){error="read_all: expected no arguments";return false;}out=nift::RuntimeValue(f->working.substr(base,n));f->cursor=base+n;return true;}
                         if(method=="read_line"){if(!no_args()||!need_read())return false;if(f->cursor>=f->working.size()){out=nift::RuntimeValue(nullptr);return true;}auto e=f->working.find('\n',f->cursor);size_t z=e==std::string::npos?f->working.size():e;std::string line=f->working.substr(f->cursor,z-f->cursor);if(!line.empty()&&line.back()=='\r')line.pop_back();f->cursor=e==std::string::npos?f->working.size():e+1;out=nift::RuntimeValue(line);return true;}
-                        if(method=="read_val"){if(!no_args()||!need_read())return false;while(f->cursor<f->working.size()&&std::isspace((unsigned char)f->working[f->cursor]))++f->cursor;if(f->cursor>=f->working.size()){out=nift::RuntimeValue(nullptr);return true;}size_t st=f->cursor;char first=f->working[f->cursor];if(first=='"'||first=='['||first=='{'){char op=first,cl=first=='['?']':first=='{'?'}':'"';int dep=0;bool qd=false,esc=false;while(f->cursor<f->working.size()){char c=f->working[f->cursor++];if(op=='"'){if(esc){esc=false;continue;}if(c=='\\'){esc=true;continue;}if(f->cursor>st+1&&c=='"')break;}else{if(qd){if(esc)esc=false;else if(c=='\\')esc=true;else if(c=='"')qd=false;}else if(c=='"')qd=true;else if(c==op)++dep;else if(c==cl&&--dep==0)break;}}}else while(f->cursor<f->working.size()&&!std::isspace((unsigned char)f->working[f->cursor]))++f->cursor;std::string tok=f->working.substr(st,f->cursor-st);nift::RuntimeValue v;if(!eval(tok,v,depth+1)){error="read_val: "+error;return false;}out=v;return true;}
+                        if(method=="read_val"){if(!no_args()||!need_read())return false;while(f->cursor<f->working.size()&&std::isspace((unsigned char)f->working[f->cursor]))++f->cursor;if(f->cursor>=f->working.size()){out=nift::RuntimeValue(nullptr);return true;}size_t st=f->cursor;char first=f->working[f->cursor];if(first=='"'||first=='['||first=='{'){char op=first,cl=first=='['?']':first=='{'?'}':'"';int dep=0;bool qd=false,esc=false;while(f->cursor<f->working.size()){char c=f->working[f->cursor++];if(op=='"'){if(esc){esc=false;continue;}if(c=='\\'){esc=true;continue;}if(f->cursor>st+1&&c=='"')break;}else{if(qd){if(esc)esc=false;else if(c=='\\')esc=true;else if(c=='"')qd=false;}else if(c=='"')qd=true;else if(c==op)++dep;else if(c==cl&&--dep==0)break;}}}else while(f->cursor<f->working.size()&&!std::isspace((unsigned char)f->working[f->cursor]))++f->cursor;std::string tok=f->working.substr(st,f->cursor-st);nift::RuntimeValue v;if(!eval(tok,v,depth+1)){error="read_val: "+error;return false;}if(runtime_contains_bytes(v)){error="read_val: bytes values are not serializable";return false;}out=v;return true;}
                         if(method=="write_val"){if(args.size()!=1||!need_write()){if(args.size()!=1&&error.empty())error="write_val: expected one value";return false;}nift::RuntimeValue v;if(!eval_arg(0,v))return false;std::string d;if(!serialize_value(v,false,d,error))return false;d+="\n";size_t base=std::min(f->cursor,f->working.size());size_t ov=std::min(d.size(),f->working.size()-base);f->working.replace(base,ov,d);f->cursor=base+d.size();dirty();out=nift::RuntimeValue(nullptr);return true;}
-                        if(method=="write"||method=="write_line"){if(args.size()!=1||!need_write()){if(args.size()!=1&&error.empty())error=method+": expected one value";return false;}nift::RuntimeValue v;if(!eval_arg(0,v))return false;if(v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0)){error=method+": value is not directly renderable";return false;}std::string d=render_expression_value(v);if(method=="write_line")d+='\n';size_t base=std::min(f->cursor,f->working.size());size_t ov=std::min(d.size(),f->working.size()-base);f->working.replace(base,ov,d);f->cursor=base+d.size();dirty();out=nift::RuntimeValue(nullptr);return true;}
+                        if(method=="write"||method=="write_line"){if(args.size()!=1||!need_write()){if(args.size()!=1&&error.empty())error=method+": expected one value";return false;}nift::RuntimeValue v;if(!eval_arg(0,v))return false;if(v.is_bytes()||v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0)){error=method+": value is not directly renderable";return false;}std::string d=render_expression_value(v);if(method=="write_line")d+='\n';size_t base=std::min(f->cursor,f->working.size());size_t ov=std::min(d.size(),f->working.size()-base);f->working.replace(base,ov,d);f->cursor=base+d.size();dirty();out=nift::RuntimeValue(nullptr);return true;}
                         if(method=="flush"){if(!no_args()||!need_write())return false;out=nift::RuntimeValue(nullptr);return true;}
                         if(method=="replace"||method=="replace_once"){if(args.size()!=2||!need_write()){if(args.size()!=2&&error.empty())error=method+": expected old and replacement strings";return false;}std::string a,b;if(!sarg(0,a)||!sarg(1,b))return false;if(a.empty()){error=method+": old string must not be empty";return false;}size_t count=0,pos=0;while((pos=f->working.find(a,pos))!=std::string::npos){++count;pos+=a.size();}if(method=="replace_once"&&count!=1){error="replace_once: expected exactly one match, found "+std::to_string(count);return false;}pos=0;while((pos=f->working.find(a,pos))!=std::string::npos){f->working.replace(pos,a.size(),b);pos+=b.size();if(method=="replace_once")break;}if(f->cursor>f->working.size())f->cursor=f->working.size();dirty();out=method=="replace"?nift::RuntimeValue((double)count):nift::RuntimeValue(nullptr);return true;}
                         if(method=="insert"||method=="insert"||method=="insert_before"||method=="insert_after"||method=="prepend"||method=="append"){if(!need_write())return false;size_t pos=0;std::string d;if(method=="prepend"||method=="append"){if(args.size()!=1||!sarg(0,d)){if(args.size()!=1&&error.empty())error=method+": expected text";return false;}pos=method=="prepend"?0:f->working.size();}else if(method=="insert"){if(args.size()!=2){error="insert: expected byte position and text";return false;}nift::RuntimeValue n;if(!eval_arg(0,n)||!nift::runtime_number_to_size(n,pos)||pos>f->working.size()||!sarg(1,d)){error="insert: invalid byte position or text";return false;}}else{if(args.size()!=2){error=method+": expected anchor and text";return false;}std::string a;if(!sarg(0,a)||!sarg(1,d))return false;if(a.empty()){error=method+": anchor must not be empty";return false;}auto at=f->working.find(a);if(at==std::string::npos||f->working.find(a,at+a.size())!=std::string::npos){error=method+": expected exactly one anchor";return false;}pos=at+(method=="insert_after"?a.size():0);}f->working.insert(pos,d);if(f->cursor>f->working.size())f->cursor=f->working.size();dirty();out=nift::RuntimeValue(nullptr);return true;}
@@ -2711,6 +2758,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     }
                     if(base.is_string() && base.string.rfind("\x1fnift:",0)!=0) {
                         const std::string& str=base.string;
+                        if(method=="encode"){if(args.size()!=1){error="encode: expected encoding";return false;}nift::RuntimeValue encoding;if(!eval_arg(0,encoding)||!encoding.is_string()||encoding.string!="utf-8"){error="encode: encoding must be exactly 'utf-8'";return false;}if(!nift::runtime_valid_utf8(str)){error="encode: invalid UTF-8 text";return false;}out=nift::RuntimeValue(nift::RuntimeBytes(str.begin(),str.end()));return true;}
                         auto utf8_parts=[&](std::vector<std::string>& parts)->bool{
                             for(std::size_t i=0;i<str.size();){unsigned char c=(unsigned char)str[i];std::size_t n=c<0x80?1:(c>=0xC2&&c<=0xDF?2:(c>=0xE0&&c<=0xEF?3:(c>=0xF0&&c<=0xF4?4:0)));if(!n||i+n>str.size()){error="split: invalid UTF-8";return false;}for(std::size_t j=1;j<n;++j)if(((unsigned char)str[i+j]&0xC0)!=0x80){error="split: invalid UTF-8";return false;}parts.push_back(str.substr(i,n));i+=n;}return true;};
                         auto utf8_length=[&](std::size_t& count)->bool{std::vector<std::string> p;if(!utf8_parts(p))return false;count=p.size();return true;};
@@ -2953,7 +3001,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         if(method=="first"||method=="last"){if(!no_args())return false;if(a.empty()){error=method+": array is empty";return false;}out=method=="first"?a.front():a.back();return true;}
                         if(method=="indexOf"){if(args.size()!=1){error="indexOf: expected one value";return false;}nift::RuntimeValue v;if(!eval_arg(0,v))return false;std::size_t i=0;for(;i<a.size();++i)if(structural_equal(a[i],v))break;out=nift::RuntimeValue(i<a.size()?static_cast<double>(i):-1.0);return true;}
                         if(method=="contains"){if(args.size()!=1){error="contains: expected one value";return false;}nift::RuntimeValue v;if(!eval_arg(0,v))return false;for(const auto& x:a)if(structural_equal(x,v)){out=nift::RuntimeValue(true);return true;}out=nift::RuntimeValue(false);return true;}
-                        if(method=="join"){if(args.size()!=1){error="join: expected separator";return false;}nift::RuntimeValue sep;if(!eval_arg(0,sep)||!sep.is_string()){error="join: separator must be a string";return false;}std::string r;for(std::size_t i=0;i<a.size();++i){if(i)r+=sep.string;if(a[i].is_array()||a[i].is_object()||(a[i].is_string()&&a[i].string.rfind("\x1fnift:",0)==0)){error="join: elements must be renderable scalar values";return false;}r+=render_expression_value(a[i]);}out=nift::RuntimeValue(r);return true;}
+                        if(method=="join"){if(args.size()!=1){error="join: expected separator";return false;}nift::RuntimeValue sep;if(!eval_arg(0,sep)||!sep.is_string()){error="join: separator must be a string";return false;}std::string r;for(std::size_t i=0;i<a.size();++i){if(i)r+=sep.string;if(a[i].is_bytes()||a[i].is_array()||a[i].is_object()||(a[i].is_string()&&a[i].string.rfind("\x1fnift:",0)==0)){error="join: elements must be renderable scalar values";return false;}r+=render_expression_value(a[i]);}out=nift::RuntimeValue(r);return true;}
                         if(method=="slice"){if(args.empty()||args.size()>2){error="slice: expected start and optional end";return false;}nift::RuntimeValue st,en;std::size_t b=0,e=a.size();if(!eval_arg(0,st)||!nift::runtime_number_to_size(st,b)){error="slice: invalid start";return false;}if(args.size()==2){if(!eval_arg(1,en)||!nift::runtime_number_to_size(en,e)){error="slice: invalid end";return false;}}b=std::min(b,a.size());e=std::min(e,a.size());if(e<b)e=b;out=nift::RuntimeValue::make_array();out.array.assign(a.begin()+b,a.begin()+e);return true;}
                     }
                     if(method=="to_string" && (base.is_array()||base.is_object())){error="to_string: use stringify() for composite values";return false;}
@@ -3032,7 +3080,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     }
                     if(method=="size"||method=="empty"||method=="clear"){if(!args.empty()){error=method+": expected no arguments";return false;}size_t n=(c->kind==CollectionKind::Map||c->kind==CollectionKind::SortedMap)?c->entries.size():c->values.size();if(method=="size")out=nift::RuntimeValue((double)n);else if(method=="empty")out=nift::RuntimeValue(n==0);else{if(!need_mut())return false;c->values.clear();c->entries.clear();c->scalar_keys.clear();c->has_huge_int=false;out=nift::RuntimeValue(nullptr);last_expression_mutation_=true;}return true;}
                     if(c->kind==CollectionKind::Stack||c->kind==CollectionKind::Queue||c->kind==CollectionKind::PriQue){
-                        if(method=="push"){if(args.size()!=1){error="push: expected one value";return false;}if(!need_mut())return false;nift::RuntimeValue v;if(quoted_args.size()>0&&quoted_args[0])v=nift::RuntimeValue(args[0]);else if(!eval(args[0],v,depth+1))return false;if(v.is_string()&&(v.string.rfind("\x1fnift:struct:",0)==0||v.string.rfind("\x1fnift:collection:",0)==0)){if(reference_would_cycle(v.string,rb->value->string)){error="push would create a cyclic reference";return false;}}c->values.push_back(v);if(c->kind==CollectionKind::PriQue){std::stable_sort(c->values.begin(),c->values.end(),[&](const auto&a,const auto&b){int z=0;return scalar_order(a,b,z)&&z<0;});}out=v;last_expression_mutation_=true;return true;}
+                        if(method=="push"){if(args.size()!=1){error="push: expected one value";return false;}if(!need_mut())return false;nift::RuntimeValue v;if(quoted_args.size()>0&&quoted_args[0])v=nift::RuntimeValue(args[0]);else if(!eval(args[0],v,depth+1))return false;if(c->kind==CollectionKind::PriQue&&runtime_contains_bytes(v)){error="prique: bytes values are not supported";return false;}if(v.is_string()&&(v.string.rfind("\x1fnift:struct:",0)==0||v.string.rfind("\x1fnift:collection:",0)==0)){if(reference_would_cycle(v.string,rb->value->string)){error="push would create a cyclic reference";return false;}}c->values.push_back(v);if(c->kind==CollectionKind::PriQue){std::stable_sort(c->values.begin(),c->values.end(),[&](const auto&a,const auto&b){int z=0;return scalar_order(a,b,z)&&z<0;});}out=v;last_expression_mutation_=true;return true;}
                         if(method=="pop"||method=="top"||method=="front"){if(!args.empty()){error=method+": expected no arguments";return false;}if(c->values.empty()){error=method+": collection is empty";return false;}size_t i=(c->kind==CollectionKind::Stack&&(method=="pop"||method=="top"))?c->values.size()-1:0;out=c->values[i];if(method=="pop"){if(!need_mut())return false;c->values.erase(c->values.begin()+i);last_expression_mutation_=true;}return true;}
                         if(method=="contains"){if(args.size()!=1){error="contains: expected one value";return false;}nift::RuntimeValue v;if(quoted_args.size()>0&&quoted_args[0])v=nift::RuntimeValue(args[0]);else if(!eval(args[0],v,depth+1))return false;bool f=false;for(auto&w:c->values)if(structural_equal(v,w)){f=true;break;}out=nift::RuntimeValue(f);return true;}
                     }
@@ -3093,7 +3141,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         std::stable_sort(a.begin(),a.end(),[&](const auto&x,const auto&y){if(failed)return false;if(args.empty()){if(x.is_number()&&y.is_number())return nift::runtime_compare_numbers(x,y)<0;if(x.is_string()&&y.is_string())return x.string<y.string;failed=true;ferr="sort: incomparable values";return false;}nift::RuntimeValue r;if(!invoke_callback(args[0],{x,y},r)){failed=true;ferr=error;return false;}if(!r.is_bool()){failed=true;ferr="sort: comparator must return bool";return false;}return r.boolean;});if(failed){error=ferr;return false;}out=*rb->value;last_expression_mutation_=true;return true;}
                     if(method=="size"||method=="empty"||method=="first"||method=="last"||method=="pop"||method=="clear"||method=="push"||method=="insert"||method=="remove"||method=="indexOf"||method=="contains"||method=="join"||method=="slice"||method=="splice"||method=="reverse"){
                         if((method=="size"||method=="empty"||method=="first"||method=="last"||method=="pop"||method=="clear")&&!args.empty()){error=method+": expected no arguments";return false;}
-                        if(method=="join"){if(args.size()!=1){error="join: expected separator";return false;}nift::RuntimeValue sep;if(!eval_arg(0,sep)||!sep.is_string()){error="join: separator must be a string";return false;}std::string joined;for(size_t j=0;j<a.size();++j){if(j)joined+=sep.string;if(a[j].is_array()||a[j].is_object()||(a[j].is_string()&&(a[j].string.rfind("\x1fnift:",0)==0))){error="join: elements must be renderable scalar values";return false;}joined+=render_expression_value(a[j]);}out=nift::RuntimeValue(joined);return true;}
+                        if(method=="join"){if(args.size()!=1){error="join: expected separator";return false;}nift::RuntimeValue sep;if(!eval_arg(0,sep)||!sep.is_string()){error="join: separator must be a string";return false;}std::string joined;for(size_t j=0;j<a.size();++j){if(j)joined+=sep.string;if(a[j].is_bytes()||a[j].is_array()||a[j].is_object()||(a[j].is_string()&&(a[j].string.rfind("\x1fnift:",0)==0))){error="join: elements must be renderable scalar values";return false;}joined+=render_expression_value(a[j]);}out=nift::RuntimeValue(joined);return true;}
                         if(method=="slice"){if(args.empty()||args.size()>2){error="slice: expected start and optional end";return false;}nift::RuntimeValue st,en;size_t b=0,e=a.size();if(!eval(args[0],st,depth+1)||!nift::runtime_number_to_size(st,b)){error="slice: invalid start";return false;}if(args.size()==2){if(!eval(args[1],en,depth+1)||!nift::runtime_number_to_size(en,e)){error="slice: invalid end";return false;}}if(b>a.size())b=a.size();if(e>a.size())e=a.size();if(e<b)e=b;out=nift::RuntimeValue::make_array();out.array.assign(a.begin()+b,a.begin()+e);return true;}
                         if(method=="splice"){if(args.size()<2||args.size()>3){error="splice: expected start, delete_count, optional replacement array";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}nift::RuntimeValue st,dc,repl;size_t b=0,count=0;if(!eval(args[0],st,depth+1)||!eval(args[1],dc,depth+1)||!nift::runtime_number_to_size(st,b)||!nift::runtime_number_to_size(dc,count)){error="splice: invalid index/count";return false;}if(b>a.size())b=a.size();size_t n=std::min(count,a.size()-b);out=nift::RuntimeValue::make_array();out.array.assign(a.begin()+b,a.begin()+b+n);a.erase(a.begin()+b,a.begin()+b+n);if(args.size()==3){if(!eval(args[2],repl,depth+1)||!repl.is_array()){error="splice: replacements must be an array";return false;}a.insert(a.begin()+b,repl.array.begin(),repl.array.end());}last_expression_mutation_=true;return true;}
                         if(method=="reverse"){if(!args.empty()){error="reverse: expected no arguments";return false;}if(!rb->mutable_binding){error="cannot mutate const array: "+root;return false;}std::reverse(a.begin(),a.end());out=*rb->value;last_expression_mutation_=true;return true;}
@@ -3118,9 +3166,9 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     if(method=="read_line"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Input){error="read_line: expected input stream and no arguments";return false;}std::string line;if(!std::getline(*st->input,line)){if(st->input->eof()){st->input->clear();out=nift::RuntimeValue(nullptr);return true;}error="read_line: input failure";return false;}out=nift::RuntimeValue(line);return true;}
                     if(method=="read_all"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Input){error="read_all: expected input stream and no arguments";return false;}std::ostringstream ss;ss<<st->input->rdbuf();out=nift::RuntimeValue(ss.str());return true;}
                     if(method=="read"){if(aa.size()!=1||st->kind!=StreamInstance::Kind::Input){error="read: expected byte count on input stream";return false;}nift::RuntimeValue n;size_t count=0;if(!eval(aa[0],n,depth+1)||!nift::runtime_number_to_size(n,count)){error="read: invalid byte count";return false;}constexpr std::size_t chunk_size=64*1024;std::vector<char> chunk(chunk_size);std::string b;std::size_t remaining=count;while(remaining>0&&*st->input){const auto requested=static_cast<std::streamsize>(std::min(remaining,chunk_size));st->input->read(chunk.data(),requested);const auto received=st->input->gcount();if(received<=0)break;b.append(chunk.data(),static_cast<std::size_t>(received));remaining-=static_cast<std::size_t>(received);if(received<requested)break;}out=nift::RuntimeValue(b);return true;}
-                    if(method=="read_val"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Input){error="read_val: expected input stream and no arguments";return false;}*st->input>>std::ws;if(st->input->peek()==std::char_traits<char>::eof()){out=nift::RuntimeValue(nullptr);return true;}std::string token;char first=(char)st->input->peek();if(first=='"'||first=='['||first=='{'){char open=first,close=first=='['?']':first=='{'?'}':'"';int dep=0;bool quoted=false,esc=false;char c;while(st->input->get(c)){token+=c;if(open=='"'){if(esc){esc=false;continue;}if(c=='\\'){esc=true;continue;}if(token.size()>1&&c=='"')break;}else{if(quoted){if(esc)esc=false;else if(c=='\\')esc=true;else if(c=='"')quoted=false;}else if(c=='"')quoted=true;else if(c==open)++dep;else if(c==close&&--dep==0)break;}}}else{while(st->input->peek()!=std::char_traits<char>::eof()&&!std::isspace((unsigned char)st->input->peek()))token+=(char)st->input->get();}nift::RuntimeValue v;std::string ee;if(!eval(token,v,depth+1)){error=std::string("read_val: ")+(error.empty()?("cannot parse value '"+token+"'"):error);return false;}out=v;return true;}
+                    if(method=="read_val"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Input){error="read_val: expected input stream and no arguments";return false;}*st->input>>std::ws;if(st->input->peek()==std::char_traits<char>::eof()){out=nift::RuntimeValue(nullptr);return true;}std::string token;char first=(char)st->input->peek();if(first=='"'||first=='['||first=='{'){char open=first,close=first=='['?']':first=='{'?'}':'"';int dep=0;bool quoted=false,esc=false;char c;while(st->input->get(c)){token+=c;if(open=='"'){if(esc){esc=false;continue;}if(c=='\\'){esc=true;continue;}if(token.size()>1&&c=='"')break;}else{if(quoted){if(esc)esc=false;else if(c=='\\')esc=true;else if(c=='"')quoted=false;}else if(c=='"')quoted=true;else if(c==open)++dep;else if(c==close&&--dep==0)break;}}}else{while(st->input->peek()!=std::char_traits<char>::eof()&&!std::isspace((unsigned char)st->input->peek()))token+=(char)st->input->get();}nift::RuntimeValue v;std::string ee;if(!eval(token,v,depth+1)){error=std::string("read_val: ")+(error.empty()?("cannot parse value '"+token+"'"):error);return false;}if(runtime_contains_bytes(v)){error="read_val: bytes values are not serializable";return false;}out=v;return true;}
                     if(method=="write_val"){if(aa.size()!=1||st->kind!=StreamInstance::Kind::Output){error="write_val: expected one value on output stream";return false;}nift::RuntimeValue v;if(!((!qq.empty()&&qq[0])?(v=nift::RuntimeValue(aa[0]),true):eval(aa[0],v,depth+1)))return false;if(v.is_string()&&!qq.empty()&&qq[0]&&v.string.find("$[")!=std::string::npos){std::string r,e;if(!interpolate_parameter(v.string,r,e)){error="write_val: "+e;return false;}v=nift::RuntimeValue(r);}std::string serialized;if(!serialize_value(v,false,serialized,error))return false;*st->output<<serialized<<'\n';if(!*st->output){error="write_val: output failure";return false;}out=nift::RuntimeValue(nullptr);return true;}
-                    if(method=="write"||method=="write_line"){if(aa.size()!=1||st->kind!=StreamInstance::Kind::Output){error=method+": expected one value on output stream";return false;}nift::RuntimeValue v;if(!((!qq.empty()&&qq[0])?(v=nift::RuntimeValue(aa[0]),true):eval(aa[0],v,depth+1)))return false;if(v.is_string()&&!qq.empty()&&qq[0]&&v.string.find("$[")!=std::string::npos){std::string r,e;if(!interpolate_parameter(v.string,r,e)){error=method+": "+e;return false;}v=nift::RuntimeValue(r);}if(v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0)){error=method+": value is not directly renderable";return false;}*st->output<<render_expression_value(v);if(method=="write_line")*st->output<<'\n';if(!*st->output){error=method+": output failure";return false;}out=nift::RuntimeValue(nullptr);return true;}
+                    if(method=="write"||method=="write_line"){if(aa.size()!=1||st->kind!=StreamInstance::Kind::Output){error=method+": expected one value on output stream";return false;}nift::RuntimeValue v;if(!((!qq.empty()&&qq[0])?(v=nift::RuntimeValue(aa[0]),true):eval(aa[0],v,depth+1)))return false;if(v.is_string()&&!qq.empty()&&qq[0]&&v.string.find("$[")!=std::string::npos){std::string r,e;if(!interpolate_parameter(v.string,r,e)){error=method+": "+e;return false;}v=nift::RuntimeValue(r);}if(v.is_bytes()||v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0)){error=method+": value is not directly renderable";return false;}*st->output<<render_expression_value(v);if(method=="write_line")*st->output<<'\n';if(!*st->output){error=method+": output failure";return false;}out=nift::RuntimeValue(nullptr);return true;}
                     if(method=="flush"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Output){error="flush: expected output stream and no arguments";return false;}st->output->flush();if(!*st->output){error="flush: output failure";return false;}out=nift::RuntimeValue(nullptr);return true;}
                 }
             }}
@@ -3486,6 +3534,12 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         }
                         out = base.array[index];
                         return true;
+                    }
+                    if (base.is_bytes()) {
+                        nift::RuntimeValue computed;std::size_t index=0;
+                        if (!eval(token,computed,depth+1) || !nift::runtime_number_to_size(computed,index)) { error="bytes indices must be non-negative integers in '"+text+"'"; return false; }
+                        if (!base.bytes || index>=base.bytes->size()) { error="bytes index "+std::to_string(index)+" is out of range in '"+text+"'"; return false; }
+                        out=nift::RuntimeValue(static_cast<int>((*base.bytes)[index]));return true;
                     }
                     if (base.is_object()) {
                         std::string key;
@@ -3872,6 +3926,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 equal = structural_equal(left,right);
                 result = op=="==" ? equal : !equal;
             } else {
+                if(left.is_bytes()||right.is_bytes()){error="bytes ordering is not supported";return false;}
                 if((left.is_string()&&left.string.rfind("\x1fnift:enum:",0)==0)||(right.is_string()&&right.string.rfind("\x1fnift:enum:",0)==0)){error="enum ordering is not defined; compare explicit to_int() values if intended";return false;}
                 if ((!left.is_number() || !right.is_number()) && !(left.is_string() && right.is_string())) { error="ordering comparisons require two numbers or two strings"; return false; }
                 int ordering=0;
@@ -3889,7 +3944,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             out=nift::RuntimeValue(!truthy_value(operand)); return true;
         }
 
-        { std::size_t cp=std::string::npos;bool q=false;char qc=0;int pa=0,br=0,bc=0;for(size_t z=text.size();z-- >0;){char c=text[z];if(q){if(c==qc&&(z==0||text[z-1]!='\\'))q=false;continue;}if(c=='\''||c=='"'){q=true;qc=c;continue;}if(c==')')++pa;else if(c=='(')--pa;else if(c==']')++br;else if(c=='[')--br;else if(c=='}')++bc;else if(c=='{')--bc;else if(c=='+'&&!pa&&!br&&!bc){if((z>0&&std::string("+-*/%(<>=!&|?:,").find(text[z-1])!=std::string::npos)||nift_numeric_exponent_sign(text,z))continue;cp=z;break;}}if(cp!=std::string::npos){nift::RuntimeValue l,r;if(!eval(text.substr(0,cp),l,depth+1)||!eval(text.substr(cp+1),r,depth+1))return false;nift::RuntimeValue ls,rs;if(!atomic_scalar(l,ls)||!atomic_scalar(r,rs))return false;l=std::move(ls);r=std::move(rs);if(l.is_array()&&r.is_array()){out=nift::RuntimeValue::make_array();out.array.reserve(l.array.size()+r.array.size());out.array.insert(out.array.end(),l.array.begin(),l.array.end());out.array.insert(out.array.end(),r.array.begin(),r.array.end());return true;}if(l.is_string()||r.is_string()){auto safe=[&](const nift::RuntimeValue& v,std::string& z){if(v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0))return false;z=render_expression_value(v);return true;};std::string a,b;if(!safe(l,a)||!safe(r,b)){error="string concatenation requires renderable scalar values";return false;}out=nift::RuntimeValue(a+b);return true;}return numeric_binary(l,r,'+',out);}}
+        { std::size_t cp=std::string::npos;bool q=false;char qc=0;int pa=0,br=0,bc=0;for(size_t z=text.size();z-- >0;){char c=text[z];if(q){if(c==qc&&(z==0||text[z-1]!='\\'))q=false;continue;}if(c=='\''||c=='"'){q=true;qc=c;continue;}if(c==')')++pa;else if(c=='(')--pa;else if(c==']')++br;else if(c=='[')--br;else if(c=='}')++bc;else if(c=='{')--bc;else if(c=='+'&&!pa&&!br&&!bc){if((z>0&&std::string("+-*/%(<>=!&|?:,").find(text[z-1])!=std::string::npos)||nift_numeric_exponent_sign(text,z))continue;cp=z;break;}}if(cp!=std::string::npos){nift::RuntimeValue l,r;if(!eval(text.substr(0,cp),l,depth+1)||!eval(text.substr(cp+1),r,depth+1))return false;nift::RuntimeValue ls,rs;if(!atomic_scalar(l,ls)||!atomic_scalar(r,rs))return false;l=std::move(ls);r=std::move(rs);if(l.is_array()&&r.is_array()){out=nift::RuntimeValue::make_array();out.array.reserve(l.array.size()+r.array.size());out.array.insert(out.array.end(),l.array.begin(),l.array.end());out.array.insert(out.array.end(),r.array.begin(),r.array.end());return true;}if(l.is_bytes()||r.is_bytes()){if(!l.is_bytes()||!r.is_bytes()){error="bytes concatenation requires two bytes values";return false;}nift::RuntimeBytes joined;if(l.bytes)joined.insert(joined.end(),l.bytes->begin(),l.bytes->end());if(r.bytes)joined.insert(joined.end(),r.bytes->begin(),r.bytes->end());out=nift::RuntimeValue(std::move(joined));return true;}if(l.is_string()||r.is_string()){auto safe=[&](const nift::RuntimeValue& v,std::string& z){if(v.is_bytes()||v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0))return false;z=render_expression_value(v);return true;};std::string a,b;if(!safe(l,a)||!safe(r,b)){error="string concatenation requires renderable scalar values";return false;}out=nift::RuntimeValue(a+b);return true;}return numeric_binary(l,r,'+',out);}}
 
         auto find_binary = [&](const std::string& ops) -> std::size_t {
             bool quoted=false; char quote=0; int parens=0; int brackets=0;
@@ -3919,7 +3974,8 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             nift::RuntimeValue ls,rs;if(!atomic_scalar(left,ls)||!atomic_scalar(right,rs))return false;left=std::move(ls);right=std::move(rs);
             const char op=text[pos];
             if(op=='+' && left.is_array() && right.is_array()){out=nift::RuntimeValue::make_array();out.array.reserve(left.array.size()+right.array.size());out.array.insert(out.array.end(),left.array.begin(),left.array.end());out.array.insert(out.array.end(),right.array.begin(),right.array.end());return true;}
-            if(op=='+' && (left.is_string()||right.is_string())) { auto safe=[&](const nift::RuntimeValue& v,std::string& r){if(v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0))return false;r=render_expression_value(v);return true;};std::string l,r;if(!safe(left,l)||!safe(right,r)){error="string concatenation requires renderable scalar values";return false;}out=nift::RuntimeValue(l+r);return true; }
+            if(op=='+' && (left.is_bytes()||right.is_bytes())){if(!left.is_bytes()||!right.is_bytes()){error="bytes concatenation requires two bytes values";return false;}nift::RuntimeBytes joined;if(left.bytes)joined.insert(joined.end(),left.bytes->begin(),left.bytes->end());if(right.bytes)joined.insert(joined.end(),right.bytes->begin(),right.bytes->end());out=nift::RuntimeValue(std::move(joined));return true;}
+            if(op=='+' && (left.is_string()||right.is_string())) { auto safe=[&](const nift::RuntimeValue& v,std::string& r){if(v.is_bytes()||v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0))return false;r=render_expression_value(v);return true;};std::string l,r;if(!safe(left,l)||!safe(right,r)){error="string concatenation requires renderable scalar values";return false;}out=nift::RuntimeValue(l+r);return true; }
             if (!left.is_number() || !right.is_number()) { error="arithmetic operators require numeric operands"; return false; }
             return numeric_binary(left,right,op,out);
         }
@@ -4043,12 +4099,14 @@ bool Parser::evaluate_condition(const std::string& expression, bool& value, std:
                     if (left->is_null()) equal = true;
                     else if (left->is_bool()) equal = left->boolean == right->boolean;
                     else if (left->is_string()) equal = left->string == right->string;
+                    else if (left->is_bytes()) equal = nift::runtime_equal(*left,*right);
                     else { error = "@if comparisons are only supported for scalar JSON values"; return false; }
                 }
                 result = op == "==" ? equal : !equal;
                 return true;
             }
 
+            if(left->is_bytes()||right->is_bytes()){error="bytes ordering is not supported";return false;}
             if ((!left->is_number() || !right->is_number()) &&
                 (left->type != right->type || !left->is_string())) {
                 error = "@if ordering comparisons require two numbers or two strings of the same type";
@@ -4388,7 +4446,7 @@ RenderResult Parser::run_script(const std::string& source, const fs::path& sourc
     rr.output.clear();
     if(rr.ok && pending_control_.kind==ControlFlow::Return && pending_control_.value) {
         const auto& v=*pending_control_.value;
-        if(v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0)) { rr.ok=false; rr.error.message="script return value is not directly renderable"; }
+        if(v.is_bytes()||v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0)) { rr.ok=false; rr.error.message="script return value is not directly renderable"; }
         else rr.output=render_expression_value(v);
     }
     pending_control_={};
@@ -4628,7 +4686,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             if(nested.ok){for(auto& kv:file_instances_)if(!pre_script_files.count(kv.first)&&kv.second->open){auto f=kv.second;f->open=false;f->dirty=false;f->mode.clear();f->working.clear();f->saved.clear();f->cursor=0;nested.ok=false;nested.error.message="managed file left open at @script completion: "+f->path.generic_string();break;}}
             if(!nested.ok){result_=nested;break;}
             if(pending_control_.kind==ControlFlow::Return){
-                if(pending_control_.value) { const auto& rv=*pending_control_.value;if(rv.is_array()||rv.is_object()||(rv.is_string()&&rv.string.rfind("\x1fnift:",0)==0)){pending_control_={};fail(source_path,source,i,"@script return value is not directly renderable");break;}output += render_expression_value(rv); }
+                if(pending_control_.value) { const auto& rv=*pending_control_.value;if(rv.is_bytes()||rv.is_array()||rv.is_object()||(rv.is_string()&&rv.string.rfind("\x1fnift:",0)==0)){pending_control_={};fail(source_path,source,i,"@script return value is not directly renderable");break;}output += render_expression_value(rv); }
                 pending_control_={};
             }
             i=bc+1; continue;
@@ -4900,6 +4958,10 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                         const std::string ck=trim_copy(key);
                         if (standalone_script_host_ && !ck.empty() && ck.back()==')') { i = end + 1; continue; }
                         fail(source_path, source, i, "cannot render JSON object $[" + key + "]; select a member first");
+                        break;
+                    }
+                    if (expression_value.is_bytes()) {
+                        fail(source_path, source, i, "cannot render bytes $[" + key + "]; decode as UTF-8 first");
                         break;
                     }
                     if (function_call_depth_ == 0 &&
@@ -5227,6 +5289,14 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             }
             if(method=="to_string"&&recv.is_number()){out=nift::RuntimeValue(render_expression_value(recv));return true;}
             if(method=="to_string"&&recv.is_string()){out=recv;return true;}
+            if(method=="encode"&&recv.is_string()){if(args.size()!=1||!args[0].is_string()||args[0].string!="utf-8"){e="encode: encoding must be exactly 'utf-8'";return false;}if(!nift::runtime_valid_utf8(recv.string)){e="encode: invalid UTF-8 text";return false;}out=nift::RuntimeValue(nift::RuntimeBytes(recv.string.begin(),recv.string.end()));return true;}
+            if(recv.is_bytes()){
+                const nift::RuntimeBytes empty;const auto& data=recv.bytes?*recv.bytes:empty;
+                if(method=="length"||method=="size"){if(!args.empty()){e=method+": expected no arguments";return false;}out=nift::RuntimeValue(static_cast<double>(data.size()));return true;}
+                if(method=="empty"){if(!args.empty()){e="empty: expected no arguments";return false;}out=nift::RuntimeValue(data.empty());return true;}
+                if(method=="slice"){if(args.empty()||args.size()>2){e="slice: expected start and optional end";return false;}std::size_t begin=0,end=data.size();if(!nift::runtime_number_to_size(args[0],begin)){e="slice: invalid start";return false;}if(args.size()==2&&!nift::runtime_number_to_size(args[1],end)){e="slice: invalid end";return false;}begin=std::min(begin,data.size());end=std::min(end,data.size());if(end<begin)end=begin;out=nift::RuntimeValue(nift::RuntimeBytes(data.begin()+begin,data.begin()+end));return true;}
+                if(method=="decode"){if(args.size()!=1||!args[0].is_string()||args[0].string!="utf-8"){e="decode: encoding must be exactly 'utf-8'";return false;}std::string decoded=runtime_bytes_string(recv);if(!nift::runtime_valid_utf8(decoded)){e="decode: invalid UTF-8";return false;}out=nift::RuntimeValue(std::move(decoded));return true;}
+            }
             if(method=="to_int"&&recv.is_number()){if(!args.empty()){e="to_int: expected no arguments";return false;}std::int64_t value=0;if(!nift::runtime_number_to_i64(recv,value)){e="to_int: invalid or out-of-range integer";return false;}out=nift::runtime_integer(value);return true;}
             if(method=="to_double"&&recv.is_number()){out=recv;return true;}
             if(method=="abs"&&recv.is_number()){out=nift::RuntimeValue(std::fabs(recv.num));return true;}
@@ -5298,7 +5368,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     if(st.op=="write"||st.op=="write_line"){
                         if(av.size()!=1||!f->open||!(f->mode=="w"||f->mode=="a"||f->mode=="rw")){if(av.size()!=1&&e.empty())e=st.op+": expected one value";return false;}
                         nift::RuntimeValue v=std::move(av[0]);
-                        if(v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0)){e=st.op+": value is not directly renderable";return false;}
+                        if(v.is_bytes()||v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0)){e=st.op+": value is not directly renderable";return false;}
                         std::string d=render_expression_value(v);
                         if(st.op=="write_line")d+='\n';
                         const std::size_t base=std::min(f->cursor,f->working.size());
@@ -5978,7 +6048,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 const std::size_t call_end = (end > call_start && source[end - 1] == ';') ? end - 1 : end;
                 const std::string call = "@" + function + source.substr(call_start, call_end - call_start);
                 if (!evaluate_collection_value(call, collection_result, collection_error)) { fail(source_path, source, i, collection_error); break; }
-                output += render_expression_value(collection_result); i = end; continue;
+                if(runtime_contains_bytes(collection_result)){fail(source_path,source,i,"bytes values cannot be rendered as text");break;}output += render_expression_value(collection_result); i = end; continue;
             }
 
             if (function == "substr") {
@@ -6053,7 +6123,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 }
                 for (std::size_t item_index = 0; item_index < array->array.size(); ++item_index) {
                     const auto& item = array->array[item_index];
-                    if (item.is_array() || item.is_object()) {
+                    if (item.is_bytes() || item.is_array() || item.is_object()) {
                         fail(source_path, source, i, "join: array items must be scalar JSON values");
                         break;
                     }

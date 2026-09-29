@@ -25,7 +25,12 @@ Checked JSON conversion rejects top-level or nested bytes atomically, text and
 value serialization reject bytes, and public C++ exposes `Value::Type::Bytes`
 and `Value::Bytes`. No language construction/operations, binary I/O, FFI bridge,
 C ABI or maintained-binding bytes API was added. Evidence is in
-`docs/evidence/cp16-bytes-storage.md`. CP17 is next.
+`docs/evidence/cp16-bytes-storage.md`.
+
+CP17 implementation status: complete candidate on 2026-09-29. Checked language
+construction, immutable byte operations, strict UTF-8 conversion, introspection
+and controlled language-facing text/value serialization rejection are in place.
+Evidence is in `docs/evidence/cp17-bytes-language.md`. CP18 is next.
 
 Strict JSON remains a separate ingress/egress boundary. The implementation must
 introduce a Nift-owned runtime value model for null, bool, number, string, bytes,

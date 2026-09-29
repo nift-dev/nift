@@ -5,6 +5,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -76,5 +77,6 @@ bool runtime_compare_numbers_relational(const RuntimeValue& left, const RuntimeV
 int runtime_compare_numbers(const RuntimeValue& left, const RuntimeValue& right);
 std::string runtime_numeric_fingerprint(const RuntimeValue& value);
 std::string runtime_fingerprint(const RuntimeValue& value);
+bool runtime_valid_utf8(std::string_view value);
 
 } // namespace nift

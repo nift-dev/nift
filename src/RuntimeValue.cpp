@@ -9,6 +9,32 @@
 
 namespace nift {
 
+bool runtime_valid_utf8(std::string_view value) {
+    for (std::size_t i = 0; i < value.size();) {
+        const auto first = static_cast<unsigned char>(value[i]);
+        std::size_t width = 0;
+        std::uint32_t codepoint = 0;
+        if (first <= 0x7f) { width = 1; codepoint = first; }
+        else if (first >= 0xc2 && first <= 0xdf) { width = 2; codepoint = first & 0x1f; }
+        else if (first >= 0xe0 && first <= 0xef) { width = 3; codepoint = first & 0x0f; }
+        else if (first >= 0xf0 && first <= 0xf4) { width = 4; codepoint = first & 0x07; }
+        else return false;
+        if (i + width > value.size()) return false;
+        for (std::size_t j = 1; j < width; ++j) {
+            const auto continuation = static_cast<unsigned char>(value[i + j]);
+            if ((continuation & 0xc0) != 0x80) return false;
+            codepoint = (codepoint << 6) | (continuation & 0x3f);
+        }
+        if ((width == 2 && codepoint < 0x80) ||
+            (width == 3 && codepoint < 0x800) ||
+            (width == 4 && codepoint < 0x10000) ||
+            (codepoint >= 0xd800 && codepoint <= 0xdfff) || codepoint > 0x10ffff)
+            return false;
+        i += width;
+    }
+    return true;
+}
+
 bool RuntimeValue::has(const std::string& key) const {
     if (!is_object()) return false;
     return std::find_if(object.begin(), object.end(), [&](const auto& entry) {
