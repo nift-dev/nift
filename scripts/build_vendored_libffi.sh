@@ -3,8 +3,20 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 BUILD="${1:?usage: build_vendored_libffi.sh <build-directory>}"
-SOURCE_DIGEST="$(python3 "$ROOT/scripts/check_vendored_libffi.py" --print-digest "$ROOT/third_party/libffi")"
-BUILD_LOGIC_DIGEST="$(python3 - "$ROOT/scripts/build_vendored_libffi.sh" "$ROOT/scripts/check_vendored_libffi.py" <<'PY'
+if [ -n "${PYTHON:-}" ]; then
+  read -r -a PYTHON_CMD <<< "$PYTHON"
+elif command -v python3 >/dev/null 2>&1; then
+  PYTHON_CMD=(python3)
+elif command -v python >/dev/null 2>&1; then
+  PYTHON_CMD=(python)
+elif command -v py >/dev/null 2>&1; then
+  PYTHON_CMD=(py -3)
+else
+  printf '%s\n' "error: Python 3 is required to build vendored libffi" >&2
+  exit 1
+fi
+SOURCE_DIGEST="$("${PYTHON_CMD[@]}" "$ROOT/scripts/check_vendored_libffi.py" --print-digest "$ROOT/third_party/libffi")"
+BUILD_LOGIC_DIGEST="$("${PYTHON_CMD[@]}" - "$ROOT/scripts/build_vendored_libffi.sh" "$ROOT/scripts/check_vendored_libffi.py" <<'PY'
 import hashlib
 import pathlib
 import sys
@@ -24,7 +36,7 @@ BASE_CFLAGS="${CFLAGS:-}"
 CFLAGS="$BASE_CFLAGS -fvisibility=hidden"
 export CFLAGS
 CONFIGURE_ARGS="--disable-shared --enable-static --with-pic --disable-docs --disable-multi-os-directory"
-FINGERPRINT="$(python3 - "$SOURCE_DIGEST" "$BUILD_LOGIC_DIGEST" "$CC_VALUE" "$CXX_VALUE" "$CFLAGS" "${CPPFLAGS:-}" "${LDFLAGS:-}" "$CONFIGURE_ARGS" <<'PY'
+FINGERPRINT="$("${PYTHON_CMD[@]}" - "$SOURCE_DIGEST" "$BUILD_LOGIC_DIGEST" "$CC_VALUE" "$CXX_VALUE" "$CFLAGS" "${CPPFLAGS:-}" "${LDFLAGS:-}" "$CONFIGURE_ARGS" <<'PY'
 import hashlib
 import os
 import subprocess
