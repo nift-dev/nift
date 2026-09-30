@@ -8,6 +8,7 @@ self-contained under valid relative paths - an sdist consumer never needs the
 canonical checkout. The version is the synchronized canonical Nift release
 version: NIFT_VERSION is REQUIRED.
 """
+import glob
 import os
 import subprocess
 import sys
@@ -37,7 +38,6 @@ CABI_SOURCES = [
     "native/markuppp/src/Markup.cpp",
     "native/markuppp/src/AsciiDoc.cpp",
     "native/markuppp/src/ReStructuredText.cpp",
-    "native/src/Parser.cpp",
     "native/src/Ast.cpp",
     "native/src/Automation.cpp",
     "native/src/Process.cpp",
@@ -49,7 +49,11 @@ CABI_SOURCES = [
     "native/src/BuildProgress.cpp",
     "native/src/embed/c_abi.cpp",
 ]
-sources = [os.path.join(BASE, s) for s in CABI_SOURCES]
+PARSER_SOURCES = sorted(glob.glob(os.path.join(NATIVE, "src", "Parser*.cpp")))
+if os.path.join(NATIVE, "src", "Parser.cpp") not in PARSER_SOURCES:
+    raise SystemExit("staged native sources are missing Parser.cpp")
+
+sources = [os.path.join(BASE, s) for s in CABI_SOURCES] + PARSER_SOURCES
 sources.append(os.path.join(BASE, "src", "nift_module.cc"))
 
 MARKUP_C_NAMES = [

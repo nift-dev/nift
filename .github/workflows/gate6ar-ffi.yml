@@ -5,7 +5,7 @@ on:
     branches: [main]
     paths:
       - 'Makefile'
-      - 'src/Parser.cpp'
+      - 'src/Parser*'
       - 'src/FfiAbi.h'
       - 'src/embed/**'
       - 'include/nift/c_abi.h'
@@ -21,7 +21,7 @@ on:
     branches: [main]
     paths:
       - 'Makefile'
-      - 'src/Parser.cpp'
+      - 'src/Parser*'
       - 'src/FfiAbi.h'
       - 'src/embed/**'
       - 'include/nift/c_abi.h'

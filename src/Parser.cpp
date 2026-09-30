@@ -1,6 +1,7 @@
 #include "JsonFile.h"
 #include "RuntimeJson.h"
 #include "Parser.h"
+#include "ParserHelpers.h"
 #include "FrontMatter.h"
 #include "Console.h"
 #include "FileSystem.h"
@@ -15,6 +16,7 @@
 #include "RenderHost.h"
 #include <markup/Markup.h>
 #include <minify/Minify.h>
+#include <nift/context.h>
 
 #include <algorithm>
 #include <chrono>
@@ -210,56 +212,6 @@ static bool nift_atomic_add_sub_checked(std::atomic<std::int64_t>& value,
     }
 }
 
-static bool nift_numeric_exponent_sign(const std::string& text, std::size_t sign) {
-    if (sign < 2 || (text[sign - 1] != 'e' && text[sign - 1] != 'E')) return false;
-    std::size_t start = sign - 1;
-    bool digit = false;
-    bool dot = false;
-    while (start > 0) {
-        const unsigned char c = static_cast<unsigned char>(text[start - 1]);
-        if (std::isdigit(c)) { digit = true; --start; continue; }
-        if (c == '.' && !dot) { dot = true; --start; continue; }
-        break;
-    }
-    if (!digit) return false;
-    if (start > 0) {
-        const unsigned char before = static_cast<unsigned char>(text[start - 1]);
-        if (std::isalnum(before) || before == '_' || before == '.') return false;
-    }
-    return true;
-}
-
-static bool nift_glob_has_magic(const std::string& s) {
-    bool escaped=false; for(char c:s){if(escaped){escaped=false;continue;}if(c=='\\'){escaped=true;continue;}if(c=='*'||c=='?')return true;} return false;
-}
-static bool nift_glob_component_match(const std::string& pattern,const std::string& name){
-    if(!name.empty()&&name[0]=='.'&&(pattern.empty()||pattern[0]!='.'))return false;
-    std::size_t p=0,n=0,star=std::string::npos,mark=0; bool escaped=false;
-    while(n<name.size()){
-        if(p<pattern.size()&&pattern[p]=='\\'&&!escaped){if(p+1<pattern.size()){++p;if(pattern[p]==name[n]){++p;++n;continue;}}}
-        else if(p<pattern.size()&&pattern[p]=='?'){++p;++n;continue;}
-        else if(p<pattern.size()&&pattern[p]=='*'){star=p++;mark=n;continue;}
-        else if(p<pattern.size()&&pattern[p]==name[n]){++p;++n;continue;}
-        if(star!=std::string::npos){p=star+1;n=++mark;continue;}return false;
-    }
-    while(p<pattern.size()&&pattern[p]=='*')++p;
-    return p==pattern.size();
-}
-static void nift_glob_walk(const fs::path& base,const std::vector<std::string>& parts,std::size_t i,std::vector<fs::path>& out){
-    if(i==parts.size()){std::error_code ec;if(fs::exists(base,ec)&&!ec)out.push_back(fs::absolute(base).lexically_normal());return;}
-    const auto& part=parts[i];
-    if(part=="**"){
-        nift_glob_walk(base,parts,i+1,out);
-        std::error_code ec; if(!fs::is_directory(base,ec)||ec)return;
-        std::vector<fs::directory_entry> entries; for(fs::directory_iterator it(base,fs::directory_options::skip_permission_denied,ec),end;!ec&&it!=end;it.increment(ec))entries.push_back(*it);
-        std::sort(entries.begin(),entries.end(),[](const auto&a,const auto&b){return a.path().generic_string()<b.path().generic_string();});
-        for(const auto& e:entries){auto name=e.path().filename().string();if(!name.empty()&&name[0]=='.')continue;std::error_code sec;if(e.is_directory(sec)&&!e.is_symlink(sec))nift_glob_walk(e.path(),parts,i,out);}
-        return;
-    }
-    if(!nift_glob_has_magic(part)){std::string literal;literal.reserve(part.size());for(std::size_t k=0;k<part.size();++k){if(part[k]=='\\'&&k+1<part.size())literal+=part[++k];else literal+=part[k];}nift_glob_walk(base/literal,parts,i+1,out);return;}
-    std::error_code ec;if(!fs::is_directory(base,ec)||ec)return;std::vector<fs::directory_entry> entries;for(fs::directory_iterator it(base,fs::directory_options::skip_permission_denied,ec),end;!ec&&it!=end;it.increment(ec))entries.push_back(*it);
-    std::sort(entries.begin(),entries.end(),[](const auto&a,const auto&b){return a.path().generic_string()<b.path().generic_string();});for(const auto&e:entries)if(nift_glob_component_match(part,e.path().filename().string()))nift_glob_walk(e.path(),parts,i+1,out);
-}
 // Filesystem-root restriction (NIFT_FS_ROOT): true when the standalone script
 // path is inside the configured root (or no root is set / not standalone).
 static bool nift_fs_root_allowed(const fs::path& p, bool standalone, std::string& err){
@@ -270,66 +222,6 @@ static bool nift_fs_root_allowed(const fs::path& p, bool standalone, std::string
     err = "path escapes configured filesystem root: " + p.generic_string();
     return false;
 }
-static std::vector<fs::path> nift_glob_expand(const fs::path& resolved_pattern){
-    std::string g=resolved_pattern.generic_string();fs::path root=resolved_pattern.root_path();std::string rel=root.empty()?g:g.substr(root.generic_string().size());while(!rel.empty()&&rel.front()=='/')rel.erase(rel.begin());std::vector<std::string> parts;std::stringstream ss(rel);std::string part;while(std::getline(ss,part,'/'))if(!part.empty())parts.push_back(part);std::vector<fs::path> out;nift_glob_walk(root.empty()?fs::path("."):root,parts,0,out);std::sort(out.begin(),out.end(),[](const auto&a,const auto&b){return a.generic_string()<b.generic_string();});out.erase(std::unique(out.begin(),out.end()),out.end());return out;
-}
-
-// Presentation-method chain recognizer (.stringify()/.prettify()/.highlight()).
-// It only strips a trailing chain when the dots sit at bracket/paren/quote
-// depth 0 and the remaining base is a single value expression with no
-// top-level operator. Larger compound expressions such as
-// `a == b.prettify()` or `"x" + a.prettify()` are therefore left to the
-// ordinary evaluator, and a string literal like "a.prettify()" is never
-// mistaken for a presentation call.
-bool strip_presentation_chain(const std::string& text, std::string& base, bool& pretty, bool& highlight) {
-    pretty = highlight = false;
-    std::size_t end = text.size();
-    auto balanced_prefix = [&](std::size_t cut) {
-        bool quoted = false; char qc = 0; int par = 0, br = 0, bc = 0;
-        for (std::size_t i = 0; i < cut; ++i) {
-            const char c = text[i];
-            if (quoted) { if (c == '\\' && i + 1 < cut) ++i; else if (c == qc) quoted = false; continue; }
-            if (c == '\'' || c == '"') { quoted = true; qc = c; continue; }
-            if (c == '(') ++par; else if (c == ')') { if (--par < 0) return false; }
-            else if (c == '[') ++br; else if (c == ']') { if (--br < 0) return false; }
-            else if (c == '{') ++bc; else if (c == '}') { if (--bc < 0) return false; }
-        }
-        return !quoted && par == 0 && br == 0 && bc == 0;
-    };
-    bool matched = false;
-    for (;;) {
-        bool stripped = false;
-        for (const auto& method : {std::string("stringify"), std::string("prettify"), std::string("highlight")}) {
-            const std::string suffix = "." + method + "()";
-            if (end >= suffix.size() && text.compare(end - suffix.size(), suffix.size(), suffix) == 0) {
-                const std::size_t cut = end - suffix.size();
-                if (!balanced_prefix(cut)) return false;
-                end = cut; matched = true; stripped = true;
-                if (method == "prettify") pretty = true;
-                if (method == "highlight") highlight = true;
-                break;
-            }
-        }
-        if (!stripped) break;
-    }
-    if (!matched) return false;
-    std::string raw = text.substr(0, end);
-    std::size_t first = raw.find_first_not_of(" \t\r\n"); std::size_t last = raw.find_last_not_of(" \t\r\n");
-    base = (first == std::string::npos) ? std::string() : raw.substr(first, last - first + 1);
-    bool quoted = false; char qc = 0; int par = 0, br = 0, bc = 0;
-    for (std::size_t i = 0; i < base.size(); ++i) {
-        const char c = base[i];
-        if (quoted) { if (c == '\\' && i + 1 < base.size()) ++i; else if (c == qc) quoted = false; continue; }
-        if (c == '\'' || c == '"') { quoted = true; qc = c; continue; }
-        if (c == '(') ++par; else if (c == ')') --par; else if (c == '[') ++br; else if (c == ']') --br; else if (c == '{') ++bc; else if (c == '}') --bc;
-        if (quoted || par || br || bc) continue;
-        if (std::string("=<>+-*/%?:,").find(c) != std::string::npos) return false;
-        if (c == '&' && i + 1 < base.size() && base[i + 1] == '&') return false;
-        if (c == '|' && i + 1 < base.size() && base[i + 1] == '|') return false;
-    }
-    return true;
-}
-
 }  // namespace
 
 // Nift source numeric literals preserve their lexical int/double form: 0, 8
@@ -460,319 +352,25 @@ int Parser::expression_type(const std::string& source) const {
 }
 
 
-namespace {
-bool is_single_quoted_parameter(const std::string& text) {
-    if (text.size() < 2 || (text.front() != '\'' && text.front() != '"')) return false;
-    const char outer = text.front();
-    for (std::size_t i = 1; i < text.size(); ++i) {
-        if (text[i] == '\\' && i + 1 < text.size()) { ++i; continue; }
-        if (text[i] == outer) return i + 1 == text.size();
-    }
-    return false;
-}
-
-std::string unescape_parameter_string(const std::string& text) {
-    std::string result;
-    result.reserve(text.size());
-    for (std::size_t i = 0; i < text.size(); ++i) {
-        if (text[i] == '\\' && i + 1 < text.size()) {
-            const char escaped = text[++i];
-            if (escaped == '$') { result += '\\'; result += '$'; continue; }
-            switch (escaped) {
-                case 'n': result += '\n'; break;
-                case 'r': result += '\r'; break;
-                case 't': result += '\t'; break;
-                case '\\': result += '\\'; break;
-                case '"': result += '"'; break;
-                case '\'': result += '\''; break;
-                default: result += escaped; break;
-            }
-        } else {
-            result += text[i];
-        }
-    }
-    return result;
-}
-std::vector<std::string> parse_parameters(const std::string& text, bool& ok,
-                                          std::vector<bool>* quoted = nullptr) {
-    std::vector<std::string> result; std::string current; bool in_quotes=false; char quote=0;
-    bool parameter_was_quoted=false;
-    int parens=0, brackets=0, braces=0; std::size_t significant_end=0; ok=true;
-    auto append_parameter=[&]{
-        current.resize(significant_end);
-        // A parameter that is exactly one quoted string is a quoted parameter:
-        // strip its outer quotes (applying the legacy in-string escape rules)
-        // and record it. Quotes inside structured literals (objects/arrays)
-        // are preserved so callables and validate() can accept {…}/[…] args.
-        if (is_single_quoted_parameter(current)) {
-            current = unescape_parameter_string(current.substr(1, current.size() - 2));
-            parameter_was_quoted = true;
-        } else {
-            parameter_was_quoted = false;
-        }
-        result.push_back(current);
-        if (quoted) quoted->push_back(parameter_was_quoted);
-        current.clear(); significant_end=0; parameter_was_quoted=false; };
-    for (std::size_t i=0;i<text.size();++i) {
-        const char c=text[i];
-        if (in_quotes) {
-            if (c=='\\' && i+1<text.size()) { current+=c; current+=text[++i]; significant_end=current.size(); continue; }
-            if (c==quote) { in_quotes=false; current+=c; significant_end=current.size(); }
-            else { current+=c; significant_end=current.size(); }
-            continue;
-        }
-        if (c=='\'' || c=='"') { in_quotes=true; quote=c; parameter_was_quoted=true; current+=c; significant_end=current.size(); continue; }
-        if (c=='(') ++parens; else if (c==')') --parens; else if (c=='[') ++brackets; else if (c==']') --brackets; else if (c=='{') ++braces; else if (c=='}') --braces;
-        if (parens<0 || brackets<0 || braces<0) { ok=false; return {}; }
-        if (c==',' && parens==0 && brackets==0 && braces==0) { append_parameter(); continue; }
-        if (std::isspace(static_cast<unsigned char>(c))) { if (!current.empty()) current+=c; }
-        else { current+=c; significant_end=current.size(); }
-    }
-    if (in_quotes || parens || brackets || braces) { ok=false; return {}; }
-    if (!text.empty() || !current.empty()) append_parameter();
-    return result;
-}
-
-bool valid_binding_identifier(const std::string& name) {
-    if (name.empty()) return false;
-    if (!(std::isalpha(static_cast<unsigned char>(name[0])) || name[0] == '_')) return false;
-    return std::all_of(name.begin() + 1, name.end(), [](char c) {
-        return std::isalnum(static_cast<unsigned char>(c)) || c == '_';
-    });
-}
-
-bool parse_callable_parameters(const std::string& text,
-                               std::vector<std::string>& params,
-                               std::string& variadic_param) {
-    auto trim=[](const std::string& value){const auto first=value.find_first_not_of(" \t\r\n");if(first==std::string::npos)return std::string();const auto last=value.find_last_not_of(" \t\r\n");return value.substr(first,last-first+1);};
-    bool ok = false;
-    params = parse_parameters(text, ok);
-    variadic_param.clear();
-    if (!ok) return false;
-    std::unordered_set<std::string> names;
-    for (std::size_t i = 0; i < params.size(); ++i) {
-        std::string param = trim(params[i]);
-        if (param.rfind("...", 0) == 0) {
-            if (!variadic_param.empty() || i + 1 != params.size() ||
-                !valid_binding_identifier(trim(param.substr(3)))) return false;
-            variadic_param = trim(param.substr(3));
-            if (!names.insert(variadic_param).second) return false;
-            params.pop_back();
-            break;
-        }
-        if (!valid_binding_identifier(param) || !names.insert(param).second) return false;
-        params[i] = std::move(param);
-    }
-    return true;
-}
-
-bool reserved_binding_name(const std::string& name) {
-    static const std::unordered_set<std::string> names = {
-        "title", "name", "content-path", "output-path", "template-path",
-        "build-timezone", "build-time", "build-UTC-time", "build-date",
-        "build-UTC-date", "build-YYYY", "build-YY", "build-OS",
-        // `loop` is the lexical metadata object injected by @for. Reserving it
-        // prevents user data aliases from becoming ambiguous with $[loop.*].
-        "loop"
-    };
-    return names.count(name) != 0;
-}
-
-bool built_in_metadata_name(const std::string& name) {
-    static const std::unordered_set<std::string> names = {
-        "title", "name", "content-path", "output-path", "template-path",
-        "build-timezone", "build-time", "build-UTC-time", "build-date",
-        "build-UTC-date", "build-YYYY", "build-YY", "build-OS"
-    };
-    return names.count(name) != 0;
-}
-
-bool parse_for_collection_clause(const std::string& clause,
-                                 std::string& collection_expression,
-                                 std::string& sort_expression,
-                                 bool& descending,
-                                 std::string& error) {
-    bool quoted=false; char quote=0; int parens=0, brackets=0; std::size_t by=std::string::npos;
-    for(std::size_t i=0;i+4<=clause.size();++i){char c=clause[i]; if(quoted){if(c=='\\')++i;else if(c==quote)quoted=false;continue;} if(c=='\''||c=='"'){quoted=true;quote=c;continue;} if(c=='(')++parens;else if(c==')')--parens;else if(c=='[')++brackets;else if(c==']')--brackets; if(!parens&&!brackets&&clause.compare(i,4," by ")==0){by=i;break;}}
-    if(by==std::string::npos){collection_expression=clause;sort_expression.clear();descending=false;return true;}
-    collection_expression=clause.substr(0,by); std::string tail=clause.substr(by+4);
-    const auto space=tail.find_last_of(" \t"); if(space==std::string::npos){error="@for sorting syntax is @for(item : collection by item.field asc|desc){...}";return false;}
-    sort_expression=tail.substr(0,space); const std::string direction=tail.substr(space+1); if(direction!="asc"&&direction!="desc"){error="@for sorting syntax is @for(item : collection by item.field asc|desc){...}";return false;} descending=direction=="desc"; return true;
-}
-std::shared_ptr<const nift::RuntimeValue> make_loop_metadata(std::size_t index,
-                                                         std::size_t length) {
-    auto loop = std::make_shared<nift::RuntimeValue>(nift::RuntimeValue::make_object());
-    (*loop)["index"] = nift::RuntimeValue(static_cast<double>(index + 1));
-    (*loop)["index0"] = nift::RuntimeValue(static_cast<double>(index));
-    (*loop)["first"] = nift::RuntimeValue(index == 0);
-    (*loop)["last"] = nift::RuntimeValue(index + 1 == length);
-    (*loop)["length"] = nift::RuntimeValue(static_cast<double>(length));
-    return loop;
-}
-
-bool sortable_scalar(const nift::RuntimeValue& value) {
-    return value.is_number() || value.is_string();
-}
-
-int compare_sort_keys(const nift::RuntimeValue& left, const nift::RuntimeValue& right) {
-    if (left.is_number()) return nift::runtime_compare_numbers(left, right);
-    return left.string < right.string ? -1 : (left.string > right.string ? 1 : 0);
-}
-
-struct ControlBlockBody {
-    std::string text;
-    bool multiline = false;
-};
-
-ControlBlockBody normalize_control_block_body(std::string body) {
-    ControlBlockBody result;
-
-    // A block written in the usual form
-    //
-    //   @if(...) {
-    //       ...
-    //   }
-    //
-    // uses the whitespace immediately inside the braces for source readability,
-    // not as output indentation. Strip that structural first/last line, then
-    // remove the common indentation from the remaining non-empty lines.
-    std::size_t first = 0;
-    while (first < body.size() && (body[first] == ' ' || body[first] == '\t')) ++first;
-    if (first < body.size() && (body[first] == '\n' || body[first] == '\r')) {
-        result.multiline = true;
-        if (body[first] == '\r' && first + 1 < body.size() && body[first + 1] == '\n') ++first;
-        body.erase(0, first + 1);
-
-        while (!body.empty() && (body.back() == ' ' || body.back() == '\t')) body.pop_back();
-        if (!body.empty() && body.back() == '\n') {
-            body.pop_back();
-            if (!body.empty() && body.back() == '\r') body.pop_back();
-        }
-
-        std::size_t common = std::string::npos;
-        std::size_t line_start = 0;
-        while (line_start <= body.size()) {
-            const std::size_t line_end = body.find('\n', line_start);
-            const std::size_t end = line_end == std::string::npos ? body.size() : line_end;
-            std::size_t pos = line_start;
-            while (pos < end && (body[pos] == ' ' || body[pos] == '\t' || body[pos] == '\r')) ++pos;
-            if (pos < end) common = std::min(common, pos - line_start);
-            if (line_end == std::string::npos) break;
-            line_start = line_end + 1;
-        }
-
-        if (common != std::string::npos && common > 0) {
-            std::string dedented;
-            dedented.reserve(body.size());
-            line_start = 0;
-            while (line_start <= body.size()) {
-                const std::size_t line_end = body.find('\n', line_start);
-                const std::size_t end = line_end == std::string::npos ? body.size() : line_end;
-                std::size_t remove = 0;
-                while (remove < common && line_start + remove < end &&
-                       (body[line_start + remove] == ' ' || body[line_start + remove] == '\t')) {
-                    ++remove;
-                }
-                dedented.append(body, line_start + remove, end - (line_start + remove));
-                if (line_end == std::string::npos) break;
-                dedented += '\n';
-                line_start = line_end + 1;
-            }
-            body = std::move(dedented);
-        }
-    }
-
-    result.text = std::move(body);
-    return result;
-}
-
-std::string insertion_indent(const std::string& output) {
-    const auto previous_newline = output.find_last_of('\n');
-    const std::string current_line = previous_newline == std::string::npos
-        ? output : output.substr(previous_newline + 1);
-    std::string indent = current_line;
-    for (char c : current_line) {
-        if (c != ' ' && c != '\t') {
-            indent.assign(current_line.size(), ' ');
-            break;
-        }
-    }
-    return indent;
-}
-
-void append_indented(std::string& output, const std::string& text, const std::string& indent,
-                     int initial_code_block_depth = 0, bool trim_trailing_newline = true) {
-    std::size_t size = text.size();
-    if (trim_trailing_newline && size && text[size - 1] == '\n') {
-        --size;
-        if (size && text[size - 1] == '\r') --size;
-    }
-    if (size == 0) return;
-
-    int code_block_depth = initial_code_block_depth;
-    int html_comment_depth = 0;
-
-    auto is_pre_open = [&](std::size_t pos) {
-        if (pos + 4 > size || text.compare(pos, 4, "<pre") != 0) return false;
-        if (pos + 4 == size) return false;
-        const char next = text[pos + 4];
-        return next == '>' || next == ' ' || next == '\t' || next == '\r' || next == '\n';
-    };
-    auto is_pre_close = [&](std::size_t pos) {
-        return pos + 6 <= size && text.compare(pos, 6, "</pre>") == 0;
-    };
-
-    std::size_t segment_start = 0;
-    for (std::size_t i = 0; i < size; ++i) {
-        if (text.compare(i, 4, "<!--") == 0) {
-            ++html_comment_depth;
-        } else if (text.compare(i, 3, "-->") == 0 && html_comment_depth > 0) {
-            --html_comment_depth;
-        }
-
-        if (html_comment_depth == 0) {
-            if (is_pre_close(i) && code_block_depth > 0) {
-                --code_block_depth;
-            } else if (is_pre_open(i)) {
-                ++code_block_depth;
-            }
-        }
-
-        if (text[i] != '\n') continue;
-
-        output.append(text, segment_start, i - segment_start + 1);
-        if (i + 1 < size && code_block_depth == 0) output += indent;
-        segment_start = i + 1;
-    }
-
-    if (segment_start < size)
-        output.append(text, segment_start, size - segment_start);
-}
-
-
-std::string entity(const std::string& value, bool& ok) {
-    static const std::vector<std::pair<std::string, std::string>> entities = {
-        {"`", "&grave;"}, {"~", "&tilde;"}, {"!", "&excl;"}, {"@", "&commat;"},
-        {"#", "&num;"}, {"$", "&dollar;"}, {"%", "&percnt;"}, {"^", "&Hat;"},
-        {"&", "&amp;"}, {"*", "&ast;"}, {"?", "&quest;"}, {"<", "&lt;"},
-        {">", "&gt;"}, {"(", "&lpar;"}, {")", "&rpar;"}, {"[", "&lbrack;"},
-        {"]", "&rbrack;"}, {"{", "&lbrace;"}, {"}", "&rbrace;"}, {"-", "&minus;"},
-        {"_", "&lowbar;"}, {"=", "&equals;"}, {"+", "&plus;"}, {"|", "&vert;"},
-        {"\\", "&bsol;"}, {"/", "&sol;"}, {";", "&semi;"}, {":", "&colon;"},
-        {"'", "&apos;"}, {"\"", "&quot;"}, {",", "&comma;"}, {".", "&period;"},
-        {"£", "&pound;"}, {"¥", "&yen;"}, {"€", "&euro;"}, {"section", "&sect;"},
-        {"+-", "&pm;"}, {"-+", "&mp;"}, {"!=", "&ne;"}, {"<=", "&leq;"},
-        {">=", "&geq;"}, {"->", "&rarr;"}, {"<-", "&larr;"}, {"<->", "&harr;"},
-        {"==>", "&rArr;"}, {"<==", "&lArr;"}, {"<==>", "&hArr;"},
-        {"<=!=>", "&nhArr;"}, {"...", "&hellip;"}
-    };
-    for (const auto& [key, encoded] : entities) {
-        if (key == value) { ok = true; return encoded; }
-    }
-    ok = false;
-    return {};
-}
-}
+using nift::detail::append_indented;
+using nift::detail::built_in_metadata_name;
+using nift::detail::compare_sort_keys;
+using nift::detail::entity;
+using nift::detail::glob_component_match;
+using nift::detail::glob_expand;
+using nift::detail::glob_has_magic;
+using nift::detail::insertion_indent;
+using nift::detail::make_loop_metadata;
+using nift::detail::normalize_control_block_body;
+using nift::detail::numeric_exponent_sign;
+using nift::detail::parse_callable_parameters;
+using nift::detail::parse_for_collection_clause;
+using nift::detail::parse_parameters;
+using nift::detail::reserved_binding_name;
+using nift::detail::sortable_scalar;
+using nift::detail::strip_presentation_chain;
+using nift::detail::unescape_parameter_string;
+using nift::detail::valid_binding_identifier;
 
 // Rejects mutations that would create a direct or indirect cycle through
 // user-visible reference graphs. Adding an edge container->target creates a
@@ -2486,11 +2084,11 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             if(call_args("exists",args,q)){fs::path p;if(args.size()!=1||!checked_path("exists",args,q,0,p))return false;std::error_code ec;out=nift::RuntimeValue(fs::exists(p,ec)&&!ec);return true;}
             if(call_args("make_dir",args,q)||call_args("mkdir",args,q)){fs::path p;if(args.size()!=1||!checked_path("make_dir",args,q,0,p))return false;std::error_code ec;fs::create_directories(p,ec);if(ec){error="make_dir: "+ec.message();return false;}out=nift::RuntimeValue(nullptr);return true;}
             if(call_args("touch",args,q)){fs::path p;if(args.size()!=1||!checked_path("touch",args,q,0,p))return false;std::ofstream f(p,std::ios::app);if(!f){error="touch: cannot open path";return false;}out=nift::RuntimeValue(nullptr);return true;}
-            auto path_values=[&](const std::string& name,const std::vector<std::string>& aa,const std::vector<bool>& qq,std::size_t begin,std::size_t end,std::vector<fs::path>& paths)->bool{for(std::size_t ai=begin;ai<end;++ai){nift::RuntimeValue v;if(!arg_value(aa,qq,ai,v))return false;std::vector<std::string> raws;if(v.is_string())raws.push_back(v.string);else if(v.is_array()){for(const auto& x:v.array){if(!x.is_string()){error=name+": path arrays must contain strings";return false;}raws.push_back(x.string);}}else{error=name+": expected string path or array of paths";return false;}for(const auto& raw:raws){fs::path p=resolve_path(raw);if(!standalone_script_host_&&!host_.root().empty()&&!filesystem::path_within(fs::absolute(host_.root()).lexically_normal(),p)){error=name+": path must stay inside the Nift project";return false;}if(!nift_fs_root_allowed(p,standalone_script_host_,error)){error=name+": "+error;return false;}if(nift_glob_has_magic(raw)){auto matches=nift_glob_expand(p);paths.insert(paths.end(),matches.begin(),matches.end());}else paths.push_back(std::move(p));}}return true;};
+            auto path_values=[&](const std::string& name,const std::vector<std::string>& aa,const std::vector<bool>& qq,std::size_t begin,std::size_t end,std::vector<fs::path>& paths)->bool{for(std::size_t ai=begin;ai<end;++ai){nift::RuntimeValue v;if(!arg_value(aa,qq,ai,v))return false;std::vector<std::string> raws;if(v.is_string())raws.push_back(v.string);else if(v.is_array()){for(const auto& x:v.array){if(!x.is_string()){error=name+": path arrays must contain strings";return false;}raws.push_back(x.string);}}else{error=name+": expected string path or array of paths";return false;}for(const auto& raw:raws){fs::path p=resolve_path(raw);if(!standalone_script_host_&&!host_.root().empty()&&!filesystem::path_within(fs::absolute(host_.root()).lexically_normal(),p)){error=name+": path must stay inside the Nift project";return false;}if(!nift_fs_root_allowed(p,standalone_script_host_,error)){error=name+": "+error;return false;}if(glob_has_magic(raw)){auto matches=glob_expand(p);paths.insert(paths.end(),matches.begin(),matches.end());}else paths.push_back(std::move(p));}}return true;};
             if(call_args("remove",args,q)||call_args("rm",args,q)){if(args.empty()){error="remove: expected at least one path";return false;}std::vector<fs::path> paths;if(!path_values("remove",args,q,0,args.size(),paths))return false;for(const auto& rp:paths){std::error_code ec;if(fs::is_directory(rp,ec)){error="remove: directories are not removed recursively";return false;}if(!fs::remove(rp,ec)&&ec){error="remove: "+ec.message();return false;}}out=nift::RuntimeValue(nullptr);return true;}
             if(call_args("copy",args,q)||call_args("cp",args,q)||call_args("move",args,q)||call_args("mv",args,q)){const bool mv=text.rfind("move(",0)==0||text.rfind("mv(",0)==0;const std::string name=mv?"move":"copy";if(text.rfind("copy(",0)==0&&args.size()<2){args.clear();q.clear();}else if(args.size()<2){error=name+": expected source(s) and destination";return false;}else{std::vector<fs::path> sources;if(!path_values(name,args,q,0,args.size()-1,sources))return false;if(sources.empty()){error=name+": glob matched no source files";return false;}std::vector<fs::path> dests;if(!path_values(name,args,q,args.size()-1,args.size(),dests)||dests.size()!=1){error=name+": destination must be one path";return false;}fs::path dest=dests.front();std::error_code dec;const bool dest_dir=fs::is_directory(dest,dec);if(sources.size()>1&&!dest_dir){error=name+": destination must be an existing directory for multiple sources";return false;}for(const auto& src:sources){fs::path target=dest_dir?dest/src.filename():dest;std::error_code ec;if(mv)fs::rename(src,target,ec);else fs::copy_file(src,target,fs::copy_options::overwrite_existing,ec);if(ec){error=name+": "+ec.message();return false;}}out=nift::RuntimeValue(nullptr);return true;}}
             if(call_args("cat",args,q)){fs::path p;if(args.size()!=1||!checked_path("cat",args,q,0,p))return false;std::error_code ec;if(fs::is_directory(p,ec)){error="cat: path is a directory";return false;}std::ifstream f(p,std::ios::binary);if(!f){error="cat: cannot open path";return false;}std::ostringstream ss;ss<<f.rdbuf();{static std::mutex cat_mutex;std::lock_guard<std::mutex> lock(cat_mutex);std::cout<<ss.str();std::cout.flush();}out=nift::RuntimeValue(nullptr);return true;}
-            if(call_args("ls",args,q)){if(args.size()>1){error="ls: expected zero or one path/pattern";return false;}out=nift::RuntimeValue::make_array();if(args.empty()){fs::path p=standalone_script_host_?fs::current_path():host_.root();std::error_code ec;std::vector<std::string> names;for(fs::directory_iterator it(p,ec),end;!ec&&it!=end;it.increment(ec))names.push_back(it->path().filename().generic_string());if(ec){error="ls: "+ec.message();return false;}std::sort(names.begin(),names.end());for(const auto& n:names)out.array.emplace_back(n);return true;}std::string raw;if(!string_arg("ls",args,q,0,raw))return false;fs::path p=resolve_path(raw);if(!standalone_script_host_&&!host_.root().empty()&&!filesystem::path_within(fs::absolute(host_.root()).lexically_normal(),p)){error="ls: path must stay inside the Nift project";return false;}if(!nift_fs_root_allowed(p,standalone_script_host_,error)){error="ls: "+error;return false;}if(nift_glob_has_magic(raw)){auto matches=nift_glob_expand(p);const fs::path base=standalone_script_host_?fs::current_path():host_.root();const bool absolute=fs::path(raw).is_absolute();for(const auto&m:matches){std::error_code rec;auto shown=absolute?m:fs::relative(m,base,rec);out.array.emplace_back((rec?m:shown).generic_string());}return true;}std::error_code ec;if(!fs::is_directory(p,ec)||ec){error="ls: path is not a readable directory";return false;}std::vector<std::string> names;for(fs::directory_iterator it(p,ec),end;!ec&&it!=end;it.increment(ec))names.push_back(it->path().filename().generic_string());if(ec){error="ls: "+ec.message();return false;}std::sort(names.begin(),names.end());for(const auto& n:names)out.array.emplace_back(n);return true;}
+            if(call_args("ls",args,q)){if(args.size()>1){error="ls: expected zero or one path/pattern";return false;}out=nift::RuntimeValue::make_array();if(args.empty()){fs::path p=standalone_script_host_?fs::current_path():host_.root();std::error_code ec;std::vector<std::string> names;for(fs::directory_iterator it(p,ec),end;!ec&&it!=end;it.increment(ec))names.push_back(it->path().filename().generic_string());if(ec){error="ls: "+ec.message();return false;}std::sort(names.begin(),names.end());for(const auto& n:names)out.array.emplace_back(n);return true;}std::string raw;if(!string_arg("ls",args,q,0,raw))return false;fs::path p=resolve_path(raw);if(!standalone_script_host_&&!host_.root().empty()&&!filesystem::path_within(fs::absolute(host_.root()).lexically_normal(),p)){error="ls: path must stay inside the Nift project";return false;}if(!nift_fs_root_allowed(p,standalone_script_host_,error)){error="ls: "+error;return false;}if(glob_has_magic(raw)){auto matches=glob_expand(p);const fs::path base=standalone_script_host_?fs::current_path():host_.root();const bool absolute=fs::path(raw).is_absolute();for(const auto&m:matches){std::error_code rec;auto shown=absolute?m:fs::relative(m,base,rec);out.array.emplace_back((rec?m:shown).generic_string());}return true;}std::error_code ec;if(!fs::is_directory(p,ec)||ec){error="ls: path is not a readable directory";return false;}std::vector<std::string> names;for(fs::directory_iterator it(p,ec),end;!ec&&it!=end;it.increment(ec))names.push_back(it->path().filename().generic_string());if(ec){error="ls: "+ec.message();return false;}std::sort(names.begin(),names.end());for(const auto& n:names)out.array.emplace_back(n);return true;}
             if(call_args("open",args,q)){fs::path p;if(args.size()!=1||!checked_path("open",args,q,0,p))return false;std::error_code ec;if(fs::is_directory(p,ec)){error="open: path is a directory";return false;}std::ifstream f(p,std::ios::binary);if(!f){error="open: cannot open path";return false;}std::ostringstream ss;ss<<f.rdbuf();out=nift::RuntimeValue(ss.str());return true;}
             if(call_args("open_bytes",args,q)){fs::path p;if(args.size()!=1||!checked_path("open_bytes",args,q,0,p))return false;std::error_code ec;if(fs::is_directory(p,ec)){error="open_bytes: path is a directory";return false;}std::ifstream f(p,std::ios::binary);if(!f){error="open_bytes: cannot open path";return false;}constexpr std::size_t chunk_size=64*1024;std::vector<char> chunk(chunk_size);nift::RuntimeBytes data;while(f){f.read(chunk.data(),static_cast<std::streamsize>(chunk.size()));const auto received=f.gcount();if(received>0)data.insert(data.end(),chunk.begin(),chunk.begin()+received);if(f.bad()){error="open_bytes: input failure";return false;}if(received<static_cast<std::streamsize>(chunk.size()))break;}out=nift::RuntimeValue(std::move(data));return true;}
             // Native script-land Minify++ (v4.4 package campaign CP19-CP24).
@@ -2938,8 +2536,8 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                             std::vector<std::string> wanted;
                             for(const auto& k:keys.array){if(!k.is_string()){error=method+": keys must be strings";return false;}if(std::find(wanted.begin(),wanted.end(),k.string)==wanted.end())wanted.push_back(k.string);}
                             nift::RuntimeValue result=nift::RuntimeValue::make_object();
-                            auto wanted_key=[&](const std::string& key){for(const auto& pat:wanted){if(nift_glob_has_magic(pat)?nift_glob_component_match(pat,key):pat==key)return true;}return false;};
-                            if(method=="pick"){std::vector<std::string> picked;for(const auto& pat:wanted){auto pat_match=[&](const std::string& key){return nift_glob_has_magic(pat)?nift_glob_component_match(pat,key):pat==key;};for(const auto& kv:base.object){if(std::find(picked.begin(),picked.end(),kv.first)==picked.end()&&pat_match(kv.first)){result[kv.first]=kv.second;picked.push_back(kv.first);}}}}
+                            auto wanted_key=[&](const std::string& key){for(const auto& pat:wanted){if(glob_has_magic(pat)?glob_component_match(pat,key):pat==key)return true;}return false;};
+                            if(method=="pick"){std::vector<std::string> picked;for(const auto& pat:wanted){auto pat_match=[&](const std::string& key){return glob_has_magic(pat)?glob_component_match(pat,key):pat==key;};for(const auto& kv:base.object){if(std::find(picked.begin(),picked.end(),kv.first)==picked.end()&&pat_match(kv.first)){result[kv.first]=kv.second;picked.push_back(kv.first);}}}}
                             else {for(const auto& kv:base.object)if(!wanted_key(kv.first))result[kv.first]=kv.second;}
                             out=std::move(result);return true;
                         }
@@ -4088,7 +3686,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             out=nift::RuntimeValue(!truthy_value(operand)); return true;
         }
 
-        { std::size_t cp=std::string::npos;bool q=false;char qc=0;int pa=0,br=0,bc=0;for(size_t z=text.size();z-- >0;){char c=text[z];if(q){if(c==qc&&(z==0||text[z-1]!='\\'))q=false;continue;}if(c=='\''||c=='"'){q=true;qc=c;continue;}if(c==')')++pa;else if(c=='(')--pa;else if(c==']')++br;else if(c=='[')--br;else if(c=='}')++bc;else if(c=='{')--bc;else if(c=='+'&&!pa&&!br&&!bc){if((z>0&&std::string("+-*/%(<>=!&|?:,").find(text[z-1])!=std::string::npos)||nift_numeric_exponent_sign(text,z))continue;cp=z;break;}}if(cp!=std::string::npos){nift::RuntimeValue l,r;if(!eval(text.substr(0,cp),l,depth+1)||!eval(text.substr(cp+1),r,depth+1))return false;nift::RuntimeValue ls,rs;if(!atomic_scalar(l,ls)||!atomic_scalar(r,rs))return false;l=std::move(ls);r=std::move(rs);if(l.is_array()&&r.is_array()){out=nift::RuntimeValue::make_array();out.array.reserve(l.array.size()+r.array.size());out.array.insert(out.array.end(),l.array.begin(),l.array.end());out.array.insert(out.array.end(),r.array.begin(),r.array.end());return true;}if(l.is_bytes()||r.is_bytes()){if(!l.is_bytes()||!r.is_bytes()){error="bytes values cannot be rendered as text; bytes concatenation requires two bytes values";return false;}nift::RuntimeBytes joined;if(l.bytes)joined.insert(joined.end(),l.bytes->begin(),l.bytes->end());if(r.bytes)joined.insert(joined.end(),r.bytes->begin(),r.bytes->end());out=nift::RuntimeValue(std::move(joined));return true;}if(l.is_string()||r.is_string()){auto safe=[&](const nift::RuntimeValue& v,std::string& z){if(v.is_bytes()||v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0))return false;z=render_expression_value(v);return true;};std::string a,b;if(!safe(l,a)||!safe(r,b)){error="string concatenation requires renderable scalar values";return false;}out=nift::RuntimeValue(a+b);return true;}return numeric_binary(l,r,'+',out);}}
+        { std::size_t cp=std::string::npos;bool q=false;char qc=0;int pa=0,br=0,bc=0;for(size_t z=text.size();z-- >0;){char c=text[z];if(q){if(c==qc&&(z==0||text[z-1]!='\\'))q=false;continue;}if(c=='\''||c=='"'){q=true;qc=c;continue;}if(c==')')++pa;else if(c=='(')--pa;else if(c==']')++br;else if(c=='[')--br;else if(c=='}')++bc;else if(c=='{')--bc;else if(c=='+'&&!pa&&!br&&!bc){if((z>0&&std::string("+-*/%(<>=!&|?:,").find(text[z-1])!=std::string::npos)||numeric_exponent_sign(text,z))continue;cp=z;break;}}if(cp!=std::string::npos){nift::RuntimeValue l,r;if(!eval(text.substr(0,cp),l,depth+1)||!eval(text.substr(cp+1),r,depth+1))return false;nift::RuntimeValue ls,rs;if(!atomic_scalar(l,ls)||!atomic_scalar(r,rs))return false;l=std::move(ls);r=std::move(rs);if(l.is_array()&&r.is_array()){out=nift::RuntimeValue::make_array();out.array.reserve(l.array.size()+r.array.size());out.array.insert(out.array.end(),l.array.begin(),l.array.end());out.array.insert(out.array.end(),r.array.begin(),r.array.end());return true;}if(l.is_bytes()||r.is_bytes()){if(!l.is_bytes()||!r.is_bytes()){error="bytes values cannot be rendered as text; bytes concatenation requires two bytes values";return false;}nift::RuntimeBytes joined;if(l.bytes)joined.insert(joined.end(),l.bytes->begin(),l.bytes->end());if(r.bytes)joined.insert(joined.end(),r.bytes->begin(),r.bytes->end());out=nift::RuntimeValue(std::move(joined));return true;}if(l.is_string()||r.is_string()){auto safe=[&](const nift::RuntimeValue& v,std::string& z){if(v.is_bytes()||v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0))return false;z=render_expression_value(v);return true;};std::string a,b;if(!safe(l,a)||!safe(r,b)){error="string concatenation requires renderable scalar values";return false;}out=nift::RuntimeValue(a+b);return true;}return numeric_binary(l,r,'+',out);}}
 
         auto find_binary = [&](const std::string& ops) -> std::size_t {
             bool quoted=false; char quote=0; int parens=0; int brackets=0;
@@ -4104,7 +3702,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 if (parens || ops.find(c)==std::string::npos) continue;
                 if ((c=='+' || c=='-') &&
                     (i==0 || std::string("+-*/%(<>=!&|?:,").find(text[i-1])!=std::string::npos ||
-                     nift_numeric_exponent_sign(text,i))) continue;
+                     numeric_exponent_sign(text,i))) continue;
                 return i;
             }
             return std::string::npos;

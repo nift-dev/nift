@@ -12,6 +12,7 @@ cd "$(dirname "$0")"
 EMBED="$(cd ../../ && pwd)"
 CC="${CC:-gcc}"
 CXX="${CXX:-g++}"
+export LC_ALL=C
 
 if [ -z "${NIFT_NODE_INCLUDE:-}" ]; then
   NODE_DISTRIBUTION_INCLUDE="$(node -p "require('path').resolve(require('path').dirname(process.execPath),'..','include','node')" 2>/dev/null || true)"
@@ -51,10 +52,17 @@ case "$(uname -s)" in
     ;;
 esac
 
+PARSER_SOURCES=""
+for source in "$EMBED"/src/Parser*.cpp; do
+  [ -f "$source" ] || continue
+  PARSER_SOURCES="$PARSER_SOURCES src/${source##*/}"
+done
+[ -n "$PARSER_SOURCES" ] || { echo "error: no src/Parser*.cpp sources found" >&2; exit 1; }
+
 CABI_SOURCES="src/ProjectOwnership.cpp src/embed/Engine.cpp src/embed/Context.cpp src/RuntimeValue.cpp src/Value.cpp \
   src/FileSystem.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp \
   markuppp/src/Markup.cpp markuppp/src/AsciiDoc.cpp markuppp/src/ReStructuredText.cpp \
-  src/Parser.cpp src/Ast.cpp src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp \
+  $PARSER_SOURCES src/Ast.cpp src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp \
   src/WatchList.cpp src/BuildProgress.cpp src/embed/c_abi.cpp"
 MARKUP_C_NAMES="blocks buffer cmark cmark_ctype houdini_href_e houdini_html_e houdini_html_u \
   html inlines iterator node references render scanners utf8"

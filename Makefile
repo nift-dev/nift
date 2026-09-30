@@ -7,7 +7,8 @@ LDFLAGS ?=
 LDLIBS ?=
 
 # Shared core + CLI implementation (the ordinary Nift CLI needs only these).
-CORE_SOURCES := src/nift.cpp src/ProjectOwnership.cpp src/CLI.cpp src/Process.cpp src/JobControl.cpp src/RuntimeValue.cpp src/Value.cpp src/FileSystem.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp markuppp/src/Markup.cpp markuppp/src/AsciiDoc.cpp markuppp/src/ReStructuredText.cpp src/Parser.cpp src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp src/WatchList.cpp src/BuildProgress.cpp src/Automation.cpp src/Hooks.cpp src/Ast.cpp
+PARSER_SOURCES := $(sort $(wildcard src/Parser*.cpp))
+CORE_SOURCES := src/nift.cpp src/ProjectOwnership.cpp src/CLI.cpp src/Process.cpp src/JobControl.cpp src/RuntimeValue.cpp src/Value.cpp src/FileSystem.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp markuppp/src/Markup.cpp markuppp/src/AsciiDoc.cpp markuppp/src/ReStructuredText.cpp $(PARSER_SOURCES) src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp src/WatchList.cpp src/BuildProgress.cpp src/Automation.cpp src/Hooks.cpp src/Ast.cpp
 # Embedding-exclusive implementation (Engine, Context, C ABI). The reduced CLI
 # never compiles or links these; they are built by the embed library and the
 # engine/C ABI test targets.
@@ -18,6 +19,7 @@ MARKUP_C_SOURCES := $(addprefix markuppp/vendor/cmark/,$(addsuffix .c,$(MARKUP_C
 MARKUP_C_OBJECTS := $(MARKUP_C_SOURCES:.c=.o)
 OBJECTS := $(SOURCES:.cpp=.o) $(MARKUP_C_OBJECTS)
 CLI_OBJECTS := $(CORE_SOURCES:.cpp=.o) $(MARKUP_C_OBJECTS)
+PARSER_OBJECTS := $(PARSER_SOURCES:.cpp=.o)
 DEPFILES := $(OBJECTS:.o=.d)
 
 ifeq ($(OS),Windows_NT)
@@ -102,7 +104,7 @@ $(LIBFFI_A): | libffi-check
 
 LDLIBS += $(LIBFFI_A)
 
-src/Parser.o $(TEST_DIR)/pic/src/Parser.o: | libffi-check
+$(PARSER_OBJECTS) $(patsubst %.cpp,$(TEST_DIR)/pic/%.o,$(PARSER_SOURCES)): | libffi-check
 
 $(SAN_LIBFFI_STAMP): scripts/build_vendored_libffi.sh scripts/check_vendored_libffi.py third_party/libffi/NIFT-PROVENANCE.md
 	CC="$(CC)" CXX="$(CXX)" CFLAGS="$(LIBFFI_CFLAGS) $(SANITIZER_FLAGS)" bash scripts/build_vendored_libffi.sh "$(SAN_LIBFFI_BUILD)"
@@ -111,7 +113,7 @@ san-libffi-check: $(SAN_LIBFFI_STAMP) FORCE
 	CC="$(CC)" CXX="$(CXX)" CFLAGS="$(LIBFFI_CFLAGS) $(SANITIZER_FLAGS)" bash scripts/build_vendored_libffi.sh "$(SAN_LIBFFI_BUILD)"
 
 $(SAN_LIBFFI_A): | san-libffi-check
-$(TEST_DIR)/san/src/Parser.o: | san-libffi-check
+$(patsubst %.cpp,$(TEST_DIR)/san/%.o,$(PARSER_SOURCES)): | san-libffi-check
 
 $(TSAN_LIBFFI_STAMP): scripts/build_vendored_libffi.sh scripts/check_vendored_libffi.py third_party/libffi/NIFT-PROVENANCE.md
 	CC="$(CC)" CXX="$(CXX)" CFLAGS="$(LIBFFI_CFLAGS) $(TSAN_FLAGS)" bash scripts/build_vendored_libffi.sh "$(TSAN_LIBFFI_BUILD)"
@@ -120,7 +122,7 @@ tsan-libffi-check: $(TSAN_LIBFFI_STAMP) FORCE
 	CC="$(CC)" CXX="$(CXX)" CFLAGS="$(LIBFFI_CFLAGS) $(TSAN_FLAGS)" bash scripts/build_vendored_libffi.sh "$(TSAN_LIBFFI_BUILD)"
 
 $(TSAN_LIBFFI_A): | tsan-libffi-check
-$(TEST_DIR)/tsan/src/Parser.o: | tsan-libffi-check
+$(patsubst %.cpp,$(TEST_DIR)/tsan/%.o,$(PARSER_SOURCES)): | tsan-libffi-check
 
 %.o: %.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -MMD -MP -c $< -o $@
