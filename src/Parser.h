@@ -13,6 +13,8 @@
 #include <mutex>
 #include <condition_variable>
 #include <thread>
+#include <chrono>
+#include <functional>
 #include "Proc.h"
 #include "Ast.h"
 
@@ -46,8 +48,10 @@ private:
 
 class Parser {
 public:
+    using TimerClock = std::function<std::chrono::steady_clock::time_point()>;
     Parser(RenderHost& host, TrackedInfo& tracked_info,
-           std::shared_ptr<ExecutionOutput> execution_output = {});
+           std::shared_ptr<ExecutionOutput> execution_output = {},
+           TimerClock timer_clock = {});
     ~Parser();
     RenderResult render();
 
@@ -81,6 +85,10 @@ public:
     // Shared single-expression host used by `nift eval`; identical evaluator to templates/scripts.
     bool eval_expression(const std::string& expression, nift::RuntimeValue& value, std::string& error);
     bool invoke_callable(const std::string& name, const std::vector<nift::RuntimeValue>& args, nift::RuntimeValue& value, std::string& error);
+    bool contains_timer_resource(const nift::RuntimeValue& value) const;
+    std::uint64_t begin_timer_operation() const { return next_timer_instance_id_; }
+    void finish_timer_operation(std::uint64_t checkpoint);
+    std::size_t timer_instance_count() const { return timer_instances_.size(); }
     void set_execution_output(std::shared_ptr<ExecutionOutput> output) { execution_output_ = std::move(output); }
 
     // Render a scalar/string value for output or command arguments.
@@ -227,6 +235,21 @@ private:
     };
     std::unordered_map<std::string, std::shared_ptr<AsyncInstance>> async_instances_;
     std::vector<std::shared_ptr<AsyncInstance>> owned_async_instances_;
+    struct TimerInstance {
+        enum class State { Stopped, Running, Paused };
+        State state = State::Stopped;
+        std::chrono::milliseconds elapsed{0};
+        std::chrono::steady_clock::time_point started{};
+    };
+    TimerClock timer_clock_;
+    const std::uint64_t timer_owner_id_;
+    std::unordered_map<std::uint64_t, std::shared_ptr<TimerInstance>> timer_instances_;
+    std::uint64_t next_timer_instance_id_ = 1;
+    bool make_timer(const std::vector<nift::RuntimeValue>& args, nift::RuntimeValue& out, std::string& error);
+    bool call_timer_method(const nift::RuntimeValue& receiver, const std::string& method,
+                           const std::vector<nift::RuntimeValue>& args,
+                           nift::RuntimeValue& out, std::string& error);
+    bool callable_contains_timer_resource(const nift::RuntimeValue& callable) const;
     struct FfiLibraryInstance {
         void* handle = nullptr;
         bool closed = false;

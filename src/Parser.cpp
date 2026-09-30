@@ -11,10 +11,27 @@
 #include <cctype>
 #include <ctime>
 #include <iostream>
+#include <limits>
 #include <mutex>
+#include <stdexcept>
 #include <vector>
 
 namespace fs = std::filesystem;
+
+namespace {
+std::atomic<std::uint64_t> next_timer_owner_id{1};
+
+std::uint64_t allocate_timer_owner_id() {
+    std::uint64_t id = next_timer_owner_id.load(std::memory_order_relaxed);
+    for (;;) {
+        if (id == 0 || id == std::numeric_limits<std::uint64_t>::max())
+            throw std::overflow_error("timer owner identity space exhausted");
+        if (next_timer_owner_id.compare_exchange_weak(
+                id, id + 1, std::memory_order_relaxed, std::memory_order_relaxed))
+            return id;
+    }
+}
+}
 
 using nift::detail::built_in_metadata_name;
 using nift::detail::nift_binding_type;
@@ -52,10 +69,13 @@ std::string ExecutionOutput::stderr_text() const {
 }
 
 Parser::Parser(RenderHost& host, TrackedInfo& tracked_info,
-               std::shared_ptr<ExecutionOutput> execution_output)
+               std::shared_ptr<ExecutionOutput> execution_output,
+               TimerClock timer_clock)
     : host_(host), execution_output_(execution_output ? std::move(execution_output)
                                                        : std::make_shared<ExecutionOutput>()),
-      tracked_info_(tracked_info) {
+      tracked_info_(tracked_info),
+      timer_clock_(timer_clock ? std::move(timer_clock) : [] { return std::chrono::steady_clock::now(); }),
+      timer_owner_id_(allocate_timer_owner_id()) {
     variable_scopes_.emplace_back();
     if (!tracked_info_.name.empty()) {
         nift::RuntimeValue metadata=nift::RuntimeValue::make_object(); bool from_project=false; std::string page_metadata_error;
@@ -74,6 +94,234 @@ Parser::Parser(RenderHost& host, TrackedInfo& tracked_info,
             auto page_sp=std::make_shared<nift::RuntimeValue>(nift::RuntimeValue(std::string("\x1fnift:page:")+tracked_info_.name));
             variable_scopes_.back().emplace("page", VariableBinding{page_sp, nift_binding_type(*page_sp), false, false});
         }
+    }
+}
+
+bool Parser::make_timer(const std::vector<nift::RuntimeValue>& args,
+                        nift::RuntimeValue& out, std::string& error) {
+    if (!args.empty()) { error = "timer: expected no arguments"; return false; }
+    if (next_timer_instance_id_ == 0 ||
+        next_timer_instance_id_ == std::numeric_limits<std::uint64_t>::max()) {
+        error = "timer: instance identity space exhausted";
+        return false;
+    }
+    const std::uint64_t id = next_timer_instance_id_++;
+    timer_instances_[id] = std::make_shared<TimerInstance>();
+    out = nift::RuntimeValue::make_timer(timer_owner_id_, id);
+    return true;
+}
+
+bool Parser::call_timer_method(const nift::RuntimeValue& receiver, const std::string& method,
+                               const std::vector<nift::RuntimeValue>& args,
+                               nift::RuntimeValue& out, std::string& error) {
+    if (!receiver.is_timer()) return false;
+    if (!args.empty()) { error = method + ": expected no arguments"; return false; }
+    if (!receiver.timer || receiver.timer->owner != timer_owner_id_) {
+        error = "timer: handle belongs to a different parser"; return false;
+    }
+    auto found = timer_instances_.find(receiver.timer->instance);
+    if (found == timer_instances_.end()) { error = "timer: invalid handle"; return false; }
+    auto& timer = *found->second;
+    const auto now = timer_clock_();
+    auto current_elapsed = [&] {
+        return timer.elapsed + (timer.state == TimerInstance::State::Running
+            ? std::chrono::duration_cast<std::chrono::milliseconds>(now - timer.started)
+            : std::chrono::milliseconds{0});
+    };
+    if (method == "start") {
+        timer.elapsed = std::chrono::milliseconds{0}; timer.started = now;
+        timer.state = TimerInstance::State::Running; out = nift::RuntimeValue(nullptr); return true;
+    }
+    if (method == "elapsed") { out = nift::runtime_integer(current_elapsed().count()); return true; }
+    if (method == "pause") {
+        if (timer.state == TimerInstance::State::Running) {
+            timer.elapsed = current_elapsed(); timer.state = TimerInstance::State::Paused;
+        }
+        out = nift::RuntimeValue(nullptr); return true;
+    }
+    if (method == "resume") {
+        if (timer.state == TimerInstance::State::Paused) {
+            timer.started = now; timer.state = TimerInstance::State::Running;
+        }
+        out = nift::RuntimeValue(nullptr); return true;
+    }
+    if (method == "stop") {
+        if (timer.state == TimerInstance::State::Running) timer.elapsed = current_elapsed();
+        if (timer.state != TimerInstance::State::Stopped) timer.state = TimerInstance::State::Stopped;
+        out = nift::RuntimeValue(nullptr); return true;
+    }
+    if (method == "reset") {
+        timer.elapsed = std::chrono::milliseconds{0}; timer.state = TimerInstance::State::Stopped;
+        out = nift::RuntimeValue(nullptr); return true;
+    }
+    if (method == "running") { out = nift::RuntimeValue(timer.state == TimerInstance::State::Running); return true; }
+    if (method == "paused") { out = nift::RuntimeValue(timer.state == TimerInstance::State::Paused); return true; }
+    return false;
+}
+
+bool Parser::contains_timer_resource(const nift::RuntimeValue& root) const {
+    std::unordered_set<const ModuleEnv*> seen_modules;
+    std::unordered_set<std::string> seen_collections, seen_structs, seen_mutexes, seen_lambdas, seen_named;
+    std::function<bool(const nift::RuntimeValue&)> contains;
+    std::function<bool(const VariableBinding&)> binding_contains;
+    std::function<bool(const std::shared_ptr<ModuleEnv>&)> module_contains;
+    std::function<bool(const Callable&)> callable_contains;
+
+    binding_contains = [&](const VariableBinding& binding) {
+        if (binding.value && contains(*binding.value)) return true;
+        if (binding.slot && *binding.slot && contains(**binding.slot)) return true;
+        return binding.ref_root_slot && *binding.ref_root_slot && contains(**binding.ref_root_slot);
+    };
+    callable_contains = [&](const Callable& callable) { return module_contains(callable.module_env); };
+    module_contains = [&](const std::shared_ptr<ModuleEnv>& module) {
+        if (!module || !seen_modules.insert(module.get()).second) return false;
+        for (const auto& binding : module->vars)
+            if (binding_contains(binding.second)) return true;
+        for (const auto& callable : module->callables)
+            if (callable_contains(callable.second)) return true;
+        return false;
+    };
+    contains = [&](const nift::RuntimeValue& value) {
+        if (value.is_timer()) return true;
+        if (value.is_array()) for (const auto& item : value.array) if (contains(item)) return true;
+        if (value.is_object()) for (const auto& entry : value.object) if (contains(entry.second)) return true;
+        if (!value.is_string()) return false;
+        if (value.string.rfind("\x1fnift:collection:", 0) == 0) {
+            const std::string id = value.string.substr(17);
+            if (!seen_collections.insert(id).second) return false;
+            auto found = collection_instances_.find(id);
+            if (found == collection_instances_.end()) return false;
+            for (const auto& item : found->second->values) if (contains(item)) return true;
+            for (const auto& entry : found->second->entries)
+                if (contains(entry.first) || contains(entry.second)) return true;
+        } else if (value.string.rfind("\x1fnift:struct:", 0) == 0) {
+            const std::string id = value.string.substr(13);
+            if (!seen_structs.insert(id).second) return false;
+            auto found = struct_instances_.find(id);
+            if (found == struct_instances_.end()) return false;
+            for (const auto& field : found->second->fields)
+                if (field.second.value && contains(*field.second.value)) return true;
+        } else if (value.string.rfind("\x1fnift:mutex:", 0) == 0) {
+            const std::string id = value.string.substr(12);
+            if (!seen_mutexes.insert(id).second) return false;
+            auto found = mutex_instances_.find(id);
+            if (found == mutex_instances_.end()) return false;
+            nift::RuntimeValue snapshot;
+            {
+                std::lock_guard<std::mutex> lock(found->second->state_mutex);
+                snapshot = found->second->value;
+            }
+            return contains(snapshot);
+        } else if (value.string.rfind("\x1fnift:callable:lambda:", 0) == 0) {
+            const std::string id = value.string.substr(22);
+            if (!seen_lambdas.insert(id).second) return false;
+            auto found = lambda_instances_.find(id);
+            if (found == lambda_instances_.end()) return false;
+            for (const auto& capture : found->second->captures)
+                if (binding_contains(capture.second)) return true;
+            return module_contains(found->second->module_env);
+        } else if (value.string.rfind("\x1fnift:callable:named:", 0) == 0) {
+            const std::string name = value.string.substr(21);
+            if (!seen_named.insert(name).second) return false;
+            if (active_module_env_) {
+                auto found = active_module_env_->callables.find(name);
+                if (found != active_module_env_->callables.end() && callable_contains(found->second)) return true;
+            }
+            auto found = callables_.find(name);
+            return found != callables_.end() && callable_contains(found->second);
+        }
+        return false;
+    };
+    return contains(root);
+}
+
+bool Parser::callable_contains_timer_resource(const nift::RuntimeValue& callable) const {
+    return contains_timer_resource(callable);
+}
+
+void Parser::finish_timer_operation(std::uint64_t checkpoint) {
+    std::unordered_set<std::uint64_t> reachable;
+    std::unordered_set<std::string> seen_collections, seen_structs, seen_mutexes, seen_lambdas;
+    std::unordered_set<const ModuleEnv*> seen_modules;
+    std::function<void(const nift::RuntimeValue&)> mark_value;
+    std::function<void(const VariableBinding&)> mark_binding;
+    std::function<void(const std::shared_ptr<ModuleEnv>&)> mark_module;
+    std::function<void(const Callable&)> mark_callable;
+
+    mark_binding = [&](const VariableBinding& binding) {
+        if (binding.value) mark_value(*binding.value);
+        if (binding.slot && *binding.slot) mark_value(**binding.slot);
+        if (binding.ref_root_slot && *binding.ref_root_slot) mark_value(**binding.ref_root_slot);
+    };
+    mark_callable = [&](const Callable& callable) { mark_module(callable.module_env); };
+    mark_module = [&](const std::shared_ptr<ModuleEnv>& module) {
+        if (!module || !seen_modules.insert(module.get()).second) return;
+        for (const auto& binding : module->vars) mark_binding(binding.second);
+        for (const auto& callable : module->callables) mark_callable(callable.second);
+    };
+    mark_value = [&](const nift::RuntimeValue& value) {
+        if (value.is_timer()) {
+            if (value.timer && value.timer->owner == timer_owner_id_)
+                reachable.insert(value.timer->instance);
+            return;
+        }
+        if (value.is_array()) for (const auto& item : value.array) mark_value(item);
+        if (value.is_object()) for (const auto& entry : value.object) mark_value(entry.second);
+        if (!value.is_string()) return;
+        if (value.string.rfind("\x1fnift:collection:", 0) == 0) {
+            const std::string id = value.string.substr(17);
+            if (!seen_collections.insert(id).second) return;
+            auto found = collection_instances_.find(id);
+            if (found == collection_instances_.end()) return;
+            for (const auto& item : found->second->values) mark_value(item);
+            for (const auto& entry : found->second->entries) { mark_value(entry.first); mark_value(entry.second); }
+        } else if (value.string.rfind("\x1fnift:struct:", 0) == 0) {
+            const std::string id = value.string.substr(13);
+            if (!seen_structs.insert(id).second) return;
+            auto found = struct_instances_.find(id);
+            if (found == struct_instances_.end()) return;
+            for (const auto& field : found->second->fields) mark_binding(field.second);
+        } else if (value.string.rfind("\x1fnift:mutex:", 0) == 0) {
+            const std::string id = value.string.substr(12);
+            if (!seen_mutexes.insert(id).second) return;
+            auto found = mutex_instances_.find(id);
+            if (found == mutex_instances_.end()) return;
+            nift::RuntimeValue snapshot;
+            {
+                std::lock_guard<std::mutex> lock(found->second->state_mutex);
+                snapshot = found->second->value;
+            }
+            mark_value(snapshot);
+        } else if (value.string.rfind("\x1fnift:callable:lambda:", 0) == 0) {
+            const std::string id = value.string.substr(22);
+            if (!seen_lambdas.insert(id).second) return;
+            auto found = lambda_instances_.find(id);
+            if (found == lambda_instances_.end()) return;
+            for (const auto& capture : found->second->captures) mark_binding(capture.second);
+            mark_module(found->second->module_env);
+        }
+    };
+
+    for (const auto& scope : variable_scopes_)
+        for (const auto& binding : scope) mark_binding(binding.second);
+    for (const auto& frame : saved_lexical_scopes_) {
+        for (const auto& scope : frame.scopes)
+            for (const auto& binding : scope) mark_binding(binding.second);
+        mark_module(frame.module_env);
+    }
+    for (const auto& callable : callables_) mark_callable(callable.second);
+    for (const auto& definition : structs_) {
+        mark_module(definition.second.module_env);
+        for (const auto& method : definition.second.methods) mark_callable(method.second.callable);
+    }
+    mark_module(active_module_env_);
+    for (const auto& receiver : receiver_stack_)
+        if (receiver) for (const auto& field : receiver->fields) mark_binding(field.second);
+    if (pending_control_.value) mark_value(*pending_control_.value);
+
+    for (auto it = timer_instances_.begin(); it != timer_instances_.end();) {
+        if (it->first >= checkpoint && !reachable.count(it->first)) it = timer_instances_.erase(it);
+        else ++it;
     }
 }
 
@@ -541,7 +789,7 @@ bool Parser::interpolate_parameter(const std::string& parameter,
         nift::RuntimeValue expression_value;
         std::string expression_error;
         if (evaluate_expression(expression, expression_value, expression_error)) {
-            if (expression_value.is_array() || expression_value.is_object() || expression_value.is_bytes()) {
+            if (expression_value.is_array() || expression_value.is_object() || expression_value.is_bytes() || expression_value.is_timer()) {
                 error = "parameter expression must resolve to a scalar value";
                 return false;
             }

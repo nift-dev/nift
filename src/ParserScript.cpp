@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <exception>
 #include <functional>
 #include <set>
 
@@ -259,7 +260,7 @@ void Parser::install_script_invocation_bindings() {
 
 RenderResult Parser::run_script(const std::string& source, const fs::path& source_path) {
     result_ = RenderResult{};
-    variable_scopes_.clear(); variable_scopes_.emplace_back();
+    variable_scopes_.clear(); variable_scopes_.emplace_back(); timer_instances_.clear();
     install_script_invocation_bindings();
     callables_.clear(); structs_.clear(); requested_exports_.clear(); pending_control_={};
     in_import_program_=false; standalone_script_host_=true; strict_script_mode_=true; function_call_depth_=1;
@@ -268,7 +269,7 @@ RenderResult Parser::run_script(const std::string& source, const fs::path& sourc
     rr.output.clear();
     if(rr.ok && pending_control_.kind==ControlFlow::Return && pending_control_.value) {
         const auto& v=*pending_control_.value;
-        if(v.is_bytes()||v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0)) { rr.ok=false; rr.error.message="script return value is not directly renderable"; }
+        if(v.is_timer()||v.is_bytes()||v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0&&v.string.rfind("\x1fnift:timer:",0)!=0)) { rr.ok=false; rr.error.message="script return value is not directly renderable"; }
         else rr.output=render_expression_value(v);
     }
     pending_control_={};
@@ -278,10 +279,11 @@ RenderResult Parser::run_script(const std::string& source, const fs::path& sourc
 }
 
 bool Parser::run_embedded_script(const std::string& source, const fs::path& source_path, nift::RuntimeValue& value, std::string& error) {
-    result_=RenderResult{};variable_scopes_.clear();variable_scopes_.emplace_back();install_script_invocation_bindings();callables_.clear();structs_.clear();requested_exports_.clear();pending_control_={};in_import_program_=false;standalone_script_host_=false;strict_script_mode_=true;function_call_depth_=1;
+    result_=RenderResult{};variable_scopes_.clear();variable_scopes_.emplace_back();timer_instances_.clear();install_script_invocation_bindings();callables_.clear();structs_.clear();requested_exports_.clear();pending_control_={};in_import_program_=false;standalone_script_host_=false;strict_script_mode_=true;function_call_depth_=1;
+    const std::uint64_t timer_checkpoint=begin_timer_operation();
     auto rr=execute_native_program(source,source_path,0);function_call_depth_=0;strict_script_mode_=false;
-    if(!rr.ok){error=rr.error.message;pending_control_={};return false;}
-    value=nift::RuntimeValue(nullptr);if(pending_control_.kind==ControlFlow::Return&&pending_control_.value)value=*pending_control_.value;pending_control_={};std::string resource_error;if(!finalize_script_resources(resource_error)){error=resource_error;return false;}return true;
+    if(!rr.ok){error=rr.error.message;pending_control_={};finish_timer_operation(timer_checkpoint);return false;}
+    value=nift::RuntimeValue(nullptr);if(pending_control_.kind==ControlFlow::Return&&pending_control_.value)value=*pending_control_.value;pending_control_={};const bool timer_result=contains_timer_resource(value);std::string resource_error;const bool resources_ok=finalize_script_resources(resource_error);finish_timer_operation(timer_checkpoint);if(timer_result){error="embedded script cannot return a timer value";if(!resources_ok)error+="; "+resource_error;return false;}if(!resources_ok){error=resource_error;return false;}return true;
 }
 
 RenderResult Parser::run_statement(const std::string& source, const fs::path& source_path) {
@@ -328,14 +330,29 @@ void Parser::reset_script_control() { pending_control_={}; result_=RenderResult{
 RenderResult Parser::execute_native_program(const std::string& source, const fs::path& source_path, int depth) {
     std::string program, error;
     if (!translate_function_program(source, program, error)) {
-        RenderResult failed; failed.ok=false; failed.error.message=error; return failed;
+        RenderResult failed; failed.ok=false; failed.error.message=error;
+        std::string ignored_resource_error; finalize_script_resources(ignored_resource_error);
+        return failed;
     }
-    auto rr=parse(program, source_path, depth);
+    RenderResult rr;
+    try {
+        rr=parse(program, source_path, depth);
+    } catch (const std::exception& exception) {
+        rr.ok=false;
+        rr.error.message=exception.what();
+    } catch (...) {
+        rr.ok=false;
+        rr.error.message="script evaluation failed";
+    }
     if(!rr.ok&&rr.error.line>0&&rr.error.message.rfind("import",0)==0){
         auto line_at=[](const std::string& text,std::size_t line){std::size_t begin=0;for(std::size_t n=1;n<line;++n){begin=text.find('\n',begin);if(begin==std::string::npos)return std::string{};++begin;}const auto end=text.find('\n',begin);return text.substr(begin,end==std::string::npos?std::string::npos:end-begin);};
         auto imports=[](const std::string& line){std::vector<std::size_t> found;bool quoted=false;char quote=0;for(std::size_t p=0;p<line.size();++p){const char c=line[p];if(quoted){if(c=='\\')++p;else if(c==quote)quoted=false;continue;}if(c=='\''||c=='"'){quoted=true;quote=c;continue;}if(line.compare(p,6,"import")!=0)continue;const bool left=p==0||(!std::isalnum(static_cast<unsigned char>(line[p-1]))&&line[p-1]!='_');std::size_t q=p+6;const bool right=q==line.size()||(!std::isalnum(static_cast<unsigned char>(line[q]))&&line[q]!='_');while(q<line.size()&&std::isspace(static_cast<unsigned char>(line[q])))++q;if(left&&right&&q<line.size()&&line[q]=='(')found.push_back(p);}return found;};
         const std::string original_line=line_at(source,rr.error.line);const auto original_imports=imports(original_line);const auto translated_imports=imports(rr.error.source_line);
         if(!original_imports.empty()){std::size_t occurrence=0;for(std::size_t n=0;n<translated_imports.size();++n)if(translated_imports[n]+1<=rr.error.column)occurrence=n;occurrence=std::min(occurrence,original_imports.size()-1);const auto position=original_imports[occurrence];rr.error.column=position+1;rr.error.source_line=original_line;std::size_t open=position+6;while(open<original_line.size()&&std::isspace(static_cast<unsigned char>(original_line[open])))++open;std::size_t close=0;rr.error.source_length=open<original_line.size()&&find_balanced(original_line,open,'(',')',close)?close-position+1:6;}
+    }
+    if (!rr.ok) {
+        std::string ignored_resource_error;
+        finalize_script_resources(ignored_resource_error);
     }
     return rr;
 }

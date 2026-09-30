@@ -515,6 +515,9 @@ test-build-boundary-nondestructive:
 
 # Focused embed/binding test targets (mirror the build separation).
 V46_TIME_EMBED_TEST := $(TEST_DIR)/v46-time-embed$(EXEEXT)
+V46_TIMER_UNIT_TEST := $(TEST_DIR)/v46-timer-unit$(EXEEXT)
+V46_TIMER_UNIT_SAN_TEST := $(TEST_DIR)/v46-timer-unit-sanitize$(EXEEXT)
+V46_TIMER_EMBED_SAN_TEST := $(TEST_DIR)/v46-timer-embed-sanitize$(EXEEXT)
 V46_SECURE_RANDOM_EMBED_TEST := $(TEST_DIR)/v46-secure-random-embed$(EXEEXT)
 V46_OUTPUT_EMBED_TEST := $(TEST_DIR)/v46-output-embed$(EXEEXT)
 test-embed: test-c-abi test-c-abi-c-smoke test-cp21-bytes test-engine test-engine-bindings test-public-header \
@@ -554,6 +557,18 @@ $(V45_EMBED_SCRIPT_C_TEST): $(V45_EMBED_SCRIPT_C_OBJECT) libnift_c.a
 $(V46_TIME_EMBED_TEST): tests/v46_time_embed.cpp $(V45_EMBED_PUBLIC_HEADERS) $(ENGINE_CORE_OBJECTS)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/v46_time_embed.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
+
+$(V46_TIMER_UNIT_TEST): tests/v46_timer_unit.cpp $(ENGINE_CORE_OBJECTS)
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/v46_timer_unit.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
+
+$(V46_TIMER_UNIT_SAN_TEST): tests/v46_timer_unit.cpp $(filter-out $(TEST_DIR)/san/src/nift.o $(TEST_DIR)/san/src/CLI.o,$(SAN_OBJECTS)) $(SAN_LIBFFI_A)
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(SAN_CPPFLAGS) $(LDFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(SANITIZER_FLAGS) tests/v46_timer_unit.cpp $(filter-out $(TEST_DIR)/san/src/nift.o $(TEST_DIR)/san/src/CLI.o,$(SAN_OBJECTS)) $(SAN_LIBFFI_A) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o $@
+
+$(V46_TIMER_EMBED_SAN_TEST): tests/v46_time_embed.cpp $(filter-out $(TEST_DIR)/san/src/nift.o $(TEST_DIR)/san/src/CLI.o,$(SAN_OBJECTS)) $(SAN_LIBFFI_A)
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(SAN_CPPFLAGS) $(LDFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(SANITIZER_FLAGS) tests/v46_time_embed.cpp $(filter-out $(TEST_DIR)/san/src/nift.o $(TEST_DIR)/san/src/CLI.o,$(SAN_OBJECTS)) $(SAN_LIBFFI_A) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o $@
 
 $(V46_SECURE_RANDOM_EMBED_TEST): tests/v46_secure_random_embed.cpp $(V45_EMBED_PUBLIC_HEADERS) $(ENGINE_CORE_OBJECTS)
 	mkdir -p $(TEST_DIR)
@@ -619,7 +634,7 @@ test: test-content test-commands test-comments test-contracts test-json test-run
 	test-zero-mutation test-repair-campaign test-ownership-concurrency \
 	test-macos-runner-policy \
 	test-v44-execution-shell test-v44-language-foundation test-v44-shell-restricted \
-	test-v46-time-cli test-v46-secure-random-cli test-v46-output-cli test-progress-render $(PROGRESS_PTY_TARGET) test-snap-contract test-distribution-summary test-version-consistency test-unreadable-source test-incremental-modified-immediate
+	test-v46-time-cli test-v46-timer test-v46-secure-random-cli test-v46-output-cli test-progress-render $(PROGRESS_PTY_TARGET) test-snap-contract test-distribution-summary test-version-consistency test-unreadable-source test-incremental-modified-immediate
 
 test-cp15-numeric-repair: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/cp15_numeric_repair.sh
@@ -1315,6 +1330,18 @@ test-v46-time-cli: $(TARGET)
 test-v46-time: test-v46-time-cli test-v46-time-embed
 
 .PHONY: test-v46-time test-v46-time-cli test-v46-time-embed
+
+test-v46-timer: $(TARGET) $(V46_TIMER_UNIT_TEST) $(V46_TIME_EMBED_TEST)
+	$(V46_TIMER_UNIT_TEST)
+	NIFT="$(CURDIR)/$(TARGET)" tests/v46_timer_smoke.sh
+	$(V46_TIME_EMBED_TEST)
+
+test-v46-timer-sanitize: $(SAN_TARGET) $(V46_TIMER_UNIT_SAN_TEST) $(V46_TIMER_EMBED_SAN_TEST)
+	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT="$(CURDIR)/$(SAN_TARGET)" tests/v46_timer_smoke.sh
+	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(V46_TIMER_UNIT_SAN_TEST)"
+	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(V46_TIMER_EMBED_SAN_TEST)"
+
+.PHONY: test-v46-timer test-v46-timer-sanitize
 
 test-v46-secure-random-cli: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/v46_secure_random_smoke.sh

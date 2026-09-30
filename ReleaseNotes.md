@@ -7,6 +7,10 @@ Development has advanced to v4.6.0 after the completed v4.5.0 release.
 - Native `epoch()` returns the current Unix epoch as an integer number of
   milliseconds. `sleep(ms)` blocks the current script execution thread for a
   non-negative signed 64-bit integer duration and returns `null`.
+- `timer()` provides an opaque, identity-preserving monotonic stopwatch with
+  start, pause/resume, stop, reset, elapsed-millisecond, and state operations.
+  Timer handles remain Parser-local and are rejected at rendering, embedding,
+  serialization, and thread/future transfer boundaries.
 - `secure_random_bytes(n)` returns up to 10,000,000 bytes from the operating
   system CSPRNG, with no fallback pseudorandom generator.
 - Runtime output now uses execution-scoped stdout and stderr sinks. `err(value)`

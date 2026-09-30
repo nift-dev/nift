@@ -2,4 +2,5 @@
 set -euo pipefail
 bin=${1:-./nift}
 "$bin" complete pw | grep -qx pwd
+"$bin" complete tim | grep -qx timer
 "$bin" complete ./src/Par | grep -q './src/Parser'

@@ -54,7 +54,10 @@ Use this compact shape for new entries:
 - Website scope: scripting API reference and runtime concurrency documentation
 - Required update: document `epoch()` as integer Unix milliseconds and
   `sleep(ms)` as a signed-64-bit, non-negative blocking delay on the current
-  execution thread
+  execution thread. Document `timer()` as a stopped monotonic stopwatch with
+  `start()`, `elapsed()`, `pause()`, `resume()`, `stop()`, `reset()`,
+  `running()`, and `paused()`, including opaque identity semantics and the v1
+  prohibition on thread/future or embedding transfer.
 - Timing: do not publish before a Nift release containing these functions
 
 ### Native secure random bytes

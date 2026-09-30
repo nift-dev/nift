@@ -43,11 +43,12 @@ int nift_binding_type(const nift::RuntimeValue& value) {
     if (value.is_array()) return 5;
     if (value.is_object()) return 6;
     if (value.is_bytes()) return 7;
+    if (value.is_timer()) return 8;
     return -1;
 }
 
 const char* nift_binding_type_name(int type) {
-    switch (type) { case 0:return "null"; case 1:return "bool"; case 2:return "int"; case 3:return "double"; case 4:return "string"; case 5:return "array"; case 6:return "json"; case 7:return "bytes"; default:return "unknown"; }
+    switch (type) { case 0:return "null"; case 1:return "bool"; case 2:return "int"; case 3:return "double"; case 4:return "string"; case 5:return "array"; case 6:return "json"; case 7:return "bytes"; case 8:return "timer"; default:return "unknown"; }
 }
 
 // An int value may be assigned to a double binding (widening: a double binding
@@ -189,7 +190,8 @@ bool call_runtime_host(const RenderHost& host, const std::string& name,
 std::string runtime_scalar_key(const nift::RuntimeValue& value) {
     if (value.is_bool()) return std::string("b") + (value.boolean ? "1" : "0");
     if (value.is_number()) return "n" + nift::runtime_numeric_fingerprint(value);
-    if (value.is_string() && value.string.rfind("\x1fnift:", 0) != 0)
+    if (value.is_string() && (value.string.rfind("\x1fnift:", 0) != 0 ||
+                              value.string.rfind("\x1fnift:timer:", 0) == 0))
         return "s" + value.string;
     return {};
 }

@@ -17,6 +17,8 @@ void Context::set_title(std::string title) {
 
 bool Context::set(std::string name, Value value) {
     if (!detail::valid_binding_identifier(name) || detail::structural_builtin_name(name)) return false;
+    if (runtime_contains_timer(ValueAccess::runtime(value)) ||
+        runtime_contains_reserved_handle(ValueAccess::runtime(value))) return false;
     bindings_[std::move(name)] = std::move(value);
     return true;
 }
@@ -36,6 +38,7 @@ bool Context::set_json(std::string name, std::string_view json_text) {
     json::Document document;
     if (!nift_json::parse(std::string(json_text), document, error)) return false;
     ValueAccess::runtime(value) = runtime_from_json(document);
+    if (runtime_contains_reserved_handle(ValueAccess::runtime(value))) return false;
     bindings_[std::move(name)] = std::move(value);
     return true;
 }

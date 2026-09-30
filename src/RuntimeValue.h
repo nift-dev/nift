@@ -11,9 +11,13 @@
 
 namespace nift {
 
-enum class RuntimeType { Null, Boolean, Number, StrNumber, String, Array, Object, Bytes };
+enum class RuntimeType { Null, Boolean, Number, StrNumber, String, Array, Object, Bytes, Timer };
 
 using RuntimeBytes = std::vector<std::uint8_t>;
+struct RuntimeTimerIdentity {
+    const std::uint64_t owner;
+    const std::uint64_t instance;
+};
 
 // Nift-owned recursive runtime substrate. StrNumber retains an exact JSON-number
 // spelling when conversion to double would lose its decimal semantics.
@@ -26,6 +30,7 @@ public:
     std::vector<RuntimeValue> array;
     std::vector<std::pair<std::string, RuntimeValue>> object;
     std::shared_ptr<const RuntimeBytes> bytes;
+    std::shared_ptr<const RuntimeTimerIdentity> timer;
 
     RuntimeValue() = default;
     RuntimeValue(std::nullptr_t) : type(RuntimeType::Null) {}
@@ -40,6 +45,11 @@ public:
 
     static RuntimeValue make_array() { RuntimeValue value; value.type = RuntimeType::Array; return value; }
     static RuntimeValue make_object() { RuntimeValue value; value.type = RuntimeType::Object; return value; }
+    static RuntimeValue make_timer(std::uint64_t owner, std::uint64_t instance) {
+        RuntimeValue value; value.type = RuntimeType::Timer;
+        value.timer = std::make_shared<const RuntimeTimerIdentity>(RuntimeTimerIdentity{owner, instance});
+        return value;
+    }
 
     bool is_null() const { return type == RuntimeType::Null; }
     bool is_bool() const { return type == RuntimeType::Boolean; }
@@ -48,6 +58,7 @@ public:
     bool is_array() const { return type == RuntimeType::Array; }
     bool is_object() const { return type == RuntimeType::Object; }
     bool is_bytes() const { return type == RuntimeType::Bytes; }
+    bool is_timer() const { return type == RuntimeType::Timer; }
 
     bool has(const std::string& key) const;
     RuntimeValue& operator[](const std::string& key);
@@ -78,5 +89,7 @@ int runtime_compare_numbers(const RuntimeValue& left, const RuntimeValue& right)
 std::string runtime_numeric_fingerprint(const RuntimeValue& value);
 std::string runtime_fingerprint(const RuntimeValue& value);
 bool runtime_valid_utf8(std::string_view value);
+bool runtime_contains_timer(const RuntimeValue& value);
+bool runtime_contains_reserved_handle(const RuntimeValue& value);
 
 } // namespace nift

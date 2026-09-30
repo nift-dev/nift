@@ -259,7 +259,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             if(nested.ok){for(auto& kv:file_instances_)if(!pre_script_files.count(kv.first)&&kv.second->open){auto f=kv.second;f->open=false;f->dirty=false;f->mode.clear();f->working.clear();f->saved.clear();f->cursor=0;nested.ok=false;nested.error.message="managed file left open at @script completion: "+f->path.generic_string();break;}}
             if(!nested.ok){result_=nested;break;}
             if(pending_control_.kind==ControlFlow::Return){
-                if(pending_control_.value) { const auto& rv=*pending_control_.value;if(rv.is_bytes()||rv.is_array()||rv.is_object()||(rv.is_string()&&rv.string.rfind("\x1fnift:",0)==0)){pending_control_={};fail(source_path,source,i,"@script return value is not directly renderable");break;}output += render_expression_value(rv); }
+                if(pending_control_.value) { const auto& rv=*pending_control_.value;if(rv.is_timer()||rv.is_bytes()||rv.is_array()||rv.is_object()||(rv.is_string()&&rv.string.rfind("\x1fnift:",0)==0&&rv.string.rfind("\x1fnift:timer:",0)!=0)){pending_control_={};fail(source_path,source,i,"@script return value is not directly renderable");break;}output += render_expression_value(rv); }
                 pending_control_={};
             }
             i=bc+1; continue;
@@ -532,6 +532,10 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                         fail(source_path, source, i, "bytes values cannot be rendered as text in $[" + key + "]; decode as UTF-8 first");
                         break;
                     }
+                    if (expression_value.is_timer()) {
+                        fail(source_path, source, i, "timer values cannot be rendered as text in $[" + key + "]");
+                        break;
+                    }
                     if (function_call_depth_ == 0 &&
                         expression_value.is_string() &&
                         (expression_value.string.rfind("\x1fnift:struct:", 0) == 0 ||
@@ -554,6 +558,10 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 // A direct legacy lookup below preserves its established diagnostics.
                 std::shared_ptr<const nift::RuntimeValue> pagination_value;
                 if (resolve_pagination_value(trim_copy(key), pagination_value)) {
+                    if (pagination_value->is_timer()) {
+                        fail(source_path, source, i, "timer values cannot be rendered as text in $[" + key + "]");
+                        break;
+                    }
                     output += pagination_value->is_string() ? pagination_value->string : pagination_value->dump(0);
                     i = end + 1;
                     continue;
@@ -825,6 +833,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             if(name=="sleep"){
                 if(args.size()!=1){e="sleep: expected one millisecond duration";return true;}std::int64_t ms=0;if(!nift::runtime_number_to_i64(args[0],ms)||ms<0){e="sleep: milliseconds must be a non-negative signed 64-bit integer";return true;}using Rep=std::chrono::milliseconds::rep;if(static_cast<std::uint64_t>(ms)>static_cast<std::uint64_t>(std::numeric_limits<Rep>::max())){e="sleep: millisecond duration is unsupported on this platform";return true;}std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<Rep>(ms)));out=nift::RuntimeValue(nullptr);return true;
             }
+            if(name=="timer") return make_timer(args,out,e) || !e.empty();
             if(name=="secure_random_bytes"){
                 if(args.size()!=1){e="secure_random_bytes: expected one byte count";return true;}std::size_t count=0;if(!nift::runtime_number_to_size(args[0],count)){e="secure_random_bytes: byte count must be a non-negative integer";return true;}if(count>10000000){e="secure_random_bytes: result exceeds 10000000 bytes";return true;}nift::detail::nift_secure_random_bytes(count,out,e);return true;
             }
@@ -839,7 +848,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             std::shared_ptr<ModuleEnv> callee_env;
             if(active_module_env_){auto mit=active_module_env_->callables.find(name);if(mit!=active_module_env_->callables.end()){callee=&mit->second;callee_env=active_module_env_;}}
             if(!callee){auto ci=callables_.find(name);if(ci!=callables_.end())callee=&ci->second;}
-            if(!callee&&host_.has_host_callable(name))return call_runtime_host(host_, name, args, out, e);
+            if(!callee&&host_.has_host_callable(name)){for(const auto& arg:args)if(contains_timer_resource(arg)){e="host callable '"+name+"' cannot receive a timer value";return true;}return call_runtime_host(host_, name, args, out, e);}
             if(!callee||callee->fragment)return false;
             if(callee->async)return false; // legacy evaluator schedules async call and returns a future
             if(callee->variadic_param.empty()?args.size()!=callee->params.size():args.size()<callee->params.size())return false;
@@ -873,6 +882,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 if(method=="fetch_add"||method=="fetch_sub"){if(st->kind!=AtomicInstance::Kind::Int){e=method+": only valid for atomic<int>";return false;}if(args.size()!=1){e=method+": expected one integer";return false;}std::int64_t x=0;if(!as_int(args[0],x))return false;std::int64_t before=0,after=0;if(!nift_atomic_add_sub_checked(st->int_value,x,method=="fetch_sub",before,after)){e=method+": integer overflow";return false;}out=int_doc(before);return true;}
                 if(method=="compare_exchange"){if(args.size()!=2){e="compare_exchange: expected expected and desired values";return false;}if(st->kind==AtomicInstance::Kind::Int){std::int64_t expected=0,desired=0;if(!as_int(args[0],expected)||!as_int(args[1],desired))return false;out=nift::RuntimeValue(st->int_value.compare_exchange_strong(expected,desired));}else{if(!args[0].is_bool()||!args[1].is_bool()){e="compare_exchange: atomic<bool> requires bool values";return false;}bool expected=args[0].boolean;out=nift::RuntimeValue(st->bool_value.compare_exchange_strong(expected,args[1].boolean));}return true;}
             }
+            if(recv.is_timer()) return call_timer_method(recv,method,args,out,e);
             if(method=="to_string"&&recv.is_number()){out=nift::RuntimeValue(render_expression_value(recv));return true;}
             if(method=="to_string"&&recv.is_string()){out=recv;return true;}
             if(method=="encode"&&recv.is_string()){if(args.size()!=1||!args[0].is_string()||args[0].string!="utf-8"){e="encode: encoding must be exactly 'utf-8'";return false;}if(!nift::runtime_valid_utf8(recv.string)){e="encode: invalid UTF-8 text";return false;}out=nift::RuntimeValue(nift::RuntimeBytes(recv.string.begin(),recv.string.end()));return true;}
@@ -898,7 +908,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             if(method=="empty"){if(recv.is_array()){out=nift::RuntimeValue(recv.array.empty());return true;}if(recv.is_string()){out=nift::RuntimeValue(recv.string.empty());return true;}if(recv.is_object()){out=nift::RuntimeValue(recv.object.empty());return true;}}
             if(method=="first"&&recv.is_array()){if(recv.array.empty()){e="first: array is empty";return false;}out=recv.array.front();return true;}
             if(method=="last"&&recv.is_array()){if(recv.array.empty()){e="last: array is empty";return false;}out=recv.array.back();return true;}
-            return false;};c.call_is_value_only=[](const std::string& name){return name=="epoch"||name=="sleep"||name=="secure_random_bytes";};c.render=[&](const nift::RuntimeValue& v){return render_expression_value(v);};return c;};
+            return false;};c.call_is_value_only=[](const std::string& name){return name=="epoch"||name=="sleep"||name=="timer"||name=="secure_random_bytes";};c.render=[&](const nift::RuntimeValue& v){return render_expression_value(v);};return c;};
         auto find_binding=[&](const std::string& name)->VariableBinding*{for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(name);if(it!=sc->end())return &it->second;}return nullptr;};
         // Build a persistent logical location from an AST Binding/Index/Member
         // chain.  Indices/keys are evaluated once when the reference is formed;
@@ -954,7 +964,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     if(st.op=="write"||st.op=="write_line"){
                         if(av.size()!=1||!f->open||!(f->mode=="w"||f->mode=="a"||f->mode=="rw")){if(av.size()!=1&&e.empty())e=st.op+": expected one value";return false;}
                         nift::RuntimeValue v=std::move(av[0]);
-                        std::string d;if(st.op=="write"&&v.is_bytes()){const nift::RuntimeBytes empty;const auto& raw=v.bytes?*v.bytes:empty;d.assign(raw.begin(),raw.end());}else{if(v.is_bytes()||v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0)){e=st.op+": value is not directly renderable";return false;}d=render_expression_value(v);if(st.op=="write_line")d+='\n';}
+                        std::string d;if(st.op=="write"&&v.is_bytes()){const nift::RuntimeBytes empty;const auto& raw=v.bytes?*v.bytes:empty;d.assign(raw.begin(),raw.end());}else{if(v.is_timer()||v.is_bytes()||v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0&&v.string.rfind("\x1fnift:timer:",0)!=0)){e=st.op+": value is not directly renderable";return false;}d=render_expression_value(v);if(st.op=="write_line")d+='\n';}
                         const std::size_t base=std::min(f->cursor,f->working.size());
                         const std::size_t ov=std::min(d.size(),f->working.size()-base);
                         f->working.replace(base,ov,d);
@@ -1632,7 +1642,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 const std::size_t call_end = (end > call_start && source[end - 1] == ';') ? end - 1 : end;
                 const std::string call = "@" + function + source.substr(call_start, call_end - call_start);
                 if (!evaluate_collection_value(call, collection_result, collection_error)) { fail(source_path, source, i, collection_error); break; }
-                if(runtime_contains_bytes(collection_result)){fail(source_path,source,i,"bytes values cannot be rendered as text");break;}output += render_expression_value(collection_result); i = end; continue;
+                if(runtime_contains_bytes(collection_result)){fail(source_path,source,i,"bytes values cannot be rendered as text");break;}if(contains_timer_resource(collection_result)){fail(source_path,source,i,"timer values cannot be rendered as text");break;}output += render_expression_value(collection_result); i = end; continue;
             }
 
             if (function == "substr") {
@@ -1707,6 +1717,10 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 }
                 for (std::size_t item_index = 0; item_index < array->array.size(); ++item_index) {
                     const auto& item = array->array[item_index];
+                    if (item.is_timer()) {
+                        fail(source_path, source, i, "join: timer values cannot be rendered as text");
+                        break;
+                    }
                     if (item.is_bytes() || item.is_array() || item.is_object()) {
                         fail(source_path, source, i, "join: array items must be scalar JSON values");
                         break;

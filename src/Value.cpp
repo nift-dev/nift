@@ -3,6 +3,7 @@
 #include "ValueInternal.h"
 #include <cstddef>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <utility>
 
@@ -71,6 +72,8 @@ Value::Type Value::type() const {
         case RuntimeType::Array: return Type::Array;
         case RuntimeType::Object: return Type::Object;
         case RuntimeType::Bytes: return Type::Bytes;
+        case RuntimeType::Timer:
+            throw std::logic_error("timer value escaped the runtime boundary");
     }
     return Type::Null;
 }

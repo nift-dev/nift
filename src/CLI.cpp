@@ -895,6 +895,7 @@ static int run_eval(int argc, char** argv) {
     ScriptRenderHost host(fs::current_path());TrackedInfo info;Parser parser(host,info);nift::RuntimeValue value;std::string error;
     if(!parser.eval_expression(expression,value,error)){std::cerr<<"eval: "<<error<<'\n';return 2;}
     if(cli_contains_bytes(value)){std::cerr<<"eval: bytes values are not serializable; decode as UTF-8 first\n";return 2;}
+    if(nift::runtime_contains_timer(value)){std::cerr<<"eval: timer values are not serializable\n";return 2;}
     if(json_output)std::cout<<value.dump()<<'\n';else if(value.is_string())std::cout<<value.string<<'\n';else std::cout<<value.dump()<<'\n';
     return 0;
 }
@@ -924,6 +925,7 @@ static bool shell_glob_expand(const std::string& token,std::vector<std::string>&
             nift::RuntimeValue v; std::string ee;
             if (!p.eval_expression(expr, v, ee)) { err = "command interpolation failed: $[" + expr + "]: " + ee; return false; }
             if (cli_contains_bytes(v)) { err = "command interpolation failed: bytes values must be decoded as UTF-8"; return false; }
+            if (nift::runtime_contains_timer(v)) { err = "command interpolation failed: timer values cannot be rendered as text"; return false; }
             const std::string rendered = p.render_expression_value(v);
             token.replace(i, close - i + 1, rendered);
             i += rendered.size();
@@ -993,7 +995,7 @@ static std::vector<std::string> load_nift_history(){
 }
 static void append_nift_history(const std::string& line){if(line.empty())return;std::ofstream out(nift_history_path(),std::ios::app);if(out)out<<line<<'\n';}
 static std::vector<std::string> nift_shell_completions(const std::string& prefix){
-    static const std::vector<std::string> builtins={"build","cat","cd","cmd","copy","cp","epoch","err","exists","file","getenv","env","os","arch","hardware_concurrency","thread","await","mutex","atomic<int>","atomic<bool>","jobs","fg","bg","wait","ls","make_dir","max","min","mkdir","move","mv","open","open_bytes","page","print","pwd","remove","rm","run","secure_random_bytes","setenv","sleep","platform","touch","unsetenv","which"};
+    static const std::vector<std::string> builtins={"build","cat","cd","cmd","copy","cp","epoch","err","exists","file","getenv","env","os","arch","hardware_concurrency","thread","await","mutex","atomic<int>","atomic<bool>","jobs","fg","bg","wait","ls","make_dir","max","min","mkdir","move","mv","open","open_bytes","page","print","pwd","remove","rm","run","secure_random_bytes","setenv","sleep","timer","platform","touch","unsetenv","which"};
     std::set<std::string> out;for(const auto& b:builtins)if(b.rfind(prefix,0)==0)out.insert(b);
     if(const char* path=std::getenv("PATH")){std::stringstream ss(path);std::string dir;while(std::getline(ss,dir,':')){std::error_code ec;for(auto it=fs::directory_iterator(dir,ec);!ec&&it!=fs::directory_iterator();it.increment(ec)){auto n=it->path().filename().string();if(n.rfind(prefix,0)==0)out.insert(n);}}}
     fs::path pp=prefix.empty()?fs::path("."):fs::path(prefix);fs::path parent=pp.has_parent_path()?pp.parent_path():fs::path(".");std::string leaf=pp.filename().string();std::error_code ec;for(auto it=fs::directory_iterator(parent,ec);!ec&&it!=fs::directory_iterator();it.increment(ec)){auto n=it->path().filename().string();if(n.rfind(leaf,0)==0){auto c=(pp.has_parent_path()?parent/fs::path(n):fs::path(n)).generic_string();if(it->is_directory(ec))c+="/";out.insert(c);}}
@@ -1034,7 +1036,7 @@ std::vector<std::string> full_shell_completions(const Parser& parser, const std:
 std::vector<std::string> command_completions(const Parser& parser, const std::string& prefix) {
     std::set<std::string> out;
     for (auto& c : parser.shell_completions(prefix)) out.insert(c);
-    for (const char* b : {"build","cat","cd","cmd","copy","cp","epoch","err","exists","file","getenv","env","os","arch","hardware_concurrency","thread","await","mutex","atomic<int>","atomic<bool>","jobs","fg","bg","wait","ls","make_dir","max","min","mkdir","move","mv","open","open_bytes","page","print","pwd","remove","rm","run","secure_random_bytes","setenv","sleep","touch","unsetenv","which"})
+    for (const char* b : {"build","cat","cd","cmd","copy","cp","epoch","err","exists","file","getenv","env","os","arch","hardware_concurrency","thread","await","mutex","atomic<int>","atomic<bool>","jobs","fg","bg","wait","ls","make_dir","max","min","mkdir","move","mv","open","open_bytes","page","print","pwd","remove","rm","run","secure_random_bytes","setenv","sleep","timer","touch","unsetenv","which"})
         if (std::string_view(b).rfind(prefix, 0) == 0) out.insert(b);
     if (const char* path = std::getenv("PATH")) {
         std::stringstream ss(path); std::string dir;
