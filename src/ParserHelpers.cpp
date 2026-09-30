@@ -1,10 +1,14 @@
 #include "ParserHelpers.h"
+#include "JsonFile.h"
+#include "RenderHost.h"
+#include "RuntimeJson.h"
 #include "RuntimeValue.h"
 
 #include <nift/context.h>
 
 #include <algorithm>
 #include <cctype>
+#include <limits>
 #include <sstream>
 #include <unordered_set>
 #include <utility>
@@ -22,6 +26,72 @@ int nift_binding_type(const nift::RuntimeValue& value) {
     if (value.is_object()) return 6;
     if (value.is_bytes()) return 7;
     return -1;
+}
+
+const char* nift_binding_type_name(int type) {
+    switch (type) { case 0:return "null"; case 1:return "bool"; case 2:return "int"; case 3:return "double"; case 4:return "string"; case 5:return "array"; case 6:return "json"; case 7:return "bytes"; default:return "unknown"; }
+}
+
+// An int value may be assigned to a double binding (widening: a double binding
+// represents any numeric value under Nift's arithmetic model, which already
+// computes int + double as double). The reverse (double -> int) stays an error
+// because it is lossy.
+bool nift_type_assignable(int from, int to) {
+    return from == to || (from == 2 && to == 3);
+}
+
+extern const int kMaxCallableDepth = 64;
+
+bool parse_runtime_json(const std::string& text, nift::RuntimeValue& value,
+                        std::string& error) {
+    json::Document document;
+    if (!nift_json::parse(text, document, error)) return false;
+    value = nift::runtime_from_json(document);
+    return true;
+}
+
+bool call_runtime_host(const RenderHost& host, const std::string& name,
+                       const std::vector<nift::RuntimeValue>& args,
+                       nift::RuntimeValue& out, std::string& error) {
+    return host.call_host_callable(name, args, out, error);
+}
+
+std::string runtime_scalar_key(const nift::RuntimeValue& value) {
+    if (value.is_bool()) return std::string("b") + (value.boolean ? "1" : "0");
+    if (value.is_number()) return "n" + nift::runtime_numeric_fingerprint(value);
+    if (value.is_string() && value.string.rfind("\x1fnift:", 0) != 0)
+        return "s" + value.string;
+    return {};
+}
+
+bool runtime_contains_bytes(const nift::RuntimeValue& value) {
+    if (value.is_bytes()) return true;
+    if (value.is_array())
+        return std::any_of(value.array.begin(), value.array.end(), runtime_contains_bytes);
+    if (value.is_object())
+        return std::any_of(value.object.begin(), value.object.end(), [](const auto& entry) {
+            return runtime_contains_bytes(entry.second);
+        });
+    return false;
+}
+
+std::string runtime_bytes_string(const nift::RuntimeValue& value) {
+    if (!value.bytes || value.bytes->empty()) return {};
+    return std::string(reinterpret_cast<const char*>(value.bytes->data()), value.bytes->size());
+}
+
+bool nift_atomic_add_sub_checked(std::atomic<std::int64_t>& value,
+                                 std::int64_t operand, bool subtract,
+                                 std::int64_t& before, std::int64_t& after) {
+    before = value.load();
+    for (;;) {
+        if ((!subtract && ((operand > 0 && before > std::numeric_limits<std::int64_t>::max() - operand) ||
+                           (operand < 0 && before < std::numeric_limits<std::int64_t>::min() - operand))) ||
+            (subtract && ((operand > 0 && before < std::numeric_limits<std::int64_t>::min() + operand) ||
+                          (operand < 0 && before > std::numeric_limits<std::int64_t>::max() + operand)))) return false;
+        after = subtract ? before - operand : before + operand;
+        if (value.compare_exchange_weak(before, after)) return true;
+    }
 }
 
 bool glob_has_magic(const std::string& s) {

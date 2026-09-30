@@ -1,12 +1,15 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
+#include <atomic>
 #include <filesystem>
 #include <memory>
 #include <string>
 #include <vector>
 
 namespace nift { class RuntimeValue; }
+class RenderHost;
 
 #if defined(__GNUC__) || defined(__clang__)
 #define NIFT_PARSER_HELPER_HIDDEN __attribute__((visibility("hidden")))
@@ -17,6 +20,23 @@ namespace nift { class RuntimeValue; }
 namespace nift::detail {
 
 NIFT_PARSER_HELPER_HIDDEN int nift_binding_type(const nift::RuntimeValue& value);
+NIFT_PARSER_HELPER_HIDDEN const char* nift_binding_type_name(int type);
+NIFT_PARSER_HELPER_HIDDEN bool nift_type_assignable(int from, int to);
+extern NIFT_PARSER_HELPER_HIDDEN const int kMaxCallableDepth;
+
+NIFT_PARSER_HELPER_HIDDEN bool parse_runtime_json(const std::string& text,
+                                                  nift::RuntimeValue& value,
+                                                  std::string& error);
+NIFT_PARSER_HELPER_HIDDEN bool call_runtime_host(
+    const RenderHost& host, const std::string& name,
+    const std::vector<nift::RuntimeValue>& args,
+    nift::RuntimeValue& out, std::string& error);
+NIFT_PARSER_HELPER_HIDDEN std::string runtime_scalar_key(const nift::RuntimeValue& value);
+NIFT_PARSER_HELPER_HIDDEN bool runtime_contains_bytes(const nift::RuntimeValue& value);
+NIFT_PARSER_HELPER_HIDDEN std::string runtime_bytes_string(const nift::RuntimeValue& value);
+NIFT_PARSER_HELPER_HIDDEN bool nift_atomic_add_sub_checked(
+    std::atomic<std::int64_t>& value, std::int64_t operand, bool subtract,
+    std::int64_t& before, std::int64_t& after);
 
 NIFT_PARSER_HELPER_HIDDEN bool numeric_exponent_sign(const std::string& text, std::size_t sign);
 
