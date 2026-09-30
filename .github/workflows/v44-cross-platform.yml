@@ -160,7 +160,10 @@ jobs:
         timeout-minutes: 6
         if: runner.os == 'Windows'
         shell: msys2 {0}
-        run: make -C nift test-v44-packages
+        run: |
+          export PATH="$PATH:$(cygpath -u "$pythonLocation")"
+          python3 --version
+          make -C nift test-v44-packages
       - name: Version consistency gate (executable + Snap metadata)
         timeout-minutes: 6
         run: make -C nift test-version-consistency
