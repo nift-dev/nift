@@ -14,6 +14,27 @@ fail_case(){
   if "$NIFT" "$@" >"$TMP/$name.out" 2>"$TMP/$name.err"; then echo "FAIL: $name unexpectedly succeeded" >&2; exit 1; fi
   grep -Eqi "$pattern" "$TMP/$name.err" || { echo "FAIL: $name diagnostic" >&2; cat "$TMP/$name.err" >&2; exit 1; }
 }
+run_bounded(){
+  local name=$1 stdin_path=$2; shift 2
+  python3 - "$name" "$stdin_path" "$@" <<'PY'
+import subprocess
+import sys
+
+name, stdin_path, *command = sys.argv[1:]
+stdin = open(stdin_path, "rb") if stdin_path else None
+try:
+    completed = subprocess.run(command, stdin=stdin, stdout=subprocess.DEVNULL, timeout=20)
+except subprocess.TimeoutExpired:
+    print(f"FAIL: {name} timed out after 20 seconds", file=sys.stderr)
+    raise SystemExit(124)
+finally:
+    if stdin is not None:
+        stdin.close()
+if completed.returncode != 0:
+    print(f"FAIL: {name} exited with status {completed.returncode}", file=sys.stderr)
+    raise SystemExit(completed.returncode)
+PY
+}
 if [[ -n "$LIB" ]]; then
   cat >"$TMP/badsig.f" <<'NIFT'
 lib := ffi_open(args[0])
@@ -67,8 +88,9 @@ for i in range(50):
     lines += [f't{i} := thread(worker, {i})', f't{i}.join()', f'f{i} := aworker({i})', f'r{i} := await f{i}']
 open(p,'w').write('\n'.join(lines)+'\n')
 PY
-timeout 20s "$NIFT" "$TMP/churn.f" >/dev/null
+run_bounded runtime_churn "" "$NIFT" "$TMP/churn.f"
 # Repeated process/job churn through the shell must terminate rather than leak/hang.
-printf '%s\n' 'sleep 0.01 &' 'sleep 0.01 &' 'sleep 0.01 &' 'jobs' 'wait' 'jobs' 'exit' | timeout 20s "$NIFT" >/dev/null
+printf '%s\n' 'sleep 0.01 &' 'sleep 0.01 &' 'sleep 0.01 &' 'jobs' 'wait' 'jobs' 'exit' >"$TMP/jobs.in"
+run_bounded job_churn "$TMP/jobs.in" "$NIFT"
 
 echo 'v4.5 adversarial runtime: PASS'

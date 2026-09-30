@@ -508,16 +508,62 @@ test-build-boundary-nondestructive:
 
 # Focused embed/binding test targets (mirror the build separation).
 test-embed: test-c-abi test-c-abi-c-smoke test-cp21-bytes test-engine test-engine-bindings test-public-header \
-	test-engine-render-api test-conformance test-v45-embed-staged-consumer
+	test-engine-render-api test-conformance test-v45-embed-contracts test-v45-embed-staged-consumer
+
+V45_EMBED_CONTRACT_TEST := $(TEST_DIR)/v45-embed-contract$(EXEEXT)
+V45_EMBED_SCRIPT_TEST := $(TEST_DIR)/v45-embed-script$(EXEEXT)
+V45_EMBED_HOST_CALLABLES_TEST := $(TEST_DIR)/v45-embed-host-callables$(EXEEXT)
+V45_EMBED_CONCURRENCY_TEST := $(TEST_DIR)/v45-embed-concurrency$(EXEEXT)
+V45_EMBED_SCRIPT_C_TEST := $(TEST_DIR)/v45-embed-script-c$(EXEEXT)
+V45_EMBED_SCRIPT_C_OBJECT := $(TEST_DIR)/v45-embed-script-c.o
+V45_EMBED_PUBLIC_HEADERS := $(wildcard include/nift/*.h)
+
+$(V45_EMBED_CONTRACT_TEST): tests/v45_embed_contract.cpp $(V45_EMBED_PUBLIC_HEADERS) $(ENGINE_CORE_OBJECTS)
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/v45_embed_contract.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
+
+$(V45_EMBED_SCRIPT_TEST): tests/v45_embed_script.cpp $(V45_EMBED_PUBLIC_HEADERS) $(ENGINE_CORE_OBJECTS)
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/v45_embed_script.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
+
+$(V45_EMBED_HOST_CALLABLES_TEST): tests/v45_embed_host_callables.cpp $(V45_EMBED_PUBLIC_HEADERS) $(ENGINE_CORE_OBJECTS)
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/v45_embed_host_callables.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
+
+$(V45_EMBED_CONCURRENCY_TEST): tests/v45_embed_concurrency.cpp $(V45_EMBED_PUBLIC_HEADERS) $(ENGINE_CORE_OBJECTS)
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/v45_embed_concurrency.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
+
+$(V45_EMBED_SCRIPT_C_OBJECT): tests/v45_embed_script_c.c $(V45_EMBED_PUBLIC_HEADERS)
+	mkdir -p $(TEST_DIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
+
+$(V45_EMBED_SCRIPT_C_TEST): $(V45_EMBED_SCRIPT_C_OBJECT) libnift_c.a
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(V45_EMBED_SCRIPT_C_OBJECT) libnift_c.a $(LDLIBS) -o $@
+
+test-v45-embed-contracts: $(V45_EMBED_CONTRACT_TEST) $(V45_EMBED_SCRIPT_TEST) $(V45_EMBED_HOST_CALLABLES_TEST) $(V45_EMBED_CONCURRENCY_TEST) $(V45_EMBED_SCRIPT_C_TEST)
+	$(V45_EMBED_CONTRACT_TEST)
+	$(V45_EMBED_SCRIPT_TEST)
+	$(V45_EMBED_HOST_CALLABLES_TEST)
+	$(V45_EMBED_CONCURRENCY_TEST)
+	$(V45_EMBED_SCRIPT_C_TEST)
 
 test-v45-embed-staged-consumer: embed
 	bash tests/v45_embed_staged_consumer.sh
 
-test-v45-integration-dogfood: nift
-	NIFT="$(CURDIR)/nift" bash tests/v45_integration_dogfood.sh
+ifneq ($(OS),Windows_NT)
+test-v45-integration-dogfood: $(TARGET)
+	NIFT="$(CURDIR)/$(TARGET)" bash tests/v45_integration_dogfood.sh
 
-test-v45-adversarial-runtime: nift
-	NIFT_BIN="$(CURDIR)/nift" bash tests/v45_adversarial_runtime.sh
+test-v45-adversarial-runtime: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" bash tests/v45_adversarial_runtime.sh
+else
+test-v45-integration-dogfood:
+	@echo "test-v45-integration-dogfood: skipped (POSIX shared-library, shebang, and job-control coverage)"
+
+test-v45-adversarial-runtime:
+	@echo "test-v45-adversarial-runtime: skipped (POSIX timeout and job-control coverage)"
+endif
 
 test-go-binding: go-binding
 	cd bindings/go && PKG_CONFIG_PATH="$(CURDIR)/dist/embed-prefix/lib/pkgconfig" go test -race ./...
@@ -904,7 +950,7 @@ clean:
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
-.PHONY: FORCE libffi-check san-libffi-check tsan-libffi-check test-ffi-abi test-libffi-source test-gate6ar-ffi test-libffi-static-archive test-libffi-dependencies test-libffi-private-symbols test-pic-depfiles test-node-package-licenses test-v45-adversarial-runtime test-v45-integration-dogfood test-v45-embed-staged-consumer embed go-binding csharp-binding node-binding python-binding bindings test-build-boundary test-embed test-go-binding test-csharp-binding test-node-binding test-python-binding test-bindings test-all test benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-markuppp-sync test-json test-json-schema test-runtime-value test-cp15-numeric-repair test-cp17-bytes test-cp18-bytes test-cp19-bytes test-cp21-bytes test-cp18-bytes-sanitize test-cp18-bytes-tsan test-console test-progress-render test-progress-pty test-snap-contract test-distribution-summary test-version-consistency test-diagnostics test-minify test-json-schema-integration test-markup-json-directives test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke test-host-seam benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-alias test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets test-init-lock test-unreadable-source test-incremental-modified-immediate test-v41-certification test-v42-language test-v42-struct test-v43-language test-macos-runner-policy install uninstall
+.PHONY: FORCE libffi-check san-libffi-check tsan-libffi-check test-ffi-abi test-libffi-source test-gate6ar-ffi test-libffi-static-archive test-libffi-dependencies test-libffi-private-symbols test-pic-depfiles test-node-package-licenses test-v45-adversarial-runtime test-v45-integration-dogfood test-v45-embed-contracts test-v45-embed-staged-consumer test-v45-concurrency test-v45-job-control test-v45-target test-v45-native-runtime embed go-binding csharp-binding node-binding python-binding bindings test-build-boundary test-embed test-go-binding test-csharp-binding test-node-binding test-python-binding test-bindings test-all test benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-markuppp-sync test-json test-json-schema test-runtime-value test-cp15-numeric-repair test-cp17-bytes test-cp18-bytes test-cp19-bytes test-cp21-bytes test-cp18-bytes-sanitize test-cp18-bytes-tsan test-console test-progress-render test-progress-pty test-snap-contract test-distribution-summary test-version-consistency test-diagnostics test-minify test-json-schema-integration test-markup-json-directives test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke test-host-seam benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-alias test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets test-init-lock test-unreadable-source test-incremental-modified-immediate test-v41-certification test-v42-language test-v42-struct test-v43-language test-macos-runner-policy install uninstall
 
 
 test-cross-feature: $(TARGET)
@@ -1132,6 +1178,7 @@ test-v44-execution-shell: $(TARGET)
 PYTHON ?= $(shell command -v python3 2>/dev/null || command -v python 2>/dev/null)
 test-v44-language-foundation: $(TARGET)
 	tests/v44_ast_expression_smoke.sh
+	tests/v44_ast_constant_fold_smoke.sh
 	tests/v44_ast_differential_corpus.sh
 	tests/v44_root_path_corruption_reproducers.sh
 	@if [ -n "$(PYTHON)" ]; then NIFT="$(CURDIR)/$(TARGET)" $(PYTHON) tests/v44_ast_fuzz.py; else echo "  (fuzz skipped: no python3/python on PATH)"; fi
@@ -1195,6 +1242,28 @@ test-v45-host-introspection: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/v45_host_introspection_smoke.sh
 
 .PHONY: test-v45-host-introspection
+
+test-v45-concurrency: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v45_threads.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v45_mutex.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v45_atomics.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v45_async.sh
+	NIFT="$(CURDIR)/$(TARGET)" tests/v45_concurrency_hardening.sh
+
+ifneq ($(OS),Windows_NT)
+test-v45-job-control: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v45_jobs_background.sh
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v45_job_control.sh
+else
+test-v45-job-control:
+	@echo "test-v45-job-control: skipped (POSIX job control unavailable)"
+endif
+
+test-v45-target: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v45_target.sh
+
+test-v45-native-runtime: test-v45-invocation test-v45-host-introspection test-v45-integration-dogfood test-v45-adversarial-runtime \
+	test-v45-concurrency test-v45-job-control test-v45-target
 
 test-cp20-bytes: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/cp20_bytes_ffi.sh

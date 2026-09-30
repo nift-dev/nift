@@ -1,12 +1,22 @@
-name: v4.4 cross-platform
+name: v4.4/v4.5 cross-platform
 
 on:
   push:
     branches: [main]
     paths:
+      - '.github/workflows/v44-cross-platform.yml'
       - 'Makefile'
       - 'src/**'
       - 'tests/v44_*'
+      - 'tests/v45_*'
+      - 'tests/package_*'
+  pull_request:
+    paths:
+      - '.github/workflows/v44-cross-platform.yml'
+      - 'Makefile'
+      - 'src/**'
+      - 'tests/v44_*'
+      - 'tests/v45_*'
       - 'tests/package_*'
   workflow_dispatch:
 
@@ -15,7 +25,7 @@ permissions:
 
 jobs:
   portable:
-    name: ${{ matrix.id }} v4.4 portable surface
+    name: ${{ matrix.id }} v4.4/v4.5 portable surface
     strategy:
       fail-fast: false
       matrix:
@@ -116,6 +126,24 @@ jobs:
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: make -C nift test-v44-automation test-v44-hooks
+      - name: v4.5 native runtime wall
+        timeout-minutes: 6
+        if: runner.os != 'Windows'
+        run: make -C nift test-v45-native-runtime
+      - name: v4.5 native runtime wall on Windows
+        timeout-minutes: 6
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: make -C nift test-v45-native-runtime
+      - name: v4.5 focused embedding contracts
+        timeout-minutes: 10
+        if: runner.os != 'Windows'
+        run: make -C nift -j2 test-v45-embed-contracts
+      - name: v4.5 focused embedding contracts on Windows
+        timeout-minutes: 10
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: make -C nift -j2 test-v45-embed-contracts
       - name: v4.4 local packages (sqlite dogfood skips if sqlite3 absent)
         timeout-minutes: 6
         if: runner.os != 'Windows'
