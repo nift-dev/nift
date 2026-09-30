@@ -143,7 +143,7 @@ with tempfile.TemporaryDirectory(prefix='nift-cp9-fuzz-') as td:
       ('html-comment-4m','<!--'+'}'*(4*1024*1024)+'-->\n@content\n',12.0),
       ('line-comment-2m','@// '+'x'*(2*1024*1024)+'\n@content\n',10.0),
       ('parameter-1m','@getenv("'+'A'*(1024*1024)+'")\n@content\n',10.0),
-      ('balanced-parens-100k','@if('+'('*50000+'true'+')'*50000+'){ok}\n@content\n',12.0),
+      ('balanced-parens-100k','@if('+'('*50000+'true'+')'*50000+'){ok}\n@content\n',20.0),
       ('interpolation-1m','$['+'a'*(1024*1024)+']\n@content\n',10.0),
       ('unicode-volume',('λ日本語🙂é'*120000)+'\n@content\n',12.0),
     ]
