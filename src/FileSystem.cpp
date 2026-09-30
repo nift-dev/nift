@@ -540,6 +540,22 @@ bool valid_extension(const std::string& extension) {
            extension.find('\\') == std::string::npos;
 }
 
+bool valid_package_name(const std::string& name) {
+    if (name.empty() || name.size() > 64) return false;
+    auto ascii_alnum = [](unsigned char c) {
+        return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9');
+    };
+    if (!ascii_alnum(static_cast<unsigned char>(name.front())) ||
+        !ascii_alnum(static_cast<unsigned char>(name.back()))) return false;
+    for (unsigned char c : name)
+        if (!ascii_alnum(c) && c != '-' && c != '_') return false;
+
+    if (name == "con" || name == "prn" || name == "aux" || name == "nul") return false;
+    if (name.size() == 4 && (name.rfind("com", 0) == 0 || name.rfind("lpt", 0) == 0) &&
+        name[3] >= '1' && name[3] <= '9') return false;
+    return true;
+}
+
 bool path_within(const fs::path& base, const fs::path& candidate) {
     const fs::path normalized_base = fs::absolute(base).lexically_normal();
     const fs::path normalized_candidate = fs::absolute(candidate).lexically_normal();
