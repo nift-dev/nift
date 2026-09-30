@@ -30,6 +30,7 @@ done
 [ -n "$PARSER_SOURCES" ] || { echo "no src/Parser*.cpp sources found" >&2; exit 1; }
 SOURCES="
   src/ProjectOwnership.cpp
+  src/PackageTransaction.cpp
   src/embed/Engine.cpp
   src/embed/Context.cpp
   src/RuntimeValue.cpp

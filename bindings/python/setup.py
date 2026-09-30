@@ -27,6 +27,7 @@ if not os.path.isdir(os.path.join(NATIVE, "src")):
 
 CABI_SOURCES = [
     "native/src/ProjectOwnership.cpp",
+    "native/src/PackageTransaction.cpp",
     "native/src/embed/Engine.cpp",
     "native/src/embed/Context.cpp",
     "native/src/RuntimeValue.cpp",

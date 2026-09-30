@@ -59,7 +59,7 @@ for source in "$EMBED"/src/Parser*.cpp; do
 done
 [ -n "$PARSER_SOURCES" ] || { echo "error: no src/Parser*.cpp sources found" >&2; exit 1; }
 
-CABI_SOURCES="src/ProjectOwnership.cpp src/embed/Engine.cpp src/embed/Context.cpp src/RuntimeValue.cpp src/Value.cpp \
+CABI_SOURCES="src/ProjectOwnership.cpp src/PackageTransaction.cpp src/embed/Engine.cpp src/embed/Context.cpp src/RuntimeValue.cpp src/Value.cpp \
   src/FileSystem.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp \
   markuppp/src/Markup.cpp markuppp/src/AsciiDoc.cpp markuppp/src/ReStructuredText.cpp \
   $PARSER_SOURCES src/Ast.cpp src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp \

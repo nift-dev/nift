@@ -2,6 +2,7 @@
 #include "ParserHelpers.h"
 #include "JsonFile.h"
 #include "PackageMetadata.h"
+#include "PackageTransaction.h"
 #include "Console.h"
 #include "FileSystem.h"
 
@@ -341,8 +342,10 @@ RenderResult Parser::execute_native_program(const std::string& source, const fs:
 
 bool Parser::execute_import_file(const std::string& argument, const fs::path& caller_path, int depth, bool legacy_syntax, std::string& error) {
     fs::path path=argument;
+    std::unique_ptr<PackageTransaction> package_reader;
     const bool package_name = argument.find('/') == std::string::npos && argument.find('\\') == std::string::npos && fs::path(argument).extension().empty();
     if (package_name && standalone_script_host_) {
+        package_reader=std::make_unique<PackageTransaction>(fs::current_path());if(!package_reader->acquire_read(error))return false;
         if (!filesystem::valid_package_name(argument)) { error="invalid package name: "+argument; return false; }
         const fs::path project = fs::absolute(fs::current_path()).lexically_normal();
         const fs::path packages = fs::absolute(project/".nift"/"packages").lexically_normal();
@@ -365,6 +368,7 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
     if(!standalone_script_host_ && !host_.root().empty() && !filesystem::path_within(fs::absolute(host_.root()).lexically_normal(),path)){error="path must stay inside the Nift project";return false;}
     if(std::find(input_stack_.begin(),input_stack_.end(),path)!=input_stack_.end()){error="script import cycle through "+path.generic_string();return false;}
     auto src=host_.read_shared_source(path); if(src.status==nift::HostStatus::Error||!src.content){error=src.error.empty()?"script is not readable":src.error;return false;}
+    if(package_reader&&!package_reader->lock_identity_valid()){error="package read lock identity changed";return false;}
 
     auto saved_scopes=std::move(variable_scopes_); auto saved_callables=std::move(callables_); auto saved_structs=std::move(structs_);
     auto saved_exports=std::move(requested_exports_); const bool saved_import=in_import_program_; auto saved_control=pending_control_; const bool saved_strict=strict_script_mode_;
@@ -377,6 +381,7 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
     auto isolated_scope=std::move(variable_scopes_.back()); auto isolated_callables=std::move(callables_); auto isolated_structs=std::move(structs_); auto exports=requested_exports_; auto completion=pending_control_;
     variable_scopes_=std::move(saved_scopes); callables_=std::move(saved_callables); structs_=std::move(saved_structs); requested_exports_=std::move(saved_exports); in_import_program_=saved_import; pending_control_=saved_control; strict_script_mode_=saved_strict;
     if(!rr.ok){error=rr.error.message;return false;}
+    if(package_reader&&!package_reader->lock_identity_valid()){error="package read lock identity changed";return false;}
     if(completion.kind==ControlFlow::Return && completion.value){error="return with a value is not allowed in "+std::string(legacy_syntax?"@import":"import");return false;}
 
     std::unordered_map<std::string,VariableBinding> vars;

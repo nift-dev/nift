@@ -8,7 +8,7 @@ LDLIBS ?=
 
 # Shared core + CLI implementation (the ordinary Nift CLI needs only these).
 PARSER_SOURCES := $(sort $(wildcard src/Parser*.cpp))
-CORE_SOURCES := src/nift.cpp src/ProjectOwnership.cpp src/CLI.cpp src/Process.cpp src/JobControl.cpp src/RuntimeValue.cpp src/Value.cpp src/FileSystem.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp markuppp/src/Markup.cpp markuppp/src/AsciiDoc.cpp markuppp/src/ReStructuredText.cpp $(PARSER_SOURCES) src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp src/WatchList.cpp src/BuildProgress.cpp src/Automation.cpp src/Hooks.cpp src/Ast.cpp
+CORE_SOURCES := src/nift.cpp src/ProjectOwnership.cpp src/PackageTransaction.cpp src/CLI.cpp src/Process.cpp src/JobControl.cpp src/RuntimeValue.cpp src/Value.cpp src/FileSystem.cpp src/JsonFile.cpp src/JsonSchema.cpp minifypp/src/Minify.cpp markuppp/src/Markup.cpp markuppp/src/AsciiDoc.cpp markuppp/src/ReStructuredText.cpp $(PARSER_SOURCES) src/ProjectInfo.cpp src/ProjectRead.cpp src/ProjectState.cpp src/WatchList.cpp src/BuildProgress.cpp src/Automation.cpp src/Hooks.cpp src/Ast.cpp
 # Embedding-exclusive implementation (Engine, Context, C ABI). The reduced CLI
 # never compiles or links these; they are built by the embed library and the
 # engine/C ABI test targets.
@@ -1236,6 +1236,7 @@ test-v44-shell-restricted: $(TARGET)
 test-v44-packages: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/package_refs_smoke.sh $(V44_SKIP_77)
 	NIFT="$(CURDIR)/$(TARGET)" tests/package_metadata_smoke.sh
+	$(PYTHON) tests/package_transaction_smoke.py "$(CURDIR)/$(TARGET)" $(V44_SKIP_77)
 	NIFT="$(CURDIR)/$(TARGET)" tests/package_callable_closure_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/package_hardening_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/package_module_export_smoke.sh

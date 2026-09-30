@@ -2,6 +2,7 @@
 #include "FileSystem.h"
 #include "JsonFile.h"
 #include "PackageMetadata.h"
+#include "PackageTransaction.h"
 #include <minify/Minify.h>
 #include <map>
 #include "ProjectInfo.h"
@@ -420,6 +421,19 @@ static bool package_validate_manifest(const fs::path& dir,std::string& name,std:
     if(!package_metadata::load_package(dir,manifest,entry,error))return false;
     name=manifest.name;return true;
 }
+static bool stage_local_package(const fs::path& source,const fs::path& staged,std::string& error){
+    std::error_code ec;fs::create_directory_symlink(source,staged,ec);
+    if(!ec)return true;
+#ifdef _WIN32
+    const std::string symlink_error=ec.message();ec.clear();
+    fs::copy(source,staged,fs::copy_options::recursive|fs::copy_options::copy_symlinks,ec);
+    if(!ec)return true;
+    error="cannot stage local package: "+symlink_error+" / "+ec.message();
+#else
+    error="cannot stage local package: "+ec.message();
+#endif
+    return false;
+}
 static bool load_project_manifest(bool allow_missing,package_metadata::Manifest& manifest,std::string& error){
     if(!filesystem::path_exists(package_manifest_path())){
         if(allow_missing)return true;
@@ -434,73 +448,47 @@ static bool package_checkout(const std::string& source,const std::string& ref,co
     if(!package_git({"clone","--quiet","--",package_git_source(source),dest.string()},fs::current_path(),r)){error=r.error.empty()?r.err:r.error;return false;}
     if(ref!="latest"&&ref!="latest-tag"){if(!package_git({"checkout","--quiet","--detach",ref},dest,r)){error=r.err;fs::remove_all(dest,ec);return false;}}
     if(ref=="latest-tag"){if(!package_git({"tag","--list","v*"},dest,r)){error=r.err;fs::remove_all(dest,ec);return false;}std::istringstream tags(r.out);std::string tag,best,best_version;while(std::getline(tags,tag)){if(tag.size()<2||tag.front()!='v'||!package_metadata::valid_semver(tag.substr(1)))continue;const std::string version=tag.substr(1);if(best.empty()||package_metadata::compare_semver(version,best_version)>0){best=tag;best_version=version;}}if(best.empty()){error="no semantic-version tag found";fs::remove_all(dest,ec);return false;}if(!package_git({"checkout","--quiet","--detach",best},dest,r)){error=r.err;fs::remove_all(dest,ec);return false;}}
-    if(!package_git({"rev-parse","HEAD"},dest,r)){error=r.err;return false;}commit=r.out;while(!commit.empty()&&(commit.back()=='\n'||commit.back()=='\r'))commit.pop_back();return true;
+    if(!package_git({"rev-parse","HEAD"},dest,r)){error=r.err;return false;}commit=r.out;while(!commit.empty()&&(commit.back()=='\n'||commit.back()=='\r'))commit.pop_back();if(!package_git({"checkout","--quiet","--detach",commit},dest,r)){error=r.err;return false;}return true;
 }
 static int package_add_cli(int argc,char**argv){
     if(argc<3){console::error("add requires a package source");return 1;}std::string source=argv[2],ref="latest";for(int i=3;i<argc;++i){std::string a=argv[i];if(a.rfind("--ref=",0)==0)ref=a.substr(6);else{console::error("unknown add option: "+a);return 1;}}
     if(!package_metadata::safe_external_text(source)||!package_metadata::safe_external_text(ref)){console::error("package source and ref must be non-empty safe strings");return 1;}
     const bool local_path=package_source_is_local_path(source);if(local_path&&!fs::is_directory(fs::path(source))){console::error("local package source is not a directory: "+source);return 1;}bool local=local_path;std::string name,error,commit;fs::path root;
-    if(!package_store_root(root,error)){console::error(error);return 1;}fs::path staged=root/".staging-add",dest;
-    std::error_code ec;fs::create_directories(root,ec);if(ec){console::error("cannot create package store: "+ec.message());return 1;}
+    if(!package_store_root(root,error)){console::error(error);return 1;}
+    PackageTransaction transaction(fs::current_path());if(!transaction.acquire(error)){console::error(error);return 1;}fs::path transaction_root;if(!transaction.create_staging(transaction_root,error)){console::error(error);return 1;}fs::path dest,staged;
     package_metadata::Manifest manifest;if(!load_project_manifest(true,manifest,error)){console::error(error);return 1;}
     package_metadata::Lock lock;bool lock_exists=false;if(!package_metadata::load_lock(package_lock_path(),lock,lock_exists,error)){console::error(error);return 1;}
     if(lock_exists&&!package_metadata::validate_lock(manifest,lock,error)){console::error(error);return 1;}
     if(!lock_exists&&!manifest.dependencies.empty()){console::error("package lock is missing for existing dependencies");return 1;}
     auto conflict_guard=[&](const std::string& n)->bool{if(manifest.dependencies.count(n)){console::error("package '" + n + "' is already a dependency; use 'nift update "+n+"' or 'nift remove "+n+"' first");return true;}return false;};
-    if(local){fs::path src=fs::absolute(source).lexically_normal();if(!package_validate_manifest(src,name,error)){console::error(error);return 1;}if(conflict_guard(name))return 1;if(!package_path_for_name(name,dest,error)){console::error(error);return 1;}fs::remove_all(dest,ec);
-                    // Windows directory symlinks require privileges/developer
-                    // mode; fall back to a recursive copy so a local package
-                    // add works without elevation there.
-                    fs::create_directory_symlink(src,dest,ec);
-                    if (ec) {
-#ifdef _WIN32
-                        std::error_code cec;
-                        fs::copy(src, dest, fs::copy_options::recursive | fs::copy_options::copy_symlinks, cec);
-                        if (cec) { console::error("cannot link local package: "+ec.message()+" / "+cec.message()); return 1; }
-#else
-                        console::error("cannot link local package: "+ec.message()); return 1;
-#endif
-                    }
-                    commit="local";}
-    else {if(!package_checkout(source,ref,staged,commit,error)){console::error("package clone failed: "+error);return 1;}if(!package_validate_manifest(staged,name,error)){fs::remove_all(staged,ec);console::error(error);return 1;}if(conflict_guard(name)){fs::remove_all(staged,ec);return 1;}if(!package_path_for_name(name,dest,error)){fs::remove_all(staged,ec);console::error(error);return 1;}fs::remove_all(dest,ec);fs::rename(staged,dest,ec);if(ec){console::error("cannot install package: "+ec.message());return 1;}}
+    if(local){fs::path src=fs::absolute(source).lexically_normal();if(!package_validate_manifest(src,name,error)){console::error(error);return 1;}if(conflict_guard(name))return 1;if(!package_path_for_name(name,dest,error)){console::error(error);return 1;}staged=transaction_root/"new"/name;if(!stage_local_package(src,staged,error)){console::error(error);return 1;}commit="local";}
+    else {const fs::path candidate=transaction_root/"new"/".candidate";if(!package_checkout(source,ref,candidate,commit,error)){console::error("package clone failed: "+error);return 1;}if(!package_validate_manifest(candidate,name,error)){console::error(error);return 1;}if(conflict_guard(name))return 1;if(!package_path_for_name(name,dest,error)){console::error(error);return 1;}staged=transaction_root/"new"/name;std::error_code ec;fs::rename(candidate,staged,ec);if(ec){console::error("cannot stage package: "+ec.message());return 1;}}
     const std::string requested=local?"local":ref;manifest.has_dependencies=true;manifest.dependencies[name]={source,requested};lock[name]={source,requested,commit};
-    if(!save_json_file(package_manifest_path(),package_metadata::manifest_document(manifest))){console::error("cannot write manifest.json");return 1;}
-    fs::create_directories(package_lock_path().parent_path(),ec);if(ec||!save_json_file(package_lock_path(),package_metadata::lock_document(lock))){console::error("cannot write package lock");return 1;}std::cout<<"added "<<name<<" ("<<commit<<")\n";return 0;
+    if(!transaction.commit({{name,PackageTransaction::Kind::Replace}},package_metadata::manifest_document(manifest),package_metadata::lock_document(lock),error)){console::error(error);return 1;}std::cout<<"added "<<name<<" ("<<commit<<")\n";return 0;
 }
 static int package_remove_cli(int argc,char**argv){
     if(argc!=3){console::error("remove requires one package name");return 1;}
     const std::string n=argv[2];std::string error;fs::path dest;
     if(!package_path_for_name(n,dest,error)){console::error(error);return 1;}
+    PackageTransaction transaction(fs::current_path());if(!transaction.acquire(error)){console::error(error);return 1;}fs::path transaction_root;if(!transaction.create_staging(transaction_root,error)){console::error(error);return 1;}
     package_metadata::Manifest manifest;if(!load_project_manifest(false,manifest,error)){console::error(error);return 1;}
     if(!manifest.dependencies.count(n)){console::error("package is not a declared dependency: "+n);return 1;}
     package_metadata::Lock lock;bool lock_exists=false;if(!package_metadata::load_lock(package_lock_path(),lock,lock_exists,error)){console::error(error);return 1;}
     if(!lock_exists||!package_metadata::validate_lock(manifest,lock,error)){console::error(lock_exists?error:"package lock is missing");return 1;}
     manifest.dependencies.erase(n);lock.erase(n);
-    if(!save_json_file(package_manifest_path(),package_metadata::manifest_document(manifest))){console::error("cannot write manifest.json");return 1;}
-    if(!save_json_file(package_lock_path(),package_metadata::lock_document(lock))){console::error("cannot write package lock");return 1;}
-    std::error_code ec;fs::remove_all(dest,ec);if(ec){console::error("cannot remove package: "+ec.message());return 1;}return 0;
+    if(!transaction.commit({{n,PackageTransaction::Kind::Remove}},package_metadata::manifest_document(manifest),package_metadata::lock_document(lock),error)){console::error(error);return 1;}return 0;
 }
 static int package_install_cli(bool update,const std::string& only={}){
-    package_metadata::Manifest manifest;std::string e;if(!load_project_manifest(false,manifest,e)){console::error(e);return 1;}if(manifest.dependencies.empty()){console::error("manifest.json has no dependencies");return 1;}
+    std::string e;fs::path root;if(!package_store_root(root,e)){console::error(e);return 1;}PackageTransaction transaction(fs::current_path());if(!transaction.acquire(e)){console::error(e);return 1;}fs::path transaction_root;if(!transaction.create_staging(transaction_root,e)){console::error(e);return 1;}
+    package_metadata::Manifest manifest;if(!load_project_manifest(false,manifest,e)){console::error(e);return 1;}if(manifest.dependencies.empty()){console::error("manifest.json has no dependencies");return 1;}
     if(!only.empty()&&!filesystem::valid_package_name(only)){console::error("invalid package name: "+only);return 1;}
     if(!only.empty()&&!manifest.dependencies.count(only)){console::error("package is not a declared dependency: "+only);return 1;}
     package_metadata::Lock lock;bool lock_exists=false;if(!package_metadata::load_lock(package_lock_path(),lock,lock_exists,e)){console::error(e);return 1;}
     if(lock_exists&&!package_metadata::validate_lock(manifest,lock,e)){console::error(e);return 1;}
     if(update&&!only.empty()&&!lock_exists&&manifest.dependencies.size()>1){console::error("targeted update requires a complete package lock");return 1;}
-    fs::path root;if(!package_store_root(root,e)){console::error(e);return 1;}std::error_code root_ec;fs::create_directories(root,root_ec);if(root_ec){console::error("cannot create package store: "+root_ec.message());return 1;}
-    for(const auto& kv:manifest.dependencies){const std::string&n=kv.first;if(!only.empty()&&n!=only)continue;fs::path dest;std::string path_error;if(!package_path_for_name(n,dest,path_error)){console::error(path_error);return 1;}const std::string&source=kv.second.source;const std::string&requested=kv.second.ref;std::string ref=(!update&&lock_exists)?lock.at(n).commit:requested;if(requested=="local"){std::string actual,error;const fs::path local_source=fs::absolute(source).lexically_normal();if(!package_validate_manifest(local_source,actual,error)||actual!=n){console::error(error.empty()?"package name mismatch":error);return 1;}std::error_code ec;fs::remove_all(dest,ec);
-                         fs::create_directory_symlink(local_source,dest,ec);
-                        if (ec) {
-#ifdef _WIN32
-                            std::error_code cec;
-                             fs::copy(local_source, dest, fs::copy_options::recursive | fs::copy_options::copy_symlinks, cec);
-                            if (cec) { console::error(ec.message()); return 1; }
-#else
-                            console::error(ec.message()); return 1;
-#endif
-                         }
-                         lock[n]={source,requested,"local"};std::cout<<(update?"updated ":"installed ")<<n<<" (local)\n";continue;}std::string commit,error;fs::path stage=package_root()/(".staging-"+n);if(!package_checkout(source,ref,stage,commit,error)){console::error(error);return 1;}std::string actual;if(!package_validate_manifest(stage,actual,error)||actual!=n){console::error(error.empty()?"package name mismatch":error);return 1;}std::error_code ec;fs::remove_all(dest,ec);fs::rename(stage,dest,ec);if(ec){console::error("cannot install package: "+ec.message());return 1;}lock[n]={source,requested,commit};std::cout<<(update?"updated ":"installed ")<<n<<" ("<<commit<<")\n";}
-    std::error_code ec;fs::create_directories(package_lock_path().parent_path(),ec);if(ec||!save_json_file(package_lock_path(),package_metadata::lock_document(lock))){console::error("cannot write package lock");return 1;}return 0;}
+    std::vector<PackageTransaction::Operation> operations;std::vector<std::string> messages;
+    for(const auto& kv:manifest.dependencies){const std::string&n=kv.first;if(!only.empty()&&n!=only)continue;fs::path dest;std::string path_error;if(!package_path_for_name(n,dest,path_error)){console::error(path_error);return 1;}const std::string&source=kv.second.source;const std::string&requested=kv.second.ref;std::string ref=(!update&&lock_exists)?lock.at(n).commit:requested;const fs::path staged=transaction_root/"new"/n;if(requested=="local"){std::string actual,error;const fs::path local_source=fs::absolute(source).lexically_normal();if(!package_validate_manifest(local_source,actual,error)||actual!=n){console::error(error.empty()?"package name mismatch":error);return 1;}if(!stage_local_package(local_source,staged,error)){console::error(error);return 1;}lock[n]={source,requested,"local"};messages.push_back((update?"updated ":"installed ")+n+" (local)");operations.push_back({n,PackageTransaction::Kind::Replace});continue;}std::string commit,error;if(!package_checkout(source,ref,staged,commit,error)){console::error(error);return 1;}std::string actual;if(!package_validate_manifest(staged,actual,error)||actual!=n){console::error(error.empty()?"package name mismatch":error);return 1;}lock[n]={source,requested,commit};messages.push_back((update?"updated ":"installed ")+n+" ("+commit+")");operations.push_back({n,PackageTransaction::Kind::Replace});}
+    if(!transaction.commit(operations,package_metadata::manifest_document(manifest),package_metadata::lock_document(lock),e)){console::error(e);return 1;}for(const auto& message:messages)std::cout<<message<<'\n';return 0;}
 
 bool has_option(int argc, char** argv, int start, const std::string& option) {
     for (int i = start; i < argc; ++i)
