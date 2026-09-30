@@ -1,6 +1,7 @@
 #include "Parser.h"
 #include "ParserHelpers.h"
 #include "JsonFile.h"
+#include "PackageMetadata.h"
 #include "Console.h"
 #include "FileSystem.h"
 
@@ -345,21 +346,15 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
         if (!filesystem::valid_package_name(argument)) { error="invalid package name: "+argument; return false; }
         const fs::path project = fs::absolute(fs::current_path()).lexically_normal();
         const fs::path packages = fs::absolute(project/".nift"/"packages").lexically_normal();
-        std::error_code package_ec;
-        const fs::path canonical_project = fs::weakly_canonical(project,package_ec);
+        std::error_code package_ec, project_ec;
+        const fs::path canonical_project = fs::weakly_canonical(project,project_ec);
         const fs::path canonical_packages = fs::weakly_canonical(packages,package_ec);
-        if (package_ec || canonical_packages != (canonical_project/".nift"/"packages").lexically_normal()) { error="package store must stay inside the project"; return false; }
+        if (project_ec || package_ec || canonical_packages != (canonical_project/".nift"/"packages").lexically_normal()) { error="package store must stay inside the project"; return false; }
         fs::path root = (packages/argument).lexically_normal();
         if (root.parent_path() != packages) { error="package path escapes .nift/packages: "+argument; return false; }
-        json::Document manifest; std::string me;
-        if (!load_json_file(root/"manifest.json", manifest, me) || !manifest.is_object() ||
-            !manifest.has("name") || !manifest["name"].is_string() || manifest["name"].string != argument ||
-            !manifest.has("entry") || !manifest["entry"].is_string()) {
-            error="package is not installed or has invalid manifest: "+argument; return false;
-        }
-        path=(root/manifest["entry"].string).lexically_normal();
-        if (!filesystem::path_within(root,path)) { error="package entry escapes the package directory: "+manifest["entry"].string; return false; }
-        if (!filesystem::file_exists(path)) { error="package entry does not exist: "+manifest["entry"].string; return false; }
+        package_metadata::Manifest manifest;
+        if (!package_metadata::load_package(root,manifest,path,error)) { error="package is not installed or has invalid manifest: "+argument+": "+error; return false; }
+        if (manifest.name != argument) { error="installed package name does not match import: "+argument; return false; }
     } else if(path.is_relative()) {
         if(standalone_script_host_ && caller_path == fs::path("<nift-sh>")) path=fs::current_path()/path;
         fs::path local=caller_path.parent_path()/path;

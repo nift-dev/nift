@@ -8,13 +8,13 @@ t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
 mkdir -p "$t/site/.nift"
 # 1) manifest entry must stay inside the package directory
 mkdir -p "$t/evil"
-printf '{"name":"evil","entry":"../../escape.f"}\n' > "$t/evil/manifest.json"
+printf '{"name":"evil","version":"0.1.0","entry":"../../escape.f"}\n' > "$t/evil/manifest.json"
 printf 'print("pwned")\n' > "$t/escape.f"
 evil=$(cd "$t/site" && "$NIFT_ABS" add ../evil 2>&1 || true)
-grep -q 'package entry escapes the package directory' <<<"$evil"
+grep -q 'manifest entry must be a contained relative .f path' <<<"$evil"
 # 2) adding a dependency name that already exists is refused
 mkdir -p "$t/pkg/src"
-printf '{"name":"demo","entry":"src/main.f"}\n' > "$t/pkg/manifest.json"
+printf '{"name":"demo","version":"0.1.0","entry":"src/main.f"}\n' > "$t/pkg/manifest.json"
 printf 'v := 1\nexport(v)\n' > "$t/pkg/src/main.f"
 (cd "$t/site" && "$NIFT_ABS" add ../pkg >/dev/null 2>&1)
 dup=$(cd "$t/site" && "$NIFT_ABS" add ../pkg 2>&1 || true)
@@ -80,7 +80,7 @@ fi
 
 # 4) imports must revalidate the installed manifest identity and entry path.
 mkdir -p "$t/site/.nift/packages/changed/src"
-printf '{"name":"other","entry":"src/main.f"}\n' > "$t/site/.nift/packages/changed/manifest.json"
+printf '{"name":"other","version":"0.1.0","entry":"src/main.f"}\n' > "$t/site/.nift/packages/changed/manifest.json"
 printf 'value := 1\nexport(value)\n' > "$t/site/.nift/packages/changed/src/main.f"
 printf 'import("changed")\n' > "$t/site/changed.f"
 if (cd "$t/site" && "$NIFT_ABS" changed.f >/dev/null 2>&1); then
@@ -89,7 +89,7 @@ if (cd "$t/site" && "$NIFT_ABS" changed.f >/dev/null 2>&1); then
 fi
 
 mkdir -p "$t/site/.nift/packages/escaped"
-printf '{"name":"escaped","entry":"../../../../escape.f"}\n' > "$t/site/.nift/packages/escaped/manifest.json"
+printf '{"name":"escaped","version":"0.1.0","entry":"../../../../escape.f"}\n' > "$t/site/.nift/packages/escaped/manifest.json"
 printf 'import("escaped")\n' > "$t/site/escaped.f"
 if (cd "$t/site" && "$NIFT_ABS" escaped.f >/dev/null 2>&1); then
     echo 'escaped installed package entry unexpectedly imported' >&2
@@ -97,7 +97,7 @@ if (cd "$t/site" && "$NIFT_ABS" escaped.f >/dev/null 2>&1); then
 fi
 
 mkdir -p "$t/site/.nift/packages/linked/src"
-printf '{"name":"linked","entry":"src/main.f"}\n' > "$t/site/.nift/packages/linked/manifest.json"
+printf '{"name":"linked","version":"0.1.0","entry":"src/main.f"}\n' > "$t/site/.nift/packages/linked/manifest.json"
 if ln -s "$t/escape.f" "$t/site/.nift/packages/linked/src/main.f" 2>/dev/null; then
     printf 'import("linked")\n' > "$t/site/linked.f"
     if (cd "$t/site" && "$NIFT_ABS" linked.f >/dev/null 2>&1); then
@@ -109,7 +109,7 @@ fi
 # 5) import isolation: exported functions keep private context; private
 #    bindings never leak into the importer.
 mkdir -p "$t/site/.nift/packages/iso/src"
-printf '{"name":"iso","entry":"src/main.f"}\n' > "$t/site/.nift/packages/iso/manifest.json"
+printf '{"name":"iso","version":"0.1.0","entry":"src/main.f"}\n' > "$t/site/.nift/packages/iso/manifest.json"
 printf 'secret_helper := "hidden"\n@fn(public_fn(x)){ return x + 1 }\nexport(public_fn)\n' > "$t/site/.nift/packages/iso/src/main.f"
 printf '@import("iso")\nprint(public_fn(1))\n' > "$t/site/t.f"
 [ "$(cd "$t/site" && "$NIFT_ABS" t.f)" = "2" ] || exit 1

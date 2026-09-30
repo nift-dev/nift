@@ -1,13 +1,29 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Nift package manifest",
+  "title": "Nift package or consumer manifest",
   "type": "object",
-  "required": ["name", "version", "entry"],
   "additionalProperties": false,
+  "oneOf": [
+    {"required": ["name", "version", "entry"]},
+    {"required": ["dependencies"], "not":{"anyOf":[{"required":["name"]},{"required":["version"]},{"required":["entry"]},{"required":["description"]}]}}
+  ],
   "properties": {
-    "name": {"type":"string", "pattern":"^[a-z0-9][a-z0-9_-]*$"},
-    "version": {"type":"string", "minLength":1},
-    "entry": {"type":"string", "pattern":"\\.f$"},
-    "dependencies": {"type":"object", "additionalProperties": {"oneOf":[{"type":"string"},{"type":"object"}]}}
+    "name": {"type":"string", "minLength":1, "maxLength":64, "pattern":"^[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?$", "not":{"enum":["con","prn","aux","nul","com1","com2","com3","com4","com5","com6","com7","com8","com9","lpt1","lpt2","lpt3","lpt4","lpt5","lpt6","lpt7","lpt8","lpt9"]}},
+    "version": {"type":"string", "pattern":"^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-((?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"},
+    "entry": {"type":"string", "pattern":"^(?!.*(?:^|/)(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\\.|/|$))(?:[a-z0-9](?:[a-z0-9._-]*[a-z0-9_-])?/)*[a-z0-9][a-z0-9._-]*\\.f$"},
+    "description": {"type":"string"},
+    "dependencies": {
+      "type":"object",
+      "propertyNames": {"pattern":"^[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?$", "not":{"enum":["con","prn","aux","nul","com1","com2","com3","com4","com5","com6","com7","com8","com9","lpt1","lpt2","lpt3","lpt4","lpt5","lpt6","lpt7","lpt8","lpt9"]}},
+      "additionalProperties": {
+        "type":"object",
+        "required":["source","ref"],
+        "additionalProperties":false,
+        "properties": {
+          "source":{"type":"string","minLength":1,"pattern":"^[^-\\u0000-\\u001F\\u007F][^\\u0000-\\u001F\\u007F]*$"},
+          "ref":{"type":"string","minLength":1,"pattern":"^[^-\\u0000-\\u001F\\u007F][^\\u0000-\\u001F\\u007F]*$"}
+        }
+      }
+    }
   }
 }

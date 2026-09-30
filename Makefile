@@ -1235,6 +1235,7 @@ test-v44-shell-restricted: $(TARGET)
 
 test-v44-packages: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/package_refs_smoke.sh $(V44_SKIP_77)
+	NIFT="$(CURDIR)/$(TARGET)" tests/package_metadata_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/package_callable_closure_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/package_hardening_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/package_module_export_smoke.sh

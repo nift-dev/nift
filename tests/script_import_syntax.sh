@@ -50,7 +50,7 @@ EOF
 
 mkdir -p "$T/site/.nift/packages/demo/src"
 cat >"$T/site/.nift/packages/demo/manifest.json" <<'EOF'
-{"name":"demo","entry":"src/main.f"}
+{"name":"demo","version":"0.1.0","entry":"src/main.f"}
 EOF
 cat >"$T/site/.nift/packages/demo/src/main.f" <<'EOF'
 fn(package_value()) { return 23 }

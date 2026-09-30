@@ -7,7 +7,7 @@ NIFT=${NIFT:-./nift}
 case "$NIFT" in /*) NIFT_ABS="$NIFT";; *) NIFT_ABS="$(pwd)/$NIFT";; esac
 t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
 mkdir -p "$t/site/.nift/packages/vips/src"
-printf '{"name":"vips","entry":"src/main.f"}\n' > "$t/site/.nift/packages/vips/manifest.json"
+printf '{"name":"vips","version":"0.1.0","entry":"src/main.f"}\n' > "$t/site/.nift/packages/vips/manifest.json"
 cat > "$t/site/.nift/packages/vips/src/main.f" <<'F'
 @fn(scale_helper(x)) { return x * 2 }
 @struct(vips_lib) { resize := (w, h) => { return {"w": scale_helper(w), "h": scale_helper(h)} } }
