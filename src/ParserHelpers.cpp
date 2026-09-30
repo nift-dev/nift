@@ -10,8 +10,18 @@
 #include <cctype>
 #include <limits>
 #include <sstream>
+#include <type_traits>
 #include <unordered_set>
 #include <utility>
+
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#else
+#include <time.h>
+#endif
 
 namespace fs = std::filesystem;
 
@@ -41,6 +51,57 @@ bool nift_type_assignable(int from, int to) {
 }
 
 extern const int kMaxCallableDepth = 64;
+
+bool nift_unix_epoch_milliseconds(std::int64_t& value, std::string& error) {
+#ifdef _WIN32
+    FILETIME file_time;
+    GetSystemTimeAsFileTime(&file_time);
+    ULARGE_INTEGER ticks;
+    ticks.LowPart = file_time.dwLowDateTime;
+    ticks.HighPart = file_time.dwHighDateTime;
+    constexpr std::uint64_t windows_to_unix_ticks = 116444736000000000ULL;
+    if (ticks.QuadPart < windows_to_unix_ticks) {
+        error = "epoch: system clock predates the Unix epoch";
+        return false;
+    }
+    value = static_cast<std::int64_t>((ticks.QuadPart - windows_to_unix_ticks) / 10000ULL);
+#else
+    timespec now{};
+    if (clock_gettime(CLOCK_REALTIME, &now) != 0) {
+        error = "epoch: cannot read the system clock";
+        return false;
+    }
+    using Seconds = decltype(now.tv_sec);
+    if constexpr (std::numeric_limits<Seconds>::is_signed) {
+        if constexpr (std::numeric_limits<Seconds>::digits > std::numeric_limits<std::int64_t>::digits) {
+            if (now.tv_sec < static_cast<Seconds>(std::numeric_limits<std::int64_t>::min()) ||
+                now.tv_sec > static_cast<Seconds>(std::numeric_limits<std::int64_t>::max())) {
+                error = "epoch: system time is outside the signed 64-bit millisecond range";
+                return false;
+            }
+        }
+    } else if (static_cast<std::uintmax_t>(now.tv_sec) >
+               static_cast<std::uintmax_t>(std::numeric_limits<std::int64_t>::max())) {
+        error = "epoch: system time is outside the signed 64-bit millisecond range";
+        return false;
+    }
+    const auto seconds = static_cast<std::int64_t>(now.tv_sec);
+    if (seconds < std::numeric_limits<std::int64_t>::min() / 1000 ||
+        seconds > std::numeric_limits<std::int64_t>::max() / 1000) {
+        error = "epoch: system time is outside the signed 64-bit millisecond range";
+        return false;
+    }
+    const std::int64_t milliseconds = now.tv_nsec / 1000000;
+    const std::int64_t whole_seconds = seconds * 1000;
+    if (whole_seconds >= 0 &&
+        milliseconds > std::numeric_limits<std::int64_t>::max() - whole_seconds) {
+        error = "epoch: system time is outside the signed 64-bit millisecond range";
+        return false;
+    }
+    value = whole_seconds + milliseconds;
+#endif
+    return true;
+}
 
 bool parse_runtime_json(const std::string& text, nift::RuntimeValue& value,
                         std::string& error) {

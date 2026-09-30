@@ -2,8 +2,11 @@
 
 ## v4.6.0 (unreleased development)
 
-Development has advanced to v4.6.0 after the completed v4.5.0 release. No
-v4.6.0 user-visible changes have been recorded yet.
+Development has advanced to v4.6.0 after the completed v4.5.0 release.
+
+- Native `epoch()` returns the current Unix epoch as an integer number of
+  milliseconds. `sleep(ms)` blocks the current script execution thread for a
+  non-negative signed 64-bit integer duration and returns `null`.
 
 ## v4.5.0 (released 2026-09-27)
 

@@ -26,6 +26,9 @@ struct Context {
     // and evaluation falls back to the legacy evaluator (the oracle), which
     // performs the location-aware binding.
     std::function<bool(const std::string&)> arg_is_location;
+    // Value-only native calls never need the location probe, which may inspect
+    // complex argument syntax before normal one-time argument evaluation.
+    std::function<bool(const std::string&)> call_is_value_only;
     std::function<std::string(const nift::RuntimeValue&)> render;
 };
 enum class StmtKind { Block, Declaration, Assignment, CompoundAssignment, Increment, Expression, If, While, For, Break, Continue, Return, Function, Struct, Enum, Import, Export, Script, Legacy };

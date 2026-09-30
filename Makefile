@@ -514,8 +514,9 @@ test-build-boundary-nondestructive:
 	bash tests/build_boundary_nondestructive.sh
 
 # Focused embed/binding test targets (mirror the build separation).
+V46_TIME_EMBED_TEST := $(TEST_DIR)/v46-time-embed$(EXEEXT)
 test-embed: test-c-abi test-c-abi-c-smoke test-cp21-bytes test-engine test-engine-bindings test-public-header \
-	test-engine-render-api test-conformance test-v45-embed-contracts test-v45-embed-staged-consumer
+	test-engine-render-api test-conformance test-v45-embed-contracts test-v45-embed-staged-consumer test-v46-time-embed
 
 V45_EMBED_CONTRACT_TEST := $(TEST_DIR)/v45-embed-contract$(EXEEXT)
 V45_EMBED_SCRIPT_TEST := $(TEST_DIR)/v45-embed-script$(EXEEXT)
@@ -547,6 +548,13 @@ $(V45_EMBED_SCRIPT_C_OBJECT): tests/v45_embed_script_c.c $(V45_EMBED_PUBLIC_HEAD
 
 $(V45_EMBED_SCRIPT_C_TEST): $(V45_EMBED_SCRIPT_C_OBJECT) libnift_c.a
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(V45_EMBED_SCRIPT_C_OBJECT) libnift_c.a $(LDLIBS) -o $@
+
+$(V46_TIME_EMBED_TEST): tests/v46_time_embed.cpp $(V45_EMBED_PUBLIC_HEADERS) $(ENGINE_CORE_OBJECTS)
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/v46_time_embed.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
+
+test-v46-time-embed: $(V46_TIME_EMBED_TEST)
+	$(V46_TIME_EMBED_TEST)
 
 test-v45-embed-contracts: $(V45_EMBED_CONTRACT_TEST) $(V45_EMBED_SCRIPT_TEST) $(V45_EMBED_HOST_CALLABLES_TEST) $(V45_EMBED_CONCURRENCY_TEST) $(V45_EMBED_SCRIPT_C_TEST)
 	$(V45_EMBED_CONTRACT_TEST)
@@ -601,7 +609,7 @@ test: test-content test-commands test-comments test-contracts test-json test-run
 	test-zero-mutation test-repair-campaign test-ownership-concurrency \
 	test-macos-runner-policy \
 	test-v44-execution-shell test-v44-language-foundation test-v44-shell-restricted \
-	test-progress-render $(PROGRESS_PTY_TARGET) test-snap-contract test-distribution-summary test-version-consistency test-unreadable-source test-incremental-modified-immediate
+	test-v46-time-cli test-progress-render $(PROGRESS_PTY_TARGET) test-snap-contract test-distribution-summary test-version-consistency test-unreadable-source test-incremental-modified-immediate
 
 test-cp15-numeric-repair: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/cp15_numeric_repair.sh
@@ -1290,6 +1298,13 @@ test-v45-target: $(TARGET)
 
 test-v45-native-runtime: test-v45-invocation test-v45-host-introspection test-v45-integration-dogfood test-v45-adversarial-runtime \
 	test-v45-concurrency test-v45-job-control test-v45-target
+
+test-v46-time-cli: $(TARGET)
+	NIFT="$(CURDIR)/$(TARGET)" tests/v46_time_smoke.sh
+
+test-v46-time: test-v46-time-cli test-v46-time-embed
+
+.PHONY: test-v46-time test-v46-time-cli test-v46-time-embed
 
 test-cp20-bytes: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/cp20_bytes_ffi.sh

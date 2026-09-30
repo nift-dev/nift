@@ -11,6 +11,7 @@
 #include <atomic>
 #include <cctype>
 #include <charconv>
+#include <chrono>
 #include <cmath>
 #include <functional>
 #include <limits>
@@ -816,6 +817,12 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             // Prepared dispatch for user callables: bind args, run the prepared
             // body once, propagate the return value. Any failure falls back to
             // the legacy evaluator (the oracle) via the Call handler.
+            if(name=="epoch"){
+                if(!args.empty()){e="epoch: expected no arguments";return true;}std::int64_t ms=0;if(!nift::detail::nift_unix_epoch_milliseconds(ms,e))return true;out=nift::runtime_integer(ms);return true;
+            }
+            if(name=="sleep"){
+                if(args.size()!=1){e="sleep: expected one millisecond duration";return true;}std::int64_t ms=0;if(!nift::runtime_number_to_i64(args[0],ms)||ms<0){e="sleep: milliseconds must be a non-negative signed 64-bit integer";return true;}using Rep=std::chrono::milliseconds::rep;if(static_cast<std::uint64_t>(ms)>static_cast<std::uint64_t>(std::numeric_limits<Rep>::max())){e="sleep: millisecond duration is unsupported on this platform";return true;}std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<Rep>(ms)));out=nift::RuntimeValue(nullptr);return true;
+            }
             if(name=="ffi_buffer"){
                 if(args.size()!=1){e="ffi_buffer: expected string, bytes, or byte array";return true;}auto st=std::make_shared<FfiBufferInstance>();const auto& d=args[0];if(d.is_string())st->bytes.assign(d.string.begin(),d.string.end());else if(d.is_bytes())st->bytes.assign(d.bytes->begin(),d.bytes->end());else if(d.is_array()){for(const auto& x:d.array){std::size_t byte=0;if(!nift::runtime_number_to_size(x,byte)||byte>255){e="ffi_buffer: array values must be bytes";return true;}st->bytes.push_back(static_cast<unsigned char>(byte));}}else{e="ffi_buffer: expected string, bytes, or byte array";return true;}const std::string id=std::to_string(next_ffi_buffer_id_++);ffi_buffers_[id]=st;out=nift::RuntimeValue(std::string("\x1fnift:ffi-buffer:")+id);return true;
             }
@@ -886,7 +893,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             if(method=="empty"){if(recv.is_array()){out=nift::RuntimeValue(recv.array.empty());return true;}if(recv.is_string()){out=nift::RuntimeValue(recv.string.empty());return true;}if(recv.is_object()){out=nift::RuntimeValue(recv.object.empty());return true;}}
             if(method=="first"&&recv.is_array()){if(recv.array.empty()){e="first: array is empty";return false;}out=recv.array.front();return true;}
             if(method=="last"&&recv.is_array()){if(recv.array.empty()){e="last: array is empty";return false;}out=recv.array.back();return true;}
-            return false;};c.render=[&](const nift::RuntimeValue& v){return render_expression_value(v);};return c;};
+            return false;};c.call_is_value_only=[](const std::string& name){return name=="epoch"||name=="sleep";};c.render=[&](const nift::RuntimeValue& v){return render_expression_value(v);};return c;};
         auto find_binding=[&](const std::string& name)->VariableBinding*{for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(name);if(it!=sc->end())return &it->second;}return nullptr;};
         // Build a persistent logical location from an AST Binding/Index/Member
         // chain.  Indices/keys are evaluated once when the reference is formed;

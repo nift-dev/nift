@@ -37,6 +37,8 @@ NIFT_PARSER_HELPER_HIDDEN std::string runtime_bytes_string(const nift::RuntimeVa
 NIFT_PARSER_HELPER_HIDDEN bool nift_atomic_add_sub_checked(
     std::atomic<std::int64_t>& value, std::int64_t operand, bool subtract,
     std::int64_t& before, std::int64_t& after);
+NIFT_PARSER_HELPER_HIDDEN bool nift_unix_epoch_milliseconds(
+    std::int64_t& value, std::string& error);
 
 NIFT_PARSER_HELPER_HIDDEN bool numeric_exponent_sign(const std::string& text, std::size_t sign);
 
