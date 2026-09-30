@@ -95,7 +95,6 @@ jobs:
         if: runner.os == 'Windows'
         with:
           msystem: UCRT64
-          path-type: inherit
           update: true
           install: make mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-winpthreads
       - name: Build Nift
@@ -140,7 +139,10 @@ jobs:
         timeout-minutes: 6
         if: runner.os == 'Windows'
         shell: msys2 {0}
-        run: make -C nift test-v45-native-runtime
+        run: |
+          export PATH="$PATH:$(cygpath -u "$pythonLocation")"
+          python3 --version
+          make -C nift test-v45-native-runtime
       - name: v4.5 focused embedding contracts
         timeout-minutes: 10
         if: runner.os != 'Windows'
