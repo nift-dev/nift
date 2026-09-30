@@ -13,6 +13,17 @@ namespace fs = std::filesystem;
 
 namespace nift::detail {
 
+int nift_binding_type(const nift::RuntimeValue& value) {
+    if (value.is_null()) return 0;
+    if (value.is_bool()) return 1;
+    if (value.is_number()) return nift::runtime_number_is_integer(value) ? 2 : 3;
+    if (value.is_string()) return 4;
+    if (value.is_array()) return 5;
+    if (value.is_object()) return 6;
+    if (value.is_bytes()) return 7;
+    return -1;
+}
+
 bool glob_has_magic(const std::string& s) {
     bool escaped=false; for(char c:s){if(escaped){escaped=false;continue;}if(c=='\\'){escaped=true;continue;}if(c=='*'||c=='?')return true;} return false;
 }

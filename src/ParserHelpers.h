@@ -16,6 +16,8 @@ namespace nift { class RuntimeValue; }
 
 namespace nift::detail {
 
+NIFT_PARSER_HELPER_HIDDEN int nift_binding_type(const nift::RuntimeValue& value);
+
 NIFT_PARSER_HELPER_HIDDEN bool numeric_exponent_sign(const std::string& text, std::size_t sign);
 
 NIFT_PARSER_HELPER_HIDDEN bool glob_has_magic(const std::string& value);
