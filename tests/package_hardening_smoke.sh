@@ -6,6 +6,13 @@ NIFT=${NIFT:-./nift}
 case "$NIFT" in /*) NIFT_ABS="$NIFT";; *) NIFT_ABS="$(pwd)/$NIFT";; esac
 t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
 mkdir -p "$t/site/.nift"
+make_native_symlink() {
+    if ! ln -s "$1" "$2" 2>/dev/null; then return 1; fi
+    if [[ -L "$2" ]]; then return 0; fi
+    case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) return 1;; esac
+    echo "ln -s succeeded without creating a symlink: $2" >&2
+    exit 1
+}
 # 1) manifest entry must stay inside the package directory
 mkdir -p "$t/evil"
 printf '{"name":"evil","version":"0.1.0","entry":"../../escape.f"}\n' > "$t/evil/manifest.json"
@@ -36,7 +43,7 @@ done
 mkdir -p "$t/root-link-site/.nift" "$t/external-store/demo"
 printf 'external\n' > "$t/external-store/demo/sentinel"
 printf '{"dependencies":{"demo":{"source":"unused","ref":"local"}}}\n' > "$t/root-link-site/manifest.json"
-if ln -s "$t/external-store" "$t/root-link-site/.nift/packages" 2>/dev/null; then
+if make_native_symlink "$t/external-store" "$t/root-link-site/.nift/packages"; then
     if (cd "$t/root-link-site" && "$NIFT_ABS" remove demo >/dev/null 2>&1); then
         echo 'symlinked external package store unexpectedly accepted' >&2
         exit 1
@@ -47,7 +54,7 @@ fi
 mkdir -p "$t/inner-link-site/.nift" "$t/inner-link-site/victim/demo"
 printf 'internal\n' > "$t/inner-link-site/victim/demo/sentinel"
 printf '{"dependencies":{"demo":{"source":"unused","ref":"local"}}}\n' > "$t/inner-link-site/manifest.json"
-if ln -s ../victim "$t/inner-link-site/.nift/packages" 2>/dev/null; then
+if make_native_symlink ../victim "$t/inner-link-site/.nift/packages"; then
     if (cd "$t/inner-link-site" && "$NIFT_ABS" remove demo >/dev/null 2>&1); then
         echo 'redirected in-project package store unexpectedly accepted' >&2
         exit 1
@@ -98,7 +105,7 @@ fi
 
 mkdir -p "$t/site/.nift/packages/linked/src"
 printf '{"name":"linked","version":"0.1.0","entry":"src/main.f"}\n' > "$t/site/.nift/packages/linked/manifest.json"
-if ln -s "$t/escape.f" "$t/site/.nift/packages/linked/src/main.f" 2>/dev/null; then
+if make_native_symlink "$t/escape.f" "$t/site/.nift/packages/linked/src/main.f"; then
     printf 'import("linked")\n' > "$t/site/linked.f"
     if (cd "$t/site" && "$NIFT_ABS" linked.f >/dev/null 2>&1); then
         echo 'symlink-escaped installed package entry unexpectedly imported' >&2
