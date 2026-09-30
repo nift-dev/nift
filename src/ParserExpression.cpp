@@ -1336,7 +1336,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 std::string path;if(!string_arg("ffi_open",args,q,0,path))return false;
                 void* handle=nullptr;
 #ifdef _WIN32
-                int n=MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,path.c_str(),-1,nullptr,0);if(n<=0){error="ffi_open: invalid UTF-8 path";return false;}std::wstring w(static_cast<size_t>(n),L'\\0');MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,path.c_str(),-1,w.data(),n);handle=reinterpret_cast<void*>(LoadLibraryW(w.c_str()));
+                int n=MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,path.c_str(),-1,nullptr,0);if(n<=0){error="ffi_open: invalid UTF-8 path";return false;}std::wstring w(static_cast<size_t>(n),L'\0');MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,path.c_str(),-1,w.data(),n);handle=reinterpret_cast<void*>(LoadLibraryW(w.c_str()));
 #else
                 dlerror();handle=dlopen(path.c_str(),RTLD_NOW|RTLD_LOCAL);
 #endif

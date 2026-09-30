@@ -53,7 +53,7 @@ jobs:
       - uses: actions/checkout@v5
         with:
           repository: nift-packages/sqlite
-          ref: 85f59b3007c5d64ef7f600e2cf773e192757d6c2
+          ref: e2f6e192f5a72e8220567952170fc814566aa400
           path: nift-packages/sqlite
       - uses: actions/checkout@v5
         with:
@@ -136,7 +136,14 @@ jobs:
         timeout-minutes: 6
         if: runner.os == 'Windows'
         shell: msys2 {0}
-        run: make -C nift test-v45-native-runtime
+        run: |
+          if ! command -v python3 >/dev/null 2>&1; then
+            PY="$(ls -d /c/hostedtoolcache/windows/Python/*/x64 2>/dev/null | sort -V | tail -1)"
+            if [ -n "$PY" ]; then
+              export PATH="$PATH:$PY"
+            fi
+          fi
+          make -C nift test-v45-native-runtime
       - name: v4.5 focused embedding contracts
         timeout-minutes: 10
         if: runner.os != 'Windows'
