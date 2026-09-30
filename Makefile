@@ -638,7 +638,7 @@ test-libffi-private-symbols: embed node-binding python-binding
 	bash scripts/audit_private_libffi.sh "$(SHARED_LIB)" bindings/node/build/nift_node.node bindings/python/nift/_nift*.so
 	bash tests/libffi_private_audit.sh
 
-test-pic-depfiles: $(TEST_DIR)/pic/src/Parser.o
+test-pic-depfiles: $(patsubst %.cpp,$(TEST_DIR)/pic/%.o,$(PARSER_SOURCES))
 	LIBFFI_INCLUDE="$(LIBFFI_INCLUDE)" bash tests/pic_depfiles.sh
 
 test-node-package-licenses:
