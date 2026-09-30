@@ -999,7 +999,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             const auto body=normalize_control_block_body(source.substr(bo+1,bc-bo-1));
             auto prepared_condition=nift::ast::parse_expression(condition);
             std::vector<std::unique_ptr<nift::ast::Stmt>> prepared_body; const bool prepared_body_ok=prepare_loop_body(body.text,prepared_body);
-            
+
             while(result_.ok){bool yes=false;std::string e;if(prepared_condition.supported){auto c=ast_context();nift::RuntimeValue cv;if(!nift::ast::evaluate(*prepared_condition.expr,c,cv,e)){fail(source_path,source,i,e);break;}yes=nift::ast::truthy(cv);last_expression_mutation_=false;}else if(!evaluate_condition(condition,yes,e)){fail(source_path,source,i,e);break;}if(!yes)break;
                 push_json_scope(); ++loop_depth_; RenderResult nested;if(prepared_body_ok){if(!execute_body(prepared_body,e)){nested.ok=false;nested.error.message=e;}}else nested=parse(body.text,source_path,depth+1); --loop_depth_; pop_json_scope();if(!nested.ok){fail(source_path,source,i,nested.error.message);break;}append_indented(output,nested.output,"",code_block_depth_);
                 if (pending_control_.kind == ControlFlow::Continue) { pending_control_ = {}; continue; }

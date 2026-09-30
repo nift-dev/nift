@@ -12,6 +12,11 @@ on:
       - 'tests/ffi/**'
       - 'tests/*ffi*'
       - 'tests/cp21_bytes*'
+      - 'tests/v45_adversarial_runtime.sh'
+      - 'tests/v45_async.sh'
+      - 'tests/v45_atomics.sh'
+      - 'tests/v45_mutex.sh'
+      - 'tests/v45_threads.sh'
       - 'third_party/libffi/**'
       - 'bindings/node/**'
       - 'bindings/python/**'
@@ -28,6 +33,11 @@ on:
       - 'tests/ffi/**'
       - 'tests/*ffi*'
       - 'tests/cp21_bytes*'
+      - 'tests/v45_adversarial_runtime.sh'
+      - 'tests/v45_async.sh'
+      - 'tests/v45_atomics.sh'
+      - 'tests/v45_mutex.sh'
+      - 'tests/v45_threads.sh'
       - 'third_party/libffi/**'
       - 'bindings/node/**'
       - 'bindings/python/**'
@@ -80,6 +90,7 @@ jobs:
           bash tests/libffi_private_audit.sh
           python3 scripts/check_node_package_licenses.py
       - name: Sanitized Gate 6A-R wall
+        timeout-minutes: 20
         env:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
@@ -87,6 +98,13 @@ jobs:
           make -j2 test-sanitize
           env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT="$PWD/.build/nift-sanitize" bash tests/gate6ar_ffi.sh
           env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT="$PWD/.build/nift-sanitize" bash tests/cp20_bytes_ffi.sh
+          make test-v45-concurrency-sanitize
+      - name: Thread-sanitized v4.5 concurrency runtime
+        timeout-minutes: 20
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+        run: make -j2 test-v45-concurrency-tsan
 
   portable:
     name: ${{ matrix.id }} complete FFI wall
