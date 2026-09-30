@@ -13,6 +13,10 @@ make_package() {
 }
 
 make_package "$t/demo" demo
+demo_source="$t/demo"
+if [ -n "${WINDIR:-}" ] && command -v cygpath >/dev/null 2>&1; then
+    demo_source=$(cygpath -m "$demo_source")
+fi
 
 # Existing malformed project metadata must never be replaced by `add`.
 mkdir -p "$t/malformed-site"
@@ -48,7 +52,7 @@ done
 # Dependency objects require explicit non-empty source/ref fields.
 mkdir -p "$t/bad-dependency-site"
 cat > "$t/bad-dependency-site/manifest.json" <<EOF
-{"dependencies":{"demo":{"source":"$t/demo"}}}
+{"dependencies":{"demo":{"source":"$demo_source"}}}
 EOF
 bad_dependency=$(cd "$t/bad-dependency-site" && "$NIFT_ABS" install 2>&1 || true)
 grep -q 'dependency.*ref' <<<"$bad_dependency"
@@ -57,7 +61,7 @@ grep -q 'dependency.*ref' <<<"$bad_dependency"
 # fallback. The live package slot remains untouched.
 mkdir -p "$t/lock-site/.nift/packages/demo"
 cat > "$t/lock-site/manifest.json" <<EOF
-{"dependencies":{"demo":{"source":"$t/demo","ref":"local"}}}
+{"dependencies":{"demo":{"source":"$demo_source","ref":"local"}}}
 EOF
 printf 'live\n' > "$t/lock-site/.nift/packages/demo/sentinel"
 printf '{broken\n' > "$t/lock-site/.nift/packages.lock.json"
@@ -91,7 +95,7 @@ zeta_lock=$(grep -n '"zeta"' "$t/order-site/.nift/packages.lock.json" | cut -d: 
 # A hand-written valid local dependency receives a complete lock on install.
 mkdir -p "$t/install-site"
 cat > "$t/install-site/manifest.json" <<EOF
-{"dependencies":{"demo":{"source":"$t/demo","ref":"local"}}}
+{"dependencies":{"demo":{"source":"$demo_source","ref":"local"}}}
 EOF
 (cd "$t/install-site" && "$NIFT_ABS" install >/dev/null)
 grep -q '"requested": "local"' "$t/install-site/.nift/packages.lock.json"
