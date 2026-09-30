@@ -67,6 +67,16 @@ Use this compact shape for new entries:
   in templates makes generated output nondeterministic
 - Timing: do not publish before a Nift release containing this function
 
+### Execution output separation
+
+- Status: pending
+- Earliest release: 4.6.0
+- Website scope: scripting console API and all embedding/binding result references
+- Required update: document `err(value)`, CLI stdout/stderr behavior, per-operation
+  embedding captures on success and failure, worker inheritance and atomic writes,
+  and the separation from return values, diagnostics, and rendered content
+- Timing: do not publish before a Nift release containing this behavior
+
 ## Completed items
 
 Move durable historical context to the relevant release record when useful; do

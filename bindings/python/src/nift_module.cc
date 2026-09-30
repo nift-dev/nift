@@ -502,6 +502,13 @@ PyObject* StrFromNift(nift_string s) {
                               "strict");
 }
 
+PyObject* BytesFromNift(nift_bytes bytes) {
+  const char* data = bytes.data == nullptr
+                         ? ""
+                         : reinterpret_cast<const char*>(bytes.data);
+  return PyBytes_FromStringAndSize(data, (Py_ssize_t)bytes.length);
+}
+
 // Parse a render source argument: str/bytes -> text; (kind, bytes) -> source.
 bool SourceFromObject(PyObject* src, int* kind, std::string* data) {
   if (PyUnicode_Check(src)) {
@@ -671,6 +678,20 @@ PyObject* DoRender(PyObject* args, int mode) {
   PyObject* ok_obj = PyBool_FromLong(ok);
   PyDict_SetItemString(dict, "ok", ok_obj);
   Py_DECREF(ok_obj);
+  nift_bytes stdout_output{nullptr, 0};
+  nift_bytes stderr_output{nullptr, 0};
+  nift_render_result_stdout(result, &stdout_output);
+  nift_render_result_stderr(result, &stderr_output);
+  PyObject* stdout_obj = BytesFromNift(stdout_output);
+  PyObject* stderr_obj = BytesFromNift(stderr_output);
+  if (stdout_obj != nullptr) {
+    PyDict_SetItemString(dict, "stdout", stdout_obj);
+    Py_DECREF(stdout_obj);
+  }
+  if (stderr_obj != nullptr) {
+    PyDict_SetItemString(dict, "stderr", stderr_obj);
+    Py_DECREF(stderr_obj);
+  }
   if (ok) {
     nift_string output{nullptr, 0};
     nift_render_result_output(result, &output);
@@ -941,6 +962,81 @@ PyObject* EngineEvaluate(PyObject*, PyObject* args) {
   nift_script_result_value_json(r,&out); PyObject* py=PyUnicode_DecodeUTF8(out.data?out.data:"",(Py_ssize_t)out.length,"strict"); nift_script_result_free(r); return py;
 }
 
+PyObject* ScriptResultDict(nift_script_result* result) {
+  if (result == nullptr) {
+    PyErr_SetString(PyExc_RuntimeError, "null script result");
+    return nullptr;
+  }
+  PyObject* dict = PyDict_New();
+  if (dict == nullptr) {
+    nift_script_result_free(result);
+    return nullptr;
+  }
+  int ok = nift_script_result_ok(result);
+  PyObject* ok_obj = PyBool_FromLong(ok);
+  PyDict_SetItemString(dict, "ok", ok_obj);
+  Py_DECREF(ok_obj);
+
+  nift_bytes stdout_output{nullptr, 0};
+  nift_bytes stderr_output{nullptr, 0};
+  nift_script_result_stdout(result, &stdout_output);
+  nift_script_result_stderr(result, &stderr_output);
+  PyObject* stdout_obj = BytesFromNift(stdout_output);
+  PyObject* stderr_obj = BytesFromNift(stderr_output);
+  if (stdout_obj != nullptr) {
+    PyDict_SetItemString(dict, "stdout", stdout_obj);
+    Py_DECREF(stdout_obj);
+  }
+  if (stderr_obj != nullptr) {
+    PyDict_SetItemString(dict, "stderr", stderr_obj);
+    Py_DECREF(stderr_obj);
+  }
+
+  nift_string value{nullptr, 0};
+  if (ok) {
+    if (nift_script_result_value_json(result, &value) != NIFT_OK) {
+      nift_script_result_free(result);
+      Py_DECREF(dict);
+      PyErr_SetString(PyExc_RuntimeError, "could not read script result");
+      return nullptr;
+    }
+    PyObject* value_obj = StrFromNift(value);
+    PyDict_SetItemString(dict, "valueJson", value_obj);
+    Py_DECREF(value_obj);
+    Py_INCREF(Py_None);
+    PyDict_SetItemString(dict, "error", Py_None);
+    Py_DECREF(Py_None);
+  } else {
+    nift_script_result_error_message(result, &value);
+    PyObject* error_obj = StrFromNift(value);
+    PyDict_SetItemString(dict, "error", error_obj);
+    Py_DECREF(error_obj);
+  }
+  nift_script_result_free(result);
+  return dict;
+}
+
+PyObject* EngineExecuteResult(PyObject*, PyObject* args) {
+  PyObject* obj=nullptr; const char* script=nullptr; Py_ssize_t sl=0; const char* cmd=nullptr; Py_ssize_t cl=0; PyObject* argv_obj=nullptr;
+  if (!PyArg_ParseTuple(args, "Os#s#O", &obj, &script, &sl, &cmd, &cl, &argv_obj)) return nullptr;
+  NiftEngineObject* self=CheckEngineObject(obj); if(!self) return nullptr;
+  PyObject* seq=PySequence_Fast(argv_obj, "args must be a sequence of strings"); if(!seq) return nullptr;
+  Py_ssize_t n=PySequence_Fast_GET_SIZE(seq); std::vector<std::string> av; av.reserve((size_t)n);
+  std::vector<const char*> ap; std::vector<size_t> al; ap.reserve((size_t)n); al.reserve((size_t)n);
+  for(Py_ssize_t i=0;i<n;++i){ PyObject* item=PySequence_Fast_GET_ITEM(seq,i); if(!PyUnicode_Check(item)){Py_DECREF(seq);PyErr_SetString(PyExc_TypeError,"args must contain strings");return nullptr;} Py_ssize_t l=0; const char* p=PyUnicode_AsUTF8AndSize(item,&l); if(!p){Py_DECREF(seq);return nullptr;} av.emplace_back(p,(size_t)l);}
+  for(auto& x:av){ap.push_back(x.data());al.push_back(x.size());}
+  nift_script_result* r=nullptr; nift_status rc=nift_engine_execute(self->engine,script,(size_t)sl,cmd,(size_t)cl,ap.empty()?nullptr:ap.data(),al.empty()?nullptr:al.data(),(size_t)n,&r); Py_DECREF(seq);
+  if(rc!=NIFT_OK||!r){PyErr_SetString(PyExc_RuntimeError,"nift_engine_execute failed");return nullptr;}
+  return ScriptResultDict(r);
+}
+
+PyObject* EngineEvaluateResult(PyObject*, PyObject* args) {
+  PyObject* obj=nullptr; const char* expr=nullptr; Py_ssize_t el=0; if(!PyArg_ParseTuple(args,"Os#",&obj,&expr,&el)) return nullptr;
+  NiftEngineObject* self=CheckEngineObject(obj); if(!self) return nullptr; nift_script_result* r=nullptr; nift_status rc=nift_engine_evaluate(self->engine,expr,(size_t)el,&r);
+  if(rc!=NIFT_OK||!r){PyErr_SetString(PyExc_RuntimeError,"nift_engine_evaluate failed");return nullptr;}
+  return ScriptResultDict(r);
+}
+
 // ---------------------------------------------------------------------------
 // Type objects
 // ---------------------------------------------------------------------------
@@ -978,6 +1074,8 @@ PyMethodDef kMethods[] = {
     {"engine_set_environment_provider", EngineSetEnvironmentProvider, METH_VARARGS, "Set the environment provider."},
     {"engine_execute", EngineExecute, METH_VARARGS, "Execute a complete Nift script."},
     {"engine_evaluate", EngineEvaluate, METH_VARARGS, "Evaluate a Nift expression."},
+    {"engine_execute_result", EngineExecuteResult, METH_VARARGS, "Execute a script and return its complete result."},
+    {"engine_evaluate_result", EngineEvaluateResult, METH_VARARGS, "Evaluate an expression and return its complete result."},
     {"engine_render_page", EngineRenderPage, METH_VARARGS, "Render a tracked page."},
     {"engine_render", EngineRender, METH_VARARGS, "Composed render."},
     {"engine_render_partial", EngineRenderPartial, METH_VARARGS, "Partial render."},

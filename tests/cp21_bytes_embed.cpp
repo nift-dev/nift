@@ -192,9 +192,9 @@ void test_result_accessors() {
 }  // namespace
 
 int main() {
-    CHECK(std::string(nift_abi_version()) == "1.2");
+    CHECK(std::string(nift_abi_version()) == "1.3");
     CHECK(nift_abi_version_major() == 1);
-    CHECK(nift_abi_version_minor() == 2);
+    CHECK(nift_abi_version_minor() == 3);
     test_setters_and_lifetime();
     test_context_setter();
     test_result_accessors();

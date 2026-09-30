@@ -177,6 +177,69 @@ function makeProject() {
     e.close();
   });
 
+  await test("output capture on render success and failure", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "nift-node-capture-"));
+    const capture = Buffer.from([0x41, 0x00, 0xff, 0x42]);
+    fs.writeFileSync(path.join(root, "capture.bin"), capture);
+    const e = Engine.new();
+    e.setRoot(root);
+    const success = await e.renderText(
+      '@script{ print("render-out"); err("render-err") }visible'
+    );
+    assert.strictEqual(success.ok, true);
+    assert.strictEqual(success.output, "visible");
+    assert.deepStrictEqual(success.stdout, Buffer.from("render-out\n"));
+    assert.deepStrictEqual(success.stderr, Buffer.from("render-err\n"));
+
+    const failure = await e.renderText(
+      '@script{ cat("capture.bin"); err("before-err"); return 1 / 0 }'
+    );
+    assert.strictEqual(failure.ok, false);
+    assert.ok(Buffer.isBuffer(failure.stdout));
+    assert.ok(Buffer.isBuffer(failure.stderr));
+    assert.deepStrictEqual(failure.stdout, capture);
+    assert.deepStrictEqual(failure.stderr, Buffer.from("before-err\n"));
+    e.close();
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  await test("script result preserves output and compatibility", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "nift-node-capture-"));
+    const capture = Buffer.from([0x41, 0x00, 0xff, 0x42]);
+    fs.writeFileSync(path.join(root, "capture.bin"), capture);
+    const e = Engine.new();
+    e.setRoot(root);
+    const success = e.executeResult(
+      'print("execute-out"); err("execute-err"); x := 40; return x + 2'
+    );
+    assert.strictEqual(success.ok, true);
+    assert.strictEqual(success.value, 42);
+    assert.strictEqual(success.error, null);
+    assert.deepStrictEqual(success.stdout, Buffer.from("execute-out\n"));
+    assert.deepStrictEqual(success.stderr, Buffer.from("execute-err\n"));
+
+    const evaluated = e.evaluateResult('print("evaluate-out")');
+    assert.strictEqual(evaluated.ok, true);
+    assert.deepStrictEqual(evaluated.stdout, Buffer.from("evaluate-out\n"));
+    assert.deepStrictEqual(evaluated.stderr, Buffer.alloc(0));
+
+    const failure = e.executeResult(
+      'cat("capture.bin"); err("before-err"); return 1 / 0'
+    );
+    assert.strictEqual(failure.ok, false);
+    assert.strictEqual(failure.value, null);
+    assert.ok(failure.error);
+    assert.ok(Buffer.isBuffer(failure.stdout));
+    assert.ok(Buffer.isBuffer(failure.stderr));
+    assert.deepStrictEqual(failure.stdout, capture);
+    assert.deepStrictEqual(failure.stderr, Buffer.from("before-err\n"));
+
+    assert.strictEqual(e.execute("return 7"), 7);
+    assert.throws(() => e.evaluate("1 / 0"));
+    e.close();
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
   await test("concurrent renders with callbacks", async () => {
     const e = Engine.new();
     e.setRoot("/");

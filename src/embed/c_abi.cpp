@@ -71,6 +71,14 @@ nift_status set_out(nift_string* out, const std::string& value) {
     return NIFT_OK;
 }
 
+nift_status set_bytes_out(nift_bytes* out, const std::string& value) {
+    if (out != nullptr) {
+        out->data = value.empty() ? nullptr : reinterpret_cast<const uint8_t*>(value.data());
+        out->length = value.size();
+    }
+    return NIFT_OK;
+}
+
 void set_engine_diag(const nift_engine* engine, std::string text) {
     std::lock_guard<std::mutex> lock(engine->diag_mutex);
     engine->diag = std::move(text);
@@ -481,6 +489,8 @@ nift_status nift_script_result_value_bytes(const nift_script_result* result,nift
     }catch(...){return NIFT_ERROR_INTERNAL;}
 }
 nift_status nift_script_result_error_message(const nift_script_result* result,nift_string*out){if(!result||result->result.ok())return NIFT_ERROR_INVALID_ARGUMENT;return set_out(out,result->result.error().message);}
+nift_status nift_script_result_stdout(const nift_script_result* result,nift_bytes*out){if(!result)return NIFT_ERROR_INVALID_ARGUMENT;return set_bytes_out(out,result->result.stdout_output());}
+nift_status nift_script_result_stderr(const nift_script_result* result,nift_bytes*out){if(!result)return NIFT_ERROR_INVALID_ARGUMENT;return set_bytes_out(out,result->result.stderr_output());}
 
 nift_status nift_engine_render_page(nift_engine* engine,
                                     const nift_context* context,
@@ -620,6 +630,18 @@ nift_status nift_render_result_output(const nift_render_result* result,
     } catch (...) {
         return NIFT_ERROR_INTERNAL;
     }
+}
+
+nift_status nift_render_result_stdout(const nift_render_result* result,
+                                      nift_bytes* out) {
+    if (result == nullptr) return NIFT_ERROR_INVALID_ARGUMENT;
+    return set_bytes_out(out, result->result.stdout_output());
+}
+
+nift_status nift_render_result_stderr(const nift_render_result* result,
+                                      nift_bytes* out) {
+    if (result == nullptr) return NIFT_ERROR_INVALID_ARGUMENT;
+    return set_bytes_out(out, result->result.stderr_output());
 }
 
 nift_status nift_render_result_error_message(const nift_render_result* result,

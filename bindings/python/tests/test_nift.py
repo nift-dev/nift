@@ -158,6 +158,72 @@ class TestBindings(unittest.TestCase):
         self.assertEqual(r.output, "<p>frag</p>")
         e.close()
 
+    def test_output_capture_on_render_success_and_failure(self):
+        root = tempfile.mkdtemp(prefix="nift-py-capture-")
+        capture = b"A\x00\xffB"
+        with open(os.path.join(root, "capture.bin"), "wb") as f:
+            f.write(capture)
+        e = Engine.new()
+        e.set_root(root)
+        success = e.render_text(
+            '@script{ print("render-out"); err("render-err") }visible'
+        )
+        self.assertTrue(success.ok)
+        self.assertEqual(success.output, "visible")
+        self.assertEqual(success.stdout, b"render-out\n")
+        self.assertEqual(success.stderr, b"render-err\n")
+
+        failure = e.render_text(
+            '@script{ cat("capture.bin"); err("before-err"); return 1 / 0 }'
+        )
+        self.assertFalse(failure.ok)
+        self.assertIsInstance(failure.stdout, bytes)
+        self.assertIsInstance(failure.stderr, bytes)
+        self.assertEqual(failure.stdout, capture)
+        self.assertEqual(failure.stderr, b"before-err\n")
+        e.close()
+        import shutil
+        shutil.rmtree(root, ignore_errors=True)
+
+    def test_script_result_preserves_output_and_compatibility(self):
+        root = tempfile.mkdtemp(prefix="nift-py-capture-")
+        capture = b"A\x00\xffB"
+        with open(os.path.join(root, "capture.bin"), "wb") as f:
+            f.write(capture)
+        e = Engine.new()
+        e.set_root(root)
+        success = e.execute_result(
+            'print("execute-out"); err("execute-err"); x := 40; return x + 2'
+        )
+        self.assertTrue(success.ok)
+        self.assertEqual(success.value, 42)
+        self.assertIsNone(success.error)
+        self.assertEqual(success.stdout, b"execute-out\n")
+        self.assertEqual(success.stderr, b"execute-err\n")
+
+        evaluated = e.evaluate_result('print("evaluate-out")')
+        self.assertTrue(evaluated.ok)
+        self.assertEqual(evaluated.stdout, b"evaluate-out\n")
+        self.assertEqual(evaluated.stderr, b"")
+
+        failure = e.execute_result(
+            'cat("capture.bin"); err("before-err"); return 1 / 0'
+        )
+        self.assertFalse(failure.ok)
+        self.assertIsNone(failure.value)
+        self.assertTrue(failure.error)
+        self.assertIsInstance(failure.stdout, bytes)
+        self.assertIsInstance(failure.stderr, bytes)
+        self.assertEqual(failure.stdout, capture)
+        self.assertEqual(failure.stderr, b"before-err\n")
+
+        self.assertEqual(e.execute("return 7"), 7)
+        with self.assertRaises(RuntimeError):
+            e.evaluate("1 / 0")
+        e.close()
+        import shutil
+        shutil.rmtree(root, ignore_errors=True)
+
     def test_source_path(self):
         root = make_project()
         e = Engine.new()

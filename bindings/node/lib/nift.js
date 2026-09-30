@@ -128,9 +128,36 @@ class Engine {
     return JSON.parse(native.engineExecute.call(this._handle, String(script), String(cmd), args.map(String)));
   }
 
+  executeResult(script, cmd = "<embed>", args = []) {
+    this._check();
+    if (!Array.isArray(args)) throw new TypeError("Nift: execute args must be an array");
+    const result = native.engineExecuteResult.call(
+      this._handle, String(script), String(cmd), args.map(String)
+    );
+    return {
+      ok: result.ok,
+      value: result.ok ? JSON.parse(result.valueJson) : null,
+      error: result.error,
+      stdout: result.stdout,
+      stderr: result.stderr,
+    };
+  }
+
   evaluate(expression) {
     this._check();
     return JSON.parse(native.engineEvaluate.call(this._handle, String(expression)));
+  }
+
+  evaluateResult(expression) {
+    this._check();
+    const result = native.engineEvaluateResult.call(this._handle, String(expression));
+    return {
+      ok: result.ok,
+      value: result.ok ? JSON.parse(result.valueJson) : null,
+      error: result.error,
+      stdout: result.stdout,
+      stderr: result.stderr,
+    };
   }
 
   render(pageName, ctx) {

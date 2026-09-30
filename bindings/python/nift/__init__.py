@@ -12,7 +12,7 @@ import json
 # holds a strong reference to the Engine/Context for its duration).
 from . import _nift
 
-__all__ = ["Engine", "Context", "RenderResult"]
+__all__ = ["Engine", "Context", "RenderResult", "ScriptResult"]
 
 
 class RenderResult:
@@ -29,6 +29,8 @@ class RenderResult:
         "pagination",
         "dependencies",
         "requirements",
+        "stdout",
+        "stderr",
     )
 
     def __init__(self, raw):
@@ -41,11 +43,26 @@ class RenderResult:
         self.pagination = raw.get("pagination", [])
         self.dependencies = raw.get("dependencies", [])
         self.requirements = raw.get("requirements", [])
+        self.stdout = raw.get("stdout", b"")
+        self.stderr = raw.get("stderr", b"")
 
     def __repr__(self):
         if self.ok:
             return f"<RenderResult ok output={self.output!r}>"
         return f"<RenderResult failed error={self.error!r}>"
+
+
+class ScriptResult:
+    """The outcome and captured output of script execution or evaluation."""
+
+    __slots__ = ("ok", "value", "error", "stdout", "stderr")
+
+    def __init__(self, raw):
+        self.ok = bool(raw.get("ok"))
+        self.value = json.loads(raw["valueJson"]) if self.ok else None
+        self.error = raw.get("error")
+        self.stdout = raw.get("stdout", b"")
+        self.stderr = raw.get("stderr", b"")
 
 
 def _source(value, what):
@@ -152,10 +169,22 @@ class Engine:
         self._check()
         return json.loads(_nift.engine_execute(self._handle, str(script), str(cmd), list(args)))
 
+    def execute_result(self, script, cmd="<embed>", args=()):
+        """Execute a program without discarding output captured before failure."""
+        self._check()
+        return ScriptResult(
+            _nift.engine_execute_result(self._handle, str(script), str(cmd), list(args))
+        )
+
     def evaluate(self, expression):
         """Evaluate an expression against this Engine's persistent runtime."""
         self._check()
         return json.loads(_nift.engine_evaluate(self._handle, str(expression)))
+
+    def evaluate_result(self, expression):
+        """Evaluate an expression and return its value/error and captured output."""
+        self._check()
+        return ScriptResult(_nift.engine_evaluate_result(self._handle, str(expression)))
 
     def render(self, page_name, ctx=None):
         """Render a tracked project page by name. The name is ALWAYS a tracked

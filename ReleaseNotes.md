@@ -9,6 +9,10 @@ Development has advanced to v4.6.0 after the completed v4.5.0 release.
   non-negative signed 64-bit integer duration and returns `null`.
 - `secure_random_bytes(n)` returns up to 10,000,000 bytes from the operating
   system CSPRNG, with no fallback pseudorandom generator.
+- Runtime output now uses execution-scoped stdout and stderr sinks. `err(value)`
+  writes one atomic line to stderr with the same value rules as `print(value)`,
+  while embedding results capture both channels separately from values,
+  diagnostics, and rendered content. The additive C ABI is now 1.3.
 
 ## v4.5.0 (released 2026-09-27)
 

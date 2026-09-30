@@ -284,7 +284,9 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             for(std::size_t t=0;t<raw.size();++t){char c=raw[t];if(esc){cur+=c;esc=false;continue;}if(c=='\\'&&!sq){esc=true;continue;}if(c=='\''&&!dq){sq=!sq;continue;}if(c=='"'&&!sq){dq=!dq;continue;}if((c==' '||c=='\t'||c=='\r'||c=='\n')&&!sq&&!dq){if(!cur.empty()){toks.push_back(cur);cur.clear();}continue;}cur+=c;}if(!cur.empty())toks.push_back(cur);
             if(toks.empty()){fail(source_path,source,i,"empty command");break;}
             ProcessSpec spec; spec.program=toks.front(); spec.args.assign(toks.begin()+1,toks.end());
-            auto pr=nift_run_process(spec,true,true);
+            auto pr=nift_run_process(spec,true,false);
+            execution_output_->write_stdout(pr.out);
+            execution_output_->write_stderr(pr.err);
             if(!pr.launched){fail(source_path,source,i,pr.error.empty()?("cannot launch command: "+spec.program):pr.error);break;}
             i=cc+1; continue;
         }
@@ -2365,7 +2367,7 @@ RenderResult Parser::render() {
             const std::size_t page_index = next_page.fetch_add(1);
             if (page_index >= total) break;
             const std::size_t page = page_index + 1;
-            Parser page_parser(host_, tracked_info_);
+            Parser page_parser(host_, tracked_info_, execution_output_);
             page_parser.json_bindings_ = json_bindings_;
             page_parser.contract_bindings_ = contract_bindings_;
             page_parser.page_source_ = page_source_;

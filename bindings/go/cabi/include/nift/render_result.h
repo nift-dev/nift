@@ -35,6 +35,8 @@ public:
     bool ok() const { return ok_; }
     const std::string& output() const { return output_; }
     const RenderError& error() const { return error_; }
+    const std::string& stdout_output() const { return stdout_output_; }
+    const std::string& stderr_output() const { return stderr_output_; }
     const std::vector<std::string>& dependencies() const { return dependencies_; }
     const std::vector<std::string>& requirements() const { return requirements_; }
     const std::vector<PaginationPage>& pagination() const { return pagination_; }
@@ -45,6 +47,8 @@ private:
     bool ok_ = false;
     std::string output_;
     RenderError error_;
+    std::string stdout_output_;
+    std::string stderr_output_;
     std::vector<std::string> dependencies_;
     std::vector<std::string> requirements_;
     std::vector<PaginationPage> pagination_;

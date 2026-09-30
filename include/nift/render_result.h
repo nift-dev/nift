@@ -25,7 +25,9 @@ struct PaginationPage {
 // a root is configured, and as supplied otherwise. Persistence (e.g. the CLI's
 // .info.json) is the caller's concern.
 //
-// Complete pagination: `output()` is page 1 (the primary); `pagination()`
+// Runtime print/err side effects are captured separately by stdout_output() and
+// stderr_output(), including on failed renders. Complete pagination: `output()`
+// is page 1 (the primary); `pagination()`
 // returns pages 2..N in ascending page order, empty for a non-paginated
 // render. Page numbers and rendered content are rendering semantics; output
 // filenames/paths are a ProjectState/build concern and are deliberately NOT
@@ -35,6 +37,8 @@ public:
     bool ok() const { return ok_; }
     const std::string& output() const { return output_; }
     const RenderError& error() const { return error_; }
+    const std::string& stdout_output() const { return stdout_output_; }
+    const std::string& stderr_output() const { return stderr_output_; }
     const std::vector<std::string>& dependencies() const { return dependencies_; }
     const std::vector<std::string>& requirements() const { return requirements_; }
     const std::vector<PaginationPage>& pagination() const { return pagination_; }
@@ -45,6 +49,8 @@ private:
     bool ok_ = false;
     std::string output_;
     RenderError error_;
+    std::string stdout_output_;
+    std::string stderr_output_;
     std::vector<std::string> dependencies_;
     std::vector<std::string> requirements_;
     std::vector<PaginationPage> pagination_;

@@ -66,6 +66,10 @@ internal static partial class Native
     internal static extern int nift_script_result_value_json(IntPtr result, out NiftString out_);
     [DllImport(Lib, EntryPoint = "nift_script_result_error_message", CallingConvention = Cdecl)]
     internal static extern int nift_script_result_error_message(IntPtr result, out NiftString out_);
+    [DllImport(Lib, EntryPoint = "nift_script_result_stdout", CallingConvention = Cdecl)]
+    internal static extern int nift_script_result_stdout(IntPtr result, out NiftBytes out_);
+    [DllImport(Lib, EntryPoint = "nift_script_result_stderr", CallingConvention = Cdecl)]
+    internal static extern int nift_script_result_stderr(IntPtr result, out NiftBytes out_);
 
     [DllImport(Lib, EntryPoint = "nift_context_new", CallingConvention = Cdecl)]
     internal static extern IntPtr nift_context_new();
@@ -120,6 +124,12 @@ internal static partial class Native
 
     [DllImport(Lib, EntryPoint = "nift_render_result_output", CallingConvention = Cdecl)]
     internal static extern int nift_render_result_output(IntPtr result, out NiftString out_);
+
+    [DllImport(Lib, EntryPoint = "nift_render_result_stdout", CallingConvention = Cdecl)]
+    internal static extern int nift_render_result_stdout(IntPtr result, out NiftBytes out_);
+
+    [DllImport(Lib, EntryPoint = "nift_render_result_stderr", CallingConvention = Cdecl)]
+    internal static extern int nift_render_result_stderr(IntPtr result, out NiftBytes out_);
 
     [DllImport(Lib, EntryPoint = "nift_render_result_error_message", CallingConvention = Cdecl)]
     internal static extern int nift_render_result_error_message(IntPtr result, out NiftString out_);

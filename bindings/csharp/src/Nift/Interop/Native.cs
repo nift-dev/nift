@@ -1,5 +1,5 @@
 // P/Invoke bindings over the frozen Nift C ABI (include/nift/c_abi.h, version
-// "1.2"). This layer is deliberately mechanical: all ownership, lifetime and
+// "1.3"). This layer is deliberately mechanical: all ownership, lifetime and
 // diagnostic logic lives in the managed API (Engine/Context/RenderResult).
 //
 // The zero-`unsafe` gate is scoped to the Rust crates; this FFI interop layer
@@ -46,6 +46,14 @@ internal static partial class Native
 /// <summary>Borrowed UTF-8 string view {const char* data, size_t length}.</summary>
 [StructLayout(LayoutKind.Sequential)]
 internal struct NiftString
+{
+    public IntPtr Data;
+    public UIntPtr Length;
+}
+
+/// <summary>Borrowed byte view {const uint8_t* data, size_t length}.</summary>
+[StructLayout(LayoutKind.Sequential)]
+internal struct NiftBytes
 {
     public IntPtr Data;
     public UIntPtr Length;

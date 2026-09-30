@@ -2,7 +2,8 @@
  *
  * A small, stable, ownership-explicit C interface representing the frozen Nift
  * Embed contract: engine, context, render, complete pagination, dependencies,
- * requirements, diagnostics, and the loader/environment host seams. It is the
+ * requirements, diagnostics, per-operation stdout/stderr captures, and the
+ * loader/environment host seams. It is the
  * long-lived foundation for production bindings (Go/Node/Python/C#/...).
  *
  * Deliberately NOT exposed: build, .unfinished, tracked persistence,
@@ -19,7 +20,7 @@
 #include <stdint.h>
 
 #define NIFT_C_ABI_VERSION_MAJOR 1
-#define NIFT_C_ABI_VERSION_MINOR 2
+#define NIFT_C_ABI_VERSION_MINOR 3
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,7 +30,7 @@ extern "C" {
 /* Versioning                                                               */
 /* ------------------------------------------------------------------------ */
 
-#define NIFT_ABI_VERSION "1.2"
+#define NIFT_ABI_VERSION "1.3"
 
 /* ABI version policy:
  *   - additive, backward-compatible ABI changes  -> bump the ABI MINOR;
@@ -81,7 +82,7 @@ typedef struct {
 } nift_string;
 
 /* A borrowed immutable byte view. Result-returned views are owned by the
- * nift_script_result and remain valid until nift_script_result_free. `data`
+ * corresponding script/render result and remain valid until it is freed. `data`
  * may be NULL when `length` is 0. Inputs follow the same NULL/length rules as
  * nift_string and are copied before the setter returns. */
 typedef struct {
@@ -214,7 +215,8 @@ nift_status nift_context_set_json(nift_context* context, const char* name,
                                   size_t name_len, const char* json,
                                   size_t json_len);
 
-/* Embedded script execution/evaluation. JSON-compatible values are exposed
+/* Embedded script execution/evaluation. stdout/stderr captures remain
+ * available on both successful and failed results. JSON-compatible values are exposed
  * lazily through nift_script_result_value_json. Top-level bytes are exposed
  * through nift_script_result_value_bytes; nested typed traversal is not part of
  * this ABI. A successful result remains successful when a mismatched accessor
@@ -230,6 +232,8 @@ int nift_script_result_ok(const nift_script_result* result);
 nift_status nift_script_result_value_json(const nift_script_result* result, nift_string* out);
 nift_status nift_script_result_value_bytes(const nift_script_result* result, nift_bytes* out);
 nift_status nift_script_result_error_message(const nift_script_result* result, nift_string* out);
+nift_status nift_script_result_stdout(const nift_script_result* result, nift_bytes* out);
+nift_status nift_script_result_stderr(const nift_script_result* result, nift_bytes* out);
 
 /* ------------------------------------------------------------------------ */
 /* Render                                                                   */
@@ -289,6 +293,10 @@ int nift_render_result_ok(const nift_render_result* result);
  * availability only where sensible). */
 nift_status nift_render_result_output(const nift_render_result* result,
                                       nift_string* out);
+nift_status nift_render_result_stdout(const nift_render_result* result,
+                                      nift_bytes* out);
+nift_status nift_render_result_stderr(const nift_render_result* result,
+                                      nift_bytes* out);
 nift_status nift_render_result_error_message(const nift_render_result* result,
                                              nift_string* out);
 nift_status nift_render_result_error_source(const nift_render_result* result,

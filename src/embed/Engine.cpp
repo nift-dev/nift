@@ -265,7 +265,8 @@ RenderSource to_render_source(const nift::Source& source, const nift::Engine::Im
 namespace nift {
 
 struct RenderResultBuilder {
-    static RenderResult build(const ::RenderResult& internal) {
+    static RenderResult build(const ::RenderResult& internal,
+                              const std::shared_ptr<ExecutionOutput>& execution_output) {
         RenderResult result;
         if (internal.ok) {
             result.ok_ = true;
@@ -279,6 +280,8 @@ struct RenderResultBuilder {
         }
         result.dependencies_.assign(internal.dependencies.begin(), internal.dependencies.end());
         result.requirements_.assign(internal.reqs.begin(), internal.reqs.end());
+        result.stdout_output_ = execution_output->stdout_text();
+        result.stderr_output_ = execution_output->stderr_text();
         // Complete pagination: the internal vector holds pages 1..N (page 1 is
         // `output`); expose pages 2..N ascending with their page numbers.
         if (internal.pagination_outputs.size() > 1) {
@@ -323,22 +326,29 @@ void Engine::set_platform(std::string platform) {
 ScriptResult Engine::execute(std::string_view script, std::string cmd, std::vector<std::string> args) {
     std::lock_guard<std::mutex> lock(impl_->script_mutex_);
     ScriptResult out;
+    auto execution_output = std::make_shared<ExecutionOutput>(true);
     try {
         if(!impl_->script_state)impl_->script_state=std::make_unique<Impl::ScriptState>(*impl_);
+        impl_->script_state->parser.set_execution_output(execution_output);
         impl_->script_state->parser.set_script_invocation(std::move(cmd),std::move(args));
-        RuntimeValue value;std::string error;if(!impl_->script_state->parser.run_embedded_script(std::string(script),"<embed>",value,error)){out.error_.message=std::move(error);out.error_.source="<embed>";return out;}ValueAccess::runtime(out.value_)=std::move(value);out.ok_=true;return out;
+        RuntimeValue value;std::string error;if(!impl_->script_state->parser.run_embedded_script(std::string(script),"<embed>",value,error)){out.error_.message=std::move(error);out.error_.source="<embed>";}else{ValueAccess::runtime(out.value_)=std::move(value);out.ok_=true;}impl_->script_state->parser.finalize_execution_workers();
     } catch (const std::exception& error) {
-        out.error_.message=error.what();out.error_.source="<embed>";return out;
+        if(impl_->script_state)impl_->script_state->parser.finalize_execution_workers();
+        out.error_.message=error.what();out.error_.source="<embed>";
     }
+    out.stdout_output_=execution_output->stdout_text();out.stderr_output_=execution_output->stderr_text();return out;
 }
 
 ScriptResult Engine::evaluate(std::string_view expression) {
     std::lock_guard<std::mutex> lock(impl_->script_mutex_);ScriptResult out;
+    auto execution_output=std::make_shared<ExecutionOutput>(true);
     try {
-        if(!impl_->script_state){impl_->script_state=std::make_unique<Impl::ScriptState>(*impl_);RuntimeValue init;std::string ie;impl_->script_state->parser.run_embedded_script("","<embed>",init,ie);}RuntimeValue value;std::string error;if(!impl_->script_state->parser.eval_expression(std::string(expression),value,error)){out.error_.message=std::move(error);out.error_.source="<embed>";return out;}ValueAccess::runtime(out.value_)=std::move(value);out.ok_=true;return out;
+        if(!impl_->script_state){impl_->script_state=std::make_unique<Impl::ScriptState>(*impl_);RuntimeValue init;std::string ie;impl_->script_state->parser.run_embedded_script("","<embed>",init,ie);}impl_->script_state->parser.set_execution_output(execution_output);RuntimeValue value;std::string error;if(!impl_->script_state->parser.eval_expression(std::string(expression),value,error)){out.error_.message=std::move(error);out.error_.source="<embed>";}else{ValueAccess::runtime(out.value_)=std::move(value);out.ok_=true;}impl_->script_state->parser.finalize_execution_workers();
     } catch (const std::exception& error) {
-        out.error_.message=error.what();out.error_.source="<embed>";return out;
+        if(impl_->script_state)impl_->script_state->parser.finalize_execution_workers();
+        out.error_.message=error.what();out.error_.source="<embed>";
     }
+    out.stdout_output_=execution_output->stdout_text();out.stderr_output_=execution_output->stderr_text();return out;
 }
 
 bool Engine::register_function(std::string name, HostFunction function) {
@@ -350,11 +360,14 @@ bool Engine::register_function(std::string name, HostFunction function) {
 
 ScriptResult Engine::call(std::string_view name, const std::vector<Value>& args) {
     std::lock_guard<std::mutex> lock(impl_->script_mutex_);ScriptResult out;
+    auto execution_output=std::make_shared<ExecutionOutput>(true);
     try {
-        if(!impl_->script_state){out.error_.message="no embedded script has been executed";out.error_.source="<embed>";return out;}std::vector<RuntimeValue> av;av.reserve(args.size());for(const auto& v:args)av.push_back(ValueAccess::runtime(v));RuntimeValue result;std::string error;if(!impl_->script_state->parser.invoke_callable(std::string(name),av,result,error)){out.error_.message=std::move(error);out.error_.source="<embed>";return out;}ValueAccess::runtime(out.value_)=std::move(result);out.ok_=true;return out;
+        if(!impl_->script_state){out.error_.message="no embedded script has been executed";out.error_.source="<embed>";}else{impl_->script_state->parser.set_execution_output(execution_output);std::vector<RuntimeValue> av;av.reserve(args.size());for(const auto& v:args)av.push_back(ValueAccess::runtime(v));RuntimeValue result;std::string error;if(!impl_->script_state->parser.invoke_callable(std::string(name),av,result,error)){out.error_.message=std::move(error);out.error_.source="<embed>";}else{ValueAccess::runtime(out.value_)=std::move(result);out.ok_=true;}impl_->script_state->parser.finalize_execution_workers();}
     } catch (const std::exception& error) {
-        out.error_.message=error.what();out.error_.source="<embed>";return out;
+        if(impl_->script_state)impl_->script_state->parser.finalize_execution_workers();
+        out.error_.message=error.what();out.error_.source="<embed>";
     }
+    out.stdout_output_=execution_output->stdout_text();out.stderr_output_=execution_output->stderr_text();return out;
 }
 
 bool Engine::reload(std::string* error) {
@@ -410,11 +423,14 @@ RenderResult Engine::render(std::string_view page_name, const Context& context) 
         render_bindings[name] = std::make_shared<RuntimeValue>(ValueAccess::runtime(value));
 
     ProjectHost host(*snapshot, &render_bindings, impl_->environment_provider);
-    Parser parser(host, info);
+    auto execution_output = std::make_shared<ExecutionOutput>(true);
+    Parser parser(host, info, execution_output);
     try {
-        return RenderResultBuilder::build(parser.render());
+        auto internal=parser.render();parser.finalize_execution_workers();return RenderResultBuilder::build(internal, execution_output);
     } catch (const std::exception& error) {
+        parser.finalize_execution_workers();
         result.error_.message = error.what();
+        result.stdout_output_=execution_output->stdout_text();result.stderr_output_=execution_output->stderr_text();
         return result;
     }
 }
@@ -485,13 +501,17 @@ RenderResult Engine::render(const Source& page, const Source& page_template, con
     for (const auto& [name, value] : context.bindings_)
         render_bindings[name] = std::make_shared<RuntimeValue>(ValueAccess::runtime(value));
     EngineHost host(*impl_, &render_bindings, context.current_output_);
-    Parser parser(host, info);
+    auto execution_output = std::make_shared<ExecutionOutput>(true);
+    Parser parser(host, info, execution_output);
     try {
-        return RenderResultBuilder::build(parser.render_composed(template_render_source, page_render_source,
-                                                                  /*require_exactly_one_content=*/true));
+        auto internal=parser.render_composed(template_render_source, page_render_source,
+                                              /*require_exactly_one_content=*/true);
+        parser.finalize_execution_workers();return RenderResultBuilder::build(internal, execution_output);
     } catch (const std::exception& error) {
+        parser.finalize_execution_workers();
         RenderResult result;
         result.error_.message = error.what();
+        result.stdout_output_=execution_output->stdout_text();result.stderr_output_=execution_output->stderr_text();
         return result;
     }
 }
@@ -509,13 +529,17 @@ RenderResult Engine::render(const Source& partial, const Context& context) {
     for (const auto& [name, value] : context.bindings_)
         render_bindings[name] = std::make_shared<RuntimeValue>(ValueAccess::runtime(value));
     EngineHost host(*impl_, &render_bindings, context.current_output_);
-    Parser parser(host, info);
+    auto execution_output = std::make_shared<ExecutionOutput>(true);
+    Parser parser(host, info, execution_output);
     try {
-        return RenderResultBuilder::build(parser.render_composed(partial_render_source, std::nullopt,
-                                                                  /*require_exactly_one_content=*/false));
+        auto internal=parser.render_composed(partial_render_source, std::nullopt,
+                                              /*require_exactly_one_content=*/false);
+        parser.finalize_execution_workers();return RenderResultBuilder::build(internal, execution_output);
     } catch (const std::exception& error) {
+        parser.finalize_execution_workers();
         RenderResult result;
         result.error_.message = error.what();
+        result.stdout_output_=execution_output->stdout_text();result.stderr_output_=execution_output->stderr_text();
         return result;
     }
 }

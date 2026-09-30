@@ -236,6 +236,17 @@ public sealed class Engine : IDisposable
     /// <summary>Executes a complete Nift program in this Engine's persistent scripting runtime and returns its JSON value.</summary>
     public string ExecuteJson(string script, string cmd = "<embed>", IReadOnlyList<string>? args = null)
     {
+        ScriptResult result = ExecuteResult(script, cmd, args);
+        if (!result.Ok)
+        {
+            throw new NiftException(result.ErrorMessage ?? "script execution failed");
+        }
+        return result.ValueJson ?? "";
+    }
+
+    /// <summary>Executes a complete Nift program and returns its outcome and captured output.</summary>
+    public ScriptResult ExecuteResult(string script, string cmd = "<embed>", IReadOnlyList<string>? args = null)
+    {
         EnterRender();
         var allocated = new List<IntPtr>();
         IntPtr ptrArray = IntPtr.Zero, lenArray = IntPtr.Zero;
@@ -261,16 +272,7 @@ public sealed class Engine : IDisposable
             }
             int rc = Native.nift_engine_execute(_handle.DangerousGetHandle(), sv.Name, sv.NameLen, cv.Name, cv.NameLen, ptrArray, lenArray, (UIntPtr)args.Count, out IntPtr result);
             if (rc != NativeStatus.Ok || result == IntPtr.Zero) throw new NiftException("nift_engine_execute failed");
-            try
-            {
-                if (Native.nift_script_result_ok(result) == 0)
-                {
-                    Native.nift_script_result_error_message(result, out NiftString err);
-                    throw new NiftException(Utf8.FromNative(err));
-                }
-                Native.nift_script_result_value_json(result, out NiftString value);
-                return Utf8.FromNative(value);
-            }
+            try { return ConsumeScriptResult(result); }
             finally { Native.nift_script_result_free(result); }
         }
         finally
@@ -285,25 +287,62 @@ public sealed class Engine : IDisposable
     /// <summary>Evaluates an expression against this Engine's persistent scripting runtime and returns its JSON value.</summary>
     public string EvaluateJson(string expression)
     {
+        ScriptResult result = EvaluateResult(expression);
+        if (!result.Ok)
+        {
+            throw new NiftException(result.ErrorMessage ?? "expression evaluation failed");
+        }
+        return result.ValueJson ?? "";
+    }
+
+    /// <summary>Evaluates an expression and returns its outcome and captured output.</summary>
+    public ScriptResult EvaluateResult(string expression)
+    {
         EnterRender();
         try
         {
             using VarString ev = new(expression);
             int rc = Native.nift_engine_evaluate(_handle.DangerousGetHandle(), ev.Name, ev.NameLen, out IntPtr result);
             if (rc != NativeStatus.Ok || result == IntPtr.Zero) throw new NiftException("nift_engine_evaluate failed");
-            try
-            {
-                if (Native.nift_script_result_ok(result) == 0)
-                {
-                    Native.nift_script_result_error_message(result, out NiftString err);
-                    throw new NiftException(Utf8.FromNative(err));
-                }
-                Native.nift_script_result_value_json(result, out NiftString value);
-                return Utf8.FromNative(value);
-            }
+            try { return ConsumeScriptResult(result); }
             finally { Native.nift_script_result_free(result); }
         }
         finally { ExitRender(); }
+    }
+
+    private static ScriptResult ConsumeScriptResult(IntPtr result)
+    {
+        byte[] stdout = Native.nift_script_result_stdout(result, out NiftBytes stdoutOut) == NativeStatus.Ok
+            ? Bytes.FromNative(stdoutOut)
+            : Array.Empty<byte>();
+        byte[] stderr = Native.nift_script_result_stderr(result, out NiftBytes stderrOut) == NativeStatus.Ok
+            ? Bytes.FromNative(stderrOut)
+            : Array.Empty<byte>();
+
+        if (Native.nift_script_result_ok(result) == 0)
+        {
+            string? error = Native.nift_script_result_error_message(result, out NiftString errorOut) == NativeStatus.Ok
+                ? Utf8.FromNative(errorOut)
+                : null;
+            return new ScriptResult
+            {
+                Ok = false,
+                ErrorMessage = error,
+                Stdout = stdout,
+                Stderr = stderr,
+            };
+        }
+
+        string? value = Native.nift_script_result_value_json(result, out NiftString valueOut) == NativeStatus.Ok
+            ? Utf8.FromNative(valueOut)
+            : null;
+        return new ScriptResult
+        {
+            Ok = true,
+            ValueJson = value,
+            Stdout = stdout,
+            Stderr = stderr,
+        };
     }
 
     /// <summary>Full page + template composition (template must contain exactly one @content).</summary>
@@ -407,6 +446,12 @@ public sealed class Engine : IDisposable
             throw new NiftException("render call failed");
         }
         using var resultHandle = new ResultHandle(resultPtr);
+        byte[] stdout = Native.nift_render_result_stdout(resultHandle.DangerousGetHandle(), out NiftBytes stdoutOut) == NativeStatus.Ok
+            ? Bytes.FromNative(stdoutOut)
+            : Array.Empty<byte>();
+        byte[] stderr = Native.nift_render_result_stderr(resultHandle.DangerousGetHandle(), out NiftBytes stderrOut) == NativeStatus.Ok
+            ? Bytes.FromNative(stderrOut)
+            : Array.Empty<byte>();
         int ok = Native.nift_render_result_ok(resultHandle.DangerousGetHandle());
         if (ok == 0)
         {
@@ -426,6 +471,8 @@ public sealed class Engine : IDisposable
             {
                 Ok = false,
                 Output = "",
+                Stdout = stdout,
+                Stderr = stderr,
                 ErrorMessage = message,
                 ErrorSource = source,
                 ErrorLine = line,
@@ -471,6 +518,8 @@ public sealed class Engine : IDisposable
         {
             Ok = true,
             Output = output,
+            Stdout = stdout,
+            Stderr = stderr,
             Pagination = pagination,
             Dependencies = dependencies,
             Requirements = requirements,

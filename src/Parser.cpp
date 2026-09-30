@@ -10,6 +10,7 @@
 #include <chrono>
 #include <cctype>
 #include <ctime>
+#include <iostream>
 #include <mutex>
 #include <vector>
 
@@ -18,8 +19,43 @@ namespace fs = std::filesystem;
 using nift::detail::built_in_metadata_name;
 using nift::detail::nift_binding_type;
 
-Parser::Parser(RenderHost& host, TrackedInfo& tracked_info)
-    : host_(host), tracked_info_(tracked_info) {
+void ExecutionOutput::write_stdout(const std::string& text) {
+    if (capture_) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        stdout_text_ += text;
+    } else {
+        static std::mutex console_stdout_mutex;
+        std::lock_guard<std::mutex> lock(console_stdout_mutex);
+        std::cout << text; std::cout.flush();
+    }
+}
+
+void ExecutionOutput::write_stderr(const std::string& text) {
+    if (capture_) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        stderr_text_ += text;
+    } else {
+        static std::mutex console_stderr_mutex;
+        std::lock_guard<std::mutex> lock(console_stderr_mutex);
+        std::cerr << text; std::cerr.flush();
+    }
+}
+
+std::string ExecutionOutput::stdout_text() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return stdout_text_;
+}
+
+std::string ExecutionOutput::stderr_text() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return stderr_text_;
+}
+
+Parser::Parser(RenderHost& host, TrackedInfo& tracked_info,
+               std::shared_ptr<ExecutionOutput> execution_output)
+    : host_(host), execution_output_(execution_output ? std::move(execution_output)
+                                                       : std::make_shared<ExecutionOutput>()),
+      tracked_info_(tracked_info) {
     variable_scopes_.emplace_back();
     if (!tracked_info_.name.empty()) {
         nift::RuntimeValue metadata=nift::RuntimeValue::make_object(); bool from_project=false; std::string page_metadata_error;
@@ -42,8 +78,14 @@ Parser::Parser(RenderHost& host, TrackedInfo& tracked_info)
 }
 
 Parser::~Parser() {
+    finalize_execution_workers();
+}
+
+void Parser::finalize_execution_workers() {
     for(auto& st:owned_async_instances_){std::unique_lock<std::mutex> lk(st->mutex);while(!st->done){lk.unlock();if(nift::detail::NiftAsyncPool::is_worker_thread()&&nift::detail::NiftAsyncPool::instance().run_one()){lk.lock();continue;}lk.lock();st->cv.wait_for(lk,std::chrono::milliseconds(1),[&]{return st->done;});}}
     for(auto& st:owned_thread_instances_){std::lock_guard<std::mutex> guard(st->join_mutex);if(st->worker.joinable())st->worker.join();}
+    owned_async_instances_.clear();
+    owned_thread_instances_.clear();
 }
 
 

@@ -18,6 +18,7 @@ public readonly record struct PaginatedPage(uint Page, string Output);
 /// <summary>
 /// The outcome of a render. `Ok` plus the composed output on success; on
 /// failure the diagnostic carried by the C ABI (message/source/line/column).
+/// Stdout and Stderr contain the exact bytes captured before either outcome.
 /// Pagination holds pages 2..N; Dependencies and Requirements are root-relative
 /// spellings. This mirrors the frozen Embed contract: render semantics live in
 /// the result, not in the mechanical status of the call.
@@ -26,6 +27,8 @@ public sealed class RenderResult
 {
     public required bool Ok { get; init; }
     public required string Output { get; init; }
+    public byte[] Stdout { get; init; } = Array.Empty<byte>();
+    public byte[] Stderr { get; init; } = Array.Empty<byte>();
     public string? ErrorMessage { get; init; }
     public string? ErrorSource { get; init; }
     public ulong ErrorLine { get; init; }

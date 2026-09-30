@@ -1,6 +1,7 @@
 package nift
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -315,5 +316,23 @@ func TestV45ExecuteEvaluate(t *testing.T) {
 	r, err = e.Evaluate("x + 1")
 	if err != nil || !r.OK || r.Value != float64(41) {
 		t.Fatalf("evaluate: %#v %v", r, err)
+	}
+}
+
+func TestV46OutputCaptureBytes(t *testing.T) {
+	root := t.TempDir()
+	want := []byte{'A', 0, 0xff, 'B'}
+	if err := os.WriteFile(filepath.Join(root, "raw.bin"), want, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	e := NewEngine()
+	defer e.Close()
+	e.SetRoot(root)
+	r, err := e.Execute(`cat("raw.bin"); err("problem"); return 1`, "go-test", nil)
+	if err != nil || !r.OK {
+		t.Fatalf("execute: %#v %v", r, err)
+	}
+	if !bytes.Equal(r.Stdout, want) || !bytes.Equal(r.Stderr, []byte("problem\n")) {
+		t.Fatalf("stdout=%v stderr=%v", r.Stdout, r.Stderr)
 	}
 }

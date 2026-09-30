@@ -99,6 +99,8 @@ type Page struct {
 type Result struct {
 	OK           bool
 	Output       string
+	Stdout       []byte
+	Stderr       []byte
 	Error        *RenderError
 	Dependencies []string
 	Requirements []string
@@ -842,21 +844,30 @@ func (e *Engine) RenderTextWithContext(text string, ctx *Context) (Result, error
 // ScriptResult is a fully Go-owned embedded script result. Value preserves the
 // JSON type returned by the canonical Nift runtime.
 type ScriptResult struct {
-	OK    bool
-	Value any
-	Error string
+	OK     bool
+	Value  any
+	Error  string
+	Stdout []byte
+	Stderr []byte
 }
 
 func convertScriptResult(r *C.nift_script_result) (ScriptResult, error) {
 	if r == nil {
 		return ScriptResult{}, errors.New("nift: null script result")
 	}
+	var stdout, stderr C.nift_bytes
+	if C.nift_script_result_stdout(r, &stdout) != C.NIFT_OK ||
+		C.nift_script_result_stderr(r, &stderr) != C.NIFT_OK {
+		return ScriptResult{}, errors.New("nift: could not read script output")
+	}
+	out := ScriptResult{Stdout: cBytes(stdout), Stderr: cBytes(stderr)}
 	if C.nift_script_result_ok(r) == 0 {
 		var msg C.nift_string
 		if C.nift_script_result_error_message(r, &msg) != C.NIFT_OK {
 			return ScriptResult{}, errors.New("nift: script failed")
 		}
-		return ScriptResult{OK: false, Error: cString(msg)}, nil
+		out.Error = cString(msg)
+		return out, nil
 	}
 	var raw C.nift_string
 	if C.nift_script_result_value_json(r, &raw) != C.NIFT_OK {
@@ -866,7 +877,9 @@ func convertScriptResult(r *C.nift_script_result) (ScriptResult, error) {
 	if err := json.Unmarshal([]byte(cString(raw)), &value); err != nil {
 		return ScriptResult{}, fmt.Errorf("nift: invalid script result json: %w", err)
 	}
-	return ScriptResult{OK: true, Value: value}, nil
+	out.OK = true
+	out.Value = value
+	return out, nil
 }
 
 // Execute runs a complete Nift program in the Engine's persistent embedded runtime.
@@ -1109,8 +1122,20 @@ func cString(s C.nift_string) string {
 	return C.GoStringN(s.data, C.int(s.length))
 }
 
+func cBytes(value C.nift_bytes) []byte {
+	if value.data == nil || value.length == 0 {
+		return []byte{}
+	}
+	return C.GoBytes(unsafe.Pointer(value.data), C.int(value.length))
+}
+
 func convertResult(r *C.nift_render_result) Result {
 	out := Result{OK: C.nift_render_result_ok(r) != 0}
+	var stdout, stderr C.nift_bytes
+	C.nift_render_result_stdout(r, &stdout)
+	C.nift_render_result_stderr(r, &stderr)
+	out.Stdout = cBytes(stdout)
+	out.Stderr = cBytes(stderr)
 	if out.OK {
 		var o C.nift_string
 		C.nift_render_result_output(r, &o)
@@ -1175,7 +1200,7 @@ func abiStatusError(status C.nift_status) error {
 func ABICompat() error {
 	major := int(C.nift_abi_version_major())
 	minor := int(C.nift_abi_version_minor())
-	if major != 1 || minor < 1 {
+	if major != 1 || minor < 3 {
 		return fmt.Errorf("nift: unsupported ABI version %d.%d", major, minor)
 	}
 	return nil

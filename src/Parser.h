@@ -29,9 +29,25 @@ struct RenderSource {
     std::string dependency;       // dependency spelling recorded for path sources
 };
 
+class ExecutionOutput {
+public:
+    explicit ExecutionOutput(bool capture = false) : capture_(capture) {}
+    void write_stdout(const std::string& text);
+    void write_stderr(const std::string& text);
+    std::string stdout_text() const;
+    std::string stderr_text() const;
+
+private:
+    bool capture_ = false;
+    mutable std::mutex mutex_;
+    std::string stdout_text_;
+    std::string stderr_text_;
+};
+
 class Parser {
 public:
-    Parser(RenderHost& host, TrackedInfo& tracked_info);
+    Parser(RenderHost& host, TrackedInfo& tracked_info,
+           std::shared_ptr<ExecutionOutput> execution_output = {});
     ~Parser();
     RenderResult render();
 
@@ -41,6 +57,7 @@ public:
     RenderResult run_statement(const std::string& source, const std::filesystem::path& source_path);
     void reset_script_control();
     bool finalize_script_resources(std::string& error);
+    void finalize_execution_workers();
 
     // Host-owned invocation identity exposed to standalone scripts/shells as
     // immutable `cmd` + `args`. A declaration may intentionally shadow these
@@ -64,6 +81,7 @@ public:
     // Shared single-expression host used by `nift eval`; identical evaluator to templates/scripts.
     bool eval_expression(const std::string& expression, nift::RuntimeValue& value, std::string& error);
     bool invoke_callable(const std::string& name, const std::vector<nift::RuntimeValue>& args, nift::RuntimeValue& value, std::string& error);
+    void set_execution_output(std::shared_ptr<ExecutionOutput> output) { execution_output_ = std::move(output); }
 
     // Render a scalar/string value for output or command arguments.
     std::string render_expression_value(const nift::RuntimeValue& value) const;
@@ -86,6 +104,7 @@ private:
         pending_control_ = {};
     }
     RenderHost& host_;
+    std::shared_ptr<ExecutionOutput> execution_output_;
     std::optional<RenderSource> page_source_;
     TrackedInfo& tracked_info_;
     std::vector<std::filesystem::path> input_stack_;

@@ -98,6 +98,16 @@ napi_value NewString(napi_env env, const std::string& s) {
   return out;
 }
 
+napi_value NewBuffer(napi_env env, nift_bytes bytes) {
+  napi_value out = nullptr;
+  void* copied = nullptr;
+  const void* data = bytes.data == nullptr
+                         ? static_cast<const void*>("")
+                         : static_cast<const void*>(bytes.data);
+  NAPI_CHECK(env, napi_create_buffer_copy(env, bytes.length, data, &copied, &out));
+  return out;
+}
+
 // A render source argument is either a string (in-memory text) or an object
 // { path } / { text }.
 bool SourceArg(napi_env env, napi_value value, std::string* data, bool* is_path) {
@@ -420,6 +430,15 @@ napi_value ReadString(napi_env env, nift_render_result* result,
   return NewString(env, std::string(s.data, s.length));
 }
 
+napi_value ReadBytes(napi_env env, nift_render_result* result,
+                     nift_status (*fn)(const nift_render_result*, nift_bytes*)) {
+  nift_bytes bytes{nullptr, 0};
+  if (fn(result, &bytes) != NIFT_OK) {
+    bytes = nift_bytes{nullptr, 0};
+  }
+  return NewBuffer(env, bytes);
+}
+
 void RenderComplete(napi_env env, napi_status status, void* data) {
   RenderReq* req = static_cast<RenderReq*>(data);
   napi_value result_value = nullptr;
@@ -435,6 +454,12 @@ void RenderComplete(napi_env env, napi_status status, void* data) {
     napi_value ok_value = nullptr;
     NAPI_CHECK(env, napi_get_boolean(env, ok != 0, &ok_value));
     NAPI_CHECK(env, napi_set_named_property(env, result_value, "ok", ok_value));
+    NAPI_CHECK(env, napi_set_named_property(
+                        env, result_value, "stdout",
+                        ReadBytes(env, req->result, nift_render_result_stdout)));
+    NAPI_CHECK(env, napi_set_named_property(
+                        env, result_value, "stderr",
+                        ReadBytes(env, req->result, nift_render_result_stderr)));
     if (ok != 0) {
       NAPI_CHECK(env, napi_set_named_property(
                           env, result_value, "output",
@@ -643,6 +668,43 @@ napi_value ScriptJsonOrThrow(napi_env env, nift_script_result* r) {
   napi_value v=nullptr; napi_create_string_utf8(env,out.data?out.data:"",out.length,&v); nift_script_result_free(r); return v;
 }
 
+napi_value ScriptResultValue(napi_env env, nift_script_result* r) {
+  if (r == nullptr) return ThrowJs(env, "Nift native: null script result");
+  napi_value result = nullptr, ok_value = nullptr, null_value = nullptr;
+  NAPI_CHECK(env, napi_create_object(env, &result));
+  int ok = nift_script_result_ok(r);
+  NAPI_CHECK(env, napi_get_boolean(env, ok != 0, &ok_value));
+  NAPI_CHECK(env, napi_get_null(env, &null_value));
+  NAPI_CHECK(env, napi_set_named_property(env, result, "ok", ok_value));
+  nift_bytes capture{nullptr, 0};
+  nift_script_result_stdout(r, &capture);
+  NAPI_CHECK(env, napi_set_named_property(
+                      env, result, "stdout",
+                      NewBuffer(env, capture)));
+  nift_script_result_stderr(r, &capture);
+  NAPI_CHECK(env, napi_set_named_property(
+                      env, result, "stderr",
+                      NewBuffer(env, capture)));
+  nift_string out{nullptr, 0};
+  if (ok != 0) {
+    if (nift_script_result_value_json(r, &out) != NIFT_OK) {
+      nift_script_result_free(r);
+      return ThrowJs(env, "Nift native: could not read script result");
+    }
+    NAPI_CHECK(env, napi_set_named_property(
+                        env, result, "valueJson",
+                        NewString(env, std::string(out.data ? out.data : "", out.length))));
+    NAPI_CHECK(env, napi_set_named_property(env, result, "error", null_value));
+  } else {
+    nift_script_result_error_message(r, &out);
+    NAPI_CHECK(env, napi_set_named_property(
+                        env, result, "error",
+                        NewString(env, std::string(out.data ? out.data : "", out.length))));
+  }
+  nift_script_result_free(r);
+  return result;
+}
+
 napi_value EngineExecute(napi_env env, napi_callback_info info) {
   napi_value this_value=nullptr,args[3]={nullptr,nullptr,nullptr}; size_t argc=3; NAPI_CHECK(env,napi_get_cb_info(env,info,&argc,args,&this_value,nullptr));
   EngineWrap* e=UnwrapEngine(env,this_value); if(!e) return nullptr; if(argc<1) return ThrowJs(env,"execute(script[, cmd, args]) requires script");
@@ -656,6 +718,21 @@ napi_value EngineExecute(napi_env env, napi_callback_info info) {
 napi_value EngineEvaluate(napi_env env, napi_callback_info info) {
   napi_value this_value=nullptr,args[1]={nullptr}; size_t argc=1; NAPI_CHECK(env,napi_get_cb_info(env,info,&argc,args,&this_value,nullptr)); EngineWrap* e=UnwrapEngine(env,this_value); if(!e)return nullptr; if(argc<1)return ThrowJs(env,"evaluate(expression) requires an expression");
   std::string expr=GetString(env,args[0]); nift_script_result* r=nullptr; nift_status rc=nift_engine_evaluate(e->engine,expr.data(),expr.size(),&r); if(rc!=NIFT_OK)return ThrowJs(env,"nift_engine_evaluate failed"); return ScriptJsonOrThrow(env,r);
+}
+
+napi_value EngineExecuteResult(napi_env env, napi_callback_info info) {
+  napi_value this_value=nullptr,args[3]={nullptr,nullptr,nullptr}; size_t argc=3; NAPI_CHECK(env,napi_get_cb_info(env,info,&argc,args,&this_value,nullptr));
+  EngineWrap* e=UnwrapEngine(env,this_value); if(!e) return nullptr; if(argc<1) return ThrowJs(env,"executeResult(script[, cmd, args]) requires script");
+  std::string script=GetString(env,args[0]); std::string cmd=argc>1?GetString(env,args[1]):"<embed>";
+  std::vector<std::string> av; if(argc>2){ bool is_array=false; napi_is_array(env,args[2],&is_array); if(!is_array)return ThrowJs(env,"execute args must be an array"); uint32_t n=0;napi_get_array_length(env,args[2],&n);for(uint32_t i=0;i<n;++i){napi_value x=nullptr;napi_get_element(env,args[2],i,&x);av.push_back(GetString(env,x));}}
+  std::vector<const char*> ap; std::vector<size_t> al; for(auto& x:av){ap.push_back(x.data());al.push_back(x.size());}
+  nift_script_result* r=nullptr; nift_status rc=nift_engine_execute(e->engine,script.data(),script.size(),cmd.data(),cmd.size(),ap.empty()?nullptr:ap.data(),al.empty()?nullptr:al.data(),av.size(),&r);
+  if(rc!=NIFT_OK)return ThrowJs(env,"nift_engine_execute failed"); return ScriptResultValue(env,r);
+}
+
+napi_value EngineEvaluateResult(napi_env env, napi_callback_info info) {
+  napi_value this_value=nullptr,args[1]={nullptr}; size_t argc=1; NAPI_CHECK(env,napi_get_cb_info(env,info,&argc,args,&this_value,nullptr)); EngineWrap* e=UnwrapEngine(env,this_value); if(!e)return nullptr; if(argc<1)return ThrowJs(env,"evaluateResult(expression) requires an expression");
+  std::string expr=GetString(env,args[0]); nift_script_result* r=nullptr; nift_status rc=nift_engine_evaluate(e->engine,expr.data(),expr.size(),&r); if(rc!=NIFT_OK)return ThrowJs(env,"nift_engine_evaluate failed"); return ScriptResultValue(env,r);
 }
 
 napi_value EngineSetRoot(napi_env env, napi_callback_info info) {
@@ -1061,6 +1138,8 @@ napi_value Init(napi_env env, napi_value exports) {
       {"engineSetEnvironmentProvider", nullptr, EngineSetEnvironmentProvider, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"engineExecute", nullptr, EngineExecute, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"engineEvaluate", nullptr, EngineEvaluate, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"engineExecuteResult", nullptr, EngineExecuteResult, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"engineEvaluateResult", nullptr, EngineEvaluateResult, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"engineRenderPage", nullptr, RenderPage, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"engineRender", nullptr, Render, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"engineRenderPartial", nullptr, RenderPartial, nullptr, nullptr, nullptr, napi_default, nullptr},

@@ -12,6 +12,7 @@ internal static class Program
     private static int Main()
     {
         Run("ABI version", TestAbiVersion);
+        Run("CP6 captured script and render output", TestCapturedOutput);
         Run("engine new/dispose lifecycle", TestEngineLifecycle);
         Run("project-aware open + isOpen/openError", TestProjectOpen);
         Run("setRoot + composed render", TestComposedRender);
@@ -75,6 +76,14 @@ internal static class Program
         }
     }
 
+    private static void AssertBytes(byte[] actual, byte[] expected, string what)
+    {
+        if (!actual.AsSpan().SequenceEqual(expected))
+        {
+            throw new Exception($"{what}: expected <{Convert.ToHexString(expected)}>, got <{Convert.ToHexString(actual)}>");
+        }
+    }
+
     private static void AssertOk(RenderResult result, string what)
     {
         if (!result.Ok)
@@ -129,8 +138,46 @@ internal static class Program
 
     private static void TestAbiVersion()
     {
-        AssertEq(NiftApi.AbiVersion, "1.2", "abi version");
+        AssertEq(NiftApi.AbiVersion, "1.3", "abi version");
         using (var scriptEngine = Engine.New()) { AssertEq(scriptEngine.ExecuteJson("x := 40; return x + 2;"), "42", "v4.5 execute"); AssertEq(scriptEngine.EvaluateJson("x + 1"), "41", "v4.5 evaluate"); }
+    }
+
+    private static void TestCapturedOutput()
+    {
+        using var engine = Engine.New();
+
+        ScriptResult executed = engine.ExecuteResult("print(\"execute-out\"); err(\"execute-err\"); return 42;");
+        Assert(executed.Ok, "execute should succeed");
+        AssertEq(executed.ValueJson, "42", "execute value");
+        AssertBytes(executed.Stdout, Encoding.UTF8.GetBytes("execute-out\n"), "execute stdout");
+        AssertBytes(executed.Stderr, Encoding.UTF8.GetBytes("execute-err\n"), "execute stderr");
+
+        ScriptResult evaluated = engine.EvaluateResult("print(\"evaluate-out\")");
+        Assert(evaluated.Ok, "evaluate should succeed");
+        AssertBytes(evaluated.Stdout, Encoding.UTF8.GetBytes("evaluate-out\n"), "evaluate stdout");
+        AssertBytes(evaluated.Stderr, Array.Empty<byte>(), "evaluate stderr");
+
+        ScriptResult failed = engine.ExecuteResult("print(\"before-out\"); err(\"before-err\"); return 1 / 0;");
+        Assert(!failed.Ok, "execute should fail");
+        Assert(failed.ErrorMessage is { Length: > 0 }, "execute error should be retained");
+        AssertBytes(failed.Stdout, Encoding.UTF8.GetBytes("before-out\n"), "failed execute stdout");
+        AssertBytes(failed.Stderr, Encoding.UTF8.GetBytes("before-err\n"), "failed execute stderr");
+
+        ScriptResult binary = engine.ExecuteResult("print(\"\0\"); err(\"\0\"); return null;");
+        Assert(binary.Ok, "binary capture should succeed");
+        AssertBytes(binary.Stdout, new byte[] { 0, (byte)'\n' }, "embedded-NUL stdout");
+        AssertBytes(binary.Stderr, new byte[] { 0, (byte)'\n' }, "embedded-NUL stderr");
+
+        RenderResult rendered = engine.RenderText("@script{ print(\"render-out\"); err(\"render-err\") }visible");
+        AssertOk(rendered, "captured output render");
+        AssertEq(rendered.Output, "visible", "captured output render value");
+        AssertBytes(rendered.Stdout, Encoding.UTF8.GetBytes("render-out\n"), "render stdout");
+        AssertBytes(rendered.Stderr, Encoding.UTF8.GetBytes("render-err\n"), "render stderr");
+
+        RenderResult renderFailed = engine.RenderText("@script{ print(\"render-before-out\"); err(\"render-before-err\"); x := 1 / 0 }");
+        Assert(!renderFailed.Ok, "render should fail");
+        AssertBytes(renderFailed.Stdout, Encoding.UTF8.GetBytes("render-before-out\n"), "failed render stdout");
+        AssertBytes(renderFailed.Stderr, Encoding.UTF8.GetBytes("render-before-err\n"), "failed render stderr");
     }
 
     private static void TestEngineLifecycle()
@@ -138,7 +185,7 @@ internal static class Program
         var engine = Engine.New();
         Assert(!engine.IsOpen(), "standalone engine should not be open");
         engine.Dispose();
-        AssertEq(NiftApi.AbiVersion, "1.2", "abi still reachable");
+        AssertEq(NiftApi.AbiVersion, "1.3", "abi still reachable");
     }
 
     private static void TestProjectOpen()
