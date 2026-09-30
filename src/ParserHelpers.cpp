@@ -19,7 +19,15 @@
 #define NOMINMAX
 #endif
 #include <windows.h>
+#elif defined(__linux__)
+#include <cerrno>
+#include <sys/random.h>
+#elif defined(__APPLE__)
+#include <cstdlib>
 #else
+#error "secure_random_bytes requires a supported native CSPRNG"
+#endif
+#ifndef _WIN32
 #include <time.h>
 #endif
 
@@ -100,6 +108,67 @@ bool nift_unix_epoch_milliseconds(std::int64_t& value, std::string& error) {
     }
     value = whole_seconds + milliseconds;
 #endif
+    return true;
+}
+
+bool nift_secure_random_bytes(std::size_t count, nift::RuntimeValue& value,
+                              std::string& error) {
+    nift::RuntimeBytes bytes;
+    try {
+        bytes.assign(count, 0);
+    } catch (const std::exception&) {
+        error = "secure_random_bytes: cannot allocate result";
+        return false;
+    }
+    if (count == 0) {
+        try {
+            value = nift::RuntimeValue(std::move(bytes));
+        } catch (const std::exception&) {
+            error = "secure_random_bytes: cannot allocate result";
+            return false;
+        }
+        return true;
+    }
+#ifdef _WIN32
+    using BCryptGenRandomFn = LONG (WINAPI*)(void*, unsigned char*, unsigned long, unsigned long);
+    wchar_t system_directory[MAX_PATH];
+    const UINT system_length = GetSystemDirectoryW(system_directory, MAX_PATH);
+    std::wstring bcrypt_path;
+    if (system_length > 0 && system_length < MAX_PATH) {
+        bcrypt_path.assign(system_directory, system_length);
+        bcrypt_path += L"\\bcrypt.dll";
+    }
+    HMODULE module = bcrypt_path.empty() ? nullptr : LoadLibraryW(bcrypt_path.c_str());
+    auto generate = module ? reinterpret_cast<BCryptGenRandomFn>(GetProcAddress(module, "BCryptGenRandom")) : nullptr;
+    std::size_t offset = 0;
+    while (generate && offset < count) {
+        const auto chunk = static_cast<unsigned long>(std::min<std::size_t>(count - offset, std::numeric_limits<unsigned long>::max()));
+        if (generate(nullptr, bytes.data() + offset, chunk, 0x00000002UL) != 0) break;
+        offset += chunk;
+    }
+    if (module) FreeLibrary(module);
+    if (!generate || offset != count) {
+        error = "secure_random_bytes: operating-system random source failed";
+        return false;
+    }
+#elif defined(__linux__)
+    std::size_t offset = 0;
+    while (offset < count) {
+        const auto received = ::getrandom(bytes.data() + offset, count - offset, 0);
+        if (received > 0) { offset += static_cast<std::size_t>(received); continue; }
+        if (received < 0 && errno == EINTR) continue;
+        error = "secure_random_bytes: operating-system random source failed";
+        return false;
+    }
+#elif defined(__APPLE__)
+    if (count != 0) ::arc4random_buf(bytes.data(), bytes.size());
+#endif
+    try {
+        value = nift::RuntimeValue(std::move(bytes));
+    } catch (const std::exception&) {
+        error = "secure_random_bytes: cannot allocate result";
+        return false;
+    }
     return true;
 }
 

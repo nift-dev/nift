@@ -57,6 +57,16 @@ Use this compact shape for new entries:
   execution thread
 - Timing: do not publish before a Nift release containing these functions
 
+### Native secure random bytes
+
+- Status: pending
+- Earliest release: 4.6.0
+- Website scope: scripting/bytes API and security/reproducibility guidance
+- Required update: document `secure_random_bytes(n)`, its 10,000,000-byte cap,
+  native-OS-only CSPRNG contract, ordinary non-erased heap storage, and that use
+  in templates makes generated output nondeterministic
+- Timing: do not publish before a Nift release containing this function
+
 ## Completed items
 
 Move durable historical context to the relevant release record when useful; do

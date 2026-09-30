@@ -515,8 +515,9 @@ test-build-boundary-nondestructive:
 
 # Focused embed/binding test targets (mirror the build separation).
 V46_TIME_EMBED_TEST := $(TEST_DIR)/v46-time-embed$(EXEEXT)
+V46_SECURE_RANDOM_EMBED_TEST := $(TEST_DIR)/v46-secure-random-embed$(EXEEXT)
 test-embed: test-c-abi test-c-abi-c-smoke test-cp21-bytes test-engine test-engine-bindings test-public-header \
-	test-engine-render-api test-conformance test-v45-embed-contracts test-v45-embed-staged-consumer test-v46-time-embed
+	test-engine-render-api test-conformance test-v45-embed-contracts test-v45-embed-staged-consumer test-v46-time-embed test-v46-secure-random-embed
 
 V45_EMBED_CONTRACT_TEST := $(TEST_DIR)/v45-embed-contract$(EXEEXT)
 V45_EMBED_SCRIPT_TEST := $(TEST_DIR)/v45-embed-script$(EXEEXT)
@@ -552,6 +553,10 @@ $(V45_EMBED_SCRIPT_C_TEST): $(V45_EMBED_SCRIPT_C_OBJECT) libnift_c.a
 $(V46_TIME_EMBED_TEST): tests/v46_time_embed.cpp $(V45_EMBED_PUBLIC_HEADERS) $(ENGINE_CORE_OBJECTS)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/v46_time_embed.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
+
+$(V46_SECURE_RANDOM_EMBED_TEST): tests/v46_secure_random_embed.cpp $(V45_EMBED_PUBLIC_HEADERS) $(ENGINE_CORE_OBJECTS)
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/v46_secure_random_embed.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
 test-v46-time-embed: $(V46_TIME_EMBED_TEST)
 	$(V46_TIME_EMBED_TEST)
@@ -609,7 +614,7 @@ test: test-content test-commands test-comments test-contracts test-json test-run
 	test-zero-mutation test-repair-campaign test-ownership-concurrency \
 	test-macos-runner-policy \
 	test-v44-execution-shell test-v44-language-foundation test-v44-shell-restricted \
-	test-v46-time-cli test-progress-render $(PROGRESS_PTY_TARGET) test-snap-contract test-distribution-summary test-version-consistency test-unreadable-source test-incremental-modified-immediate
+	test-v46-time-cli test-v46-secure-random-cli test-progress-render $(PROGRESS_PTY_TARGET) test-snap-contract test-distribution-summary test-version-consistency test-unreadable-source test-incremental-modified-immediate
 
 test-cp15-numeric-repair: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/cp15_numeric_repair.sh
@@ -1305,6 +1310,16 @@ test-v46-time-cli: $(TARGET)
 test-v46-time: test-v46-time-cli test-v46-time-embed
 
 .PHONY: test-v46-time test-v46-time-cli test-v46-time-embed
+
+test-v46-secure-random-cli: $(TARGET)
+	NIFT="$(CURDIR)/$(TARGET)" tests/v46_secure_random_smoke.sh
+
+test-v46-secure-random-embed: $(V46_SECURE_RANDOM_EMBED_TEST)
+	$(V46_SECURE_RANDOM_EMBED_TEST)
+
+test-v46-secure-random: test-v46-secure-random-cli test-v46-secure-random-embed
+
+.PHONY: test-v46-secure-random test-v46-secure-random-cli test-v46-secure-random-embed
 
 test-cp20-bytes: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/cp20_bytes_ffi.sh
