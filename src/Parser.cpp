@@ -1,6 +1,7 @@
 #include "JsonFile.h"
 #include "RuntimeJson.h"
 #include "Parser.h"
+#include "ParserAsyncPool.h"
 #include "ParserHelpers.h"
 #include "FrontMatter.h"
 #include "Console.h"
@@ -122,7 +123,6 @@ static const int kMaxCallableDepth = 64;
 
 namespace {
 
-thread_local bool nift_async_pool_worker = false;
 thread_local Parser* nift_ffi_callback_parser = nullptr;
 thread_local std::string nift_ffi_callback_tag;
 thread_local std::string nift_ffi_callback_error;
@@ -165,39 +165,6 @@ private:
     std::string old_error_;
     bool active_ = false;
 };
-class NiftAsyncPool {
-public:
-    NiftAsyncPool() {
-        const unsigned hint=std::thread::hardware_concurrency();
-        const unsigned count=std::max(2u,hint==0?2u:hint);
-        workers_.reserve(count);
-        for(unsigned i=0;i<count;++i) workers_.emplace_back([this]{
-            nift_async_pool_worker=true;
-            for(;;){
-                std::function<void()> task;
-                {std::unique_lock<std::mutex> lk(mutex_);cv_.wait(lk,[&]{return stop_||!queue_.empty();});if(stop_&&queue_.empty())break;task=std::move(queue_.front());queue_.pop_front();}
-                task();
-            }
-            nift_async_pool_worker=false;
-        });
-    }
-    ~NiftAsyncPool(){
-        {std::lock_guard<std::mutex> lk(mutex_);stop_=true;}cv_.notify_all();
-        for(auto& w:workers_)if(w.joinable())w.join();
-    }
-    void submit(std::function<void()> task){
-        {std::lock_guard<std::mutex> lk(mutex_);queue_.push_back(std::move(task));}cv_.notify_one();
-    }
-    bool run_one(){
-        std::function<void()> task;
-        {std::lock_guard<std::mutex> lk(mutex_);if(queue_.empty())return false;task=std::move(queue_.front());queue_.pop_front();}
-        task();return true;
-    }
-private:
-    std::mutex mutex_;std::condition_variable cv_;std::deque<std::function<void()>> queue_;std::vector<std::thread> workers_;bool stop_=false;
-};
-static NiftAsyncPool& nift_async_pool(){static NiftAsyncPool pool;return pool;}
-
 static bool nift_atomic_add_sub_checked(std::atomic<std::int64_t>& value,
                                         std::int64_t operand, bool subtract,
                                         std::int64_t& before, std::int64_t& after) {
@@ -423,7 +390,7 @@ Parser::Parser(RenderHost& host, TrackedInfo& tracked_info)
 }
 
 Parser::~Parser() {
-    for(auto& st:owned_async_instances_){std::unique_lock<std::mutex> lk(st->mutex);while(!st->done){lk.unlock();if(nift_async_pool_worker&&nift_async_pool().run_one()){lk.lock();continue;}lk.lock();st->cv.wait_for(lk,std::chrono::milliseconds(1),[&]{return st->done;});}}
+    for(auto& st:owned_async_instances_){std::unique_lock<std::mutex> lk(st->mutex);while(!st->done){lk.unlock();if(nift::detail::NiftAsyncPool::is_worker_thread()&&nift::detail::NiftAsyncPool::instance().run_one()){lk.lock();continue;}lk.lock();st->cv.wait_for(lk,std::chrono::milliseconds(1),[&]{return st->done;});}}
     for(auto& st:owned_thread_instances_){std::lock_guard<std::mutex> guard(st->join_mutex);if(st->worker.joinable())st->worker.join();}
 }
 
@@ -1827,7 +1794,7 @@ bool Parser::evaluate_expression(const std::string& expression, nift::RuntimeVal
             if(callable_tag.rfind("\x1fnift:callable:named:",0)==0){auto it=funcs.find(callable_tag.substr(21));if(it!=funcs.end())it->second.async=false;}
             else if(callable_tag.rfind("\x1fnift:callable:lambda:",0)==0){auto it=lambdas.find(callable_tag.substr(22));if(it!=lambdas.end())it->second->async=false;}
             RenderHost* hp=&host_;TrackedInfo* tp=&tracked_info_;
-            nift_async_pool().submit([state,hp,tp,vars=std::move(vars),funcs=std::move(funcs),lambdas=std::move(lambdas),threads=std::move(threads),mutexes=std::move(mutexes),atomics=std::move(atomics),asyncs=std::move(asyncs),callable_tag,av]() mutable {
+            nift::detail::NiftAsyncPool::instance().submit([state,hp,tp,vars=std::move(vars),funcs=std::move(funcs),lambdas=std::move(lambdas),threads=std::move(threads),mutexes=std::move(mutexes),atomics=std::move(atomics),asyncs=std::move(asyncs),callable_tag,av]() mutable {
                 nift::RuntimeValue result;std::string e;try{Parser worker(*hp,*tp);worker.standalone_script_host_=true;worker.callables_=std::move(funcs);worker.lambda_instances_=std::move(lambdas);worker.thread_instances_=std::move(threads);worker.mutex_instances_=std::move(mutexes);worker.atomic_instances_=std::move(atomics);worker.async_instances_=std::move(asyncs);worker.variable_scopes_.back()=std::move(vars);auto csp=std::make_shared<nift::RuntimeValue>(callable_tag);worker.variable_scopes_.back()["__future_callable"]=VariableBinding{csp,nift_binding_type(*csp),false,false};std::string expr="__future_callable(";for(size_t i=0;i<av.size();++i){auto sp=std::make_shared<nift::RuntimeValue>(av[i]);std::string n="__future_arg"+std::to_string(i);worker.variable_scopes_.back()[n]=VariableBinding{sp,nift_binding_type(*sp),false,false};if(i)expr+=",";expr+=n;}expr+=")";if(!worker.evaluate_expression(expr,result,e)&&e.empty())e="async function failed";}catch(const std::exception& ex){e=ex.what();}catch(...){e="unknown async worker exception";}
                 {std::lock_guard<std::mutex> lk(state->mutex);state->result=std::make_shared<nift::RuntimeValue>(std::move(result));state->error=std::move(e);state->done=true;}state->cv.notify_all();
             });
@@ -1835,7 +1802,7 @@ bool Parser::evaluate_expression(const std::string& expression, nift::RuntimeVal
         };
 
         auto await_future = [&](const nift::RuntimeValue& h, nift::RuntimeValue& result)->bool {
-            if(!h.is_string()||h.string.rfind("\x1fnift:async:",0)!=0){error="await: expected future";return false;}auto ai=async_instances_.find(h.string.substr(12));if(ai==async_instances_.end()){error="await: invalid future";return false;}auto st=ai->second;std::unique_lock<std::mutex> lk(st->mutex);while(!st->done){lk.unlock();if(nift_async_pool_worker&&nift_async_pool().run_one()){lk.lock();continue;}lk.lock();st->cv.wait_for(lk,std::chrono::milliseconds(1),[&]{return st->done;});}if(!st->error.empty()){error="future: "+st->error;return false;}result=st->result?*st->result:nift::RuntimeValue(nullptr);return true;
+            if(!h.is_string()||h.string.rfind("\x1fnift:async:",0)!=0){error="await: expected future";return false;}auto ai=async_instances_.find(h.string.substr(12));if(ai==async_instances_.end()){error="await: invalid future";return false;}auto st=ai->second;std::unique_lock<std::mutex> lk(st->mutex);while(!st->done){lk.unlock();if(nift::detail::NiftAsyncPool::is_worker_thread()&&nift::detail::NiftAsyncPool::instance().run_one()){lk.lock();continue;}lk.lock();st->cv.wait_for(lk,std::chrono::milliseconds(1),[&]{return st->done;});}if(!st->error.empty()){error="future: "+st->error;return false;}result=st->result?*st->result:nift::RuntimeValue(nullptr);return true;
         };
 
         if(text.rfind("await ",0)==0){nift::RuntimeValue f;if(!eval(trim_copy(text.substr(6)),f,depth+1))return false;return await_future(f,out);}
