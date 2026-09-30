@@ -18,7 +18,10 @@ SQLITE3_BIN="${SQLITE3_BIN:-sqlite3}"
 t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
 mkdir -p "$t/site/.nift" "$t/site/assets" "$t/site/out"
 for p in sqlite curl postgres mysql redis vips imagemagick; do
-  (cd "$t/site" && "$NIFT_ABS" add "$PKG_ROOT/$p" >/dev/null 2>&1)
+  if ! package_error=$(cd "$t/site" && "$NIFT_ABS" add "$PKG_ROOT/$p" 2>&1); then
+    echo "combined dogfood could not add $p: $package_error" >&2
+    exit 1
+  fi
 done
 
 PORT=$((19000 + RANDOM % 2000))
