@@ -10,7 +10,9 @@ i=0; while [ $i -lt 200 ]; do touch "$t/tree/b/item-$i.tmp"; i=$((i+1)); done
 # there (everything globbed to zero matches).
 cd "$t"
 cat >"$t/test.f" <<F
-print(ls("tree/**/*.o").size())
+print(ls("tree/**/*.o").prettify())
+print(ls("tree/?/*.o").prettify())
+print(ls("tree/**/.hidden/*.o").prettify())
 copy("tree/a/*.o", "out")
 copy("tree/b/*.o", "out")
 print(ls("out/*.o").size())
@@ -18,7 +20,18 @@ remove("out/*.o")
 print(ls("out/*.o").size())
 F
 out=$($NIFT "$t/test.f")
-[ "$out" = "3
+[ "$out" = "[
+  \"tree/a/deep/three.o\",
+  \"tree/a/one.o\",
+  \"tree/b/four.o\"
+]
+[
+  \"tree/a/one.o\",
+  \"tree/b/four.o\"
+]
+[
+  \"tree/.hidden/secret.o\"
+]
 2
 0" ] || { printf '%s\n' "$out" >&2; exit 1; }
 echo 'PASS v4.4 CP6-CP7 filesystem globs'

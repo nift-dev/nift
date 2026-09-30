@@ -230,6 +230,11 @@ test-content: $(TARGET)
 
 ENGINE_TEST := $(TEST_DIR)/engine-smoke$(EXEEXT)
 ENGINE_CORE_OBJECTS := $(filter-out src/nift.o src/CLI.o,$(OBJECTS))
+PARSER_STATEMENT_STATE_TEST := $(TEST_DIR)/parser-statement-state-unit$(EXEEXT)
+
+$(PARSER_STATEMENT_STATE_TEST): tests/parser_statement_state_unit.cpp $(ENGINE_CORE_OBJECTS)
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/parser_statement_state_unit.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
 $(ENGINE_TEST): tests/engine_smoke.cpp $(ENGINE_CORE_OBJECTS)
 	mkdir -p $(TEST_DIR)
@@ -1176,7 +1181,8 @@ test-v44-execution-shell: $(TARGET)
 # Portable Python discovery for the AST fuzz/property target. Windows msys2
 # PATH exposes python (from setup-python) rather than python3.
 PYTHON ?= $(shell command -v python3 2>/dev/null || command -v python 2>/dev/null)
-test-v44-language-foundation: $(TARGET)
+test-v44-language-foundation: $(TARGET) $(PARSER_STATEMENT_STATE_TEST)
+	$(PARSER_STATEMENT_STATE_TEST)
 	tests/v44_ast_expression_smoke.sh
 	tests/v44_ast_constant_fold_smoke.sh
 	tests/v44_ast_differential_corpus.sh
