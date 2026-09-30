@@ -85,13 +85,17 @@ jobs:
           repository: nift-packages/imagemagick
           ref: dda5437fb20ca92045cea901323c2bd2399f38a8
           path: nift-packages/imagemagick
-      # The hosted runners already carry a system python3 (used by the
-      # package dogfoods' local HTTP server); setup-python is not needed and
-      # its teardown has hung on macOS runners.
+      # Keep setup-python Windows-only: the native-runtime wall requires it,
+      # while setup-python teardown has hung on macOS runners.
+      - uses: actions/setup-python@v6
+        if: runner.os == 'Windows'
+        with:
+          python-version: '3.x'
       - uses: msys2/setup-msys2@v2
         if: runner.os == 'Windows'
         with:
           msystem: UCRT64
+          path-type: inherit
           update: true
           install: make mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-winpthreads
       - name: Build Nift
@@ -136,14 +140,7 @@ jobs:
         timeout-minutes: 6
         if: runner.os == 'Windows'
         shell: msys2 {0}
-        run: |
-          if ! command -v python3 >/dev/null 2>&1; then
-            PY="$(ls -d /c/hostedtoolcache/windows/Python/*/x64 2>/dev/null | sort -V | tail -1)"
-            if [ -n "$PY" ]; then
-              export PATH="$PATH:$PY"
-            fi
-          fi
-          make -C nift test-v45-native-runtime
+        run: make -C nift test-v45-native-runtime
       - name: v4.5 focused embedding contracts
         timeout-minutes: 10
         if: runner.os != 'Windows'

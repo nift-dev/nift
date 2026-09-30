@@ -23,8 +23,11 @@ cat > "$t/invocation.f" <<'F'
 print(cmd)
 print(args.join("|"))
 F
-out=$("$BIN" "$t/invocation.f" "hello world" -- --no-process -x)
-[ "$(sed -n '1p' <<<"$out")" = "$t/invocation.f" ]
+invocation="$t/invocation.f"
+invocation_identity="$invocation"
+case "$(uname -s)" in MINGW*|MSYS*) invocation_identity=$(cygpath -am "$invocation");; esac
+out=$("$BIN" "$invocation" "hello world" -- --no-process -x)
+[ "$(sed -n '1p' <<<"$out")" = "$invocation_identity" ]
 [ "$(sed -n '2p' <<<"$out")" = 'hello world|--no-process|-x' ]
 # host-owned values are immutable unless deliberately shadowed by declaration.
 printf 'cmd = "x"\n' > "$t/mutate.f"
@@ -46,9 +49,12 @@ cat > "$t/interactive.f" <<'F'
 x := 17
 fn(plus_one(v)) { return v + 1 }
 F
-out=$(printf 'plus_one(x)\ncmd\nexit\n' | "$BIN" -i "$t/interactive.f")
+interactive="$t/interactive.f"
+interactive_identity="$interactive"
+case "$(uname -s)" in MINGW*|MSYS*) interactive_identity=$(cygpath -am "$interactive");; esac
+out=$(printf 'plus_one(x)\ncmd\nexit\n' | "$BIN" -i "$interactive")
 [ "$(sed -n '1p' <<<"$out")" = '18' ]
-[ "$(sed -n '2p' <<<"$out")" = "\"$t/interactive.f\"" ]
+[ "$(sed -n '2p' <<<"$out")" = "\"$interactive_identity\"" ]
 # A failed initial program is terminal: piped follow-up input must not be run as a REPL.
 if printf 'print("BAD-REPL")\n' | "$BIN" -i -e 'this is not valid := ' >"$t/fail.out" 2>"$t/fail.err"; then
   echo '-i accepted invalid initial program' >&2; exit 1
