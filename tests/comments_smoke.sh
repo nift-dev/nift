@@ -40,6 +40,22 @@ grep -F '<pre>@# is ordinary text now</pre>' public/index.html >/dev/null
 grep -F '<p>@# inline text remains</p>' public/index.html >/dev/null
 ! grep -F '"data/ignored.json"' .nift/public/index.info.json >/dev/null
 
+# A comment in an included template fragment must close before @content is
+# parsed. Otherwise comment state leaks into the page and desynchronizes the
+# <pre> tracker when literal arrow syntax contains angle brackets.
+cat > templates/head.html <<'EOF'
+<!-- included expression: $[title] -->
+EOF
+cat > templates/template.html <<'EOF'
+<head>@input('head.html')</head><body>@content</body>
+EOF
+cat > content/index.html <<'EOF'
+<pre class="mermaid">a <--> b</pre>
+EOF
+"$NIFT_BIN" build --all >/dev/null
+grep -F '<head><!-- included expression: Comments -->' public/index.html >/dev/null
+grep -F '<pre class="mermaid">a &lt;--> b</pre>' public/index.html >/dev/null
+
 cat > content/index.html <<'EOF'
 before
 @/* never closes

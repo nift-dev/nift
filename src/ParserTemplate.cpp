@@ -229,6 +229,9 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
         }
         if (source.compare(i, 3, "-->") == 0 && html_comment_depth_ > 0) {
             --html_comment_depth_;
+            output.append(source, i, 3);
+            i += 3;
+            continue;
         }
         if (source[i] == '<' && html_comment_depth_ == 0) {
             const bool closes_pre = source.compare(i + 1, 4, "/pre") == 0 &&
@@ -2221,6 +2224,12 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
         } else {
             const std::size_t next_special = source.find_first_of("\\@<$", i);
             std::size_t end = next_special == std::string::npos ? source.size() : next_special;
+            if (html_comment_depth_ > 0) {
+                const std::size_t comment_close = source.find("-->", i);
+                if (comment_close != std::string::npos && comment_close < end) {
+                    end = comment_close;
+                }
+            }
             if(strict_script_mode_){for(std::size_t p=source.find("import",i);p<end;p=source.find("import",p+6)){const bool left=p==0||(!std::isalnum(static_cast<unsigned char>(source[p-1]))&&source[p-1]!='_');const std::size_t after=p+6;const bool right=after==source.size()||(!std::isalnum(static_cast<unsigned char>(source[after]))&&source[after]!='_');if(left&&right){end=p;break;}if(p==std::string::npos)break;}}
             output.append(source, i, end - i);
             i = end;
