@@ -556,10 +556,60 @@ bool valid_package_name(const std::string& name) {
     return true;
 }
 
+#ifdef _WIN32
+static bool windows_resolved_path(const fs::path& path, fs::path& resolved) {
+    fs::path existing = path;
+    fs::path suffix;
+    while (!existing.empty()) {
+        HANDLE handle = CreateFileW(existing.c_str(), 0,
+                                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                    nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+        if (handle != INVALID_HANDLE_VALUE) {
+            const DWORD flags = FILE_NAME_NORMALIZED | VOLUME_NAME_DOS;
+            const DWORD required = GetFinalPathNameByHandleW(handle, nullptr, 0, flags);
+            if (required == 0) { CloseHandle(handle); return false; }
+            std::vector<wchar_t> buffer(static_cast<std::size_t>(required) + 1);
+            const DWORD length = GetFinalPathNameByHandleW(handle, buffer.data(),
+                                                            static_cast<DWORD>(buffer.size()), flags);
+            CloseHandle(handle);
+            if (length == 0 || length >= buffer.size()) return false;
+
+            std::wstring final_path(buffer.data(), length);
+            if (final_path.rfind(L"\\\\?\\UNC\\", 0) == 0)
+                final_path = L"\\\\" + final_path.substr(8);
+            else if (final_path.rfind(L"\\\\?\\", 0) == 0)
+                final_path.erase(0, 4);
+            resolved = (fs::path(std::move(final_path)) / suffix).lexically_normal();
+            return true;
+        }
+
+        const DWORD open_error = GetLastError();
+        if (open_error != ERROR_FILE_NOT_FOUND && open_error != ERROR_PATH_NOT_FOUND) return false;
+
+        // A dangling reparse point also reports a missing target when followed.
+        // Do not mistake it for a genuinely absent path component.
+        handle = CreateFileW(existing.c_str(), 0,
+                             FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                             nullptr, OPEN_EXISTING,
+                             FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+        if (handle != INVALID_HANDLE_VALUE) { CloseHandle(handle); return false; }
+        const DWORD reparse_error = GetLastError();
+        if (reparse_error != ERROR_FILE_NOT_FOUND && reparse_error != ERROR_PATH_NOT_FOUND) return false;
+
+        const fs::path parent = existing.parent_path();
+        if (parent.empty() || parent == existing) return false;
+        suffix = existing.filename() / suffix;
+        existing = parent;
+    }
+    return false;
+}
+#endif
+
 bool path_within(const fs::path& base, const fs::path& candidate) {
     const fs::path normalized_base = fs::absolute(base).lexically_normal();
     const fs::path normalized_candidate = fs::absolute(candidate).lexically_normal();
 
+#ifndef _WIN32
     // Reject obvious lexical escapes first.
     const fs::path lexical_relative = normalized_candidate.lexically_relative(normalized_base);
     if (lexical_relative.empty()) {
@@ -567,14 +617,23 @@ bool path_within(const fs::path& base, const fs::path& candidate) {
     } else if (*lexical_relative.begin() == "..") {
         return false;
     }
+#endif
 
-    // Then resolve existing prefixes/symlinks. weakly_canonical also handles a
-    // non-existent leaf while resolving any symlinked parent directories.
+    // Then resolve existing prefixes/symlinks. MinGW's weakly_canonical does
+    // not reliably follow native reparse points, so Windows resolves through
+    // handles and appends any non-existent suffix to the resolved ancestor.
+    fs::path canonical_base;
+    fs::path canonical_candidate;
+#ifdef _WIN32
+    if (!windows_resolved_path(normalized_base, canonical_base) ||
+        !windows_resolved_path(normalized_candidate, canonical_candidate)) return false;
+#else
     std::error_code error;
-    const fs::path canonical_base = fs::weakly_canonical(normalized_base, error);
+    canonical_base = fs::weakly_canonical(normalized_base, error);
     if (error) return false;
-    const fs::path canonical_candidate = fs::weakly_canonical(normalized_candidate, error);
+    canonical_candidate = fs::weakly_canonical(normalized_candidate, error);
     if (error) return false;
+#endif
 
     const fs::path canonical_relative = canonical_candidate.lexically_relative(canonical_base);
     if (canonical_relative.empty()) return canonical_candidate == canonical_base;
