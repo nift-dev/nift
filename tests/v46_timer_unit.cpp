@@ -79,6 +79,14 @@ int main() {
         assert(parser.timer_instance_count() == timer_count);
     }
 
+    for (int i = 0; i < 128; ++i) {
+        const auto rejected = parser.run_statement("timer()", "<timer-repl-test>");
+        assert(!rejected.ok);
+        assert(rejected.error.message.find("timer") != std::string::npos);
+        assert(parser.timer_instance_count() == timer_count);
+    }
+    eval("t.elapsed()"); assert(value.is_number());
+
     const nift::RuntimeValue forged(std::string("\x1fnift:timer:1"));
     assert(forged.is_string() && !forged.is_timer());
     assert(!nift::runtime_contains_timer(forged));

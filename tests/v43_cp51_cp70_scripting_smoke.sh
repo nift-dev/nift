@@ -57,7 +57,7 @@ export(double)
 EOT
 cat > content/index.html <<'EOT'
 $[secret := 7]
-@import("content/lib.nift")
+@import("lib.nift")
 $[secret],$[n],$[inc()],$[n],$[double(5)]
 EOT
 "$NIFT_BIN" build --all >/dev/null
@@ -68,7 +68,7 @@ x := caller_only
 export(x)
 EOT
 cat > content/index.html <<'EOT'
-$[caller_only := 9]@import("content/isolated.nift")
+$[caller_only := 9]@import("isolated.nift")
 EOT
 if "$NIFT_BIN" build --all >/dev/null 2>&1; then echo 'import saw caller scope' >&2; exit 1; fi
 # Duplicate/missing/colliding exports and value returns reject.
@@ -78,14 +78,14 @@ export(x)
 export(x)
 EOT
 cat > content/index.html <<'EOT'
-@import("content/baddup.nift")
+@import("baddup.nift")
 EOT
 if "$NIFT_BIN" build --all >/dev/null 2>&1; then echo 'duplicate export succeeded' >&2; exit 1; fi
 cat > content/badreturn.nift <<'EOT'
 return 5
 EOT
 cat > content/index.html <<'EOT'
-@import("content/badreturn.nift")
+@import("badreturn.nift")
 EOT
 if "$NIFT_BIN" build --all >/dev/null 2>&1; then echo 'value return from import succeeded' >&2; exit 1; fi
 cat > content/early.nift <<'EOT'
@@ -95,7 +95,7 @@ return
 x = 9
 EOT
 cat > content/index.html <<'EOT'
-@import("content/early.nift")$[x]
+@import("early.nift")$[x]
 EOT
 "$NIFT_BIN" build --all >/dev/null; [[ "$(body)" == *"8"* ]]
 # Nested import/dependency path resolution.
@@ -109,7 +109,7 @@ cat > content/lib/top.nift <<'EOT'
 export(y)
 EOT
 cat > content/index.html <<'EOT'
-@import("content/lib/top.nift")$[y]
+@import("lib/top.nift")$[y]
 EOT
 "$NIFT_BIN" build --all >/dev/null; [[ "$(body)" == *"11"* ]]
 
@@ -119,7 +119,7 @@ z := 1
 export(z)
 EOT
 cat > content/index.html <<'EOT'
-@import("content/dep.nift")$[z]
+@import("dep.nift")$[z]
 EOT
 "$NIFT_BIN" build --all >/dev/null; [[ "$(body)" == *"1"* ]]
 sleep 1

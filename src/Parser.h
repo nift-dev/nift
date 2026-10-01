@@ -89,6 +89,9 @@ public:
     bool contains_timer_resource(const nift::RuntimeValue& value) const;
     std::uint64_t begin_timer_operation() const { return next_timer_instance_id_; }
     void finish_timer_operation(std::uint64_t checkpoint);
+    void rollback_timer_operation(std::uint64_t checkpoint);
+    std::uint64_t begin_file_operation() const { return next_file_instance_id_; }
+    void rollback_file_operation(std::uint64_t checkpoint);
     std::size_t timer_instance_count() const { return timer_instances_.size(); }
     void set_execution_output(std::shared_ptr<ExecutionOutput> output) { execution_output_ = std::move(output); }
 
@@ -286,6 +289,7 @@ private:
                            const std::vector<nift::RuntimeValue>& args,
                            nift::RuntimeValue& out, std::string& error);
     bool callable_contains_timer_resource(const nift::RuntimeValue& callable) const;
+    bool evaluate_expression_impl(const std::string& expression, nift::RuntimeValue& value, std::string& error);
     struct FfiLibraryInstance {
         void* handle = nullptr;
         bool closed = false;
@@ -334,6 +338,7 @@ private:
     };
     std::unordered_map<std::string, std::shared_ptr<FileInstance>> file_instances_;
     std::uint64_t next_file_instance_id_ = 1;
+    bool make_file_value(std::filesystem::path path, nift::RuntimeValue& out, std::string& error);
     struct CommandInstance { std::vector<ProcessSpec> stages; };
     std::unordered_map<std::string, std::shared_ptr<CommandInstance>> command_instances_;
     std::uint64_t next_command_instance_id_ = 1;
@@ -391,7 +396,7 @@ private:
     RenderResult parse(const std::string& source, const std::filesystem::path& source_path, int depth);
     bool translate_function_program(const std::string& source, std::string& translated, std::string& error) const;
     RenderResult execute_native_program(const std::string& source, const std::filesystem::path& source_path, int depth,
-                                        SourceProvenance source_provenance);
+                                         SourceProvenance source_provenance, bool rollback_files_on_failure = true);
     bool execute_import_file(const std::string& argument, const std::filesystem::path& caller_path, int depth, bool legacy_syntax, std::string& error);
     std::string metadata(const std::string& key) const;
     bool json_value(const std::string& expression, std::string& value, std::string& error);

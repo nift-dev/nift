@@ -154,7 +154,7 @@ fn(script_value()) { return 37 }
 export(script_value)
 EOF
 cat >"$T/project/content/index.html" <<'EOF'
-@import("content/module.f")
+@import("module.f")
 template=$[template_value()]
 import("content/missing-template.f")
 @script { import("script-module.f"); return script_value() }

@@ -283,7 +283,7 @@ RenderResult Parser::run_script(const std::string& source, const fs::path& sourc
     const std::string identity=source_path.generic_string();
     const auto provenance=!source_path.empty()&&!(identity.size()>=2&&identity.front()=='<'&&identity.back()=='>')
         ? SourceProvenance::FileBacked : SourceProvenance::InMemory;
-    auto rr=execute_native_program(source,source_path,0,provenance);
+    auto rr=execute_native_program(source,source_path,0,provenance,false);
     function_call_depth_=0; strict_script_mode_=false;
     rr.output.clear();
     if(rr.ok && pending_control_.kind==ControlFlow::Return && pending_control_.value) {
@@ -300,12 +300,22 @@ RenderResult Parser::run_script(const std::string& source, const fs::path& sourc
 bool Parser::run_embedded_script(const std::string& source, const fs::path& source_path, nift::RuntimeValue& value, std::string& error) {
     result_=RenderResult{};variable_scopes_.clear();variable_scopes_.emplace_back();timer_instances_.clear();install_script_invocation_bindings();callables_.clear();structs_.clear();requested_exports_.clear();pending_control_={};active_module_env_.reset();loading_module_env_.reset();saved_lexical_scopes_.clear();module_envs_.clear();next_module_identity_=1;in_import_program_=false;standalone_script_host_=false;resource_path_authority_.enforce_project_root=true;resource_path_authority_.enforce_filesystem_root=false;strict_script_mode_=true;function_call_depth_=1;
     const std::uint64_t timer_checkpoint=begin_timer_operation();
-    auto rr=execute_native_program(source,source_path,0,SourceProvenance::InMemory);function_call_depth_=0;strict_script_mode_=false;
-    if(!rr.ok){error=rr.error.message;pending_control_={};finish_timer_operation(timer_checkpoint);return false;}
+    auto rr=execute_native_program(source,source_path,0,SourceProvenance::InMemory,false);function_call_depth_=0;strict_script_mode_=false;
+    if(!rr.ok){error=rr.error.message;pending_control_={};std::string ignored_resource_error;finalize_script_resources(ignored_resource_error);finish_timer_operation(timer_checkpoint);return false;}
     value=nift::RuntimeValue(nullptr);if(pending_control_.kind==ControlFlow::Return&&pending_control_.value)value=*pending_control_.value;pending_control_={};const bool timer_result=contains_timer_resource(value);std::string resource_error;const bool resources_ok=finalize_script_resources(resource_error);finish_timer_operation(timer_checkpoint);if(timer_result){error="embedded script cannot return a timer value";if(!resources_ok)error+="; "+resource_error;return false;}if(!resources_ok){error=resource_error;return false;}return true;
 }
 
 RenderResult Parser::run_statement(const std::string& source, const fs::path& source_path) {
+    const std::uint64_t file_checkpoint=begin_file_operation();
+    struct TimerOperationGuard {
+        Parser& parser;
+        std::uint64_t checkpoint;
+        bool success = false;
+        ~TimerOperationGuard() {
+            if (success) parser.finish_timer_operation(checkpoint);
+            else parser.rollback_timer_operation(checkpoint);
+        }
+    } timer_operation{*this,begin_timer_operation()};
     if(variable_scopes_.empty()) { variable_scopes_.emplace_back(); install_script_invocation_bindings(); }
     standalone_script_host_=true; resource_path_authority_.enforce_project_root=false; resource_path_authority_.enforce_filesystem_root=true; strict_script_mode_=true; result_ = RenderResult{}; pending_control_={}; function_call_depth_=1;
     const std::string identity=source_path.generic_string();const auto provenance=!source_path.empty()&&!(identity.size()>=2&&identity.front()=='<'&&identity.back()=='>')?SourceProvenance::FileBacked:SourceProvenance::InMemory;
@@ -333,7 +343,7 @@ RenderResult Parser::run_statement(const std::string& source, const fs::path& so
             // string has nothing useful to inspect. Keep both silent rather than
             // displaying `null` or an empty quoted string.
             if(v.is_null() || (v.is_string() && v.string.empty())) {
-                function_call_depth_=0; strict_script_mode_=false; return rr;
+                timer_operation.success=true;function_call_depth_=0;strict_script_mode_=false;return rr;
             }
             // Presentation modifiers are composable and order-independent. The evaluator
             // has already serialized their original value into an ANSI-free string; here
@@ -341,25 +351,24 @@ RenderResult Parser::run_statement(const std::string& source, const fs::path& so
             std::string presentation; bool presentation_method=false, highlight=false;
             { bool p=false,h=false; if(strip_presentation_chain(t,presentation,p,h)){presentation_method=true;highlight=h;} }
             if(presentation_method&&v.is_string()) shown=v.string;
-            else if(!serialize_value(v,false,shown,error)){rr.ok=false;rr.error.message=error;function_call_depth_=0;strict_script_mode_=false;return rr;}
+            else if(!serialize_value(v,false,shown,error)){rr.ok=false;rr.error.message=error;rollback_file_operation(file_checkpoint);function_call_depth_=0;strict_script_mode_=false;return rr;}
             if(highlight && console::stdout_colour_enabled()) shown=console::highlight_nift_value(shown);
-            rr.output=shown; function_call_depth_=0; strict_script_mode_=false; return rr;
+            rr.output=shown;timer_operation.success=true;function_call_depth_=0;strict_script_mode_=false;return rr;
         }
         // If direct evaluation fails, let the native statement path provide the
         // canonical diagnostic; it may be a valid statement form not recognized above.
     }
-    auto rr=execute_native_program(source,source_path,0,provenance); function_call_depth_=0; strict_script_mode_=false; pending_control_={}; return rr;
+    auto rr=execute_native_program(source,source_path,0,provenance);if(!rr.ok)rollback_file_operation(file_checkpoint);timer_operation.success=rr.ok;function_call_depth_=0;strict_script_mode_=false;pending_control_={};return rr;
 }
 
 void Parser::reset_script_control() { pending_control_={}; result_=RenderResult{}; }
 
 RenderResult Parser::execute_native_program(const std::string& source, const fs::path& source_path, int depth,
-                                            SourceProvenance source_provenance) {
+                                            SourceProvenance source_provenance, bool rollback_files_on_failure) {
+    const std::uint64_t file_checkpoint = begin_file_operation();
     std::string program, error;
     if (!translate_function_program(source, program, error)) {
-        RenderResult failed; failed.ok=false; failed.error.message=error;
-        std::string ignored_resource_error; finalize_script_resources(ignored_resource_error);
-        return failed;
+        RenderResult failed; failed.ok=false; failed.error.message=error;if(rollback_files_on_failure)rollback_file_operation(file_checkpoint);return failed;
     }
     RenderResult rr;
     try {
@@ -377,10 +386,7 @@ RenderResult Parser::execute_native_program(const std::string& source, const fs:
         const std::string original_line=line_at(source,rr.error.line);const auto original_imports=imports(original_line);const auto translated_imports=imports(rr.error.source_line);
         if(!original_imports.empty()){std::size_t occurrence=0;for(std::size_t n=0;n<translated_imports.size();++n)if(translated_imports[n]+1<=rr.error.column)occurrence=n;occurrence=std::min(occurrence,original_imports.size()-1);const auto position=original_imports[occurrence];rr.error.column=position+1;rr.error.source_line=original_line;std::size_t open=position+6;while(open<original_line.size()&&std::isspace(static_cast<unsigned char>(original_line[open])))++open;std::size_t close=0;rr.error.source_length=open<original_line.size()&&find_balanced(original_line,open,'(',')',close)?close-position+1:6;}
     }
-    if (!rr.ok) {
-        std::string ignored_resource_error;
-        finalize_script_resources(ignored_resource_error);
-    }
+    if (!rr.ok && rollback_files_on_failure) rollback_file_operation(file_checkpoint);
     return rr;
 }
 
@@ -448,6 +454,7 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
     std::unordered_set<std::uint64_t> existing_modules;for(const auto& entry:module_envs_)existing_modules.insert(entry.first);
     std::unordered_set<std::string> existing_lambdas;for(const auto& entry:lambda_instances_)existing_lambdas.insert(entry.first);
     std::unordered_set<std::string> existing_structs;for(const auto& entry:struct_instances_)existing_structs.insert(entry.first);
+    const std::uint64_t file_checkpoint=begin_file_operation();
     std::unordered_set<const Callable*> existing_prepared;for(const auto& entry:prepared_callables_)existing_prepared.insert(entry.first);
     bool import_committed=false;
     auto rollback=std::unique_ptr<void,std::function<void(void*)>>(reinterpret_cast<void*>(1),[&](void*){
@@ -455,6 +462,7 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
         for(auto it=module_envs_.begin();it!=module_envs_.end();)if(!existing_modules.count(it->first))it=module_envs_.erase(it);else ++it;
         for(auto it=lambda_instances_.begin();it!=lambda_instances_.end();)if(!existing_lambdas.count(it->first))it=lambda_instances_.erase(it);else ++it;
         for(auto it=struct_instances_.begin();it!=struct_instances_.end();)if(!existing_structs.count(it->first))it=struct_instances_.erase(it);else ++it;
+        rollback_file_operation(file_checkpoint);
         for(auto it=prepared_callables_.begin();it!=prepared_callables_.end();)if(!existing_prepared.count(it->first))it=prepared_callables_.erase(it);else ++it;
         next_module_identity_=module_identity_checkpoint;next_lambda_instance_id_=lambda_identity_checkpoint;next_struct_instance_id_=struct_identity_checkpoint;
     });

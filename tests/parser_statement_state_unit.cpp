@@ -60,6 +60,30 @@ int main() {
     assert(import_parser.run_statement("answer := callback()",root/"main.f").ok);
     nift::RuntimeValue answer;std::string eval_error;assert(import_parser.eval_expression("answer",answer,eval_error));assert(answer.is_number()&&answer.num==42);
 
+    // Failed nested execution owns only the FileValues allocated inside it.
+    // A caller's dirty open file remains recoverable, while function/@script
+    // locals are removed rather than surviving until parser teardown.
+    {std::ofstream caller(root/"caller.txt");caller<<"BASE";}
+    const std::string caller_path=(root/"caller.txt").generic_string();
+    const std::string function_path=(root/"function-local.txt").generic_string();
+    const std::string rejected_path=(root/"rejected-local.txt").generic_string();
+    const std::string script_path=(root/"script-local.txt").generic_string();
+    assert(import_parser.run_statement("caller_file := file(\""+caller_path+"\")",root/"main.f").ok);
+    assert(import_parser.run_statement("caller_file.open(\"rw\")",root/"main.f").ok);
+    assert(import_parser.run_statement("caller_file.replace_once(\"BASE\", \"DIRTY\")",root/"main.f").ok);
+    assert(import_parser.run_statement("fn(leak_file()) { local := file(\""+function_path+"\"); local.open(\"w\"); missing_value }",root/"main.f").ok);
+    assert(!import_parser.run_statement("leak_file()",root/"main.f").ok);
+    nift::RuntimeValue modified;assert(import_parser.eval_expression("caller_file.modified()",modified,eval_error)&&modified.is_bool()&&modified.boolean);
+    assert(import_parser.run_statement("caller_file.revert()",root/"main.f").ok);
+    assert(import_parser.run_statement("caller_file.close()",root/"main.f").ok);
+    std::string resource_error;assert(import_parser.finalize_script_resources(resource_error));
+    assert(import_parser.run_statement("fn(rejected_file()) { local := file(\""+rejected_path+"\"); local.open(\"w\"); return timer() }",root/"main.f").ok);
+    assert(!import_parser.run_statement("rejected_file()",root/"main.f").ok);
+    resource_error.clear();assert(import_parser.finalize_script_resources(resource_error));
+    const auto failed_script=import_parser.run_statement("@script { local := file(\""+script_path+"\"); local.open(\"w\"); missing_value }",root/"main.f");
+    assert(!failed_script.ok);
+    resource_error.clear();assert(import_parser.finalize_script_resources(resource_error));
+
     // A failed package import must roll back its ModuleEnv and release the read
     // lease even while the persistent parser remains alive.
     const auto package=root/".nift/packages/demo";std::filesystem::create_directories(package/"src",ec);assert(!ec);

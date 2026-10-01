@@ -264,16 +264,17 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             std::size_t bo=i+7; while(bo<source.size()&&std::isspace(static_cast<unsigned char>(source[bo])))++bo; std::size_t bc=0;
             if(bo>=source.size()||source[bo]!='{'||!find_balanced(source,bo,'{','}',bc)){fail(source_path,source,i,"@script requires a balanced block");break;}
             if(pending_control_.kind!=ControlFlow::None) pending_control_={};
-            std::unordered_set<std::string> pre_script_files; for(const auto& kv:file_instances_)pre_script_files.insert(kv.first);
+            const std::uint64_t file_checkpoint=begin_file_operation();
             ++function_call_depth_;
             const bool saved_strict=strict_script_mode_; strict_script_mode_=true;
             auto nested=execute_native_program(source.substr(bo+1,bc-bo-1),source_path,depth+1,source_provenance);
             strict_script_mode_=saved_strict;
             --function_call_depth_;
-            if(nested.ok){for(auto& kv:file_instances_)if(!pre_script_files.count(kv.first)&&kv.second->open){auto f=kv.second;f->open=false;f->dirty=false;f->mode.clear();f->working.clear();f->saved.clear();f->cursor=0;nested.ok=false;nested.error.message="managed file left open at @script completion: "+f->path.generic_string();break;}}
+            if(nested.ok){for(auto& kv:file_instances_){std::uint64_t id=0;const auto parsed=std::from_chars(kv.first.data(),kv.first.data()+kv.first.size(),id);if(parsed.ec==std::errc()&&parsed.ptr==kv.first.data()+kv.first.size()&&id>=file_checkpoint&&kv.second->open){nested.ok=false;nested.error.message="managed file left open at @script completion: "+kv.second->path.generic_string();break;}}}
+            if(!nested.ok)rollback_file_operation(file_checkpoint);
             if(!nested.ok){result_=nested;break;}
             if(pending_control_.kind==ControlFlow::Return){
-                if(pending_control_.value) { const auto& rv=*pending_control_.value;if(rv.is_timer()||rv.is_bytes()||rv.is_array()||rv.is_object()||(rv.is_string()&&rv.string.rfind("\x1fnift:",0)==0&&rv.string.rfind("\x1fnift:timer:",0)!=0)){pending_control_={};fail(source_path,source,i,"@script return value is not directly renderable");break;}output += render_expression_value(rv); }
+                if(pending_control_.value) { const auto& rv=*pending_control_.value;if(rv.is_timer()||rv.is_bytes()||rv.is_array()||rv.is_object()||(rv.is_string()&&rv.string.rfind("\x1fnift:",0)==0&&rv.string.rfind("\x1fnift:timer:",0)!=0)){pending_control_={};rollback_file_operation(file_checkpoint);fail(source_path,source,i,"@script return value is not directly renderable");break;}output += render_expression_value(rv); }
                 pending_control_={};
             }
             i=bc+1; continue;

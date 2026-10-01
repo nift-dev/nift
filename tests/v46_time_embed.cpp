@@ -120,5 +120,23 @@ int main() {
     assert(engine.evaluate("f.open(\"w\")").ok());
     assert(engine.evaluate("f.revert()").ok());
     assert(engine.evaluate("f.close()").ok());
+
+    auto define_evaluate_file = engine.execute(
+        "fn(leak_evaluate_file()) { local := file(\"engine-evaluate-local.txt\"); "
+        "local.open(\"w\"); return timer() }");
+    assert(define_evaluate_file.ok());
+    auto failed_evaluate_file = engine.evaluate("leak_evaluate_file()");
+    assert(!failed_evaluate_file.ok());
+    assert(failed_evaluate_file.error().message.find("timer") != std::string::npos);
+    assert(engine.execute("return 1").ok());
+
+    auto define_call_file = engine.execute(
+        "fn(leak_call_file()) { local := file(\"engine-call-local.txt\"); "
+        "local.open(\"w\"); return timer() }");
+    assert(define_call_file.ok());
+    auto failed_call_file = engine.call("leak_call_file");
+    assert(!failed_call_file.ok());
+    assert(failed_call_file.error().message.find("timer") != std::string::npos);
+    assert(engine.execute("return 1").ok());
     return 0;
 }

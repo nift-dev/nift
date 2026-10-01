@@ -125,6 +125,20 @@ bool Parser::make_timer(const std::vector<nift::RuntimeValue>& args,
     return true;
 }
 
+bool Parser::make_file_value(fs::path path, nift::RuntimeValue& out, std::string& error) {
+    if (next_file_instance_id_ == 0 ||
+        next_file_instance_id_ == std::numeric_limits<std::uint64_t>::max()) {
+        error = "file: instance identity space exhausted";
+        return false;
+    }
+    const std::uint64_t id = next_file_instance_id_++;
+    auto file = std::make_shared<FileInstance>();
+    file->path = std::move(path);
+    file_instances_[std::to_string(id)] = std::move(file);
+    out = nift::RuntimeValue(std::string("\x1fnift:file:") + std::to_string(id));
+    return true;
+}
+
 bool Parser::call_timer_method(const nift::RuntimeValue& receiver, const std::string& method,
                                const std::vector<nift::RuntimeValue>& args,
                                nift::RuntimeValue& out, std::string& error) {
@@ -618,6 +632,32 @@ void Parser::finish_timer_operation(std::uint64_t checkpoint) {
     for (auto it = timer_instances_.begin(); it != timer_instances_.end();) {
         if (it->first >= checkpoint && !reachable.count(it->first)) it = timer_instances_.erase(it);
         else ++it;
+    }
+}
+
+void Parser::rollback_timer_operation(std::uint64_t checkpoint) {
+    for (auto it = timer_instances_.begin(); it != timer_instances_.end();) {
+        if (it->first >= checkpoint) it = timer_instances_.erase(it);
+        else ++it;
+    }
+}
+
+void Parser::rollback_file_operation(std::uint64_t checkpoint) {
+    for (auto it = file_instances_.begin(); it != file_instances_.end();) {
+        std::uint64_t id = 0;
+        const auto parsed = std::from_chars(it->first.data(), it->first.data() + it->first.size(), id);
+        if (parsed.ec != std::errc() || parsed.ptr != it->first.data() + it->first.size() || id < checkpoint) {
+            ++it;
+            continue;
+        }
+        auto& file = *it->second;
+        file.open = false;
+        file.dirty = false;
+        file.mode.clear();
+        file.working.clear();
+        file.saved.clear();
+        file.cursor = 0;
+        it = file_instances_.erase(it);
     }
 }
 
