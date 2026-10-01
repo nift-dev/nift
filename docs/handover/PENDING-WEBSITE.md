@@ -80,6 +80,19 @@ Use this compact shape for new entries:
   and the separation from return values, diagnostics, and rendered content
 - Timing: do not publish before a Nift release containing this behavior
 
+### Relative import module ownership
+
+- Status: pending
+- Earliest release: 4.6.0
+- Website scope: scripting imports and package authoring guidance
+- Required update: document that path-shaped relative imports resolve from the
+  source module containing the import, including escaped package callables and
+  nested/re-exported modules; missing siblings never fall through to the
+  consumer root. Document canonical package-root confinement, delayed package
+  read locking, and worker-local module snapshots. Keep bare package-name and
+  absolute-path behavior distinct.
+- Timing: do not publish before a Nift release containing this behavior
+
 ## Completed items
 
 Move durable historical context to the relevant release record when useful; do

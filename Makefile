@@ -634,7 +634,7 @@ test: test-content test-commands test-comments test-contracts test-json test-run
 	test-zero-mutation test-repair-campaign test-ownership-concurrency \
 	test-macos-runner-policy \
 	test-v44-execution-shell test-v44-language-foundation test-v44-shell-restricted \
-	test-v46-time-cli test-v46-timer test-v46-secure-random-cli test-v46-output-cli test-progress-render $(PROGRESS_PTY_TARGET) test-snap-contract test-distribution-summary test-version-consistency test-unreadable-source test-incremental-modified-immediate
+	test-v46-time-cli test-v46-timer test-v46-secure-random-cli test-v46-output-cli test-v46-relative-imports test-progress-render $(PROGRESS_PTY_TARGET) test-snap-contract test-distribution-summary test-version-consistency test-unreadable-source test-incremental-modified-immediate
 
 test-cp15-numeric-repair: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/cp15_numeric_repair.sh
@@ -1128,6 +1128,7 @@ test-v45-concurrency-tsan: $(TSAN_TARGET)
 	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 NIFT_BIN="$(CURDIR)/$(TSAN_TARGET)" tests/v45_mutex.sh
 	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 NIFT_BIN="$(CURDIR)/$(TSAN_TARGET)" tests/v45_atomics.sh
 	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 NIFT_BIN="$(CURDIR)/$(TSAN_TARGET)" tests/v45_adversarial_runtime.sh
+	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 NIFT_BIN="$(CURDIR)/$(TSAN_TARGET)" bash tests/v46_import_worker_ownership_smoke.sh
 
 CP18_BYTES_TSAN_TEST := $(TEST_DIR)/nift-cp18-bytes-tsan$(EXEEXT)
 $(CP18_BYTES_TSAN_TEST): tests/cp18_bytes.cpp $(filter-out $(TEST_DIR)/tsan/src/nift.o $(TEST_DIR)/tsan/src/CLI.o,$(TSAN_OBJECTS)) $(TSAN_LIBFFI_A)
@@ -1276,6 +1277,7 @@ test-v44-packages: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" SQLITE_PACKAGE="$(CURDIR)/../nift-packages/sqlite" tests/package_sqlite_dogfood.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/package_combined_dogfood.sh $(V44_SKIP_77)
 	NIFT="$(CURDIR)/$(TARGET)" tests/package_tools_dogfood.sh
+	NIFT="$(CURDIR)/$(TARGET)" bash tests/v44_relative_import_ownership_smoke.sh
 
 test-v44-automation: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_automation_smoke.sh
@@ -1308,6 +1310,7 @@ test-v45-concurrency: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v45_atomics.sh
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v45_async.sh
 	NIFT="$(CURDIR)/$(TARGET)" tests/v45_concurrency_hardening.sh
+	NIFT="$(CURDIR)/$(TARGET)" bash tests/v46_import_worker_ownership_smoke.sh
 
 ifneq ($(OS),Windows_NT)
 test-v45-job-control: $(TARGET)
@@ -1362,6 +1365,16 @@ test-v46-output-embed: $(V46_OUTPUT_EMBED_TEST)
 test-v46-output: test-v46-output-cli test-v46-output-embed
 
 .PHONY: test-v46-output test-v46-output-cli test-v46-output-embed
+
+test-v46-relative-imports: $(TARGET)
+	NIFT="$(CURDIR)/$(TARGET)" bash tests/v44_relative_import_ownership_smoke.sh
+	NIFT="$(CURDIR)/$(TARGET)" bash tests/v46_import_worker_ownership_smoke.sh
+
+test-v46-relative-imports-sanitize: $(SAN_TARGET)
+	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT="$(CURDIR)/$(SAN_TARGET)" bash tests/v44_relative_import_ownership_smoke.sh
+	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT="$(CURDIR)/$(SAN_TARGET)" bash tests/v46_import_worker_ownership_smoke.sh
+
+.PHONY: test-v46-relative-imports test-v46-relative-imports-sanitize
 
 test-cp20-bytes: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/cp20_bytes_ffi.sh

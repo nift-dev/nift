@@ -16,7 +16,14 @@ Resolution contract:
 - `import("./local.f")` and other path-shaped imports are local files.
 - `import("sqlite")` is a package import resolved from the installed package root.
 - package imports execute the package manifest `entry` in isolated scope and expose only explicit exports.
-- package-local relative imports/resources resolve relative to the package entry/module that requests them, never the consuming project's current directory.
+- Path-shaped relative imports such as `import("./helper.f")`, including imports
+  made later by exported functions, methods, lambdas, callbacks, and re-exported
+  child callables, resolve from the source module containing that import. A
+  missing sibling is an error and never falls through to a same-named file in
+  the consuming project. Package-owned relative imports are canonically confined
+  to that package root, including symlink/reparse traversal checks, and delayed
+  imports reacquire the package read lock. Bare package names remain
+  package-store lookups.
 - dependencies are declared by package name in `manifest.json`; acquisition/version locking is CP31+ and is intentionally separate from this module contract.
 
 Canonical layout:

@@ -1177,16 +1177,15 @@ bool Parser::evaluate_expression(const std::string& expression, nift::RuntimeVal
             for(const auto& v:av){if(contains_timer_resource(v)){error="async function argument contains a non-transferable timer";return false;}if(!transferable(v)){error="async function argument contains a non-transferable resource";return false;}}
             if(callable_contains_timer_resource(cb)){error="async function capture contains a non-transferable timer";return false;}
             auto inherited_asyncs=async_instances_;auto state=std::make_shared<AsyncInstance>();static std::atomic<std::uint64_t> async_ids{1};const std::string id=std::to_string(async_ids.fetch_add(1));async_instances_[id]=state;owned_async_instances_.push_back(state);
-            std::unordered_map<std::string,VariableBinding> vars;for(const auto& scope:variable_scopes_)for(const auto&kv:scope)if(kv.second.value&&transferable(*kv.second.value)){auto sp=std::make_shared<nift::RuntimeValue>(*kv.second.value);vars[kv.first]=VariableBinding{sp,kv.second.type,kv.second.mutable_binding,kv.second.deep_readonly};}
-            auto funcs=callables_;auto threads=thread_instances_;auto mutexes=mutex_instances_;auto atomics=atomic_instances_;auto asyncs=std::move(inherited_asyncs);
-            std::unordered_map<std::string,std::shared_ptr<LambdaInstance>> lambdas;for(const auto&kv:lambda_instances_){auto li=std::make_shared<LambdaInstance>(*kv.second);li->captures.clear();for(const auto&cv:kv.second->captures)if(cv.second.value&&transferable(*cv.second.value)){auto sp=std::make_shared<nift::RuntimeValue>(*cv.second.value);li->captures[cv.first]=VariableBinding{sp,cv.second.type,cv.second.mutable_binding,cv.second.deep_readonly};}lambdas[kv.first]=std::move(li);}
+            WorkerCloneMemo clone_memo;std::unordered_map<std::string,VariableBinding> vars;for(const auto& scope:variable_scopes_)for(const auto&kv:scope)if(kv.second.value&&transferable(*kv.second.value))vars[kv.first]=clone_worker_binding(kv.second,clone_memo);
+            std::unordered_map<std::string,Callable> funcs;std::unordered_map<std::uint64_t,std::shared_ptr<ModuleEnv>> modules;clone_worker_module_graph(funcs,modules,clone_memo);const auto next_module_identity=next_module_identity_;auto threads=thread_instances_;auto mutexes=mutex_instances_;auto atomics=atomic_instances_;auto asyncs=std::move(inherited_asyncs);
+            std::unordered_map<std::string,std::shared_ptr<LambdaInstance>> lambdas;for(const auto&kv:lambda_instances_){auto li=std::make_shared<LambdaInstance>(*kv.second);li->captures.clear();for(const auto&cv:kv.second->captures)if(cv.second.value&&transferable(*cv.second.value))li->captures[cv.first]=clone_worker_binding(cv.second,clone_memo);if(li->module_env){auto owner=modules.find(li->module_env->identity);li->module_env=owner==modules.end()?std::shared_ptr<ModuleEnv>{}:owner->second;}lambdas[kv.first]=std::move(li);}
             const std::string callable_tag=cb.string;
-            if(callable_tag.rfind("\x1fnift:callable:named:",0)==0){auto it=funcs.find(callable_tag.substr(21));if(it!=funcs.end())it->second.async=false;}
-            else if(callable_tag.rfind("\x1fnift:callable:lambda:",0)==0){auto it=lambdas.find(callable_tag.substr(22));if(it!=lambdas.end())it->second->async=false;}
+            if(callable_tag.rfind("\x1fnift:callable:lambda:",0)==0){auto it=lambdas.find(callable_tag.substr(22));if(it!=lambdas.end())it->second->async=false;}
             RenderHost* hp=&host_;TrackedInfo* tp=&tracked_info_;
             auto execution_output=execution_output_;
-            nift::detail::NiftAsyncPool::instance().submit([state,hp,tp,execution_output=std::move(execution_output),vars=std::move(vars),funcs=std::move(funcs),lambdas=std::move(lambdas),threads=std::move(threads),mutexes=std::move(mutexes),atomics=std::move(atomics),asyncs=std::move(asyncs),callable_tag,av]() mutable {
-                nift::RuntimeValue result;std::string e;try{Parser worker(*hp,*tp,std::move(execution_output));worker.standalone_script_host_=true;worker.callables_=std::move(funcs);worker.lambda_instances_=std::move(lambdas);worker.thread_instances_=std::move(threads);worker.mutex_instances_=std::move(mutexes);worker.atomic_instances_=std::move(atomics);worker.async_instances_=std::move(asyncs);worker.variable_scopes_.back()=std::move(vars);auto csp=std::make_shared<nift::RuntimeValue>(callable_tag);worker.variable_scopes_.back()["__future_callable"]=VariableBinding{csp,nift_binding_type(*csp),false,false};std::string expr="__future_callable(";for(size_t i=0;i<av.size();++i){auto sp=std::make_shared<nift::RuntimeValue>(av[i]);std::string n="__future_arg"+std::to_string(i);worker.variable_scopes_.back()[n]=VariableBinding{sp,nift_binding_type(*sp),false,false};if(i)expr+=",";expr+=n;}expr+=")";if(!worker.evaluate_expression(expr,result,e)&&e.empty())e="async function failed";if(e.empty()&&worker.contains_timer_resource(result))e="async function result contains a non-transferable timer";}catch(const std::exception& ex){e=ex.what();}catch(...){e="unknown async worker exception";}
+            nift::detail::NiftAsyncPool::instance().submit([state,hp,tp,execution_output=std::move(execution_output),vars=std::move(vars),funcs=std::move(funcs),modules=std::move(modules),next_module_identity,lambdas=std::move(lambdas),threads=std::move(threads),mutexes=std::move(mutexes),atomics=std::move(atomics),asyncs=std::move(asyncs),callable_tag,av]() mutable {
+                nift::RuntimeValue result;std::string e;try{Parser worker(*hp,*tp,std::move(execution_output));worker.standalone_script_host_=true;worker.strict_script_mode_=true;worker.callables_=std::move(funcs);worker.module_envs_=std::move(modules);worker.next_module_identity_=next_module_identity;worker.lambda_instances_=std::move(lambdas);worker.thread_instances_=std::move(threads);worker.mutex_instances_=std::move(mutexes);worker.atomic_instances_=std::move(atomics);worker.async_instances_=std::move(asyncs);worker.variable_scopes_.back()=std::move(vars);if(callable_tag.rfind("\x1fnift:callable:named:",0)==0&&!worker.set_named_callable_async(callable_tag,false))e="invalid async callable";auto csp=std::make_shared<nift::RuntimeValue>(callable_tag);worker.variable_scopes_.back()["__future_callable"]=VariableBinding{csp,nift_binding_type(*csp),false,false};std::string expr="__future_callable(";for(size_t i=0;e.empty()&&i<av.size();++i){auto sp=std::make_shared<nift::RuntimeValue>(av[i]);std::string n="__future_arg"+std::to_string(i);worker.variable_scopes_.back()[n]=VariableBinding{sp,nift_binding_type(*sp),false,false};if(i)expr+=",";expr+=n;}expr+=")";if(e.empty()&&!worker.evaluate_expression(expr,result,e)&&e.empty())e="async function failed";if(e.empty()&&worker.contains_timer_resource(result))e="async function result contains a non-transferable timer";}catch(const std::exception& ex){e=ex.what();}catch(...){e="unknown async worker exception";}
                 {std::lock_guard<std::mutex> lk(state->mutex);state->result=std::make_shared<nift::RuntimeValue>(std::move(result));state->error=std::move(e);state->done=true;}state->cv.notify_all();
             });
             future_out=nift::RuntimeValue(std::string("\x1fnift:async:")+id);return true;
@@ -1199,8 +1198,19 @@ bool Parser::evaluate_expression(const std::string& expression, nift::RuntimeVal
         if(text.rfind("await ",0)==0){nift::RuntimeValue f;if(!eval(trim_copy(text.substr(6)),f,depth+1))return false;return await_future(f,out);}
 
         // v4.3 first-class callable values and lambda expressions.
-        if (auto ci = callables_.find(text); ci != callables_.end()) {
-            out = nift::RuntimeValue(std::string("\x1fnift:callable:named:") + text);
+        const Callable* named_callable = nullptr;
+        std::shared_ptr<ModuleEnv> named_owner;
+        if (active_module_env_) {
+            auto found = active_module_env_->callables.find(text);
+            if (found != active_module_env_->callables.end()) { named_callable=&found->second; named_owner=found->second.module_env ? found->second.module_env : active_module_env_; }
+        }
+        if (!named_callable) {
+            auto found = callables_.find(text);
+            if (found != callables_.end()) { named_callable=&found->second; named_owner=found->second.module_env; }
+        }
+        if (named_callable) {
+            if (!named_owner && loading_module_env_) named_owner=loading_module_env_;
+            out = nift::RuntimeValue(named_callable_tag(text,named_owner));
             return true;
         }
         {
@@ -1220,14 +1230,9 @@ bool Parser::evaluate_expression(const std::string& expression, nift::RuntimeVal
                 auto li=std::make_shared<LambdaInstance>(); li->params=params; li->variadic_param=variadic_param; li->async=async_lambda;
                 li->block=rhs.size()>=2&&rhs.front()=='{'&&rhs.back()=='}';
                 li->body=li->block?rhs.substr(1,rhs.size()-2):rhs;
+                if(!source_path_stack_.empty()) li->source_path=source_path_stack_.back();
                 for(const auto& scope:variable_scopes_) for(const auto& kv:scope) li->captures[kv.first]=kv.second;
-                // A lambda created inside an imported module may escape via an
-                // exported value; snapshot the module's callables so its body
-                // can still reach package-private @fn helpers.
-                if (in_import_program_ && !callables_.empty()) {
-                    auto env=std::make_shared<ModuleEnv>(); env->callables=callables_;
-                    li->module_env=std::move(env);
-                }
+                li->module_env=active_module_env_ ? active_module_env_ : loading_module_env_;
                 const std::string id=std::to_string(next_lambda_instance_id_++); lambda_instances_[id]=li;
                 out=nift::RuntimeValue(std::string("\x1fnift:callable:lambda:")+id); return true;
             }
@@ -1319,16 +1324,16 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 auto state=std::make_shared<ThreadInstance>();static std::atomic<std::uint64_t> thread_ids{1};const std::string id=std::to_string(thread_ids.fetch_add(1));thread_instances_[id]=state;owned_thread_instances_.push_back(state);
                 // Snapshot ordinary root bindings and callable/lambda definitions. Opaque
                 // values are intentionally omitted from the worker environment.
-                std::unordered_map<std::string,VariableBinding> vars;
-                for(const auto& scope:variable_scopes_)for(const auto&kv:scope)if(kv.second.value&&transferable(*kv.second.value)){auto sp=std::make_shared<nift::RuntimeValue>(*kv.second.value);vars[kv.first]=VariableBinding{sp,kv.second.type,kv.second.mutable_binding,kv.second.deep_readonly};}
-                auto funcs=callables_;auto threads=thread_instances_;auto mutexes=mutex_instances_;auto atomics=atomic_instances_;auto asyncs=async_instances_;
+                WorkerCloneMemo clone_memo;std::unordered_map<std::string,VariableBinding> vars;
+                for(const auto& scope:variable_scopes_)for(const auto&kv:scope)if(kv.second.value&&transferable(*kv.second.value))vars[kv.first]=clone_worker_binding(kv.second,clone_memo);
+                std::unordered_map<std::string,Callable> funcs;std::unordered_map<std::uint64_t,std::shared_ptr<ModuleEnv>> modules;clone_worker_module_graph(funcs,modules,clone_memo);const auto next_module_identity=next_module_identity_;auto threads=thread_instances_;auto mutexes=mutex_instances_;auto atomics=atomic_instances_;auto asyncs=async_instances_;
                 std::unordered_map<std::string,std::shared_ptr<LambdaInstance>> lambdas;
-                for(const auto&kv:lambda_instances_){auto li=std::make_shared<LambdaInstance>(*kv.second);li->captures.clear();for(const auto&cv:kv.second->captures)if(cv.second.value&&transferable(*cv.second.value)){auto sp=std::make_shared<nift::RuntimeValue>(*cv.second.value);li->captures[cv.first]=VariableBinding{sp,cv.second.type,cv.second.mutable_binding,cv.second.deep_readonly};}lambdas[kv.first]=std::move(li);}
+                for(const auto&kv:lambda_instances_){auto li=std::make_shared<LambdaInstance>(*kv.second);li->captures.clear();for(const auto&cv:kv.second->captures)if(cv.second.value&&transferable(*cv.second.value))li->captures[cv.first]=clone_worker_binding(cv.second,clone_memo);if(li->module_env){auto owner=modules.find(li->module_env->identity);li->module_env=owner==modules.end()?std::shared_ptr<ModuleEnv>{}:owner->second;}lambdas[kv.first]=std::move(li);}
                 RenderHost* hp=&host_;TrackedInfo* tp=&tracked_info_;const std::string callable_tag=cb.string;
                 auto execution_output=execution_output_;
-                state->worker=std::thread([state,hp,tp,execution_output=std::move(execution_output),vars=std::move(vars),funcs=std::move(funcs),lambdas=std::move(lambdas),threads=std::move(threads),mutexes=std::move(mutexes),atomics=std::move(atomics),asyncs=std::move(asyncs),callable_tag,av=std::move(av)]() mutable {
+                state->worker=std::thread([state,hp,tp,execution_output=std::move(execution_output),vars=std::move(vars),funcs=std::move(funcs),modules=std::move(modules),next_module_identity,lambdas=std::move(lambdas),threads=std::move(threads),mutexes=std::move(mutexes),atomics=std::move(atomics),asyncs=std::move(asyncs),callable_tag,av=std::move(av)]() mutable {
                     nift::RuntimeValue result;std::string e;
-                    try{Parser worker(*hp,*tp,std::move(execution_output));worker.standalone_script_host_=true;worker.callables_=std::move(funcs);worker.lambda_instances_=std::move(lambdas);worker.thread_instances_=std::move(threads);worker.mutex_instances_=std::move(mutexes);worker.atomic_instances_=std::move(atomics);worker.async_instances_=std::move(asyncs);worker.variable_scopes_.back()=std::move(vars);auto csp=std::make_shared<nift::RuntimeValue>(callable_tag);worker.variable_scopes_.back()["__thread_callable"]=VariableBinding{csp,nift_binding_type(*csp),false,false};std::string expr="__thread_callable(";for(size_t i=0;i<av.size();++i){auto sp=std::make_shared<nift::RuntimeValue>(av[i]);std::string n="__thread_arg"+std::to_string(i);worker.variable_scopes_.back()[n]=VariableBinding{sp,nift_binding_type(*sp),false,false};if(i)expr+=",";expr+=n;}expr+=")";if(!worker.evaluate_expression(expr,result,e)&&e.empty())e="thread callable failed";if(e.empty()&&worker.contains_timer_resource(result))e="thread result contains a non-transferable timer";}catch(const std::exception& ex){e=ex.what();}catch(...){e="unknown worker exception";}
+                    try{Parser worker(*hp,*tp,std::move(execution_output));worker.standalone_script_host_=true;worker.strict_script_mode_=true;worker.callables_=std::move(funcs);worker.module_envs_=std::move(modules);worker.next_module_identity_=next_module_identity;worker.lambda_instances_=std::move(lambdas);worker.thread_instances_=std::move(threads);worker.mutex_instances_=std::move(mutexes);worker.atomic_instances_=std::move(atomics);worker.async_instances_=std::move(asyncs);worker.variable_scopes_.back()=std::move(vars);auto csp=std::make_shared<nift::RuntimeValue>(callable_tag);worker.variable_scopes_.back()["__thread_callable"]=VariableBinding{csp,nift_binding_type(*csp),false,false};std::string expr="__thread_callable(";for(size_t i=0;i<av.size();++i){auto sp=std::make_shared<nift::RuntimeValue>(av[i]);std::string n="__thread_arg"+std::to_string(i);worker.variable_scopes_.back()[n]=VariableBinding{sp,nift_binding_type(*sp),false,false};if(i)expr+=",";expr+=n;}expr+=")";if(!worker.evaluate_expression(expr,result,e)&&e.empty())e="thread callable failed";if(e.empty()&&worker.contains_timer_resource(result))e="thread result contains a non-transferable timer";}catch(const std::exception& ex){e=ex.what();}catch(...){e="unknown worker exception";}
                     std::lock_guard<std::mutex> lock(state->mutex);state->result=std::make_shared<nift::RuntimeValue>(std::move(result));state->error=std::move(e);state->done=true;
                 });
                 out=nift::RuntimeValue(std::string("\x1fnift:thread:")+id);return true;
@@ -1976,10 +1981,10 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                                 pop_variable_scope();leave_lexical_environment(std::move(lexical_env));--callable_call_depth_;return okcall;
                             }
                             if(tag.rfind("\x1fnift:callable:named:",0)==0){
-                                auto ci=callables_.find(tag.substr(21));if(ci==callables_.end()){error="invalid callable";return false;}const Callable& callee=ci->second;
+                                const Callable* resolved=nullptr;std::shared_ptr<ModuleEnv> owner;if(!resolve_named_callable(tag,resolved,owner)){error="invalid callable";return false;}const Callable& callee=*resolved;
                                 if(callable_call_depth_>=kMaxCallableDepth){error="callable recursion depth exceeded";return false;}++callable_call_depth_;
                                 if(callee.variadic_param.empty()?av.size()!=callee.params.size():av.size()<callee.params.size()){--callable_call_depth_;error="callback argument count mismatch";return false;}
-                                auto lexical_env=enter_lexical_environment(callee.module_env);
+                                auto lexical_env=enter_lexical_environment(owner ? owner : callee.module_env);
                                 push_variable_scope();auto& scope=variable_scopes_.back();
                                 for(std::size_t ai=0;ai<callee.params.size();++ai){auto sp=std::make_shared<nift::RuntimeValue>(av[ai]);scope.emplace(callee.params[ai],VariableBinding{sp,nift_binding_type(*sp),true,false});}
                                 if(!callee.variadic_param.empty()){nift::RuntimeValue rest=nift::RuntimeValue::make_array();for(std::size_t ai=callee.params.size();ai<av.size();++ai)rest.array.push_back(av[ai]);auto sp=std::make_shared<nift::RuntimeValue>(std::move(rest));scope.emplace(callee.variadic_param,VariableBinding{sp,nift_binding_type(*sp),true,false});}
@@ -2327,13 +2332,13 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     out=nift::RuntimeValue(std::string("\x1fnift:struct:")+id); return true;
                 }
                 auto ci = callables_.find(call_name);
-                const Callable* module_callee=nullptr;if(active_module_env_){auto mi=active_module_env_->callables.find(call_name);if(mi!=active_module_env_->callables.end())module_callee=&mi->second;}
+                const Callable* module_callee=nullptr;std::shared_ptr<ModuleEnv> module_callee_env;if(active_module_env_){auto mi=active_module_env_->callables.find(call_name);if(mi!=active_module_env_->callables.end()){module_callee=&mi->second;module_callee_env=mi->second.module_env ? mi->second.module_env : active_module_env_;}}
                 // Indirect first-class callable invocation.
                 {
                     VariableBinding* cb=find_binding(call_name);
                     if(cb&&cb->value&&cb->value->is_string()&&cb->value->string.rfind("\x1fnift:callable:",0)==0){
                         const std::string tag=cb->value->string;
-                        if(tag.rfind("\x1fnift:callable:named:",0)==0){ci=callables_.find(tag.substr(21));module_callee=nullptr;}
+                        if(tag.rfind("\x1fnift:callable:named:",0)==0){const Callable* resolved=nullptr;std::shared_ptr<ModuleEnv> owner;if(!resolve_named_callable(tag,resolved,owner)){error="invalid callable";return false;}if(owner){module_callee=resolved;module_callee_env=std::move(owner);}else{ci=callables_.find(tag.substr(21));module_callee=nullptr;module_callee_env.reset();}}
                         else if(tag.rfind("\x1fnift:callable:lambda:",0)==0){
                             auto li=lambda_instances_.find(tag.substr(22));if(li==lambda_instances_.end()){error="invalid lambda";return false;}auto fn=li->second;
                             if (callable_call_depth_ >= kMaxCallableDepth) { error = "callable recursion depth exceeded"; return false; }
@@ -2356,11 +2361,11 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 // remain a fallback, and either still precedes an implicit sibling.
                 const Callable* callee = module_callee ? module_callee : ((ci != callables_.end()) ? &ci->second : nullptr);
                 if (callee) {
-                    const auto callee_env = module_callee ? active_module_env_ : callee->module_env;
+                    const auto callee_env = module_callee ? module_callee_env : callee->module_env;
                     if (callable_call_depth_ >= kMaxCallableDepth) { error = "callable recursion depth exceeded: " + call_name; return false; }
                     std::vector<nift::RuntimeValue> spread_args;bool args_ok=false; std::vector<bool> quoted_args; auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),args_ok,&quoted_args); if(args_ok){std::vector<std::string> ex;std::vector<bool> eq;for(size_t ai=0;ai<args.size();++ai){if(!(ai<quoted_args.size()&&quoted_args[ai])&&trim_copy(args[ai]).rfind("...",0)==0){nift::RuntimeValue sv;if(!eval(trim_copy(args[ai]).substr(3),sv,depth+1))return false;if(!sv.is_array()){error="spread value must be an array";return false;}for(const auto& item:sv.array){ex.push_back("\x1fnift:spread:"+std::to_string(spread_args.size()));spread_args.push_back(item);eq.push_back(false);}}else{ex.push_back(args[ai]);eq.push_back(ai<quoted_args.size()&&quoted_args[ai]);}}args.swap(ex);quoted_args.swap(eq);}if(!args_ok||(!callee->variadic_param.empty()?args.size()<callee->params.size():args.size()!=callee->params.size())){error="callable argument count mismatch: "+call_name;return false;}
                     std::vector<nift::RuntimeValue> values; for(std::size_t ai=0;ai<args.size();++ai){nift::RuntimeValue v;if(ai<quoted_args.size()&&quoted_args[ai])v=nift::RuntimeValue(args[ai]);else if(args[ai].rfind("\x1fnift:spread:",0)==0)v=spread_args[static_cast<std::size_t>(std::stoull(args[ai].substr(13)))];else if(!eval(args[ai],v,depth+1))return false;values.push_back(std::move(v));}
-                    if(callee->async){if(module_callee){error="module-private async callables are unsupported";return false;}for(std::size_t ai=0;ai<args.size();++ai){const std::string an=trim_copy(args[ai]);if(valid_binding_identifier(an)){if(auto* ab=find_binding(an)){ab->sync();if(ab->value&&ab->value->is_string()&&ab->value->string.rfind("\x1fnift:atomic:",0)==0)values[ai]=*ab->value;}}}nift::RuntimeValue cb(std::string("\x1fnift:callable:named:")+call_name);return spawn_future(cb,values,out);}
+                    if(callee->async){if(module_callee){error="module-private async callables are unsupported";return false;}for(std::size_t ai=0;ai<args.size();++ai){const std::string an=trim_copy(args[ai]);if(valid_binding_identifier(an)){if(auto* ab=find_binding(an)){ab->sync();if(ab->value&&ab->value->is_string()&&ab->value->string.rfind("\x1fnift:atomic:",0)==0)values[ai]=*ab->value;}}}nift::RuntimeValue cb(named_callable_tag(call_name,callee->module_env));return spawn_future(cb,values,out);}
                     ++callable_call_depth_;
                     const int caller_loop_depth = loop_depth_;
                     loop_depth_ = 0;

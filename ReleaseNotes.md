@@ -17,6 +17,13 @@ Development has advanced to v4.6.0 after the completed v4.5.0 release.
   writes one atomic line to stderr with the same value rules as `print(value)`,
   while embedding results capture both channels separately from values,
   diagnostics, and rendered content. The additive C ABI is now 1.3.
+- Relative imports are now owned by their defining source module. Exported
+  package functions, methods, lambdas, callbacks, nested modules, and
+  transitive re-exports retain that owner, and a missing package-local sibling
+  no longer falls through to a consumer-project decoy. Bare package imports
+  and absolute/non-relative paths keep their distinct behavior. Package-relative
+  paths are canonically confined and transaction-locked; worker parsers deep-copy
+  module graphs so nested worker imports cannot mutate parent or sibling state.
 
 ## v4.5.0 (released 2026-09-27)
 

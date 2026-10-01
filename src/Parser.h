@@ -173,7 +173,14 @@ private:
     std::vector<std::unordered_map<std::string, VariableBinding>> variable_scopes_;
     struct ModuleEnv;
     struct Callable { std::vector<std::string> params; std::string variadic_param; std::string body; std::filesystem::path source_path; bool fragment = false; bool async = false; std::shared_ptr<ModuleEnv> module_env; };
-    struct ModuleEnv { std::unordered_map<std::string, Callable> callables; std::unordered_map<std::string, VariableBinding> vars; };
+    struct ModuleEnv {
+        std::uint64_t identity = 0;
+        std::filesystem::path source_path;
+        std::filesystem::path import_base;
+        std::filesystem::path package_root;
+        std::unordered_map<std::string, Callable> callables;
+        std::unordered_map<std::string, VariableBinding> vars;
+    };
     struct LexicalEnvironmentState {
         std::shared_ptr<ModuleEnv> module_env;
         bool active = false;
@@ -185,6 +192,10 @@ private:
     struct PreparedCallable { bool ready=false; std::vector<std::unique_ptr<nift::ast::Stmt>> stmts; };
     std::unordered_map<const Callable*, PreparedCallable> prepared_callables_;
     std::shared_ptr<ModuleEnv> active_module_env_;
+    std::shared_ptr<ModuleEnv> loading_module_env_;
+    std::unordered_map<std::uint64_t, std::shared_ptr<ModuleEnv>> module_envs_;
+    std::uint64_t next_module_identity_ = 1;
+    std::vector<std::filesystem::path> source_path_stack_;
     struct LambdaInstance {
         std::vector<std::string> params;
         std::string variadic_param;
@@ -376,6 +387,21 @@ private:
     void pop_variable_scope();
     LexicalEnvironmentState enter_lexical_environment(std::shared_ptr<ModuleEnv> module_env);
     void leave_lexical_environment(LexicalEnvironmentState state);
+    std::string named_callable_tag(const std::string& name, const std::shared_ptr<ModuleEnv>& owner) const;
+    bool resolve_named_callable(const std::string& tag, const Callable*& callable, std::shared_ptr<ModuleEnv>& owner) const;
+    struct WorkerCloneMemo {
+        std::unordered_map<const nift::RuntimeValue*, std::shared_ptr<nift::RuntimeValue>> values;
+        std::unordered_map<const std::shared_ptr<nift::RuntimeValue>*, std::shared_ptr<std::shared_ptr<nift::RuntimeValue>>> slots;
+    };
+    std::shared_ptr<nift::RuntimeValue> clone_worker_value(const std::shared_ptr<nift::RuntimeValue>& value,
+                                                          WorkerCloneMemo& memo) const;
+    std::shared_ptr<std::shared_ptr<nift::RuntimeValue>> clone_worker_slot(
+        const std::shared_ptr<std::shared_ptr<nift::RuntimeValue>>& slot, WorkerCloneMemo& memo) const;
+    VariableBinding clone_worker_binding(const VariableBinding& binding, WorkerCloneMemo& memo) const;
+    void clone_worker_module_graph(std::unordered_map<std::string, Callable>& callables,
+                                   std::unordered_map<std::uint64_t, std::shared_ptr<ModuleEnv>>& modules,
+                                   WorkerCloneMemo& memo) const;
+    bool set_named_callable_async(const std::string& tag, bool async);
     bool find_balanced(const std::string& source,
                        std::size_t open_position,
                        char open_char,

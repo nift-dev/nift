@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cwctype>
 #include <exception>
 #include <functional>
 #include <set>
@@ -19,6 +20,20 @@ namespace fs = std::filesystem;
 using nift::detail::valid_binding_identifier;
 using nift::detail::strip_presentation_chain;
 using nift::detail::nift_binding_type;
+
+namespace {
+fs::path stable_import_identity(const fs::path& path) {
+    std::error_code ec;
+    fs::path identity=fs::weakly_canonical(fs::absolute(path).lexically_normal(),ec);
+    if(ec)identity=fs::absolute(path).lexically_normal();
+#ifdef _WIN32
+    auto native=identity.native();
+    std::transform(native.begin(),native.end(),native.begin(),[](wchar_t c){return static_cast<wchar_t>(std::towlower(c));});
+    identity=fs::path(std::move(native));
+#endif
+    return identity;
+}
+}
 
 bool Parser::translate_function_program(const std::string& source, std::string& translated, std::string& error) const {
     std::function<bool(const std::string&, std::string&)> convert;
@@ -263,6 +278,7 @@ RenderResult Parser::run_script(const std::string& source, const fs::path& sourc
     variable_scopes_.clear(); variable_scopes_.emplace_back(); timer_instances_.clear();
     install_script_invocation_bindings();
     callables_.clear(); structs_.clear(); requested_exports_.clear(); pending_control_={};
+    active_module_env_.reset(); loading_module_env_.reset(); saved_lexical_scopes_.clear(); module_envs_.clear(); next_module_identity_=1;
     in_import_program_=false; standalone_script_host_=true; strict_script_mode_=true; function_call_depth_=1;
     auto rr=execute_native_program(source,source_path,0);
     function_call_depth_=0; strict_script_mode_=false;
@@ -279,7 +295,7 @@ RenderResult Parser::run_script(const std::string& source, const fs::path& sourc
 }
 
 bool Parser::run_embedded_script(const std::string& source, const fs::path& source_path, nift::RuntimeValue& value, std::string& error) {
-    result_=RenderResult{};variable_scopes_.clear();variable_scopes_.emplace_back();timer_instances_.clear();install_script_invocation_bindings();callables_.clear();structs_.clear();requested_exports_.clear();pending_control_={};in_import_program_=false;standalone_script_host_=false;strict_script_mode_=true;function_call_depth_=1;
+    result_=RenderResult{};variable_scopes_.clear();variable_scopes_.emplace_back();timer_instances_.clear();install_script_invocation_bindings();callables_.clear();structs_.clear();requested_exports_.clear();pending_control_={};active_module_env_.reset();loading_module_env_.reset();saved_lexical_scopes_.clear();module_envs_.clear();next_module_identity_=1;in_import_program_=false;standalone_script_host_=false;strict_script_mode_=true;function_call_depth_=1;
     const std::uint64_t timer_checkpoint=begin_timer_operation();
     auto rr=execute_native_program(source,source_path,0);function_call_depth_=0;strict_script_mode_=false;
     if(!rr.ok){error=rr.error.message;pending_control_={};finish_timer_operation(timer_checkpoint);return false;}
@@ -358,9 +374,14 @@ RenderResult Parser::execute_native_program(const std::string& source, const fs:
 }
 
 bool Parser::execute_import_file(const std::string& argument, const fs::path& caller_path, int depth, bool legacy_syntax, std::string& error) {
-    fs::path path=argument;
+    std::string normalized_argument=argument;
+    std::replace(normalized_argument.begin(),normalized_argument.end(),'\\','/');
+    fs::path path=normalized_argument;
     std::unique_ptr<PackageTransaction> package_reader;
     const bool package_name = argument.find('/') == std::string::npos && argument.find('\\') == std::string::npos && fs::path(argument).extension().empty();
+    const bool relative_file_import=!package_name&&path.is_relative();
+    const auto caller_module=active_module_env_ ? active_module_env_ : loading_module_env_;
+    fs::path package_root=caller_module ? caller_module->package_root : fs::path{};
     if (package_name && standalone_script_host_) {
         package_reader=std::make_unique<PackageTransaction>(fs::current_path());if(!package_reader->acquire_read(error))return false;
         if (!filesystem::valid_package_name(argument)) { error="invalid package name: "+argument; return false; }
@@ -375,28 +396,60 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
         package_metadata::Manifest manifest;
         if (!package_metadata::load_package(root,manifest,path,error)) { error="package is not installed or has invalid manifest: "+argument+": "+error; return false; }
         if (manifest.name != argument) { error="installed package name does not match import: "+argument; return false; }
+        package_root=root;
     } else if(path.is_relative()) {
         if(standalone_script_host_ && caller_path == fs::path("<nift-sh>")) path=fs::current_path()/path;
-        fs::path local=caller_path.parent_path()/path;
-        if(!caller_path.parent_path().empty() && host_.source_exists(local)) path=local;
+        else if(caller_module) path=caller_module->import_base/path;
+        else if(!caller_path.parent_path().empty()) path=caller_path.parent_path()/path;
         else path=host_.root()/path;
     }
     path=fs::absolute(path).lexically_normal();
+    if(relative_file_import&&!package_root.empty()){
+        if(!package_reader){
+            const fs::path project_root=package_root.parent_path().parent_path().parent_path();
+            package_reader=std::make_unique<PackageTransaction>(project_root);
+            if(!package_reader->acquire_read(error))return false;
+        }
+        if(!filesystem::path_within(package_root,path)){error="package-relative import escapes package root: "+path.generic_string();return false;}
+    }
     if(!standalone_script_host_ && !host_.root().empty() && !filesystem::path_within(fs::absolute(host_.root()).lexically_normal(),path)){error="path must stay inside the Nift project";return false;}
-    if(std::find(input_stack_.begin(),input_stack_.end(),path)!=input_stack_.end()){error="script import cycle through "+path.generic_string();return false;}
-    auto src=host_.read_shared_source(path); if(src.status==nift::HostStatus::Error||!src.content){error=src.error.empty()?"script is not readable":src.error;return false;}
+    const fs::path import_identity=stable_import_identity(path);
+    bool cycle=std::find(input_stack_.begin(),input_stack_.end(),import_identity)!=input_stack_.end();
+    if(!cycle)for(const auto& source:source_path_stack_)if(!source.empty()&&source.native().front()!='<'&&stable_import_identity(source)==import_identity){cycle=true;break;}
+    if(cycle){error="script import cycle through "+path.generic_string();return false;}
+    auto src=host_.read_shared_source(path); if(src.status==nift::HostStatus::Error||!src.content){error=src.error.empty()?"script is not readable: "+path.generic_string():src.error+": "+path.generic_string();return false;}
     if(package_reader&&!package_reader->lock_identity_valid()){error="package read lock identity changed";return false;}
+
+    const auto module_identity_checkpoint=next_module_identity_;
+    const auto lambda_identity_checkpoint=next_lambda_instance_id_;
+    const auto struct_identity_checkpoint=next_struct_instance_id_;
+    std::unordered_set<std::uint64_t> existing_modules;for(const auto& entry:module_envs_)existing_modules.insert(entry.first);
+    std::unordered_set<std::string> existing_lambdas;for(const auto& entry:lambda_instances_)existing_lambdas.insert(entry.first);
+    std::unordered_set<std::string> existing_structs;for(const auto& entry:struct_instances_)existing_structs.insert(entry.first);
+    std::unordered_set<const Callable*> existing_prepared;for(const auto& entry:prepared_callables_)existing_prepared.insert(entry.first);
+    bool import_committed=false;
+    auto rollback=std::unique_ptr<void,std::function<void(void*)>>(reinterpret_cast<void*>(1),[&](void*){
+        if(import_committed)return;
+        for(auto it=module_envs_.begin();it!=module_envs_.end();)if(!existing_modules.count(it->first))it=module_envs_.erase(it);else ++it;
+        for(auto it=lambda_instances_.begin();it!=lambda_instances_.end();)if(!existing_lambdas.count(it->first))it=lambda_instances_.erase(it);else ++it;
+        for(auto it=struct_instances_.begin();it!=struct_instances_.end();)if(!existing_structs.count(it->first))it=struct_instances_.erase(it);else ++it;
+        for(auto it=prepared_callables_.begin();it!=prepared_callables_.end();)if(!existing_prepared.count(it->first))it=prepared_callables_.erase(it);else ++it;
+        next_module_identity_=module_identity_checkpoint;next_lambda_instance_id_=lambda_identity_checkpoint;next_struct_instance_id_=struct_identity_checkpoint;
+    });
 
     auto saved_scopes=std::move(variable_scopes_); auto saved_callables=std::move(callables_); auto saved_structs=std::move(structs_);
     auto saved_exports=std::move(requested_exports_); const bool saved_import=in_import_program_; auto saved_control=pending_control_; const bool saved_strict=strict_script_mode_;
+    auto saved_active=std::move(active_module_env_); auto saved_loading=std::move(loading_module_env_);
+    auto module_env=std::make_shared<ModuleEnv>();module_env->identity=next_module_identity_++;module_env->source_path=path;module_env->import_base=path.parent_path();module_env->package_root=package_root;
     variable_scopes_.clear(); variable_scopes_.emplace_back(); callables_.clear(); structs_.clear(); requested_exports_.clear(); pending_control_={}; in_import_program_=true; strict_script_mode_=true;
+    active_module_env_.reset();loading_module_env_=module_env;
     std::unordered_set<std::string> pre_import_files; for(const auto& kv:file_instances_)pre_import_files.insert(kv.first);
-    input_stack_.push_back(path); result_.dependencies.insert(host_.relative(path)); ++function_call_depth_;
+    input_stack_.push_back(import_identity); result_.dependencies.insert(host_.relative(path)); ++function_call_depth_;
     auto rr=execute_native_program(*src.content,path,depth+1);
     --function_call_depth_; input_stack_.pop_back();
     if(rr.ok){for(auto& kv:file_instances_)if(!pre_import_files.count(kv.first)&&kv.second->open){auto f=kv.second;f->open=false;f->dirty=false;f->mode.clear();f->working.clear();f->saved.clear();f->cursor=0;rr.ok=false;rr.error.message="managed file left open at "+std::string(legacy_syntax?"@import":"import")+" completion: "+f->path.generic_string();break;}}
     auto isolated_scope=std::move(variable_scopes_.back()); auto isolated_callables=std::move(callables_); auto isolated_structs=std::move(structs_); auto exports=requested_exports_; auto completion=pending_control_;
-    variable_scopes_=std::move(saved_scopes); callables_=std::move(saved_callables); structs_=std::move(saved_structs); requested_exports_=std::move(saved_exports); in_import_program_=saved_import; pending_control_=saved_control; strict_script_mode_=saved_strict;
+    variable_scopes_=std::move(saved_scopes); callables_=std::move(saved_callables); structs_=std::move(saved_structs); requested_exports_=std::move(saved_exports); in_import_program_=saved_import; pending_control_=saved_control; strict_script_mode_=saved_strict;active_module_env_=std::move(saved_active);loading_module_env_=std::move(saved_loading);
     if(!rr.ok){error=rr.error.message;return false;}
     if(package_reader&&!package_reader->lock_identity_valid()){error="package read lock identity changed";return false;}
     if(completion.kind==ControlFlow::Return && completion.value){error="return with a value is not allowed in "+std::string(legacy_syntax?"@import":"import");return false;}
@@ -404,9 +457,11 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
     std::unordered_map<std::string,VariableBinding> vars;
     std::unordered_map<std::string,Callable> funcs;
     std::unordered_map<std::string,StructDefinition> types;
+    const auto destination_module=active_module_env_;
     for(const auto& name:exports){
-        bool collision=false; for(auto it=variable_scopes_.rbegin();it!=variable_scopes_.rend();++it) if(it->count(name)){collision=true;break;}
-        if(collision||callables_.count(name)||structs_.count(name)){error="export collides with existing binding: "+name;return false;}
+        bool collision=destination_module&&(destination_module->vars.count(name)||destination_module->callables.count(name));
+        if(!destination_module)for(auto it=variable_scopes_.rbegin();it!=variable_scopes_.rend();++it)if(it->count(name)){collision=true;break;}
+        if(collision||(!destination_module&&(callables_.count(name)||structs_.count(name)))){error="export collides with existing binding: "+name;return false;}
         auto vi=isolated_scope.find(name); if(vi!=isolated_scope.end()){
             // Exporting a struct instance must also make its type resolvable in
             // the importer so module-style values such as vips.resize(...) work.
@@ -426,19 +481,27 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
     // Exported callables and struct methods may reference the module's private
     // callables and top-level bindings. Attach a shared module environment so
     // those references resolve while the module stays isolated from the importer.
+    module_env->callables = isolated_callables;
+    module_env->vars = isolated_scope;
+    for(auto& callable:module_env->callables)if(callable.second.module_env==module_env)callable.second.module_env.reset();
     if (!funcs.empty() || !types.empty()) {
-        auto module_env = std::make_shared<ModuleEnv>();
-        module_env->callables = isolated_callables;
-        module_env->vars = isolated_scope;
-        for (auto& kv : funcs) kv.second.module_env = module_env;
+        for (auto& kv : funcs) if(!kv.second.module_env)kv.second.module_env = module_env;
         for (auto& kv : types) {
-            kv.second.module_env = module_env;
-            for (auto& m : kv.second.methods) m.second.callable.module_env = module_env;
+            if(!kv.second.module_env)kv.second.module_env = module_env;
+            for (auto& m : kv.second.methods) if(!m.second.callable.module_env)m.second.callable.module_env = kv.second.module_env;
         }
     }
+    module_envs_[module_env->identity]=module_env;
     // Install only after the complete export set has validated.
-    auto& dst=variable_scopes_.back(); for(auto& kv:vars)dst.emplace(kv.first,std::move(kv.second));
-    for(auto& kv:funcs) callables_.emplace(kv.first,std::move(kv.second));
-    for(auto& kv:types) structs_.emplace(kv.first,std::move(kv.second));
+    if(destination_module){
+        if(!types.empty()){module_envs_.erase(module_env->identity);error="struct exports cannot be imported from an active module callable";return false;}
+        for(auto& kv:vars){destination_module->vars.emplace(kv.first,kv.second);if(variable_scopes_.size()>1)variable_scopes_[1].emplace(kv.first,std::move(kv.second));}
+        for(auto& kv:funcs)destination_module->callables.emplace(kv.first,std::move(kv.second));
+    }else{
+        auto& dst=variable_scopes_.back(); for(auto& kv:vars)dst.emplace(kv.first,std::move(kv.second));
+        for(auto& kv:funcs) callables_.emplace(kv.first,std::move(kv.second));
+        for(auto& kv:types) structs_.emplace(kv.first,std::move(kv.second));
+    }
+    import_committed=true;
     return true;
 }

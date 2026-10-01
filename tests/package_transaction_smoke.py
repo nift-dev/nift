@@ -303,4 +303,45 @@ with tempfile.TemporaryDirectory() as raw:
     assert reader_out.strip().startswith("two-")
     assert_clean(reader_site)
 
+    # A relative import made later by an escaped package callable reacquires the
+    # package read lock. Hold a writer after exclusive acquisition: the delayed
+    # helper import must block until replacement completes, then read one
+    # coherent package generation.
+    delayed_site = root / "delayed-reader-lock"
+    delayed_site.mkdir()
+    (repo / "src/main.f").write_text(
+        'fn(delayed()) { import("./helper.f"); return helper_value }\nexport(delayed)\n',
+        encoding="utf-8")
+    (repo / "src/helper.f").write_text('helper_value := "before"\nexport(helper_value)\n', encoding="utf-8")
+    git(repo, "add", ".")
+    git(repo, "commit", "-qm", "delayed-before")
+    run(delayed_site, "add", source)
+    (repo / "src/helper.f").write_text('helper_value := "after"\nexport(helper_value)\n', encoding="utf-8")
+    git(repo, "add", ".")
+    git(repo, "commit", "-qm", "delayed-after")
+    (delayed_site / "delayed.f").write_text(
+        'import("demo")\nprint("ready")\nsleep(250)\nprint(delayed())\n', encoding="utf-8")
+    delayed_reader = subprocess.Popen([NIFT, "delayed.f"], cwd=delayed_site,
+                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    assert delayed_reader.stdout.readline().strip() == "ready"
+    delayed_hold = root / "delayed-hold"
+    delayed_hold.mkdir()
+    env = os.environ.copy()
+    env["NIFT_TEST_PACKAGE_TXN_HOLD"] = str(delayed_hold)
+    delayed_writer = subprocess.Popen([NIFT, "update", "demo"], cwd=delayed_site, env=env,
+                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    deadline = time.time() + 10
+    while not (delayed_hold / "acquired").exists() and time.time() < deadline:
+        time.sleep(0.01)
+    assert (delayed_hold / "acquired").exists()
+    time.sleep(0.35)
+    assert delayed_reader.poll() is None
+    (delayed_hold / "release").write_text("go\n", encoding="utf-8")
+    _, delayed_writer_err = delayed_writer.communicate(timeout=20)
+    delayed_out, delayed_err = delayed_reader.communicate(timeout=20)
+    assert delayed_writer.returncode == 0, delayed_writer_err
+    assert delayed_reader.returncode == 0, delayed_err
+    assert delayed_out.strip() == "after"
+    assert_clean(delayed_site)
+
 print("PASS package transaction recovery and locking")

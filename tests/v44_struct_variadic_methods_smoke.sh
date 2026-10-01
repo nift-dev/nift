@@ -308,11 +308,10 @@ import("method-module.f")
 callback := api.private_value()
 print(callback(1))
 NIFT
-if $NIFT "$t/private-callable-value.f" >/dev/null 2>"$t/private-callable-value.err"; then
-    echo 'module-private named function converted to a first-class value' >&2
+[ "$($NIFT "$t/private-callable-value.f")" = 'module-private:1' ] || {
+    echo 'module-private callback lost its owning module' >&2
     exit 1
-fi
-grep -q 'private_transform' "$t/private-callable-value.err"
+}
 
 for method in receiver_direct receiver_compound receiver_direct_prepared receiver_compound_prepared; do
     cat >"$t/receiver-collision-missing.f" <<NIFT

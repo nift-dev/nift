@@ -221,14 +221,9 @@ bool Parser::contains_timer_resource(const nift::RuntimeValue& root) const {
                 if (binding_contains(capture.second)) return true;
             return module_contains(found->second->module_env);
         } else if (value.string.rfind("\x1fnift:callable:named:", 0) == 0) {
-            const std::string name = value.string.substr(21);
-            if (!seen_named.insert(name).second) return false;
-            if (active_module_env_) {
-                auto found = active_module_env_->callables.find(name);
-                if (found != active_module_env_->callables.end() && callable_contains(found->second)) return true;
-            }
-            auto found = callables_.find(name);
-            return found != callables_.end() && callable_contains(found->second);
+            if (!seen_named.insert(value.string).second) return false;
+            const Callable* callable=nullptr;std::shared_ptr<ModuleEnv> owner;
+            return resolve_named_callable(value.string,callable,owner) && callable_contains(*callable);
         }
         return false;
     };
@@ -237,6 +232,151 @@ bool Parser::contains_timer_resource(const nift::RuntimeValue& root) const {
 
 bool Parser::callable_contains_timer_resource(const nift::RuntimeValue& callable) const {
     return contains_timer_resource(callable);
+}
+
+std::string Parser::named_callable_tag(const std::string& name, const std::shared_ptr<ModuleEnv>& owner) const {
+    if (!owner) return std::string("\x1fnift:callable:named:") + name;
+    return std::string("\x1fnift:callable:named:") + std::to_string(owner->identity) + ":" + name;
+}
+
+bool Parser::resolve_named_callable(const std::string& tag, const Callable*& callable, std::shared_ptr<ModuleEnv>& owner) const {
+    static constexpr std::size_t prefix_size = 21;
+    callable = nullptr;
+    owner.reset();
+    if (tag.rfind("\x1fnift:callable:named:", 0) != 0) return false;
+    const std::string encoded = tag.substr(prefix_size);
+    const auto colon = encoded.find(':');
+    if (colon != std::string::npos) {
+        std::uint64_t identity = 0;
+        const auto parsed = std::from_chars(encoded.data(), encoded.data() + colon, identity);
+        if (parsed.ec == std::errc() && parsed.ptr == encoded.data() + colon) {
+            if (loading_module_env_ && loading_module_env_->identity == identity) owner = loading_module_env_;
+            else if (auto found = module_envs_.find(identity); found != module_envs_.end()) owner = found->second;
+            if (!owner) return false;
+            auto found = owner->callables.find(encoded.substr(colon + 1));
+            if (found == owner->callables.end()) return false;
+            callable = &found->second;
+            return true;
+        }
+    }
+    auto found = callables_.find(encoded);
+    if (found != callables_.end()) {
+        callable = &found->second;
+        owner = found->second.module_env;
+        return true;
+    }
+    if (!active_module_env_) return false;
+    auto module_found = active_module_env_->callables.find(encoded);
+    if (module_found == active_module_env_->callables.end()) return false;
+    callable = &module_found->second;
+    owner = active_module_env_;
+    return true;
+}
+
+std::shared_ptr<nift::RuntimeValue> Parser::clone_worker_value(
+        const std::shared_ptr<nift::RuntimeValue>& value, WorkerCloneMemo& memo) const {
+    if (!value) return {};
+    if (auto found=memo.values.find(value.get()); found!=memo.values.end()) return found->second;
+    auto clone=std::make_shared<nift::RuntimeValue>(*value);
+    memo.values.emplace(value.get(),clone);
+    return clone;
+}
+
+std::shared_ptr<std::shared_ptr<nift::RuntimeValue>> Parser::clone_worker_slot(
+        const std::shared_ptr<std::shared_ptr<nift::RuntimeValue>>& slot, WorkerCloneMemo& memo) const {
+    if (!slot) return {};
+    if (auto found=memo.slots.find(slot.get()); found!=memo.slots.end()) return found->second;
+    auto clone=std::make_shared<std::shared_ptr<nift::RuntimeValue>>();
+    memo.slots.emplace(slot.get(),clone);
+    *clone=clone_worker_value(*slot,memo);
+    return clone;
+}
+
+Parser::VariableBinding Parser::clone_worker_binding(const VariableBinding& binding, WorkerCloneMemo& memo) const {
+    VariableBinding clone;
+    clone.type=binding.type;
+    clone.mutable_binding=binding.mutable_binding;
+    clone.deep_readonly=binding.deep_readonly;
+    clone.is_script_invocation=binding.is_script_invocation;
+    clone.slot=clone_worker_slot(binding.slot,memo);
+    clone.ref_root_slot=clone_worker_slot(binding.ref_root_slot,memo);
+    clone.ref_path=binding.ref_path;
+    clone.ref_valid=binding.ref_valid;
+    if(clone.ref_root_slot)clone.sync();
+    else clone.value=clone_worker_value(binding.value,memo);
+    return clone;
+}
+
+void Parser::clone_worker_module_graph(
+        std::unordered_map<std::string, Callable>& callables,
+        std::unordered_map<std::uint64_t, std::shared_ptr<ModuleEnv>>& modules,
+        WorkerCloneMemo& memo) const {
+    modules.clear();
+    auto add_module=[&](const std::shared_ptr<ModuleEnv>& source) {
+        if(!source||modules.count(source->identity))return;
+        auto clone=std::make_shared<ModuleEnv>();
+        clone->identity=source->identity;
+        clone->source_path=source->source_path;
+        clone->import_base=source->import_base;
+        clone->package_root=source->package_root;
+        modules.emplace(source->identity,std::move(clone));
+    };
+    for (const auto& entry : module_envs_) add_module(entry.second);
+    add_module(loading_module_env_);
+    auto remap_owner=[&](const std::shared_ptr<ModuleEnv>& owner) {
+        if(!owner)return std::shared_ptr<ModuleEnv>{};
+        auto found=modules.find(owner->identity);
+        return found==modules.end()?std::shared_ptr<ModuleEnv>{}:found->second;
+    };
+    for(const auto& entry:module_envs_){
+        const auto clone_module=modules.at(entry.first);
+        auto& clone=*clone_module;
+        for(const auto& variable:entry.second->vars)clone.vars.emplace(variable.first,clone_worker_binding(variable.second,memo));
+        for(const auto& callable:entry.second->callables){
+            Callable copied=callable.second;
+            copied.module_env=remap_owner(callable.second.module_env);
+            if(copied.module_env==clone_module)copied.module_env.reset();
+            clone.callables.emplace(callable.first,std::move(copied));
+        }
+    }
+    if(loading_module_env_){
+        const auto clone_module=modules.at(loading_module_env_->identity);
+        auto& clone=*clone_module;
+        clone.vars.clear();
+        for(const auto& scope:variable_scopes_)for(const auto& variable:scope)
+            clone.vars.insert_or_assign(variable.first,clone_worker_binding(variable.second,memo));
+        clone.callables.clear();
+        for(const auto& callable:callables_){
+            Callable copied=callable.second;
+            copied.module_env=remap_owner(callable.second.module_env);
+            if(copied.module_env==clone_module)copied.module_env.reset();
+            clone.callables.emplace(callable.first,std::move(copied));
+        }
+    }
+    callables=callables_;
+    for(auto& callable:callables)callable.second.module_env=remap_owner(callable.second.module_env);
+}
+
+bool Parser::set_named_callable_async(const std::string& tag, bool async) {
+    static constexpr std::size_t prefix_size=21;
+    if(tag.rfind("\x1fnift:callable:named:",0)!=0)return false;
+    const std::string encoded=tag.substr(prefix_size);
+    const auto colon=encoded.find(':');
+    if(colon!=std::string::npos){
+        std::uint64_t identity=0;
+        const auto parsed=std::from_chars(encoded.data(),encoded.data()+colon,identity);
+        if(parsed.ec!=std::errc()||parsed.ptr!=encoded.data()+colon)return false;
+        auto module=module_envs_.find(identity);
+        if(module==module_envs_.end())return false;
+        auto callable=module->second->callables.find(encoded.substr(colon+1));
+        if(callable==module->second->callables.end())return false;
+        callable->second.async=async;
+        return true;
+    }
+    auto callable=callables_.find(encoded);
+    if(callable==callables_.end())return false;
+    callable->second.async=async;
+    return true;
 }
 
 void Parser::finish_timer_operation(std::uint64_t checkpoint) {
