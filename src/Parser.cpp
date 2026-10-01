@@ -191,6 +191,13 @@ bool Parser::contains_timer_resource(const nift::RuntimeValue& root) const {
         if (!module || !seen_modules.insert(module.get()).second) return false;
         for (const auto& binding : module->vars)
             if (binding_contains(binding.second)) return true;
+        if (module == loading_module_env_) {
+            for (const auto& scope : variable_scopes_)
+                for (const auto& binding : scope)
+                    if (binding_contains(binding.second)) return true;
+            for (const auto& callable : callables_)
+                if (callable_contains(callable.second)) return true;
+        }
         for (const auto& callable : module->callables)
             if (callable_contains(callable.second)) return true;
         return false;
@@ -237,7 +244,8 @@ bool Parser::contains_timer_resource(const nift::RuntimeValue& root) const {
         } else if (value.string.rfind("\x1fnift:callable:named:", 0) == 0) {
             if (!seen_named.insert(value.string).second) return false;
             const Callable* callable=nullptr;std::shared_ptr<ModuleEnv> owner;
-            return resolve_named_callable(value.string,callable,owner) && callable_contains(*callable);
+            return resolve_named_callable(value.string,callable,owner) &&
+                   (module_contains(owner) || callable_contains(*callable));
         }
         return false;
     };
@@ -268,8 +276,12 @@ bool Parser::resolve_named_callable(const std::string& tag, const Callable*& cal
             else if (auto found = module_envs_.find(identity); found != module_envs_.end()) owner = found->second;
             if (!owner) return false;
             auto found = owner->callables.find(encoded.substr(colon + 1));
-            if (found == owner->callables.end()) return false;
-            callable = &found->second;
+            if (found != owner->callables.end()) callable = &found->second;
+            else if (owner == loading_module_env_) {
+                auto loading_found = callables_.find(encoded.substr(colon + 1));
+                if (loading_found == callables_.end()) return false;
+                callable = &loading_found->second;
+            } else return false;
             return true;
         }
     }

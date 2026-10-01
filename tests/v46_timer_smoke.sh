@@ -175,6 +175,54 @@ NIFT
 if (cd "$TMP" && "$NIFT" module-future.f) >"$TMP/out" 2>"$TMP/err"; then exit 1; fi
 grep -q 'async function capture contains a non-transferable timer' "$TMP/err"
 
+cat >"$TMP/timer-reexport.f" <<'NIFT'
+import("timer-module.f")
+export(exported_thread_timer)
+NIFT
+
+cat >"$TMP/module-reexport-thread.f" <<'NIFT'
+import("timer-reexport.f")
+worker := thread(exported_thread_timer)
+NIFT
+if (cd "$TMP" && "$NIFT" module-reexport-thread.f) >"$TMP/out" 2>"$TMP/err"; then exit 1; fi
+grep -q 'thread: capture contains a non-transferable timer' "$TMP/err"
+
+cat >"$TMP/loading-module-thread.f" <<'NIFT'
+hidden_timer := timer()
+fn(loading_timer()) { return hidden_timer.elapsed() }
+worker := thread(loading_timer)
+NIFT
+
+cat >"$TMP/import-loading-module.f" <<'NIFT'
+import("loading-module-thread.f")
+NIFT
+if (cd "$TMP" && "$NIFT" import-loading-module.f) >"$TMP/out" 2>"$TMP/err"; then exit 1; fi
+grep -q 'thread: capture contains a non-transferable timer' "$TMP/err"
+
+cat >"$TMP/loading-imported-wrapper-thread.f" <<'NIFT'
+import("timer-module.f")
+fn(loading_imported_timer_wrapper()) { return exported_thread_timer() }
+worker := thread(loading_imported_timer_wrapper)
+NIFT
+
+cat >"$TMP/import-loading-imported-wrapper-thread.f" <<'NIFT'
+import("loading-imported-wrapper-thread.f")
+NIFT
+if (cd "$TMP" && "$NIFT" import-loading-imported-wrapper-thread.f) >"$TMP/out" 2>"$TMP/err"; then exit 1; fi
+grep -q 'thread: capture contains a non-transferable timer' "$TMP/err"
+
+cat >"$TMP/loading-imported-wrapper-async.f" <<'NIFT'
+import("timer-module.f")
+@fn[async](loading_imported_timer_async_wrapper()) { return exported_thread_timer() }
+future := loading_imported_timer_async_wrapper()
+NIFT
+
+cat >"$TMP/import-loading-imported-wrapper-async.f" <<'NIFT'
+import("loading-imported-wrapper-async.f")
+NIFT
+if (cd "$TMP" && "$NIFT" import-loading-imported-wrapper-async.f) >"$TMP/out" 2>"$TMP/err"; then exit 1; fi
+grep -q 'async function capture contains a non-transferable timer' "$TMP/err"
+
 cat >"$TMP/callable-arg-thread.f" <<'NIFT'
 import("timer-module.f")
 fn(ignore(x)) { return 1 }
@@ -227,6 +275,33 @@ print(worker.join())
 print(await future)
 NIFT
 [[ "$(cd "$TMP" && "$NIFT" clean-callable-args.f)" == $'1\n2' ]]
+
+cat >"$TMP/clean-module.f" <<'NIFT'
+fn(clean_module_target()) { return 4 }
+export(clean_module_target)
+NIFT
+
+cat >"$TMP/clean-module-worker.f" <<'NIFT'
+import("clean-module.f")
+worker := thread(clean_module_target)
+print(worker.join())
+NIFT
+[[ "$(cd "$TMP" && "$NIFT" clean-module-worker.f)" == 4 ]]
+
+cat >"$TMP/clean-loading-imported-wrappers.f" <<'NIFT'
+import("clean-module.f")
+fn(clean_loading_wrapper()) { return clean_module_target() }
+@fn[async](clean_loading_async_wrapper()) { return clean_module_target() }
+worker := thread(clean_loading_wrapper)
+future := clean_loading_async_wrapper()
+print(worker.join())
+print(await future)
+NIFT
+
+cat >"$TMP/import-clean-loading-imported-wrappers.f" <<'NIFT'
+import("clean-loading-imported-wrappers.f")
+NIFT
+[[ "$(cd "$TMP" && "$NIFT" import-clean-loading-imported-wrappers.f)" == $'4\n4' ]]
 
 cat >"$TMP/unrelated-timer.f" <<'NIFT'
 unrelated := timer()
