@@ -88,10 +88,32 @@ Use this compact shape for new entries:
 - Required update: document that path-shaped relative imports resolve from the
   source module containing the import, including escaped package callables and
   nested/re-exported modules; missing siblings never fall through to the
-  consumer root. Document canonical package-root confinement, delayed package
-  read locking, and worker-local module snapshots. Keep bare package-name and
-  absolute-path behavior distinct.
+  consumer root. Document canonical package-root confinement, frozen package
+  lock provenance, short per-operation read locks, stale-owner rejection, live
+  local-source behavior, and worker-local module snapshots. Explain that locks
+  are released before child code executes, avoiding synchronous child package
+  command deadlocks, and that failed imports roll back cleanly. Keep bare
+  package-name and absolute-path behavior distinct.
 - Timing: do not publish before a Nift release containing this behavior
+
+### Explicit module and package resource paths
+
+- Status: pending
+- Earliest release: 4.6.0
+- Website scope: scripting path API, package authoring guidance, completion list,
+  embedding source semantics, and filesystem authority/restriction guidance
+- Required update: document `module_path()` / `module_path(relative)` and
+  `package_path()` / `package_path(relative)`, including absolute normalized
+  output, defining-module ownership across escaped callables and workers,
+  deliberate empty-string rejection, root-qualified/traversal rejection,
+  canonical package containment with missing leaves allowed, controlled
+  no-source/no-package errors, and the fact that existing filesystem APIs keep
+  their prior CWD/project authority and existence semantics. Cover copied
+  project/`--fs-root` resource authority in workers, one-time canonical authority
+  snapshots that do not move after `cd()`, explicit file-backed vs logical/in-memory
+  provenance rather than path-string inference, short package provenance checks,
+  and the inherent TOCTOU after a validated path string is returned.
+- Timing: do not publish before a Nift release containing these functions
 
 ## Completed items
 

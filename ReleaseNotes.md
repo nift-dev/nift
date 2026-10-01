@@ -22,8 +22,21 @@ Development has advanced to v4.6.0 after the completed v4.5.0 release.
   transitive re-exports retain that owner, and a missing package-local sibling
   no longer falls through to a consumer-project decoy. Bare package imports
   and absolute/non-relative paths keep their distinct behavior. Package-relative
-  paths are canonically confined and transaction-locked; worker parsers deep-copy
-  module graphs so nested worker imports cannot mutate parent or sibling state.
+  paths are canonically confined; module environments retain frozen lock
+  provenance and delayed imports use short validation locks, rejecting stale
+  replaced ownership without deadlocking synchronous child package commands.
+  Worker parsers deep-copy module graphs so nested worker imports cannot mutate
+  parent or sibling state.
+- New `module_path()` / `module_path(relative)` and `package_path()` /
+  `package_path(relative)` APIs expose explicit absolute normalized resource
+  paths without changing existing filesystem resolution. They retain CP8 module
+  ownership across exported callables, methods, lambdas, callbacks, re-exports,
+  and workers; reject empty, rooted, and escaping arguments; canonically confine
+  package-owned results; and report controlled errors when no file or package
+  owner exists instead of falling back to the process CWD. Filesystem authority
+  is canonicalized once per parser/invocation and copied to workers, so relative
+  `--fs-root` values remain anchored across `cd()`; package-owned path checks use
+  scoped provenance validation and return path strings without a lasting lease.
 
 ## v4.5.0 (released 2026-09-27)
 

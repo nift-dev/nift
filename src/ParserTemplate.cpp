@@ -154,15 +154,24 @@ std::string Parser::path_to(const std::string& argument, const std::string& dire
 }
 
 RenderResult Parser::parse(const std::string& source, const fs::path& source_path, int depth) {
+    const SourceProvenance provenance = active_module_env_ ? active_module_env_->source_provenance
+        : (source_context_stack_.empty() ? SourceProvenance::FileBacked : source_context_stack_.back().provenance);
+    return parse(source, source_path, depth, provenance);
+}
+
+RenderResult Parser::parse(const std::string& source, const fs::path& source_path, int depth,
+                           SourceProvenance source_provenance) {
     if (depth > 64) {
         fail(source_path, source, 0, "maximum template parse depth exceeded (possible recursion)");
         return result_;
     }
+    source_context_stack_.push_back(SourceContext{source_path,source_provenance});
     source_path_stack_.push_back(source_path);
-    struct SourcePathGuard {
-        std::vector<fs::path>& stack;
-        ~SourcePathGuard() { stack.pop_back(); }
-    } source_path_guard{source_path_stack_};
+    struct SourceContextGuard {
+        std::vector<SourceContext>& stack;
+        std::vector<fs::path>& paths;
+        ~SourceContextGuard() { stack.pop_back(); paths.pop_back(); }
+    } source_context_guard{source_context_stack_,source_path_stack_};
 
     const int base_code_block_depth = code_block_depth_;
     std::size_t open_code_offset = 0;
@@ -258,7 +267,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             std::unordered_set<std::string> pre_script_files; for(const auto& kv:file_instances_)pre_script_files.insert(kv.first);
             ++function_call_depth_;
             const bool saved_strict=strict_script_mode_; strict_script_mode_=true;
-            auto nested=execute_native_program(source.substr(bo+1,bc-bo-1),source_path,depth+1);
+            auto nested=execute_native_program(source.substr(bo+1,bc-bo-1),source_path,depth+1,source_provenance);
             strict_script_mode_=saved_strict;
             --function_call_depth_;
             if(nested.ok){for(auto& kv:file_instances_)if(!pre_script_files.count(kv.first)&&kv.second->open){auto f=kv.second;f->open=false;f->dirty=false;f->mode.clear();f->working.clear();f->saved.clear();f->cursor=0;nested.ok=false;nested.error.message="managed file left open at @script completion: "+f->path.generic_string();break;}}
@@ -357,7 +366,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     if(!valid_binding_identifier(mn)||!pok||mbo>=body.size()||body[mbo]!='{'||!find_balanced(body,mbo,'{','}',mbc)){fail(source_path,source,i,"invalid struct method");struct_ok=false;break;}
                     const bool ctor=mn==struct_name; if(ctor&&!variadic_param.empty()){fail(source_path,source,i,"struct constructors cannot be variadic");struct_ok=false;break;}if(ctor && def.methods.find(struct_name)!=def.methods.end()){fail(source_path,source,i,"struct may define at most one constructor");struct_ok=false;break;}
                     const auto mb=normalize_control_block_body(body.substr(mbo+1,mbc-mbo-1));
-                    def.methods[mn]=StructMethod{Callable{ps,variadic_param,mb.text,source_path,false,false,{}},priv,ctor}; p=mbc+1; continue;
+                    def.methods[mn]=StructMethod{Callable{ps,variadic_param,mb.text,source_path,false,false,{},source_provenance},priv,ctor}; p=mbc+1; continue;
                 }
                 // Struct fields are separated by top-level newlines or
                 // semicolons; a ';' or newline inside a nested lambda/block must
@@ -387,7 +396,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             std::size_t bo=header_close+1; while(bo<source.size()&&std::isspace(static_cast<unsigned char>(source[bo])))++bo; std::size_t bc=0;
             if(bo>=source.size()||source[bo]!='{'||!find_balanced(source,bo,'{','}',bc)){fail(source_path,source,i,"callable definition requires a block");break;}
             const auto def_body = normalize_control_block_body(source.substr(bo+1,bc-bo-1));
-            callables_[name]=Callable{params,variadic_param,def_body.text,source_path,fragment,async,active_module_env_ ? active_module_env_ : loading_module_env_}; i=bc+1; continue;
+            callables_[name]=Callable{params,variadic_param,def_body.text,source_path,fragment,async,active_module_env_ ? active_module_env_ : loading_module_env_,source_provenance}; i=bc+1; continue;
         }
 
         if (source.compare(i, 4, "@:=(") == 0) {
@@ -503,7 +512,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                         selected_literal.is_string()) {
                         output += selected_literal.string;
                     } else {
-                        const auto nested = parse(selected, source_path, depth + 1);
+                        const auto nested = parse(selected, source_path, depth + 1, source_provenance);
                         if (!nested.ok) break;
                         output += nested.output;
                     }
@@ -605,7 +614,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             if (!find_balanced(source, block_open, '{', '}', block_close)) { fail(source_path, source, block_open, "@item block has no matching '}'"); break; }
             const auto body = normalize_control_block_body(source.substr(block_open + 1, block_close - block_open - 1));
             push_json_scope();
-            const auto nested = parse(body.text, source_path, depth + 1);
+            const auto nested = parse(body.text, source_path, depth + 1, source_provenance);
             pop_json_scope();
             if (!nested.ok) break;
             result_.pagination_items.push_back(nested.output);
@@ -664,7 +673,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 const auto body = normalize_control_block_body(
                     source.substr(block_open + 1, block_close - block_open - 1));
                 push_json_scope();
-                const auto nested = parse(body.text, source_path, depth + 1);
+                const auto nested = parse(body.text, source_path, depth + 1, source_provenance);
                 pop_json_scope();
                 if (!nested.ok) break;
                 append_indented(output, nested.output, control_indent, insertion_code_block_depth);
@@ -754,7 +763,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                         source.substr(cursor + 1, else_block_close - cursor - 1));
                     push_json_scope();
                     ++loop_depth_;
-                    const auto nested = parse(body.text, source_path, depth + 1);
+                    const auto nested = parse(body.text, source_path, depth + 1, source_provenance);
                     --loop_depth_;
                     pop_json_scope();
                     if (!nested.ok) break;
@@ -836,6 +845,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             if(name=="epoch"){
                 if(!args.empty()){e="epoch: expected no arguments";return true;}std::int64_t ms=0;if(!nift::detail::nift_unix_epoch_milliseconds(ms,e))return true;out=nift::runtime_integer(ms);return true;
             }
+            if(name=="module_path"||name=="package_path") return resolve_owned_resource_path(name,args,out,e) || !e.empty();
             if(name=="sleep"){
                 if(args.size()!=1){e="sleep: expected one millisecond duration";return true;}std::int64_t ms=0;if(!nift::runtime_number_to_i64(args[0],ms)||ms<0){e="sleep: milliseconds must be a non-negative signed 64-bit integer";return true;}using Rep=std::chrono::milliseconds::rep;if(static_cast<std::uint64_t>(ms)>static_cast<std::uint64_t>(std::numeric_limits<Rep>::max())){e="sleep: millisecond duration is unsupported on this platform";return true;}std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<Rep>(ms)));out=nift::RuntimeValue(nullptr);return true;
             }
@@ -871,7 +881,9 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             for(std::size_t ai=0;ai<callee->params.size()&&ai<args.size();++ai){auto sp=std::make_shared<nift::RuntimeValue>(std::move(args[ai]));scope.emplace(callee->params[ai],VariableBinding{sp,nift_binding_type(*sp),true,false});}
             if(!callee->variadic_param.empty()){nift::RuntimeValue rest=nift::RuntimeValue::make_array();for(std::size_t ai=callee->params.size();ai<args.size();++ai)rest.array.push_back(std::move(args[ai]));auto sp=std::make_shared<nift::RuntimeValue>(std::move(rest));scope.emplace(callee->variadic_param,VariableBinding{sp,nift_binding_type(*sp),true,false});}
             ++callable_call_depth_;const int saved_loop_depth=loop_depth_;loop_depth_=0;pending_control_={};
+            source_context_stack_.push_back(SourceContext{callee->source_path,callee->source_provenance});
             std::string pe;const bool ok=execute_body(prep.stmts,pe);
+            source_context_stack_.pop_back();
             loop_depth_=saved_loop_depth;--callable_call_depth_;
             pop_variable_scope();
             leave_lexical_environment(std::move(lexical_env));
@@ -914,7 +926,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             if(method=="empty"){if(recv.is_array()){out=nift::RuntimeValue(recv.array.empty());return true;}if(recv.is_string()){out=nift::RuntimeValue(recv.string.empty());return true;}if(recv.is_object()){out=nift::RuntimeValue(recv.object.empty());return true;}}
             if(method=="first"&&recv.is_array()){if(recv.array.empty()){e="first: array is empty";return false;}out=recv.array.front();return true;}
             if(method=="last"&&recv.is_array()){if(recv.array.empty()){e="last: array is empty";return false;}out=recv.array.back();return true;}
-            return false;};c.call_is_value_only=[](const std::string& name){return name=="epoch"||name=="sleep"||name=="timer"||name=="secure_random_bytes";};c.render=[&](const nift::RuntimeValue& v){return render_expression_value(v);};return c;};
+            return false;};c.call_is_value_only=[](const std::string& name){return name=="epoch"||name=="sleep"||name=="timer"||name=="secure_random_bytes"||name=="module_path"||name=="package_path";};c.render=[&](const nift::RuntimeValue& v){return render_expression_value(v);};return c;};
         auto find_binding=[&](const std::string& name)->VariableBinding*{for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(name);if(it!=sc->end())return &it->second;}return nullptr;};
         // Build a persistent logical location from an AST Binding/Index/Member
         // chain.  Indices/keys are evaluated once when the reference is formed;
@@ -1029,7 +1041,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             std::vector<std::unique_ptr<nift::ast::Stmt>> prepared_body; const bool prepared_body_ok=prepare_loop_body(body.text,prepared_body);
 
             while(result_.ok){bool yes=false;std::string e;if(prepared_condition.supported){auto c=ast_context();nift::RuntimeValue cv;if(!nift::ast::evaluate(*prepared_condition.expr,c,cv,e)){fail(source_path,source,i,e);break;}yes=nift::ast::truthy(cv);last_expression_mutation_=false;}else if(!evaluate_condition(condition,yes,e)){fail(source_path,source,i,e);break;}if(!yes)break;
-                push_json_scope(); ++loop_depth_; RenderResult nested;if(prepared_body_ok){if(!execute_body(prepared_body,e)){nested.ok=false;nested.error.message=e;}}else nested=parse(body.text,source_path,depth+1); --loop_depth_; pop_json_scope();if(!nested.ok){fail(source_path,source,i,nested.error.message);break;}append_indented(output,nested.output,"",code_block_depth_);
+                push_json_scope(); ++loop_depth_; RenderResult nested;if(prepared_body_ok){if(!execute_body(prepared_body,e)){nested.ok=false;nested.error.message=e;}}else nested=parse(body.text,source_path,depth+1,source_provenance); --loop_depth_; pop_json_scope();if(!nested.ok){fail(source_path,source,i,nested.error.message);break;}append_indented(output,nested.output,"",code_block_depth_);
                 if (pending_control_.kind == ControlFlow::Continue) { pending_control_ = {}; continue; }
                 if (pending_control_.kind == ControlFlow::Break) { pending_control_ = {}; break; }
                 if(pending_control_.kind!=ControlFlow::None)break;
@@ -1205,7 +1217,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     variable_scopes_.back().emplace(key_name,VariableBinding{std::make_shared<nift::RuntimeValue>(entry.first),nift_binding_type(entry.first),true,false});
                     variable_scopes_.back().emplace(value_name,VariableBinding{std::make_shared<nift::RuntimeValue>(entry.second),nift_binding_type(entry.second),true,false});
                     ++loop_depth_;
-                    const auto nested=parse(body.text,source_path,depth+1);
+                    const auto nested=parse(body.text,source_path,depth+1,source_provenance);
                     --loop_depth_;
                     pop_json_scope();
                     if(!nested.ok)break;
@@ -1317,7 +1329,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     if(for_prepared_ok){
                         std::string pe;
                         if(!execute_body(for_prepared_body,pe)){nested.ok=false;nested.error.message=pe;}
-                    }else nested=parse(body.text, source_path, depth + 1);
+                    }else nested=parse(body.text, source_path, depth + 1, source_provenance);
                     --loop_depth_;
                     pop_json_scope();
                     if (!nested.ok) break;
@@ -1455,7 +1467,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     if(valid_binding_identifier(collection_expression)){VariableBinding* srcb=nullptr;for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(collection_expression);if(it!=sc->end()){srcb=&it->second;break;}}if(srcb){srcb->sync();if(srcb->value){vb.ref_root_slot=srcb->slot;std::vector<PathComponent> pc;pc.push_back(PathComponent::member(entry.first));vb.ref_path=std::move(pc);}}}
                     variable_scopes_.back().emplace(value_name, std::move(vb));
                     ++loop_depth_;
-                    const auto nested = parse(body.text, source_path, depth + 1);
+                    const auto nested = parse(body.text, source_path, depth + 1, source_provenance);
                     --loop_depth_;
                     pop_json_scope();
                     if (!nested.ok) break;
@@ -1606,7 +1618,8 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 }
                 input_stack_.push_back(content_identity);
                 const int insertion_code_block_depth = code_block_depth_;
-                const auto nested = parse(content_source, content_identity, depth + 1);
+                const auto content_provenance=page_source_->path.empty()?SourceProvenance::InMemory:SourceProvenance::FileBacked;
+                const auto nested = parse(content_source, content_identity, depth + 1, content_provenance);
                 input_stack_.pop_back();
 
                 if (!nested.ok) break;
@@ -1777,7 +1790,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 if (input_source.status == nift::HostStatus::Error) { fail(source_path, source, i, input_source.error); break; }
                 if (!input_source.content) { fail(source_path, source, i, "input file is not readable"); break; }
                 push_variable_scope();
-                const auto nested = parse(*input_source.content, input_path, depth + 1);
+                const auto nested = parse(*input_source.content, input_path, depth + 1, SourceProvenance::FileBacked);
                 pop_variable_scope();
                 input_stack_.pop_back();
                 if (!nested.ok) break;
@@ -1882,7 +1895,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     }
                     const auto body = normalize_control_block_body(
                         source.substr(block_open + 1, block_close - block_open - 1));
-                    const auto templated = parse(body.text, source_path, depth + 1);
+                    const auto templated = parse(body.text, source_path, depth + 1, source_provenance);
                     if (!templated.ok) break;
                     markup_source = templated.output;
                     directive_end = block_close + 1;
@@ -1920,7 +1933,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     }
                     result_.dependencies.insert(host_.relative(candidate));
                     input_stack_.push_back(candidate);
-                    const auto templated = parse(*loaded.content, candidate, depth + 1);
+                    const auto templated = parse(*loaded.content, candidate, depth + 1, SourceProvenance::FileBacked);
                     input_stack_.pop_back();
                     if (!templated.ok) break;
                     markup_source = templated.output;
@@ -1963,7 +1976,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     }
                     result_.dependencies.insert(host_.relative(candidate));
                     input_stack_.push_back(candidate);
-                    const auto templated = parse(*loaded.content, candidate, depth + 1);
+                    const auto templated = parse(*loaded.content, candidate, depth + 1, SourceProvenance::FileBacked);
                     input_stack_.pop_back();
                     if (!templated.ok) {
                         resolver_error = result_.error.message;
@@ -2045,7 +2058,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     }
                     const auto body = normalize_control_block_body(
                         source.substr(block_open + 1, block_close - block_open - 1));
-                    const auto templated = parse(body.text, source_path, depth + 1);
+                    const auto templated = parse(body.text, source_path, depth + 1, source_provenance);
                     if (!templated.ok) break;
                     nift::RuntimeValue parsed;
                     std::string parse_error;
@@ -2249,7 +2262,8 @@ RenderResult Parser::render_composed(const RenderSource& template_source,
     page_source_ = page_source;
     input_stack_.push_back(template_identity);
     if (!template_source.dependency.empty()) result_.dependencies.insert(template_source.dependency);
-    auto result = parse(template_content, template_identity, 0);
+    auto result = parse(template_content, template_identity, 0,
+                        template_source.path.empty()?SourceProvenance::InMemory:SourceProvenance::FileBacked);
     input_stack_.pop_back();
 
     if (result.ok && require_exactly_one_content && result.content_count != 1) {
@@ -2279,7 +2293,7 @@ RenderResult Parser::render() {
         auto fm = frontmatter::parse_inline(*content_source.content);
         if (!fm.error.empty()) { result_.ok=false; result_.error={tracked_info_.name,content_path,0,fm.error}; return result_; }
         if (tracked_info_.frontmatter && fm.present) { result_.ok=false; result_.error={tracked_info_.name,content_path,0,"multiple front matter sources are not allowed"}; return result_; }
-        auto result = parse(fm.body, content_path, 0);
+        auto result = parse(fm.body, content_path, 0, SourceProvenance::FileBacked);
         result.content_used = true;
         result.dependencies.insert(host_.relative(content_path));
         return result;
@@ -2402,7 +2416,7 @@ RenderResult Parser::render() {
             const std::size_t finish = std::min(result_.pagination_items.size(), begin + config.items_per_page);
             std::string separator_text;
             if (separator_source && finish > begin + 1) {
-                const auto rendered_separator = page_parser.parse(*separator_source, separator, 0);
+                const auto rendered_separator = page_parser.parse(*separator_source, separator, 0, SourceProvenance::FileBacked);
                 if (!rendered_separator.ok) {
                     pages[page_index].error = rendered_separator.error;
                     continue;
@@ -2415,7 +2429,7 @@ RenderResult Parser::render() {
                 items += result_.pagination_items[index];
             }
             page_parser.pagination_items_text_ = std::move(items);
-            const auto rendered_page = page_parser.parse(*page_source.content, pagination_template, 0);
+            const auto rendered_page = page_parser.parse(*page_source.content, pagination_template, 0, SourceProvenance::FileBacked);
             if (!rendered_page.ok) {
                 pages[page_index].error = rendered_page.error;
                 continue;

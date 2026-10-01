@@ -279,8 +279,11 @@ RenderResult Parser::run_script(const std::string& source, const fs::path& sourc
     install_script_invocation_bindings();
     callables_.clear(); structs_.clear(); requested_exports_.clear(); pending_control_={};
     active_module_env_.reset(); loading_module_env_.reset(); saved_lexical_scopes_.clear(); module_envs_.clear(); next_module_identity_=1;
-    in_import_program_=false; standalone_script_host_=true; strict_script_mode_=true; function_call_depth_=1;
-    auto rr=execute_native_program(source,source_path,0);
+    in_import_program_=false; standalone_script_host_=true; resource_path_authority_.enforce_project_root=false; resource_path_authority_.enforce_filesystem_root=true; strict_script_mode_=true; function_call_depth_=1;
+    const std::string identity=source_path.generic_string();
+    const auto provenance=!source_path.empty()&&!(identity.size()>=2&&identity.front()=='<'&&identity.back()=='>')
+        ? SourceProvenance::FileBacked : SourceProvenance::InMemory;
+    auto rr=execute_native_program(source,source_path,0,provenance);
     function_call_depth_=0; strict_script_mode_=false;
     rr.output.clear();
     if(rr.ok && pending_control_.kind==ControlFlow::Return && pending_control_.value) {
@@ -295,16 +298,17 @@ RenderResult Parser::run_script(const std::string& source, const fs::path& sourc
 }
 
 bool Parser::run_embedded_script(const std::string& source, const fs::path& source_path, nift::RuntimeValue& value, std::string& error) {
-    result_=RenderResult{};variable_scopes_.clear();variable_scopes_.emplace_back();timer_instances_.clear();install_script_invocation_bindings();callables_.clear();structs_.clear();requested_exports_.clear();pending_control_={};active_module_env_.reset();loading_module_env_.reset();saved_lexical_scopes_.clear();module_envs_.clear();next_module_identity_=1;in_import_program_=false;standalone_script_host_=false;strict_script_mode_=true;function_call_depth_=1;
+    result_=RenderResult{};variable_scopes_.clear();variable_scopes_.emplace_back();timer_instances_.clear();install_script_invocation_bindings();callables_.clear();structs_.clear();requested_exports_.clear();pending_control_={};active_module_env_.reset();loading_module_env_.reset();saved_lexical_scopes_.clear();module_envs_.clear();next_module_identity_=1;in_import_program_=false;standalone_script_host_=false;resource_path_authority_.enforce_project_root=true;resource_path_authority_.enforce_filesystem_root=false;strict_script_mode_=true;function_call_depth_=1;
     const std::uint64_t timer_checkpoint=begin_timer_operation();
-    auto rr=execute_native_program(source,source_path,0);function_call_depth_=0;strict_script_mode_=false;
+    auto rr=execute_native_program(source,source_path,0,SourceProvenance::InMemory);function_call_depth_=0;strict_script_mode_=false;
     if(!rr.ok){error=rr.error.message;pending_control_={};finish_timer_operation(timer_checkpoint);return false;}
     value=nift::RuntimeValue(nullptr);if(pending_control_.kind==ControlFlow::Return&&pending_control_.value)value=*pending_control_.value;pending_control_={};const bool timer_result=contains_timer_resource(value);std::string resource_error;const bool resources_ok=finalize_script_resources(resource_error);finish_timer_operation(timer_checkpoint);if(timer_result){error="embedded script cannot return a timer value";if(!resources_ok)error+="; "+resource_error;return false;}if(!resources_ok){error=resource_error;return false;}return true;
 }
 
 RenderResult Parser::run_statement(const std::string& source, const fs::path& source_path) {
     if(variable_scopes_.empty()) { variable_scopes_.emplace_back(); install_script_invocation_bindings(); }
-    standalone_script_host_=true; strict_script_mode_=true; result_ = RenderResult{}; pending_control_={}; function_call_depth_=1;
+    standalone_script_host_=true; resource_path_authority_.enforce_project_root=false; resource_path_authority_.enforce_filesystem_root=true; strict_script_mode_=true; result_ = RenderResult{}; pending_control_={}; function_call_depth_=1;
+    const std::string identity=source_path.generic_string();const auto provenance=!source_path.empty()&&!(identity.size()>=2&&identity.front()=='<'&&identity.back()=='>')?SourceProvenance::FileBacked:SourceProvenance::InMemory;
     const std::string t=trim_copy(source);
     // A REPL is also an inspector: a single expression is evaluated directly so
     // arrays/collections/structs can be safely displayed without routing through
@@ -317,7 +321,13 @@ RenderResult Parser::run_statement(const std::string& source, const fs::path& so
     for(std::size_t i=0;i<t.size();++i){char c=t[i];if(quoted){if(c=='\\')++i;else if(c==qc)quoted=false;continue;}if(c=='\''||c=='"'){quoted=true;qc=c;continue;}if(c=='(')++par;else if(c==')')--par;else if(c=='[')++br;else if(c==']')--br;else if(c=='{')++bc;else if(c=='}')--bc;else if(!par&&!br&&!bc&&c=='='){char a=i?t[i-1]:0,b=i+1<t.size()?t[i+1]:0;if(a!='='&&a!='!'&&a!='<'&&a!='>'&&b!='='){assignment=true;break;}}}
     if(!declaration&&!assignment&&!t.empty()){
         nift::RuntimeValue v; std::string error;
-        if(evaluate_expression(t,v,error)){
+        source_context_stack_.push_back(SourceContext{source_path,provenance});
+        struct SourceContextGuard {
+            std::vector<SourceContext>& stack;
+            ~SourceContextGuard() { stack.pop_back(); }
+        } source_context_guard{source_context_stack_};
+        const bool evaluated=evaluate_expression(t,v,error);
+        if(evaluated){
             RenderResult rr; std::string shown;
             // REPL commands commonly return null (for example cd()) and an empty
             // string has nothing useful to inspect. Keep both silent rather than
@@ -338,12 +348,13 @@ RenderResult Parser::run_statement(const std::string& source, const fs::path& so
         // If direct evaluation fails, let the native statement path provide the
         // canonical diagnostic; it may be a valid statement form not recognized above.
     }
-    auto rr=execute_native_program(source,source_path,0); function_call_depth_=0; strict_script_mode_=false; pending_control_={}; return rr;
+    auto rr=execute_native_program(source,source_path,0,provenance); function_call_depth_=0; strict_script_mode_=false; pending_control_={}; return rr;
 }
 
 void Parser::reset_script_control() { pending_control_={}; result_=RenderResult{}; }
 
-RenderResult Parser::execute_native_program(const std::string& source, const fs::path& source_path, int depth) {
+RenderResult Parser::execute_native_program(const std::string& source, const fs::path& source_path, int depth,
+                                            SourceProvenance source_provenance) {
     std::string program, error;
     if (!translate_function_program(source, program, error)) {
         RenderResult failed; failed.ok=false; failed.error.message=error;
@@ -352,7 +363,7 @@ RenderResult Parser::execute_native_program(const std::string& source, const fs:
     }
     RenderResult rr;
     try {
-        rr=parse(program, source_path, depth);
+        rr=parse(program, source_path, depth, source_provenance);
     } catch (const std::exception& exception) {
         rr.ok=false;
         rr.error.message=exception.what();
@@ -378,14 +389,15 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
     std::replace(normalized_argument.begin(),normalized_argument.end(),'\\','/');
     fs::path path=normalized_argument;
     std::unique_ptr<PackageTransaction> package_reader;
+    std::shared_ptr<const PackageProvenance> package_provenance;
     const bool package_name = argument.find('/') == std::string::npos && argument.find('\\') == std::string::npos && fs::path(argument).extension().empty();
     const bool relative_file_import=!package_name&&path.is_relative();
     const auto caller_module=active_module_env_ ? active_module_env_ : loading_module_env_;
     fs::path package_root=caller_module ? caller_module->package_root : fs::path{};
     if (package_name && standalone_script_host_) {
-        package_reader=std::make_unique<PackageTransaction>(fs::current_path());if(!package_reader->acquire_read(error))return false;
         if (!filesystem::valid_package_name(argument)) { error="invalid package name: "+argument; return false; }
         const fs::path project = fs::absolute(fs::current_path()).lexically_normal();
+        package_reader=std::make_unique<PackageTransaction>(project);if(!package_reader->acquire_read(error))return false;
         const fs::path packages = fs::absolute(project/".nift"/"packages").lexically_normal();
         std::error_code package_ec, project_ec;
         const fs::path canonical_project = fs::weakly_canonical(project,project_ec);
@@ -396,6 +408,18 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
         package_metadata::Manifest manifest;
         if (!package_metadata::load_package(root,manifest,path,error)) { error="package is not installed or has invalid manifest: "+argument+": "+error; return false; }
         if (manifest.name != argument) { error="installed package name does not match import: "+argument; return false; }
+        package_metadata::Manifest project_manifest;package_metadata::Lock lock;bool lock_exists=false;
+        if(!package_metadata::load_manifest(project/"manifest.json",false,project_manifest,error)||
+           !package_metadata::load_lock(project/".nift"/"packages.lock.json",lock,lock_exists,error)||!lock_exists||
+           !package_metadata::validate_lock(project_manifest,lock,error)){if(error.empty())error="package lock is missing";return false;}
+        const auto locked=lock.find(argument);if(locked==lock.end()){error="package lock is missing dependency: "+argument;return false;}
+        package_provenance=std::make_shared<const PackageProvenance>(PackageProvenance{
+            project,root,argument,locked->second.source,locked->second.requested,locked->second.commit});
+        if(locked->second.commit!="local"){
+            const auto head=filesystem::read_file_checked(root/".git"/"HEAD");std::string revision=head.value_or(std::string());
+            while(!revision.empty()&&(revision.back()=='\n'||revision.back()=='\r'))revision.pop_back();
+            if(revision!=locked->second.commit){error="installed package revision does not match package lock: "+argument;return false;}
+        }
         package_root=root;
     } else if(path.is_relative()) {
         if(standalone_script_host_ && caller_path == fs::path("<nift-sh>")) path=fs::current_path()/path;
@@ -405,20 +429,18 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
     }
     path=fs::absolute(path).lexically_normal();
     if(relative_file_import&&!package_root.empty()){
-        if(!package_reader){
-            const fs::path project_root=package_root.parent_path().parent_path().parent_path();
-            package_reader=std::make_unique<PackageTransaction>(project_root);
-            if(!package_reader->acquire_read(error))return false;
-        }
+        package_provenance=caller_module?caller_module->package_provenance:nullptr;
+        if(!package_provenance){error="package-relative import has no frozen package provenance";return false;}
+        if(!acquire_package_read(package_provenance,package_reader,error))return false;
         if(!filesystem::path_within(package_root,path)){error="package-relative import escapes package root: "+path.generic_string();return false;}
     }
-    if(!standalone_script_host_ && !host_.root().empty() && !filesystem::path_within(fs::absolute(host_.root()).lexically_normal(),path)){error="path must stay inside the Nift project";return false;}
+    if(!standalone_script_host_ && !resource_path_authority_.project_root.empty() && !filesystem::path_within(resource_path_authority_.project_root,path)){error="path must stay inside the Nift project";return false;}
     const fs::path import_identity=stable_import_identity(path);
     bool cycle=std::find(input_stack_.begin(),input_stack_.end(),import_identity)!=input_stack_.end();
-    if(!cycle)for(const auto& source:source_path_stack_)if(!source.empty()&&source.native().front()!='<'&&stable_import_identity(source)==import_identity){cycle=true;break;}
+    if(!cycle)for(const auto& source:source_context_stack_)if(!source.path.empty()&&source.provenance==SourceProvenance::FileBacked&&stable_import_identity(source.path)==import_identity){cycle=true;break;}
     if(cycle){error="script import cycle through "+path.generic_string();return false;}
     auto src=host_.read_shared_source(path); if(src.status==nift::HostStatus::Error||!src.content){error=src.error.empty()?"script is not readable: "+path.generic_string():src.error+": "+path.generic_string();return false;}
-    if(package_reader&&!package_reader->lock_identity_valid()){error="package read lock identity changed";return false;}
+    package_reader.reset();
 
     const auto module_identity_checkpoint=next_module_identity_;
     const auto lambda_identity_checkpoint=next_lambda_instance_id_;
@@ -440,18 +462,17 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
     auto saved_scopes=std::move(variable_scopes_); auto saved_callables=std::move(callables_); auto saved_structs=std::move(structs_);
     auto saved_exports=std::move(requested_exports_); const bool saved_import=in_import_program_; auto saved_control=pending_control_; const bool saved_strict=strict_script_mode_;
     auto saved_active=std::move(active_module_env_); auto saved_loading=std::move(loading_module_env_);
-    auto module_env=std::make_shared<ModuleEnv>();module_env->identity=next_module_identity_++;module_env->source_path=path;module_env->import_base=path.parent_path();module_env->package_root=package_root;
+    auto module_env=std::make_shared<ModuleEnv>();module_env->identity=next_module_identity_++;module_env->source_path=path;module_env->source_provenance=SourceProvenance::FileBacked;module_env->import_base=path.parent_path();module_env->package_root=package_root;module_env->package_provenance=package_provenance;
     variable_scopes_.clear(); variable_scopes_.emplace_back(); callables_.clear(); structs_.clear(); requested_exports_.clear(); pending_control_={}; in_import_program_=true; strict_script_mode_=true;
     active_module_env_.reset();loading_module_env_=module_env;
     std::unordered_set<std::string> pre_import_files; for(const auto& kv:file_instances_)pre_import_files.insert(kv.first);
     input_stack_.push_back(import_identity); result_.dependencies.insert(host_.relative(path)); ++function_call_depth_;
-    auto rr=execute_native_program(*src.content,path,depth+1);
+    auto rr=execute_native_program(*src.content,path,depth+1,SourceProvenance::FileBacked);
     --function_call_depth_; input_stack_.pop_back();
     if(rr.ok){for(auto& kv:file_instances_)if(!pre_import_files.count(kv.first)&&kv.second->open){auto f=kv.second;f->open=false;f->dirty=false;f->mode.clear();f->working.clear();f->saved.clear();f->cursor=0;rr.ok=false;rr.error.message="managed file left open at "+std::string(legacy_syntax?"@import":"import")+" completion: "+f->path.generic_string();break;}}
     auto isolated_scope=std::move(variable_scopes_.back()); auto isolated_callables=std::move(callables_); auto isolated_structs=std::move(structs_); auto exports=requested_exports_; auto completion=pending_control_;
     variable_scopes_=std::move(saved_scopes); callables_=std::move(saved_callables); structs_=std::move(saved_structs); requested_exports_=std::move(saved_exports); in_import_program_=saved_import; pending_control_=saved_control; strict_script_mode_=saved_strict;active_module_env_=std::move(saved_active);loading_module_env_=std::move(saved_loading);
     if(!rr.ok){error=rr.error.message;return false;}
-    if(package_reader&&!package_reader->lock_identity_valid()){error="package read lock identity changed";return false;}
     if(completion.kind==ControlFlow::Return && completion.value){error="return with a value is not allowed in "+std::string(legacy_syntax?"@import":"import");return false;}
 
     std::unordered_map<std::string,VariableBinding> vars;

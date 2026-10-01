@@ -1,10 +1,13 @@
 #include "Parser.h"
+#include "PackageTransaction.h"
 #include "ScriptHost.h"
 
 #include <cassert>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <future>
+#include <memory>
 #include <string>
 
 int main() {
@@ -48,10 +51,31 @@ int main() {
     {std::ofstream child(root/"child.f");child<<"fn(private_value()) { return 42 }\ncallback := private_value\nexport(callback)\n";}
     {std::ofstream outer(root/"outer.f");outer<<"import(\"./child.f\")\nleaked := () => { return callback() }\nexport(missing)\n";}
     ScriptRenderHost import_host(root);TrackedInfo import_tracked;Parser import_parser(import_host,import_tracked);
+    const auto file_backed_path=import_parser.run_statement("module_path()",root/"main.f");
+    assert(file_backed_path.ok&&file_backed_path.output==nift::RuntimeValue(root.generic_string()).dump(0));
+    const auto in_memory_path=import_parser.run_statement("module_path()","<statement-resource-test>");
+    assert(!in_memory_path.ok&&in_memory_path.error.message.find("no file-backed source")!=std::string::npos);
     for(int attempt=0;attempt<2;++attempt){const auto failed=import_parser.run_statement("import(\"./outer.f\")",root/"main.f");assert(!failed.ok);assert(failed.error.message.find("export names no existing binding: missing")!=std::string::npos);}
     assert(import_parser.run_statement("import(\"./child.f\")",root/"main.f").ok);
     assert(import_parser.run_statement("answer := callback()",root/"main.f").ok);
     nift::RuntimeValue answer;std::string eval_error;assert(import_parser.eval_expression("answer",answer,eval_error));assert(answer.is_number()&&answer.num==42);
+
+    // A failed package import must roll back its ModuleEnv and release the read
+    // lease even while the persistent parser remains alive.
+    const auto package=root/".nift/packages/demo";std::filesystem::create_directories(package/"src",ec);assert(!ec);
+    {std::ofstream project_manifest(root/"manifest.json");project_manifest<<"{\"dependencies\":{\"demo\":{\"source\":\"./demo\",\"ref\":\"local\"}}}\n";}
+    {std::ofstream package_lock(root/".nift/packages.lock.json");package_lock<<"{\"demo\":{\"source\":\"./demo\",\"requested\":\"local\",\"commit\":\"local\"}}\n";}
+    {std::ofstream manifest(package/"manifest.json");manifest<<"{\"name\":\"demo\",\"version\":\"0.1.0\",\"entry\":\"src/main.f\"}\n";}
+    {std::ofstream module(package/"src/main.f");module<<"value := 1\nexport(missing)\n";}
+    auto package_parser=std::make_unique<Parser>(import_host,import_tracked);
+    const auto saved_cwd=std::filesystem::current_path();std::filesystem::current_path(root);
+    const auto package_failed=package_parser->run_statement("import(\"demo\")",root/"main.f");assert(!package_failed.ok);
+    std::filesystem::current_path(saved_cwd);
+    auto exclusive=std::async(std::launch::async,[&root]{PackageTransaction transaction(root);std::string error;return transaction.acquire(error);});
+    const bool lease_released=exclusive.wait_for(std::chrono::seconds(2))==std::future_status::ready;
+    package_parser.reset();
+    assert(exclusive.wait_for(std::chrono::seconds(2))==std::future_status::ready);
+    assert(lease_released&&exclusive.get());
     std::filesystem::remove_all(root,ec);
     return 0;
 }

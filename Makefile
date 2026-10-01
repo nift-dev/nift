@@ -520,8 +520,10 @@ V46_TIMER_UNIT_SAN_TEST := $(TEST_DIR)/v46-timer-unit-sanitize$(EXEEXT)
 V46_TIMER_EMBED_SAN_TEST := $(TEST_DIR)/v46-timer-embed-sanitize$(EXEEXT)
 V46_SECURE_RANDOM_EMBED_TEST := $(TEST_DIR)/v46-secure-random-embed$(EXEEXT)
 V46_OUTPUT_EMBED_TEST := $(TEST_DIR)/v46-output-embed$(EXEEXT)
+V46_RESOURCE_PATHS_EMBED_TEST := $(TEST_DIR)/v46-resource-paths-embed$(EXEEXT)
+V46_RESOURCE_PATHS_EMBED_SAN_TEST := $(TEST_DIR)/v46-resource-paths-embed-sanitize$(EXEEXT)
 test-embed: test-c-abi test-c-abi-c-smoke test-cp21-bytes test-engine test-engine-bindings test-public-header \
-	test-engine-render-api test-conformance test-v45-embed-contracts test-v45-embed-staged-consumer test-v46-time-embed test-v46-secure-random-embed test-v46-output-embed
+	test-engine-render-api test-conformance test-v45-embed-contracts test-v45-embed-staged-consumer test-v46-time-embed test-v46-secure-random-embed test-v46-output-embed test-v46-resource-paths-embed
 
 V45_EMBED_CONTRACT_TEST := $(TEST_DIR)/v45-embed-contract$(EXEEXT)
 V45_EMBED_SCRIPT_TEST := $(TEST_DIR)/v45-embed-script$(EXEEXT)
@@ -577,6 +579,14 @@ $(V46_SECURE_RANDOM_EMBED_TEST): tests/v46_secure_random_embed.cpp $(V45_EMBED_P
 $(V46_OUTPUT_EMBED_TEST): tests/v46_output_embed.cpp $(V45_EMBED_PUBLIC_HEADERS) $(ENGINE_CORE_OBJECTS)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/v46_output_embed.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
+
+$(V46_RESOURCE_PATHS_EMBED_TEST): tests/v46_resource_paths_embed.cpp $(V45_EMBED_PUBLIC_HEADERS) $(ENGINE_CORE_OBJECTS)
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/v46_resource_paths_embed.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
+
+$(V46_RESOURCE_PATHS_EMBED_SAN_TEST): tests/v46_resource_paths_embed.cpp $(filter-out $(TEST_DIR)/san/src/nift.o $(TEST_DIR)/san/src/CLI.o,$(SAN_OBJECTS)) $(SAN_LIBFFI_A)
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(SAN_CPPFLAGS) $(LDFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(SANITIZER_FLAGS) tests/v46_resource_paths_embed.cpp $(filter-out $(TEST_DIR)/san/src/nift.o $(TEST_DIR)/san/src/CLI.o,$(SAN_OBJECTS)) $(SAN_LIBFFI_A) $(filter-out $(LIBFFI_A),$(LDLIBS)) -o $@
 
 test-v46-time-embed: $(V46_TIME_EMBED_TEST)
 	$(V46_TIME_EMBED_TEST)
@@ -1129,6 +1139,7 @@ test-v45-concurrency-tsan: $(TSAN_TARGET)
 	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 NIFT_BIN="$(CURDIR)/$(TSAN_TARGET)" tests/v45_atomics.sh
 	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 NIFT_BIN="$(CURDIR)/$(TSAN_TARGET)" tests/v45_adversarial_runtime.sh
 	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 NIFT_BIN="$(CURDIR)/$(TSAN_TARGET)" bash tests/v46_import_worker_ownership_smoke.sh
+	env -u LD_PRELOAD TSAN_OPTIONS=halt_on_error=1 $(PYTHON) tests/v46_resource_paths.py "$(CURDIR)/$(TSAN_TARGET)"
 
 CP18_BYTES_TSAN_TEST := $(TEST_DIR)/nift-cp18-bytes-tsan$(EXEEXT)
 $(CP18_BYTES_TSAN_TEST): tests/cp18_bytes.cpp $(filter-out $(TEST_DIR)/tsan/src/nift.o $(TEST_DIR)/tsan/src/CLI.o,$(TSAN_OBJECTS)) $(TSAN_LIBFFI_A)
@@ -1278,6 +1289,7 @@ test-v44-packages: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/package_combined_dogfood.sh $(V44_SKIP_77)
 	NIFT="$(CURDIR)/$(TARGET)" tests/package_tools_dogfood.sh
 	NIFT="$(CURDIR)/$(TARGET)" bash tests/v44_relative_import_ownership_smoke.sh
+	$(PYTHON) tests/v46_resource_paths.py "$(CURDIR)/$(TARGET)"
 
 test-v44-automation: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/v44_automation_smoke.sh
@@ -1374,7 +1386,19 @@ test-v46-relative-imports-sanitize: $(SAN_TARGET)
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT="$(CURDIR)/$(SAN_TARGET)" bash tests/v44_relative_import_ownership_smoke.sh
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT="$(CURDIR)/$(SAN_TARGET)" bash tests/v46_import_worker_ownership_smoke.sh
 
-.PHONY: test-v46-relative-imports test-v46-relative-imports-sanitize
+test-v46-resource-paths-embed: $(V46_RESOURCE_PATHS_EMBED_TEST)
+	$(V46_RESOURCE_PATHS_EMBED_TEST)
+
+test-v46-resource-paths: $(TARGET) $(V46_RESOURCE_PATHS_EMBED_TEST)
+	$(PYTHON) tests/v46_resource_paths.py "$(CURDIR)/$(TARGET)"
+	$(V46_RESOURCE_PATHS_EMBED_TEST)
+	NIFT="$(CURDIR)/$(TARGET)" tests/v44_cp22_completion_smoke.sh
+
+test-v46-resource-paths-sanitize: $(SAN_TARGET) $(V46_RESOURCE_PATHS_EMBED_SAN_TEST)
+	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 $(PYTHON) tests/v46_resource_paths.py "$(CURDIR)/$(SAN_TARGET)"
+	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(V46_RESOURCE_PATHS_EMBED_SAN_TEST)"
+
+.PHONY: test-v46-relative-imports test-v46-relative-imports-sanitize test-v46-resource-paths test-v46-resource-paths-embed test-v46-resource-paths-sanitize
 
 test-cp20-bytes: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/cp20_bytes_ffi.sh

@@ -19,6 +19,7 @@
 #include "Ast.h"
 
 namespace json { class Document; }
+class PackageTransaction;
 
 // Internal source of a template or page within a render. Either filesystem
 // backed (path is non-empty; content is read through the host) or in-memory
@@ -171,13 +172,34 @@ private:
         void rebind(std::shared_ptr<nift::RuntimeValue> v) { ref_root_slot.reset(); ref_path.clear(); ref_valid=true; value=std::move(v); if(slot)*slot=value; }
     };
     std::vector<std::unordered_map<std::string, VariableBinding>> variable_scopes_;
+    enum class SourceProvenance { FileBacked, InMemory };
+    struct SourceContext {
+        std::filesystem::path path;
+        SourceProvenance provenance = SourceProvenance::FileBacked;
+    };
+    struct ResourcePathAuthority {
+        std::filesystem::path project_root;
+        std::filesystem::path filesystem_root;
+        bool enforce_project_root = true;
+        bool enforce_filesystem_root = false;
+    };
+    struct PackageProvenance {
+        std::filesystem::path project_root;
+        std::filesystem::path package_root;
+        std::string name;
+        std::string source;
+        std::string requested;
+        std::string commit;
+    };
     struct ModuleEnv;
-    struct Callable { std::vector<std::string> params; std::string variadic_param; std::string body; std::filesystem::path source_path; bool fragment = false; bool async = false; std::shared_ptr<ModuleEnv> module_env; };
+    struct Callable { std::vector<std::string> params; std::string variadic_param; std::string body; std::filesystem::path source_path; bool fragment = false; bool async = false; std::shared_ptr<ModuleEnv> module_env; SourceProvenance source_provenance = SourceProvenance::FileBacked; };
     struct ModuleEnv {
         std::uint64_t identity = 0;
         std::filesystem::path source_path;
+        SourceProvenance source_provenance = SourceProvenance::FileBacked;
         std::filesystem::path import_base;
         std::filesystem::path package_root;
+        std::shared_ptr<const PackageProvenance> package_provenance;
         std::unordered_map<std::string, Callable> callables;
         std::unordered_map<std::string, VariableBinding> vars;
     };
@@ -195,7 +217,9 @@ private:
     std::shared_ptr<ModuleEnv> loading_module_env_;
     std::unordered_map<std::uint64_t, std::shared_ptr<ModuleEnv>> module_envs_;
     std::uint64_t next_module_identity_ = 1;
-    std::vector<std::filesystem::path> source_path_stack_;
+    std::vector<SourceContext> source_context_stack_;
+    std::vector<std::filesystem::path> source_path_stack_; // Compatibility view for prepared import ownership.
+    ResourcePathAuthority resource_path_authority_;
     struct LambdaInstance {
         std::vector<std::string> params;
         std::string variadic_param;
@@ -203,6 +227,7 @@ private:
         bool block = false;
         bool async = false;
         std::filesystem::path source_path;
+        SourceProvenance source_provenance = SourceProvenance::FileBacked;
         std::unordered_map<std::string, VariableBinding> captures;
         std::shared_ptr<ModuleEnv> module_env;
     };
@@ -361,9 +386,12 @@ private:
     std::string pagination_items_text_;
     std::filesystem::path pagination_current_output_;
 
+    RenderResult parse(const std::string& source, const std::filesystem::path& source_path, int depth,
+                       SourceProvenance source_provenance);
     RenderResult parse(const std::string& source, const std::filesystem::path& source_path, int depth);
     bool translate_function_program(const std::string& source, std::string& translated, std::string& error) const;
-    RenderResult execute_native_program(const std::string& source, const std::filesystem::path& source_path, int depth);
+    RenderResult execute_native_program(const std::string& source, const std::filesystem::path& source_path, int depth,
+                                        SourceProvenance source_provenance);
     bool execute_import_file(const std::string& argument, const std::filesystem::path& caller_path, int depth, bool legacy_syntax, std::string& error);
     std::string metadata(const std::string& key) const;
     bool json_value(const std::string& expression, std::string& value, std::string& error);
@@ -374,6 +402,13 @@ private:
                             std::shared_ptr<const nift::RuntimeValue>& value,
                             std::string& error);
     bool evaluate_expression(const std::string& expression, nift::RuntimeValue& value, std::string& error);
+    bool resolve_owned_resource_path(const std::string& name,
+                                     const std::vector<nift::RuntimeValue>& args,
+                                     nift::RuntimeValue& value,
+                                     std::string& error) const;
+    bool acquire_package_read(const std::shared_ptr<const PackageProvenance>& provenance,
+                              std::unique_ptr<PackageTransaction>& reader,
+                              std::string& error) const;
     bool evaluate_collection_value(const std::string& expression, nift::RuntimeValue& value, std::string& error);
     bool evaluate_condition(const std::string& expression, bool& value, std::string& error);
     bool serialize_value(const nift::RuntimeValue& value, bool pretty, std::string& output, std::string& error, int depth = 0) const;

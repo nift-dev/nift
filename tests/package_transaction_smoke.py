@@ -17,7 +17,8 @@ def run(cwd, *args, env=None, ok=True):
     if env:
         merged.update(env)
     result = subprocess.run([NIFT, *args], cwd=cwd, env=merged,
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                            timeout=30)
     if ok and result.returncode != 0:
         raise AssertionError(f"{' '.join(args)} failed: {result.stderr}")
     return result
@@ -303,45 +304,103 @@ with tempfile.TemporaryDirectory() as raw:
     assert reader_out.strip().startswith("two-")
     assert_clean(reader_site)
 
-    # A relative import made later by an escaped package callable reacquires the
-    # package read lock. Hold a writer after exclusive acquisition: the delayed
-    # helper import must block until replacement completes, then read one
-    # coherent package generation.
-    delayed_site = root / "delayed-reader-lock"
-    delayed_site.mkdir()
+    # Package owners retain frozen lock provenance, not a lifetime read lock.
+    # Unchanged delayed imports and resource paths work normally.
     (repo / "src/main.f").write_text(
-        'fn(delayed()) { import("./helper.f"); return helper_value }\nexport(delayed)\n',
+        'fn(unchanged_value()) { import("./helper.f"); return helper_value }\n'
+        'fn(current_path()) { return module_path("asset.txt") }\n'
+        'fn(delayed_path()) { sleep(2000); return module_path("worker.txt") }\n'
+        'fn(delayed_import()) { sleep(2000); import("./helper.f"); return helper_value }\n'
+        'export(unchanged_value)\nexport(current_path)\nexport(delayed_path)\nexport(delayed_import)\n',
         encoding="utf-8")
     (repo / "src/helper.f").write_text('helper_value := "before"\nexport(helper_value)\n', encoding="utf-8")
     git(repo, "add", ".")
-    git(repo, "commit", "-qm", "delayed-before")
-    run(delayed_site, "add", source)
-    (repo / "src/helper.f").write_text('helper_value := "after"\nexport(helper_value)\n', encoding="utf-8")
-    git(repo, "add", ".")
-    git(repo, "commit", "-qm", "delayed-after")
-    (delayed_site / "delayed.f").write_text(
-        'import("demo")\nprint("ready")\nsleep(250)\nprint(delayed())\n', encoding="utf-8")
-    delayed_reader = subprocess.Popen([NIFT, "delayed.f"], cwd=delayed_site,
-                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    assert delayed_reader.stdout.readline().strip() == "ready"
-    delayed_hold = root / "delayed-hold"
-    delayed_hold.mkdir()
-    env = os.environ.copy()
-    env["NIFT_TEST_PACKAGE_TXN_HOLD"] = str(delayed_hold)
-    delayed_writer = subprocess.Popen([NIFT, "update", "demo"], cwd=delayed_site, env=env,
-                                      stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    deadline = time.time() + 10
-    while not (delayed_hold / "acquired").exists() and time.time() < deadline:
-        time.sleep(0.01)
-    assert (delayed_hold / "acquired").exists()
-    time.sleep(0.35)
-    assert delayed_reader.poll() is None
-    (delayed_hold / "release").write_text("go\n", encoding="utf-8")
-    _, delayed_writer_err = delayed_writer.communicate(timeout=20)
-    delayed_out, delayed_err = delayed_reader.communicate(timeout=20)
-    assert delayed_writer.returncode == 0, delayed_writer_err
-    assert delayed_reader.returncode == 0, delayed_err
-    assert delayed_out.strip() == "after"
-    assert_clean(delayed_site)
+    git(repo, "commit", "-qm", "provenance-base")
+
+    def advance_helper(value):
+        (repo / "src/helper.f").write_text(
+            f'helper_value := "{value}"\nexport(helper_value)\n', encoding="utf-8")
+        git(repo, "add", ".")
+        git(repo, "commit", "-qm", value)
+
+    unchanged = root / "unchanged-provenance"
+    unchanged.mkdir()
+    run(unchanged, "add", source)
+    (unchanged / "same.f").write_text(
+        'import("demo")\nprint(unchanged_value())\nprint(current_path())\n', encoding="utf-8")
+    same = run(unchanged, "same.f")
+    assert same.stdout.splitlines() == [
+        "before", (unchanged / ".nift/packages/demo/src/asset.txt").as_posix()
+    ]
+
+    # A synchronous child package command must complete while an old package
+    # callable remains live. The next package-owned path operation rejects the
+    # changed lock provenance instead of silently using the replacement.
+    advance_helper("child-update")
+    (unchanged / "child-update.f").write_text(
+        f'import("demo")\nr := run({json.dumps(NIFT)}, "update", "demo")\n'
+        'print(r.exit_code)\nprint(current_path())\n', encoding="utf-8")
+    child = run(unchanged, "child-update.f", ok=False)
+    assert child.stdout.splitlines() == ["0"]
+    assert "stale package ownership" in child.stderr
+    assert "child-update" in (unchanged / ".nift/packages/demo/src/helper.f").read_text(encoding="utf-8")
+    assert_clean(unchanged)
+
+    def stale_worker_case(name, callable_name, next_value):
+        site = root / name
+        site.mkdir()
+        run(site, "add", source)
+        advance_helper(next_value)
+        marker = site / "worker-ready"
+        (site / "worker.f").write_text(
+            f'import("demo")\nworker := thread({callable_name})\n'
+            f'touch({json.dumps(marker.as_posix())})\nprint(worker.join())\n', encoding="utf-8")
+        reader = subprocess.Popen([NIFT, "worker.f"], cwd=site,
+                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        deadline = time.time() + 10
+        while not marker.exists() and time.time() < deadline:
+            time.sleep(0.01)
+        assert marker.exists()
+        writer = run(site, "update", "demo")
+        assert writer.returncode == 0
+        reader_out, reader_err = reader.communicate(timeout=20)
+        assert reader.returncode != 0, reader_out
+        assert "stale package ownership" in reader_err
+        assert_clean(site)
+
+    stale_worker_case("stale-worker-path", "delayed_path", "worker-path-update")
+    stale_worker_case("stale-worker-import", "delayed_import", "worker-import-update")
+
+    # Local package links intentionally remain live: source edits do not alter
+    # lock provenance, so a delayed relative import observes the local source.
+    local_source = root / "local-source"
+    (local_source / "src").mkdir(parents=True)
+    (local_source / "manifest.json").write_text(
+        '{"name":"localdemo","version":"0.1.0","entry":"src/main.f"}\n', encoding="utf-8")
+    (local_source / "src/main.f").write_text(
+        'fn(delayed_local()) { sleep(500); import("./helper.f"); return helper_value }\nexport(delayed_local)\n',
+        encoding="utf-8")
+    (local_source / "src/helper.f").write_text(
+        'helper_value := "local-before"\nexport(helper_value)\n', encoding="utf-8")
+    local_site = root / "local-live"
+    local_site.mkdir()
+    run(local_site, "add", str(local_source))
+    installed_local = local_site / ".nift/packages/localdemo"
+    if installed_local.is_symlink():
+        marker = local_site / "local-ready"
+        (local_site / "local.f").write_text(
+            f'import("localdemo")\nworker := thread(delayed_local)\n'
+            f'touch({json.dumps(marker.as_posix())})\nprint(worker.join())\n', encoding="utf-8")
+        reader = subprocess.Popen([NIFT, "local.f"], cwd=local_site,
+                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        deadline = time.time() + 10
+        while not marker.exists() and time.time() < deadline:
+            time.sleep(0.01)
+        assert marker.exists()
+        (local_source / "src/helper.f").write_text(
+            'helper_value := "local-after"\nexport(helper_value)\n', encoding="utf-8")
+        local_out, local_err = reader.communicate(timeout=20)
+        assert reader.returncode == 0, local_err
+        assert local_out.strip() == "local-after"
 
 print("PASS package transaction recovery and locking")

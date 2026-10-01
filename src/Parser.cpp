@@ -5,10 +5,13 @@
 #include "FrontMatter.h"
 #include "FileSystem.h"
 #include "Json.h"
+#include "PackageMetadata.h"
+#include "PackageTransaction.h"
 
 #include <algorithm>
 #include <chrono>
 #include <cctype>
+#include <cstdlib>
 #include <ctime>
 #include <iostream>
 #include <limits>
@@ -20,6 +23,14 @@ namespace fs = std::filesystem;
 
 namespace {
 std::atomic<std::uint64_t> next_timer_owner_id{1};
+
+fs::path canonical_authority_path(const fs::path& path) {
+    std::error_code error;
+    const fs::path absolute = fs::absolute(path, error).lexically_normal();
+    if (error) return path.lexically_normal();
+    const fs::path canonical = fs::weakly_canonical(absolute, error);
+    return error ? absolute : canonical.lexically_normal();
+}
 
 std::uint64_t allocate_timer_owner_id() {
     std::uint64_t id = next_timer_owner_id.load(std::memory_order_relaxed);
@@ -76,6 +87,9 @@ Parser::Parser(RenderHost& host, TrackedInfo& tracked_info,
       tracked_info_(tracked_info),
       timer_clock_(timer_clock ? std::move(timer_clock) : [] { return std::chrono::steady_clock::now(); }),
       timer_owner_id_(allocate_timer_owner_id()) {
+    if (!host_.root().empty()) resource_path_authority_.project_root = canonical_authority_path(host_.root());
+    if (const char* configured_root = std::getenv("NIFT_FS_ROOT"); configured_root && *configured_root)
+        resource_path_authority_.filesystem_root = canonical_authority_path(configured_root);
     variable_scopes_.emplace_back();
     if (!tracked_info_.name.empty()) {
         nift::RuntimeValue metadata=nift::RuntimeValue::make_object(); bool from_project=false; std::string page_metadata_error;
@@ -317,8 +331,10 @@ void Parser::clone_worker_module_graph(
         auto clone=std::make_shared<ModuleEnv>();
         clone->identity=source->identity;
         clone->source_path=source->source_path;
+        clone->source_provenance=source->source_provenance;
         clone->import_base=source->import_base;
         clone->package_root=source->package_root;
+        clone->package_provenance=source->package_provenance;
         modules.emplace(source->identity,std::move(clone));
     };
     for (const auto& entry : module_envs_) add_module(entry.second);
@@ -355,6 +371,134 @@ void Parser::clone_worker_module_graph(
     }
     callables=callables_;
     for(auto& callable:callables)callable.second.module_env=remap_owner(callable.second.module_env);
+}
+
+bool Parser::resolve_owned_resource_path(const std::string& name,
+                                         const std::vector<nift::RuntimeValue>& args,
+                                         nift::RuntimeValue& value,
+                                         std::string& error) const {
+    if (args.size() > 1) {
+        error = name + ": expected zero or one relative path";
+        return false;
+    }
+
+    const auto owner = active_module_env_ ? active_module_env_ : loading_module_env_;
+    std::unique_ptr<PackageTransaction> package_reader;
+    if (owner && owner->package_provenance && !acquire_package_read(owner->package_provenance, package_reader, error)) {
+        error = name + ": " + error;
+        return false;
+    }
+    fs::path containment_root;
+    fs::path base;
+    if (name == "package_path") {
+        if (!owner || owner->package_root.empty()) {
+            error = "package_path: current module is not owned by a package";
+            return false;
+        }
+        containment_root = fs::absolute(owner->package_root).lexically_normal();
+        base = containment_root;
+    } else {
+        const SourceContext source_context = owner
+            ? SourceContext{owner->source_path, owner->source_provenance}
+            : (source_context_stack_.empty() ? SourceContext{} : source_context_stack_.back());
+        fs::path source = source_context.path;
+        if (source.empty() || source_context.provenance != SourceProvenance::FileBacked) {
+            error = "module_path: current execution has no file-backed source";
+            return false;
+        }
+        source = fs::absolute(source).lexically_normal();
+        base = source.parent_path();
+        if (owner && !owner->package_root.empty())
+            containment_root = fs::absolute(owner->package_root).lexically_normal();
+    }
+
+    fs::path resolved = base;
+    if (!args.empty()) {
+        if (!args[0].is_string()) {
+            error = name + ": expected string path";
+            return false;
+        }
+        std::string raw = args[0].string;
+        if (raw.empty()) {
+            error = name + ": relative path must not be empty";
+            return false;
+        }
+        std::replace(raw.begin(), raw.end(), '\\', '/');
+        const fs::path relative(raw);
+        const bool drive_qualified = raw.size() >= 2 &&
+            ((raw[0] >= 'A' && raw[0] <= 'Z') || (raw[0] >= 'a' && raw[0] <= 'z')) && raw[1] == ':';
+        if (raw.front() == '/' || drive_qualified || relative.is_absolute() ||
+            relative.has_root_name() || relative.has_root_directory()) {
+            error = name + ": path must be relative and not root-qualified";
+            return false;
+        }
+        resolved = (base / relative).lexically_normal();
+    }
+
+    std::error_code absolute_error;
+    resolved = fs::absolute(resolved, absolute_error).lexically_normal();
+    if (absolute_error) {
+        error = name + ": cannot resolve path: " + absolute_error.message();
+        return false;
+    }
+
+    if (!containment_root.empty() && !filesystem::path_within(containment_root, resolved)) {
+        error = name + ": path must stay inside the owning package";
+        return false;
+    }
+    const ResourcePathAuthority& authority = resource_path_authority_;
+    if (containment_root.empty() && authority.enforce_project_root && !authority.project_root.empty() &&
+        !filesystem::path_within(authority.project_root, resolved)) {
+        error = name + ": path must stay inside the Nift project";
+        return false;
+    }
+    if (authority.enforce_filesystem_root && !authority.filesystem_root.empty() &&
+        !filesystem::path_within(authority.filesystem_root, resolved)) {
+        error = name + ": path escapes configured filesystem root: " + resolved.generic_string();
+        return false;
+    }
+
+    value = nift::RuntimeValue(resolved.generic_string());
+    return true;
+}
+
+bool Parser::acquire_package_read(const std::shared_ptr<const PackageProvenance>& provenance,
+                                  std::unique_ptr<PackageTransaction>& reader,
+                                  std::string& error) const {
+    if (!provenance) return true;
+    reader = std::make_unique<PackageTransaction>(provenance->project_root);
+    if (!reader->acquire_read(error)) return false;
+
+    package_metadata::Lock lock;
+    bool lock_exists = false;
+    if (!package_metadata::load_lock(provenance->project_root/".nift"/"packages.lock.json", lock, lock_exists, error)) return false;
+    const auto found = lock.find(provenance->name);
+    if (!lock_exists || found == lock.end() || found->second.source != provenance->source ||
+        found->second.requested != provenance->requested || found->second.commit != provenance->commit) {
+        error = "stale package ownership: package '" + provenance->name + "' lock provenance changed";
+        return false;
+    }
+    const fs::path expected_root = (provenance->project_root/".nift"/"packages"/provenance->name).lexically_normal();
+    if (provenance->package_root.lexically_normal() != expected_root) {
+        error = "stale package ownership: package '" + provenance->name + "' root identity changed";
+        return false;
+    }
+    package_metadata::Manifest manifest;
+    fs::path entry;
+    if (!package_metadata::load_package(expected_root, manifest, entry, error) || manifest.name != provenance->name) {
+        error = "stale package ownership: package '" + provenance->name + "' installed identity changed";
+        return false;
+    }
+    if (provenance->commit != "local") {
+        const auto head = filesystem::read_file_checked(expected_root/".git"/"HEAD");
+        std::string revision = head.value_or(std::string());
+        while (!revision.empty() && (revision.back() == '\n' || revision.back() == '\r')) revision.pop_back();
+        if (revision != provenance->commit) {
+            error = "stale package ownership: package '" + provenance->name + "' installed revision changed";
+            return false;
+        }
+    }
+    return true;
 }
 
 bool Parser::set_named_callable_async(const std::string& tag, bool async) {
