@@ -13,6 +13,8 @@ printf '{"name":"right","version":"0.1.0","entry":"src/main.f"}\n' > "$site/.nif
 printf '{"name":"async-owner","version":"0.1.0","entry":"src/main.f"}\n' > "$site/.nift/packages/async-owner/manifest.json"
 printf '{"name":"init-worker","version":"0.1.0","entry":"src/main.f"}\n' > "$site/.nift/packages/init-worker/manifest.json"
 printf '{"name":"alias-owner","version":"0.1.0","entry":"src/main.f"}\n' > "$site/.nift/packages/alias-owner/manifest.json"
+printf '{"dependencies":{"alias-owner":{"source":"./alias-owner","ref":"local"},"async-owner":{"source":"./async-owner","ref":"local"},"init-worker":{"source":"./init-worker","ref":"local"},"left":{"source":"./left","ref":"local"},"right":{"source":"./right","ref":"local"},"worker":{"source":"./worker","ref":"local"}}}\n' > "$site/manifest.json"
+printf '{"alias-owner":{"source":"./alias-owner","requested":"local","commit":"local"},"async-owner":{"source":"./async-owner","requested":"local","commit":"local"},"init-worker":{"source":"./init-worker","requested":"local","commit":"local"},"left":{"source":"./left","requested":"local","commit":"local"},"right":{"source":"./right","requested":"local","commit":"local"},"worker":{"source":"./worker","requested":"local","commit":"local"}}\n' > "$site/.nift/packages.lock.json"
 cat > "$site/.nift/packages/worker/src/child.f" <<'F'
 @fn(child_value(x)) { return x }
 export(child_value)

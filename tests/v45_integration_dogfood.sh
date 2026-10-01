@@ -4,6 +4,8 @@ NIFT=${NIFT:-$(pwd)/nift}
 case "$NIFT" in /*) BIN="$NIFT";; *) BIN="$(pwd)/$NIFT";; esac
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 mkdir -p "$T/site/.nift/packages/demo/src" "$T/site/.nift" "$T/site/lib"
+printf '{"dependencies":{"demo":{"source":"./demo","ref":"local"}}}\n' > "$T/site/manifest.json"
+printf '{"demo":{"source":"./demo","requested":"local","commit":"local"}}\n' > "$T/site/.nift/packages.lock.json"
 printf '{"name":"demo","version":"0.1.0","entry":"src/main.f"}\n' > "$T/site/.nift/packages/demo/manifest.json"
 cat > "$T/site/.nift/packages/demo/src/main.f" <<'NIFT'
 fn(package_double(x)) { return x * 2 }

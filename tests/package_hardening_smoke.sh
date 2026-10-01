@@ -86,6 +86,9 @@ if (cd "$t/site" && "$NIFT_ABS" update missing >/dev/null 2>&1); then
 fi
 
 # 4) imports must revalidate the installed manifest identity and entry path.
+printf '{"dependencies":{"changed":{"source":"./changed","ref":"local"},"escaped":{"source":"./escaped","ref":"local"},"iso":{"source":"./iso","ref":"local"},"linked":{"source":"./linked","ref":"local"}}}\n' > "$t/site/manifest.json"
+mkdir -p "$t/site/.nift"
+printf '{"changed":{"source":"./changed","requested":"local","commit":"local"},"escaped":{"source":"./escaped","requested":"local","commit":"local"},"iso":{"source":"./iso","requested":"local","commit":"local"},"linked":{"source":"./linked","requested":"local","commit":"local"}}\n' > "$t/site/.nift/packages.lock.json"
 mkdir -p "$t/site/.nift/packages/changed/src"
 printf '{"name":"other","version":"0.1.0","entry":"src/main.f"}\n' > "$t/site/.nift/packages/changed/manifest.json"
 printf 'value := 1\nexport(value)\n' > "$t/site/.nift/packages/changed/src/main.f"

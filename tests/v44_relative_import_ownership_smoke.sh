@@ -70,6 +70,8 @@ pkg="$site/.nift/packages/owner"
 mkdir -p "$pkg/src/sub" "$site/.nift/packages/bare/src"
 printf '{"name":"owner","version":"0.1.0","entry":"src/main.f"}\n' > "$pkg/manifest.json"
 printf '{"name":"bare","version":"0.1.0","entry":"src/main.f"}\n' > "$site/.nift/packages/bare/manifest.json"
+printf '{"dependencies":{"bare":{"source":"./bare","ref":"local"},"owner":{"source":"./owner","ref":"local"}}}\n' > "$site/manifest.json"
+printf '{"bare":{"source":"./bare","requested":"local","commit":"local"},"owner":{"source":"./owner","requested":"local","commit":"local"}}\n' > "$site/.nift/packages.lock.json"
 cat > "$site/.nift/packages/bare/src/main.f" <<'F'
 @fn(bare_value()) { return "bare-package" }
 export(bare_value)

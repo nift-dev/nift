@@ -49,6 +49,8 @@ EOF
 [[ "$(cd "$T/scripts" && "$NIFT" nested.f)" == 17 ]]
 
 mkdir -p "$T/site/.nift/packages/demo/src"
+printf '{"dependencies":{"demo":{"source":"./demo","ref":"local"}}}\n' > "$T/site/manifest.json"
+printf '{"demo":{"source":"./demo","requested":"local","commit":"local"}}\n' > "$T/site/.nift/packages.lock.json"
 cat >"$T/site/.nift/packages/demo/manifest.json" <<'EOF'
 {"name":"demo","version":"0.1.0","entry":"src/main.f"}
 EOF
