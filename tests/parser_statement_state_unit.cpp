@@ -42,6 +42,70 @@ int main() {
     check_diagnostic("while true {}", "function while requires '(...)'");
     check_diagnostic("fn(example())", "fn requires a block");
 
+    // CP1 diagnostic baseline: nested execution currently preserves only the
+    // message and reconstructs the source tuple at the observing call site.
+    const auto check_exact_failure = [](const RenderResult& result,
+                                        const std::filesystem::path& source,
+                                        const std::string& source_line,
+                                        const std::string& message) {
+        assert(!result.ok);
+        assert(result.error.message == message);
+        assert(result.error.source_file == source);
+        assert(result.error.line == 1);
+        assert(result.error.column == 1);
+        assert(result.error.source_line == source_line);
+        const bool directive = source_line.rfind("$[", 0) == 0 ||
+                               source_line.rfind("@", 0) == 0 ||
+                               source_line.rfind("import(", 0) == 0;
+        const auto expected_length = directive ? source_line.size() : 1;
+        assert(result.error.source_length == expected_length);
+    };
+    ScriptRenderHost diagnostic_host(std::filesystem::current_path());
+    TrackedInfo diagnostic_tracked;
+    Parser diagnostic_parser(diagnostic_host, diagnostic_tracked);
+    check_exact_failure(diagnostic_parser.run_statement("missing_value", "<direct>"),
+                        "<direct>", "$[missing_value]",
+                        "unknown value or malformed expression: missing_value");
+    assert(diagnostic_parser.run_statement(
+        "fn(bad_function()) { return 1 / 0 }", "<define-function>").ok);
+    check_exact_failure(diagnostic_parser.run_statement("bad_function()", "<function-call>"),
+                        "<define-function>", "@return(1 / 0)", "return: division by zero");
+    assert(diagnostic_parser.run_statement(
+        "struct(bad_box) { fn(fail()) { return 1 / 0 } }", "<define-method>").ok);
+    assert(diagnostic_parser.run_statement("box := bad_box()", "<make-method>").ok);
+    check_exact_failure(diagnostic_parser.run_statement("box.fail()", "<method-call>"),
+                        "<define-method>", "@return(1 / 0)", "return: division by zero");
+    assert(diagnostic_parser.run_statement(
+        "bad_lambda := () => { return 1 / 0 }", "<define-lambda>").ok);
+    check_exact_failure(diagnostic_parser.run_statement("bad_lambda()", "<lambda-call>"),
+                        "<define-lambda>", "@return(1 / 0)", "return: division by zero");
+    assert(diagnostic_parser.run_statement(
+        "fn(bad_callback(value)) { return 1 / 0 }", "<define-callback>").ok);
+    check_exact_failure(
+        diagnostic_parser.run_statement("[1].map(bad_callback)", "<callback-call>"),
+        "<define-callback>", "@return(1 / 0)", "return: division by zero");
+    check_exact_failure(
+        diagnostic_parser.run_statement("@script { missing_value }", "<script-block>"),
+        "<script-block>", "$[missing_value]",
+        "unknown value or malformed expression: missing_value");
+
+    assert(diagnostic_parser.run_statement("worker := thread(bad_function)",
+                                           "<thread-create>").ok);
+    for (int observation = 0; observation < 2; ++observation) {
+        check_exact_failure(diagnostic_parser.run_statement("worker.join()", "<thread-join>"),
+                            "<thread-join>", "$[worker.join()]",
+                            "thread: return: division by zero");
+    }
+    assert(diagnostic_parser.run_statement(
+        "@fn[async](bad_future()) { return 1 / 0 }", "<define-future>").ok);
+    assert(diagnostic_parser.run_statement("pending := bad_future()", "<future-create>").ok);
+    for (int observation = 0; observation < 2; ++observation) {
+        check_exact_failure(diagnostic_parser.run_statement("await pending", "<future-await>"),
+                            "<future-await>", "$[await pending]",
+                            "future: return: division by zero");
+    }
+    diagnostic_parser.finalize_execution_workers();
+
     // A failed outer import may have completed child imports and allocated
     // escaping lambdas before its own export validation fails. Repeating that
     // failure must leave the persistent parser clean, and the next import must
@@ -50,11 +114,19 @@ int main() {
     std::error_code ec;std::filesystem::remove_all(root,ec);std::filesystem::create_directories(root,ec);assert(!ec);
     {std::ofstream child(root/"child.f");child<<"fn(private_value()) { return 42 }\ncallback := private_value\nexport(callback)\n";}
     {std::ofstream outer(root/"outer.f");outer<<"import(\"./child.f\")\nleaked := () => { return callback() }\nexport(missing)\n";}
+    {std::ofstream bad(root/"bad.f");bad<<"missing_value\n";}
+    {std::ofstream bad_outer(root/"bad-outer.f");bad_outer<<"import(\"./bad.f\")\n";}
     ScriptRenderHost import_host(root);TrackedInfo import_tracked;Parser import_parser(import_host,import_tracked);
     const auto file_backed_path=import_parser.run_statement("module_path()",root/"main.f");
     assert(file_backed_path.ok&&file_backed_path.output==nift::RuntimeValue(root.generic_string()).dump(0));
     const auto in_memory_path=import_parser.run_statement("module_path()","<statement-resource-test>");
     assert(!in_memory_path.ok&&in_memory_path.error.message.find("no file-backed source")!=std::string::npos);
+    check_exact_failure(import_parser.run_statement("import(\"./bad.f\")",root/"main.f"),
+                        root/"main.f", "import(\"./bad.f\")",
+                        "import: unknown value or malformed expression: missing_value");
+    check_exact_failure(import_parser.run_statement("import(\"./bad-outer.f\")",root/"main.f"),
+                        root/"main.f", "import(\"./bad-outer.f\")",
+                        "import: import: unknown value or malformed expression: missing_value");
     for(int attempt=0;attempt<2;++attempt){const auto failed=import_parser.run_statement("import(\"./outer.f\")",root/"main.f");assert(!failed.ok);assert(failed.error.message.find("export names no existing binding: missing")!=std::string::npos);}
     assert(import_parser.run_statement("import(\"./child.f\")",root/"main.f").ok);
     assert(import_parser.run_statement("answer := callback()",root/"main.f").ok);

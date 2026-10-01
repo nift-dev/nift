@@ -1378,6 +1378,19 @@ test-v46-output: test-v46-output-cli test-v46-output-embed
 
 .PHONY: test-v46-output test-v46-output-cli test-v46-output-embed
 
+test-v46-b4-cp1: $(TARGET) $(PARSER_STATEMENT_STATE_TEST) $(RUNTIME_VALUE_TEST) $(V46_OUTPUT_EMBED_TEST) \
+	test-v42-language test-v43-language test-v44-execution-shell test-v44-packages \
+	test-v44-language-foundation \
+	test-json-schema-integration test-host-seam test-v45-ffi test-v45-concurrency \
+	test-v45-embed-contracts test-c-abi test-c-abi-c-smoke test-bindings
+	$(PARSER_STATEMENT_STATE_TEST)
+	$(RUNTIME_VALUE_TEST)
+	tests/v44_ast_expression_smoke.sh
+	NIFT="$(CURDIR)/$(TARGET)" tests/v46_b4_cp1_characterization.sh
+	$(V46_OUTPUT_EMBED_TEST)
+
+.PHONY: test-v46-b4-cp1
+
 test-v46-relative-imports: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" bash tests/v44_relative_import_ownership_smoke.sh
 	NIFT="$(CURDIR)/$(TARGET)" bash tests/v46_import_worker_ownership_smoke.sh

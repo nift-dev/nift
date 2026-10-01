@@ -65,6 +65,65 @@ int main() {
     assert(!nift::ast::evaluate(*overflow.expr, context, overflow_result, overflow_error));
     assert(overflow_error == "arithmetic result is not finite");
 
+    // CP1 baseline: prepared callable dispatch uses false + empty error for
+    // Unsupported, while false + a message is an actual failure.
+    {
+        auto parsed = nift::ast::parse_expression("probe()");
+        assert(parsed.supported);
+        int legacy_calls = 0;
+        context.call = [](const std::string&, std::vector<nift::RuntimeValue>&&,
+                          nift::RuntimeValue&, std::string&) { return false; };
+        context.legacy = [&](const std::string& source, nift::RuntimeValue& out,
+                             std::string&) {
+            ++legacy_calls;
+            assert(source == "probe()");
+            out = nift::RuntimeValue(19);
+            return true;
+        };
+        nift::RuntimeValue out;
+        std::string error;
+        assert(nift::ast::evaluate(*parsed.expr, context, out, error));
+        assert(out.is_number() && out.num == 19 && legacy_calls == 1);
+
+        context.call = [](const std::string&, std::vector<nift::RuntimeValue>&&,
+                          nift::RuntimeValue&, std::string& error) {
+            error = "prepared callable failed";
+            return false;
+        };
+        legacy_calls = 0;
+        error.clear();
+        assert(!nift::ast::evaluate(*parsed.expr, context, out, error));
+        assert(error == "prepared callable failed" && legacy_calls == 0);
+    }
+
+    // Native methods currently have no failure/unsupported distinction: false
+    // falls back even when the prepared method supplied an error. CP2 must make
+    // any correction explicit rather than silently changing this baseline.
+    {
+        auto parsed = nift::ast::parse_expression("o.probe()");
+        assert(parsed.supported);
+        int legacy_calls = 0;
+        context.native_method = [](const nift::RuntimeValue&, const std::string&,
+                                   std::vector<nift::RuntimeValue>&&,
+                                   nift::RuntimeValue&, std::string& error) {
+            error = "prepared method failed";
+            return false;
+        };
+        context.legacy = [&](const std::string& source, nift::RuntimeValue& out,
+                             std::string& error) {
+            ++legacy_calls;
+            assert(source == "o.probe()");
+            assert(error == "prepared method failed");
+            error.clear();
+            out = nift::RuntimeValue(23);
+            return true;
+        };
+        nift::RuntimeValue out;
+        std::string error;
+        assert(nift::ast::evaluate(*parsed.expr, context, out, error));
+        assert(out.is_number() && out.num == 23 && legacy_calls == 1);
+    }
+
     for (const auto* source : {"x = y + 1", "x += y", "++x", "y--",
                                "if(x > y) { x += 1 }", "while(x < 10) { x++ }"}) {
         auto statement = nift::ast::parse_statement(source);

@@ -9,5 +9,13 @@ int main(void){
   assert(nift_script_result_stdout(r,&stream)==NIFT_OK); assert(stream.length==4&&!memcmp(stream.data,"out\n",4));
   assert(nift_script_result_stderr(r,&stream)==NIFT_OK); assert(stream.length==4&&!memcmp(stream.data,"err\n",4)); nift_script_result_free(r);
   const char* ex="add(2,3)"; r=0; assert(nift_engine_evaluate(e,ex,strlen(ex),&r)==NIFT_OK); assert(nift_script_result_ok(r)); assert(nift_script_result_value_json(r,&out)==NIFT_OK); assert(out.length==1&&out.data[0]=='5'); assert(nift_script_result_stdout(r,&stream)==NIFT_OK&&stream.length==0); assert(nift_script_result_stderr(r,&stream)==NIFT_OK&&stream.length==0); nift_script_result_free(r);
+  const char* fail="print(\"before-out\"); err(\"before-err\"); return 1 / 0"; r=0;
+  assert(nift_engine_execute(e,fail,strlen(fail),"embed",5,0,0,0,&r)==NIFT_OK);
+  assert(r&&!nift_script_result_ok(r));
+  assert(nift_script_result_error_message(r,&out)==NIFT_OK);
+  assert(out.length==24&&!memcmp(out.data,"return: division by zero",24));
+  assert(nift_script_result_stdout(r,&stream)==NIFT_OK&&stream.length==11&&!memcmp(stream.data,"before-out\n",11));
+  assert(nift_script_result_stderr(r,&stream)==NIFT_OK&&stream.length==11&&!memcmp(stream.data,"before-err\n",11));
+  nift_script_result_free(r);
   nift_engine_free(e); return 0;
 }

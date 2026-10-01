@@ -28,8 +28,19 @@ int main() {
     auto failed = engine.execute(
         "print(\"before-out\"); err(\"before-err\"); return 1 / 0");
     assert(!failed.ok());
+    assert(failed.error().message == "return: division by zero");
+    assert(failed.error().source == "<embed>");
+    assert(failed.error().line == 0);
+    assert(failed.error().column == 0);
     assert(failed.stdout_output() == "before-out\n");
     assert(failed.stderr_output() == "before-err\n");
+
+    auto failed_evaluate = engine.evaluate("1 / 0");
+    assert(!failed_evaluate.ok());
+    assert(failed_evaluate.error().message == "division by zero");
+    assert(failed_evaluate.error().source == "<embed>");
+    assert(failed_evaluate.error().line == 0);
+    assert(failed_evaluate.error().column == 0);
 
     auto workers = engine.execute(
         "fn(late()) { sleep(20); print(\"late-out\"); err(\"late-err\"); return 1 }\n"
@@ -52,6 +63,24 @@ int main() {
     assert(rendered.output() == "visible");
     assert(rendered.stdout_output() == "render-out\n");
     assert(rendered.stderr_output() == "render-err\n");
+
+    auto failed_render = engine.render(
+        nift::Source::text("@script { print(\"render-before\"); return 1 / 0 }",
+                           "cp1-render.nift"));
+    assert(!failed_render.ok());
+    assert(failed_render.error().message == "return: division by zero");
+    assert(failed_render.error().source == "cp1-render.nift");
+    assert(failed_render.error().line == 1);
+    assert(failed_render.error().column == 26);
+    assert(failed_render.stdout_output() == "render-before\n");
+
+    auto failed_fragment = engine.render(
+        nift::Source::text("@fragment(bad()){$[1 / 0]}$[bad()]", "cp1-fragment.nift"));
+    assert(!failed_fragment.ok());
+    assert(failed_fragment.error().message == "division by zero");
+    assert(failed_fragment.error().source == "cp1-fragment.nift");
+    assert(failed_fragment.error().line == 1);
+    assert(failed_fragment.error().column == 27);
 
     std::vector<std::thread> threads;
     std::vector<nift::RenderResult> results(8);

@@ -14,6 +14,26 @@ nift::RuntimeValue exact_number(std::string spelling) {
 }
 
 int main() {
+    static_assert(static_cast<int>(nift::RuntimeType::Null) == 0);
+    static_assert(static_cast<int>(nift::RuntimeType::Boolean) == 1);
+    static_assert(static_cast<int>(nift::RuntimeType::Number) == 2);
+    static_assert(static_cast<int>(nift::RuntimeType::StrNumber) == 3);
+    static_assert(static_cast<int>(nift::RuntimeType::String) == 4);
+    static_assert(static_cast<int>(nift::RuntimeType::Array) == 5);
+    static_assert(static_cast<int>(nift::RuntimeType::Object) == 6);
+    static_assert(static_cast<int>(nift::RuntimeType::Bytes) == 7);
+    static_assert(static_cast<int>(nift::RuntimeType::Timer) == 8);
+
+    assert(nift::runtime_fingerprint(nift::RuntimeValue(nullptr)) == "0:");
+    assert(nift::runtime_fingerprint(nift::RuntimeValue(true)) == "1:1");
+    assert(nift::runtime_fingerprint(nift::RuntimeValue(2)) == "2:+2e0");
+    assert(nift::runtime_fingerprint(exact_number("2.00")) == "2:+2e0");
+    assert(nift::runtime_fingerprint(nift::RuntimeValue("x")) == "4:1:x");
+    assert(nift::runtime_fingerprint(nift::RuntimeValue::make_array()) == "5:0[]");
+    assert(nift::runtime_fingerprint(nift::RuntimeValue::make_object()) == "6:0{}");
+    assert(nift::runtime_fingerprint(nift::RuntimeValue(nift::RuntimeBytes{})) == "7:0:");
+    assert(nift::runtime_fingerprint(nift::RuntimeValue::make_timer(4, 9)) == "8:4:9");
+
     json::Document parsed;
     std::string error;
     assert(json::Document::parse(
@@ -33,6 +53,14 @@ int main() {
     const json::Document round_trip = nift::runtime_to_json(value);
     assert(round_trip["exact"].type == json::Type::StrNumber);
     assert(round_trip.dump(0) == parsed.dump(0));
+
+    json::Document error_shaped_json;
+    assert(json::Document::parse(
+        R"({"message":"x","code":"io.open_failed","category":"io","source":"forged.f","line":7,"column":9,"cause":null})",
+        error_shaped_json, error));
+    const auto error_shaped_value = nift::runtime_from_json(error_shaped_json);
+    assert(error_shaped_value.type == nift::RuntimeType::Object);
+    assert(nift::runtime_to_json(error_shaped_value).dump(0) == error_shaped_json.dump(0));
 
     nift::RuntimeValue copy = value;
     copy["nested"].array[3].string = "changed";

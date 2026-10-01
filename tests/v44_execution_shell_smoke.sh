@@ -5,6 +5,7 @@ t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
 echo "MARK exec-shell start"
 cat >"$t/run.f" <<'F'
 r := run("sh", "-c", "printf out; printf err >&2; exit 3")
+if(!r.launched) { return "successful spawn not marked launched" }
 if(r.exit_code != 3) { return "bad exit" }
 if(r.stdout.trim() != "out") { return "bad stdout" }
 if(r.stderr.trim() != "err") { return "bad stderr" }
@@ -13,9 +14,23 @@ if(p.stdout.trim() != "HELLO") { return "bad pipeline" }
 setenv("NIFT_V44_ENV", "yes")
 e := run("sh", "-c", "printf $NIFT_V44_ENV")
 if(e.stdout.trim() != "yes") { return "bad env" }
+missing := run("nift-command-does-not-exist-cp1")
+if(!missing.launched || missing.exit_code != 127 || missing.stdout != "" || missing.stderr != "") { return "bad 127 result" }
 F
 rf_out=$("$NIFT" "$t/run.f" 2>&1) || { echo "run.f failed: $rf_out" >&2; exit 1; }
 test -z "$rf_out" || { echo "run.f returned: $rf_out" >&2; exit 1; }
+case "$(uname -s)" in
+MINGW*|MSYS*) ;;
+*)
+  printf '#!/bin/sh\nexit 0\n' >"$t/not-executable"
+  chmod 644 "$t/not-executable"
+  result=$("$NIFT" -e "r := run(\"$t/not-executable\"); print(r.stringify())")
+  [[ "$result" == '{"exit_code":126,"stdout":"","stderr":"","launched":true}' ]] || {
+    echo "unexpected 126 result: $result" >&2
+    exit 1
+  }
+  ;;
+esac
 echo "MARK after run.f"
 shell_out=$(printf 'printf hello | tr a-z A-Z > %s/out\ncat %s/out\nexit\n' "$t" "$t" | "$NIFT" 2>&1 || true)
 grep -q HELLO <<<"$shell_out" || { echo "shell pipeline: $shell_out" >&2; exit 1; }

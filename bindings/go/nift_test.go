@@ -336,3 +336,15 @@ func TestV46OutputCaptureBytes(t *testing.T) {
 		t.Fatalf("stdout=%v stderr=%v", r.Stdout, r.Stderr)
 	}
 }
+
+func TestV46OutputCaptureOnFailure(t *testing.T) {
+	e := NewEngine()
+	defer e.Close()
+	r, err := e.Execute(`print("before-out"); err("before-err"); return 1 / 0`, "go-test", nil)
+	if err != nil || r.OK || r.Error != "return: division by zero" {
+		t.Fatalf("execute failure: %#v %v", r, err)
+	}
+	if !bytes.Equal(r.Stdout, []byte("before-out\n")) || !bytes.Equal(r.Stderr, []byte("before-err\n")) {
+		t.Fatalf("stdout=%q stderr=%q", r.Stdout, r.Stderr)
+	}
+}
