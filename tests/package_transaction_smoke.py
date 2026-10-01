@@ -72,7 +72,7 @@ if shutil.which("git") is None:
     raise SystemExit(77)
 
 with tempfile.TemporaryDirectory() as raw:
-    root = Path(raw)
+    root = Path(raw).resolve()
     repo = make_repo(root)
     source = f"file://{repo}"
 

@@ -4,6 +4,37 @@ set -euo pipefail
 NIFT=${NIFT:-./nift}
 case "$NIFT" in /*) NIFT_ABS="$NIFT";; *) NIFT_ABS="$(pwd)/$NIFT";; esac
 t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
+make_native_symlink() {
+  local target=$1 link=$2 target_path target_native link_native
+  case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+      # Avoid MSYS copies and runtime-emulated links that native Nift cannot follow.
+      command -v cygpath >/dev/null 2>&1 || return 1
+      command -v powershell.exe >/dev/null 2>&1 || return 1
+      case "$target" in
+        /*) target_path=$target;;
+        *) target_path=$(dirname "$link")/$target;;
+      esac
+      target_native=$(cygpath -aw "$target_path") || return 1
+      link_native=$(cygpath -aw "$link") || return 1
+      if ! MSYS2_ARG_CONV_EXCL='*' NIFT_TEST_SYMLINK_TARGET="$target_native" \
+        NIFT_TEST_SYMLINK_PATH="$link_native" powershell.exe -NoProfile -NonInteractive -Command \
+        '$ErrorActionPreference = "Stop"; $link = $env:NIFT_TEST_SYMLINK_PATH; $target = $env:NIFT_TEST_SYMLINK_TARGET; New-Item -ItemType SymbolicLink -Path $link -Target $target | Out-Null; $item = Get-Item -LiteralPath $link -Force; if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0 -or $item.LinkType -ne "SymbolicLink") { Remove-Item -LiteralPath $link -Force; exit 2 }' \
+        >/dev/null 2>&1; then
+        rm -f "$link"
+        return 1
+      fi
+      ;;
+    *)
+      if ! ln -s "$target" "$link" 2>/dev/null; then rm -f "$link"; return 1; fi
+      if [[ ! -L "$link" ]]; then
+        rm -f "$link"
+        echo "ln -s succeeded without creating a symlink: $link" >&2
+        exit 1
+      fi
+      ;;
+  esac
+}
 
 # Direct/legacy parity, nested paths, Windows separators, and no root fallback.
 mkdir -p "$t/direct/modules/nested"
@@ -50,10 +81,10 @@ fi
 grep -F 'modules/missing.f' "$t/missing.err" >/dev/null
 
 # Canonical identity catches a source imported again through a symlink alias.
-if ln -s main-cycle.f "$t/direct/modules/main-cycle-link.f" 2>/dev/null; then
-  cat > "$t/direct/modules/main-cycle.f" <<'F'
+cat > "$t/direct/modules/main-cycle.f" <<'F'
 import("./main-cycle-link.f")
 F
+if make_native_symlink main-cycle.f "$t/direct/modules/main-cycle-link.f"; then
   if (cd "$t/direct" && "$NIFT_ABS" modules/main-cycle.f >/dev/null 2>"$t/cycle.err"); then
     echo 'symlink self-import cycle succeeded' >&2
     exit 1
@@ -178,7 +209,7 @@ cat > "$t/outside-package.f" <<'F'
 @fn(outside_value()) { return "outside" }
 export(outside_value)
 F
-if ln -s "$t/outside-package.f" "$pkg/src/outside-link.f" 2>/dev/null; then
+if make_native_symlink "$t/outside-package.f" "$pkg/src/outside-link.f"; then
   cat > "$site/symlink-escape.f" <<'F'
 import("owner")
 print(symlink_escape())
