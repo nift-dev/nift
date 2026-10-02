@@ -1443,7 +1443,10 @@ test-v46-b4-cp7: test-v46-b4-cp5b
 test-v46-b4-cp8: test-v46-b4-cp7
 	bash tests/v46_b4_cp8_embedding_abi.sh
 
-.PHONY: test-v46-b4-cp2 test-v46-b4-cp3 test-v46-b4-pre-cp4 test-v46-b4-cp4a test-v46-b4-cp4b test-v46-b4-cp4b-stream-operators test-v46-b4-cp4c test-v46-b4-cp5a test-v46-b4-cp6 test-v46-b4-cp5b test-v46-b4-cp7 test-v46-b4-cp8
+test-v46-b4-cp9: test-v46-b4-cp8
+	bash tests/v46_b4_cp9_final_certification.sh
+
+.PHONY: test-v46-b4-cp2 test-v46-b4-cp3 test-v46-b4-pre-cp4 test-v46-b4-cp4a test-v46-b4-cp4b test-v46-b4-cp4b-stream-operators test-v46-b4-cp4c test-v46-b4-cp5a test-v46-b4-cp6 test-v46-b4-cp5b test-v46-b4-cp7 test-v46-b4-cp8 test-v46-b4-cp9
 
 test-v46-relative-imports: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" bash tests/v44_relative_import_ownership_smoke.sh
