@@ -87,6 +87,12 @@ inline bool parse_graph_lock(const json::Document& document, GraphLock& out, std
         if (commit != "local" && !package_metadata::exact_commit(commit)) {
             error = "package graph node '" + name + "' has an invalid exact commit"; return false;
         }
+        // Local source identity must be paired with the literal local commit;
+        // a Git/non-local source must be paired with an exact accepted commit.
+        const bool local_source = package_metadata::source_is_local_path(node["source"].string);
+        if (local_source != (commit == "local")) {
+            error = "package graph node '" + name + "' has an inconsistent source/commit pairing"; return false;
+        }
         if (!node.has("requirements") || !node["requirements"].is_object()) {
             error = "package graph node '" + name + "' requirements must be an object"; return false;
         }
@@ -225,6 +231,72 @@ inline bool local_source_absolute(const std::filesystem::path& owner_dir,
     }
     out = (owner_dir / source).lexically_normal();
     return true;
+}
+
+// ---- format-aware lock payload interpretation for PackageTransaction ----
+// The transaction journal version is independent of the lock payload format.
+// A journal may carry a v1 direct lock or a future v2 graph lock. These
+// helpers detect the format and produce a format-agnostic per-name view so
+// the transaction's coverage/commit checks do not need graph semantics. They
+// never open installed packages and never perform network access.
+
+struct LockViewEntry {
+    std::string source;      // v1: entry source; v2: canonical node source
+    std::string requested;   // v1: requested ref; v2: empty (no single meaning)
+    std::string commit;      // exact commit or "local"
+};
+
+using LockView = std::map<std::string, LockViewEntry>;
+
+inline bool parse_lock_view(const json::Document& lock_document, LockView& view,
+                            std::string& error) {
+    const LockFormat detected = detect_lock_format(lock_document);
+    if (detected == LockFormat::V1) {
+        package_metadata::Lock lock;
+        if (!package_metadata::parse_lock(lock_document, lock, error)) return false;
+        for (const auto& item : lock)
+            view.emplace(item.first, LockViewEntry{item.second.source, item.second.requested, item.second.commit});
+        return true;
+    }
+    if (detected == LockFormat::V2) {
+        GraphLock graph;
+        if (!parse_graph_lock(lock_document, graph, error)) return false;
+        for (const auto& item : graph.packages)
+            view.emplace(item.first, LockViewEntry{item.second.source, "", item.second.commit});
+        return true;
+    }
+    error = "package lock payload has an unsupported or mixed format";
+    return false;
+}
+
+// Validate a lock payload against the journal manifest, format-aware, and
+// produce the format-agnostic view. v1 uses the existing parse_lock +
+// validate_lock contract; v2 uses parse_graph_lock + validate_graph_lock
+// (self-contained; no installed-package reads, no network).
+inline bool validate_lock_payload_against_manifest(const json::Document& manifest_document,
+                                                   const json::Document& lock_document,
+                                                   LockView& view, std::string& error) {
+    package_metadata::Manifest manifest;
+    if (!package_metadata::parse_manifest(manifest_document, false, manifest, error)) return false;
+    const LockFormat detected = detect_lock_format(lock_document);
+    if (detected == LockFormat::V1) {
+        package_metadata::Lock lock;
+        if (!package_metadata::parse_lock(lock_document, lock, error)) return false;
+        if (!package_metadata::validate_lock(manifest, lock, error)) return false;
+        for (const auto& item : lock)
+            view.emplace(item.first, LockViewEntry{item.second.source, item.second.requested, item.second.commit});
+        return true;
+    }
+    if (detected == LockFormat::V2) {
+        GraphLock graph;
+        if (!parse_graph_lock(lock_document, graph, error)) return false;
+        if (!validate_graph_lock(manifest, graph, error)) return false;
+        for (const auto& item : graph.packages)
+            view.emplace(item.first, LockViewEntry{item.second.source, "", item.second.commit});
+        return true;
+    }
+    error = "package lock payload has an unsupported or mixed format";
+    return false;
 }
 
 }  // namespace package_graph

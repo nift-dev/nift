@@ -38,4 +38,9 @@ fi
     echo 'CP10 FAIL: v1 package transaction recovery wall failed' >&2; exit 1
 }
 
+# ---- 5. CP10a: PackageTransaction recovery understands v2 graph lock payloads ----
+(cd "$ROOT" && python3 tests/v46_b5_cp10a_recovery_smoke.py >/dev/null 2>&1) || {
+    echo 'CP10 FAIL: v2 journal-payload recovery wall failed' >&2; exit 1
+}
+
 echo 'v4.6 Batch 5 CP10 lock graph: PASS'

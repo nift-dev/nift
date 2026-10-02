@@ -121,6 +121,11 @@ int main() {
         CHECK(fail("{\"lockfileVersion\": 2, \"packages\": {\"b\": {\"source\": \"x\", \"commit\": \"local\"}}}"));
         // invalid commit
         CHECK(fail("{\"lockfileVersion\": 2, \"packages\": {\"b\": {\"source\": \"x\", \"commit\": \"not-a-commit\", \"requirements\": {}}}}"));
+        // source/commit coupling: local source must pair with local commit
+        CHECK(fail("{\"lockfileVersion\": 2, \"packages\": {\"b\": {\"source\": \"./local-pkg\", \"commit\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"requirements\": {}}}}"));
+        CHECK(fail("{\"lockfileVersion\": 2, \"packages\": {\"b\": {\"source\": \"/abs/local-pkg\", \"commit\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\", \"requirements\": {}}}}"));
+        // source/commit coupling: Git source must pair with an exact commit
+        CHECK(fail("{\"lockfileVersion\": 2, \"packages\": {\"b\": {\"source\": \"https://github.com/org/b.git\", \"commit\": \"local\", \"requirements\": {}}}}"));
         // requirements not an object
         CHECK(fail("{\"lockfileVersion\": 2, \"packages\": {\"b\": {\"source\": \"x\", \"commit\": \"local\", \"requirements\": [1]}}}"));
         // malformed edge: extra field
@@ -135,7 +140,7 @@ int main() {
         // missing root dependency node
         {
             json::Document doc;
-            CHECK(parse("{\"lockfileVersion\": 2, \"packages\": {\"b\": {\"source\": \"x\", \"commit\": \"local\", \"requirements\": {}}}}", doc, error));
+            CHECK(parse("{\"lockfileVersion\": 2, \"packages\": {\"b\": {\"source\": \"/abs/x\", \"commit\": \"local\", \"requirements\": {}}}}", doc, error));
             package_graph::GraphLock g;
             CHECK(package_graph::parse_graph_lock(doc, g, error));
             CHECK(!package_graph::validate_graph_lock(manifest, g, error));
@@ -143,7 +148,7 @@ int main() {
         // missing edge target
         {
             json::Document doc;
-            CHECK(parse("{\"lockfileVersion\": 2, \"packages\": {\"a\": {\"source\": \"x\", \"commit\": \"local\", \"requirements\": {\"z\": {\"source\": \"y\", \"requested\": \"latest\"}}}}}", doc, error));
+            CHECK(parse("{\"lockfileVersion\": 2, \"packages\": {\"a\": {\"source\": \"/abs/x\", \"commit\": \"local\", \"requirements\": {\"z\": {\"source\": \"y\", \"requested\": \"latest\"}}}}}", doc, error));
             package_graph::GraphLock g;
             CHECK(package_graph::parse_graph_lock(doc, g, error));
             CHECK(!package_graph::validate_graph_lock(manifest, g, error));
@@ -151,7 +156,7 @@ int main() {
         // orphan node (not reachable from any root dep)
         {
             json::Document doc;
-            CHECK(parse("{\"lockfileVersion\": 2, \"packages\": {\"a\": {\"source\": \"x\", \"commit\": \"local\", \"requirements\": {}}, \"orphan\": {\"source\": \"y\", \"commit\": \"local\", \"requirements\": {}}}}", doc, error));
+            CHECK(parse("{\"lockfileVersion\": 2, \"packages\": {\"a\": {\"source\": \"/abs/x\", \"commit\": \"local\", \"requirements\": {}}, \"orphan\": {\"source\": \"/abs/y\", \"commit\": \"local\", \"requirements\": {}}}}", doc, error));
             package_graph::GraphLock g;
             CHECK(package_graph::parse_graph_lock(doc, g, error));
             CHECK(!package_graph::validate_graph_lock(manifest, g, error));
@@ -159,7 +164,7 @@ int main() {
         // self-cycle
         {
             json::Document doc;
-            CHECK(parse("{\"lockfileVersion\": 2, \"packages\": {\"a\": {\"source\": \"x\", \"commit\": \"local\", \"requirements\": {\"a\": {\"source\": \"x\", \"requested\": \"latest\"}}}}}", doc, error));
+            CHECK(parse("{\"lockfileVersion\": 2, \"packages\": {\"a\": {\"source\": \"/abs/x\", \"commit\": \"local\", \"requirements\": {\"a\": {\"source\": \"/abs/x\", \"requested\": \"latest\"}}}}}", doc, error));
             package_graph::GraphLock g;
             CHECK(package_graph::parse_graph_lock(doc, g, error));
             CHECK(!package_graph::validate_graph_lock(manifest, g, error));
@@ -168,7 +173,7 @@ int main() {
         // multi-node cycle a -> b -> a
         {
             json::Document doc;
-            CHECK(parse("{\"lockfileVersion\": 2, \"packages\": {\"a\": {\"source\": \"x\", \"commit\": \"local\", \"requirements\": {\"b\": {\"source\": \"y\", \"requested\": \"latest\"}}}, \"b\": {\"source\": \"y\", \"commit\": \"local\", \"requirements\": {\"a\": {\"source\": \"x\", \"requested\": \"latest\"}}}}}", doc, error));
+            CHECK(parse("{\"lockfileVersion\": 2, \"packages\": {\"a\": {\"source\": \"/abs/x\", \"commit\": \"local\", \"requirements\": {\"b\": {\"source\": \"/abs/y\", \"requested\": \"latest\"}}}, \"b\": {\"source\": \"/abs/y\", \"commit\": \"local\", \"requirements\": {\"a\": {\"source\": \"/abs/x\", \"requested\": \"latest\"}}}}}", doc, error));
             package_graph::GraphLock g;
             CHECK(package_graph::parse_graph_lock(doc, g, error));
             CHECK(!package_graph::validate_graph_lock(manifest, g, error));
@@ -190,15 +195,15 @@ int main() {
                 g.packages[name] = std::move(node);
             };
             if (reverse) {
-                add("d", "s4", "local", {});
-                add("c", "s3", "local", {});
-                add("b", "s2", "local", {});
-                add("a", "s1", "local", {{"b", {"s2", "latest"}}});
+                add("d", "/abs/s4", "local", {});
+                add("c", "/abs/s3", "local", {});
+                add("b", "/abs/s2", "local", {});
+                add("a", "/abs/s1", "local", {{"b", {"/abs/s2", "latest"}}});
             } else {
-                add("a", "s1", "local", {{"b", {"s2", "latest"}}});
-                add("b", "s2", "local", {});
-                add("c", "s3", "local", {});
-                add("d", "s4", "local", {});
+                add("a", "/abs/s1", "local", {{"b", {"/abs/s2", "latest"}}});
+                add("b", "/abs/s2", "local", {});
+                add("c", "/abs/s3", "local", {});
+                add("d", "/abs/s4", "local", {});
             }
             return g;
         };

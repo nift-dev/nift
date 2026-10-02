@@ -2,6 +2,7 @@
 
 #include "FileSystem.h"
 #include "JsonFile.h"
+#include "PackageGraphLock.h"
 #include "PackageMetadata.h"
 
 #include <algorithm>
@@ -269,11 +270,8 @@ bool PackageTransaction::commit(const std::vector<Operation>& operations,
                                 std::string& error) {
     if (!locked_ || staging_root_.empty()) { error = "package transaction is not prepared"; return false; }
     if (!exclusive_ || !lock_path_matches(nift_root_/".packages-transaction.lock", lock_file_)) { error = "package transaction lock identity changed"; return false; }
-    package_metadata::Manifest parsed_manifest;
-    package_metadata::Lock parsed_lock;
-    if (!package_metadata::parse_manifest(manifest, false, parsed_manifest, error) ||
-        !package_metadata::parse_lock(lock, parsed_lock, error) ||
-        !package_metadata::validate_lock(parsed_manifest, parsed_lock, error)) return false;
+    package_graph::LockView parsed_lock;
+    if (!package_graph::validate_lock_payload_against_manifest(manifest, lock, parsed_lock, error)) return false;
 
     std::vector<Operation> sorted = operations;
     std::sort(sorted.begin(), sorted.end(), [](const Operation& a, const Operation& b) { return a.name < b.name; });
@@ -337,11 +335,8 @@ bool PackageTransaction::apply_journal(const json::Document& journal, std::strin
         !journal.has("oldLock") || !(journal["oldLock"].is_null() || journal["oldLock"].is_string())) {
         error = "invalid package transaction journal"; return false;
     }
-    package_metadata::Manifest manifest;
-    package_metadata::Lock lock;
-    if (!package_metadata::parse_manifest(journal["manifest"], false, manifest, error) ||
-        !package_metadata::parse_lock(journal["lock"], lock, error) ||
-        !package_metadata::validate_lock(manifest, lock, error)) return false;
+    package_graph::LockView lock;
+    if (!package_graph::validate_lock_payload_against_manifest(journal["manifest"], journal["lock"], lock, error)) return false;
 
     const std::string manifest_text = journal["manifest"].dump(2) + "\n";
     const std::string lock_text = journal["lock"].dump(2) + "\n";
@@ -369,14 +364,17 @@ bool PackageTransaction::apply_journal(const json::Document& journal, std::strin
     if (transaction_root.parent_path() != package_root_) { error = "package transaction path escapes the package store"; return false; }
     if(!real_directory(transaction_root)||!real_directory(transaction_root/"new")||!real_directory(transaction_root/"old")){error="package transaction staging layout is missing or redirected";return false;}
 
-    package_metadata::Lock old_lock;
+    package_graph::LockView old_lock;
     if(journal["oldLock"].is_string()){
         json::Document old_lock_document;std::string parse_error;
-        if(!nift_json::parse(journal["oldLock"].string,old_lock_document,parse_error)||!package_metadata::parse_lock(old_lock_document,old_lock,error)){error="invalid old package lock in transaction journal";return false;}
+        if(!nift_json::parse(journal["oldLock"].string,old_lock_document,parse_error)||!package_graph::parse_lock_view(old_lock_document,old_lock,error)){error="invalid old package lock in transaction journal";return false;}
     }
     std::map<std::string,Kind> operation_kinds;for(const auto& operation:operations)operation_kinds.emplace(operation.name,operation.kind);
     std::set<std::string> lock_names;for(const auto& item:old_lock)lock_names.insert(item.first);for(const auto& item:lock)lock_names.insert(item.first);
-    auto lock_equal=[](const package_metadata::LockEntry& a,const package_metadata::LockEntry& b){return a.source==b.source&&a.requested==b.requested&&a.commit==b.commit;};
+    // Store-slot identity is (canonical source, exact commit); requested is v1
+    // only and has no single meaning in a v2 node, so change detection compares
+    // source + commit (format-agnostic).
+    auto lock_equal=[](const package_graph::LockViewEntry& a,const package_graph::LockViewEntry& b){return a.source==b.source&&a.commit==b.commit;};
     for(const auto& name:lock_names){const auto before=old_lock.find(name),after=lock.find(name);const bool changed=before==old_lock.end()||after==lock.end()||!lock_equal(before->second,after->second);if(!changed)continue;const auto operation=operation_kinds.find(name);const Kind required=after==lock.end()?Kind::Remove:Kind::Replace;if(operation==operation_kinds.end()||operation->second!=required){error="package transaction operations do not cover lock change: "+name;return false;}}
 
     // Recovery independently validates every replacement before moving any old
@@ -422,10 +420,11 @@ bool PackageTransaction::apply_journal(const json::Document& journal, std::strin
     crash_at("after-lock");
 
     package_metadata::Manifest verified_manifest;
-    package_metadata::Lock verified_lock; bool lock_exists = false;
-    if (!package_metadata::load_manifest(project_root_/"manifest.json", false, verified_manifest, error) ||
-        !package_metadata::load_lock(nift_root_/"packages.lock.json", verified_lock, lock_exists, error) || !lock_exists ||
-        !package_metadata::validate_lock(verified_manifest, verified_lock, error)) return false;
+    json::Document verified_manifest_doc;json::Document verified_lock_doc;package_graph::LockView verified_lock;
+    if (!load_json_file(project_root_/"manifest.json", verified_manifest_doc, error) ||
+        !package_metadata::parse_manifest(verified_manifest_doc, false, verified_manifest, error) ||
+        !load_json_file(nift_root_/"packages.lock.json", verified_lock_doc, error) ||
+        !package_graph::validate_lock_payload_against_manifest(verified_manifest_doc, verified_lock_doc, verified_lock, error)) return false;
     for (const auto& operation : operations) {
         const fs::path live = package_root_/operation.name;
         if (operation.kind == Kind::Remove) {

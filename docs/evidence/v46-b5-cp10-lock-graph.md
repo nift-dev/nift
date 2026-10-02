@@ -98,14 +98,36 @@ a CWD change.
 - Migration stays dormant: no command writes v2 yet. The first successful
   graph-aware mutating operation (CP12) emits v2 atomically.
 
-## PackageTransaction recovery compatibility
+## PackageTransaction recovery compatibility (CP10a)
 
 The journal version and the lock-format version are separate concerns; the
-journal version is unchanged. In CP10 all journals carry v1 payloads (commands
-emit v1), so recovery is untouched and the existing v1 recovery walls pass.
-CP12 must extend `apply_journal`'s `parse_lock`/`validate_lock` to understand
-a v2 graph payload once commands begin writing v2 (the journal stays version
-1). Documented integration point; no half-v2 state is created.
+journal version is unchanged. Recovery now understands both payload formats:
+
+- `PackageGraphLock.h` adds `LockView`/`LockViewEntry`,
+  `parse_lock_view` (format-detecting parse for the old lock), and
+  `validate_lock_payload_against_manifest` (format-aware parse + validate:
+  v1 uses the existing `parse_lock`+`validate_lock`; v2 uses
+  `parse_graph_lock`+`validate_graph_lock`). No installed-package reads, no
+  network, during recovery.
+- `PackageTransaction::commit` and `apply_journal` delegate lock-payload
+  interpretation to these helpers. `apply_journal`'s post-publication
+  verification also re-reads the published manifest+lock format-aware, so a
+  published v2 lock verifies and the journal/staging are cleaned exactly as
+  for v1. Coverage change-detection compares store-slot identity
+  (canonical source + exact commit) format-agnostically (`requested` has no
+  single meaning in a v2 node).
+- Existing v1 journal bytes are accepted unchanged and the existing v1
+  recovery wall stays green.
+- `tests/v46_b5_cp10a_recovery_smoke.py` constructs interrupted-transaction
+  journals directly and triggers recovery: a valid v2 payload is accepted and
+  replayed to the deterministic final filesystem state with normal journal
+  cleanup; malformed v2 payloads (unsupported version, missing edge target,
+  orphan, cycle, malformed node/edge) are rejected without mutating the store
+  or cleaning the unapplied journal. Journal version remains 1 throughout.
+
+This removes the unsafe "commands write v2 but recovery only reads v1"
+integration sequence before any command wiring exists. Commands still emit v1
+in CP10/CP10a; the v2 serializer/parser and recovery substrate are format-ready.
 
 ## Runtime provenance audit (CP12 integration notes)
 
