@@ -57,34 +57,47 @@ public:
     enum class Kind { Normal, Return, Break, Continue, Recoverable, Fatal };
 
     static ExecOutcome normal() { return ExecOutcome{}; }
-    static ExecOutcome returned() { return ExecOutcome{Kind::Return, std::nullopt}; }
-    static ExecOutcome broken() { return ExecOutcome{Kind::Break, std::nullopt}; }
-    static ExecOutcome continued() { return ExecOutcome{Kind::Continue, std::nullopt}; }
+    static ExecOutcome returned() { return ExecOutcome{Kind::Return}; }
+    static ExecOutcome broken() { return ExecOutcome{Kind::Break}; }
+    static ExecOutcome continued() { return ExecOutcome{Kind::Continue}; }
     static ExecOutcome recoverable(RuntimeValue error_value) {
         if (!error_value.is_error()) throw std::logic_error("recoverable outcome requires Error");
         ExecOutcome outcome;
         outcome.kind_ = Kind::Recoverable;
-        outcome.error_ = std::move(error_value);
+        outcome.payload_ = std::make_unique<Payload>(Payload{std::nullopt, std::move(error_value)});
         return outcome;
     }
     static ExecOutcome fatal(Diagnostic diagnostic) {
-        return ExecOutcome{Kind::Fatal, std::move(diagnostic)};
+        ExecOutcome outcome;
+        outcome.kind_ = Kind::Fatal;
+        outcome.payload_ = std::make_unique<Payload>(Payload{std::move(diagnostic), std::nullopt});
+        return outcome;
     }
 
     Kind kind() const { return kind_; }
-    Diagnostic& diagnostic() { return *diagnostic_; }
-    const Diagnostic& diagnostic() const { return *diagnostic_; }
-    RuntimeValue& error() { return *error_; }
-    const RuntimeValue& error() const { return *error_; }
+    Diagnostic& diagnostic() { return *payload_->diagnostic; }
+    const Diagnostic& diagnostic() const { return *payload_->diagnostic; }
+    RuntimeValue& error() { return *payload_->error; }
+    const RuntimeValue& error() const { return *payload_->error; }
+
+    ExecOutcome(ExecOutcome&&) noexcept = default;
+    ExecOutcome& operator=(ExecOutcome&&) noexcept = default;
+    ExecOutcome(const ExecOutcome&) = delete;
+    ExecOutcome& operator=(const ExecOutcome&) = delete;
 
 private:
+    // The exceptional payload lives on the heap so the overwhelmingly common
+    // Normal/Return/Break/Continue paths stay tiny with no allocation. The
+    // failure path (Recoverable/Fatal) pays one allocation.
+    struct Payload {
+        std::optional<Diagnostic> diagnostic;
+        std::optional<RuntimeValue> error;
+    };
     ExecOutcome() = default;
-    ExecOutcome(Kind kind, std::optional<Diagnostic> diagnostic)
-        : kind_(kind), diagnostic_(std::move(diagnostic)) {}
+    explicit ExecOutcome(Kind kind) : kind_(kind) {}
 
     Kind kind_ = Kind::Normal;
-    std::optional<Diagnostic> diagnostic_;
-    std::optional<RuntimeValue> error_;
+    std::unique_ptr<Payload> payload_;
 };
 
 template <typename T>
