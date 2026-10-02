@@ -149,10 +149,14 @@ grep -q 'unknown value or malformed expression: after_failed_import' "$TMP/repl.
     echo 'failed REPL import installed a later export' >&2
     exit 1
 }
-if grep -q 'import:' "$TMP/repl.err"; then
-    echo 'failed REPL import unexpectedly produced an import diagnostic' >&2
+# CP6 corrected the REPL import routing: a failing import now reports its own
+# diagnostic (previously it was misrouted as an external command and silently
+# swallowed) while still not installing any later export. The REPL stays usable.
+grep -q 'import: unknown value or malformed expression: missing_from_import' "$TMP/repl.err" || {
+    echo 'failed REPL import did not report its diagnostic' >&2
+    printf '%s\n' "$(<"$TMP/repl.err")" >&2
     exit 1
-fi
+}
 grep -q '42' "$TMP/repl.out" || {
     printf 'REPL did not retain state:\n%s\n' "$(<"$TMP/repl.out")" >&2
     exit 1

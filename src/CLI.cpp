@@ -1149,7 +1149,10 @@ static int run_script_shell_loop(Parser& parser, bool load_rc) {
             // Executable paths (./x, ../x, /x, dir/x) are ordinary external
             // commands even without arguments, exactly like Bash executing a
             // path: ./hello.f, ./scripts/deploy.f, ../tools/generate.f.
-            if(!command_style&&!assignment_like&&!toks.empty()&&toks[0][0]!='#'&&(toks[0].rfind("./",0)==0||toks[0].rfind("../",0)==0||toks[0][0]=='/'||toks[0].find('/')!=std::string::npos))command_style=true;
+            // A token containing '(' is Nift call/statement syntax, never a
+            // path command (shell_tokens strips quotes, so import("./x") would
+            // otherwise look like a path).
+            if(!command_style&&!assignment_like&&!toks.empty()&&toks[0][0]!='#'&&toks[0].find('(')==std::string::npos&&(toks[0].rfind("./",0)==0||toks[0].rfind("../",0)==0||toks[0][0]=='/'||toks[0].find('/')!=std::string::npos))command_style=true;
         }
         if(command_style){execute_shell_command(parser,trimmed,true,&jobs);pending.clear();continue;}
         const Parser::StatementState st=parser.statement_state(pending);
