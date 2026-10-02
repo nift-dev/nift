@@ -2336,9 +2336,9 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     if(method=="read"){if(aa.size()!=1||st->kind!=StreamInstance::Kind::Input){error="read: expected byte count on input stream";return false;}nift::RuntimeValue n;size_t count=0;if(!eval(aa[0],n,depth+1)||!nift::runtime_number_to_size(n,count)){error="read: invalid byte count";return false;}constexpr std::size_t chunk_size=64*1024;std::vector<char> chunk(chunk_size);std::string b;std::size_t remaining=count;while(remaining>0&&*st->input){const auto requested=static_cast<std::streamsize>(std::min(remaining,chunk_size));st->input->read(chunk.data(),requested);const auto received=st->input->gcount();if(received<=0)break;b.append(chunk.data(),static_cast<std::size_t>(received));remaining-=static_cast<std::size_t>(received);if(received<requested)break;}if(st->input->bad())return fail_recoverable(nift::detail::DiagnosticCode::StreamReadFailed,"read: input failure",error);out=nift::RuntimeValue(b);return true;}
                     if(method=="read_bytes"||method=="read_all_bytes"){if(st->kind!=StreamInstance::Kind::Input){error=method+": expected input stream";return false;}if(st->input->bad())return fail_recoverable(nift::detail::DiagnosticCode::StreamReadFailed,method+": input failure",error);std::size_t count=std::numeric_limits<std::size_t>::max();if(method=="read_bytes"){if(aa.size()!=1){error="read_bytes: expected byte count on input stream";return false;}nift::RuntimeValue n;if(!eval(aa[0],n,depth+1)||!nift::runtime_number_to_size(n,count)){error="read_bytes: invalid byte count";return false;}}else if(!aa.empty()){error="read_all_bytes: expected input stream and no arguments";return false;}constexpr std::size_t chunk_size=64*1024;std::vector<char> chunk(chunk_size);nift::RuntimeBytes b;while(count>0&&*st->input){const std::size_t wanted=std::min(count,chunk_size);st->input->read(chunk.data(),static_cast<std::streamsize>(wanted));const auto received=st->input->gcount();if(received>0)b.insert(b.end(),chunk.begin(),chunk.begin()+received);if(st->input->bad())return fail_recoverable(nift::detail::DiagnosticCode::StreamReadFailed,method+": input failure",error);if(received<=0)break;if(count!=std::numeric_limits<std::size_t>::max())count-=static_cast<std::size_t>(received);if(static_cast<std::size_t>(received)<wanted)break;}if(st->input->bad())return fail_recoverable(nift::detail::DiagnosticCode::StreamReadFailed,method+": input failure",error);out=nift::RuntimeValue(std::move(b));return true;}
                     if(method=="read_val"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Input){error="read_val: expected input stream and no arguments";return false;}*st->input>>std::ws;if(st->input->peek()==std::char_traits<char>::eof()){out=nift::RuntimeValue(nullptr);return true;}std::string token;char first=(char)st->input->peek();if(first=='"'||first=='['||first=='{'){char open=first,close=first=='['?']':first=='{'?'}':'"';int dep=0;bool quoted=false,esc=false;char c;while(st->input->get(c)){token+=c;if(open=='"'){if(esc){esc=false;continue;}if(c=='\\'){esc=true;continue;}if(token.size()>1&&c=='"')break;}else{if(quoted){if(esc)esc=false;else if(c=='\\')esc=true;else if(c=='"')quoted=false;}else if(c=='"')quoted=true;else if(c==open)++dep;else if(c==close&&--dep==0)break;}}}else{while(st->input->peek()!=std::char_traits<char>::eof()&&!std::isspace((unsigned char)st->input->peek()))token+=(char)st->input->get();}nift::RuntimeValue v;std::string ee;if(!eval(token,v,depth+1)){error=std::string("read_val: ")+(error.empty()?("cannot parse value '"+token+"'"):error);return false;}if(runtime_contains_bytes(v)){error="read_val: bytes values are not serializable";return false;}out=v;return true;}
-                    if(method=="write_bytes"){if(aa.size()!=1||st->kind!=StreamInstance::Kind::Output){error="write_bytes: expected one bytes value on output stream";return false;}nift::RuntimeValue v;if(!eval(aa[0],v,depth+1))return false;if(!v.is_bytes()){error="write_bytes: expected bytes";return false;}const nift::RuntimeBytes empty;const auto& raw=v.bytes?*v.bytes:empty;st->output->write(reinterpret_cast<const char*>(raw.data()),static_cast<std::streamsize>(raw.size()));if(!*st->output)return fail_recoverable(nift::detail::DiagnosticCode::StreamWriteFailed,"write_bytes: output failure",error);out=nift::RuntimeValue(nullptr);return true;}
+                    if(method=="write_bytes"){if(aa.size()!=1||st->kind!=StreamInstance::Kind::Output){error="write_bytes: expected one bytes value on output stream";return false;}nift::RuntimeValue v;if(!eval(aa[0],v,depth+1))return false;if(!v.is_bytes()){error="write_bytes: expected bytes";return false;}if(!stream_write_value(st,v,"write_bytes",error))return false;out=nift::RuntimeValue(nullptr);return true;}
                     if(method=="write_val"){if(aa.size()!=1||st->kind!=StreamInstance::Kind::Output){error="write_val: expected one value on output stream";return false;}nift::RuntimeValue v;if(!((!qq.empty()&&qq[0])?(v=nift::RuntimeValue(aa[0]),true):eval(aa[0],v,depth+1)))return false;if(v.is_string()&&!qq.empty()&&qq[0]&&v.string.find("$[")!=std::string::npos){std::string r,e;if(!interpolate_parameter(v.string,r,e)){error="write_val: "+e;return false;}v=nift::RuntimeValue(r);}std::string serialized;if(!serialize_value(v,false,serialized,error,0,true))return false;*st->output<<serialized<<'\n';if(!*st->output)return fail_recoverable(nift::detail::DiagnosticCode::StreamWriteFailed,"write_val: output failure",error);out=nift::RuntimeValue(nullptr);return true;}
-                    if(method=="write"||method=="write_line"){if(aa.size()!=1||st->kind!=StreamInstance::Kind::Output){error=method+": expected one value on output stream";return false;}nift::RuntimeValue v;if(!((!qq.empty()&&qq[0])?(v=nift::RuntimeValue(aa[0]),true):eval(aa[0],v,depth+1)))return false;if(v.is_string()&&!qq.empty()&&qq[0]&&v.string.find("$[")!=std::string::npos){std::string r,e;if(!interpolate_parameter(v.string,r,e)){error=method+": "+e;return false;}v=nift::RuntimeValue(r);}if(method=="write"&&v.is_bytes()){const nift::RuntimeBytes empty;const auto& raw=v.bytes?*v.bytes:empty;st->output->write(reinterpret_cast<const char*>(raw.data()),static_cast<std::streamsize>(raw.size()));}else{if(v.is_error()||v.is_timer()||v.is_bytes()||v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0&&v.string.rfind("\x1fnift:timer:",0)!=0)){error=method+": value is not directly renderable";return false;}*st->output<<render_expression_value(v);if(method=="write_line")*st->output<<'\n';}if(!*st->output)return fail_recoverable(nift::detail::DiagnosticCode::StreamWriteFailed,method+": output failure",error);out=nift::RuntimeValue(nullptr);return true;}
+                    if(method=="write"||method=="write_line"){if(aa.size()!=1||st->kind!=StreamInstance::Kind::Output){error=method+": expected one value on output stream";return false;}nift::RuntimeValue v;if(!((!qq.empty()&&qq[0])?(v=nift::RuntimeValue(aa[0]),true):eval(aa[0],v,depth+1)))return false;if(v.is_string()&&!qq.empty()&&qq[0]&&v.string.find("$[")!=std::string::npos){std::string r,e;if(!interpolate_parameter(v.string,r,e)){error=method+": "+e;return false;}v=nift::RuntimeValue(r);}if(method=="write_line"&&v.is_bytes()){error="write_line: value is not directly renderable";return false;}if(!stream_write_value(st,v,method,error))return false;if(method=="write_line"){*st->output<<'\n';if(!*st->output)return fail_recoverable(nift::detail::DiagnosticCode::StreamWriteFailed,"write_line: output failure",error);}out=nift::RuntimeValue(nullptr);return true;}
                     if(method=="flush"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Output){error="flush: expected output stream and no arguments";return false;}st->output->flush();if(!*st->output)return fail_recoverable(nift::detail::DiagnosticCode::StreamFlushFailed,"flush: output failure",error);out=nift::RuntimeValue(nullptr);return true;}
                 }
             }}
@@ -3126,9 +3126,66 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             nift::RuntimeValue right; if (!eval(text.substr(p+2),right,depth+1)) return false;
             out=nift::RuntimeValue(truthy_value(right)); return true;
         }
+        // Stream insertion/extraction operators. Handled lazily inside the comparison
+        // loop below so expressions without a top-level << or >> pay nothing
+        // extra. try_stream_operator returns 0 (not a stream operation, fall
+        // through), 1 (handled, out set), or 2 (error already staged).
+        auto try_stream_operator = [&](bool insert) -> int {
+            std::size_t sop = std::string::npos;
+            { bool q=false; char qc=0; int pa=0,br=0,bc2=0;
+              for (std::size_t z=text.size(); z-- > 0;) {
+                char c=text[z];
+                if (q) { if (c==qc && (z==0 || text[z-1]!='\\')) q=false; continue; }
+                if (c=='\'' || c=='"') { q=true; qc=c; continue; }
+                if (c==')') ++pa; else if (c=='(') --pa;
+                else if (c==']') ++br; else if (c=='[') --br;
+                else if (c=='}') ++bc2; else if (c=='{') --bc2;
+                if (pa || br || bc2) continue;
+                if (z+1<text.size() && text[z]=='<' && text[z+1]=='<') { sop=z; break; }
+                if (z>0 && text[z]=='>' && text[z-1]=='>') { sop=z-1; break; }
+              } }
+            if (sop == std::string::npos) return 0;
+            nift::RuntimeValue stream_value;
+            if (!eval(text.substr(0,sop), stream_value, depth+1)) return 2;
+            if (!(stream_value.is_string() && stream_value.string.rfind("\x1fnift:stream:",0)==0)) return 0;
+            auto it = stream_instances_.find(stream_value.string.substr(13));
+            if (it == stream_instances_.end()) { error = "stream is closed or invalid"; return 2; }
+            if (!it->second->open) { error = it->second->closed ? "stream is closed or invalid" : "stream is not open"; return 2; }
+            auto st = it->second;
+            const std::string rhs_text = trim_copy(text.substr(sop+2));
+            if (insert) {
+                if (st->kind != StreamInstance::Kind::Output) { error = "insertion requires an output stream"; return 2; }
+                nift::RuntimeValue v;
+                if (!eval(rhs_text, v, depth+1)) return 2;
+                if (!stream_write_value(st, v, "write", error)) return 2;
+                out = std::move(stream_value); return 1;
+            }
+            if (st->kind != StreamInstance::Kind::Input) { error = "extraction requires an input stream"; return 2; }
+            if (!valid_binding_identifier(rhs_text)) { error = "extraction destination must be an assignable binding"; return 2; }
+            VariableBinding* db = find_binding(rhs_text);
+            if (!db || !db->mutable_binding) { error = "extraction destination is not mutable"; return 2; }
+            if (db->is_location_ref()) { error = "extraction destination must be a simple mutable binding"; return 2; }
+            db->sync();
+            if (!db->value) { error = "extraction destination has no value"; return 2; }
+            nift::RuntimeValue dest = *db->value;
+            if (dest.is_array() || dest.is_object() || dest.is_bytes() || dest.is_timer() || dest.is_error()) {
+                error = "extraction destination type is not supported"; return 2;
+            }
+            const auto ext = stream_extract_token(*st, dest, error);
+            if (ext == StreamExtraction::Backend || ext == StreamExtraction::Conversion) return 2;
+            if (ext == StreamExtraction::Ok)
+                db->rebind(std::make_shared<nift::RuntimeValue>(std::move(dest)));
+            out = std::move(stream_value); return 1;
+        };
         for (const std::string op : {"==","!=","<=",">=","<",">"}) {
             const auto p=find_top_level_op(op);
             if (p==std::string::npos) continue;
+            if ((op=="<" && p+1<text.size() && text[p+1]=='<') ||
+                (op==">" && p+1<text.size() && text[p+1]=='>')) {
+                const int sr = try_stream_operator(op=="<");
+                if (sr == 1) return true;
+                if (sr == 2) return false;
+            }
             nift::RuntimeValue left,right;
             if (!eval(text.substr(0,p),left,depth+1) || !eval(text.substr(p+op.size()),right,depth+1)) return false;
             nift::RuntimeValue ls,rs;if(!atomic_scalar(left,ls)||!atomic_scalar(right,rs))return false;left=std::move(ls);right=std::move(rs);

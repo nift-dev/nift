@@ -454,6 +454,11 @@ private:
     bool fail_recoverable(nift::detail::DiagnosticCode code, std::string message, std::string& error);
     bool stream_open(std::shared_ptr<StreamInstance> stream, const std::filesystem::path& path, std::string& error);
     bool stream_close(std::shared_ptr<StreamInstance> stream, std::string& error);
+    enum class StreamExtraction { Ok, Eof, Conversion, Backend };
+    bool stream_write_value(std::shared_ptr<StreamInstance> stream, const nift::RuntimeValue& value,
+                            const std::string& label, std::string& error);
+    StreamExtraction stream_extract_token(StreamInstance& stream, nift::RuntimeValue& destination,
+                                          std::string& error);
     void append_diagnostic_frame(nift::detail::DiagnosticFrameKind kind,
                                  std::string label,
                                  std::string compatibility_prefix = {});

@@ -853,6 +853,86 @@ bool Parser::stream_close(std::shared_ptr<StreamInstance> stream, std::string& e
     return true;
 }
 
+bool Parser::stream_write_value(std::shared_ptr<StreamInstance> stream,
+                                const nift::RuntimeValue& value,
+                                const std::string& label, std::string& error) {
+    if (value.is_bytes()) {
+        const nift::RuntimeBytes empty;
+        const auto& raw = value.bytes ? *value.bytes : empty;
+        stream->output->write(reinterpret_cast<const char*>(raw.data()),
+                              static_cast<std::streamsize>(raw.size()));
+    } else {
+        if (value.is_error() || value.is_timer() || value.is_bytes() || value.is_array() ||
+            value.is_object() ||
+            (value.is_string() && value.string.rfind("\x1fnift:", 0) == 0 &&
+             value.string.rfind("\x1fnift:timer:", 0) != 0)) {
+            error = label + ": value is not directly renderable";
+            return false;
+        }
+        *stream->output << render_expression_value(value);
+    }
+    if (!*stream->output)
+        return fail_recoverable(nift::detail::DiagnosticCode::StreamWriteFailed,
+                                label + ": output failure", error);
+    return true;
+}
+
+Parser::StreamExtraction Parser::stream_extract_token(StreamInstance& stream,
+                                                      nift::RuntimeValue& destination,
+                                                      std::string& error) {
+    if (stream.input->bad())
+        return fail_recoverable(nift::detail::DiagnosticCode::StreamReadFailed,
+                                "extraction: input failure", error), StreamExtraction::Backend;
+    *stream.input >> std::ws;
+    if (stream.input->bad())
+        return fail_recoverable(nift::detail::DiagnosticCode::StreamReadFailed,
+                                "extraction: input failure", error), StreamExtraction::Backend;
+    if (stream.input->peek() == std::char_traits<char>::eof()) {
+        if (stream.input->bad())
+            return fail_recoverable(nift::detail::DiagnosticCode::StreamReadFailed,
+                                    "extraction: input failure", error), StreamExtraction::Backend;
+        return StreamExtraction::Eof;
+    }
+    std::string token;
+    char c = 0;
+    while (stream.input->get(c)) {
+        if (std::isspace(static_cast<unsigned char>(c))) break;
+        token.push_back(c);
+    }
+    if (stream.input->bad())
+        return fail_recoverable(nift::detail::DiagnosticCode::StreamReadFailed,
+                                "extraction: input failure", error), StreamExtraction::Backend;
+    if (token.empty()) return StreamExtraction::Eof;
+    if (destination.is_string()) {
+        destination.string = std::move(token);
+        return StreamExtraction::Ok;
+    }
+    nift::RuntimeValue parsed;
+    std::string parse_error;
+    if (!scalar_literal(token, parsed, parse_error)) {
+        error = "extraction conversion failed: " + token;
+        return StreamExtraction::Conversion;
+    }
+    if (destination.is_number()) {
+        if (!parsed.is_number()) {
+            error = "extraction conversion failed: " + token;
+            return StreamExtraction::Conversion;
+        }
+        destination = std::move(parsed);
+        return StreamExtraction::Ok;
+    }
+    if (destination.is_bool()) {
+        if (!parsed.is_bool()) {
+            error = "extraction conversion failed: " + token;
+            return StreamExtraction::Conversion;
+        }
+        destination = std::move(parsed);
+        return StreamExtraction::Ok;
+    }
+    error = "extraction destination type is not supported";
+    return StreamExtraction::Conversion;
+}
+
 void Parser::append_diagnostic_frame(nift::detail::DiagnosticFrameKind kind,
                                      std::string label,
                                      std::string compatibility_prefix) {

@@ -19,15 +19,16 @@ Nift now matches the Strut stream model for the file-stream surface:
 | `read_all()` / `read()` / `read_line()` / `read_bytes()` / `read_all_bytes()` / `read_val()` / `eof()` | yes | yes | yes |
 | `write()` / `write_line()` / `write_val()` / `flush()` | yes | yes | yes |
 | `write_bytes()` | yes | no | yes |
-| `>>` / `<<` operators | yes | no (silently treated as an external shell command) | deferred to a dedicated follow-up checkpoint |
+| `>>` / `<<` operators | yes | no (currently unrecognized as Nift syntax and therefore follows Nift's normal external-command fallback) | dedicated CP4b+ checkpoint |
 | standard `in` / `out` / `err` streams | yes | no (only `print`/`err` functions) | documented gap; out of CP4b scope |
 | `sstream` | yes | no | documented follow-up |
 
 `>>` / `<<` are deliberately **not** part of CP4b. Nift has no multi-character
-operator machinery and `s >> x` currently falls through to external process
-dispatch (a hazard). Adding them needs parser/evaluator work (multi-char
-operators, lvalue mutation for `>>`, chaining returns) and is proposed as a
-small immediate CP4b-follow-up checkpoint rather than expanding this one.
+operator machinery, and before operators exist `s >> x` is not recognized as
+Nift syntax, so it follows Nift's normal external-command fallback (which is
+intentional and unchanged). Adding the operators needs parser/evaluator work
+(multi-char operators, lvalue mutation for `>>`, chaining returns) and is the
+dedicated CP4b+ stream-operator checkpoint rather than part of this one.
 
 ## One stream state machine
 

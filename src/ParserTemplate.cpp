@@ -339,6 +339,27 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             // cannot be launched is a hard error.
             std::size_t cc=0; if(!find_balanced(source,i+11,'(',')',cc)){fail(source_path,source,i,"@__nift_cmd has no matching ')'");break;}
             const std::string raw=source.substr(i+12,cc-(i+12));
+            // Stream insertion/extraction operators land in command position only
+            // when the statement otherwise has no Nift delimiter. Recognize them
+            // only when the line actually contains a << or >> sequence and the
+            // first token resolves to a Nift stream binding; everything else
+            // keeps the normal external-command fallback unchanged.
+            if (raw.find("<<") != std::string::npos || raw.find(">>") != std::string::npos) {
+                const std::size_t sp = raw.find_first_of(" \t");
+                const std::string first = sp == std::string::npos ? raw : raw.substr(0, sp);
+                VariableBinding* stream_binding = nullptr;
+                for (auto sc = variable_scopes_.rbegin(); sc != variable_scopes_.rend() && !stream_binding; ++sc) {
+                    auto it = sc->find(first);
+                    if (it != sc->end()) stream_binding = &it->second;
+                }
+                if (stream_binding && stream_binding->value && stream_binding->value->is_string() &&
+                    stream_binding->value->string.rfind("\x1fnift:stream:", 0) == 0) {
+                    nift::RuntimeValue ignored; std::string stream_error;
+                    if (evaluate_expression(raw, ignored, stream_error)) { i=cc+1; continue; }
+                    fail(source_path, source, i, stream_error);
+                    break;
+                }
+            }
             if(std::getenv("NIFT_NO_PROCESS")){fail(source_path,source,i,"external process execution disabled");break;}
             // Quote-aware tokenization of the command line.
             std::vector<std::string> toks; std::string cur; bool sq=false,dq=false,esc=false;
