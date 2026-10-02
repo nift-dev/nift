@@ -24,12 +24,18 @@ the boundary. `RuntimeType::Error` remains interpreter-internal.
   ordinary failed results with a non-empty human-readable message and origin:
   filesystem `open` failure, stream `ifstream` open failure,
   `validate()` schema rejection (`expected string, received number`), FFI
-  library-load failure, and `throw error(...)`. No Error value escapes.
+  library-load failure (`ffi.library_load_failed`), `throw error(...)`, and a
+  deliberately missing FFI symbol against the reused known-good fixture
+  (`ffi.symbol_not_found`). No Error value escapes.
+- `json.parse_failed` through the template render boundary: an `@json(name,
+  path)` directive reading malformed runtime data (the exact CP4c-classified
+  producer) yields a failed `RenderResult` with a `failed to parse` message and
+  a populated source, and a subsequent render on the same Engine succeeds.
 - Import-source recoverable through a file-backed embedded project
   (`import("./missing.f")`) -> failed result with `not readable`; embedded
   hosted mode performs no shell package resolution, so a package-name import
   projects the unresolvable import source as an ordinary failed result
-  (`package.not_installed` itself is certified on the CLI side by the CP5b
+  (`package.not_installed` is CLI/package-host-side and certified by the CP5b
   wall).
 - Worker outcomes through embedding: a built-in recoverable produced inside an
   async worker and observed uncaught at `await` projects as a failed result;
@@ -40,8 +46,29 @@ the boundary. `RuntimeType::Error` remains interpreter-internal.
   a fatal failure returns a normal success result (`7`, `8`).
 - Recursive Error rejection: a returned graph containing a nested Error
   (`{"ok": true, "inner": [error(...)]}`) is rejected with an
-  `Error value` message; the CP3 embed wall already covers direct/array/object/
-  collection/struct forms.
+  `Error value` message (no stringify/coercion). The recursive
+  public-boundary rejection matrix is split deliberately: CP3's embed wall is
+  the base matrix (direct Error, array, object, collection, struct); CP8
+  re-certifies and adds the nested-combination graph. `err.stringify()` /
+  `err.prettify()` remain ordinary string data at the boundary.
+
+## Maintained external consumers
+
+All four maintained language consumers plus the staged embedding consumer were
+built, linked and their contract tests executed explicitly against the
+unchanged C ABI (no binding source changes were required):
+
+| Consumer | Result |
+| --- | --- |
+| Python (`make test-python-binding`) | 25 tests OK |
+| Node (`make test-node-binding`) | 1 test, 0 failures |
+| Go (`make test-go-binding`, `-race`) | ok (embed + harness packages) |
+| C# (`make test-csharp-binding`) | 29 passed, 0 failed |
+| staged embedding consumer (`make test-v45-embed-staged-consumer`) | staged C + C++ consumers PASS |
+
+Each consumer sees the same public value/result model and reports failures
+through its existing error/result convention; none required changes for the
+v4.6 Error model.
 
 ## ABI compatibility
 
@@ -70,10 +97,14 @@ make test-v46-b4-cp8
 ```
 
 runs the full Batch 4B/CP5a/CP6/CP5b/CP7 aggregate gate, then the CP8 wall:
-the focused CP8 embed binary, the existing embedding/C ABI walls
+the focused CP8 embed binary (with the reused FFI fixture for
+`ffi.symbol_not_found`), the existing embedding/C ABI walls
 (`test-c-abi`, `test-c-abi-c-smoke`, `test-engine`, `test-engine-bindings`,
-`test-engine-concurrency`), the public-header-vs-baseline check, and the frozen
-exported-symbol surface match.
+`test-engine-concurrency`), the maintained external consumers
+(`test-node-binding`, `test-python-binding`, `test-go-binding`,
+`test-csharp-binding`) and the staged embedding consumer
+(`test-v45-embed-staged-consumer`), the public-header-vs-baseline check, and
+the frozen exported-symbol surface match.
 
 The maintained language-binding consumers (Python/Node/Go/C#) are thin
 adapters over this unchanged C ABI and are exercised by the existing binding

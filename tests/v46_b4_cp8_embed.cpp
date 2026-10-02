@@ -161,6 +161,46 @@ int main() {
         CHECK(contains(r.error().message, "Error value"));
     }
 
+    // 6. json.parse_failed through the template render boundary (the @json
+    //    malformed-data producer classified by CP4c), plus a subsequent
+    //    successful render on the same Engine.
+    {
+        fs::path root = fs::temp_directory_path() / ("nift-cp8-json-" + tag);
+        fs::remove_all(root, ec);
+        fs::create_directories(root, ec);
+        { std::ofstream f(root / "bad.json"); f << "{ \"broken\": [1, 2\n"; }
+        nift::Engine engine(root);
+        auto r = engine.render(nift::Source::text(""),
+                               nift::Source::text("@json(d, \"bad.json\")@content", "template.html"));
+        CHECK(!r.ok());
+        CHECK(contains(r.error().message, "failed to parse"));
+        CHECK(!r.error().source.empty());
+        auto ok = engine.render(nift::Source::text("hi"),
+                                nift::Source::text("@content"));
+        CHECK(ok.ok());
+        CHECK(ok.output() == "hi");
+        fs::remove_all(root, ec);
+    }
+
+    // 7. ffi.symbol_not_found through the known-good FFI fixture (reused from
+    //    the v4.5/CP5a fixture; path supplied by the wall via NIFT_FFI_FIXTURE).
+    {
+        const char* fixture = std::getenv("NIFT_FFI_FIXTURE");
+        CHECK(fixture != nullptr && *fixture != '\0');
+        if (fixture && *fixture) {
+            nift::Engine engine;
+            std::string script = std::string("lib := ffi_open(\"") + fixture + "\")\n"
+                "ffi_call(lib, \"no_such_symbol_xyz\", \"i64(i64,i64)\", 1, 2)\n";
+            auto r = engine.execute(script);
+            CHECK(!r.ok());
+            CHECK(!r.error().message.empty());
+            CHECK(contains(r.error().message, "symbol") || contains(r.error().message, "not found"));
+            auto ok = engine.execute("return 9");
+            CHECK(ok.ok());
+            CHECK(ok.value().is_number() && ok.value().number() == 9);
+        }
+    }
+
     if (failures) {
         std::fprintf(stderr, "v46-b4-cp8-embed: %d failure(s)\n", failures);
         return 1;

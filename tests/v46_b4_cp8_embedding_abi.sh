@@ -8,10 +8,17 @@ case "$NIFT" in /*) ;; *) NIFT="$ROOT/$NIFT" ;; esac
 
 # ---- 1. focused CP8 embedding test (Engine boundary certification) ----
 make .build/v46-b4-cp8-embed
-.build/v46-b4-cp8-embed
+NIFT_FFI_FIXTURE="$(bash tests/ffi/build_fixture.sh .build)" .build/v46-b4-cp8-embed
 
 # ---- 2. existing embedding / C ABI walls ----
 make test-c-abi test-c-abi-c-smoke test-engine test-engine-bindings test-engine-concurrency
+
+# ---- 2b. maintained external consumers (Node, Python, Go, C#) + staged consumer ----
+make test-node-binding
+make test-python-binding
+make test-go-binding
+make test-csharp-binding
+make test-v45-embed-staged-consumer
 
 # ---- 3. public ABI headers unchanged vs the prior approved baseline (4368dea) ----
 if ! git diff --quiet 4368dea..HEAD -- include/; then
