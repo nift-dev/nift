@@ -106,11 +106,12 @@ public:
         return completion;
     }
 
-    static WorkerCompletion recoverable(RuntimeValue error_value) {
+    static WorkerCompletion recoverable(RuntimeValue error_value, Diagnostic diagnostic = {}) {
         if (!error_value.is_error()) throw std::logic_error("recoverable worker completion requires Error");
         WorkerCompletion completion;
         completion.kind_ = Kind::Recoverable;
         completion.error_ = std::move(error_value);
+        completion.recoverable_diagnostic_ = std::move(diagnostic);
         return completion;
     }
 
@@ -122,11 +123,15 @@ public:
     const Diagnostic& diagnostic() const { return *diagnostic_; }
     RuntimeValue& error() { return *error_; }
     const RuntimeValue& error() const { return *error_; }
+    bool has_recoverable_diagnostic() const { return recoverable_diagnostic_.has_value(); }
+    Diagnostic& recoverable_diagnostic() { return *recoverable_diagnostic_; }
+    const Diagnostic& recoverable_diagnostic() const { return *recoverable_diagnostic_; }
 
 private:
     Kind kind_ = Kind::Pending;
     std::optional<T> value_;
     std::optional<Diagnostic> diagnostic_;
+    std::optional<Diagnostic> recoverable_diagnostic_;
     std::optional<RuntimeValue> error_;
 };
 

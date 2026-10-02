@@ -134,6 +134,24 @@ int main() {
     assert(has_frame(synthesized_worker_failure,nift::detail::DiagnosticFrameKind::Thread));
     assert(synthesized_worker_failure.diagnostic->origin.source=="<define-timer-worker>");
     assert(synthesized_worker_failure.diagnostic->origin.line==1);
+
+    // CP7 M1: a built-in recoverable worker failure must preserve its built-in
+    // DiagnosticCode through await/join instead of being flattened to UserRaised,
+    // while a user.* error keeps the UserRaised umbrella internally.
+    assert(diagnostic_parser.run_statement(
+        "fn[async](builtin_async()) { import(\"./missing-worker.f\") }", "<define-builtin-async>").ok);
+    assert(diagnostic_parser.run_statement("bh := builtin_async()", "<create-builtin-async>").ok);
+    const auto builtin_await=diagnostic_parser.run_statement("await bh", "<await-builtin>");
+    assert(!builtin_await.ok&&builtin_await.diagnostic);
+    assert(builtin_await.diagnostic->code==nift::detail::DiagnosticCode::IoImportSourceUnreadable);
+    assert(has_frame(builtin_await,nift::detail::DiagnosticFrameKind::Future));
+    assert(diagnostic_parser.run_statement(
+        "fn[async](user_async()) { throw error(\"x\", \"user.custom\") }", "<define-user-async>").ok);
+    assert(diagnostic_parser.run_statement("uh := user_async()", "<create-user-async>").ok);
+    const auto user_await=diagnostic_parser.run_statement("await uh", "<await-user>");
+    assert(!user_await.ok&&user_await.diagnostic);
+    assert(user_await.diagnostic->code==nift::detail::DiagnosticCode::UserRaised);
+    assert(has_frame(user_await,nift::detail::DiagnosticFrameKind::Future));
     diagnostic_parser.finalize_execution_workers();
 
     // A failed outer import may have completed child imports and allocated

@@ -1432,7 +1432,10 @@ test-v46-b4-cp6: test-v46-b4-cp5a
 test-v46-b4-cp5b: test-v46-b4-cp6
 	bash tests/v46_b4_cp5b_import_source_recoverable.sh
 
-.PHONY: test-v46-b4-cp2 test-v46-b4-cp3 test-v46-b4-pre-cp4 test-v46-b4-cp4a test-v46-b4-cp4b test-v46-b4-cp4b-stream-operators test-v46-b4-cp4c test-v46-b4-cp5a test-v46-b4-cp6 test-v46-b4-cp5b
+test-v46-b4-cp7: test-v46-b4-cp5b
+	bash tests/v46_b4_cp7_worker_hardening.sh
+
+.PHONY: test-v46-b4-cp2 test-v46-b4-cp3 test-v46-b4-pre-cp4 test-v46-b4-cp4a test-v46-b4-cp4b test-v46-b4-cp4b-stream-operators test-v46-b4-cp4c test-v46-b4-cp5a test-v46-b4-cp6 test-v46-b4-cp5b test-v46-b4-cp7
 
 test-v46-relative-imports: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" bash tests/v44_relative_import_ownership_smoke.sh
