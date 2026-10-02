@@ -237,6 +237,7 @@ DIAGNOSTIC_OUTCOME_TEST := $(TEST_DIR)/diagnostic-outcome-unit$(EXEEXT)
 CP3_EMBED_TEST := $(TEST_DIR)/v46-b4-cp3-embed$(EXEEXT)
 CP8_EMBED_TEST := $(TEST_DIR)/v46-b4-cp8-embed$(EXEEXT)
 PACKAGE_GRAPH_LOCK_TEST := $(TEST_DIR)/package-graph-lock-unit$(EXEEXT)
+PACKAGE_GRAPH_RESOLVER_TEST := $(TEST_DIR)/package-graph-resolver-unit$(EXEEXT)
 
 $(DIAGNOSTIC_OUTCOME_TEST): tests/diagnostic_outcome_unit.cpp src/Diagnostic.h src/Outcome.h src/RuntimeValue.cpp src/RuntimeValue.h
 	mkdir -p $(TEST_DIR)
@@ -253,6 +254,10 @@ $(CP8_EMBED_TEST): tests/v46_b4_cp8_embed.cpp $(ENGINE_CORE_OBJECTS)
 $(PACKAGE_GRAPH_LOCK_TEST): tests/package_graph_lock_unit.cpp src/PackageGraphLock.h src/PackageMetadata.h src/FileSystem.cpp src/JsonFile.cpp
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/package_graph_lock_unit.cpp src/FileSystem.cpp src/JsonFile.cpp -o $@
+
+$(PACKAGE_GRAPH_RESOLVER_TEST): tests/package_graph_resolver_unit.cpp src/PackageGraphResolver.h src/PackageGraphLock.h src/PackageMetadata.h src/FileSystem.cpp src/JsonFile.cpp
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/package_graph_resolver_unit.cpp src/FileSystem.cpp src/JsonFile.cpp -o $@
 
 $(PARSER_STATEMENT_STATE_TEST): tests/parser_statement_state_unit.cpp $(ENGINE_CORE_OBJECTS)
 	mkdir -p $(TEST_DIR)
@@ -1454,7 +1459,10 @@ test-v46-b4-cp9: test-v46-b4-cp8
 test-v46-b5-cp10: test-v46-b4-cp9
 	bash tests/v46_b5_cp10_lock_graph.sh
 
-.PHONY: test-v46-b4-cp2 test-v46-b4-cp3 test-v46-b4-pre-cp4 test-v46-b4-cp4a test-v46-b4-cp4b test-v46-b4-cp4b-stream-operators test-v46-b4-cp4c test-v46-b4-cp5a test-v46-b4-cp6 test-v46-b4-cp5b test-v46-b4-cp7 test-v46-b4-cp8 test-v46-b4-cp9 test-v46-b5-cp10
+test-v46-b5-cp11: test-v46-b5-cp10
+	bash tests/v46_b5_cp11_resolver.sh
+
+.PHONY: test-v46-b4-cp2 test-v46-b4-cp3 test-v46-b4-pre-cp4 test-v46-b4-cp4a test-v46-b4-cp4b test-v46-b4-cp4b-stream-operators test-v46-b4-cp4c test-v46-b4-cp5a test-v46-b4-cp6 test-v46-b4-cp5b test-v46-b4-cp7 test-v46-b4-cp8 test-v46-b4-cp9 test-v46-b5-cp10 test-v46-b5-cp11
 
 test-v46-relative-imports: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" bash tests/v44_relative_import_ownership_smoke.sh
