@@ -235,6 +235,7 @@ ENGINE_CORE_OBJECTS := $(filter-out src/nift.o src/CLI.o,$(OBJECTS))
 PARSER_STATEMENT_STATE_TEST := $(TEST_DIR)/parser-statement-state-unit$(EXEEXT)
 DIAGNOSTIC_OUTCOME_TEST := $(TEST_DIR)/diagnostic-outcome-unit$(EXEEXT)
 CP3_EMBED_TEST := $(TEST_DIR)/v46-b4-cp3-embed$(EXEEXT)
+CP8_EMBED_TEST := $(TEST_DIR)/v46-b4-cp8-embed$(EXEEXT)
 
 $(DIAGNOSTIC_OUTCOME_TEST): tests/diagnostic_outcome_unit.cpp src/Diagnostic.h src/Outcome.h src/RuntimeValue.cpp src/RuntimeValue.h
 	mkdir -p $(TEST_DIR)
@@ -243,6 +244,10 @@ $(DIAGNOSTIC_OUTCOME_TEST): tests/diagnostic_outcome_unit.cpp src/Diagnostic.h s
 $(CP3_EMBED_TEST): tests/v46_b4_cp3_embed.cpp $(ENGINE_CORE_OBJECTS)
 	mkdir -p $(TEST_DIR)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/v46_b4_cp3_embed.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
+
+$(CP8_EMBED_TEST): tests/v46_b4_cp8_embed.cpp $(ENGINE_CORE_OBJECTS)
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LDFLAGS) tests/v46_b4_cp8_embed.cpp $(ENGINE_CORE_OBJECTS) $(LDLIBS) -o $@
 
 $(PARSER_STATEMENT_STATE_TEST): tests/parser_statement_state_unit.cpp $(ENGINE_CORE_OBJECTS)
 	mkdir -p $(TEST_DIR)
@@ -1435,7 +1440,10 @@ test-v46-b4-cp5b: test-v46-b4-cp6
 test-v46-b4-cp7: test-v46-b4-cp5b
 	bash tests/v46_b4_cp7_worker_hardening.sh
 
-.PHONY: test-v46-b4-cp2 test-v46-b4-cp3 test-v46-b4-pre-cp4 test-v46-b4-cp4a test-v46-b4-cp4b test-v46-b4-cp4b-stream-operators test-v46-b4-cp4c test-v46-b4-cp5a test-v46-b4-cp6 test-v46-b4-cp5b test-v46-b4-cp7
+test-v46-b4-cp8: test-v46-b4-cp7
+	bash tests/v46_b4_cp8_embedding_abi.sh
+
+.PHONY: test-v46-b4-cp2 test-v46-b4-cp3 test-v46-b4-pre-cp4 test-v46-b4-cp4a test-v46-b4-cp4b test-v46-b4-cp4b-stream-operators test-v46-b4-cp4c test-v46-b4-cp5a test-v46-b4-cp6 test-v46-b4-cp5b test-v46-b4-cp7 test-v46-b4-cp8
 
 test-v46-relative-imports: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" bash tests/v44_relative_import_ownership_smoke.sh
