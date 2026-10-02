@@ -53,8 +53,6 @@ TemplateParseResult parse_template(const std::string& source);
 StatementParseResult parse_statement(const std::string& source);
 ParseResult parse_expression(const std::string& source);
 bool evaluate(const Expr& expr, Context& ctx, nift::RuntimeValue& out, std::string& error);
-nift::detail::EvalOutcome<nift::RuntimeValue> evaluate_outcome(const Expr& expr,
-                                                               Context& ctx);
 bool truthy(const nift::RuntimeValue& value);
 void fold_constants(Expr& expr);
 } // namespace nift::ast

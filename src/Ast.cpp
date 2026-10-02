@@ -117,11 +117,4 @@ bool evaluate(const Expr& e,Context& c,nift::RuntimeValue& out,std::string& erro
       if(o=="+"&&(l.is_bytes()||r.is_bytes())){if(!l.is_bytes()||!r.is_bytes()){error="bytes values cannot be rendered as text; bytes concatenation requires two bytes values";return false;}nift::RuntimeBytes joined;if(l.bytes)joined.insert(joined.end(),l.bytes->begin(),l.bytes->end());if(r.bytes)joined.insert(joined.end(),r.bytes->begin(),r.bytes->end());out=nift::RuntimeValue(std::move(joined));return true;}if(o=="+"&&(l.is_string()||r.is_string())){if(!c.render){error="string rendering unavailable";return false;}try{out=nift::RuntimeValue(c.render(l)+c.render(r));}catch(const std::runtime_error&){error="string concatenation requires renderable scalar values";return false;}return true;}if(!l.is_number()||!r.is_number()){error="arithmetic operators require numeric operands";return false;}if(o=="+")out=nift::RuntimeValue(l.num+r.num);else if(o=="-")out=nift::RuntimeValue(l.num-r.num);else if(o=="*")out=nift::RuntimeValue(l.num*r.num);else if(o=="/"){if(nift::runtime_number_is_zero(r)){error="division by zero";return false;}out=nift::RuntimeValue(l.num/r.num);}else if(o=="%"){if(nift::runtime_number_is_zero(r)){error="modulo by zero";return false;}if(!nift::runtime_number_is_integer(l)||!nift::runtime_number_is_integer(r)){error="modulo requires integer-valued operands";return false;}out=nift::RuntimeValue(std::fmod(l.num,r.num));}else return false;if(!std::isfinite(out.num)){error="arithmetic result is not finite";return false;}return true;}
  error="unsupported AST node";return false;
 }
-nift::detail::EvalOutcome<nift::RuntimeValue> evaluate_outcome(const Expr& e,Context& c){
-  c.propagated_diagnostic.reset();c.propagated_recoverable.reset();nift::RuntimeValue value;std::string error;
-  if(evaluate(e,c,value,error))return nift::detail::EvalOutcome<nift::RuntimeValue>::value(std::move(value));
-  if(c.propagated_recoverable)return nift::detail::EvalOutcome<nift::RuntimeValue>::recoverable(std::move(*c.propagated_recoverable));
-  if(c.propagated_diagnostic)return nift::detail::EvalOutcome<nift::RuntimeValue>::fatal(std::move(*c.propagated_diagnostic));
-  return nift::detail::EvalOutcome<nift::RuntimeValue>::fatal(nift::detail::make_diagnostic(nift::detail::DiagnosticCode::InternalLegacyFailure,std::move(error)));
-}
 } // namespace nift::ast

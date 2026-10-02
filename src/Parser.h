@@ -416,7 +416,7 @@ private:
                               std::string& error) const;
     bool evaluate_collection_value(const std::string& expression, nift::RuntimeValue& value, std::string& error);
     bool evaluate_condition(const std::string& expression, bool& value, std::string& error);
-    bool serialize_value(const nift::RuntimeValue& value, bool pretty, std::string& output, std::string& error, int depth = 0) const;
+    bool serialize_value(const nift::RuntimeValue& value, bool pretty, std::string& output, std::string& error, int depth = 0, bool reject_errors = false) const;
     bool resolve_pagination_value(const std::string& expression, std::shared_ptr<const nift::RuntimeValue>& value) const;
     std::string path_to_page(std::size_t page);
     bool scalar_literal(const std::string& text, nift::RuntimeValue& value, std::string& error) const;
