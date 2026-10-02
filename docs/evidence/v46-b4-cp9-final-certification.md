@@ -105,17 +105,39 @@ Reused existing harnesses; no new benchmark framework.
 | successful FFI call (10k) | 0.14s | 0.14s | unchanged |
 | tight int loop `s = s + i` (1M, best-of-5) | 0.66s | 0.89s | +35% |
 
-The one measured regression is a tight numeric loop. Root cause: CP4a replaced
-per-statement loop-body execution with `execute_body_outcome`, which constructs
-an `ExecOutcome` (336 bytes) per statement to carry recoverable/fatal outcomes
-for rollback-before-catch — a Batch 4 design requirement. The cost is bounded
-to tight statement-dispatch loops; realistic workloads (build, recursion,
-string work, concurrency, FFI) show no regression, and peak RSS on the tight
-loop rises ~12% (~0.8 MB). This is recorded as a known cost of the error model;
-an optimization (e.g. shrinking `ExecOutcome` storage to shared_ptr for the
-empty path) is deliberately NOT made unilaterally in CP9 and is deferred for
-approval. Structured diagnostic preservation on the failure path is not
-optimized away.
+### The tight-loop regression and its repair (CP9a)
+
+CP9 first measured the tight numeric loop at ~35% over the pre-Batch-4
+baseline and attributed the initial suspicion to the inline `ExecOutcome`
+exceptional payload (336 bytes) added at CP4a. A smaller, separately committed
+repair (`perf: remove ExecOutcome payloads from the normal statement hot path`)
+did two things:
+
+1. **ExecOutcome** moved its exceptional payload (Diagnostic + Error) to a
+   heap-backed `unique_ptr`, making the Normal/Return/Break/Continue paths a
+   16-byte object with no allocation (`sizeof` 336 -> 16) and the failure path
+   pay one allocation. Move-only; all call sites move it, so no copy/aliasing.
+2. **`ast_context`** (the actual dominant cause, confirmed by bisecting to CP3
+   and by callgrind): each per-statement/per-condition call re-constructed an
+   `ast::Context` (~800 bytes after CP3 added the call_outcome /
+   native_method_outcome / propagate_* / render members and two large
+   optionals) and re-bound ~8 `std::function` members; the `[&]` capturing
+   lambdas captured the local Context itself, defeating RVO so every call
+   copied the Context and allocated std::function targets. The Context is now
+   built once per `parse()` and returned by reference (its only mutable
+   members, `propagated_diagnostic`/`propagated_recoverable`, are write-only
+   in the AST evaluator, so sharing is safe).
+
+Post-repair vs pre-Batch-4 (`21e7f97`), min/median of 5 alternating runs of the
+1M `s = s + i` loop: **0.72/0.76 pre-Batch-4 vs 0.67/0.71 repaired** — the
+regression is recovered (at parity/better). The simpler `i = i + 1` loop is
+also at parity. fib recursion, string-concat loops, successful async/threads/
+FFI, and the full website build stayed neutral. Peak RSS on the 2M loop is
++7.5% (~0.5 MB), inherent to the RuntimeValue Error member (136 -> 152 bytes)
+required by the Error value type and not changed here. The failure path
+(caught recoverables) remains reasonable (~20 us each) and is not
+pathologically slower. Full CP9 gate re-certifies at 945 PASS; ASan/UBSan/TSan
+are clean under the repaired code.
 
 ## Regression suite
 
