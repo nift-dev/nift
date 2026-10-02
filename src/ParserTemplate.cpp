@@ -2194,8 +2194,11 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     std::string parse_error;
                     auto runtime_document = host_.read_shared_runtime_json(json_path, parse_error);
                     if (!runtime_document) {
-                        fail(source_path, source, i, "json: failed to parse " + json_path_argument +
-                             (parse_error.empty() ? "" : " (" + parse_error + ")"));
+                        const std::string message = "json: failed to parse " + json_path_argument +
+                             (parse_error.empty() ? "" : " (" + parse_error + ")");
+                        std::string recoverable_error;
+                        fail_recoverable(nift::detail::DiagnosticCode::JsonParseFailed, message, recoverable_error);
+                        fail(source_path, source, i, message);
                         break;
                     }
                     document = std::move(runtime_document);
@@ -2277,9 +2280,21 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                         fail(source_path, source, i, "json: " + conversion_error);
                         break;
                     }
+                    std::string schema_shape_error;
+                    if (!jsonschema::schema_valid(*schema, schema_shape_error)) {
+                        std::string fatal_error;
+                        fail_fatal(nift::detail::DiagnosticCode::SchemaDefinitionInvalid,
+                                   "json: " + schema_label + " is not a valid schema (" + schema_shape_error + ")",
+                                   fatal_error);
+                        fail(source_path, source, i, fatal_error);
+                        break;
+                    }
                     if (!jsonschema::validate(instance_document, *schema, validation_error)) {
-                        fail(source_path, source, i, "json: " + instance_label+
-                             " does not satisfy schema " + schema_label + " (" + validation_error + ")");
+                        const std::string message = "json: " + instance_label +
+                             " does not satisfy schema " + schema_label + " (" + validation_error + ")";
+                        std::string recoverable_error;
+                        fail_recoverable(nift::detail::DiagnosticCode::SchemaRejected, message, recoverable_error);
+                        fail(source_path, source, i, message);
                         break;
                     }
                 }

@@ -2516,12 +2516,20 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             nift::RuntimeValue schema, candidate; if (!eval(args[0], schema, depth + 1) || !eval(args[1], candidate, depth + 1)) return false;
             json::Document schema_document, candidate_document;
             std::string conversion_error;
-            if (!nift::runtime_to_json(schema, schema_document, conversion_error) ||
-                !nift::runtime_to_json(candidate, candidate_document, conversion_error)) {
-                error = "validate: " + conversion_error;
-                return false;
-            }
-            std::string validation_error; if (!jsonschema::validate(candidate_document, schema_document, validation_error)) { error = "validate: " + validation_error; return false; }
+            if (!nift::runtime_to_json(schema, schema_document, conversion_error))
+                return fail_fatal(nift::detail::DiagnosticCode::SchemaDefinitionInvalid,
+                                  "validate: " + conversion_error, error);
+            if (!nift::runtime_to_json(candidate, candidate_document, conversion_error))
+                return fail_fatal(nift::detail::DiagnosticCode::NativeUnsupportedValue,
+                                  "validate: " + conversion_error, error);
+            std::string schema_error;
+            if (!jsonschema::schema_valid(schema_document, schema_error))
+                return fail_fatal(nift::detail::DiagnosticCode::SchemaDefinitionInvalid,
+                                  "validate: " + schema_error, error);
+            std::string validation_error;
+            if (!jsonschema::validate(candidate_document, schema_document, validation_error))
+                return fail_recoverable(nift::detail::DiagnosticCode::SchemaRejected,
+                                        "validate: " + validation_error, error);
             out = std::move(candidate); return true;
         }
 

@@ -452,6 +452,7 @@ private:
     std::string path_to(const std::string& argument, const std::string& directive);
     void fail(const std::filesystem::path& source_path, const std::string& source, std::size_t offset, const std::string& message);
     bool fail_recoverable(nift::detail::DiagnosticCode code, std::string message, std::string& error);
+    bool fail_fatal(nift::detail::DiagnosticCode code, std::string message, std::string& error);
     bool stream_open(std::shared_ptr<StreamInstance> stream, const std::filesystem::path& path, std::string& error);
     bool stream_close(std::shared_ptr<StreamInstance> stream, std::string& error);
     enum class StreamExtraction { Ok, Eof, Conversion, Backend };

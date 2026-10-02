@@ -472,4 +472,10 @@ bool validate(const json::Document& instance,
     return validator.apply(instance, schema, "$", error, 0);
 }
 
+bool schema_valid(const json::Document& schema, std::string& error) {
+    error.clear();
+    Validator validator{schema};
+    return validator.validate_schema_shape(schema, "#", error, 0);
+}
+
 } // namespace jsonschema

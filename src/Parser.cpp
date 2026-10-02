@@ -812,6 +812,16 @@ bool Parser::fail_recoverable(nift::detail::DiagnosticCode code, std::string mes
     return false;
 }
 
+bool Parser::fail_fatal(nift::detail::DiagnosticCode code, std::string message,
+                        std::string& error) {
+    const auto info = nift::detail::diagnostic_code_info(code);
+    if (info.disposition != nift::detail::DiagnosticDisposition::Fatal)
+        throw std::logic_error("fail_fatal requires a fatal diagnostic code");
+    active_diagnostic_ = nift::detail::make_diagnostic(code, std::move(message));
+    error = active_diagnostic_->message;
+    return false;
+}
+
 bool Parser::stream_open(std::shared_ptr<StreamInstance> stream,
                          const fs::path& path, std::string& error) {
     stream->path = path;
