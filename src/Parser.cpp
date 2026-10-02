@@ -666,7 +666,7 @@ Parser::~Parser() {
 }
 
 void Parser::finalize_execution_workers() {
-    for(auto& st:owned_async_instances_){std::unique_lock<std::mutex> lk(st->mutex);while(!st->done){lk.unlock();if(nift::detail::NiftAsyncPool::is_worker_thread()&&nift::detail::NiftAsyncPool::instance().run_one()){lk.lock();continue;}lk.lock();st->cv.wait_for(lk,std::chrono::milliseconds(1),[&]{return st->done;});}}
+    for(auto& st:owned_async_instances_){std::unique_lock<std::mutex> lk(st->mutex);while(st->completion.pending()){lk.unlock();if(nift::detail::NiftAsyncPool::is_worker_thread()&&nift::detail::NiftAsyncPool::instance().run_one()){lk.lock();continue;}lk.lock();st->cv.wait_for(lk,std::chrono::milliseconds(1),[&]{return !st->completion.pending();});}}
     for(auto& st:owned_thread_instances_){std::lock_guard<std::mutex> guard(st->join_mutex);if(st->worker.joinable())st->worker.join();}
     owned_async_instances_.clear();
     owned_thread_instances_.clear();
@@ -725,6 +725,38 @@ void Parser::fail(const fs::path& source_path, const std::string& source, std::s
         result_.error.source_line.pop_back();
 
     result_.error.message = message;
+    nift::detail::DiagnosticOrigin origin;
+    origin.source = result_.error.source_file;
+    origin.line = result_.error.line;
+    origin.column = result_.error.column;
+    origin.source_length = result_.error.source_length;
+    origin.source_line = result_.error.source_line;
+    if (active_diagnostic_) {
+        result_.diagnostic = std::move(active_diagnostic_);
+        active_diagnostic_.reset();
+        if (result_.diagnostic->origin.source.empty())
+            result_.diagnostic->origin.source = origin.source;
+        if (result_.diagnostic->origin.line == 0) {
+            result_.diagnostic->origin.line = origin.line;
+            result_.diagnostic->origin.column = origin.column;
+            result_.diagnostic->origin.source_length = origin.source_length;
+            result_.diagnostic->origin.source_line = std::move(origin.source_line);
+        }
+    } else {
+        result_.diagnostic = nift::detail::make_diagnostic(
+            nift::detail::DiagnosticCode::InternalLegacyFailure, message, std::move(origin));
+    }
+}
+
+void Parser::append_diagnostic_frame(nift::detail::DiagnosticFrameKind kind,
+                                     std::string label,
+                                     std::string compatibility_prefix) {
+    if (!active_diagnostic_) return;
+    nift::detail::DiagnosticOrigin site;
+    if (!source_context_stack_.empty()) site.source = source_context_stack_.back().path;
+    active_diagnostic_->frames.push_back(
+        {kind, std::move(label), std::move(site), std::move(compatibility_prefix)});
+    result_.diagnostic = active_diagnostic_;
 }
 
 std::string Parser::metadata(const std::string& key) const {

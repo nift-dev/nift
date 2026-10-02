@@ -1,8 +1,10 @@
 #pragma once
+#include "Outcome.h"
 #include "RuntimeValue.h"
 #include <cstddef>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -20,6 +22,13 @@ struct Context {
     std::function<bool(const std::string&, nift::RuntimeValue&, std::string&)> legacy;
     std::function<bool(const std::string&, std::vector<nift::RuntimeValue>&&, nift::RuntimeValue&, std::string&)> call;
     std::function<bool(const nift::RuntimeValue&, const std::string&, std::vector<nift::RuntimeValue>&&, nift::RuntimeValue&, std::string&)> native_method;
+    std::function<nift::detail::EvalOutcome<nift::RuntimeValue>(
+        const std::string&, std::vector<nift::RuntimeValue>&&)> call_outcome;
+    std::function<nift::detail::EvalOutcome<nift::RuntimeValue>(
+        const nift::RuntimeValue&, const std::string&,
+        std::vector<nift::RuntimeValue>&&)> native_method_outcome;
+    std::optional<nift::detail::Diagnostic> propagated_diagnostic;
+    std::function<void(nift::detail::Diagnostic)> propagate_diagnostic;
     // Optional: given an argument expression text, report whether it denotes a
     // location reference that must keep its identity across the call boundary.
     // When set and true for any argument, the prepared Call dispatch is skipped
@@ -42,6 +51,8 @@ TemplateParseResult parse_template(const std::string& source);
 StatementParseResult parse_statement(const std::string& source);
 ParseResult parse_expression(const std::string& source);
 bool evaluate(const Expr& expr, Context& ctx, nift::RuntimeValue& out, std::string& error);
+nift::detail::EvalOutcome<nift::RuntimeValue> evaluate_outcome(const Expr& expr,
+                                                               Context& ctx);
 bool truthy(const nift::RuntimeValue& value);
 void fold_constants(Expr& expr);
 } // namespace nift::ast

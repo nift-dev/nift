@@ -245,12 +245,12 @@ bool Parser::invoke_ffi_callback_i64(const std::string& callable_tag, std::int64
     auto sp=std::make_shared<nift::RuntimeValue>(callable_tag); variable_scopes_.back()[name]=VariableBinding{sp,nift_binding_type(*sp),false,false};
     nift::RuntimeValue result; bool ok=evaluate_expression(name+"("+std::to_string(arg)+")",result,error);
     if(saved) variable_scopes_.back()[name]=*saved; else variable_scopes_.back().erase(name);
-    if(!ok)return false;
+    if(!ok){append_diagnostic_frame(nift::detail::DiagnosticFrameKind::Callback,"ffi callback");return false;}
     if(!nift::runtime_number_to_i64(result,out_value)){error="callback result must be an integer";return false;}return true;
 }
 
-bool Parser::invoke_callable(const std::string& name, const std::vector<nift::RuntimeValue>& args, nift::RuntimeValue& value, std::string& error) {
-    if(!valid_binding_identifier(name)){error="invalid callable name";return false;}if(variable_scopes_.empty())variable_scopes_.emplace_back();std::vector<std::string> names;names.reserve(args.size());for(size_t i=0;i<args.size();++i){std::string n="__nift_host_arg_"+std::to_string(i);auto sp=std::make_shared<nift::RuntimeValue>(args[i]);variable_scopes_.back()[n]=VariableBinding{sp,nift_binding_type(*sp),false,false};names.push_back(n);}std::string expr=name+"(";for(size_t i=0;i<names.size();++i){if(i)expr+=",";expr+=names[i];}expr+=")";bool ok=evaluate_expression(expr,value,error);for(const auto& n:names)variable_scopes_.back().erase(n);return ok;
+bool Parser::invoke_callable(const std::string& name, const std::vector<nift::RuntimeValue>& args, nift::RuntimeValue& value, std::string& error, nift::detail::Diagnostic* diagnostic) {
+    active_diagnostic_.reset();if(!valid_binding_identifier(name)){error="invalid callable name";return false;}if(variable_scopes_.empty())variable_scopes_.emplace_back();std::vector<std::string> names;names.reserve(args.size());for(size_t i=0;i<args.size();++i){std::string n="__nift_host_arg_"+std::to_string(i);auto sp=std::make_shared<nift::RuntimeValue>(args[i]);variable_scopes_.back()[n]=VariableBinding{sp,nift_binding_type(*sp),false,false};names.push_back(n);}std::string expr=name+"(";for(size_t i=0;i<names.size();++i){if(i)expr+=",";expr+=names[i];}expr+=")";bool ok=evaluate_expression(expr,value,error);for(const auto& n:names)variable_scopes_.back().erase(n);if(!ok&&diagnostic&&active_diagnostic_)*diagnostic=*active_diagnostic_;return ok;
 }
 
 void Parser::set_script_invocation(std::string cmd, std::vector<std::string> args) {
@@ -275,6 +275,7 @@ void Parser::install_script_invocation_bindings() {
 
 RenderResult Parser::run_script(const std::string& source, const fs::path& source_path) {
     result_ = RenderResult{};
+    active_diagnostic_.reset();
     variable_scopes_.clear(); variable_scopes_.emplace_back(); timer_instances_.clear();
     install_script_invocation_bindings();
     callables_.clear(); structs_.clear(); requested_exports_.clear(); pending_control_={};
@@ -288,20 +289,20 @@ RenderResult Parser::run_script(const std::string& source, const fs::path& sourc
     rr.output.clear();
     if(rr.ok && pending_control_.kind==ControlFlow::Return && pending_control_.value) {
         const auto& v=*pending_control_.value;
-        if(v.is_timer()||v.is_bytes()||v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0&&v.string.rfind("\x1fnift:timer:",0)!=0)) { rr.ok=false; rr.error.message="script return value is not directly renderable"; }
+        if(v.is_timer()||v.is_bytes()||v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0&&v.string.rfind("\x1fnift:timer:",0)!=0)) { rr.ok=false; rr.error.message="script return value is not directly renderable";rr.diagnostic=nift::detail::make_diagnostic(nift::detail::DiagnosticCode::NativeUnsupportedValue,rr.error.message); }
         else rr.output=render_expression_value(v);
     }
     pending_control_={};
     std::string resource_error;
-    if(!finalize_script_resources(resource_error) && rr.ok){rr.ok=false;rr.error.message=resource_error;}
+    if(!finalize_script_resources(resource_error) && rr.ok){rr.ok=false;rr.error.message=resource_error;rr.diagnostic=nift::detail::make_diagnostic(nift::detail::DiagnosticCode::NativeResourceLifecycle,resource_error);}
     return rr;
 }
 
-bool Parser::run_embedded_script(const std::string& source, const fs::path& source_path, nift::RuntimeValue& value, std::string& error) {
-    result_=RenderResult{};variable_scopes_.clear();variable_scopes_.emplace_back();timer_instances_.clear();install_script_invocation_bindings();callables_.clear();structs_.clear();requested_exports_.clear();pending_control_={};active_module_env_.reset();loading_module_env_.reset();saved_lexical_scopes_.clear();module_envs_.clear();next_module_identity_=1;in_import_program_=false;standalone_script_host_=false;resource_path_authority_.enforce_project_root=true;resource_path_authority_.enforce_filesystem_root=false;strict_script_mode_=true;function_call_depth_=1;
+bool Parser::run_embedded_script(const std::string& source, const fs::path& source_path, nift::RuntimeValue& value, std::string& error, nift::detail::Diagnostic* diagnostic) {
+    result_=RenderResult{};active_diagnostic_.reset();variable_scopes_.clear();variable_scopes_.emplace_back();timer_instances_.clear();install_script_invocation_bindings();callables_.clear();structs_.clear();requested_exports_.clear();pending_control_={};active_module_env_.reset();loading_module_env_.reset();saved_lexical_scopes_.clear();module_envs_.clear();next_module_identity_=1;in_import_program_=false;standalone_script_host_=false;resource_path_authority_.enforce_project_root=true;resource_path_authority_.enforce_filesystem_root=false;strict_script_mode_=true;function_call_depth_=1;
     const std::uint64_t timer_checkpoint=begin_timer_operation();
     auto rr=execute_native_program(source,source_path,0,SourceProvenance::InMemory,false);function_call_depth_=0;strict_script_mode_=false;
-    if(!rr.ok){error=rr.error.message;pending_control_={};std::string ignored_resource_error;finalize_script_resources(ignored_resource_error);finish_timer_operation(timer_checkpoint);return false;}
+    if(!rr.ok){error=rr.error.message;if(diagnostic&&rr.diagnostic)*diagnostic=*rr.diagnostic;pending_control_={};std::string ignored_resource_error;finalize_script_resources(ignored_resource_error);finish_timer_operation(timer_checkpoint);return false;}
     value=nift::RuntimeValue(nullptr);if(pending_control_.kind==ControlFlow::Return&&pending_control_.value)value=*pending_control_.value;pending_control_={};const bool timer_result=contains_timer_resource(value);std::string resource_error;const bool resources_ok=finalize_script_resources(resource_error);finish_timer_operation(timer_checkpoint);if(timer_result){error="embedded script cannot return a timer value";if(!resources_ok)error+="; "+resource_error;return false;}if(!resources_ok){error=resource_error;return false;}return true;
 }
 
@@ -317,7 +318,7 @@ RenderResult Parser::run_statement(const std::string& source, const fs::path& so
         }
     } timer_operation{*this,begin_timer_operation()};
     if(variable_scopes_.empty()) { variable_scopes_.emplace_back(); install_script_invocation_bindings(); }
-    standalone_script_host_=true; resource_path_authority_.enforce_project_root=false; resource_path_authority_.enforce_filesystem_root=true; strict_script_mode_=true; result_ = RenderResult{}; pending_control_={}; function_call_depth_=1;
+    active_diagnostic_.reset();standalone_script_host_=true; resource_path_authority_.enforce_project_root=false; resource_path_authority_.enforce_filesystem_root=true; strict_script_mode_=true; result_ = RenderResult{}; pending_control_={}; function_call_depth_=1;
     const std::string identity=source_path.generic_string();const auto provenance=!source_path.empty()&&!(identity.size()>=2&&identity.front()=='<'&&identity.back()=='>')?SourceProvenance::FileBacked:SourceProvenance::InMemory;
     const std::string t=trim_copy(source);
     // A REPL is also an inspector: a single expression is evaluated directly so
@@ -368,7 +369,7 @@ RenderResult Parser::execute_native_program(const std::string& source, const fs:
     const std::uint64_t file_checkpoint = begin_file_operation();
     std::string program, error;
     if (!translate_function_program(source, program, error)) {
-        RenderResult failed; failed.ok=false; failed.error.message=error;if(rollback_files_on_failure)rollback_file_operation(file_checkpoint);return failed;
+        RenderResult failed; failed.ok=false; failed.error.message=error;failed.diagnostic=nift::detail::make_diagnostic(nift::detail::DiagnosticCode::NativeTranslationError,error);if(rollback_files_on_failure)rollback_file_operation(file_checkpoint);return failed;
     }
     RenderResult rr;
     try {
@@ -376,9 +377,11 @@ RenderResult Parser::execute_native_program(const std::string& source, const fs:
     } catch (const std::exception& exception) {
         rr.ok=false;
         rr.error.message=exception.what();
+        rr.diagnostic=nift::detail::make_diagnostic(nift::detail::DiagnosticCode::InternalUnexpectedException,rr.error.message);
     } catch (...) {
         rr.ok=false;
         rr.error.message="script evaluation failed";
+        rr.diagnostic=nift::detail::make_diagnostic(nift::detail::DiagnosticCode::InternalUnexpectedException,rr.error.message);
     }
     if(!rr.ok&&rr.error.line>0&&rr.error.message.rfind("import",0)==0){
         auto line_at=[](const std::string& text,std::size_t line){std::size_t begin=0;for(std::size_t n=1;n<line;++n){begin=text.find('\n',begin);if(begin==std::string::npos)return std::string{};++begin;}const auto end=text.find('\n',begin);return text.substr(begin,end==std::string::npos?std::string::npos:end-begin);};
@@ -386,6 +389,7 @@ RenderResult Parser::execute_native_program(const std::string& source, const fs:
         const std::string original_line=line_at(source,rr.error.line);const auto original_imports=imports(original_line);const auto translated_imports=imports(rr.error.source_line);
         if(!original_imports.empty()){std::size_t occurrence=0;for(std::size_t n=0;n<translated_imports.size();++n)if(translated_imports[n]+1<=rr.error.column)occurrence=n;occurrence=std::min(occurrence,original_imports.size()-1);const auto position=original_imports[occurrence];rr.error.column=position+1;rr.error.source_line=original_line;std::size_t open=position+6;while(open<original_line.size()&&std::isspace(static_cast<unsigned char>(original_line[open])))++open;std::size_t close=0;rr.error.source_length=open<original_line.size()&&find_balanced(original_line,open,'(',')',close)?close-position+1:6;}
     }
+    if(!rr.ok){if(!rr.diagnostic)rr.diagnostic=nift::detail::make_diagnostic(nift::detail::DiagnosticCode::InternalLegacyFailure,rr.error.message);if(rr.diagnostic->origin.source.empty()){rr.diagnostic->origin.source=rr.error.source_file;rr.diagnostic->origin.line=rr.error.line;rr.diagnostic->origin.column=rr.error.column;rr.diagnostic->origin.source_length=rr.error.source_length;rr.diagnostic->origin.source_line=rr.error.source_line;}}
     if (!rr.ok && rollback_files_on_failure) rollback_file_operation(file_checkpoint);
     return rr;
 }
@@ -445,7 +449,7 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
     bool cycle=std::find(input_stack_.begin(),input_stack_.end(),import_identity)!=input_stack_.end();
     if(!cycle)for(const auto& source:source_context_stack_)if(!source.path.empty()&&source.provenance==SourceProvenance::FileBacked&&stable_import_identity(source.path)==import_identity){cycle=true;break;}
     if(cycle){error="script import cycle through "+path.generic_string();return false;}
-    auto src=host_.read_shared_source(path); if(src.status==nift::HostStatus::Error||!src.content){error=src.error.empty()?"script is not readable: "+path.generic_string():src.error+": "+path.generic_string();return false;}
+    auto src=host_.read_shared_source(path); if(src.status==nift::HostStatus::Error||!src.content){error=src.error.empty()?"script is not readable: "+path.generic_string():src.error+": "+path.generic_string();const auto code=src.status==nift::HostStatus::Error?nift::detail::DiagnosticCode::HostProviderError:(package_provenance?nift::detail::DiagnosticCode::PackageImportSourceUnreadable:nift::detail::DiagnosticCode::IoImportSourceUnreadable);active_diagnostic_=nift::detail::make_diagnostic(code,error);active_diagnostic_->frames.push_back({nift::detail::DiagnosticFrameKind::Import,path.generic_string(),{},legacy_syntax?"@import: ":"import: "});return false;}
     package_reader.reset();
 
     const auto module_identity_checkpoint=next_module_identity_;
@@ -480,7 +484,7 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
     if(rr.ok){for(auto& kv:file_instances_)if(!pre_import_files.count(kv.first)&&kv.second->open){auto f=kv.second;f->open=false;f->dirty=false;f->mode.clear();f->working.clear();f->saved.clear();f->cursor=0;rr.ok=false;rr.error.message="managed file left open at "+std::string(legacy_syntax?"@import":"import")+" completion: "+f->path.generic_string();break;}}
     auto isolated_scope=std::move(variable_scopes_.back()); auto isolated_callables=std::move(callables_); auto isolated_structs=std::move(structs_); auto exports=requested_exports_; auto completion=pending_control_;
     variable_scopes_=std::move(saved_scopes); callables_=std::move(saved_callables); structs_=std::move(saved_structs); requested_exports_=std::move(saved_exports); in_import_program_=saved_import; pending_control_=saved_control; strict_script_mode_=saved_strict;active_module_env_=std::move(saved_active);loading_module_env_=std::move(saved_loading);
-    if(!rr.ok){error=rr.error.message;return false;}
+    if(!rr.ok){error=rr.error.message;if(rr.diagnostic){auto diagnostic=*rr.diagnostic;diagnostic.frames.push_back({nift::detail::DiagnosticFrameKind::Import,path.generic_string(),{},legacy_syntax?"@import: ":"import: "});active_diagnostic_=std::move(diagnostic);}return false;}
     if(completion.kind==ControlFlow::Return && completion.value){error="return with a value is not allowed in "+std::string(legacy_syntax?"@import":"import");return false;}
 
     std::unordered_map<std::string,VariableBinding> vars;

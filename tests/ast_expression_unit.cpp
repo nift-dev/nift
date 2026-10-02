@@ -96,9 +96,8 @@ int main() {
         assert(error == "prepared callable failed" && legacy_calls == 0);
     }
 
-    // Native methods currently have no failure/unsupported distinction: false
-    // falls back even when the prepared method supplied an error. CP2 must make
-    // any correction explicit rather than silently changing this baseline.
+    // Legacy method callbacks retain the characterized ambiguous fallback.
+    // Only the new outcome callback may distinguish failure from Unsupported.
     {
         auto parsed = nift::ast::parse_expression("o.probe()");
         assert(parsed.supported);
@@ -122,6 +121,77 @@ int main() {
         std::string error;
         assert(nift::ast::evaluate(*parsed.expr, context, out, error));
         assert(out.is_number() && out.num == 23 && legacy_calls == 1);
+    }
+
+    {
+        auto parsed = nift::ast::parse_expression("o.probe()");
+        assert(parsed.supported);
+        int legacy_calls = 0;
+        context.native_method = {};
+        context.native_method_outcome = [](const nift::RuntimeValue&,
+                                           const std::string&,
+                                           std::vector<nift::RuntimeValue>&&) {
+            return nift::detail::EvalOutcome<nift::RuntimeValue>::fatal(
+                nift::detail::make_diagnostic(
+                    nift::detail::DiagnosticCode::NativeInvalidOperation,
+                    "explicit method failure"));
+        };
+        context.legacy = [&](const std::string&, nift::RuntimeValue&,
+                             std::string&) { ++legacy_calls; return true; };
+        nift::RuntimeValue out;
+        std::string error;
+        assert(!nift::ast::evaluate(*parsed.expr, context, out, error));
+        assert(error == "explicit method failure" && legacy_calls == 0);
+
+        context.native_method_outcome = [](const nift::RuntimeValue&,
+                                           const std::string&,
+                                           std::vector<nift::RuntimeValue>&&) {
+            return nift::detail::EvalOutcome<nift::RuntimeValue>::unsupported();
+        };
+        context.legacy = [&](const std::string&, nift::RuntimeValue& value,
+                             std::string&) {
+            ++legacy_calls;
+            value = nift::RuntimeValue(31);
+            return true;
+        };
+        error.clear();
+        assert(nift::ast::evaluate(*parsed.expr, context, out, error));
+        assert(out.num == 31 && legacy_calls == 1);
+        context.native_method_outcome = {};
+    }
+
+    // New prepared implementations return explicit outcomes directly.
+    {
+        auto parsed = nift::ast::parse_expression("probe()");
+        assert(parsed.supported);
+        int legacy_calls = 0;
+        context.call = {};
+        context.call_outcome = [](const std::string&,
+                                  std::vector<nift::RuntimeValue>&&) {
+            return nift::detail::EvalOutcome<nift::RuntimeValue>::unsupported();
+        };
+        context.legacy = [&](const std::string&, nift::RuntimeValue& out,
+                             std::string&) {
+            ++legacy_calls;
+            out = nift::RuntimeValue(29);
+            return true;
+        };
+        nift::RuntimeValue out;
+        std::string error;
+        assert(nift::ast::evaluate(*parsed.expr, context, out, error));
+        assert(out.num == 29 && legacy_calls == 1);
+
+        context.call_outcome = [](const std::string&,
+                                  std::vector<nift::RuntimeValue>&&) {
+            return nift::detail::EvalOutcome<nift::RuntimeValue>::fatal(
+                nift::detail::make_diagnostic(
+                    nift::detail::DiagnosticCode::NativeInvalidOperation,
+                    "explicit prepared failure"));
+        };
+        legacy_calls = 0;
+        assert(!nift::ast::evaluate(*parsed.expr, context, out, error));
+        assert(error == "explicit prepared failure" && legacy_calls == 0);
+        context.call_outcome = {};
     }
 
     for (const auto* source : {"x = y + 1", "x += y", "++x", "y--",

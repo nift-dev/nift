@@ -1,4 +1,5 @@
 #pragma once
+#include "Diagnostic.h"
 #include <filesystem>
 #include <set>
 #include <vector>
@@ -67,6 +68,7 @@ struct RenderResult {
     std::size_t content_count = 0;
     std::string output;
     BuildError error;
+    std::optional<nift::detail::Diagnostic> diagnostic;
     std::set<std::string> dependencies;
     std::set<std::string> reqs;
     std::vector<std::string> pagination_items;

@@ -58,7 +58,7 @@ public:
 
     // Native script hosts used by direct scripts / the Nift shell.
     RenderResult run_script(const std::string& source, const std::filesystem::path& source_path);
-    bool run_embedded_script(const std::string& source, const std::filesystem::path& source_path, nift::RuntimeValue& value, std::string& error);
+    bool run_embedded_script(const std::string& source, const std::filesystem::path& source_path, nift::RuntimeValue& value, std::string& error, nift::detail::Diagnostic* diagnostic = nullptr);
     RenderResult run_statement(const std::string& source, const std::filesystem::path& source_path);
     void reset_script_control();
     bool finalize_script_resources(std::string& error);
@@ -84,8 +84,8 @@ public:
     std::vector<std::string> shell_completions(const std::string& prefix) const;
 
     // Shared single-expression host used by `nift eval`; identical evaluator to templates/scripts.
-    bool eval_expression(const std::string& expression, nift::RuntimeValue& value, std::string& error);
-    bool invoke_callable(const std::string& name, const std::vector<nift::RuntimeValue>& args, nift::RuntimeValue& value, std::string& error);
+    bool eval_expression(const std::string& expression, nift::RuntimeValue& value, std::string& error, nift::detail::Diagnostic* diagnostic = nullptr);
+    bool invoke_callable(const std::string& name, const std::vector<nift::RuntimeValue>& args, nift::RuntimeValue& value, std::string& error, nift::detail::Diagnostic* diagnostic = nullptr);
     bool contains_timer_resource(const nift::RuntimeValue& value) const;
     std::uint64_t begin_timer_operation() const { return next_timer_instance_id_; }
     void finish_timer_operation(std::uint64_t checkpoint);
@@ -121,6 +121,7 @@ private:
     TrackedInfo& tracked_info_;
     std::vector<std::filesystem::path> input_stack_;
     RenderResult result_;
+    std::optional<nift::detail::Diagnostic> active_diagnostic_;
     int code_block_depth_ = 0;
     int html_comment_depth_ = 0;
     std::unordered_map<std::string, std::shared_ptr<const nift::RuntimeValue>> json_bindings_;
@@ -241,10 +242,8 @@ private:
         std::thread worker;
         mutable std::mutex mutex;
         mutable std::mutex join_mutex;
-        bool done = false;
         bool joined = false;
-        std::shared_ptr<nift::RuntimeValue> result;
-        std::string error;
+        nift::detail::WorkerCompletion<nift::RuntimeValue> completion;
         ~ThreadInstance(){ std::lock_guard<std::mutex> guard(join_mutex); if(worker.joinable()) worker.join(); }
     };
     std::unordered_map<std::string, std::shared_ptr<ThreadInstance>> thread_instances_;
@@ -268,9 +267,7 @@ private:
     struct AsyncInstance {
         mutable std::mutex mutex;
         std::condition_variable cv;
-        bool done = false;
-        std::shared_ptr<nift::RuntimeValue> result;
-        std::string error;
+        nift::detail::WorkerCompletion<nift::RuntimeValue> completion;
     };
     std::unordered_map<std::string, std::shared_ptr<AsyncInstance>> async_instances_;
     std::vector<std::shared_ptr<AsyncInstance>> owned_async_instances_;
@@ -449,4 +446,7 @@ private:
                        std::size_t& close_position) const;
     std::string path_to(const std::string& argument, const std::string& directive);
     void fail(const std::filesystem::path& source_path, const std::string& source, std::size_t offset, const std::string& message);
+    void append_diagnostic_frame(nift::detail::DiagnosticFrameKind kind,
+                                 std::string label,
+                                 std::string compatibility_prefix = {});
 };

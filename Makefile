@@ -233,6 +233,11 @@ test-content: $(TARGET)
 ENGINE_TEST := $(TEST_DIR)/engine-smoke$(EXEEXT)
 ENGINE_CORE_OBJECTS := $(filter-out src/nift.o src/CLI.o,$(OBJECTS))
 PARSER_STATEMENT_STATE_TEST := $(TEST_DIR)/parser-statement-state-unit$(EXEEXT)
+DIAGNOSTIC_OUTCOME_TEST := $(TEST_DIR)/diagnostic-outcome-unit$(EXEEXT)
+
+$(DIAGNOSTIC_OUTCOME_TEST): tests/diagnostic_outcome_unit.cpp src/Diagnostic.h src/Outcome.h
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/diagnostic_outcome_unit.cpp -o $@
 
 $(PARSER_STATEMENT_STATE_TEST): tests/parser_statement_state_unit.cpp $(ENGINE_CORE_OBJECTS)
 	mkdir -p $(TEST_DIR)
@@ -1390,6 +1395,11 @@ test-v46-b4-cp1: $(TARGET) $(PARSER_STATEMENT_STATE_TEST) $(RUNTIME_VALUE_TEST) 
 	$(V46_OUTPUT_EMBED_TEST)
 
 .PHONY: test-v46-b4-cp1
+
+test-v46-b4-cp2: test-v46-b4-cp1 $(DIAGNOSTIC_OUTCOME_TEST)
+	$(DIAGNOSTIC_OUTCOME_TEST)
+
+.PHONY: test-v46-b4-cp2
 
 test-v46-relative-imports: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" bash tests/v44_relative_import_ownership_smoke.sh
