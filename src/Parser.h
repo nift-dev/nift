@@ -326,6 +326,8 @@ private:
         Kind kind = Kind::Input;
         std::shared_ptr<std::ifstream> input;
         std::shared_ptr<std::ofstream> output;
+        std::filesystem::path path;
+        bool open = false;
         bool closed = false;
     };
     std::unordered_map<std::string, std::shared_ptr<StreamInstance>> stream_instances_;
@@ -450,6 +452,8 @@ private:
     std::string path_to(const std::string& argument, const std::string& directive);
     void fail(const std::filesystem::path& source_path, const std::string& source, std::size_t offset, const std::string& message);
     bool fail_recoverable(nift::detail::DiagnosticCode code, std::string message, std::string& error);
+    bool stream_open(std::shared_ptr<StreamInstance> stream, const std::filesystem::path& path, std::string& error);
+    bool stream_close(std::shared_ptr<StreamInstance> stream, std::string& error);
     void append_diagnostic_frame(nift::detail::DiagnosticFrameKind kind,
                                  std::string label,
                                  std::string compatibility_prefix = {});

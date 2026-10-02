@@ -94,38 +94,34 @@ if (cd "$TMP" && "$NIFT" oac.nift >/dev/null 2>&1); then
   echo 'operation after close unexpectedly succeeded' >&2; exit 1
 fi
 
-# POSIX backend-failure baseline. Directory reads currently look like clean EOF;
-# buffered /dev/full writes are reported by flush, while close alone does not
-# report the delayed write failure. CP4 may intentionally add missing detection.
+# POSIX backend-failure detection. CP4b added reliable read and close
+# detection: reading a directory is a genuine backend read failure
+# (stream.read_failed), buffered /dev/full writes are reported by flush
+# (stream.flush_failed), and explicit close now surfaces a delayed write
+# failure (stream.close_failed).
 case "$(uname -s)" in
 Linux)
   cat > "$TMP/backend-read.nift" <<'NIFT'
 i := ifstream("/dev")
-print(i.read(1) == "")
-print(i.eof())
-close(i)
+try { print(i.read(1)) } catch(err) { print("read:" + err.code) }
+i.close()
 i2 := ifstream("/dev")
-print(i2.read_all() == "")
-print(i2.eof())
-close(i2)
+try { print(i2.read_all()) } catch(err) { print("readall:" + err.code) }
+i2.close()
 NIFT
-  [[ "$("$NIFT" "$TMP/backend-read.nift")" == $'true\ntrue\ntrue\ntrue' ]]
+  [[ "$("$NIFT" "$TMP/backend-read.nift")" == $'read:stream.read_failed\nreadall:stream.read_failed' ]]
   cat > "$TMP/backend-flush.nift" <<'NIFT'
 o := ofstream("/dev/full")
 o.write("x")
-o.flush()
+try { o.flush() } catch(err) { print("flush:" + err.code) }
 NIFT
-  if "$NIFT" "$TMP/backend-flush.nift" >/dev/null 2>"$TMP/backend-flush.err"; then
-    echo '/dev/full flush unexpectedly succeeded' >&2; exit 1
-  fi
-  grep -q 'flush: output failure' "$TMP/backend-flush.err"
+  [[ "$("$NIFT" "$TMP/backend-flush.nift")" == 'flush:stream.flush_failed' ]]
   cat > "$TMP/backend-close.nift" <<'NIFT'
 o := ofstream("/dev/full")
 o.write("x")
-close(o)
-print("alive")
+try { o.close() } catch(err) { print("close:" + err.code) }
 NIFT
-  [[ "$("$NIFT" "$TMP/backend-close.nift")" == 'alive' ]]
+  [[ "$("$NIFT" "$TMP/backend-close.nift")" == 'close:stream.close_failed' ]]
   ;;
 esac
 

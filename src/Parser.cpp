@@ -812,6 +812,47 @@ bool Parser::fail_recoverable(nift::detail::DiagnosticCode code, std::string mes
     return false;
 }
 
+bool Parser::stream_open(std::shared_ptr<StreamInstance> stream,
+                         const fs::path& path, std::string& error) {
+    stream->path = path;
+    if (stream->kind == StreamInstance::Kind::Output) {
+        stream->output = std::make_shared<std::ofstream>(path, std::ios::binary | std::ios::trunc);
+        if (!*stream->output)
+            return fail_recoverable(nift::detail::DiagnosticCode::StreamOpenFailed,
+                                    "ofstream: cannot open path", error);
+    } else {
+        stream->input = std::make_shared<std::ifstream>(path, std::ios::binary);
+        if (!*stream->input)
+            return fail_recoverable(nift::detail::DiagnosticCode::StreamOpenFailed,
+                                    "ifstream: cannot open path", error);
+    }
+    stream->open = true;
+    stream->closed = false;
+    return true;
+}
+
+bool Parser::stream_close(std::shared_ptr<StreamInstance> stream, std::string& error) {
+    if (!stream->open) {
+        error = stream->closed ? "close: stream already closed" : "close: stream is not open";
+        return false;
+    }
+    if (stream->output) {
+        stream->output->flush();
+        if (!*stream->output) {
+            stream->output->close();
+            stream->open = false;
+            stream->closed = true;
+            return fail_recoverable(nift::detail::DiagnosticCode::StreamCloseFailed,
+                                    "close: output flush failed", error);
+        }
+        stream->output->close();
+    }
+    if (stream->input) stream->input->close();
+    stream->open = false;
+    stream->closed = true;
+    return true;
+}
+
 void Parser::append_diagnostic_frame(nift::detail::DiagnosticFrameKind kind,
                                      std::string label,
                                      std::string compatibility_prefix) {

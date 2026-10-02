@@ -1414,7 +1414,10 @@ test-v46-b4-pre-cp4: test-v46-b4-cp3
 test-v46-b4-cp4a: test-v46-b4-pre-cp4
 	bash tests/v46_b4_cp4a_filesystem.sh
 
-.PHONY: test-v46-b4-cp2 test-v46-b4-cp3 test-v46-b4-pre-cp4 test-v46-b4-cp4a
+test-v46-b4-cp4b: test-v46-b4-cp4a
+	bash tests/v46_b4_cp4b_streams.sh
+
+.PHONY: test-v46-b4-cp2 test-v46-b4-cp3 test-v46-b4-pre-cp4 test-v46-b4-cp4a test-v46-b4-cp4b
 
 test-v46-relative-imports: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" bash tests/v44_relative_import_ownership_smoke.sh
