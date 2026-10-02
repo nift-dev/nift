@@ -69,6 +69,37 @@ performance.
 - **No duplicate evaluation**: side-effecting producers are invoked exactly
   once per operand (verified by test).
 
+## Build-workload certification
+
+Nift project builds over a 30-page site with a 4000-interpolation template
+(120k expression evaluations per full build) on the same machine/compiler,
+alternating baseline/candidate runs, medians of 5:
+
+| Build metric | Baseline (e648154) | b269aa0 | d523e55 |
+| --- | --- | --- | --- |
+| full/hash build (`build --all`) | ~1.57-1.69 s | -2.35% / -6.03% (faster) | +2.07% / -2.07% / -2.72% (within noise) |
+| incremental no-op (`build`) | ~3.5-4.8 ms | -2.10% | -2.3% / -0.6% / -2.6% |
+| single-page incremental | ~3.6-4.9 ms | startup-dominated | startup-dominated |
+| targeted `build <page>` | ~56-67 ms | -7.7% / -15.6% (faster) | +5.9% / +2.7% / -5.1% (noisy) |
+| full-build peak RSS (6-sample median) | 7064-7086 kB | 7104 kB (+0.6%) | 7144 kB (+0.8%) |
+
+Interpretation:
+
+- The full/hash build (the only metric with enough real parser work to rise
+  above startup) shows no repeatable regression: deltas flip sign between runs
+  (within the machine's ~2-6% build variance) and the median is ~0 to -2%.
+- Single-page and incremental-no-op builds are sub-5 ms (process startup and
+  filesystem dominated); the incremental single-page path does not re-render
+  the template interpolations, so it is not a parser-work benchmark. The full
+  build covers the same render/expression path.
+- Targeted `build <page>` (~60 ms) re-renders one page and is noisy (±6%);
+  it shows no consistent regression.
+- Peak RSS is unchanged within measurement spread (+0.6-0.8%, overlapping
+  sample ranges), well below the 5% threshold.
+
+Conclusion: no repeatable unexplained build regression (>2-3%) and no
+unexplained peak-memory increase (>5%) for websites that never use `<<`/`>>`.
+
 ## Conclusion
 
 The stream-operator checkpoint meets the acceptance criteria: ordinary code,
