@@ -169,6 +169,30 @@ int main() {
     assert(import_parser.run_statement("answer := callback()",root/"main.f").ok);
     nift::RuntimeValue answer;std::string eval_error;assert(import_parser.eval_expression("answer",answer,eval_error));assert(answer.is_number()&&answer.num==42);
 
+    // package.not_installed: the import frame label is the attempted package
+    // root (never empty), and the recoverable diagnostic is catchable.
+    {
+        const auto old_cwd=std::filesystem::current_path();
+        std::error_code pec;
+        const std::filesystem::path proot=old_cwd/".nift-b4-cp5b-pkg";
+        std::filesystem::remove_all(proot,pec);
+        std::filesystem::create_directories(proot/".nift"/"packages"/"demo",pec);
+        {std::ofstream m(proot/"manifest.json");m<<"{\"dependencies\":{\"demo\":{\"source\":\"./demo\",\"ref\":\"local\"}}}\n";}
+        {std::ofstream l(proot/".nift"/"packages.lock.json");l<<"{\"demo\":{\"source\":\"./demo\",\"requested\":\"local\",\"commit\":\"local\"}}\n";}
+        std::filesystem::current_path(proot);
+        ScriptRenderHost package_host(proot);TrackedInfo package_tracked;Parser package_parser(package_host,package_tracked);
+        const auto not_installed=package_parser.run_statement("import(\"demo\")",proot/"main.f");
+        std::filesystem::current_path(old_cwd);
+        std::filesystem::remove_all(proot,pec);
+        assert(!not_installed.ok&&not_installed.diagnostic);
+        assert(not_installed.diagnostic->code==nift::detail::DiagnosticCode::PackageNotInstalled);
+        assert(nift::detail::diagnostic_code_info(not_installed.diagnostic->code).disposition==nift::detail::DiagnosticDisposition::Recoverable);
+        bool frame_label_ok=false;
+        for(const auto& f:not_installed.diagnostic->frames)
+            if(f.kind==nift::detail::DiagnosticFrameKind::Import&&!f.label.empty()&&f.label.find("demo")!=std::string::npos)frame_label_ok=true;
+        assert(frame_label_ok);
+    }
+
     // Failed nested execution owns only the FileValues allocated inside it.
     // A caller's dirty open file remains recoverable, while function/@script
     // locals are removed rather than surviving until parser teardown.

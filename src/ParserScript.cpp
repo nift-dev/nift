@@ -443,10 +443,10 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
         if (root.parent_path() != packages) { error="package path escapes .nift/packages: "+argument; return false; }
         package_metadata::Manifest manifest;
         // Distinguish "not installed" (manifest absent) from malformed metadata.
-        if(!filesystem::file_exists(root/"manifest.json")){const std::string message="package is not installed: "+argument;fail_recoverable(nift::detail::DiagnosticCode::PackageNotInstalled,message,error);if(active_diagnostic_)active_diagnostic_->frames.push_back({nift::detail::DiagnosticFrameKind::Import,path.generic_string(),{},legacy_syntax?"@import: ":"import: "});return false;}
-        if(!package_metadata::load_manifest(root/"manifest.json",true,manifest,error)){fail_fatal(nift::detail::DiagnosticCode::PackageManifestInvalid,"invalid package manifest: "+argument+": "+error,error);return false;}
+        if(!filesystem::file_exists(root/"manifest.json")){const std::string message="package is not installed: "+argument;fail_recoverable(nift::detail::DiagnosticCode::PackageNotInstalled,message,error);if(active_diagnostic_)active_diagnostic_->frames.push_back({nift::detail::DiagnosticFrameKind::Import,root.generic_string(),{},legacy_syntax?"@import: ":"import: "});return false;}
+        if(!package_metadata::load_manifest(root/"manifest.json",true,manifest,error)){fail_fatal(nift::detail::DiagnosticCode::PackageManifestInvalid,"invalid package manifest: "+argument+": "+error,error);if(active_diagnostic_)active_diagnostic_->frames.push_back({nift::detail::DiagnosticFrameKind::Import,root.generic_string(),{},legacy_syntax?"@import: ":"import: "});return false;}
         path=(root/manifest.entry).lexically_normal();
-        if(!filesystem::path_within(root,path)){fail_fatal(nift::detail::DiagnosticCode::PackageManifestInvalid,"package entry escapes the package directory: "+manifest.entry,error);return false;}
+        if(!filesystem::path_within(root,path)){fail_fatal(nift::detail::DiagnosticCode::PackageManifestInvalid,"package entry escapes the package directory: "+manifest.entry,error);if(active_diagnostic_)active_diagnostic_->frames.push_back({nift::detail::DiagnosticFrameKind::Import,root.generic_string(),{},legacy_syntax?"@import: ":"import: "});return false;}
         if (manifest.name != argument) { error="installed package name does not match import: "+argument; return false; }
         package_metadata::Manifest project_manifest;package_metadata::Lock lock;bool lock_exists=false;
         if(!package_metadata::load_manifest(project/"manifest.json",false,project_manifest,error)||
