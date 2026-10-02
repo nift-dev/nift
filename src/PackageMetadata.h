@@ -41,6 +41,24 @@ inline bool safe_external_text(const std::string& value) {
     return std::none_of(value.begin(), value.end(), [](unsigned char c) { return c < 0x20 || c == 0x7f; });
 }
 
+// Canonical source identity used for package acquisition and graph conflict
+// detection. Reused by CLI package commands; do not create a second normalizer.
+inline std::string git_source(const std::string& source){
+    if(source.find('/')==std::string::npos && source.find(':')==std::string::npos && source.find('.')==std::string::npos) return "https://github.com/nift-packages/"+source+".git";
+    if(source.rfind("github:",0)==0){std::string r=source.substr(7);return "https://github.com/"+r+(r.size()>4&&r.substr(r.size()-4)==".git"?"":".git");}
+    if(source.find("://")!=std::string::npos||source.rfind("git@",0)==0)return source;
+    return source;
+}
+inline bool source_is_local_path(const std::string& source){
+    const std::filesystem::path path(source);
+    if(path.is_absolute()||path.has_root_name()||source=="."||source==".."||source.rfind("./",0)==0||source.rfind("../",0)==0||
+       source.rfind(".\\",0)==0||source.rfind("..\\",0)==0)return true;
+    if(source.find("://")!=std::string::npos||source.rfind("git@",0)==0||source.rfind("github:",0)==0)return false;
+    const auto colon=source.find(':');
+    if(colon!=std::string::npos&&colon>0&&colon+1<source.size())return false;
+    return source.find('/')!=std::string::npos||source.find('\\')!=std::string::npos;
+}
+
 inline bool portable_entry_component(const std::string& value) {
     if (value.empty() || value == "." || value == ".." ||
         !((value.front() >= 'a' && value.front() <= 'z') || (value.front() >= '0' && value.front() <= '9')) ||

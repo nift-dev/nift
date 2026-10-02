@@ -401,21 +401,6 @@ static bool package_path_for_name(const std::string& name, fs::path& path, std::
     }
     return true;
 }
-static std::string package_git_source(const std::string& source){
-    if(source.find('/')==std::string::npos && source.find(':')==std::string::npos && source.find('.')==std::string::npos) return "https://github.com/nift-packages/"+source+".git";
-    if(source.rfind("github:",0)==0){std::string r=source.substr(7);return "https://github.com/"+r+(r.size()>4&&r.substr(r.size()-4)==".git"?"":".git");}
-    if(source.find("://")!=std::string::npos||source.rfind("git@",0)==0)return source;
-    return source;
-}
-static bool package_source_is_local_path(const std::string& source){
-    const fs::path path(source);
-    if(path.is_absolute()||path.has_root_name()||source=="."||source==".."||source.rfind("./",0)==0||source.rfind("../",0)==0||
-       source.rfind(".\\",0)==0||source.rfind("..\\",0)==0)return true;
-    if(source.find("://")!=std::string::npos||source.rfind("git@",0)==0||source.rfind("github:",0)==0)return false;
-    const auto colon=source.find(':');
-    if(colon!=std::string::npos&&colon>0&&colon+1<source.size())return false;
-    return source.find('/')!=std::string::npos||source.find('\\')!=std::string::npos;
-}
 static bool package_validate_manifest(const fs::path& dir,std::string& name,std::string& error){
     package_metadata::Manifest manifest;fs::path entry;
     if(!package_metadata::load_package(dir,manifest,entry,error))return false;
@@ -445,7 +430,7 @@ static bool package_git(const std::vector<std::string>& args,const fs::path& cwd
 static bool package_checkout(const std::string& source,const std::string& ref,const fs::path& dest,std::string& commit,std::string& error){
     if(!package_metadata::safe_external_text(source)||!package_metadata::safe_external_text(ref)){error="package source and ref must be non-empty safe strings";return false;}
     std::error_code ec;fs::remove_all(dest,ec);fs::create_directories(dest.parent_path(),ec);ProcessResult r;
-    if(!package_git({"clone","--quiet","--",package_git_source(source),dest.string()},fs::current_path(),r)){error=r.error.empty()?r.err:r.error;return false;}
+    if(!package_git({"clone","--quiet","--",package_metadata::git_source(source),dest.string()},fs::current_path(),r)){error=r.error.empty()?r.err:r.error;return false;}
     if(ref!="latest"&&ref!="latest-tag"){if(!package_git({"checkout","--quiet","--detach",ref},dest,r)){error=r.err;fs::remove_all(dest,ec);return false;}}
     if(ref=="latest-tag"){if(!package_git({"tag","--list","v*"},dest,r)){error=r.err;fs::remove_all(dest,ec);return false;}std::istringstream tags(r.out);std::string tag,best,best_version;while(std::getline(tags,tag)){if(tag.size()<2||tag.front()!='v'||!package_metadata::valid_semver(tag.substr(1)))continue;const std::string version=tag.substr(1);if(best.empty()||package_metadata::compare_semver(version,best_version)>0){best=tag;best_version=version;}}if(best.empty()){error="no semantic-version tag found";fs::remove_all(dest,ec);return false;}if(!package_git({"checkout","--quiet","--detach",best},dest,r)){error=r.err;fs::remove_all(dest,ec);return false;}}
     if(!package_git({"rev-parse","HEAD"},dest,r)){error=r.err;return false;}commit=r.out;while(!commit.empty()&&(commit.back()=='\n'||commit.back()=='\r'))commit.pop_back();if(!package_git({"checkout","--quiet","--detach",commit},dest,r)){error=r.err;return false;}return true;
@@ -453,7 +438,7 @@ static bool package_checkout(const std::string& source,const std::string& ref,co
 static int package_add_cli(int argc,char**argv){
     if(argc<3){console::error("add requires a package source");return 1;}std::string source=argv[2],ref="latest";for(int i=3;i<argc;++i){std::string a=argv[i];if(a.rfind("--ref=",0)==0)ref=a.substr(6);else{console::error("unknown add option: "+a);return 1;}}
     if(!package_metadata::safe_external_text(source)||!package_metadata::safe_external_text(ref)){console::error("package source and ref must be non-empty safe strings");return 1;}
-    const bool local_path=package_source_is_local_path(source);if(local_path&&!fs::is_directory(fs::path(source))){console::error("local package source is not a directory: "+source);return 1;}bool local=local_path;std::string name,error,commit;fs::path root;
+    const bool local_path=package_metadata::source_is_local_path(source);if(local_path&&!fs::is_directory(fs::path(source))){console::error("local package source is not a directory: "+source);return 1;}bool local=local_path;std::string name,error,commit;fs::path root;
     if(!package_store_root(root,error)){console::error(error);return 1;}
     PackageTransaction transaction(fs::current_path());if(!transaction.acquire(error)){console::error(error);return 1;}fs::path transaction_root;if(!transaction.create_staging(transaction_root,error)){console::error(error);return 1;}fs::path dest,staged;
     package_metadata::Manifest manifest;if(!load_project_manifest(true,manifest,error)){console::error(error);return 1;}
