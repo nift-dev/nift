@@ -1433,11 +1433,13 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
 #endif
                 if(!handle){
 #ifdef _WIN32
-                    error="ffi_open: failed to load library";
+                    return fail_recoverable(nift::detail::DiagnosticCode::FfiLibraryLoadFailed,
+                                            "ffi_open: failed to load library", error);
 #else
-                    const char* e=dlerror();error=std::string("ffi_open: ")+(e?e:"failed to load library");
+                    const char* e=dlerror();
+                    return fail_recoverable(nift::detail::DiagnosticCode::FfiLibraryLoadFailed,
+                                            std::string("ffi_open: ")+(e?e:"failed to load library"), error);
 #endif
-                    return false;
                 }
                 auto st=std::make_shared<FfiLibraryInstance>();st->handle=handle;const std::string id=std::to_string(next_ffi_library_id_++);ffi_libraries_[id]=st;out=nift::RuntimeValue(std::string("\x1fnift:ffi-lib:")+id);return true;
             }
@@ -1487,9 +1489,9 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 // POSIX specifies that a successful dlsym result can represent a
                 // function pointer. ISO C++ has no direct API for that boundary, so
                 // copy the POSIX-provided representation into libffi's exact type.
-                static_assert(sizeof(NiftFfiFunction)==sizeof(void*),"dlsym function pointer representation is unsupported");void* address=nullptr;dlerror();address=dlsym(li->second->handle,symbol.c_str());const char* dlerr=dlerror();if(dlerr){error=std::string("ffi_call: symbol lookup failed: ")+dlerr;return false;}std::memcpy(&sym,&address,sizeof(sym));
+                static_assert(sizeof(NiftFfiFunction)==sizeof(void*),"dlsym function pointer representation is unsupported");void* address=nullptr;dlerror();address=dlsym(li->second->handle,symbol.c_str());const char* dlerr=dlerror();if(dlerr)return fail_recoverable(nift::detail::DiagnosticCode::FfiSymbolNotFound,std::string("ffi_call: symbol lookup failed: ")+dlerr,error);std::memcpy(&sym,&address,sizeof(sym));
 #endif
-                if(!sym){error="ffi_call: symbol not found: "+symbol;return false;}
+                if(!sym)return fail_recoverable(nift::detail::DiagnosticCode::FfiSymbolNotFound,"ffi_call: symbol not found: "+symbol,error);
 
                 std::vector<NiftFfiValue> values(types.size());
                 std::vector<ffi_type*> ffi_types;ffi_types.reserve(types.size());

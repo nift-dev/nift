@@ -1423,7 +1423,10 @@ test-v46-b4-cp4b-stream-operators: test-v46-b4-cp4b
 test-v46-b4-cp4c: test-v46-b4-cp4b-stream-operators
 	bash tests/v46_b4_cp4c_json_schema.sh
 
-.PHONY: test-v46-b4-cp2 test-v46-b4-cp3 test-v46-b4-pre-cp4 test-v46-b4-cp4a test-v46-b4-cp4b test-v46-b4-cp4b-stream-operators test-v46-b4-cp4c
+test-v46-b4-cp5a: test-v46-b4-cp4c
+	bash tests/v46_b4_cp5a_ffi_recoverable.sh
+
+.PHONY: test-v46-b4-cp2 test-v46-b4-cp3 test-v46-b4-pre-cp4 test-v46-b4-cp4a test-v46-b4-cp4b test-v46-b4-cp4b-stream-operators test-v46-b4-cp4c test-v46-b4-cp5a
 
 test-v46-relative-imports: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" bash tests/v44_relative_import_ownership_smoke.sh
