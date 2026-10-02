@@ -1411,7 +1411,10 @@ test-v46-b4-cp3: test-v46-b4-cp2 test-runtime-value $(CP3_EMBED_TEST)
 test-v46-b4-pre-cp4: test-v46-b4-cp3
 	bash tests/v46_b4_precp4_repairs.sh
 
-.PHONY: test-v46-b4-cp2 test-v46-b4-cp3 test-v46-b4-pre-cp4
+test-v46-b4-cp4a: test-v46-b4-pre-cp4
+	bash tests/v46_b4_cp4a_filesystem.sh
+
+.PHONY: test-v46-b4-cp2 test-v46-b4-cp3 test-v46-b4-pre-cp4 test-v46-b4-cp4a
 
 test-v46-relative-imports: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" bash tests/v44_relative_import_ownership_smoke.sh

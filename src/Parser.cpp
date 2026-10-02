@@ -787,6 +787,29 @@ void Parser::fail(const fs::path& source_path, const std::string& source, std::s
         result_.error.source_length = result_.diagnostic->origin.source_length;
         result_.error.source_line = result_.diagnostic->origin.source_line;
     }
+    if (active_recoverable_ && result_.diagnostic &&
+        nift::detail::diagnostic_code_info(result_.diagnostic->code).disposition ==
+            nift::detail::DiagnosticDisposition::Recoverable &&
+        !result_.diagnostic->origin.source.empty() && active_recoverable_->is_error()) {
+        active_recoverable_ = nift::runtime_error_with_origin(
+            *active_recoverable_, result_.diagnostic->origin.source,
+            result_.diagnostic->origin.line, result_.diagnostic->origin.column);
+    }
+}
+
+bool Parser::fail_recoverable(nift::detail::DiagnosticCode code, std::string message,
+                              std::string& error) {
+    const auto info = nift::detail::diagnostic_code_info(code);
+    if (info.disposition != nift::detail::DiagnosticDisposition::Recoverable)
+        throw std::logic_error("fail_recoverable requires a recoverable diagnostic code");
+    const std::size_t dot = info.text.find('.');
+    error = message;
+    active_recoverable_ = nift::RuntimeValue::make_error(
+        std::make_shared<const nift::RuntimeErrorData>(
+            message, std::string(info.text), std::string(info.text.substr(0, dot)),
+            "", 0, 0, nullptr));
+    active_diagnostic_ = nift::detail::make_diagnostic(code, std::move(message));
+    return false;
 }
 
 void Parser::append_diagnostic_frame(nift::detail::DiagnosticFrameKind kind,

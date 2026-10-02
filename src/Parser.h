@@ -449,6 +449,7 @@ private:
                        std::size_t& close_position) const;
     std::string path_to(const std::string& argument, const std::string& directive);
     void fail(const std::filesystem::path& source_path, const std::string& source, std::size_t offset, const std::string& message);
+    bool fail_recoverable(nift::detail::DiagnosticCode code, std::string message, std::string& error);
     void append_diagnostic_frame(nift::detail::DiagnosticFrameKind kind,
                                  std::string label,
                                  std::string compatibility_prefix = {});
