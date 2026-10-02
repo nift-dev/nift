@@ -90,12 +90,17 @@ explanation/query work.
   mismatches are rejected. Physical install availability remains CP12.
 - **ResolveUpdate**: requirement refs are resolved through the provider with
   per-transaction memoization.
-- **TargetedUpdate**: `target_root` names a root/direct dependency to
-  re-resolve; unrelated root nodes and their reachable closure are preserved
-  at their locked identities (never re-resolved); shared nodes are reconciled
+- **TargetedUpdate**: `target_root` names a root/direct dependency selected
+  for root-level re-resolution. **Only that root among the root dependencies
+  is re-resolved**; unrelated root nodes are preserved at their locked
+  identities (never re-resolved). The target's **reachable transitive closure
+  is re-resolved according to update policy** (refs inside that closure are
+  not frozen — the DFS descends the target's refreshed manifest and resolves
+  its dependencies with memoized ref resolution). Shared nodes are reconciled
   globally and a conflict fails atomically. Both a compatible-shared-node and
   a conflicting-shared-node fixture are proven, and the unrelated root is
-  preserved (only the target's ref is resolved).
+  preserved (only the target root's closure is re-resolved; a preserved root
+  never triggers ref resolution).
 
 ## Resolver result / acquisition plan
 
