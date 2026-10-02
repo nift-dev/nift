@@ -29,6 +29,8 @@ struct Context {
         std::vector<nift::RuntimeValue>&&)> native_method_outcome;
     std::optional<nift::detail::Diagnostic> propagated_diagnostic;
     std::function<void(nift::detail::Diagnostic)> propagate_diagnostic;
+    std::optional<nift::RuntimeValue> propagated_recoverable;
+    std::function<void(nift::RuntimeValue)> propagate_recoverable;
     // Optional: given an argument expression text, report whether it denotes a
     // location reference that must keep its identity across the call boundary.
     // When set and true for any argument, the prepared Call dispatch is skipped

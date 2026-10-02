@@ -54,6 +54,10 @@ int main() {
     assert(unsupported.kind() == EvalOutcome<int>::Kind::Unsupported);
     auto value = EvalOutcome<int>::value(42);
     assert(value.kind() == EvalOutcome<int>::Kind::Value && value.value() == 42);
+    auto recoverable_value = EvalOutcome<nift::RuntimeValue>::recoverable(
+        nift::RuntimeValue::make_error("failed"));
+    assert(recoverable_value.kind() == EvalOutcome<nift::RuntimeValue>::Kind::Recoverable);
+    assert(recoverable_value.error().is_error());
     auto failure = EvalOutcome<int>::fatal(diagnostic);
     assert(failure.kind() == EvalOutcome<int>::Kind::Fatal);
     assert(failure.diagnostic().message == "division by zero");
@@ -63,6 +67,10 @@ int main() {
     auto completed = WorkerCompletion<int>::value(7);
     assert(completed.kind() == WorkerCompletion<int>::Kind::Value);
     assert(completed.value() == 7);
+    auto recoverable_worker = WorkerCompletion<int>::recoverable(
+        nift::RuntimeValue::make_error("worker failed"));
+    assert(recoverable_worker.kind() == WorkerCompletion<int>::Kind::Recoverable);
+    assert(recoverable_worker.error().is_error());
     auto fatal = WorkerCompletion<int>::fatal(std::move(diagnostic));
     assert(fatal.kind() == WorkerCompletion<int>::Kind::Fatal);
     assert(nift::detail::project_diagnostic(fatal.diagnostic()) ==

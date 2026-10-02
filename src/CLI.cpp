@@ -895,6 +895,7 @@ static int run_eval(int argc, char** argv) {
     ScriptRenderHost host(fs::current_path());TrackedInfo info;Parser parser(host,info);nift::RuntimeValue value;std::string error;
     if(!parser.eval_expression(expression,value,error)){std::cerr<<"eval: "<<error<<'\n';return 2;}
     if(cli_contains_bytes(value)){std::cerr<<"eval: bytes values are not serializable; decode as UTF-8 first\n";return 2;}
+    if(nift::runtime_contains_error(value)){std::cerr<<"eval: Error values are not serializable\n";return 2;}
     if(nift::runtime_contains_timer(value)){std::cerr<<"eval: timer values are not serializable\n";return 2;}
     if(json_output)std::cout<<value.dump()<<'\n';else if(value.is_string())std::cout<<value.string<<'\n';else std::cout<<value.dump()<<'\n';
     return 0;
@@ -925,6 +926,7 @@ static bool shell_glob_expand(const std::string& token,std::vector<std::string>&
             nift::RuntimeValue v; std::string ee;
             if (!p.eval_expression(expr, v, ee)) { err = "command interpolation failed: $[" + expr + "]: " + ee; return false; }
             if (cli_contains_bytes(v)) { err = "command interpolation failed: bytes values must be decoded as UTF-8"; return false; }
+            if (nift::runtime_contains_error(v)) { err = "command interpolation failed: Error values cannot be rendered as text"; return false; }
             if (nift::runtime_contains_timer(v)) { err = "command interpolation failed: timer values cannot be rendered as text"; return false; }
             const std::string rendered = p.render_expression_value(v);
             token.replace(i, close - i + 1, rendered);

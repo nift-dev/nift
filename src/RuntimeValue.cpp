@@ -6,8 +6,28 @@
 #include <charconv>
 #include <cmath>
 #include <limits>
+#include <unordered_set>
 
 namespace nift {
+
+namespace {
+json::Document runtime_error_to_json(const RuntimeErrorData& error, std::size_t depth,
+                                     std::unordered_set<const RuntimeErrorData*>& seen) {
+    if (depth >= 16 || !seen.insert(&error).second)
+        throw std::runtime_error("invalid Error cause chain");
+    json::Document value = json::Document::make_object();
+    value["message"] = json::Document(error.message);
+    value["code"] = json::Document(error.code);
+    value["category"] = json::Document(error.category);
+    value["source"] = json::Document(error.source);
+    value["line"] = json::Document(static_cast<double>(error.line));
+    value["column"] = json::Document(static_cast<double>(error.column));
+    value["cause"] = error.cause ? runtime_error_to_json(*error.cause, depth + 1, seen)
+                                  : json::Document(nullptr);
+    seen.erase(&error);
+    return value;
+}
+}
 
 bool runtime_valid_utf8(std::string_view value) {
     for (std::size_t i = 0; i < value.size();) {
@@ -33,6 +53,92 @@ bool runtime_valid_utf8(std::string_view value) {
         i += width;
     }
     return true;
+}
+
+bool runtime_valid_user_error_code(std::string_view code) {
+    if (code.size() > 128) return false;
+    std::size_t segments = 0;
+    for (std::size_t start = 0; start <= code.size();) {
+        const std::size_t end = code.find('.', start);
+        const std::string_view segment = code.substr(start, end == std::string_view::npos
+                                                            ? code.size() - start : end - start);
+        if (segment.empty() || segment.size() > 32 || segment.front() < 'a' || segment.front() > 'z')
+            return false;
+        for (const unsigned char c : segment)
+            if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_' || c == '-'))
+                return false;
+        ++segments;
+        if (end == std::string_view::npos) break;
+        start = end + 1;
+    }
+    return segments >= 2 && segments <= 8 && code.substr(0, code.find('.')) == "user";
+}
+
+RuntimeValue RuntimeValue::make_error(std::string message, std::string code,
+                                      const RuntimeValue& cause, std::string source,
+                                      std::size_t line, std::size_t column) {
+    if (!runtime_valid_user_error_code(code)) throw std::invalid_argument("invalid user Error code");
+    if (!cause.is_null() && !cause.is_error())
+        throw std::invalid_argument("Error cause must be Error or null");
+    std::size_t depth = 1;
+    std::unordered_set<const RuntimeErrorData*> seen;
+    for (auto current = cause.error; current; current = current->cause) {
+        if (!seen.insert(current.get()).second || ++depth > 16)
+            throw std::invalid_argument("Error cause chain exceeds 16 values or contains a cycle");
+    }
+    if (source.empty() || line == 0 || column == 0) { source.clear(); line = 0; column = 0; }
+    const std::size_t dot = code.find('.');
+    std::string category = code.substr(0, dot);
+    return make_error(std::make_shared<const RuntimeErrorData>(
+        std::move(message), std::move(code), std::move(category), std::move(source), line, column,
+        cause.is_error() ? cause.error : nullptr));
+}
+
+RuntimeValue RuntimeValue::make_error(std::shared_ptr<const RuntimeErrorData> data) {
+    if (!data) throw std::invalid_argument("Error backing must not be null");
+    std::unordered_set<const RuntimeErrorData*> seen;
+    std::size_t depth = 0;
+    for (auto current = data; current; current = current->cause) {
+        if (++depth > 16 || !seen.insert(current.get()).second)
+            throw std::invalid_argument("Error cause chain exceeds 16 values or contains a cycle");
+        const std::size_t dot = current->code.find('.');
+        if (dot == std::string::npos || current->category != current->code.substr(0, dot))
+            throw std::invalid_argument("Error code and category do not match");
+        const bool complete_origin = !current->source.empty() && current->line != 0 && current->column != 0;
+        const bool empty_origin = current->source.empty() && current->line == 0 && current->column == 0;
+        if (!complete_origin && !empty_origin)
+            throw std::invalid_argument("Error origin must be wholly present or absent");
+    }
+    RuntimeValue value; value.type = RuntimeType::Error; value.error = std::move(data); return value;
+}
+
+RuntimeValue RuntimeValue::make_error(std::string message, std::string code) {
+    return make_error(std::move(message), std::move(code), RuntimeValue(nullptr));
+}
+
+bool runtime_error_member(const RuntimeValue& value, std::string_view member, RuntimeValue& result) {
+    if (!value.is_error() || !value.error) return false;
+    if (member == "message") result = RuntimeValue(value.error->message);
+    else if (member == "code") result = RuntimeValue(value.error->code);
+    else if (member == "category") result = RuntimeValue(value.error->category);
+    else if (member == "source") result = RuntimeValue(value.error->source);
+    else if (member == "line") result = runtime_unsigned_integer(value.error->line);
+    else if (member == "column") result = runtime_unsigned_integer(value.error->column);
+    else if (member == "cause") result = value.error->cause ? RuntimeValue::make_error(value.error->cause)
+                                                             : RuntimeValue(nullptr);
+    else return false;
+    return true;
+}
+
+RuntimeValue runtime_error_with_origin(const RuntimeValue& value, std::string source,
+                                       std::size_t line, std::size_t column) {
+    if (!value.is_error() || !value.error) throw std::invalid_argument("expected Error value");
+    if (!value.error->source.empty() && value.error->line != 0 && value.error->column != 0)
+        return value;
+    if (source.empty() || line == 0 || column == 0) return value;
+    return RuntimeValue::make_error(std::make_shared<const RuntimeErrorData>(
+        value.error->message, value.error->code, value.error->category, std::move(source),
+        line, column, value.error->cause));
 }
 
 bool RuntimeValue::has(const std::string& key) const {
@@ -79,6 +185,11 @@ void RuntimeValue::push_back(RuntimeValue&& value) {
 }
 
 std::string RuntimeValue::dump(int indent) const {
+    if (is_error()) {
+        if (!error) throw std::runtime_error("invalid Error value");
+        std::unordered_set<const RuntimeErrorData*> seen;
+        return runtime_error_to_json(*error, 0, seen).dump(indent);
+    }
     return runtime_to_json(*this).dump(indent);
 }
 
@@ -315,6 +426,18 @@ bool runtime_truthy(const RuntimeValue& value) {
     if (value.is_object()) return !value.object.empty();
     if (value.is_bytes()) return value.bytes && !value.bytes->empty();
     if (value.is_timer()) return true;
+    if (value.is_error()) return true;
+    return false;
+}
+
+bool runtime_contains_error(const RuntimeValue& value) {
+    if (value.is_error()) return true;
+    if (value.is_array())
+        return std::any_of(value.array.begin(), value.array.end(), runtime_contains_error);
+    if (value.is_object())
+        return std::any_of(value.object.begin(), value.object.end(), [](const auto& entry) {
+            return runtime_contains_error(entry.second);
+        });
     return false;
 }
 
@@ -503,6 +626,22 @@ bool runtime_equal(const RuntimeValue& left, const RuntimeValue& right) {
     if (left.is_timer())
         return left.timer && right.timer && left.timer->owner == right.timer->owner &&
                left.timer->instance == right.timer->instance;
+    if (left.is_error()) {
+        std::unordered_set<const RuntimeErrorData*> left_seen, right_seen;
+        auto l = left.error;
+        auto r = right.error;
+        std::size_t depth = 0;
+        while (l && r) {
+            if (++depth > 16 || !left_seen.insert(l.get()).second || !right_seen.insert(r.get()).second)
+                return false;
+            if (l->message != r->message || l->code != r->code || l->category != r->category ||
+                l->source != r->source || l->line != r->line || l->column != r->column)
+                return false;
+            l = l->cause;
+            r = r->cause;
+        }
+        return !l && !r;
+    }
     if (left.is_array()) {
         if (left.array.size() != right.array.size()) return false;
         for (std::size_t i = 0; i < left.array.size(); ++i)
@@ -552,6 +691,19 @@ void append_fingerprint(std::string& out, const RuntimeValue& value) {
     }
     if (value.is_timer()) {
         if (value.timer) out += std::to_string(value.timer->owner) + ":" + std::to_string(value.timer->instance);
+        return;
+    }
+    if (value.is_error()) {
+        if (!value.error) return;
+        std::unordered_set<const RuntimeErrorData*> seen;
+        auto current=value.error;std::size_t depth=0;
+        while(current&&depth++<16&&seen.insert(current.get()).second){
+            auto append_text=[&](const std::string& text){out+=std::to_string(text.size())+":"+text;};
+            append_text(current->message);append_text(current->code);append_text(current->category);append_text(current->source);
+            out+=std::to_string(current->line)+":"+std::to_string(current->column)+":";
+            current=current->cause;
+        }
+        out+=current?"invalid":"null";
         return;
     }
     if (value.is_array()) {
@@ -647,6 +799,9 @@ bool runtime_to_json(const RuntimeValue& value, json::Document& output, std::str
             return false;
         case RuntimeType::Timer:
             error = "timer values are not JSON serializable";
+            return false;
+        case RuntimeType::Error:
+            error = "Error values are not JSON serializable";
             return false;
     }
     output = std::move(document);

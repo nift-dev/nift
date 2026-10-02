@@ -74,6 +74,8 @@ Value::Type Value::type() const {
         case RuntimeType::Bytes: return Type::Bytes;
         case RuntimeType::Timer:
             throw std::logic_error("timer value escaped the runtime boundary");
+        case RuntimeType::Error:
+            throw std::logic_error("Error value escaped the runtime boundary");
     }
     return Type::Null;
 }

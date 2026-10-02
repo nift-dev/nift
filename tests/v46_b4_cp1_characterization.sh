@@ -68,27 +68,24 @@ print(throw(2))
 NIFT
 [[ "$("$NIFT" "$TMP/import-names.f")" == $'11\n22\n33\n22' ]]
 
-# Statement-like spellings do not exist yet. Bare `throw value` is currently a
-# no-op script line, while a try/catch-shaped expression is rejected. CP3's
-# intentional grammar additions must update these explicit baselines.
-"$NIFT" -e 'throw 1' >"$TMP/throw.out" 2>"$TMP/throw.err"
-[[ ! -s "$TMP/throw.out" && ! -s "$TMP/throw.err" ]]
-
-if "$NIFT" -e 'try { value := 1 } catch(err) { value := 2 }' \
-    >"$TMP/try.out" 2>"$TMP/try.err"; then
-    echo 'pre-CP3 try/catch statement unexpectedly succeeded' >&2
+# CP3 makes only the exact statement forms contextual. Call-position and member
+# spellings above remain compatible, while a non-Error throw is fatal.
+if "$NIFT" -e 'throw 1' >"$TMP/throw.out" 2>"$TMP/throw.err"; then
+    echo 'non-Error throw unexpectedly succeeded' >&2
     exit 1
 fi
-grep -q 'unknown value or malformed expression' "$TMP/try.err"
+grep -q 'throw expression must evaluate to Error' "$TMP/throw.err"
+
+"$NIFT" -e 'try { value := 1 } catch(err) { value := 2 }'
 for malformed in \
     'try {}' \
     'try { value := 1 } catch' \
     'try { value := 1 } catch() {}'; do
     if "$NIFT" -e "$malformed" >"$TMP/malformed-try.out" 2>"$TMP/malformed-try.err"; then
-        echo "pre-CP3 malformed try unexpectedly succeeded: $malformed" >&2
+        echo "malformed try unexpectedly succeeded: $malformed" >&2
         exit 1
     fi
-    grep -q 'unknown value or malformed expression' "$TMP/malformed-try.err"
+    grep -Eq 'try requires|catch requires' "$TMP/malformed-try.err"
 done
 
 # Execute failing prepared and forced-legacy twins. Their exact call-site

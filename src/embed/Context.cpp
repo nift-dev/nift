@@ -17,7 +17,8 @@ void Context::set_title(std::string title) {
 
 bool Context::set(std::string name, Value value) {
     if (!detail::valid_binding_identifier(name) || detail::structural_builtin_name(name)) return false;
-    if (runtime_contains_timer(ValueAccess::runtime(value)) ||
+    if (runtime_contains_error(ValueAccess::runtime(value)) ||
+        runtime_contains_timer(ValueAccess::runtime(value)) ||
         runtime_contains_reserved_handle(ValueAccess::runtime(value))) return false;
     bindings_[std::move(name)] = std::move(value);
     return true;

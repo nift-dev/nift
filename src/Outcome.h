@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Diagnostic.h"
+#include "RuntimeValue.h"
 
 #include <optional>
 #include <utility>
@@ -10,7 +11,7 @@ namespace nift::detail {
 template <typename T>
 class EvalOutcome {
 public:
-    enum class Kind { Value, Unsupported, Fatal };
+    enum class Kind { Value, Unsupported, Recoverable, Fatal };
 
     static EvalOutcome value(T value) {
         EvalOutcome outcome;
@@ -20,6 +21,14 @@ public:
     }
 
     static EvalOutcome unsupported() { return EvalOutcome{}; }
+
+    static EvalOutcome recoverable(RuntimeValue error_value) {
+        if (!error_value.is_error()) throw std::logic_error("recoverable outcome requires Error");
+        EvalOutcome outcome;
+        outcome.kind_ = Kind::Recoverable;
+        outcome.error_ = std::move(error_value);
+        return outcome;
+    }
 
     static EvalOutcome fatal(Diagnostic diagnostic) {
         EvalOutcome outcome;
@@ -33,21 +42,31 @@ public:
     const T& value() const { return *value_; }
     Diagnostic& diagnostic() { return *diagnostic_; }
     const Diagnostic& diagnostic() const { return *diagnostic_; }
+    RuntimeValue& error() { return *error_; }
+    const RuntimeValue& error() const { return *error_; }
 
 private:
     Kind kind_ = Kind::Unsupported;
     std::optional<T> value_;
     std::optional<Diagnostic> diagnostic_;
+    std::optional<RuntimeValue> error_;
 };
 
 class ExecOutcome {
 public:
-    enum class Kind { Normal, Return, Break, Continue, Fatal };
+    enum class Kind { Normal, Return, Break, Continue, Recoverable, Fatal };
 
     static ExecOutcome normal() { return ExecOutcome{}; }
     static ExecOutcome returned() { return ExecOutcome{Kind::Return, std::nullopt}; }
     static ExecOutcome broken() { return ExecOutcome{Kind::Break, std::nullopt}; }
     static ExecOutcome continued() { return ExecOutcome{Kind::Continue, std::nullopt}; }
+    static ExecOutcome recoverable(RuntimeValue error_value) {
+        if (!error_value.is_error()) throw std::logic_error("recoverable outcome requires Error");
+        ExecOutcome outcome;
+        outcome.kind_ = Kind::Recoverable;
+        outcome.error_ = std::move(error_value);
+        return outcome;
+    }
     static ExecOutcome fatal(Diagnostic diagnostic) {
         return ExecOutcome{Kind::Fatal, std::move(diagnostic)};
     }
@@ -55,6 +74,8 @@ public:
     Kind kind() const { return kind_; }
     Diagnostic& diagnostic() { return *diagnostic_; }
     const Diagnostic& diagnostic() const { return *diagnostic_; }
+    RuntimeValue& error() { return *error_; }
+    const RuntimeValue& error() const { return *error_; }
 
 private:
     ExecOutcome() = default;
@@ -63,12 +84,13 @@ private:
 
     Kind kind_ = Kind::Normal;
     std::optional<Diagnostic> diagnostic_;
+    std::optional<RuntimeValue> error_;
 };
 
 template <typename T>
 class WorkerCompletion {
 public:
-    enum class Kind { Pending, Value, Fatal };
+    enum class Kind { Pending, Value, Recoverable, Fatal };
 
     static WorkerCompletion value(T value) {
         WorkerCompletion completion;
@@ -84,17 +106,28 @@ public:
         return completion;
     }
 
+    static WorkerCompletion recoverable(RuntimeValue error_value) {
+        if (!error_value.is_error()) throw std::logic_error("recoverable worker completion requires Error");
+        WorkerCompletion completion;
+        completion.kind_ = Kind::Recoverable;
+        completion.error_ = std::move(error_value);
+        return completion;
+    }
+
     Kind kind() const { return kind_; }
     bool pending() const { return kind_ == Kind::Pending; }
     T& value() { return *value_; }
     const T& value() const { return *value_; }
     Diagnostic& diagnostic() { return *diagnostic_; }
     const Diagnostic& diagnostic() const { return *diagnostic_; }
+    RuntimeValue& error() { return *error_; }
+    const RuntimeValue& error() const { return *error_; }
 
 private:
     Kind kind_ = Kind::Pending;
     std::optional<T> value_;
     std::optional<Diagnostic> diagnostic_;
+    std::optional<RuntimeValue> error_;
 };
 
 }  // namespace nift::detail

@@ -23,6 +23,7 @@ int main() {
     static_assert(static_cast<int>(nift::RuntimeType::Object) == 6);
     static_assert(static_cast<int>(nift::RuntimeType::Bytes) == 7);
     static_assert(static_cast<int>(nift::RuntimeType::Timer) == 8);
+    static_assert(static_cast<int>(nift::RuntimeType::Error) == 9);
 
     assert(nift::runtime_fingerprint(nift::RuntimeValue(nullptr)) == "0:");
     assert(nift::runtime_fingerprint(nift::RuntimeValue(true)) == "1:1");
@@ -33,6 +34,40 @@ int main() {
     assert(nift::runtime_fingerprint(nift::RuntimeValue::make_object()) == "6:0{}");
     assert(nift::runtime_fingerprint(nift::RuntimeValue(nift::RuntimeBytes{})) == "7:0:");
     assert(nift::runtime_fingerprint(nift::RuntimeValue::make_timer(4, 9)) == "8:4:9");
+
+    assert(nift::runtime_valid_user_error_code("user.raised"));
+    assert(nift::runtime_valid_user_error_code("user.owner.not_found"));
+    assert(!nift::runtime_valid_user_error_code("io.open_failed"));
+    assert(!nift::runtime_valid_user_error_code("user.Upper"));
+    const auto cause = nift::RuntimeValue::make_error("root", "user.root");
+    const auto runtime_error = nift::RuntimeValue::make_error(
+        "outer", "user.owner.failed", cause, "script.f", 2, 3);
+    assert(runtime_error.is_error());
+    assert(nift::runtime_truthy(runtime_error));
+    assert(nift::runtime_contains_error(runtime_error));
+    nift::RuntimeValue member;
+    assert(nift::runtime_error_member(runtime_error, "category", member));
+    assert(member.string == "user");
+    assert(nift::runtime_error_member(runtime_error, "cause", member));
+    assert(nift::runtime_equal(member, cause));
+    assert(nift::runtime_equal(runtime_error, runtime_error));
+    json::Document expected_runtime_error;
+    std::string expected_runtime_error_parse;
+    assert(json::Document::parse(R"({"message":"outer","code":"user.owner.failed","category":"user","source":"script.f","line":2,"column":3,"cause":{"message":"root","code":"user.root","category":"user","source":"","line":0,"column":0,"cause":null}})",
+                                 expected_runtime_error, expected_runtime_error_parse));
+    assert(runtime_error.dump(0) == expected_runtime_error.dump(0));
+    json::Document rejected_error;
+    std::string rejected_error_message;
+    assert(!nift::runtime_to_json(runtime_error, rejected_error, rejected_error_message));
+    assert(rejected_error_message == "Error values are not JSON serializable");
+    auto deepest = nift::RuntimeValue::make_error("0");
+    for (int i = 1; i < 16; ++i)
+        deepest = nift::RuntimeValue::make_error(std::to_string(i), "user.depth", deepest);
+    assert(deepest.is_error());
+    bool depth_rejected = false;
+    try { (void)nift::RuntimeValue::make_error("16", "user.depth", deepest); }
+    catch (const std::invalid_argument&) { depth_rejected = true; }
+    assert(depth_rejected);
 
     json::Document parsed;
     std::string error;

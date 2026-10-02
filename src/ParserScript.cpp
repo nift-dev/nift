@@ -14,6 +14,7 @@
 #include <exception>
 #include <functional>
 #include <set>
+#include <type_traits>
 
 namespace fs = std::filesystem;
 
@@ -36,9 +37,10 @@ fs::path stable_import_identity(const fs::path& path) {
 }
 
 bool Parser::translate_function_program(const std::string& source, std::string& translated, std::string& error) const {
-    std::function<bool(const std::string&, std::string&)> convert;
-    convert = [&](const std::string& in, std::string& out) -> bool {
+    std::function<bool(const std::string&, std::string&, std::size_t, std::size_t)> convert;
+    convert = [&](const std::string& in, std::string& out, std::size_t base_line, std::size_t base_column) -> bool {
         std::size_t i=0;
+        auto source_position=[&](std::size_t offset){std::size_t line=base_line,column=base_column;for(std::size_t p=0;p<offset&&p<in.size();++p){if(in[p]=='\n'){++line;column=1;}else ++column;}return std::pair<std::size_t,std::size_t>{line,column};};
         auto boundary=[&](std::size_t p,const std::string& kw){return in.compare(p,kw.size(),kw)==0 && (p+kw.size()==in.size() || (!std::isalnum((unsigned char)in[p+kw.size()]) && in[p+kw.size()]!='_'));};
         while(i<in.size()) {
             while(i<in.size() && std::isspace((unsigned char)in[i])) ++i;
@@ -50,7 +52,8 @@ bool Parser::translate_function_program(const std::string& source, std::string& 
                 if(p>=in.size()||in[p]!='('||!find_balanced(in,p,'(',')',pc)){error="fn requires '(name(args))'";return false;}
                 std::size_t bo=pc+1; while(bo<in.size()&&std::isspace((unsigned char)in[bo]))++bo; std::size_t bc=0;
                 if(bo>=in.size()||in[bo]!='{'||!find_balanced(in,bo,'{','}',bc)){error="fn requires a block";return false;}
-                out += async?"@fn[async](":"@fn("; out+=in.substr(p+1,pc-p-1)+"){"+in.substr(bo+1,bc-bo-1)+"}"; i=bc+1; continue;
+                std::string body;const auto body_position=source_position(bo+1);if(!convert(in.substr(bo+1,bc-bo-1),body,body_position.first,body_position.second))return false;
+                out += async?"@fn[async](":"@fn("; out+=in.substr(p+1,pc-p-1)+"){"+body+"}"; i=bc+1; continue;
             }
             if(boundary(i,"enum")) {
                 std::size_t p=i+4;while(p<in.size()&&std::isspace((unsigned char)in[p]))++p;std::size_t ns=p;while(p<in.size()&&(std::isalnum((unsigned char)in[p])||in[p]=='_'))++p;std::string name=in.substr(ns,p-ns);while(p<in.size()&&std::isspace((unsigned char)in[p]))++p;std::size_t bc=0;
@@ -108,14 +111,30 @@ bool Parser::translate_function_program(const std::string& source, std::string& 
                 if(p>=in.size()||in[p]!='('||!find_balanced(in,p,'(',')',pc)){error="function while requires '(...)'";return false;}
                 std::size_t bo=pc+1;while(bo<in.size()&&std::isspace((unsigned char)in[bo]))++bo;std::size_t bc=0;
                 if(bo>=in.size()||in[bo]!='{'||!find_balanced(in,bo,'{','}',bc)){error="function while requires a block";return false;}
-                std::string body;if(!convert(in.substr(bo+1,bc-bo-1),body))return false;out+="@while("+in.substr(p+1,pc-p-1)+"){"+body+"}";i=bc+1;continue;
+                std::string body;const auto body_position=source_position(bo+1);if(!convert(in.substr(bo+1,bc-bo-1),body,body_position.first,body_position.second))return false;out+="@while("+in.substr(p+1,pc-p-1)+"){"+body+"}";i=bc+1;continue;
+            }
+            if(boundary(i,"try")) {
+                std::size_t bo=i+3;while(bo<in.size()&&std::isspace((unsigned char)in[bo]))++bo;
+                if(bo<in.size()&&in[bo]=='{'){
+                    std::size_t bc=0;if(!find_balanced(in,bo,'{','}',bc)){error="try requires a balanced block";return false;}
+                    std::size_t cp=bc+1;while(cp<in.size()&&std::isspace((unsigned char)in[cp]))++cp;
+                    if(!boundary(cp,"catch")){error="try requires catch(identifier)";return false;}
+                    cp+=5;while(cp<in.size()&&std::isspace((unsigned char)in[cp]))++cp;std::size_t cc=0;
+                    if(cp>=in.size()||in[cp]!='('||!find_balanced(in,cp,'(',')',cc)){error="catch requires '(identifier)'";return false;}
+                    const std::string binding=trim_copy(in.substr(cp+1,cc-cp-1));
+                    if(!valid_binding_identifier(binding)){error="catch requires one valid identifier";return false;}
+                    std::size_t cbo=cc+1;while(cbo<in.size()&&std::isspace((unsigned char)in[cbo]))++cbo;std::size_t cbc=0;
+                    if(cbo>=in.size()||in[cbo]!='{'||!find_balanced(in,cbo,'{','}',cbc)){error="catch(identifier) requires a block";return false;}
+                    std::string try_body,catch_body;const auto try_position=source_position(bo+1);const auto catch_position=source_position(cbo+1);if(!convert(in.substr(bo+1,bc-bo-1),try_body,try_position.first,try_position.second)||!convert(in.substr(cbo+1,cbc-cbo-1),catch_body,catch_position.first,catch_position.second))return false;
+                    out+="@__try("+binding+"){"+try_body+"}{"+catch_body+"}";i=cbc+1;continue;
+                }
             }
             if(boundary(i,"for")) {
                 std::size_t p=i+3; while(p<in.size()&&std::isspace((unsigned char)in[p]))++p;
                 std::size_t pc=0; if(p>=in.size()||in[p]!='('||!find_balanced(in,p,'(',')',pc)){error="function for requires '(...)'";return false;}
                 std::size_t bo=pc+1;while(bo<in.size()&&std::isspace((unsigned char)in[bo]))++bo;std::size_t bc=0;
                 if(bo>=in.size()||in[bo]!='{'||!find_balanced(in,bo,'{','}',bc)){error="function for requires a block";return false;}
-                std::string body;if(!convert(in.substr(bo+1,bc-bo-1),body))return false;
+                std::string body;const auto body_position=source_position(bo+1);if(!convert(in.substr(bo+1,bc-bo-1),body,body_position.first,body_position.second))return false;
                 out += "@for("+in.substr(p+1,pc-p-1)+"){"+body+"}";i=bc+1;continue;
             }
             if(boundary(i,"if")) {
@@ -124,17 +143,23 @@ bool Parser::translate_function_program(const std::string& source, std::string& 
                 std::size_t pc=0; if(!find_balanced(in,p,'(',')',pc)){error="function if has no matching ')'";return false;}
                 std::size_t bo=pc+1; while(bo<in.size()&&std::isspace((unsigned char)in[bo]))++bo;
                 std::size_t bc=0; if(bo>=in.size()||in[bo]!='{'||!find_balanced(in,bo,'{','}',bc)){error="function if requires a block";return false;}
-                std::string body; if(!convert(in.substr(bo+1,bc-bo-1),body))return false;
+                std::string body;const auto body_position=source_position(bo+1); if(!convert(in.substr(bo+1,bc-bo-1),body,body_position.first,body_position.second))return false;
                 out += "@if("+in.substr(p+1,pc-p-1)+"){"+body+"}"; i=bc+1;
                 while(true){std::size_t e=i;while(e<in.size()&&std::isspace((unsigned char)in[e]))++e;if(!boundary(e,"else"))break;e+=4;while(e<in.size()&&std::isspace((unsigned char)in[e]))++e;
-                    if(boundary(e,"if")){std::size_t q=e+2;while(q<in.size()&&std::isspace((unsigned char)in[q]))++q;std::size_t qc=0;if(q>=in.size()||in[q]!='('||!find_balanced(in,q,'(',')',qc)){error="function else if malformed";return false;}std::size_t eb=qc+1;while(eb<in.size()&&std::isspace((unsigned char)in[eb]))++eb;std::size_t ec=0;if(eb>=in.size()||in[eb]!='{'||!find_balanced(in,eb,'{','}',ec)){error="function else if requires block";return false;}std::string body2;if(!convert(in.substr(eb+1,ec-eb-1),body2))return false;out+=" else if("+in.substr(q+1,qc-q-1)+"){"+body2+"}";i=ec+1;continue;}
-                    std::size_t ec=0;if(e>=in.size()||in[e]!='{'||!find_balanced(in,e,'{','}',ec)){error="function else requires block";return false;}std::string body2;if(!convert(in.substr(e+1,ec-e-1),body2))return false;out+=" else {"+body2+"}";i=ec+1;break;}
+                    if(boundary(e,"if")){std::size_t q=e+2;while(q<in.size()&&std::isspace((unsigned char)in[q]))++q;std::size_t qc=0;if(q>=in.size()||in[q]!='('||!find_balanced(in,q,'(',')',qc)){error="function else if malformed";return false;}std::size_t eb=qc+1;while(eb<in.size()&&std::isspace((unsigned char)in[eb]))++eb;std::size_t ec=0;if(eb>=in.size()||in[eb]!='{'||!find_balanced(in,eb,'{','}',ec)){error="function else if requires block";return false;}std::string body2;const auto body2_position=source_position(eb+1);if(!convert(in.substr(eb+1,ec-eb-1),body2,body2_position.first,body2_position.second))return false;out+=" else if("+in.substr(q+1,qc-q-1)+"){"+body2+"}";i=ec+1;continue;}
+                    std::size_t ec=0;if(e>=in.size()||in[e]!='{'||!find_balanced(in,e,'{','}',ec)){error="function else requires block";return false;}std::string body2;const auto body2_position=source_position(e+1);if(!convert(in.substr(e+1,ec-e-1),body2,body2_position.first,body2_position.second))return false;out+=" else {"+body2+"}";i=ec+1;break;}
                 continue;
             }
             if(boundary(i,"return")) {
                 std::size_t e=i+6; bool quoted=false;char quote=0;
                 while(e<in.size()&&in[e]!='\n'&&in[e]!=';' ) { char c=in[e]; if(quoted){if(c=='\\'&&e+1<in.size())++e;else if(c==quote)quoted=false;}else if(c=='\''||c=='"'){quoted=true;quote=c;}++e; }
                 std::string expr=trim_copy(in.substr(i+6,e-(i+6))); out += expr.empty()?"@__bare_return()":"@return("+expr+")"; i=e<in.size()?e+1:e; continue;
+            }
+            if(boundary(i,"throw") && i+5<in.size() && std::isspace((unsigned char)in[i+5]) && trim_copy(in.substr(i+5)).rfind(":=",0)!=0 && trim_copy(in.substr(i+5)).rfind("=",0)!=0 && trim_copy(in.substr(i+5)).rfind("+=",0)!=0 && trim_copy(in.substr(i+5)).rfind("-=",0)!=0 && trim_copy(in.substr(i+5)).rfind("*=",0)!=0 && trim_copy(in.substr(i+5)).rfind("/=",0)!=0 && trim_copy(in.substr(i+5)).rfind("%=",0)!=0) {
+                std::size_t e=i+6;bool quoted=false;char quote=0;int par=0,br=0,bc=0;
+                for(;e<in.size();++e){char c=in[e];if(quoted){if(c=='\\'&&e+1<in.size())++e;else if(c==quote)quoted=false;continue;}if(c=='\''||c=='"'){quoted=true;quote=c;continue;}if(c=='(')++par;else if(c==')')--par;else if(c=='[')++br;else if(c==']')--br;else if(c=='{')++bc;else if(c=='}')--bc;if(!par&&!br&&!bc&&(c==';'||c=='\n'))break;}
+                const std::string expr=trim_copy(in.substr(i+5,e-(i+5)));if(expr.empty()){error="throw requires an Error expression";return false;}
+                const auto throw_position=source_position(i);out+="@__throw("+std::to_string(throw_position.first)+","+std::to_string(throw_position.second)+","+expr+")";i=e<in.size()?e+1:e;continue;
             }
             if(boundary(i,"break")) { std::size_t e=i+5; while(e<in.size()&&std::isspace((unsigned char)in[e])&&in[e]!='\n')++e; if(e==in.size()||in[e]==';'||in[e]=='\n') { out += "break"; i=e<in.size()?e+1:e; continue; } }
             if(boundary(i,"continue")) { std::size_t e=i+8; while(e<in.size()&&std::isspace((unsigned char)in[e])&&in[e]!='\n')++e; if(e==in.size()||in[e]==';'||in[e]=='\n') { out += "continue"; i=e<in.size()?e+1:e; continue; } }
@@ -200,7 +225,7 @@ bool Parser::translate_function_program(const std::string& source, std::string& 
         }
         return true;
     };
-    translated.clear(); return convert(source,translated);
+    translated.clear(); return convert(source,translated,1,1);
 }
 
 Parser::StatementState Parser::statement_state(const std::string& raw) const {
@@ -250,7 +275,7 @@ bool Parser::invoke_ffi_callback_i64(const std::string& callable_tag, std::int64
 }
 
 bool Parser::invoke_callable(const std::string& name, const std::vector<nift::RuntimeValue>& args, nift::RuntimeValue& value, std::string& error, nift::detail::Diagnostic* diagnostic) {
-    active_diagnostic_.reset();if(!valid_binding_identifier(name)){error="invalid callable name";return false;}if(variable_scopes_.empty())variable_scopes_.emplace_back();std::vector<std::string> names;names.reserve(args.size());for(size_t i=0;i<args.size();++i){std::string n="__nift_host_arg_"+std::to_string(i);auto sp=std::make_shared<nift::RuntimeValue>(args[i]);variable_scopes_.back()[n]=VariableBinding{sp,nift_binding_type(*sp),false,false};names.push_back(n);}std::string expr=name+"(";for(size_t i=0;i<names.size();++i){if(i)expr+=",";expr+=names[i];}expr+=")";bool ok=evaluate_expression(expr,value,error);for(const auto& n:names)variable_scopes_.back().erase(n);if(!ok&&diagnostic&&active_diagnostic_)*diagnostic=*active_diagnostic_;return ok;
+    active_diagnostic_.reset();active_recoverable_.reset();if(!valid_binding_identifier(name)){error="invalid callable name";return false;}if(variable_scopes_.empty())variable_scopes_.emplace_back();std::vector<std::string> names;names.reserve(args.size());for(size_t i=0;i<args.size();++i){std::string n="__nift_host_arg_"+std::to_string(i);auto sp=std::make_shared<nift::RuntimeValue>(args[i]);variable_scopes_.back()[n]=VariableBinding{sp,nift_binding_type(*sp),false,false};names.push_back(n);}std::string expr=name+"(";for(size_t i=0;i<names.size();++i){if(i)expr+=",";expr+=names[i];}expr+=")";bool ok=evaluate_expression(expr,value,error);for(const auto& n:names)variable_scopes_.back().erase(n);if(!ok&&diagnostic&&active_diagnostic_)*diagnostic=*active_diagnostic_;return ok;
 }
 
 void Parser::set_script_invocation(std::string cmd, std::vector<std::string> args) {
@@ -276,6 +301,7 @@ void Parser::install_script_invocation_bindings() {
 RenderResult Parser::run_script(const std::string& source, const fs::path& source_path) {
     result_ = RenderResult{};
     active_diagnostic_.reset();
+    active_recoverable_.reset();
     variable_scopes_.clear(); variable_scopes_.emplace_back(); timer_instances_.clear();
     install_script_invocation_bindings();
     callables_.clear(); structs_.clear(); requested_exports_.clear(); pending_control_={};
@@ -289,7 +315,7 @@ RenderResult Parser::run_script(const std::string& source, const fs::path& sourc
     rr.output.clear();
     if(rr.ok && pending_control_.kind==ControlFlow::Return && pending_control_.value) {
         const auto& v=*pending_control_.value;
-        if(v.is_timer()||v.is_bytes()||v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0&&v.string.rfind("\x1fnift:timer:",0)!=0)) { rr.ok=false; rr.error.message="script return value is not directly renderable";rr.diagnostic=nift::detail::make_diagnostic(nift::detail::DiagnosticCode::NativeUnsupportedValue,rr.error.message); }
+        if(v.is_error()||v.is_timer()||v.is_bytes()||v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0&&v.string.rfind("\x1fnift:timer:",0)!=0)) { rr.ok=false; rr.error.message="script return value is not directly renderable";rr.diagnostic=nift::detail::make_diagnostic(nift::detail::DiagnosticCode::NativeUnsupportedValue,rr.error.message); }
         else rr.output=render_expression_value(v);
     }
     pending_control_={};
@@ -299,11 +325,11 @@ RenderResult Parser::run_script(const std::string& source, const fs::path& sourc
 }
 
 bool Parser::run_embedded_script(const std::string& source, const fs::path& source_path, nift::RuntimeValue& value, std::string& error, nift::detail::Diagnostic* diagnostic) {
-    result_=RenderResult{};active_diagnostic_.reset();variable_scopes_.clear();variable_scopes_.emplace_back();timer_instances_.clear();install_script_invocation_bindings();callables_.clear();structs_.clear();requested_exports_.clear();pending_control_={};active_module_env_.reset();loading_module_env_.reset();saved_lexical_scopes_.clear();module_envs_.clear();next_module_identity_=1;in_import_program_=false;standalone_script_host_=false;resource_path_authority_.enforce_project_root=true;resource_path_authority_.enforce_filesystem_root=false;strict_script_mode_=true;function_call_depth_=1;
+    result_=RenderResult{};active_diagnostic_.reset();active_recoverable_.reset();variable_scopes_.clear();variable_scopes_.emplace_back();timer_instances_.clear();install_script_invocation_bindings();callables_.clear();structs_.clear();requested_exports_.clear();pending_control_={};active_module_env_.reset();loading_module_env_.reset();saved_lexical_scopes_.clear();module_envs_.clear();next_module_identity_=1;in_import_program_=false;standalone_script_host_=false;resource_path_authority_.enforce_project_root=true;resource_path_authority_.enforce_filesystem_root=false;strict_script_mode_=true;function_call_depth_=1;
     const std::uint64_t timer_checkpoint=begin_timer_operation();
     auto rr=execute_native_program(source,source_path,0,SourceProvenance::InMemory,false);function_call_depth_=0;strict_script_mode_=false;
     if(!rr.ok){error=rr.error.message;if(diagnostic&&rr.diagnostic)*diagnostic=*rr.diagnostic;pending_control_={};std::string ignored_resource_error;finalize_script_resources(ignored_resource_error);finish_timer_operation(timer_checkpoint);return false;}
-    value=nift::RuntimeValue(nullptr);if(pending_control_.kind==ControlFlow::Return&&pending_control_.value)value=*pending_control_.value;pending_control_={};const bool timer_result=contains_timer_resource(value);std::string resource_error;const bool resources_ok=finalize_script_resources(resource_error);finish_timer_operation(timer_checkpoint);if(timer_result){error="embedded script cannot return a timer value";if(!resources_ok)error+="; "+resource_error;return false;}if(!resources_ok){error=resource_error;return false;}return true;
+    value=nift::RuntimeValue(nullptr);if(pending_control_.kind==ControlFlow::Return&&pending_control_.value)value=*pending_control_.value;pending_control_={};const bool timer_result=contains_timer_resource(value);const bool error_result=contains_error_resource(value);std::string resource_error;const bool resources_ok=finalize_script_resources(resource_error);finish_timer_operation(timer_checkpoint);if(timer_result){error="embedded script cannot return a timer value";if(!resources_ok)error+="; "+resource_error;return false;}if(error_result){error="embedded script cannot return an Error value";if(!resources_ok)error+="; "+resource_error;return false;}if(!resources_ok){error=resource_error;return false;}return true;
 }
 
 RenderResult Parser::run_statement(const std::string& source, const fs::path& source_path) {
@@ -318,7 +344,7 @@ RenderResult Parser::run_statement(const std::string& source, const fs::path& so
         }
     } timer_operation{*this,begin_timer_operation()};
     if(variable_scopes_.empty()) { variable_scopes_.emplace_back(); install_script_invocation_bindings(); }
-    active_diagnostic_.reset();standalone_script_host_=true; resource_path_authority_.enforce_project_root=false; resource_path_authority_.enforce_filesystem_root=true; strict_script_mode_=true; result_ = RenderResult{}; pending_control_={}; function_call_depth_=1;
+    active_diagnostic_.reset();active_recoverable_.reset();standalone_script_host_=true; resource_path_authority_.enforce_project_root=false; resource_path_authority_.enforce_filesystem_root=true; strict_script_mode_=true; result_ = RenderResult{}; pending_control_={}; function_call_depth_=1;
     const std::string identity=source_path.generic_string();const auto provenance=!source_path.empty()&&!(identity.size()>=2&&identity.front()=='<'&&identity.back()=='>')?SourceProvenance::FileBacked:SourceProvenance::InMemory;
     const std::string t=trim_copy(source);
     // A REPL is also an inspector: a single expression is evaluated directly so
@@ -362,7 +388,7 @@ RenderResult Parser::run_statement(const std::string& source, const fs::path& so
     auto rr=execute_native_program(source,source_path,0,provenance);if(!rr.ok)rollback_file_operation(file_checkpoint);timer_operation.success=rr.ok;function_call_depth_=0;strict_script_mode_=false;pending_control_={};return rr;
 }
 
-void Parser::reset_script_control() { pending_control_={}; result_=RenderResult{}; }
+void Parser::reset_script_control() { pending_control_={}; active_recoverable_.reset(); result_=RenderResult{}; }
 
 RenderResult Parser::execute_native_program(const std::string& source, const fs::path& source_path, int depth,
                                             SourceProvenance source_provenance, bool rollback_files_on_failure) {
@@ -455,9 +481,34 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
     const auto module_identity_checkpoint=next_module_identity_;
     const auto lambda_identity_checkpoint=next_lambda_instance_id_;
     const auto struct_identity_checkpoint=next_struct_instance_id_;
+    const auto runtime_temporary_checkpoint=next_runtime_temporary_id_;
+    const auto timer_identity_checkpoint=next_timer_instance_id_;
+    const auto ffi_library_checkpoint=next_ffi_library_id_;
+    const auto ffi_pointer_checkpoint=next_ffi_pointer_id_;
+    const auto ffi_buffer_checkpoint=next_ffi_buffer_id_;
+    const auto ffi_callback_checkpoint=next_ffi_callback_id_;
+    const auto collection_checkpoint=next_collection_instance_id_;
+    const auto stream_checkpoint=next_stream_instance_id_;
+    const auto file_identity_checkpoint=next_file_instance_id_;
+    const auto command_checkpoint=next_command_instance_id_;
+    const auto owned_threads_checkpoint=owned_thread_instances_.size();
+    const auto owned_asyncs_checkpoint=owned_async_instances_.size();
+    auto snapshot_keys=[](const auto& values){using Key=typename std::decay_t<decltype(values)>::key_type;std::unordered_set<Key> keys;for(const auto& entry:values)keys.insert(entry.first);return keys;};
     std::unordered_set<std::uint64_t> existing_modules;for(const auto& entry:module_envs_)existing_modules.insert(entry.first);
     std::unordered_set<std::string> existing_lambdas;for(const auto& entry:lambda_instances_)existing_lambdas.insert(entry.first);
     std::unordered_set<std::string> existing_structs;for(const auto& entry:struct_instances_)existing_structs.insert(entry.first);
+    const auto existing_mutexes=snapshot_keys(mutex_instances_);
+    const auto existing_threads=snapshot_keys(thread_instances_);
+    const auto existing_asyncs=snapshot_keys(async_instances_);
+    const auto existing_atomics=snapshot_keys(atomic_instances_);
+    const auto existing_timers=snapshot_keys(timer_instances_);
+    const auto existing_ffi_libraries=snapshot_keys(ffi_libraries_);
+    const auto existing_ffi_pointers=snapshot_keys(ffi_pointers_);
+    const auto existing_ffi_buffers=snapshot_keys(ffi_buffers_);
+    const auto existing_ffi_callbacks=snapshot_keys(ffi_callbacks_i64_);
+    const auto existing_collections=snapshot_keys(collection_instances_);
+    const auto existing_streams=snapshot_keys(stream_instances_);
+    const auto existing_commands=snapshot_keys(command_instances_);
     const std::uint64_t file_checkpoint=begin_file_operation();
     std::unordered_set<const Callable*> existing_prepared;for(const auto& entry:prepared_callables_)existing_prepared.insert(entry.first);
     bool import_committed=false;
@@ -466,9 +517,13 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
         for(auto it=module_envs_.begin();it!=module_envs_.end();)if(!existing_modules.count(it->first))it=module_envs_.erase(it);else ++it;
         for(auto it=lambda_instances_.begin();it!=lambda_instances_.end();)if(!existing_lambdas.count(it->first))it=lambda_instances_.erase(it);else ++it;
         for(auto it=struct_instances_.begin();it!=struct_instances_.end();)if(!existing_structs.count(it->first))it=struct_instances_.erase(it);else ++it;
+        auto erase_new=[](auto& values,const auto& existing){for(auto it=values.begin();it!=values.end();)if(!existing.count(it->first))it=values.erase(it);else ++it;};
+        erase_new(mutex_instances_,existing_mutexes);erase_new(atomic_instances_,existing_atomics);erase_new(timer_instances_,existing_timers);
+        erase_new(ffi_libraries_,existing_ffi_libraries);erase_new(ffi_pointers_,existing_ffi_pointers);erase_new(ffi_buffers_,existing_ffi_buffers);erase_new(ffi_callbacks_i64_,existing_ffi_callbacks);
+        erase_new(collection_instances_,existing_collections);erase_new(stream_instances_,existing_streams);erase_new(command_instances_,existing_commands);
         rollback_file_operation(file_checkpoint);
         for(auto it=prepared_callables_.begin();it!=prepared_callables_.end();)if(!existing_prepared.count(it->first))it=prepared_callables_.erase(it);else ++it;
-        next_module_identity_=module_identity_checkpoint;next_lambda_instance_id_=lambda_identity_checkpoint;next_struct_instance_id_=struct_identity_checkpoint;
+        next_module_identity_=module_identity_checkpoint;next_lambda_instance_id_=lambda_identity_checkpoint;next_struct_instance_id_=struct_identity_checkpoint;next_runtime_temporary_id_=runtime_temporary_checkpoint;next_timer_instance_id_=timer_identity_checkpoint;next_ffi_library_id_=ffi_library_checkpoint;next_ffi_pointer_id_=ffi_pointer_checkpoint;next_ffi_buffer_id_=ffi_buffer_checkpoint;next_ffi_callback_id_=ffi_callback_checkpoint;next_collection_instance_id_=collection_checkpoint;next_stream_instance_id_=stream_checkpoint;next_file_instance_id_=file_identity_checkpoint;next_command_instance_id_=command_checkpoint;
     });
 
     auto saved_scopes=std::move(variable_scopes_); auto saved_callables=std::move(callables_); auto saved_structs=std::move(structs_);
@@ -481,11 +536,28 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
     input_stack_.push_back(import_identity); result_.dependencies.insert(host_.relative(path)); ++function_call_depth_;
     auto rr=execute_native_program(*src.content,path,depth+1,SourceProvenance::FileBacked);
     --function_call_depth_; input_stack_.pop_back();
+    const bool import_created_workers=owned_thread_instances_.size()>owned_threads_checkpoint||owned_async_instances_.size()>owned_asyncs_checkpoint;
+    auto defer_import_cleanup=[&]{
+        if(import_committed)return;
+        import_committed=true;
+        deferred_worker_cleanups_.push_back([this,existing_modules,existing_lambdas,existing_structs,existing_mutexes,existing_threads,existing_asyncs,existing_atomics,existing_timers,existing_ffi_libraries,existing_ffi_pointers,existing_ffi_buffers,existing_ffi_callbacks,existing_collections,existing_streams,existing_commands,existing_prepared,file_checkpoint,module_identity_checkpoint,lambda_identity_checkpoint,struct_identity_checkpoint,runtime_temporary_checkpoint,timer_identity_checkpoint,ffi_library_checkpoint,ffi_pointer_checkpoint,ffi_buffer_checkpoint,ffi_callback_checkpoint,collection_checkpoint,stream_checkpoint,file_identity_checkpoint,command_checkpoint]{
+            auto erase_new=[](auto& values,const auto& existing){for(auto it=values.begin();it!=values.end();)if(!existing.count(it->first))it=values.erase(it);else ++it;};
+            erase_new(module_envs_,existing_modules);erase_new(lambda_instances_,existing_lambdas);erase_new(struct_instances_,existing_structs);erase_new(mutex_instances_,existing_mutexes);erase_new(thread_instances_,existing_threads);erase_new(async_instances_,existing_asyncs);erase_new(atomic_instances_,existing_atomics);erase_new(timer_instances_,existing_timers);erase_new(ffi_libraries_,existing_ffi_libraries);erase_new(ffi_pointers_,existing_ffi_pointers);erase_new(ffi_buffers_,existing_ffi_buffers);erase_new(ffi_callbacks_i64_,existing_ffi_callbacks);erase_new(collection_instances_,existing_collections);erase_new(stream_instances_,existing_streams);erase_new(command_instances_,existing_commands);
+            rollback_file_operation(file_checkpoint);for(auto it=prepared_callables_.begin();it!=prepared_callables_.end();)if(!existing_prepared.count(it->first))it=prepared_callables_.erase(it);else ++it;
+            next_module_identity_=module_identity_checkpoint;next_lambda_instance_id_=lambda_identity_checkpoint;next_struct_instance_id_=struct_identity_checkpoint;next_runtime_temporary_id_=runtime_temporary_checkpoint;next_timer_instance_id_=timer_identity_checkpoint;next_ffi_library_id_=ffi_library_checkpoint;next_ffi_pointer_id_=ffi_pointer_checkpoint;next_ffi_buffer_id_=ffi_buffer_checkpoint;next_ffi_callback_id_=ffi_callback_checkpoint;next_collection_instance_id_=collection_checkpoint;next_stream_instance_id_=stream_checkpoint;next_file_instance_id_=file_identity_checkpoint;next_command_instance_id_=command_checkpoint;
+        });
+    };
+    auto fail_worker_import=[&](const std::string& detail,nift::detail::DiagnosticOrigin origin={}){
+        active_recoverable_.reset();
+        auto diagnostic=nift::detail::make_diagnostic(nift::detail::DiagnosticCode::InternalImportLifecycle,"failed import created worker resources: "+detail,std::move(origin));
+        diagnostic.frames.push_back({nift::detail::DiagnosticFrameKind::Import,path.generic_string(),{},legacy_syntax?"@import: ":"import: "});
+        error=diagnostic.message;active_diagnostic_=std::move(diagnostic);defer_import_cleanup();
+    };
     if(rr.ok){for(auto& kv:file_instances_)if(!pre_import_files.count(kv.first)&&kv.second->open){auto f=kv.second;f->open=false;f->dirty=false;f->mode.clear();f->working.clear();f->saved.clear();f->cursor=0;rr.ok=false;rr.error.message="managed file left open at "+std::string(legacy_syntax?"@import":"import")+" completion: "+f->path.generic_string();break;}}
     auto isolated_scope=std::move(variable_scopes_.back()); auto isolated_callables=std::move(callables_); auto isolated_structs=std::move(structs_); auto exports=requested_exports_; auto completion=pending_control_;
     variable_scopes_=std::move(saved_scopes); callables_=std::move(saved_callables); structs_=std::move(saved_structs); requested_exports_=std::move(saved_exports); in_import_program_=saved_import; pending_control_=saved_control; strict_script_mode_=saved_strict;active_module_env_=std::move(saved_active);loading_module_env_=std::move(saved_loading);
-    if(!rr.ok){error=rr.error.message;if(rr.diagnostic){auto diagnostic=*rr.diagnostic;diagnostic.frames.push_back({nift::detail::DiagnosticFrameKind::Import,path.generic_string(),{},legacy_syntax?"@import: ":"import: "});active_diagnostic_=std::move(diagnostic);}return false;}
-    if(completion.kind==ControlFlow::Return && completion.value){error="return with a value is not allowed in "+std::string(legacy_syntax?"@import":"import");return false;}
+    if(!rr.ok){if(import_created_workers){fail_worker_import(rr.error.message,rr.diagnostic?rr.diagnostic->origin:nift::detail::DiagnosticOrigin{});return false;}error=rr.error.message;if(rr.diagnostic){auto diagnostic=*rr.diagnostic;diagnostic.frames.push_back({nift::detail::DiagnosticFrameKind::Import,path.generic_string(),{},legacy_syntax?"@import: ":"import: "});active_diagnostic_=std::move(diagnostic);}return false;}
+    if(completion.kind==ControlFlow::Return && completion.value){const std::string detail="return with a value is not allowed in "+std::string(legacy_syntax?"@import":"import");if(import_created_workers){fail_worker_import(detail);return false;}error=detail;return false;}
 
     std::unordered_map<std::string,VariableBinding> vars;
     std::unordered_map<std::string,Callable> funcs;
@@ -494,7 +566,7 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
     for(const auto& name:exports){
         bool collision=destination_module&&(destination_module->vars.count(name)||destination_module->callables.count(name));
         if(!destination_module)for(auto it=variable_scopes_.rbegin();it!=variable_scopes_.rend();++it)if(it->count(name)){collision=true;break;}
-        if(collision||(!destination_module&&(callables_.count(name)||structs_.count(name)))){error="export collides with existing binding: "+name;return false;}
+        if(collision||(!destination_module&&(callables_.count(name)||structs_.count(name)))){const std::string detail="export collides with existing binding: "+name;if(import_created_workers){fail_worker_import(detail);return false;}error=detail;return false;}
         auto vi=isolated_scope.find(name); if(vi!=isolated_scope.end()){
             // Exporting a struct instance must also make its type resolvable in
             // the importer so module-style values such as vips.resize(...) work.
@@ -509,7 +581,9 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
         }
         auto fi=isolated_callables.find(name); if(fi!=isolated_callables.end()){funcs.emplace(name,fi->second);continue;}
         auto si=isolated_structs.find(name); if(si!=isolated_structs.end()){types.emplace(name,si->second);continue;}
-        error="export names no existing binding: "+name;return false;
+        const std::string detail="export names no existing binding: "+name;
+        if(import_created_workers){fail_worker_import(detail);return false;}
+        error=detail;return false;
     }
     // Exported callables and struct methods may reference the module's private
     // callables and top-level bindings. Attach a shared module environment so
@@ -527,7 +601,7 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
     module_envs_[module_env->identity]=module_env;
     // Install only after the complete export set has validated.
     if(destination_module){
-        if(!types.empty()){module_envs_.erase(module_env->identity);error="struct exports cannot be imported from an active module callable";return false;}
+        if(!types.empty()){const std::string detail="struct exports cannot be imported from an active module callable";if(import_created_workers){fail_worker_import(detail);return false;}module_envs_.erase(module_env->identity);error=detail;return false;}
         for(auto& kv:vars){destination_module->vars.emplace(kv.first,kv.second);if(variable_scopes_.size()>1)variable_scopes_[1].emplace(kv.first,std::move(kv.second));}
         for(auto& kv:funcs)destination_module->callables.emplace(kv.first,std::move(kv.second));
     }else{

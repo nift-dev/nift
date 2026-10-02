@@ -87,6 +87,7 @@ public:
     bool eval_expression(const std::string& expression, nift::RuntimeValue& value, std::string& error, nift::detail::Diagnostic* diagnostic = nullptr);
     bool invoke_callable(const std::string& name, const std::vector<nift::RuntimeValue>& args, nift::RuntimeValue& value, std::string& error, nift::detail::Diagnostic* diagnostic = nullptr);
     bool contains_timer_resource(const nift::RuntimeValue& value) const;
+    bool contains_error_resource(const nift::RuntimeValue& value) const;
     std::uint64_t begin_timer_operation() const { return next_timer_instance_id_; }
     void finish_timer_operation(std::uint64_t checkpoint);
     void rollback_timer_operation(std::uint64_t checkpoint);
@@ -122,6 +123,7 @@ private:
     std::vector<std::filesystem::path> input_stack_;
     RenderResult result_;
     std::optional<nift::detail::Diagnostic> active_diagnostic_;
+    std::optional<nift::RuntimeValue> active_recoverable_;
     int code_block_depth_ = 0;
     int html_comment_depth_ = 0;
     std::unordered_map<std::string, std::shared_ptr<const nift::RuntimeValue>> json_bindings_;
@@ -271,6 +273,7 @@ private:
     };
     std::unordered_map<std::string, std::shared_ptr<AsyncInstance>> async_instances_;
     std::vector<std::shared_ptr<AsyncInstance>> owned_async_instances_;
+    std::vector<std::function<void()>> deferred_worker_cleanups_;
     struct TimerInstance {
         enum class State { Stopped, Running, Paused };
         State state = State::Stopped;

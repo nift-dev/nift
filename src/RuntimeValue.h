@@ -11,12 +11,30 @@
 
 namespace nift {
 
-enum class RuntimeType { Null, Boolean, Number, StrNumber, String, Array, Object, Bytes, Timer };
+enum class RuntimeType { Null, Boolean, Number, StrNumber, String, Array, Object, Bytes, Timer, Error };
 
 using RuntimeBytes = std::vector<std::uint8_t>;
 struct RuntimeTimerIdentity {
     const std::uint64_t owner;
     const std::uint64_t instance;
+};
+
+struct RuntimeErrorData {
+    const std::string message;
+    const std::string code;
+    const std::string category;
+    const std::string source;
+    const std::size_t line;
+    const std::size_t column;
+    const std::shared_ptr<const RuntimeErrorData> cause;
+
+    RuntimeErrorData(std::string message_value, std::string code_value,
+                     std::string category_value, std::string source_value,
+                     std::size_t line_value, std::size_t column_value,
+                     std::shared_ptr<const RuntimeErrorData> cause_value)
+        : message(std::move(message_value)), code(std::move(code_value)),
+          category(std::move(category_value)), source(std::move(source_value)),
+          line(line_value), column(column_value), cause(std::move(cause_value)) {}
 };
 
 // Nift-owned recursive runtime substrate. StrNumber retains an exact JSON-number
@@ -31,6 +49,7 @@ public:
     std::vector<std::pair<std::string, RuntimeValue>> object;
     std::shared_ptr<const RuntimeBytes> bytes;
     std::shared_ptr<const RuntimeTimerIdentity> timer;
+    std::shared_ptr<const RuntimeErrorData> error;
 
     RuntimeValue() = default;
     RuntimeValue(std::nullptr_t) : type(RuntimeType::Null) {}
@@ -50,6 +69,12 @@ public:
         value.timer = std::make_shared<const RuntimeTimerIdentity>(RuntimeTimerIdentity{owner, instance});
         return value;
     }
+    static RuntimeValue make_error(std::string message, std::string code = "user.raised");
+    static RuntimeValue make_error(std::string message, std::string code,
+                                   const RuntimeValue& cause,
+                                   std::string source = {}, std::size_t line = 0,
+                                   std::size_t column = 0);
+    static RuntimeValue make_error(std::shared_ptr<const RuntimeErrorData> data);
 
     bool is_null() const { return type == RuntimeType::Null; }
     bool is_bool() const { return type == RuntimeType::Boolean; }
@@ -59,6 +84,7 @@ public:
     bool is_object() const { return type == RuntimeType::Object; }
     bool is_bytes() const { return type == RuntimeType::Bytes; }
     bool is_timer() const { return type == RuntimeType::Timer; }
+    bool is_error() const { return type == RuntimeType::Error; }
 
     bool has(const std::string& key) const;
     RuntimeValue& operator[](const std::string& key);
@@ -89,6 +115,11 @@ int runtime_compare_numbers(const RuntimeValue& left, const RuntimeValue& right)
 std::string runtime_numeric_fingerprint(const RuntimeValue& value);
 std::string runtime_fingerprint(const RuntimeValue& value);
 bool runtime_valid_utf8(std::string_view value);
+bool runtime_valid_user_error_code(std::string_view code);
+bool runtime_error_member(const RuntimeValue& value, std::string_view member, RuntimeValue& result);
+RuntimeValue runtime_error_with_origin(const RuntimeValue& value, std::string source,
+                                       std::size_t line, std::size_t column);
+bool runtime_contains_error(const RuntimeValue& value);
 bool runtime_contains_timer(const RuntimeValue& value);
 bool runtime_contains_reserved_handle(const RuntimeValue& value);
 

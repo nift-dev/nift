@@ -266,6 +266,35 @@ bool Parser::contains_timer_resource(const nift::RuntimeValue& root) const {
     return contains(root);
 }
 
+bool Parser::contains_error_resource(const nift::RuntimeValue& root) const {
+    std::unordered_set<std::string> seen_collections, seen_structs;
+    std::function<bool(const nift::RuntimeValue&)> contains;
+    contains = [&](const nift::RuntimeValue& value) {
+        if (value.is_error()) return true;
+        if (value.is_array()) for (const auto& item : value.array) if (contains(item)) return true;
+        if (value.is_object()) for (const auto& entry : value.object) if (contains(entry.second)) return true;
+        if (!value.is_string()) return false;
+        if (value.string.rfind("\x1fnift:collection:", 0) == 0) {
+            const std::string id = value.string.substr(17);
+            if (!seen_collections.insert(id).second) return false;
+            auto found = collection_instances_.find(id);
+            if (found == collection_instances_.end()) return false;
+            for (const auto& item : found->second->values) if (contains(item)) return true;
+            for (const auto& entry : found->second->entries)
+                if (contains(entry.first) || contains(entry.second)) return true;
+        } else if (value.string.rfind("\x1fnift:struct:", 0) == 0) {
+            const std::string id = value.string.substr(13);
+            if (!seen_structs.insert(id).second) return false;
+            auto found = struct_instances_.find(id);
+            if (found == struct_instances_.end()) return false;
+            for (const auto& field : found->second->fields)
+                if (field.second.value && contains(*field.second.value)) return true;
+        }
+        return false;
+    };
+    return contains(root);
+}
+
 bool Parser::callable_contains_timer_resource(const nift::RuntimeValue& callable) const {
     return contains_timer_resource(callable);
 }
@@ -670,6 +699,8 @@ void Parser::finalize_execution_workers() {
     for(auto& st:owned_thread_instances_){std::lock_guard<std::mutex> guard(st->join_mutex);if(st->worker.joinable())st->worker.join();}
     owned_async_instances_.clear();
     owned_thread_instances_.clear();
+    auto cleanups=std::move(deferred_worker_cleanups_);deferred_worker_cleanups_.clear();
+    for(auto& cleanup:cleanups)cleanup();
 }
 
 
@@ -745,6 +776,16 @@ void Parser::fail(const fs::path& source_path, const std::string& source, std::s
     } else {
         result_.diagnostic = nift::detail::make_diagnostic(
             nift::detail::DiagnosticCode::InternalLegacyFailure, message, std::move(origin));
+    }
+    if (result_.diagnostic &&
+        nift::detail::diagnostic_code_info(result_.diagnostic->code).disposition ==
+            nift::detail::DiagnosticDisposition::Recoverable &&
+        !result_.diagnostic->origin.source.empty()) {
+        result_.error.source_file = result_.diagnostic->origin.source;
+        result_.error.line = result_.diagnostic->origin.line;
+        result_.error.column = result_.diagnostic->origin.column;
+        result_.error.source_length = result_.diagnostic->origin.source_length;
+        result_.error.source_line = result_.diagnostic->origin.source_line;
     }
 }
 
@@ -1157,7 +1198,7 @@ bool Parser::interpolate_parameter(const std::string& parameter,
         nift::RuntimeValue expression_value;
         std::string expression_error;
         if (evaluate_expression(expression, expression_value, expression_error)) {
-            if (expression_value.is_array() || expression_value.is_object() || expression_value.is_bytes() || expression_value.is_timer()) {
+            if (expression_value.is_error() || expression_value.is_array() || expression_value.is_object() || expression_value.is_bytes() || expression_value.is_timer()) {
                 error = "parameter expression must resolve to a scalar value";
                 return false;
             }

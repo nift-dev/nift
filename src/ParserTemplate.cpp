@@ -277,7 +277,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             if(!nested.ok)rollback_file_operation(file_checkpoint);
             if(!nested.ok){if(nested.diagnostic)nested.diagnostic->frames.push_back({nift::detail::DiagnosticFrameKind::Script,"@script",{},{}});result_=nested;break;}
             if(pending_control_.kind==ControlFlow::Return){
-                if(pending_control_.value) { const auto& rv=*pending_control_.value;if(rv.is_timer()||rv.is_bytes()||rv.is_array()||rv.is_object()||(rv.is_string()&&rv.string.rfind("\x1fnift:",0)==0&&rv.string.rfind("\x1fnift:timer:",0)!=0)){pending_control_={};rollback_file_operation(file_checkpoint);fail(source_path,source,i,"@script return value is not directly renderable");break;}output += render_expression_value(rv); }
+                if(pending_control_.value) { const auto& rv=*pending_control_.value;if(rv.is_error()||rv.is_timer()||rv.is_bytes()||rv.is_array()||rv.is_object()||(rv.is_string()&&rv.string.rfind("\x1fnift:",0)==0&&rv.string.rfind("\x1fnift:timer:",0)!=0)){pending_control_={};rollback_file_operation(file_checkpoint);fail(source_path,source,i,"@script return value is not directly renderable");break;}output += render_expression_value(rv); }
                 pending_control_={};
             }
             i=bc+1; continue;
@@ -286,6 +286,49 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
         if (source.compare(i, 16, "@__bare_return()") == 0) {
             if(function_call_depth_<=0){fail(source_path,source,i,"return is only valid in script/function execution");break;}
             pending_control_.kind=ControlFlow::Return; pending_control_.value.reset(); i+=16; break;
+        }
+
+        if (source.compare(i, 9, "@__throw(") == 0) {
+            std::size_t close=0;if(!find_balanced(source,i+8,'(',')',close)){fail(source_path,source,i,"throw has no matching ')' ");break;}
+            const std::string payload=source.substr(i+9,close-(i+9));const auto first_comma=payload.find(',');const auto second_comma=first_comma==std::string::npos?first_comma:payload.find(',',first_comma+1);
+            if(first_comma==std::string::npos||second_comma==std::string::npos){fail(source_path,source,i,"throw metadata is malformed");break;}
+            std::size_t throw_line=0,throw_column=0;try{throw_line=static_cast<std::size_t>(std::stoull(payload.substr(0,first_comma)));throw_column=static_cast<std::size_t>(std::stoull(payload.substr(first_comma+1,second_comma-first_comma-1)));}catch(...){fail(source_path,source,i,"throw metadata is malformed");break;}
+            nift::RuntimeValue thrown;std::string expression_error;
+            if(!evaluate_expression(payload.substr(second_comma+1),thrown,expression_error)){fail(source_path,source,i,expression_error);break;}
+            if(!thrown.is_error()){fail(source_path,source,i,"throw expression must evaluate to Error");break;}
+            fail(source_path,source,i,thrown.error?thrown.error->message:"invalid Error value");
+            active_recoverable_=nift::runtime_error_with_origin(
+                thrown,source_path.generic_string(),throw_line,throw_column);
+            if(active_recoverable_->error){result_.error.source_file=active_recoverable_->error->source;result_.error.line=active_recoverable_->error->line;result_.error.column=active_recoverable_->error->column;}
+            nift::detail::DiagnosticOrigin throw_origin;throw_origin.source=result_.error.source_file;throw_origin.line=result_.error.line;throw_origin.column=result_.error.column;throw_origin.source_length=result_.error.source_length;throw_origin.source_line=result_.error.source_line;
+            result_.diagnostic=nift::detail::make_diagnostic(
+                nift::detail::DiagnosticCode::UserRaised,
+                active_recoverable_->error?active_recoverable_->error->message:"invalid Error value",
+                std::move(throw_origin));
+            break;
+        }
+
+        if (source.compare(i, 7, "@__try(") == 0) {
+            std::size_t binding_close=0;if(!find_balanced(source,i+6,'(',')',binding_close)){fail(source_path,source,i,"try has malformed catch binding");break;}
+            const std::string binding=trim_copy(source.substr(i+7,binding_close-(i+7)));
+            std::size_t try_open=binding_close+1;while(try_open<source.size()&&std::isspace((unsigned char)source[try_open]))++try_open;std::size_t try_close=0;
+            if(try_open>=source.size()||source[try_open]!='{'||!find_balanced(source,try_open,'{','}',try_close)){fail(source_path,source,i,"try requires a block");break;}
+            std::size_t catch_open=try_close+1;while(catch_open<source.size()&&std::isspace((unsigned char)source[catch_open]))++catch_open;std::size_t catch_close=0;
+            if(catch_open>=source.size()||source[catch_open]!='{'||!find_balanced(source,catch_open,'{','}',catch_close)){fail(source_path,source,i,"catch requires a block");break;}
+            const RenderResult saved_result=result_;
+            push_json_scope();
+            auto attempted=parse(source.substr(try_open+1,try_close-try_open-1),source_path,depth+1,source_provenance);
+            pop_json_scope();
+            if(attempted.ok){output+=attempted.output;i=catch_close+1;continue;}
+            if(!active_recoverable_){result_=std::move(attempted);break;}
+            nift::RuntimeValue caught=std::move(*active_recoverable_);active_recoverable_.reset();active_diagnostic_.reset();result_=saved_result;
+            push_json_scope();
+            auto caught_value=std::make_shared<nift::RuntimeValue>(std::move(caught));
+            variable_scopes_.back()[binding]=VariableBinding{caught_value,nift_binding_type(*caught_value),false,true};
+            auto handled=parse(source.substr(catch_open+1,catch_close-catch_open-1),source_path,depth+1,source_provenance);
+            pop_json_scope();
+            if(!handled.ok){result_=std::move(handled);break;}
+            output+=handled.output;i=catch_close+1;continue;
         }
 
         if (source.compare(i, 12, "@__nift_cmd(") == 0) {
@@ -369,8 +412,8 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     std::size_t mbo=mhc+1; while(mbo<body.size()&&std::isspace(static_cast<unsigned char>(body[mbo])))++mbo; std::size_t mbc=0;
                     if(!valid_binding_identifier(mn)||!pok||mbo>=body.size()||body[mbo]!='{'||!find_balanced(body,mbo,'{','}',mbc)){fail(source_path,source,i,"invalid struct method");struct_ok=false;break;}
                     const bool ctor=mn==struct_name; if(ctor&&!variadic_param.empty()){fail(source_path,source,i,"struct constructors cannot be variadic");struct_ok=false;break;}if(ctor && def.methods.find(struct_name)!=def.methods.end()){fail(source_path,source,i,"struct may define at most one constructor");struct_ok=false;break;}
-                    const auto mb=normalize_control_block_body(body.substr(mbo+1,mbc-mbo-1));
-                    def.methods[mn]=StructMethod{Callable{ps,variadic_param,mb.text,source_path,false,false,{},source_provenance},priv,ctor}; p=mbc+1; continue;
+                    const std::string raw_method_body=body.substr(mbo+1,mbc-mbo-1);const auto mb=normalize_control_block_body(raw_method_body);std::size_t content_offset=raw_method_body.find(mb.text);if(content_offset==std::string::npos)content_offset=0;const std::size_t absolute_offset=bo+1+mbo+1+content_offset;std::size_t method_line=1,method_column=1;for(std::size_t q=0;q<absolute_offset&&q<source.size();++q){if(source[q]=='\n'){++method_line;method_column=1;}else ++method_column;}std::string translated_method,method_error;const std::string padded_method(method_line-1,'\n');const std::string method_source=padded_method+std::string(method_column-1,' ')+mb.text;if(!translate_function_program(method_source,translated_method,method_error)){fail(source_path,source,i,method_error);struct_ok=false;break;}
+                    def.methods[mn]=StructMethod{Callable{ps,variadic_param,std::move(translated_method),source_path,false,false,{},source_provenance},priv,ctor}; p=mbc+1; continue;
                 }
                 // Struct fields are separated by top-level newlines or
                 // semicolons; a ';' or newline inside a nested lambda/block must
@@ -552,6 +595,10 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     }
                     if (expression_value.is_timer()) {
                         fail(source_path, source, i, "timer values cannot be rendered as text in $[" + key + "]");
+                        break;
+                    }
+                    if (expression_value.is_error()) {
+                        fail(source_path, source, i, "Error values cannot be rendered as text in $[" + key + "]");
                         break;
                     }
                     if (function_call_depth_ == 0 &&
@@ -888,7 +935,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             if(!callee->variadic_param.empty()){nift::RuntimeValue rest=nift::RuntimeValue::make_array();for(std::size_t ai=callee->params.size();ai<args.size();++ai)rest.array.push_back(std::move(args[ai]));auto sp=std::make_shared<nift::RuntimeValue>(std::move(rest));scope.emplace(callee->variadic_param,VariableBinding{sp,nift_binding_type(*sp),true,false});}
             ++callable_call_depth_;const int saved_loop_depth=loop_depth_;loop_depth_=0;pending_control_={};
             source_context_stack_.push_back(SourceContext{callee->source_path,callee->source_provenance});
-            auto execution=execute_body_outcome(prep.stmts);const bool ok=execution.kind()!=nift::detail::ExecOutcome::Kind::Fatal;std::string pe;if(!ok)pe=nift::detail::project_diagnostic(execution.diagnostic());
+            auto execution=execute_body_outcome(prep.stmts);const bool ok=execution.kind()!=nift::detail::ExecOutcome::Kind::Fatal&&execution.kind()!=nift::detail::ExecOutcome::Kind::Recoverable;std::string pe;if(execution.kind()==nift::detail::ExecOutcome::Kind::Fatal)pe=nift::detail::project_diagnostic(execution.diagnostic());else if(execution.kind()==nift::detail::ExecOutcome::Kind::Recoverable)pe=execution.error().error?execution.error().error->message:"recoverable failure";
             source_context_stack_.pop_back();
             loop_depth_=saved_loop_depth;--callable_call_depth_;
             pop_variable_scope();
@@ -938,22 +985,25 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 const std::string& name,std::vector<nift::RuntimeValue>&& args){
                 nift::RuntimeValue value;std::string error;
                 const bool handled=legacy_call(name,std::move(args),value,error);
+                if(active_recoverable_)return nift::detail::EvalOutcome<nift::RuntimeValue>::recoverable(*active_recoverable_);
                 if(!error.empty()){auto diagnostic=active_diagnostic_?*active_diagnostic_:nift::detail::make_diagnostic(nift::detail::DiagnosticCode::InternalLegacyFailure,std::move(error));diagnostic.frames.push_back({nift::detail::DiagnosticFrameKind::Callable,name,{},{}});result_.diagnostic=diagnostic;return nift::detail::EvalOutcome<nift::RuntimeValue>::fatal(std::move(diagnostic));}
                 if(handled)return nift::detail::EvalOutcome<nift::RuntimeValue>::value(std::move(value));
                 return nift::detail::EvalOutcome<nift::RuntimeValue>::unsupported();
             };
             auto legacy_native_method=std::move(c.native_method);
-            c.native_method_outcome=[legacy_native_method=std::move(legacy_native_method)](
+            c.native_method_outcome=[&,legacy_native_method=std::move(legacy_native_method)](
                 const nift::RuntimeValue& receiver,const std::string& method,
                 std::vector<nift::RuntimeValue>&& args){
                 nift::RuntimeValue value;std::string error;
                 const bool handled=legacy_native_method(receiver,method,std::move(args),value,error);
+                if(active_recoverable_)return nift::detail::EvalOutcome<nift::RuntimeValue>::recoverable(*active_recoverable_);
                 if(!error.empty())return nift::detail::EvalOutcome<nift::RuntimeValue>::fatal(
                     nift::detail::make_diagnostic(nift::detail::DiagnosticCode::InternalLegacyFailure,std::move(error)));
                 if(handled)return nift::detail::EvalOutcome<nift::RuntimeValue>::value(std::move(value));
                 return nift::detail::EvalOutcome<nift::RuntimeValue>::unsupported();
             };
             c.propagate_diagnostic=[&](nift::detail::Diagnostic diagnostic){active_diagnostic_=std::move(diagnostic);};
+            c.propagate_recoverable=[&](nift::RuntimeValue recoverable){active_recoverable_=std::move(recoverable);};
             c.call_is_value_only=[](const std::string& name){return name=="epoch"||name=="sleep"||name=="timer"||name=="secure_random_bytes"||name=="module_path"||name=="package_path";};c.render=[&](const nift::RuntimeValue& v){return render_expression_value(v);};return c;};
         auto find_binding=[&](const std::string& name)->VariableBinding*{for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(name);if(it!=sc->end())return &it->second;}return nullptr;};
         // Build a persistent logical location from an AST Binding/Index/Member
@@ -1010,7 +1060,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     if(st.op=="write"||st.op=="write_line"){
                         if(av.size()!=1||!f->open||!(f->mode=="w"||f->mode=="a"||f->mode=="rw")){if(av.size()!=1&&e.empty())e=st.op+": expected one value";return false;}
                         nift::RuntimeValue v=std::move(av[0]);
-                        std::string d;if(st.op=="write"&&v.is_bytes()){const nift::RuntimeBytes empty;const auto& raw=v.bytes?*v.bytes:empty;d.assign(raw.begin(),raw.end());}else{if(v.is_timer()||v.is_bytes()||v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0&&v.string.rfind("\x1fnift:timer:",0)!=0)){e=st.op+": value is not directly renderable";return false;}d=render_expression_value(v);if(st.op=="write_line")d+='\n';}
+                        std::string d;if(st.op=="write"&&v.is_bytes()){const nift::RuntimeBytes empty;const auto& raw=v.bytes?*v.bytes:empty;d.assign(raw.begin(),raw.end());}else{if(v.is_error()||v.is_timer()||v.is_bytes()||v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0&&v.string.rfind("\x1fnift:timer:",0)!=0)){e=st.op+": value is not directly renderable";return false;}d=render_expression_value(v);if(st.op=="write_line")d+='\n';}
                         const std::size_t base=std::min(f->cursor,f->working.size());
                         const std::size_t ov=std::min(d.size(),f->working.size()-base);
                         f->working.replace(base,ov,d);
@@ -1059,7 +1109,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             // replace) cannot dangle the element (no interior pointer retained).
             if(st.iterable&&st.iterable->kind==nift::ast::Kind::Binding){auto* src=find_binding(st.iterable->name);if(src){src->sync();if(src->value&&(src->value->is_array()||src->value->is_object())){lb.ref_root_slot=src->slot;std::vector<PathComponent> pc;pc.push_back(PathComponent::at(k));lb.ref_path=std::move(pc);}}}
             variable_scopes_.back().emplace(st.name,std::move(lb));++loop_depth_;const bool bok=execute_body(st.body,e);--loop_depth_;pop_json_scope();if(!bok)return false;if(pending_control_.kind==ControlFlow::Break){pending_control_={};break;}if(pending_control_.kind==ControlFlow::Continue){pending_control_={};continue;}}return true;}if(st.kind==nift::ast::StmtKind::Break){pending_control_.kind=ControlFlow::Break;pending_control_.value.reset();return true;}if(st.kind==nift::ast::StmtKind::Continue){pending_control_.kind=ControlFlow::Continue;pending_control_.value.reset();return true;}if(st.kind==nift::ast::StmtKind::Return){nift::RuntimeValue rv;pending_control_.ref_root_slot.reset();pending_control_.ref_path.clear();if(st.expr){if(!nift::ast::evaluate(*st.expr,c,rv,e))return false;VariableBinding rl;std::string locerr;if(bind_location(rl,*st.expr,locerr)&&rl.is_location_ref()&&rl.value){pending_control_.ref_root_slot=rl.ref_root_slot;pending_control_.ref_path=rl.ref_path;}else if(last_call_return_loc_root_&&(rv.is_array()||rv.is_object()||(rv.is_string()&&rv.string.rfind("\x1fnift:",0)==0))){pending_control_.ref_root_slot=last_call_return_loc_root_;pending_control_.ref_path=last_call_return_loc_path_;}pending_control_.value=std::make_shared<nift::RuntimeValue>(std::move(rv));}else pending_control_.value.reset();pending_control_.kind=ControlFlow::Return;return true;}if(st.kind==nift::ast::StmtKind::Expression){return execute_native_call(st,e);}if(st.kind==nift::ast::StmtKind::Declaration){last_call_return_loc_root_.reset();last_call_return_loc_path_.clear();if(!nift::ast::evaluate(*st.expr,c,rhs,e))return false;if(large_num(rhs)){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}if(variable_scopes_.empty()){e="no scope for declaration: "+st.name;return false;}auto& scope=variable_scopes_.back();if(scope.count(st.name)){e="binding already declared in this scope: "+st.name;return false;}if(last_call_return_loc_root_&&(rhs.is_array()||rhs.is_object()||(rhs.is_string()&&rhs.string.rfind("\x1fnift:",0)==0))){VariableBinding dloc;dloc.ref_root_slot=last_call_return_loc_root_;dloc.ref_path=last_call_return_loc_path_;dloc.sync();if(!dloc.value){e="reference target no longer exists";return false;}dloc.type=nift_binding_type(*dloc.value);dloc.mutable_binding=true;last_call_return_loc_root_.reset();last_call_return_loc_path_.clear();scope.emplace(st.name,std::move(dloc));return true;}auto sp=std::make_shared<nift::RuntimeValue>(std::move(rhs));const int dt=st.decl_type;const int bt=(dt==3)?3:((dt==2)?nift_binding_type(*sp):((dt>=0&&dt!=2&&dt!=3)?dt:nift_binding_type(*sp)));auto ins=scope.emplace(st.name,VariableBinding{sp,bt,true,false});if(st.expr&&(st.expr->kind==nift::ast::Kind::Index||st.expr->kind==nift::ast::Kind::Member)){std::string re;if(!bind_location(ins.first->second,*st.expr,re)&&!re.empty()){e=re;scope.erase(ins.first);return false;}}else if(st.expr&&st.expr->kind==nift::ast::Kind::Binding&&(sp->is_array()||sp->is_object())){auto* src=find_binding(st.expr->name);if(src){src->sync();if(src->value){ins.first->second.value=src->value;*ins.first->second.slot=src->value;}}}return true;}if(st.kind==nift::ast::StmtKind::Assignment){if(!nift::ast::evaluate(*st.expr,c,rhs,e))return false;if(large_num(rhs)){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}if(st.target)return assign_indexed(*st.target,std::move(rhs),e);return assign_plain(st.name,std::move(rhs),e);}VariableBinding* cb=nullptr;for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(st.name);if(it!=sc->end()){cb=&it->second;break;}}if(!cb){e="assignment to undefined binding: "+st.name;return false;}cb->sync();if(!cb->mutable_binding){e="cannot assign to const binding: "+st.name;return false;}if(cb->value&&cb->value->is_string()&&cb->value->string.rfind("\x1fnift:atomic:",0)==0){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}if(st.kind==nift::ast::StmtKind::Increment){if(!cb->value->is_number()){e="increment/decrement requires a numeric lvalue";return false;}oldv=*cb->value;if(large_num(oldv)){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}next=nift::RuntimeValue(oldv.num+(st.op=="++"?1.0:-1.0));return assign_plain(st.name,std::move(next),e);}if(!nift::ast::evaluate(*st.expr,c,rhs,e))return false;if(st.op=="+="&&cb->value->is_string()&&rhs.is_string()){if(cb->value.use_count()==2){cb->value->string.append(rhs.string);last_expression_mutation_=true;return true;}oldv=*cb->value;next=nift::RuntimeValue(oldv.string+rhs.string);}else if(st.op=="+="&&cb->value->is_array()&&rhs.is_array()){oldv=*cb->value;next=nift::RuntimeValue::make_array();next.array.reserve(oldv.array.size()+rhs.array.size());next.array.insert(next.array.end(),oldv.array.begin(),oldv.array.end());next.array.insert(next.array.end(),rhs.array.begin(),rhs.array.end());}else{oldv=*cb->value;if(!oldv.is_number()||!rhs.is_number()){e="arithmetic operators require numeric operands";return false;}if(large_num(oldv)||large_num(rhs)){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}if(st.op=="+=")next=nift::RuntimeValue(oldv.num+rhs.num);else if(st.op=="-=")next=nift::RuntimeValue(oldv.num-rhs.num);else if(st.op=="*=")next=nift::RuntimeValue(oldv.num*rhs.num);else if(st.op=="/="){if(rhs.num==0){e="division by zero";return false;}next=nift::RuntimeValue(oldv.num/rhs.num);}else{if(rhs.num==0){e="modulo by zero";return false;}next=nift::RuntimeValue(std::fmod(oldv.num,rhs.num));}}return assign_plain(st.name,std::move(next),e);};
-        execute_prepared_outcome=[&](const nift::ast::Stmt& statement){std::string error;if(!execute_prepared(statement,error)){if(active_diagnostic_)return nift::detail::ExecOutcome::fatal(*active_diagnostic_);if(result_.diagnostic)return nift::detail::ExecOutcome::fatal(*result_.diagnostic);return nift::detail::ExecOutcome::fatal(nift::detail::make_diagnostic(nift::detail::DiagnosticCode::InternalLegacyFailure,std::move(error)));}if(pending_control_.kind==ControlFlow::Return)return nift::detail::ExecOutcome::returned();if(pending_control_.kind==ControlFlow::Break)return nift::detail::ExecOutcome::broken();if(pending_control_.kind==ControlFlow::Continue)return nift::detail::ExecOutcome::continued();return nift::detail::ExecOutcome::normal();};
+        execute_prepared_outcome=[&](const nift::ast::Stmt& statement){std::string error;if(!execute_prepared(statement,error)){if(active_recoverable_)return nift::detail::ExecOutcome::recoverable(*active_recoverable_);if(active_diagnostic_)return nift::detail::ExecOutcome::fatal(*active_diagnostic_);if(result_.diagnostic)return nift::detail::ExecOutcome::fatal(*result_.diagnostic);return nift::detail::ExecOutcome::fatal(nift::detail::make_diagnostic(nift::detail::DiagnosticCode::InternalLegacyFailure,std::move(error)));}if(pending_control_.kind==ControlFlow::Return)return nift::detail::ExecOutcome::returned();if(pending_control_.kind==ControlFlow::Break)return nift::detail::ExecOutcome::broken();if(pending_control_.kind==ControlFlow::Continue)return nift::detail::ExecOutcome::continued();return nift::detail::ExecOutcome::normal();};
         execute_body_outcome=[&](const std::vector<std::unique_ptr<nift::ast::Stmt>>& body){for(const auto& statement:body){auto outcome=execute_prepared_outcome(*statement);if(outcome.kind()!=nift::detail::ExecOutcome::Kind::Normal)return outcome;}return nift::detail::ExecOutcome::normal();};
         if (source.compare(i, 7, "@while(") == 0) {
             std::size_t hc=0;if(!find_balanced(source,i+6,'(',')',hc)){fail(source_path,source,i,"@while has no matching ')' for its condition");break;}
@@ -1071,7 +1121,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             std::vector<std::unique_ptr<nift::ast::Stmt>> prepared_body; const bool prepared_body_ok=prepare_loop_body(body.text,prepared_body);
 
             while(result_.ok){bool yes=false;std::string e;if(prepared_condition.supported){auto c=ast_context();nift::RuntimeValue cv;if(!nift::ast::evaluate(*prepared_condition.expr,c,cv,e)){fail(source_path,source,i,e);break;}yes=nift::ast::truthy(cv);last_expression_mutation_=false;}else if(!evaluate_condition(condition,yes,e)){fail(source_path,source,i,e);break;}if(!yes)break;
-                push_json_scope(); ++loop_depth_; RenderResult nested;if(prepared_body_ok){auto execution=execute_body_outcome(prepared_body);if(execution.kind()==nift::detail::ExecOutcome::Kind::Fatal){nested.ok=false;nested.diagnostic=execution.diagnostic();nested.error.message=nift::detail::project_diagnostic(execution.diagnostic());}}else nested=parse(body.text,source_path,depth+1,source_provenance); --loop_depth_; pop_json_scope();if(!nested.ok){if(nested.diagnostic)active_diagnostic_=nested.diagnostic;fail(source_path,source,i,nested.error.message);break;}append_indented(output,nested.output,"",code_block_depth_);
+                push_json_scope(); ++loop_depth_; RenderResult nested;if(prepared_body_ok){auto execution=execute_body_outcome(prepared_body);if(execution.kind()==nift::detail::ExecOutcome::Kind::Fatal){nested.ok=false;nested.diagnostic=execution.diagnostic();nested.error.message=nift::detail::project_diagnostic(execution.diagnostic());}else if(execution.kind()==nift::detail::ExecOutcome::Kind::Recoverable){active_recoverable_=execution.error();nested.ok=false;nested.error.message=execution.error().error?execution.error().error->message:"recoverable failure";}}else nested=parse(body.text,source_path,depth+1,source_provenance); --loop_depth_; pop_json_scope();if(!nested.ok){if(nested.diagnostic)active_diagnostic_=nested.diagnostic;fail(source_path,source,i,nested.error.message);break;}append_indented(output,nested.output,"",code_block_depth_);
                 if (pending_control_.kind == ControlFlow::Continue) { pending_control_ = {}; continue; }
                 if (pending_control_.kind == ControlFlow::Break) { pending_control_ = {}; break; }
                 if(pending_control_.kind!=ControlFlow::None)break;
@@ -1358,11 +1408,11 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     RenderResult nested;
                     if(for_prepared_ok){
                         std::string pe;
-                        auto execution=execute_body_outcome(for_prepared_body);if(execution.kind()==nift::detail::ExecOutcome::Kind::Fatal){nested.ok=false;nested.diagnostic=execution.diagnostic();nested.error.message=nift::detail::project_diagnostic(execution.diagnostic());}
+                        auto execution=execute_body_outcome(for_prepared_body);if(execution.kind()==nift::detail::ExecOutcome::Kind::Fatal){nested.ok=false;nested.diagnostic=execution.diagnostic();nested.error.message=nift::detail::project_diagnostic(execution.diagnostic());}else if(execution.kind()==nift::detail::ExecOutcome::Kind::Recoverable){active_recoverable_=execution.error();nested.ok=false;nested.error.message=execution.error().error?execution.error().error->message:"recoverable failure";}
                     }else nested=parse(body.text, source_path, depth + 1, source_provenance);
                     --loop_depth_;
                     pop_json_scope();
-                    if (!nested.ok) break;
+                    if (!nested.ok) { if(nested.diagnostic)active_diagnostic_=nested.diagnostic;fail(source_path,source,i,nested.error.message);break; }
                     append_indented(output, nested.output, control_indent, insertion_code_block_depth);
                     if (pending_control_.kind == ControlFlow::Continue) { pending_control_ = {}; continue; }
                     if (pending_control_.kind == ControlFlow::Break) { pending_control_ = {}; break; }
@@ -1691,7 +1741,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 const std::size_t call_end = (end > call_start && source[end - 1] == ';') ? end - 1 : end;
                 const std::string call = "@" + function + source.substr(call_start, call_end - call_start);
                 if (!evaluate_collection_value(call, collection_result, collection_error)) { fail(source_path, source, i, collection_error); break; }
-                if(runtime_contains_bytes(collection_result)){fail(source_path,source,i,"bytes values cannot be rendered as text");break;}if(contains_timer_resource(collection_result)){fail(source_path,source,i,"timer values cannot be rendered as text");break;}output += render_expression_value(collection_result); i = end; continue;
+                if(runtime_contains_bytes(collection_result)){fail(source_path,source,i,"bytes values cannot be rendered as text");break;}if(contains_timer_resource(collection_result)){fail(source_path,source,i,"timer values cannot be rendered as text");break;}if(contains_error_resource(collection_result)){fail(source_path,source,i,"Error values cannot be rendered as text");break;}output += render_expression_value(collection_result); i = end; continue;
             }
 
             if (function == "substr") {
@@ -1768,6 +1818,10 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     const auto& item = array->array[item_index];
                     if (item.is_timer()) {
                         fail(source_path, source, i, "join: timer values cannot be rendered as text");
+                        break;
+                    }
+                    if (item.is_error()) {
+                        fail(source_path, source, i, "join: Error values cannot be rendered as text");
                         break;
                     }
                     if (item.is_bytes() || item.is_array() || item.is_object()) {

@@ -118,8 +118,9 @@ bool evaluate(const Expr& e,Context& c,nift::RuntimeValue& out,std::string& erro
  error="unsupported AST node";return false;
 }
 nift::detail::EvalOutcome<nift::RuntimeValue> evaluate_outcome(const Expr& e,Context& c){
-  c.propagated_diagnostic.reset();nift::RuntimeValue value;std::string error;
+  c.propagated_diagnostic.reset();c.propagated_recoverable.reset();nift::RuntimeValue value;std::string error;
   if(evaluate(e,c,value,error))return nift::detail::EvalOutcome<nift::RuntimeValue>::value(std::move(value));
+  if(c.propagated_recoverable)return nift::detail::EvalOutcome<nift::RuntimeValue>::recoverable(std::move(*c.propagated_recoverable));
   if(c.propagated_diagnostic)return nift::detail::EvalOutcome<nift::RuntimeValue>::fatal(std::move(*c.propagated_diagnostic));
   return nift::detail::EvalOutcome<nift::RuntimeValue>::fatal(nift::detail::make_diagnostic(nift::detail::DiagnosticCode::InternalLegacyFailure,std::move(error)));
 }
