@@ -1050,7 +1050,15 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
         };
         auto bind_location=[&](VariableBinding& dst,const nift::ast::Expr& ex,std::string& e)->bool{
             std::shared_ptr<std::shared_ptr<nift::RuntimeValue>> root;std::vector<PathComponent> path;if(!build_location_ref(ex,root,path,e)||path.empty())return false;
-            dst.ref_root_slot=std::move(root);dst.ref_path=std::move(path);dst.sync();if(!dst.value){e="reference target no longer exists";return false;}dst.type=nift_binding_type(*dst.value);return dst.value->is_array()||dst.value->is_object()||(dst.value->is_string()&&dst.value->string.rfind("\x1fnift:",0)==0);
+            dst.ref_root_slot=std::move(root);dst.ref_path=std::move(path);dst.sync();
+            // A target that does not resolve to a referenceable aggregate
+            // (bytes index, scalar, out-of-range) cannot be aliased: fall back
+            // to the plain value binding instead of erroring, matching the
+            // string-eval path. Fixes `c := b[0]` (bytes index) in loop bodies,
+            // which the AST hot path rejected with "reference target no longer
+            // exists" while array/object indexing worked.
+            if(!dst.value){dst.ref_root_slot.reset();dst.ref_path.clear();dst.sync();e.clear();return false;}
+            dst.type=nift_binding_type(*dst.value);return dst.value->is_array()||dst.value->is_object()||(dst.value->is_string()&&dst.value->string.rfind("\x1fnift:",0)==0);
         };
         auto assign_plain=[&](const std::string& name,nift::RuntimeValue v,std::string& e)->bool{for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(name);if(it==sc->end())continue;if(!it->second.mutable_binding){e="cannot assign to const binding: "+name;return false;}it->second.sync();if(it->second.value&&it->second.value->is_string()&&it->second.value->string.rfind("\x1fnift:atomic:",0)==0&&!(v.is_string()&&v.string.rfind("\x1fnift:atomic:",0)==0)){auto ai=atomic_instances_.find(it->second.value->string.substr(13));if(ai==atomic_instances_.end()){e="atomic: invalid handle";return false;}if(ai->second->kind==AtomicInstance::Kind::Int){std::int64_t x=0;if(!nift::runtime_number_to_i64(v,x)){e="assignment to atomic<int> requires signed 64-bit integer";return false;}ai->second->int_value.store(x);}else{if(!v.is_bool()){e="assignment to atomic<bool> requires bool";return false;}ai->second->bool_value.store(v.boolean);}last_expression_mutation_=true;return true;}const int at=nift_binding_type(v);if(!nift_type_assignable(at,it->second.type)){e="cannot change binding type: "+name;return false;}it->second.rebind(std::make_shared<nift::RuntimeValue>(std::move(v)));return true;}e="assignment to undefined binding: "+name;return false;};
             // Resolve an Index/Member chain to a non-const Document reference so

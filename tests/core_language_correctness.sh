@@ -2,7 +2,8 @@
 # CORE-SERVER-BLOCKERS regression wall: pinned language/runtime correctness
 # cases surfaced by the SERVER2 investigation. These must remain green; they
 # guard the intended contracts (expression evaluation, empty-string codecs,
-# return semantics) against regressions.
+# return semantics, bytes-index bindings, cross-package facades) against
+# regressions.
 set -euo pipefail
 NIFT="${NIFT:-./nift}"
 t=$(mktemp -d); trap 'rm -rf "$t"' EXIT
@@ -67,8 +68,6 @@ export(use_own)
 export(counter)
 PKG
 mkdir -p "$t/proj/.nift"
-"$NIFT" add "$cpkg" --project-dir "$t/proj" >/dev/null 2>&1 || "$NIFT" add "$cpkg" >/dev/null 2>&1
-# simpler: run add from the project dir
 ( cd "$t/proj" && "$NIFT" add "$cpkg" >/dev/null 2>&1 )
 cat > "$t/proj/use.f" <<'USE'
 @import("cpkg")
@@ -78,6 +77,34 @@ print(counter.inc(100))
 USE
 out=$( cd "$t/proj" && "$NIFT" use.f )
 check "cross-package exported facade + private-facade dispatch" [ "$out" == $'42\n11\n101' ]
+
+# 5. Binding a bytes-index result inside a loop body must not dangle.
+#    The AST hot path rejected `c := b[0]` in a while body with
+#    "reference target no longer exists" (bytes have no aliased location);
+#    it must fall back to the plain value binding, like array/object indexes.
+cat >"$t/b6.f" <<'EOF'
+fn(sync(s)) {
+    b := s.encode("utf-8")
+    i := 0
+    r := 0
+    while(i < 1) { c := b[0]; r = c; i += 1 }
+    return r == 71
+}
+print(sync("GET"))
+struct(p) {
+    fn(m(s)) {
+        b := s.encode("utf-8")
+        i := 0
+        r := 0
+        while(i < 1) { c := b[1]; r = c; i += 1 }
+        return r == 69
+    }
+}
+p := p()
+print(p.m("GET"))
+EOF
+out=$("$NIFT" "$t/b6.f")
+check "bytes-index binding in loop bodies" [ "$out" == $'true\ntrue' ]
 
 if [ "$fails" -ne 0 ]; then echo "FAILED"; exit 1; fi
 echo "PASS core language correctness"
