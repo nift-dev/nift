@@ -2610,7 +2610,21 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     key=unescape_parameter_string(key.substr(1,key.size()-2));
                     if(out.has(key)){error="object literal: duplicate object key '"+key+"'";return false;}
                     nift::RuntimeValue v;
-                    if(value.size()>=2&&((value.front()=='"'&&value.back()=='"')||(value.front()=='\''&&value.back()=='\''))){v=nift::RuntimeValue(unescape_parameter_string(value.substr(1,value.size()-2)));}
+                    // A value is a string literal only when it is ONE fully
+                    // quoted string (the opening quote's matching close is the
+                    // last character). Otherwise it is an expression, so
+                    // {"a": "pre " + x + " post"} evaluates the concatenation
+                    // instead of being misread as a literal.
+                    bool quoted_literal=false;
+                    if(value.size()>=2){
+                        const char qc=value.front();
+                        if(qc=='"'||qc=='\''){
+                            bool in_q=false;quoted_literal=true;
+                            for(std::size_t z=0;z<value.size();++z){const char c=value[z];if(in_q){if(c=='\\'&&z+1<value.size()){++z;}else if(c==qc){if(z!=value.size()-1){quoted_literal=false;break;}in_q=false;}}else if(c==qc){in_q=true;}else{quoted_literal=false;break;}}
+                            if(quoted_literal&&in_q){quoted_literal=false;}
+                        }else{quoted_literal=false;}
+                    }
+                    if(quoted_literal){v=nift::RuntimeValue(unescape_parameter_string(value.substr(1,value.size()-2)));}
                     else{if(value.empty()){error="object literal: missing value for key '"+key+"'";return false;}if(!eval(value,v,depth+1))return false;}
                     out[key]=std::move(v);
                 }

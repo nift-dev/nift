@@ -751,6 +751,9 @@ test-template-variables: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/template_variables_smoke.sh
 
 
+test-core-language-correctness: $(TARGET)
+	NIFT="$(CURDIR)/$(TARGET)" tests/core_language_correctness.sh
+
 test-v41-certification: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v41_certification_adversarial.sh
 
