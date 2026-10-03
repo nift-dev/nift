@@ -1,14 +1,54 @@
 # Nift package contract v1
 
 A package is a Git/local repository containing `manifest.json`, Nift `.f` sources, tests and documentation. A package manifest requires a portable lowercase `name`, a semantic `version`, and a contained relative `.f` `entry` made from lowercase portable path components; `description` and `dependencies` are optional. A consumer project may instead contain only `dependencies`. Recognized fields are strict and malformed metadata is rejected rather than replaced.
-
 Direct dependencies use an explicit source and requested revision:
 
 ```json
 {"dependencies":{"sqlite":{"source":"sqlite","ref":"latest"}}}
 ```
 
-`.nift/packages.lock.json` records the same `source`, the original `requested` revision, and either a full exact Git commit or `local`. Existing locks must be complete and consistent with the manifest. Graph-shaped transitive locks are intentionally deferred to the dependency-graph checkpoint.
+`.nift/packages.lock.json` records the **complete resolved dependency graph**:
+every installed package (direct and transitive) as one node with its
+canonical/resolved source identity and exact Git commit (or `local`), plus
+each node's outgoing requirement edges (the source spelling and requested ref
+each parent declared). The root manifest declares only direct dependencies;
+transitive requirements come from package manifests and are resolved and
+installed deterministically.
+
+```json
+{
+  "lockfileVersion": 2,
+  "packages": {
+    "a": {
+      "source": "https://github.com/org/a.git",
+      "commit": "<40-hex>",
+      "requirements": {
+        "b": {"source": "github:org/b", "requested": "latest"}
+      }
+    },
+    "b": {
+      "source": "https://github.com/org/b.git",
+      "commit": "<40-hex>",
+      "requirements": {}
+    }
+  }
+}
+```
+
+The lock is the exact, reproducible closure: one node per package name;
+conflicting requirements for the same name (different canonical source or
+different resolved commit) are deterministic failures; import cycles and
+self-dependencies are deterministic failures. Git dependencies are
+content-pinned by exact commit. Local dependencies (`commit == "local"`) are
+graph/path-deterministic with live contents (not content-reproducible across
+machines).
+
+`nift packages [name] [--json]` explains why a package is installed, listing
+every root-to-package dependency path and what each parent requested, derived
+from the root manifest and the v2 lock alone (no installed-package reads).
+`nift install` accepts a valid v1 direct-only lock and migrates it to v2 while
+preserving the locked direct commits; read-only operations never rewrite a v1
+lock.
 
 Package code uses isolated `import`/explicit `export` semantics. Script land retains `@import` as a compatibility spelling; template top level continues to use the `@import` directive.
 

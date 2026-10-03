@@ -3,6 +3,7 @@
 #include "JsonFile.h"
 #include "PackageMetadata.h"
 #include "PackageGraphCommands.h"
+#include "PackageGraphQuery.h"
 #include "PackageTransaction.h"
 #include <minify/Minify.h>
 #include <map>
@@ -361,6 +362,7 @@ void print_commands() {
     row("remove", "<name>", "Remove a package dependency");
     row("install", "", "Install locked/package manifest dependencies");
     row("update", "[name]", "Refresh floating package refs and lock commits");
+    row("packages", "[name]", "Explain why packages are installed (dependency graph)");
 
     std::cout << '\n' << console::dim("General") << '\n';
     row("init", "[--target=platform] [--ext=.ext] [--handover]", "Create a Nift project");
@@ -484,6 +486,55 @@ static int package_install_cli(bool update,const std::string& only={}){
     if(!package_graph_commands::acquire_graph(fs::current_path(),transaction_root,manifest,v1_exists?&v1_lock:nullptr,v2_exists?&v2_doc:nullptr,mode,target_root,root_locked_commits.empty()?nullptr:&root_locked_commits,result,e)){console::error(e);return 1;}
     if(!transaction.commit(result.operations,result.manifest_document,result.lock_document,e)){console::error(e);return 1;}
     for(const auto& op:result.operations){if(op.kind!=PackageTransaction::Kind::Replace)continue;std::string commit="local";const auto node=result.graph.packages.find(op.name);if(node!=result.graph.packages.end())commit=node->second.commit;std::cout<<(update?"updated ":"installed ")<<op.name<<" ("<<commit<<")\n";}
+    return 0;
+}
+
+static int package_query_cli(int argc,char**argv){
+    bool want_json=false;std::string name;bool name_set=false;
+    for(int i=2;i<argc;++i){std::string a=argv[i];if(a=="--json")want_json=true;else if(name_set){console::error("packages takes at most one package name");return 1;}else{name=a;name_set=true;}}
+    std::string error;package_metadata::Manifest manifest;
+    if(!load_project_manifest(false,manifest,error)){console::error(error);return 1;}
+    json::Document lock_doc;bool lock_exists=false;
+    if(!filesystem::path_exists(package_lock_path())){console::error("packages.lock.json is missing; run nift install first");return 1;}
+    if(!load_json_file(package_lock_path(),lock_doc,error)){console::error(error);return 1;}
+    const package_graph::LockFormat format=package_graph::detect_lock_format(lock_doc);
+    if(format!=package_graph::LockFormat::V2){console::error("packages query requires a v2 graph lock (current lock is legacy/direct-only; run nift install to migrate)");return 1;}
+    package_graph::GraphLock graph;
+    if(!package_graph::parse_graph_lock(lock_doc,graph,error)){console::error(error);return 1;}
+    if(want_json){
+        // Semantically-structured output: the lock graph plus per-package paths.
+        json::Document result=json::Document::make_object();
+        result["lockfileVersion"]=json::Document(2);
+        json::Document packages=json::Document::make_object();
+        std::map<std::string,std::vector<package_graph::GraphPath>> by_target;
+        if(!package_graph::enumerate_graph_paths(manifest,graph,by_target,error)){console::error(error);return 1;}
+        for(const auto& node:graph.packages){
+            json::Document entry=json::Document::make_object();
+            entry["source"]=json::Document(node.second.source);
+            entry["commit"]=json::Document(node.second.commit);
+            json::Document paths=json::Document::make_array();
+            const auto found=by_target.find(node.first);
+            if(found!=by_target.end()){
+                for(const auto& path:found->second){
+                    json::Document p=json::Document::make_object();
+                    json::Document nodes=json::Document::make_array();
+                    for(const auto& n:path.nodes)nodes.array.emplace_back(n);
+                    p["nodes"]=nodes;
+                    p["source"]=json::Document(path.requirement.source);
+                    p["requested"]=json::Document(path.requirement.requested);
+                    paths.array.push_back(std::move(p));
+                }
+            }
+            entry["paths"]=paths;
+            packages[node.first]=entry;
+        }
+        result["packages"]=packages;
+        std::cout<<result.dump(2)+"\n";
+        return 0;
+    }
+    std::string text=package_graph::explain_graph(manifest,graph,name,error);
+    if(text.empty()){console::error(error);return 1;}
+    std::cout<<text;
     return 0;
 }
 
@@ -1363,6 +1414,7 @@ int run_cli(int argc, char** argv) {
     if (command == "remove") return package_remove_cli(argc,argv);
     if (command == "install") return package_install_cli(false);
     if (command == "update") { if(argc>3){console::error("update takes at most one package name");return 1;} return package_install_cli(true,argc==3?argv[2]:std::string{}); }
+    if (command == "packages") return package_query_cli(argc,argv);
 
     if (command == "eval") {
         for (int i = 2; i < argc; ++i) if (std::string(argv[i]) == "--no-process") nift_setenv("NIFT_NO_PROCESS", "1", 1);
