@@ -791,7 +791,7 @@ void Parser::fail(const fs::path& source_path, const std::string& source, std::s
             nift::detail::DiagnosticDisposition::Recoverable &&
         !result_.diagnostic->origin.source.empty() && active_recoverable_->is_error()) {
         active_recoverable_ = nift::runtime_error_with_origin(
-            *active_recoverable_, result_.diagnostic->origin.source,
+            *active_recoverable_, result_.diagnostic->origin.source.generic_string(),
             result_.diagnostic->origin.line, result_.diagnostic->origin.column);
     }
 }
