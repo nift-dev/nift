@@ -50,5 +50,34 @@ EOF
 out=$("$NIFT" "$t/b3.f")
 check "return exits callable (for loops)" [ "$out" == $'99\n99\n99' ]
 
+# 4. Cross-package exported struct facade: a package that imports another
+#    package must be able to call the exported facade, and an exported function
+#    may dispatch on its module's own (possibly non-exported) facade.
+cpkg="$t/cpkg"; mkdir -p "$cpkg/src"
+printf '{"name":"cpkg","version":"0.1.0","entry":"src/cpkg.f"}\n' > "$cpkg/manifest.json"
+cat > "$cpkg/src/cpkg.f" <<'PKG'
+struct(counter) {
+    fn(inc(n)) { return n + 1 }
+}
+counter := counter()
+fn(direct()) { return counter.inc(41) }
+fn(use_own(n)) { return counter.inc(n) }
+export(direct)
+export(use_own)
+export(counter)
+PKG
+mkdir -p "$t/proj/.nift"
+"$NIFT" add "$cpkg" --project-dir "$t/proj" >/dev/null 2>&1 || "$NIFT" add "$cpkg" >/dev/null 2>&1
+# simpler: run add from the project dir
+( cd "$t/proj" && "$NIFT" add "$cpkg" >/dev/null 2>&1 )
+cat > "$t/proj/use.f" <<'USE'
+@import("cpkg")
+print(direct())
+print(use_own(10))
+print(counter.inc(100))
+USE
+out=$( cd "$t/proj" && "$NIFT" use.f )
+check "cross-package exported facade + private-facade dispatch" [ "$out" == $'42\n11\n101' ]
+
 if [ "$fails" -ne 0 ]; then echo "FAILED"; exit 1; fi
 echo "PASS core language correctness"

@@ -581,7 +581,25 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
             }
             vars.emplace(name,vi->second);continue;
         }
-        auto fi=isolated_callables.find(name); if(fi!=isolated_callables.end()){funcs.emplace(name,fi->second);continue;}
+        auto fi=isolated_callables.find(name); if(fi!=isolated_callables.end()){
+            // An exported function may dispatch on the module's own struct
+            // facades (exported or private). Its module_env carries the module
+            // top-level bindings, but struct method dispatch resolves the type
+            // from the importer's global structs_, so every struct type the
+            // module's facades reference must be registered here for the
+            // callable's method calls to work.
+            for(const auto& sv: isolated_scope){
+                const auto& vb=sv.second;
+                if(vb.value && vb.value->is_string() && vb.value->string.rfind("\x1fnift:struct:",0)==0){
+                    auto ii=struct_instances_.find(vb.value->string.substr(13));
+                    if(ii!=struct_instances_.end()){
+                        auto sit=isolated_structs.find(ii->second->type_name);
+                        if(sit!=isolated_structs.end() && !types.count(ii->second->type_name)) types.emplace(ii->second->type_name, sit->second);
+                    }
+                }
+            }
+            funcs.emplace(name,fi->second);continue;
+        }
         auto si=isolated_structs.find(name); if(si!=isolated_structs.end()){types.emplace(name,si->second);continue;}
         const std::string detail="export names no existing binding: "+name;
         if(import_created_workers){fail_worker_import(detail);return false;}
