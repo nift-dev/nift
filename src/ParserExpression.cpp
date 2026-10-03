@@ -490,10 +490,10 @@ bool Parser::serialize_value(const nift::RuntimeValue& value, bool pretty, std::
     if (ref.rfind("\x1fnift:struct:", 0) == 0) {
         auto it=struct_instances_.find(ref.substr(13));
         if(it==struct_instances_.end()){error="invalid struct value";return false;}
-        auto sd=structs_.find(it->second->type_name);
+        auto* sd=struct_definition_for(it->second);
         output += it->second->type_name + "{";
         bool first=true;
-        for(const auto& field : sd->second.fields){
+        for(const auto& field : sd->fields){
             if(field.private_member) continue;
             auto fv=it->second->fields.find(field.name); if(fv==it->second->fields.end()) continue;
             if(pretty){output += first?"\n":""; output += child_pad;} else if(!first) output += ",";
@@ -830,12 +830,12 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
                     if(inst==struct_instances_.end()){error="invalid struct instance";return false;}
                     auto fit=inst->second->fields.find(member);
                     if(fit==inst->second->fields.end()){
-                        auto sd2=structs_.find(inst->second->type_name);
-                        if(sd2!=structs_.end()&&sd2->second.methods.count(member)) return false;
+                        auto* sd2=struct_definition_for(inst->second);
+                        if(sd2&&sd2->methods.count(member)) return false;
                         error="struct has no field: "+member;return false;
                     }
-                    auto sd=structs_.find(inst->second->type_name);bool priv=false;
-                    if(sd!=structs_.end())for(const auto& f:sd->second.fields)if(f.name==member)priv=f.private_member;
+                    auto* sd=struct_definition_for(inst->second);bool priv=false;
+                    if(sd)for(const auto& f:sd->fields)if(f.name==member)priv=f.private_member;
                     if(priv&&(receiver_stack_.empty()||receiver_stack_.back()!=inst->second)){error="private struct field: "+member;return false;}
                     current=*fit->second.value;
                     if(me==text.size()){out=current;return true;}
@@ -982,10 +982,10 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
                             if (member_start == pos) { error = "invalid struct member path: " + text; return false; }
                             auto fit = inst->second->fields.find(member);
                             if (fit == inst->second->fields.end()) { error = "struct has no field: " + member; return false; }
-                            auto sd = structs_.find(inst->second->type_name);
+                            auto* sd = struct_definition_for(inst->second);
                             bool priv = false;
-                            if (sd != structs_.end())
-                                for (const auto& f : sd->second.fields)
+                            if (sd)
+                                for (const auto& f : sd->fields)
                                     if (f.name == member) priv = f.private_member;
                             if (priv && (receiver_stack_.empty() || receiver_stack_.back() != inst->second)) {
                                 error = "private struct field: " + member;
@@ -2385,13 +2385,13 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             if (terminal_call && text.substr(0,lp).find('.') != std::string::npos) {
                 const std::string target=trim_copy(text.substr(0,lp)); const auto dot=target.rfind('.'); const std::string root=target.substr(0,dot), mn=target.substr(dot+1);
                 VariableBinding* rb=nullptr;for(auto scope=variable_scopes_.rbegin();scope!=variable_scopes_.rend();++scope){auto it=scope->find(root);if(it!=scope->end()){rb=&it->second;break;}}
-                if(rb&&rb->value->is_string()&&rb->value->string.rfind("\x1fnift:struct:",0)==0){auto inst=struct_instances_.find(rb->value->string.substr(13));if(inst==struct_instances_.end()){error="invalid struct instance";return false;}auto sd=structs_.find(inst->second->type_name);if(sd==structs_.end()){error="struct type is not available in this scope: "+inst->second->type_name;return false;}auto mi=sd->second.methods.find(mn);if((mi==sd->second.methods.end()||mi->second.constructor)){
+                if(rb&&rb->value->is_string()&&rb->value->string.rfind("\x1fnift:struct:",0)==0){auto inst=struct_instances_.find(rb->value->string.substr(13));if(inst==struct_instances_.end()){error="invalid struct instance";return false;}auto* sd=struct_definition_for(inst->second);if(!sd){error="struct type is not available in this scope: "+inst->second->type_name;return false;}auto mi=sd->methods.find(mn);if((mi==sd->methods.end()||mi->second.constructor)){
                 // A callable FIELD acts as a method (module-style values such as
                 // vips.resize(...)). Invoke the field's callable directly.
                 auto ff=inst->second->fields.find(mn);
                 if(ff!=inst->second->fields.end()&&ff->second.value&&ff->second.value->is_string()&&ff->second.value->string.rfind("\x1fnift:callable:",0)==0){
                     bool priv=false;
-                    for(const auto& field:sd->second.fields)if(field.name==mn){priv=field.private_member;break;}
+                    for(const auto& field:sd->fields)if(field.name==mn){priv=field.private_member;break;}
                     if(priv&&(receiver_stack_.empty()||receiver_stack_.back()!=inst->second)){error="private struct field: "+mn;return false;}
                     // Reconstruct a call that preserves quoted string arguments
                     // (parse_parameters strips quotes and unescapes; re-escape
@@ -2410,7 +2410,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     bool args_ok=false; std::vector<bool> q; auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),args_ok,&q);
                     auto ctor=si->second.methods.find(call_name); const std::size_t expected=ctor==si->second.methods.end()?0:ctor->second.callable.params.size();
                     if(!args_ok||args.size()!=expected){error="struct constructor argument count mismatch: "+call_name;return false;}
-                    auto instance=std::make_shared<StructInstance>(); instance->type_name=call_name;
+                    auto instance=std::make_shared<StructInstance>(); instance->type_name=call_name; instance->definition=std::make_shared<StructDefinition>(si->second);
                     auto initializer_env=enter_lexical_environment(si->second.module_env);
                     bool initializers_ok=true;
                     for(const auto& field:si->second.fields){ nift::RuntimeValue fv; if(!eval(field.initializer,fv,depth+1)){initializers_ok=false;break;} auto sp=std::make_shared<nift::RuntimeValue>(std::move(fv)); instance->fields.emplace(field.name,VariableBinding{sp,nift_binding_type_from_text(field.initializer,*sp),true,false}); }
@@ -2446,7 +2446,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         }
                     }
                 }
-                if(ci==callables_.end()&&!module_callee&&!receiver_stack_.empty()){auto sd=structs_.find(receiver_stack_.back()->type_name);if(sd!=structs_.end()){auto mi=sd->second.methods.find(call_name);if(mi!=sd->second.methods.end()&&!mi->second.constructor){std::vector<nift::RuntimeValue> av;std::vector<std::string> ar;if(!method_arguments(mi->second,av,ar))return false;return invoke_struct_method(receiver_stack_.back(),mi->second,av,ar,out,error);}}}
+                if(ci==callables_.end()&&!module_callee&&!receiver_stack_.empty()){auto* sd=struct_definition_for(receiver_stack_.back());if(sd){auto mi=sd->methods.find(call_name);if(mi!=sd->methods.end()&&!mi->second.constructor){std::vector<nift::RuntimeValue> av;std::vector<std::string> ar;if(!method_arguments(mi->second,av,ar))return false;return invoke_struct_method(receiver_stack_.back(),mi->second,av,ar,out,error);}}}
                 // An active module's callable is the lexical binding. Caller globals
                 // remain a fallback, and either still precedes an implicit sibling.
                 const Callable* callee = module_callee ? module_callee : ((ci != callables_.end()) ? &ci->second : nullptr);
@@ -2506,7 +2506,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             std::function<bool(const nift::RuntimeValue&,nift::RuntimeValue&)> clone;
             clone=[&](const nift::RuntimeValue& in,nift::RuntimeValue& dst)->bool{
                 if(in.is_string()&&in.string.rfind("\x1fnift:collection:",0)==0){auto it=collection_instances_.find(in.string.substr(17));if(it==collection_instances_.end()){error="deepcopy: invalid collection";return false;}auto nc=std::make_shared<CollectionInstance>();nc->kind=it->second->kind;for(const auto& v:it->second->values){nift::RuntimeValue cv;if(!clone(v,cv))return false;nc->values.push_back(std::move(cv));if(nc->kind==CollectionKind::Set||nc->kind==CollectionKind::SortedSet){std::string k=runtime_scalar_key(cv);if(!k.empty())nc->scalar_keys.insert(k);if(cv.type==nift::RuntimeType::StrNumber)nc->has_huge_int=true;}}for(const auto& e:it->second->entries){nift::RuntimeValue ck,cv;if(!clone(e.first,ck)||!clone(e.second,cv))return false;nc->entries.push_back({std::move(ck),std::move(cv)});if(nc->kind==CollectionKind::Map||nc->kind==CollectionKind::SortedMap){std::string kk=runtime_scalar_key(nc->entries.back().first);if(!kk.empty())nc->scalar_keys.insert(kk);if(nc->entries.back().first.type==nift::RuntimeType::StrNumber)nc->has_huge_int=true;}}const std::string id=std::to_string(next_collection_instance_id_++);collection_instances_[id]=nc;dst=nift::RuntimeValue(std::string("\x1fnift:collection:")+id);return true;}
-                if(in.is_string()&&in.string.rfind("\x1fnift:struct:",0)==0){const std::string old=in.string.substr(13);auto sit=seen.find(old);if(sit!=seen.end()){dst=nift::RuntimeValue(std::string("\x1fnift:struct:")+sit->second);return true;}auto it=struct_instances_.find(old);if(it==struct_instances_.end()){error="deepcopy: invalid struct instance";return false;}auto ni=std::make_shared<StructInstance>();ni->type_name=it->second->type_name;const std::string id=std::to_string(next_struct_instance_id_++);seen[old]=id;struct_instances_[id]=ni;for(const auto& f:it->second->fields){nift::RuntimeValue cv;if(!clone(*f.second.value,cv))return false;auto sp=std::make_shared<nift::RuntimeValue>(std::move(cv));ni->fields.emplace(f.first,VariableBinding{sp,f.second.type,f.second.mutable_binding,f.second.deep_readonly});}dst=nift::RuntimeValue(std::string("\x1fnift:struct:")+id);return true;}
+                if(in.is_string()&&in.string.rfind("\x1fnift:struct:",0)==0){const std::string old=in.string.substr(13);auto sit=seen.find(old);if(sit!=seen.end()){dst=nift::RuntimeValue(std::string("\x1fnift:struct:")+sit->second);return true;}auto it=struct_instances_.find(old);if(it==struct_instances_.end()){error="deepcopy: invalid struct instance";return false;}auto ni=std::make_shared<StructInstance>();ni->type_name=it->second->type_name;ni->definition=it->second->definition;const std::string id=std::to_string(next_struct_instance_id_++);seen[old]=id;struct_instances_[id]=ni;for(const auto& f:it->second->fields){nift::RuntimeValue cv;if(!clone(*f.second.value,cv))return false;auto sp=std::make_shared<nift::RuntimeValue>(std::move(cv));ni->fields.emplace(f.first,VariableBinding{sp,f.second.type,f.second.mutable_binding,f.second.deep_readonly});}dst=nift::RuntimeValue(std::string("\x1fnift:struct:")+id);return true;}
                 dst=in;if(in.is_array()){dst.array.clear();for(const auto& v:in.array){nift::RuntimeValue cv;if(!clone(v,cv))return false;dst.array.push_back(std::move(cv));}}else if(in.is_object()){dst.object.clear();for(const auto& e:in.object){nift::RuntimeValue cv;if(!clone(e.second,cv))return false;dst.object.emplace_back(e.first,std::move(cv));}}return true;
             };
             return clone(source,out);
@@ -3025,7 +3025,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 if(!rb&&!receiver_stack_.empty()){auto rf=receiver_stack_.back()->fields.find(root);if(rf!=receiver_stack_.back()->fields.end())rb=&rf->second;}
                 if(!rb||!rb->value->is_string()||rb->value->string.rfind("\x1fnift:struct:",0)!=0){error="member assignment requires a struct instance: "+root;return false;}
                 nift::RuntimeValue current=*rb->value;std::size_t mp=dot+1;std::shared_ptr<StructInstance> parent;std::string member;
-                while(mp<name.size()){std::size_t me=name.find('.',mp);member=name.substr(mp,me==std::string::npos?std::string::npos:me-mp);auto ii=struct_instances_.find(current.string.substr(13));if(ii==struct_instances_.end()){error="invalid struct instance";return false;}parent=ii->second;auto fit=parent->fields.find(member);if(fit==parent->fields.end()){error="struct has no field: "+member;return false;}auto sd=structs_.find(parent->type_name);bool priv=false;if(sd!=structs_.end())for(const auto& f:sd->second.fields)if(f.name==member){priv=f.private_member;break;}if(priv&&(receiver_stack_.empty()||receiver_stack_.back()!=parent)){error="private struct field: "+member;return false;}if(me==std::string::npos)break;current=*fit->second.value;if(!current.is_string()||current.string.rfind("\x1fnift:struct:",0)!=0){error="member path is not a struct: "+member;return false;}mp=me+1;}
+                while(mp<name.size()){std::size_t me=name.find('.',mp);member=name.substr(mp,me==std::string::npos?std::string::npos:me-mp);auto ii=struct_instances_.find(current.string.substr(13));if(ii==struct_instances_.end()){error="invalid struct instance";return false;}parent=ii->second;auto fit=parent->fields.find(member);if(fit==parent->fields.end()){error="struct has no field: "+member;return false;}auto* sd=struct_definition_for(parent);bool priv=false;if(sd)for(const auto& f:sd->fields)if(f.name==member){priv=f.private_member;break;}if(priv&&(receiver_stack_.empty()||receiver_stack_.back()!=parent)){error="private struct field: "+member;return false;}if(me==std::string::npos)break;current=*fit->second.value;if(!current.is_string()||current.string.rfind("\x1fnift:struct:",0)!=0){error="member path is not a struct: "+member;return false;}mp=me+1;}
                 auto fit=parent->fields.find(member);
                 nift::RuntimeValue assigned;if(!eval(text.substr(p+1),assigned,depth+1))return false;const int at=nift_binding_type_from_text(text.substr(p+1),assigned);if(!nift_type_assignable(at,fit->second.type)){error="cannot change struct field type: "+member;return false;}
                 if(assigned.is_string()&&(assigned.string.rfind("\x1fnift:struct:",0)==0||assigned.string.rfind("\x1fnift:collection:",0)==0)){std::string parent_id;for(const auto& e:struct_instances_)if(e.second==parent){parent_id=e.first;break;}if(reference_would_cycle(assigned.string,std::string("\x1fnift:struct:")+parent_id)){error="assignment would create a cyclic reference: "+member;return false;}}
@@ -3427,6 +3427,15 @@ bool Parser::evaluate_condition(const std::string& expression, bool& value, std:
     };
 
     return eval(expression, value);
+}
+
+const Parser::StructDefinition* Parser::struct_definition_for(const std::shared_ptr<StructInstance>& inst) const {
+    if (inst) {
+        if (inst->definition) return inst->definition.get();
+        const auto sd = structs_.find(inst->type_name);
+        if (sd != structs_.end()) return &sd->second;
+    }
+    return nullptr;
 }
 
 bool Parser::invoke_struct_method(std::shared_ptr<StructInstance> instance,

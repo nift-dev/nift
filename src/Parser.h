@@ -349,7 +349,17 @@ private:
     struct StructField { std::string name; std::string initializer; bool private_member = false; };
     struct StructMethod { Callable callable; bool private_member = false; bool constructor = false; };
     struct StructDefinition { std::string name; std::vector<StructField> fields; std::unordered_map<std::string, StructMethod> methods; std::shared_ptr<ModuleEnv> module_env; };
-    struct StructInstance { std::string type_name; std::unordered_map<std::string, VariableBinding> fields; };
+    struct StructInstance {
+        std::string type_name;
+        std::unordered_map<std::string, VariableBinding> fields;
+        // The StructDefinition an instance was created from (owned by its
+        // defining module when applicable). Dispatch resolves the definition
+        // through the instance so module-local and cross-package facades work
+        // without relying on the global name registry, which would collide
+        // when two modules define the same type name.
+        std::shared_ptr<StructDefinition> definition;
+    };
+    const StructDefinition* struct_definition_for(const std::shared_ptr<StructInstance>& inst) const;
     std::unordered_map<std::string, StructDefinition> structs_;
     std::unordered_map<std::string, std::shared_ptr<StructInstance>> struct_instances_;
     std::uint64_t next_struct_instance_id_ = 1;
