@@ -14,9 +14,6 @@ if(p.stdout.trim() != "HELLO") { return "bad pipeline" }
 setenv("NIFT_V44_ENV", "yes")
 e := run("sh", "-c", "printf $NIFT_V44_ENV")
 if(e.stdout.trim() != "yes") { return "bad env" }
-# A missing command reports POSIX 127 when launched (Unix execvp ENOENT); the
-# Windows CreateProcessW backend cannot launch it and reports a spawn failure
-# (launched=false + error). Both must produce empty stdout/stderr.
 missing := run("nift-command-does-not-exist-cp1")
 if(missing.stdout != "" || missing.stderr != "") { return "bad missing-command output" }
 if(missing.launched) {
