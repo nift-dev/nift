@@ -1292,7 +1292,7 @@ test-v44-language-foundation: $(TARGET) $(PARSER_STATEMENT_STATE_TEST)
 # the package tests can run with NIFT and the sibling sqlite package injected.
 # autoconf exit 77 (platform skip) from a v44 test is an acknowledged skip,
 # not a failure: POSIX-only tests report it on platforms without the facility.
-V44_SKIP_77 := ; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped: platform lacks facility)"; else exit $$st; fi
+V44_SKIP_77 := ; st=$$?; if [ $$st -eq 77 ]; then echo "  (skipped)"; else exit $$st; fi
 PORTABLE_TIMEOUT ?= python3 -c "import subprocess,sys; subprocess.call(sys.argv[1:], timeout=120)"
 
 test-v44-shell-restricted: $(TARGET)

@@ -227,6 +227,52 @@ def main():
             if imported_value(site, "a") != "a1":
                 fail(f"crash seam {seam}: recovered graph import failed")
 
+        # ---- 7b. real graph update crash recovery (root -> a -> b, b moves) ----
+        btu2 = make_repo(tmp / "su1", "b", "u1")
+        atu2 = make_repo(tmp / "su2", "a", "ua", deps={"b": {"source": f"file://{btu2}", "ref": "latest"}}, entry_import="b")
+        site = tmp / "siteupd"; (site / ".nift").mkdir(parents=True)
+        (site / "manifest.json").write_text('{"dependencies":{}}\n')
+        run(site, "add", f"file://{atu2}")
+        b_before = lock_doc(site)["packages"]["b"]["commit"]
+        (btu2 / "src/main.f").write_text('v_b := "u2"\nexport(v_b)\n')
+        git(btu2, "add", "."); git(btu2, "commit", "-qm", "b2")
+        b_after = subprocess.check_output(["git", "-C", str(btu2), "rev-parse", "HEAD"], text=True).strip()
+        # crash during the full graph update (replaces b within the graph)
+        run(site, "update", env={"NIFT_TEST_PACKAGE_TXN_CRASH": "after-journal"}, ok=False)
+        run(site, "install")  # recovery
+        doc = lock_doc(site)
+        if doc["packages"]["b"]["commit"] != b_after:
+            fail("graph update recovery did not land on the new b commit")
+        names = sorted(p.name for p in (site / ".nift/packages").iterdir())
+        if names != ["a", "b"]:
+            fail("graph update recovery missing nodes: " + str(names))
+        if imported_value(site, "a") != "ua":
+            fail("graph update recovery import failed")
+        if (site / ".nift/package-transaction.json").exists():
+            fail("graph update recovery left a journal")
+        if any(p.name.startswith(".txn-") for p in (site / ".nift/packages").iterdir()):
+            fail("graph update recovery left staging")
+
+        # ---- 7c. transitive-orphan removal crash recovery (root -> a -> b) ----
+        site = tmp / "siteorph"; (site / ".nift").mkdir(parents=True)
+        (site / "manifest.json").write_text('{"dependencies":{}}\n')
+        orp = make_repo(tmp / "so1", "b", "ob")
+        ora = make_local(tmp / "so2", "a", "oa", deps={"b": {"source": f"file://{orp}", "ref": "latest"}}, entry_import="b")
+        run(site, "add", str(ora))
+        run(site, "remove", "a", env={"NIFT_TEST_PACKAGE_TXN_CRASH": "after-backup"}, ok=False)
+        run(site, "install", ok=False)  # recover; manifest has no deps so install reports it
+        manifest = json.loads((site / "manifest.json").read_text(encoding="utf-8"))
+        if "a" in manifest.get("dependencies", {}):
+            fail("orphan-removal recovery kept a in the manifest")
+        if lock_doc(site)["packages"] != {}:
+            fail("orphan-removal recovery did not empty the graph lock")
+        if (site / ".nift/packages").exists() and any((site / ".nift/packages").iterdir()):
+            fail("orphan-removal recovery left installed packages")
+        if (site / ".nift/package-transaction.json").exists():
+            fail("orphan-removal recovery left a journal")
+        if (site / ".nift/packages").exists() and any(p.name.startswith(".txn-") for p in (site / ".nift/packages").iterdir()):
+            fail("orphan-removal recovery left staging")
+
         # ---- 7. read-only v1 is not rewritten (runtime import) ----
         site = tmp / "site7"; (site / ".nift").mkdir(parents=True)
         pkg = make_local(tmp / "s7", "mig3", "m3")

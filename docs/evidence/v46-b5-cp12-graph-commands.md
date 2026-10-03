@@ -108,20 +108,20 @@ fail only because of that uncommitted self-reference.
 
 ## Real v2 crash/recovery seam matrix
 
-`tests/v46_b5_cp12_graph_commands.py` exercises a **multi-node (2-node)
-graph install** with a real v2 journal across every recovery seam, plus the
-existing transaction smoke for single-package operations:
+`tests/v46_b5_cp12_graph_commands.py` exercises three real graph operations
+with real v2 journals:
 
 | Seam | Graph operation | Recovery result |
 | --- | --- | --- |
-| after-journal | install of a 2-node git graph (store wiped first) | recovered full graph (a + b), import works |
-| after-backup | install of a 2-node git graph | recovered full graph |
-| after-promote | install of a 2-node git graph | recovered full graph |
-| after-manifest | install of a 2-node git graph | recovered full graph |
-| after-lock | install of a 2-node git graph | recovered full graph |
-| during-cleanup | install of a 2-node git graph | recovered full graph |
-| after-journal | single-package update (replace), existing transaction smoke | recovered updated slot |
-| after-backup | single-package remove (orphan), existing transaction smoke | recovered removal |
+| after-journal / after-backup / after-promote / after-manifest / after-lock / during-cleanup | **multi-node (2-node) graph install** (store wiped first) | full graph (a + b) recovered; import works — every seam |
+| after-journal | **graph update replacing a node** (root -> a -> b; b moves B1 -> B2; `nift update`) | full graph on the new b commit; a + b present; import works; journal + staging cleaned |
+| after-backup | **transitive-orphan removal** (root -> a -> b; `nift remove a`) | manifest without a; v2 lock `packages == {}`; a and b both absent; journal + staging cleaned |
+| after-journal | single-package update (replace) — existing transaction smoke | recovered updated slot |
+| after-backup | single-package remove — existing transaction smoke | recovered removal |
+
+Graph-specific recovery asserts exact node identities (not just file existence):
+the v2 lock's commit agrees with the installed package, and for the update case
+the recovered graph lands on the new b commit while a and b both remain.
 
 All recoveries reach one defined atomic state (old or new manifest+lock+store),
 never a mixture; journal stays version 1.
@@ -132,12 +132,12 @@ The CP12 production delta touched `Parser.cpp`, `ParserScript.cpp`,
 `PackageTransaction.cpp`, `CLI.cpp`, `PackageGraphResolver.h`,
 `PackageGraphLock.h`, and `PackageGraphCommands.h`. No dedicated package-command
 sanitizer target exists; the closest maintained runtime sanitizer surface that
-exercises these paths is the ASan/UBSan concurrency gate (`make
-test-v45-concurrency-sanitize`, which builds the sanitizer binary from these
-sources with leak detection + halt_on_error and runs async/thread/mutex/atomics/
-adversarial walls) plus the sanitizer-built `nift-sanitize` binary running the
-package import/provenance and worker-ownership smoke walls. See the CP12
-follow-up evidence for the exact run result.
+exercises these paths is the ASan/UBSan `nift-sanitize` binary (leak detection +
+`halt_on_error`) running the full CP12 graph-command E2E plus the import-source
+recoverable, relative-import ownership, worker package ownership, and import/
+module projection walls — all PASS. The CP12b follow-up is test/evidence-only;
+the production tree is byte-identical to the sanitized `3741302` tree, so no
+sanitizer rerun was required.
 
 ## Wall
 
@@ -157,3 +157,9 @@ callable/provenance, Batch 3 relative-import/provenance, Batch 4 package/import
 recoverability, worker package ownership, package transaction/recovery smoke,
 v2 recovery smoke, recovery-epoch resource wall, and the aggregate
 CP1..CP11 gates.
+
+Gate count (from the existing `test-v46-b5-cp12` log): **957 `PASS|passed`
+lines**, **17 case-insensitive "skipped" markers** (of which **4 are the
+explicit `SKIP` sqlite lines**: 2 `package_sqlite_dogfood` + 2
+`package_combined_dogfood` across the aggregate chain), full gate **exit 0**.
+The sqlite skips are the documented dirty-worktree exclusions.
