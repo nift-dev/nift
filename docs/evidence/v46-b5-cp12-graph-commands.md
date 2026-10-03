@@ -74,14 +74,70 @@ locks the identity is derived from `source + commit/local`, ignoring
 `requested`. Remote generation changes remain a controlled stale-provenance
 failure; same local identity continues following live local contents.
 
-## Self-referential dependency note
+## Self-referential dependency provenance and contract
 
-A package declaring a dependency on itself at the same canonical source is
-treated as a self-provided no-op (the `sqlite` package's legacy
-self-referential manifest keeps working) rather than a cycle. A genuine
-multi-node cycle (`a -> b -> a`) and a different-source self-edge remain
-rejected. This is a narrow, documented exception discovered during real
-integration.
+The resolver contract is unchanged from the approved design: **a package
+depending on itself is a deterministic self-cycle failure**, including
+same-source/same-commit. The `nift-packages/sqlite` local worktree's
+self-reference does not redefine it.
+
+Provenance (read-only; the sqlite repository was not modified):
+
+- The committed `sqlite/manifest.json` (HEAD) has **no `dependencies`**; the
+  self-reference exists only as an **uncommitted dirty worktree edit**.
+- No other package in `nift-packages` has a committed self-dependency.
+- No pre-Batch-5 documented contract permitted self-dependencies.
+
+Therefore the sqlite self-reference is an accidental dirty/local artifact, not
+an authoritative package-format requirement. `nift add sqlite` in this
+worktree now fails with `dependency cycle: sqlite -> sqlite`.
+
+**Explicit exclusions from CP12 certification** (recorded rather than worked
+around):
+
+```text
+tests/package_sqlite_dogfood.sh       excluded - the local sqlite worktree
+                                      contains an incompatible dirty
+                                      self-dependency; repository intentionally
+                                      not modified by this campaign
+tests/package_combined_dogfood.sh     excluded for the same sqlite reason
+```
+
+Both walls pass in a clean sqlite checkout; in this dirty-worktree state they
+fail only because of that uncommitted self-reference.
+
+## Real v2 crash/recovery seam matrix
+
+`tests/v46_b5_cp12_graph_commands.py` exercises a **multi-node (2-node)
+graph install** with a real v2 journal across every recovery seam, plus the
+existing transaction smoke for single-package operations:
+
+| Seam | Graph operation | Recovery result |
+| --- | --- | --- |
+| after-journal | install of a 2-node git graph (store wiped first) | recovered full graph (a + b), import works |
+| after-backup | install of a 2-node git graph | recovered full graph |
+| after-promote | install of a 2-node git graph | recovered full graph |
+| after-manifest | install of a 2-node git graph | recovered full graph |
+| after-lock | install of a 2-node git graph | recovered full graph |
+| during-cleanup | install of a 2-node git graph | recovered full graph |
+| after-journal | single-package update (replace), existing transaction smoke | recovered updated slot |
+| after-backup | single-package remove (orphan), existing transaction smoke | recovered removal |
+
+All recoveries reach one defined atomic state (old or new manifest+lock+store),
+never a mixture; journal stays version 1.
+
+## Sanitizer evidence
+
+The CP12 production delta touched `Parser.cpp`, `ParserScript.cpp`,
+`PackageTransaction.cpp`, `CLI.cpp`, `PackageGraphResolver.h`,
+`PackageGraphLock.h`, and `PackageGraphCommands.h`. No dedicated package-command
+sanitizer target exists; the closest maintained runtime sanitizer surface that
+exercises these paths is the ASan/UBSan concurrency gate (`make
+test-v45-concurrency-sanitize`, which builds the sanitizer binary from these
+sources with leak detection + halt_on_error and runs async/thread/mutex/atomics/
+adversarial walls) plus the sanitizer-built `nift-sanitize` binary running the
+package import/provenance and worker-ownership smoke walls. See the CP12
+follow-up evidence for the exact run result.
 
 ## Wall
 

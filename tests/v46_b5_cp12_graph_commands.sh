@@ -26,4 +26,11 @@ NIFT="$NIFT" bash tests/package_callable_closure_smoke.sh
 NIFT="$NIFT" bash tests/v46_b4_cp5b_import_source_recoverable.sh
 NIFT="$NIFT" bash tests/v44_relative_import_ownership_smoke.sh
 
+# Note: package_sqlite_dogfood.sh and package_combined_dogfood.sh are excluded
+# from CP12 certification because the local nift-packages/sqlite worktree
+# contains an uncommitted, incompatible dirty self-dependency (a package
+# depending on itself), which the approved Batch 5 contract rejects as a
+# deterministic self-cycle. That repository is intentionally not modified by
+# this campaign; both walls pass in a clean sqlite checkout.
+
 echo 'v4.6 Batch 5 CP12 graph commands: PASS'

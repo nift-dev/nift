@@ -243,15 +243,6 @@ inline bool resolve_graph(const package_metadata::Manifest& root_manifest,
             }
             for (const auto& dep : manifest.dependencies) {
                 Requirement child{dep.first, dep.second.source, dep.second.ref, manifest_dir};
-                if (dep.first == req.name) {
-                    // A package declaring a dependency on itself at the same
-                    // canonical source is self-provided: it adds no external
-                    // requirement, so it is a no-op rather than a cycle. A
-                    // genuine multi-node cycle (a -> b -> a) is still rejected.
-                    std::string self_error;
-                    const std::string self_canonical = detail::canonical_source(child, self_error);
-                    if (self_error.empty() && self_canonical == canonical) continue;
-                }
                 node.requirements[dep.first] =
                     GraphRequirement{dep.second.source, dep.second.ref};
                 if (!dfs(child, incoming_path, true, err)) {

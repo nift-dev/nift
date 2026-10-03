@@ -209,6 +209,24 @@ def main():
         if (site / ".nift/packages.lock.json").read_text(encoding="utf-8").find("lockfileVersion") != -1:
             fail("failed operation migrated a v1 lock")
 
+        # ---- 7a. crash/recovery across a real multi-node v2 graph operation ----
+        for seam in ("after-journal", "after-backup", "after-promote", "after-manifest", "after-lock", "during-cleanup"):
+            site = tmp / f"sitecrash-{seam}"; (site / ".nift").mkdir(parents=True)
+            (site / "manifest.json").write_text('{"dependencies":{}}\n')
+            crm = make_repo(tmp / f"sc-{seam}", "a", "a1",
+                            deps={"b": {"source": f"file://{b_repo}", "ref": b1}}, entry_import="b")
+            run(site, "add", f"file://{crm}")
+            # wipe the store, then crash during a fresh install of the 2-node graph
+            shutil.rmtree(site / ".nift/packages")
+            run(site, "install", env={"NIFT_TEST_PACKAGE_TXN_CRASH": seam}, ok=False)
+            # recovery on a subsequent install must reach the full graph
+            run(site, "install")
+            names = sorted(p.name for p in (site / ".nift/packages").iterdir())
+            if names != ["a", "b"]:
+                fail(f"crash seam {seam}: recovery did not rebuild the full graph: {names}")
+            if imported_value(site, "a") != "a1":
+                fail(f"crash seam {seam}: recovered graph import failed")
+
         # ---- 7. read-only v1 is not rewritten (runtime import) ----
         site = tmp / "site7"; (site / ".nift").mkdir(parents=True)
         pkg = make_local(tmp / "s7", "mig3", "m3")
