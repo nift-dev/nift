@@ -184,6 +184,110 @@ def main():
         if diag1n != diag2n:
             fail("conflict determinism: diagnostics differ across equivalent fixtures")
 
+    # ---- 6. targeted-update determinism (compatible shared node) ----
+        bd = make_repo(tmp / "tb", "b", "b1")
+        ad = make_repo(tmp / "ta", "a", "a1", deps={"b": {"source": f"file://{bd}", "ref": "latest"}}, entry_import="b")
+        cd = make_repo(tmp / "tc", "c", "c1", deps={"b": {"source": f"file://{bd}", "ref": "latest"}}, entry_import="b")
+
+        def targeted_update(mk):
+            s = mk()
+            run(s, "add", f"file://{ad}")
+            run(s, "add", f"file://{cd}")
+            out = run(s, "update", "a").stdout
+            manifest = (s / "manifest.json").read_text(encoding="utf-8")
+            lock = lock_text(s)
+            nodes = sorted(p.name for p in (s / ".nift/packages").iterdir())
+            return {"out": out, "manifest": manifest, "lock": lock, "nodes": nodes}
+
+        t1 = targeted_update(lambda: fresh_site(tmp, "tu1"))
+        t2 = targeted_update(lambda: fresh_site(tmp, "tu2"))
+        for key in ("out", "manifest", "lock", "nodes"):
+            if t1[key] != t2[key]:
+                fail(f"targeted-update determinism: {key} differs")
+
+        # ---- 7. remove/orphan-cleanup determinism ----
+        def do_remove(mk):
+            s = mk()
+            run(s, "add", f"file://{ad}")
+            run(s, "add", f"file://{cd}")
+            # remove a: b retained because c still reaches it
+            run(s, "remove", "a")
+            mid_manifest = (s / "manifest.json").read_text(encoding="utf-8")
+            mid_lock = lock_text(s)
+            mid_nodes = sorted(p.name for p in (s / ".nift/packages").iterdir())
+            # remove c: b becomes orphaned and is removed
+            run(s, "remove", "c")
+            final_manifest = (s / "manifest.json").read_text(encoding="utf-8")
+            final_lock = lock_text(s)
+            final_nodes = sorted(p.name for p in (s / ".nift/packages").iterdir())
+            return {"mid_manifest": mid_manifest, "mid_lock": mid_lock, "mid_nodes": mid_nodes,
+                    "final_manifest": final_manifest, "final_lock": final_lock, "final_nodes": final_nodes}
+
+        r1 = do_remove(lambda: fresh_site(tmp, "rm1"))
+        r2 = do_remove(lambda: fresh_site(tmp, "rm2"))
+        for key in r1:
+            if r1[key] != r2[key]:
+                fail(f"remove determinism: {key} differs")
+        if r1["mid_nodes"] != ["b", "c"] or "b" not in r1["mid_nodes"]:
+            fail("remove determinism: shared b was not retained while reachable")
+        if "b" in r1["final_nodes"]:
+            fail("remove determinism: orphan b was not removed")
+
+        # ---- 8. missing transitive local source failure immutability ----
+        lb = make_local(tmp / "lb", "b", "b1")
+        la = make_local(tmp / "la", "a", "a1", deps={"b": {"source": str(lb), "ref": "local"}})
+        site = fresh_site(tmp, "missrc")
+        run(site, "add", str(la))
+        m_before = (site / "manifest.json").read_text(encoding="utf-8")
+        l_before = lock_text(site)
+        store_before = sorted(p.name for p in (site / ".nift/packages").iterdir())
+        # delete b's source so graph re-resolution cannot load its manifest
+        shutil.rmtree(lb)
+        res = run(site, "update", ok=False)
+        if res.returncode == 0:
+            fail("missing-transitive-source: update unexpectedly succeeded")
+        if (site / "manifest.json").read_text(encoding="utf-8") != m_before:
+            fail("missing-transitive-source: update mutated the manifest")
+        if lock_text(site) != l_before:
+            fail("missing-transitive-source: update mutated the lock")
+        if sorted(p.name for p in (site / ".nift/packages").iterdir()) != store_before:
+            fail("missing-transitive-source: update mutated the store")
+        if any(p.name.startswith(".txn-") for p in (site / ".nift/packages").iterdir()):
+            fail("missing-transitive-source: update left partial staging")
+
+        # ---- 9. conflict determinism: different source ----
+        bS1 = make_repo(tmp / "cs1", "b", "b1")
+        bS2 = make_repo(tmp / "cs2", "b", "b1")
+        aS1 = make_repo(tmp / "csa", "a", "a1", deps={"b": {"source": f"file://{bS1}", "ref": "latest"}}, entry_import="b")
+        cS2 = make_repo(tmp / "csc", "c", "c1", deps={"b": {"source": f"file://{bS2}", "ref": "latest"}}, entry_import="b")
+
+        def diff_source_diag(mk):
+            s = mk()
+            run(s, "add", f"file://{aS1}")
+            return run(s, "add", f"file://{cS2}", ok=False).stderr.replace(str(tmp), "TMP")
+
+        if diff_source_diag(lambda: fresh_site(tmp, "ds1")) != diff_source_diag(lambda: fresh_site(tmp, "ds2")):
+            fail("conflict determinism: different-source diagnostics differ")
+
+        # ---- 10. conflict determinism: targeted-update shared-node conflict ----
+        bt = make_repo(tmp / "tsb", "b", "b1")
+        at = make_repo(tmp / "tsa", "a", "a1", deps={"b": {"source": f"file://{bt}", "ref": "latest"}}, entry_import="b")
+        ct = make_repo(tmp / "tsc", "c", "c1", deps={"b": {"source": f"file://{bt}", "ref": "latest"}}, entry_import="b")
+
+        def targeted_conflict(mk):
+            s = mk()
+            run(s, "add", f"file://{at}")
+            run(s, "add", f"file://{ct}")
+            return run(s, "update", "a", ok=False).stderr.replace(str(tmp), "TMP")
+
+        # advance b once (shared repo) so a's latest re-resolves to B2 while
+        # preserved c stays pinned at B1
+        (bt / "src/main.f").write_text('v_b := "b2"\nexport(v_b)\n')
+        git(bt, "add", "."); git(bt, "commit", "-qm", "b2")
+
+        if targeted_conflict(lambda: fresh_site(tmp, "tc1")) != targeted_conflict(lambda: fresh_site(tmp, "tc2")):
+            fail("conflict determinism: targeted-update conflict diagnostics differ")
+
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     if failures:

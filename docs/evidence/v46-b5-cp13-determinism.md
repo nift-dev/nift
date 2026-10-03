@@ -171,7 +171,54 @@ Local packages are **not** content-reproducible across machines, and locked
 install is **not** a general global-cache/offline-artifact guarantee — the
 evidence does not claim either.
 
+## CP13b — completed determinism and failure-state certification
+
+`tests/v46_b5_cp13a_certification.py` additionally closes the three remaining
+gaps:
+
+- **Targeted-update determinism:** `nift update <root>` (compatible shared
+  node, diamond `root -> {a -> b, c -> b}`) executed from two equivalent
+  independently-created projects yields identical stdout, byte-identical
+  manifest and v2 lock, identical installed node identities, and the unrelated
+  root `c` stays pinned.
+- **Remove/orphan-cleanup determinism:** `nift remove a` then `nift remove c`
+  from two equivalent starting states yield byte-identical resulting
+  manifest/lock and identical installed-node sets; shared `b` is retained
+  while `c` still reaches it and is removed as an orphan when it no longer
+  is.
+- **Missing transitive local source immutability:** a valid project
+  `root -> a -> b` (b from a local path) with the local source then absent:
+  `nift update` fails with a nonzero exit, and the manifest bytes, lock bytes,
+  installed-store identities, and staging are all unchanged (no partial
+  publication).
+- **Conflict determinism, completed:** same-name/different-source and
+  targeted-update shared-node conflict diagnostics are compared across
+  equivalent fixtures (only the temp-root prefix normalized) and are
+  identical, alongside the already-covered same-name/same-source/
+  different-commit case.
+
+### Final failure-immutability mapping
+
+| Case | Proving fixture (manifest/lock/store unchanged) |
+| --- | --- |
+| conflict (same name, different commit) | `v46_b5_cp13_determinism.py` (add) + CP12 E2E |
+| conflict (same name, different source) | `v46_b5_cp13a_certification.py` section 9 |
+| targeted-update shared-node conflict | `v46_b5_cp13a_certification.py` section 10 |
+| cycle (self + multi-node) | `v46_b5_cp13a_certification.py` (self-cycle add) + CP12 E2E |
+| malformed transitive manifest | CP12 E2E + resolver unit (provider load failure) |
+| unknown ref | `v46_b5_cp13a_certification.py` (bad-ref add) |
+| missing transitive local source | `v46_b5_cp13a_certification.py` section 8 |
+| package-name mismatch | CP12 E2E + resolver unit |
+
+Each command-level case asserts nonzero exit plus byte-identical manifest and
+lock and unchanged installed-store identities; resolver-unit cases are
+referenced only where a published store is not involved.
+
 ## Wall
+
+```sh
+make test-v46-b5-cp13
+```
 
 ```sh
 make test-v46-b5-cp13
