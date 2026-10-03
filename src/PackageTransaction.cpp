@@ -280,7 +280,8 @@ bool PackageTransaction::commit(const std::vector<Operation>& operations,
     journal["version"] = json::Document(1);
     journal["transaction"] = json::Document(staging_root_.filename().string());
     journal["operations"] = json::Document::make_array();
-    if(sorted.empty()){error="package transaction has no operations";return false;}
+    // An empty operation list is a metadata-only publication (manifest + lock),
+    // e.g. a no-op install or a v1->v2 lock migration with no store changes.
     for (const auto& operation : sorted) {
         if (!filesystem::valid_package_name(operation.name) || !names.insert(operation.name).second) { error = "invalid or duplicate package transaction operation"; return false; }
         if (operation.kind == Kind::Replace && !exists_no_follow(staging_root_/"new"/operation.name)) { error = "staged package is missing: " + operation.name; return false; }
@@ -358,7 +359,7 @@ bool PackageTransaction::apply_journal(const json::Document& journal, std::strin
         if((kind==Kind::Replace&&(desired_lock==lock.end()||desired_lock->second.commit!=value["commit"].string))||(kind==Kind::Remove&&(desired_lock!=lock.end()||value["commit"].string!="removed"))){error="package transaction operation does not match desired lock";return false;}
         operations.push_back({value["name"].string,kind,value["hadOld"].boolean,value["commit"].string});
     }
-    if(operations.empty()){error="package transaction has no operations";return false;}
+    // Empty operations are a metadata-only journal (manifest + lock only).
     std::sort(operations.begin(), operations.end(), [](const ParsedOperation& a, const ParsedOperation& b) { return a.name < b.name; });
     const fs::path transaction_root = package_root_/journal["transaction"].string;
     if (transaction_root.parent_path() != package_root_) { error = "package transaction path escapes the package store"; return false; }

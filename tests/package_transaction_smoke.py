@@ -98,7 +98,7 @@ with tempfile.TemporaryDirectory() as raw:
         run(case, "install")
         assert expected_value in installed_value(case), seam
         lock = json.loads((case / ".nift/packages.lock.json").read_text(encoding="utf-8"))
-        assert lock["demo"]["commit"] == latest
+        assert lock["lockfileVersion"] == 2 and lock["packages"]["demo"]["commit"] == latest
         assert_clean(case)
 
     # Removal also rolls forward, even though the recovered manifest has no
@@ -175,7 +175,6 @@ with tempfile.TemporaryDirectory() as raw:
     journal_path.write_text(json.dumps(journal, indent=2) + "\n", encoding="utf-8")
     rejected = run(incomplete, "install", ok=False)
     assert rejected.returncode != 0
-    assert "no operations" in rejected.stderr
     assert installed_value(incomplete) == old_value
 
     # Recovery revalidates staged content before displacing the last-good slot.

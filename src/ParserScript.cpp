@@ -1,6 +1,7 @@
 #include "Parser.h"
 #include "ParserHelpers.h"
 #include "JsonFile.h"
+#include "PackageGraphLock.h"
 #include "PackageMetadata.h"
 #include "PackageTransaction.h"
 #include "Console.h"
@@ -448,17 +449,14 @@ bool Parser::execute_import_file(const std::string& argument, const fs::path& ca
         path=(root/manifest.entry).lexically_normal();
         if(!filesystem::path_within(root,path)){fail_fatal(nift::detail::DiagnosticCode::PackageManifestInvalid,"package entry escapes the package directory: "+manifest.entry,error);if(active_diagnostic_)active_diagnostic_->frames.push_back({nift::detail::DiagnosticFrameKind::Import,root.generic_string(),{},legacy_syntax?"@import: ":"import: "});return false;}
         if (manifest.name != argument) { error="installed package name does not match import: "+argument; return false; }
-        package_metadata::Manifest project_manifest;package_metadata::Lock lock;bool lock_exists=false;
-        if(!package_metadata::load_manifest(project/"manifest.json",false,project_manifest,error)||
-           !package_metadata::load_lock(project/".nift"/"packages.lock.json",lock,lock_exists,error)||!lock_exists||
-           !package_metadata::validate_lock(project_manifest,lock,error)){if(error.empty())error="package lock is missing";return false;}
-        const auto locked=lock.find(argument);if(locked==lock.end()){error="package lock is missing dependency: "+argument;return false;}
+        std::string locked_source,locked_commit;bool locked_found=false;
+        if(!package_graph::lock_node_identity(project/".nift"/"packages.lock.json",argument,locked_source,locked_commit,locked_found,error)||!locked_found){if(error.empty())error="package lock is missing dependency: "+argument;return false;}
         package_provenance=std::make_shared<const PackageProvenance>(PackageProvenance{
-            project,root,argument,locked->second.source,locked->second.requested,locked->second.commit});
-        if(locked->second.commit!="local"){
+            project,root,argument,locked_source,locked_commit});
+        if(locked_commit!="local"){
             const auto head=filesystem::read_file_checked(root/".git"/"HEAD");std::string revision=head.value_or(std::string());
             while(!revision.empty()&&(revision.back()=='\n'||revision.back()=='\r'))revision.pop_back();
-            if(revision!=locked->second.commit){error="installed package revision does not match package lock: "+argument;return false;}
+            if(revision!=locked_commit){error="installed package revision does not match package lock: "+argument;return false;}
         }
         package_root=root;
     } else if(path.is_relative()) {

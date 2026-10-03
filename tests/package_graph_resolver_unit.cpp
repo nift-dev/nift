@@ -186,15 +186,29 @@ int main() {
         CHECK(out.graph.packages.count("foo") && out.graph.packages.count("bar"));
     }
 
-    // ---- self-cycle a -> a ----
+    // ---- same-source self-edge a -> a is a self-provided no-op ----
+    // (keeps the sqlite package's self-referential local manifest working)
     {
         FakeProvider p;
         p.manifests["a"] = make_manifest("a", {{"a", {"github:org/a", "latest"}}});
         p.ref_commits[{"https://github.com/org/a.git", "latest"}] = "X";
         package_graph::ResolveOutcome out; std::string error;
+        CHECK(resolve(root_manifest({{"a", {"github:org/a", "latest"}}}), root_dir,
+                      package_graph::ResolveMode::ResolveUpdate, nullptr, nullptr, p, out, error));
+        CHECK(out.graph.packages.size() == 1);
+        CHECK(out.graph.packages.at("a").requirements.empty());
+    }
+
+    // ---- different-source self-edge a -> a (from elsewhere) is a conflict ----
+    {
+        FakeProvider p;
+        p.manifests["a"] = make_manifest("a", {{"a", {"github:other/a", "latest"}}});
+        p.ref_commits[{"https://github.com/org/a.git", "latest"}] = "X";
+        p.ref_commits[{"https://github.com/other/a.git", "latest"}] = "X";
+        package_graph::ResolveOutcome out; std::string error;
         CHECK(!resolve(root_manifest({{"a", {"github:org/a", "latest"}}}), root_dir,
                        package_graph::ResolveMode::ResolveUpdate, nullptr, nullptr, p, out, error));
-        CHECK(error.find("cycle") != std::string::npos);
+        CHECK(error.find("cycle") != std::string::npos || error.find("conflict") != std::string::npos);
     }
 
     // ---- multi-node cycle a -> b -> a with deterministic path ----

@@ -5,6 +5,7 @@
 #include "FrontMatter.h"
 #include "FileSystem.h"
 #include "Json.h"
+#include "PackageGraphLock.h"
 #include "PackageMetadata.h"
 #include "PackageTransaction.h"
 
@@ -524,12 +525,10 @@ bool Parser::acquire_package_read(const std::shared_ptr<const PackageProvenance>
     reader = std::make_unique<PackageTransaction>(provenance->project_root);
     if (!reader->acquire_read(error)) return false;
 
-    package_metadata::Lock lock;
-    bool lock_exists = false;
-    if (!package_metadata::load_lock(provenance->project_root/".nift"/"packages.lock.json", lock, lock_exists, error)) return false;
-    const auto found = lock.find(provenance->name);
-    if (!lock_exists || found == lock.end() || found->second.source != provenance->source ||
-        found->second.requested != provenance->requested || found->second.commit != provenance->commit) {
+    std::string locked_source, locked_commit; bool locked_found = false;
+    if (!package_graph::lock_node_identity(provenance->project_root/".nift"/"packages.lock.json",
+                                           provenance->name, locked_source, locked_commit, locked_found, error)) return false;
+    if (!locked_found || locked_source != provenance->source || locked_commit != provenance->commit) {
         error = "stale package ownership: package '" + provenance->name + "' lock provenance changed";
         return false;
     }

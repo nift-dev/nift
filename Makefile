@@ -1462,7 +1462,10 @@ test-v46-b5-cp10: test-v46-b4-cp9
 test-v46-b5-cp11: test-v46-b5-cp10
 	bash tests/v46_b5_cp11_resolver.sh
 
-.PHONY: test-v46-b4-cp2 test-v46-b4-cp3 test-v46-b4-pre-cp4 test-v46-b4-cp4a test-v46-b4-cp4b test-v46-b4-cp4b-stream-operators test-v46-b4-cp4c test-v46-b4-cp5a test-v46-b4-cp6 test-v46-b4-cp5b test-v46-b4-cp7 test-v46-b4-cp8 test-v46-b4-cp9 test-v46-b5-cp10 test-v46-b5-cp11
+test-v46-b5-cp12: test-v46-b5-cp11
+	bash tests/v46_b5_cp12_graph_commands.sh
+
+.PHONY: test-v46-b4-cp2 test-v46-b4-cp3 test-v46-b4-pre-cp4 test-v46-b4-cp4a test-v46-b4-cp4b test-v46-b4-cp4b-stream-operators test-v46-b4-cp4c test-v46-b4-cp5a test-v46-b4-cp6 test-v46-b4-cp5b test-v46-b4-cp7 test-v46-b4-cp8 test-v46-b4-cp9 test-v46-b5-cp10 test-v46-b5-cp11 test-v46-b5-cp12
 
 test-v46-relative-imports: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" bash tests/v44_relative_import_ownership_smoke.sh

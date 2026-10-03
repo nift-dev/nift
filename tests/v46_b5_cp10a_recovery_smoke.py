@@ -117,6 +117,7 @@ def main():
         for label, bad_lock in cases.items():
             case = tmp / label
             site2, pkg2 = setup(case, "old")
+            before_lock = (site2 / ".nift/packages.lock.json").read_text(encoding="utf-8")
             build_v2_journal(site2, pkg2, bad_lock)
             (case / "bad").mkdir()  # a valid dir lacking a manifest: add reaches acquire/recovery
             res = run(site2, "add", str(case / "bad"), ok=False)
@@ -126,8 +127,8 @@ def main():
                 print(f"FAIL: {label} recovery mutated the store"); failures += 1
             if not (site2 / ".nift/package-transaction.json").exists():
                 print(f"FAIL: {label} recovery cleaned an unapplied journal"); failures += 1
-            if lock_doc(site2).get("lockfileVersion") is not None:
-                print(f"FAIL: {label} recovery published a lock"); failures += 1
+            if (site2 / ".nift/packages.lock.json").read_text(encoding="utf-8") != before_lock:
+                print(f"FAIL: {label} recovery modified the lock"); failures += 1
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     if failures:

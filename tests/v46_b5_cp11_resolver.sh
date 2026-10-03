@@ -23,8 +23,8 @@ printf '{"name":"demo","version":"0.1.0","entry":"src/main.f"}\n' > "$TMP/pkg/ma
 printf 'fn(demo_hello()) { return 42 }\nexport(demo_hello)\n' > "$TMP/pkg/src/main.f"
 printf '{"dependencies":{}}\n' > "$TMP/site/manifest.json"
 (cd "$TMP/site" && "$NIFT" add "$TMP/pkg" >/dev/null)
-if grep -q '"lockfileVersion"' "$TMP/site/.nift/packages.lock.json"; then
-    echo 'CP11 FAIL: a command emitted a graph-shaped lock' >&2; exit 1
-fi
+grep -q '"lockfileVersion": 2' "$TMP/site/.nift/packages.lock.json" || {
+    echo 'CP11 FAIL: a command did not emit a v2 graph lock' >&2; exit 1
+}
 
 echo 'v4.6 Batch 5 CP11 resolver: PASS'

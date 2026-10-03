@@ -128,7 +128,12 @@ inline bool parse_graph_lock(const json::Document& document, GraphLock& out, std
 // carry the deterministic path (a -> b -> c -> a).
 inline bool validate_graph_lock(const package_metadata::Manifest& manifest,
                                 const GraphLock& graph, std::string& error) {
-    if (graph.packages.empty()) { error = "package graph lock has no packages"; return false; }
+    if (graph.packages.empty()) {
+        // An empty closure is valid only when the root declares no dependencies
+        // (e.g. the last package was removed).
+        if (manifest.dependencies.empty()) return true;
+        error = "package graph lock has no packages"; return false;
+    }
     for (const auto& dep : manifest.dependencies) {
         if (!graph.packages.count(dep.first)) {
             error = "package graph lock is missing root dependency: " + dep.first; return false;
@@ -296,6 +301,35 @@ inline bool validate_lock_payload_against_manifest(const json::Document& manifes
         return true;
     }
     error = "package lock payload has an unsupported or mixed format";
+    return false;
+}
+
+// Load a lock (v1 or v2) and return the node identity (canonical source,
+// exact commit/local) for a package name. Ownership identity never uses a
+// node-level requested ref; edge requirements belong to the graph/lock
+// explanation layer, not module ownership.
+inline bool lock_node_identity(const std::filesystem::path& lock_path, const std::string& name,
+                               std::string& source, std::string& commit, bool& found,
+                               std::string& error) {
+    found = false;
+    json::Document doc;
+    if (!load_json_file(lock_path, doc, error)) return false;
+    const LockFormat format = detect_lock_format(doc);
+    if (format == LockFormat::V1) {
+        package_metadata::Lock lock;
+        if (!package_metadata::parse_lock(doc, lock, error)) return false;
+        const auto it = lock.find(name);
+        if (it == lock.end()) return true;
+        source = it->second.source; commit = it->second.commit; found = true; return true;
+    }
+    if (format == LockFormat::V2) {
+        GraphLock graph;
+        if (!parse_graph_lock(doc, graph, error)) return false;
+        const auto it = graph.packages.find(name);
+        if (it == graph.packages.end()) return true;
+        source = it->second.source; commit = it->second.commit; found = true; return true;
+    }
+    error = "package lock has an unsupported or mixed format";
     return false;
 }
 

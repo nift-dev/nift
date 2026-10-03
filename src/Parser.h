@@ -193,9 +193,8 @@ private:
         std::filesystem::path project_root;
         std::filesystem::path package_root;
         std::string name;
-        std::string source;
-        std::string requested;
-        std::string commit;
+        std::string source;   // canonical/resolved source identity
+        std::string commit;   // exact commit or "local"
     };
     struct ModuleEnv;
     struct Callable { std::vector<std::string> params; std::string variadic_param; std::string body; std::filesystem::path source_path; bool fragment = false; bool async = false; std::shared_ptr<ModuleEnv> module_env; SourceProvenance source_provenance = SourceProvenance::FileBacked; };

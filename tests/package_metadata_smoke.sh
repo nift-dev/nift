@@ -98,7 +98,7 @@ cat > "$t/install-site/manifest.json" <<EOF
 {"dependencies":{"demo":{"source":"$demo_source","ref":"local"}}}
 EOF
 (cd "$t/install-site" && "$NIFT_ABS" install >/dev/null)
-grep -q '"requested": "local"' "$t/install-site/.nift/packages.lock.json"
+grep -q '"lockfileVersion": 2' "$t/install-site/.nift/packages.lock.json"
 grep -q '"commit": "local"' "$t/install-site/.nift/packages.lock.json"
 
 echo 'PASS package metadata and lock schema'

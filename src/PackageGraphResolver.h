@@ -91,11 +91,17 @@ inline std::string canonical_source(const Requirement& requirement, std::string&
 //                    re-resolve; unrelated root nodes and their reachable
 //                    closure are preserved at their locked identities; shared
 //                    nodes are reconciled globally (conflict => error).
+// Overload with root_locked_commits: for a root/direct dependency whose name
+// appears in root_locked_commits, its exact commit is taken from the map
+// (preserving an existing lock's direct identity) instead of re-resolving the
+// ref; the original requested ref is still recorded on the edge. Used by
+// `install` migration from a v1 lock.
 inline bool resolve_graph(const package_metadata::Manifest& root_manifest,
                           const std::filesystem::path& root_dir,
                           ResolveMode mode,
                           const GraphLock* existing_lock,
                           const std::string* target_root,
+                          const std::map<std::string, std::string>* root_locked_commits,
                           ResolutionProvider& provider,
                           ResolveOutcome& outcome,
                           std::string& error) {
@@ -143,7 +149,14 @@ inline bool resolve_graph(const package_metadata::Manifest& root_manifest,
                 if (found != memo.end()) {
                     commit = found->second;
                 } else {
-                    if (!provider.resolve_ref(req, commit, err)) return false;
+                    const bool root_locked =
+                        root_locked_commits && ancestors.empty() &&
+                        root_locked_commits->count(req.name) != 0;
+                    if (root_locked) {
+                        commit = root_locked_commits->at(req.name);
+                    } else if (!provider.resolve_ref(req, commit, err)) {
+                        return false;
+                    }
                     memo.emplace(key, commit);
                 }
             }
@@ -229,9 +242,18 @@ inline bool resolve_graph(const package_metadata::Manifest& root_manifest,
                 return false;
             }
             for (const auto& dep : manifest.dependencies) {
+                Requirement child{dep.first, dep.second.source, dep.second.ref, manifest_dir};
+                if (dep.first == req.name) {
+                    // A package declaring a dependency on itself at the same
+                    // canonical source is self-provided: it adds no external
+                    // requirement, so it is a no-op rather than a cycle. A
+                    // genuine multi-node cycle (a -> b -> a) is still rejected.
+                    std::string self_error;
+                    const std::string self_canonical = detail::canonical_source(child, self_error);
+                    if (self_error.empty() && self_canonical == canonical) continue;
+                }
                 node.requirements[dep.first] =
                     GraphRequirement{dep.second.source, dep.second.ref};
-                Requirement child{dep.first, dep.second.source, dep.second.ref, manifest_dir};
                 if (!dfs(child, incoming_path, true, err)) {
                     visiting.pop_back(); visiting_set.erase(req.name);
                     return false;
@@ -267,6 +289,20 @@ inline bool resolve_graph(const package_metadata::Manifest& root_manifest,
     }
     outcome.graph = std::move(graph);
     return true;
+}
+
+// Convenience overload without root_locked_commits.
+inline bool resolve_graph(const package_metadata::Manifest& root_manifest,
+                          const std::filesystem::path& root_dir,
+                          ResolveMode mode,
+                          const GraphLock* existing_lock,
+                          const std::string* target_root,
+                          ResolutionProvider& provider,
+                          ResolveOutcome& outcome,
+                          std::string& error) {
+    return resolve_graph(root_manifest, root_dir, mode, existing_lock, target_root,
+                         static_cast<const std::map<std::string, std::string>*>(nullptr),
+                         provider, outcome, error);
 }
 
 }  // namespace package_graph

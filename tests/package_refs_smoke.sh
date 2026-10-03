@@ -25,11 +25,9 @@ grep -q '"commit": "local"' "$tmp/site/.nift/packages.lock.json"
 commit=$(git -C "$tmp/pkg" rev-parse HEAD)
 mkdir -p "$tmp/remote-site"
 (cd "$tmp/remote-site" && "$NIFT_ABS" add "file://$tmp/pkg" "--ref=$commit")
-grep -q "\"requested\": \"$commit\"" "$tmp/remote-site/.nift/packages.lock.json"
 grep -q "\"commit\": \"$commit\"" "$tmp/remote-site/.nift/packages.lock.json"
 rm -rf "$tmp/remote-site/.nift/packages/demo"
 (cd "$tmp/remote-site" && "$NIFT_ABS" install >/dev/null)
-grep -q "\"requested\": \"$commit\"" "$tmp/remote-site/.nift/packages.lock.json"
 
 printf '{"demo":{"source":"file://%s/pkg","requested":"%s","commit":"abc"}}\n' "$tmp" "$commit" > "$tmp/remote-site/.nift/packages.lock.json"
 if (cd "$tmp/remote-site" && "$NIFT_ABS" install >/dev/null 2>&1); then
