@@ -21,11 +21,12 @@ print({"a": 'single'}.a)
 print({"a": "esc \" inside"}.a)
 print({"a": 1 + 2}.a)
 print({"a": ""}.a)
+print({"a": "say "hi" now"}.a)
 print({"nested": {"k": "v"}}.nested.k)
 EOF
 out=$("$NIFT" "$t/b4.f")
 check "object-literal expression values" \
-  [ "$out" == $'pre x post\nxy\nhello\nsingle\nesc " inside\n3\n\nv' ]
+  [ "$out" == $'pre x post\nxy\nhello\nsingle\nesc " inside\n3\n\nsay "hi" now\nv' ]
 
 # 2. Empty-string UTF-8 encode returns an empty bytes value; decode of an empty
 #    bytes value returns an empty string.

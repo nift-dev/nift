@@ -2625,7 +2625,18 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         }else{quoted_literal=false;}
                     }
                     if(quoted_literal){v=nift::RuntimeValue(unescape_parameter_string(value.substr(1,value.size()-2)));}
-                    else{if(value.empty()){error="object literal: missing value for key '"+key+"'";return false;}if(!eval(value,v,depth+1))return false;}
+                    else{
+                        if(value.empty()){error="object literal: missing value for key '"+key+"'";return false;}
+                        if(!eval(value,v,depth+1)){
+                            // Expression evaluation failed (e.g. embedded
+                            // unescaped quotes like {"a": "say "hi" now"}).
+                            // Fall back to the quoted-literal interpretation
+                            // when the value is delimited by matching quotes so
+                            // previously-working object literals keep parsing.
+                            if(value.size()>=2&&(value.front()=='"'||value.front()=='\'')&&value.back()==value.front()){v=nift::RuntimeValue(unescape_parameter_string(value.substr(1,value.size()-2)));}
+                            else return false;
+                        }
+                    }
                     out[key]=std::move(v);
                 }
                 return true;
