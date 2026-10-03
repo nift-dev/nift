@@ -12,6 +12,7 @@ make .build/package-graph-query-unit
 
 # ---- 2. determinism / reproducibility / no-op stability / failure immutability ----
 (cd "$ROOT" && python3 tests/v46_b5_cp13_determinism.py >/dev/null 2>&1)
+(cd "$ROOT" && python3 tests/v46_b5_cp13a_certification.py >/dev/null 2>&1)
 
 # ---- 3. compose CP10/CP11/CP12 gates (representation, resolver, commands) ----
 make .build/package-graph-lock-unit

@@ -98,19 +98,78 @@ The CP12 E2E already asserts deterministic operation/message ordering and
 byte-identical lock output for add/install/update/targeted-update/remove,
 including a diamond/shared child and orphan cleanup; CP13 composes those gates.
 
-## Cross-platform audit
-
-Local absolute path identity uses `std::filesystem` normalization (Windows
-drive/root-name handling already covered by the existing package/path
-hardening walls). No contradiction with already-certified containment behavior
-was found; no new resolver semantics were introduced.
-
 ## Documentation
 
 `docs/packages/README.md` updated to describe the transitive dependency graph,
 the v2 lock schema at a user-facing level, exact Git commits, the local
 package qualification, update semantics, the `nift packages` query surface,
 and v1 compatibility/migration. No v4.6 release claim.
+
+## CP13a — completed certification matrix
+
+`tests/v46_b5_cp13a_certification.py` (wired into `test-v46-b5-cp13`) closes
+the remaining certification items:
+
+- **Local live-content contract:** a local package's lock node is
+  `{canonical absolute path, "local"}`; after editing the package contents in
+  place (same path), a runtime import observes the new live contents, the lock
+  bytes stay unchanged, and `nift packages <name>` shows `commit: local`.
+- **No-op slot stability:** a no-op `install` does not replace a matching store
+  slot (a sentinel inside the installed slot survives) and leaves the lock
+  bytes unchanged.
+- **Operation determinism matrix:** `add`, `install`, and `update` run from
+  equivalent starting states produce byte-identical stdout and byte-identical
+  locks, and identical installed node identities; a diamond/shared child and
+  orphan cleanup are covered by the CP12 E2E.
+- **Failure immutability:** self-cycle and unknown-ref `add` failures leave
+  the manifest unchanged and create no lock (conflict/malformed-transitive/
+  name-mismatch cases are covered by the CP12 E2E and the resolver unit).
+- **Conflict determinism:** a same-name/different-commit conflict produces the
+  same diagnostic (after normalizing only the fixture temp-root prefix) from
+  equivalent fixtures; the resolver unit covers same-name/different-source and
+  targeted-update shared-node conflicts with stable path diagnostics.
+- **Source-spelling vs canonical fidelity:** the query unit proves the edge
+  retains the declared spelling (`github:org/b`) while the node carries the
+  canonical `https://github.com/org/b.git` (the shared `git_source`
+  canonicalizer), so canonicalization history is not lost.
+- **Cycle determinism:** `a -> a`, `a -> b -> a`, and `a -> b -> c -> a`
+  produce deterministic cycle paths (resolver + lock units); self-cycles are
+  invalid with no exception.
+
+## Cross-platform static audit
+
+CP13 introduces no new platform-specific normalization: the query only reads
+canonical identities already produced by the shared `local_source_absolute` /
+`source_is_local_path` / `git_source` helpers (Windows drive/root-name,
+separator, symlink/reparse, and path-containment behavior already certified by
+the Batch 3 Windows reparse containment and filesystem/path hardening walls).
+JSON ordering/newlines come from the deterministic graph serializer and query
+builder. No Windows-specific ambiguity was introduced.
+
+## Website publication (Batch 3–5 differential)
+
+The website differential found Batch 4 recoverable/stream/FFI/JSON/schema/
+import content already synced; genuine Batch 3/5 gaps were repaired:
+
+- `scripting-imports.html`: added transitive package graphs, the v2 lock,
+  exact Git commits, the `nift packages` query, and a **source ownership**
+  section (`module_path()`/`package_path()`, defining-source relative imports,
+  package confinement/provenance).
+- `runtime-concurrency.html`: added the `timer()` stopwatch API
+  (`start`/`pause`/`resume`/`stop`/`reset`/`elapsed`).
+
+Published per the established workflow (public deployment first, stage second;
+verified live at `nift.dev/docs/scripting-imports.html` and
+`nift.dev/docs/runtime-concurrency.html`, assets 200):
+
+```text
+public/main:  cf34dab..95e57e0  docs: publish Batch 3-5 package graph and runtime ownership updates
+stage:        21fd4d4..33a7779  docs: sync website source with Batch 3-5 graph and runtime ownership
+```
+
+Local packages are **not** content-reproducible across machines, and locked
+install is **not** a general global-cache/offline-artifact guarantee — the
+evidence does not claim either.
 
 ## Wall
 
@@ -120,8 +179,9 @@ make test-v46-b5-cp13
 
 runs the Batch 4 + CP10/CP11/CP12 aggregate then the CP13 wall: the graph-query
 unit test, the determinism/reproducibility/no-op/failure-immutability python
-suite, the CP10/CP11/CP12 units + recovery + graph-command suites, and a query
-sanity check that the command works without the installed store.
+suites (including the CP13a certification matrix), the CP10/CP11/CP12 units +
+recovery + graph-command suites, and a query sanity check that the command
+works without the installed store.
 
 Gate: **961 `PASS|passed` lines**, 4 explicit sqlite SKIPs (17 case-insensitive
 "skipped" markers), full gate **exit 0**.
