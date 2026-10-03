@@ -168,3 +168,56 @@ failures hardcoded `method: "GET"` → now the intended method;
 
 None were worked around by modifying Nift core; all are documented and left as
 later blockers.
+
+## HTTP1a — cross-platform certification
+
+The client is now certified by a package-owned GitHub Actions workflow
+(`.github/workflows/http1.yml`) that builds `nift-dev/nift` main and runs all
+three suites on Linux, macOS and Windows. Curl repository commits
+(`nift-packages/curl`, pushed `origin/main` = `71d7eca`):
+
+```text
+b6ed36f  feat: make curl a production-grade HTTP client
+75edfca  test: add HTTP1 option-construction, session-lifecycle, and cleanup coverage
+d47d592  ci: certify curl HTTP client across supported platforms
+1f79f27  test: keep package test work dirs outside the package root
+d3f8258  fix: verify temp-file helper paths are reachable before use
+6cfbbe7  ci: use native Windows curl and a Windows temp dir
+e7149de  test: decode nift subprocess output as UTF-8
+71d7eca  fix: use the PowerShell temp helper on Windows; quiet fixture aborts
+```
+
+Certification run `37136678653` — all jobs green:
+
+| Platform | curl | dogfood | http1 | options |
+| --- | --- | --- | --- | --- |
+| ubuntu-latest | 8.5.0 (x86_64-pc-linux-gnu) | PASS | PASS | PASS |
+| macos-latest | 8.7.1 (x86_64-apple-darwin) | PASS | PASS | PASS |
+| windows-latest | 8.16.0 (Windows) | PASS | PASS | PASS |
+
+Per-suite checks: `dogfood.py` 10, `http1.py` 37 + summary, `options.py` 22 +
+summary (71 `PASS` lines total per platform). The macOS/ubuntu runners also
+carry the shared POSIX suites unchanged.
+
+### Platform fixes required to reach green
+
+Cross-platform execution exposed four genuine issues (all package/test, no
+Nift core change):
+
+1. `nift add <local path>` aborted on Windows (`0xC0000409`): a local package is
+   staged by `fs::copy(recursive)` when directory symlinks are unavailable, and
+   the test work dir was nested inside the package, so the copy recursed into
+   itself. Fixed by moving the test work dirs to a system temp dir
+   (`1f79f27`).
+2. `open: cannot open path`: on Windows the MSYS2 `mktemp` returns a POSIX path
+   a native `nift.exe` cannot open. Fixed by verifying the helper path is
+   reachable before use (`d3f8258`), then by preferring the PowerShell temp
+   helper on Windows so a rejected `mktemp` cannot orphan its file (`71d7eca`).
+3. The MSYS2/cygwin `curl` mishandles native Windows paths passed to
+   `--data-binary @file`; the CI now uses the native Windows curl and a Windows
+   temp dir (`6cfbbe7`).
+4. Windows decoded subprocess output as cp1252, mis-comparing the UTF-8
+   response body; the harness now decodes as UTF-8 (`e7149de`).
+
+These are exactly the platform-specific process/temp-file behaviours the
+certification was meant to exercise; none required weakening a test.
