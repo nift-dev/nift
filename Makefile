@@ -1473,7 +1473,10 @@ test-v46-b5-cp12: test-v46-b5-cp11
 test-v46-b5-cp13: test-v46-b5-cp12
 	bash tests/v46_b5_cp13_determinism.sh
 
-.PHONY: test-v46-b4-cp2 test-v46-b4-cp3 test-v46-b4-pre-cp4 test-v46-b4-cp4a test-v46-b4-cp4b test-v46-b4-cp4b-stream-operators test-v46-b4-cp4c test-v46-b4-cp5a test-v46-b4-cp6 test-v46-b4-cp5b test-v46-b4-cp7 test-v46-b4-cp8 test-v46-b4-cp9 test-v46-b5-cp10 test-v46-b5-cp11 test-v46-b5-cp12 test-v46-b5-cp13
+test-v46-b5-cp14: test-v46-b5-cp13
+	bash tests/v46_b5_cp14_final_certification.sh
+
+.PHONY: test-v46-b4-cp2 test-v46-b4-cp3 test-v46-b4-pre-cp4 test-v46-b4-cp4a test-v46-b4-cp4b test-v46-b4-cp4b-stream-operators test-v46-b4-cp4c test-v46-b4-cp5a test-v46-b4-cp6 test-v46-b4-cp5b test-v46-b4-cp7 test-v46-b4-cp8 test-v46-b4-cp9 test-v46-b5-cp10 test-v46-b5-cp11 test-v46-b5-cp12 test-v46-b5-cp13 test-v46-b5-cp14
 
 test-v46-relative-imports: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" bash tests/v44_relative_import_ownership_smoke.sh
