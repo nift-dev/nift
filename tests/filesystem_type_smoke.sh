@@ -78,7 +78,11 @@ check "stat dir type / no size key / missing exists" [ "$(echo "$out" | grep -E 
 # Recoverable error on a genuine metadata failure (permission denied).
 # POSIX permission bits are meaningless on Windows, so this reproduces only on
 # POSIX hosts.
-if [ "$(uname -s 2>/dev/null | cut -c1-7)" != "MINGW" ] && [ "$(uname -s 2>/dev/null | cut -c1-5)" != "MSYS" ]; then
+case "$(uname -s 2>/dev/null)" in
+  MINGW*|MSYS*) IS_WINDOWS=1 ;;
+  *) IS_WINDOWS=0 ;;
+esac
+if [ "$IS_WINDOWS" -eq 0 ]; then
 mkdir -p "$t/locked"; echo "secret" > "$t/locked/secret.txt"; chmod 000 "$t/locked"
 if [ "$(id -u)" != "0" ]; then
   cat > "$t/perm.f" <<'EOF'
@@ -98,7 +102,7 @@ chmod 755 "$t/locked"
 fi
 
 # Windows-specific path forms (drive letters, backslashes, trailing backslash).
-if [ "$(uname -s 2>/dev/null | cut -c1-7)" = "MINGW" ] || [ "$(uname -s 2>/dev/null | cut -c1-5)" = "MSYS" ]; then
+if [ "$IS_WINDOWS" -eq 1 ]; then
   cat > "$t/win.f" <<'WINEOF'
 drive := getenv("SystemDrive")
 if(drive == null) { drive = "C:" }
