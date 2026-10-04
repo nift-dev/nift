@@ -11,6 +11,7 @@ on:
       - 'tests/v44_*'
       - 'tests/v45_*'
       - 'tests/package_*'
+      - 'tests/filesystem_*'
   pull_request:
     paths:
       - '.github/workflows/v44-cross-platform.yml'
@@ -20,6 +21,7 @@ on:
       - 'tests/v44_*'
       - 'tests/v45_*'
       - 'tests/package_*'
+      - 'tests/filesystem_*'
   workflow_dispatch:
 
 permissions:
