@@ -465,6 +465,10 @@ bool runtime_contains_reserved_handle(const RuntimeValue& value) {
 
 bool runtime_number_is_integer(const RuntimeValue& value) {
     if (!value.is_number()) return false;
+    // Fast path for the common plain double: the exact-number decimal layer
+    // (to_chars + parse_finite_decimal) is only needed to preserve a StrNumber's
+    // exact JSON spelling. A Number's integer-ness is the v4.5 trunc check.
+    if (value.type == RuntimeType::Number) return std::trunc(value.num) == value.num;
     const NumericForm form = numeric_form(value);
     return form.kind == NumericKind::Finite &&
            (form.sign == 0 || form.exponent.sign >= 0);
