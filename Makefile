@@ -1047,8 +1047,15 @@ clean:
 	# Ordinary development clean removes Nift build products but PRESERVES the
 	# reusable vendored libffi dependency cache so clean+make does not re-pay
 	# the configure/build/install bootstrap. Use `make distclean` (or
-	# `make pristine`) for a fully cold state.
-	@if [ -d "$(TEST_DIR)" ]; then find "$(TEST_DIR)" -mindepth 1 -maxdepth 1 ! -name libffi -exec rm -rf {} + 2>/dev/null || true; rmdir "$(TEST_DIR)" 2>/dev/null || true; fi
+	# `make pristine`) for a fully cold state. Genuine removal failures are
+	# reported; concurrent `make` + `make clean` on one checkout is explicitly
+	# unsupported.
+	@if [ -d "$(TEST_DIR)" ]; then \
+		find "$(TEST_DIR)" -mindepth 1 -maxdepth 1 ! -name libffi -exec rm -rf {} +; \
+		leftovers="$$(find "$(TEST_DIR)" -mindepth 1 -maxdepth 1 ! -name libffi 2>/dev/null)"; \
+		if [ -n "$$leftovers" ]; then echo "clean: could not remove: $$leftovers" >&2; exit 1; fi; \
+		if [ ! -d "$(TEST_DIR)/libffi" ]; then rmdir "$(TEST_DIR)"; fi; \
+	fi
 	rm -f libnift_c.a libnift_c.so libnift_c.dylib bindings/go/embed-harness
 	rm -rf dist/embed-prefix bindings/node/build bindings/python/build
 	rm -f bindings/python/nift/_nift*.so
