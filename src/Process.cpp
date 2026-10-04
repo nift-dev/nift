@@ -142,6 +142,7 @@ std::wstring widen(const std::string& s) {
 // Quote one argv element using Windows command-line rules: wrap in quotes when
 // it contains spaces/tabs/quotes; embedded quotes become backslash-escaped.
 std::string quote_win_arg(const std::string& a) {
+    if (a.empty()) return "\"\"";
     if (a.find_first_of(" \t\"") == std::string::npos) return a;
     std::string out = "\"";
     std::size_t backslashes = 0;
