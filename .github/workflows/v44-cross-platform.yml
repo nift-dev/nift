@@ -113,6 +113,15 @@ jobs:
         if: runner.os == 'Windows'
         shell: msys2 {0}
         run: make -C nift test-v44-execution-shell test-v44-language-foundation
+      - name: FS-TYPE filesystem type inspection
+        timeout-minutes: 6
+        if: runner.os != 'Windows'
+        run: make -C nift test-filesystem-type
+      - name: FS-TYPE filesystem type inspection on Windows
+        timeout-minutes: 6
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: make -C nift test-filesystem-type
       - name: v4.4 shell restricted (glob/history/completion/PTY/restriction)
         timeout-minutes: 6
         if: runner.os != 'Windows'
