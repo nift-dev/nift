@@ -751,6 +751,9 @@ test-template-variables: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/template_variables_smoke.sh
 
 
+test-filesystem-type: $(TARGET)
+	NIFT="$(CURDIR)/$(TARGET)" tests/filesystem_type_smoke.sh
+
 test-process-empty-arg: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/process_empty_arg_smoke.sh
 

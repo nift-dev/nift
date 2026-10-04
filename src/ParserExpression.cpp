@@ -1527,7 +1527,10 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 out=nift::RuntimeValue(nullptr);return true;}
             if(call_args("pwd",args,q)){if(!args.empty()){error="pwd: expected no arguments";return false;}out=nift::RuntimeValue((standalone_script_host_?fs::current_path():host_.root()).generic_string());return true;}
             if(call_args("cd",args,q)){if(!standalone_script_host_){error="cd: only available in standalone Nift scripts/shell";return false;}fs::path p;if(args.size()!=1||!checked_path("cd",args,q,0,p))return false;std::error_code ec;fs::current_path(p,ec);if(ec)return fail_recoverable(nift::detail::DiagnosticCode::IoChangeDirectoryFailed,"cd: "+ec.message(),error);out=nift::RuntimeValue(nullptr);return true;}
-            if(call_args("exists",args,q)){fs::path p;if(args.size()!=1||!checked_path("exists",args,q,0,p))return false;std::error_code ec;out=nift::RuntimeValue(fs::exists(p,ec)&&!ec);return true;}
+            if(call_args("exists",args,q)){fs::path p;if(args.size()!=1||!checked_path("exists",args,q,0,p))return false;FsInfo info=inspect_path(p);if(info.error)return fail_recoverable(nift::detail::DiagnosticCode::IoMetadataFailed,"exists: "+info.error_message,error);out=nift::RuntimeValue(info.exists);return true;}
+            if(call_args("is_file",args,q)){fs::path p;if(args.size()!=1||!checked_path("is_file",args,q,0,p))return false;FsInfo info=inspect_path(p);if(info.error)return fail_recoverable(nift::detail::DiagnosticCode::IoMetadataFailed,"is_file: "+info.error_message,error);out=nift::RuntimeValue(info.exists&&info.type=="file");return true;}
+            if(call_args("is_dir",args,q)){fs::path p;if(args.size()!=1||!checked_path("is_dir",args,q,0,p))return false;FsInfo info=inspect_path(p);if(info.error)return fail_recoverable(nift::detail::DiagnosticCode::IoMetadataFailed,"is_dir: "+info.error_message,error);out=nift::RuntimeValue(info.exists&&info.type=="directory");return true;}
+            if(call_args("stat",args,q)){fs::path p;if(args.size()!=1||!checked_path("stat",args,q,0,p))return false;FsInfo info=inspect_path(p);if(info.error)return fail_recoverable(nift::detail::DiagnosticCode::IoMetadataFailed,"stat: "+info.error_message,error);nift::RuntimeValue d=nift::RuntimeValue::make_object();d["exists"]=nift::RuntimeValue(info.exists);if(info.exists){d["type"]=nift::RuntimeValue(info.type);if(info.type=="file")d["size"]=nift::RuntimeValue(static_cast<double>(info.size));}out=std::move(d);return true;}
             if(call_args("make_dir",args,q)||call_args("mkdir",args,q)){fs::path p;if(args.size()!=1||!checked_path("make_dir",args,q,0,p))return false;std::error_code ec;fs::create_directories(p,ec);if(ec)return fail_recoverable(nift::detail::DiagnosticCode::IoCreateFailed,"make_dir: "+ec.message(),error);out=nift::RuntimeValue(nullptr);return true;}
             if(call_args("touch",args,q)){fs::path p;if(args.size()!=1||!checked_path("touch",args,q,0,p))return false;std::ofstream f(p,std::ios::app);if(!f)return fail_recoverable(nift::detail::DiagnosticCode::IoCreateFailed,"touch: cannot open path",error);out=nift::RuntimeValue(nullptr);return true;}
             auto path_values=[&](const std::string& name,const std::vector<std::string>& aa,const std::vector<bool>& qq,std::size_t begin,std::size_t end,std::vector<fs::path>& paths)->bool{for(std::size_t ai=begin;ai<end;++ai){nift::RuntimeValue v;if(!arg_value(aa,qq,ai,v))return false;std::vector<std::string> raws;if(v.is_string())raws.push_back(v.string);else if(v.is_array()){for(const auto& x:v.array){if(!x.is_string()){error=name+": path arrays must contain strings";return false;}raws.push_back(x.string);}}else{error=name+": expected string path or array of paths";return false;}for(const auto& raw:raws){fs::path p=resolve_path(raw);if(!standalone_script_host_&&!resource_path_authority_.project_root.empty()&&!filesystem::path_within(resource_path_authority_.project_root,p)){error=name+": path must stay inside the Nift project";return false;}if(!nift_fs_root_allowed(p,resource_path_authority_.enforce_filesystem_root?resource_path_authority_.filesystem_root:fs::path{},error)){error=name+": "+error;return false;}if(glob_has_magic(raw)){auto matches=glob_expand(p);paths.insert(paths.end(),matches.begin(),matches.end());}else paths.push_back(std::move(p));}}return true;};
@@ -3438,6 +3441,47 @@ bool Parser::evaluate_condition(const std::string& expression, bool& value, std:
     };
 
     return eval(expression, value);
+}
+
+Parser::FsInfo Parser::inspect_path(const std::filesystem::path& path) const {
+    FsInfo info;
+    std::error_code ec;
+    const std::filesystem::file_status st = std::filesystem::status(path, ec);
+    if (ec) {
+        // A missing path (or a dangling symlink target) is not an error. The
+        // toolchain mapping for "does not exist" is not standard-guaranteed, so
+        // accept both the not_found status and the common no-such-entry errcodes
+        // (ENOENT / ERROR_FILE_NOT_FOUND and ENOTDIR for trailing separators).
+        if (st.type() == std::filesystem::file_type::not_found ||
+            ec == std::errc::no_such_file_or_directory || ec == std::errc::not_a_directory) {
+            return info;
+        }
+        info.error = true;
+        info.error_message = ec.message();
+        return info;
+    }
+    info.exists = true;
+    switch (st.type()) {
+        case std::filesystem::file_type::regular: info.type = "file"; break;
+        case std::filesystem::file_type::directory: info.type = "directory"; break;
+        // fs::status follows symlinks, so this case is unreachable today; kept
+        // so a future symlink_status backend can report "symlink" deliberately.
+        case std::filesystem::file_type::symlink: info.type = "symlink"; break;
+        default: info.type = "other"; break;
+    }
+    if (info.type == "file") {
+        std::error_code szec;
+        const std::uintmax_t sz = std::filesystem::file_size(path, szec);
+        if (szec) {
+            // A real size query failure (race, I/O) is a genuine metadata error,
+            // not "size zero".
+            info.error = true;
+            info.error_message = szec.message();
+        } else {
+            info.size = static_cast<std::uint64_t>(sz);
+        }
+    }
+    return info;
 }
 
 const Parser::StructDefinition* Parser::struct_definition_for(const std::shared_ptr<StructInstance>& inst) const {

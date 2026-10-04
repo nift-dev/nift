@@ -60,6 +60,7 @@ enum class DiagnosticCode {
     IoRemoveFailed,
     IoDirectoryReadFailed,
     IoChangeDirectoryFailed,
+    IoMetadataFailed,
     IoAtomicReplaceFailed,
     IoImportSourceUnreadable,
     StreamOpenFailed,
@@ -134,6 +135,7 @@ inline DiagnosticCodeInfo diagnostic_code_info(DiagnosticCode code) {
         NIFT_DIAGNOSTIC_CASE(IoRemoveFailed, "io.remove_failed", Recoverable);
         NIFT_DIAGNOSTIC_CASE(IoDirectoryReadFailed, "io.directory_read_failed", Recoverable);
         NIFT_DIAGNOSTIC_CASE(IoChangeDirectoryFailed, "io.change_directory_failed", Recoverable);
+        NIFT_DIAGNOSTIC_CASE(IoMetadataFailed, "io.metadata_failed", Recoverable);
         NIFT_DIAGNOSTIC_CASE(IoAtomicReplaceFailed, "io.atomic_replace_failed", Recoverable);
         NIFT_DIAGNOSTIC_CASE(IoImportSourceUnreadable, "io.import_source_unreadable", Recoverable);
         NIFT_DIAGNOSTIC_CASE(StreamOpenFailed, "stream.open_failed", Recoverable);

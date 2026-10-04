@@ -49,6 +49,18 @@ private:
 
 class Parser {
 public:
+    // Shared filesystem type-inspection result backing exists/is_file/is_dir/stat.
+    // One metadata query (std::filesystem::status) derives exists + type; size is
+    // filled only for regular files. Following symlinks is the consistent default
+    // for all four predicates (matching std::filesystem::status).
+    struct FsInfo {
+        bool exists = false;
+        bool error = false;
+        std::string type;
+        std::uint64_t size = 0;
+        std::string error_message;
+    };
+    FsInfo inspect_path(const std::filesystem::path& path) const;
     using TimerClock = std::function<std::chrono::steady_clock::time_point()>;
     Parser(RenderHost& host, TrackedInfo& tracked_info,
            std::shared_ptr<ExecutionOutput> execution_output = {},
