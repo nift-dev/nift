@@ -26,11 +26,25 @@ for index in "${!headers[@]}"; do
   header="${headers[$index]}"
   source="${sources[$index]}"
   [ -f "$header" ] || { echo "missing PIC dependency probe header: $header" >&2; exit 1; }
+  depfile=".build/pic/${source%.cpp}.d"
+  # The depfile must already reference the exact header path; otherwise the PIC
+  # object was built under a different configuration (e.g. a different libffi
+  # include dir) and the probe would be measuring a stale graph rather than the
+  # current one. Fail loudly instead of silently probing stale state.
+  if ! grep -Fq -- "$header" "$depfile"; then
+    echo "PIC ${source##*/} depfile does not reference $header (stale configuration?)" >&2
+    echo "  depfile: $depfile" >&2
+    exit 1
+  fi
   stamp="$TMP/$(basename "$header").stamp"
   touch -r "$header" "$stamp"
   current_header="$header"
   current_stamp="$stamp"
-  touch "$header"
+  # Use a fixed, clearly-future mtime rather than a bare `touch`: a bare touch
+  # can land in the same filesystem timestamp-granularity window as the object
+  # build, in which case make treats the header as not-newer and skips the
+  # rebuild, making this probe intermittently flaky on CI.
+  touch -t 203801010000 "$header"
   dry_run="$(make -n "${TARGETS[@]}")"
   touch -r "$stamp" "$header"
   current_header=
