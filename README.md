@@ -33,6 +33,23 @@ make
 sudo make install
 ```
 
+For faster development builds, use the machine's cores (the default Make build
+is serial):
+
+```bash
+make -j$(nproc)
+```
+
+Build lifecycle:
+
+```bash
+make            # incremental build (reuses the vendored libffi cache)
+make clean      # remove Nift build products; PRESERVES the reusable libffi cache
+make clean && make -j$(nproc)   # fast full Nift rebuild without re-bootstrapping libffi
+make distclean  # fully cold state: also removes .build and the libffi cache
+make pristine   # alias for distclean
+```
+
 On Unix-like systems this installs `nift` to `/usr/local/bin` by default. Custom prefixes and package staging are supported, for example:
 
 ```bash

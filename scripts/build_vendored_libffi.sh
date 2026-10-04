@@ -61,29 +61,43 @@ if [ -f "$BUILD/.nift-fingerprint" ] && [ "$(cat "$BUILD/.nift-fingerprint")" = 
   exit 0
 fi
 
-RECONFIGURED=0
-if [ -f "$BUILD/Makefile" ] && { [ ! -f "$BUILD/.nift-fingerprint" ] || [ "$(cat "$BUILD/.nift-fingerprint")" != "$FINGERPRINT" ]; }; then
-  rm -rf "$BUILD"
-  RECONFIGURED=1
-fi
+# The cache is unusable (first build, fingerprint/toolchain change, or an
+# interrupted previous build that left partial autoconf artifacts without a
+# usable Makefile). Always start from a clean slate so stale configure state
+# can never poison the rebuild; libffi itself only takes a few seconds cold.
+rm -rf "$BUILD"
 mkdir -p "$BUILD"
 BUILD="$(cd "$BUILD" && pwd)"
 PREFIX="$BUILD/install"
-if [ ! -f "$BUILD/Makefile" ]; then
-  RECONFIGURED=1
-  rm -rf "$BUILD/source"
-  cp -R "$ROOT/third_party/libffi" "$BUILD/source"
-  (
-    cd "$BUILD"
-    CONFIG_SHELL=sh SHELL=sh ./source/configure $CONFIGURE_ARGS \
-      --prefix="$PREFIX"
-  )
+LOG="$BUILD/.build.log"
+START_TIME="$({ date +%s%N 2>/dev/null || date +%s; } || echo 0)"
+echo "BUILD vendored libffi ($(basename "$BUILD"))"
+fail_build() {
+  tail -n 40 "$LOG" >&2
+  echo "error: vendored libffi build failed; full log: $LOG" >&2
+  exit 1
+}
+cp -R "$ROOT/third_party/libffi" "$BUILD/source"
+if ! ( cd "$BUILD" && CONFIG_SHELL=sh SHELL=sh ./source/configure $CONFIGURE_ARGS \
+        --prefix="$PREFIX" ) >"$LOG" 2>&1; then
+  fail_build
 fi
+
 # libffi clears MAKEOVERRIDES, so carry the relative libtool command through both recursive levels.
 LIBFFI_MAKE_FLAGS="LIBTOOL='sh ./libtool' AM_MAKEFLAGS=\"LIBTOOL='sh ./libtool'\""
-make -C "$BUILD" SHELL=sh "AM_MAKEFLAGS=$LIBFFI_MAKE_FLAGS" -j"${NIFT_BUILD_JOBS:-2}"
-make -C "$BUILD" SHELL=sh "AM_MAKEFLAGS=$LIBFFI_MAKE_FLAGS" install
+if ! make -C "$BUILD" SHELL=sh "AM_MAKEFLAGS=$LIBFFI_MAKE_FLAGS" -j"${NIFT_BUILD_JOBS:-2}" >"$LOG" 2>&1; then
+  fail_build
+fi
+if ! make -C "$BUILD" SHELL=sh "AM_MAKEFLAGS=$LIBFFI_MAKE_FLAGS" install >>"$LOG" 2>&1; then
+  fail_build
+fi
 printf '%s\n' "$FINGERPRINT" > "$BUILD/.nift-fingerprint"
-if [ "$RECONFIGURED" -eq 1 ] || [ ! -f "$BUILD/.nift-built" ]; then
+if [ ! -f "$BUILD/.nift-built" ]; then
   touch "$BUILD/.nift-built"
+fi
+if [ "$START_TIME" != "0" ]; then
+  END_TIME="$({ date +%s%N 2>/dev/null || date +%s; } || echo 0)"
+  printf 'BUILD vendored libffi: done (%ss)\n' "$(( (END_TIME - START_TIME) / 1000000000 ))"
+else
+  echo "BUILD vendored libffi: done"
 fi

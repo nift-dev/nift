@@ -57,7 +57,13 @@ LIBFFI_BUILD := $(TEST_DIR)/libffi/$(LIBFFI_TARGET)
 LIBFFI_STAMP := $(LIBFFI_BUILD)/.nift-built
 LIBFFI_A := $(LIBFFI_BUILD)/install/lib/libffi.a
 LIBFFI_INCLUDE := $(LIBFFI_BUILD)/install/include
-LIBFFI_CFLAGS ?= -O2 -fPIC
+# Vendored libffi is built with its own flags, kept separate from Nift's
+# warning-disciplined CXXFLAGS. -Wno-deprecated-declarations silences the
+# upstream legacy Java raw-API deprecation warnings emitted inside vendored
+# libffi itself (java_raw_api.c calls its own deprecated entry points); there
+# is no upstream configure switch that drops that translation unit. The
+# suppression applies only to the libffi build, never to Nift's own sources.
+LIBFFI_CFLAGS ?= -O2 -fPIC -Wno-deprecated-declarations
 CPPFLAGS += -I$(LIBFFI_INCLUDE)
 SANITIZER_FLAGS ?= -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined
 SAN_TARGET := $(TEST_DIR)/nift-sanitize$(EXEEXT)
@@ -94,35 +100,50 @@ FORCE:
 $(TARGET): $(CLI_OBJECTS) $(LIBFFI_A)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(CLI_OBJECTS) $(LDLIBS) -o $@
 
-$(LIBFFI_STAMP): scripts/build_vendored_libffi.sh scripts/check_vendored_libffi.py third_party/libffi/NIFT-PROVENANCE.md
+# Toolchain/build signature the libffi stamp depends on. Regenerated cheaply
+# on every make; the file is rewritten only when its content changes, so an
+# unchanged compiler/target/flags do not invalidate the cached libffi build,
+# while a toolchain or config change forces a rebuild.
+LIBFFI_SIGNATURE := $(LIBFFI_BUILD)/.nift-toolchain-signature
+$(LIBFFI_SIGNATURE): FORCE
+	@mkdir -p "$(LIBFFI_BUILD)"
+	@printf '%s\n' "$(CC)|$(CXX)|$(LIBFFI_TARGET)|$(LIBFFI_CFLAGS)|$$($(CC) --version 2>/dev/null | head -1)|$$($(CXX) --version 2>/dev/null | head -1)" > "$@.tmp"
+	@if cmp -s "$@" "$@.tmp"; then rm -f "$@.tmp"; else mv -f "$@.tmp" "$@"; fi
+
+SAN_LIBFFI_SIGNATURE := $(SAN_LIBFFI_BUILD)/.nift-toolchain-signature
+$(SAN_LIBFFI_SIGNATURE): FORCE
+	@mkdir -p "$(SAN_LIBFFI_BUILD)"
+	@printf '%s\n' "$(CC)|$(CXX)|$(LIBFFI_TARGET)|$(LIBFFI_CFLAGS) $(SANITIZER_FLAGS)|$$($(CC) --version 2>/dev/null | head -1)|$$($(CXX) --version 2>/dev/null | head -1)" > "$@.tmp"
+	@if cmp -s "$@" "$@.tmp"; then rm -f "$@.tmp"; else mv -f "$@.tmp" "$@"; fi
+
+TSAN_LIBFFI_SIGNATURE := $(TSAN_LIBFFI_BUILD)/.nift-toolchain-signature
+$(TSAN_LIBFFI_SIGNATURE): FORCE
+	@mkdir -p "$(TSAN_LIBFFI_BUILD)"
+	@printf '%s\n' "$(CC)|$(CXX)|$(LIBFFI_TARGET)|$(LIBFFI_CFLAGS) $(TSAN_FLAGS)|$$($(CC) --version 2>/dev/null | head -1)|$$($(CXX) --version 2>/dev/null | head -1)" > "$@.tmp"
+	@if cmp -s "$@" "$@.tmp"; then rm -f "$@.tmp"; else mv -f "$@.tmp" "$@"; fi
+
+# The stamp is a real sentinel: libffi is bootstrapped only when the script,
+# provenance, or toolchain signature changed, not on every make.
+$(LIBFFI_STAMP): scripts/build_vendored_libffi.sh scripts/check_vendored_libffi.py third_party/libffi/NIFT-PROVENANCE.md $(LIBFFI_SIGNATURE)
 	CC="$(CC)" CXX="$(CXX)" CFLAGS="$(LIBFFI_CFLAGS)" bash scripts/build_vendored_libffi.sh "$(LIBFFI_BUILD)"
 
-libffi-check: $(LIBFFI_STAMP) FORCE
-	CC="$(CC)" CXX="$(CXX)" CFLAGS="$(LIBFFI_CFLAGS)" bash scripts/build_vendored_libffi.sh "$(LIBFFI_BUILD)"
-
-$(LIBFFI_A): | libffi-check
+$(LIBFFI_A): | $(LIBFFI_STAMP)
 
 LDLIBS += $(LIBFFI_A)
 
-$(PARSER_OBJECTS) $(patsubst %.cpp,$(TEST_DIR)/pic/%.o,$(PARSER_SOURCES)): | libffi-check
+$(PARSER_OBJECTS) $(patsubst %.cpp,$(TEST_DIR)/pic/%.o,$(PARSER_SOURCES)): | $(LIBFFI_STAMP)
 
-$(SAN_LIBFFI_STAMP): scripts/build_vendored_libffi.sh scripts/check_vendored_libffi.py third_party/libffi/NIFT-PROVENANCE.md
+$(SAN_LIBFFI_STAMP): scripts/build_vendored_libffi.sh scripts/check_vendored_libffi.py third_party/libffi/NIFT-PROVENANCE.md $(SAN_LIBFFI_SIGNATURE)
 	CC="$(CC)" CXX="$(CXX)" CFLAGS="$(LIBFFI_CFLAGS) $(SANITIZER_FLAGS)" bash scripts/build_vendored_libffi.sh "$(SAN_LIBFFI_BUILD)"
 
-san-libffi-check: $(SAN_LIBFFI_STAMP) FORCE
-	CC="$(CC)" CXX="$(CXX)" CFLAGS="$(LIBFFI_CFLAGS) $(SANITIZER_FLAGS)" bash scripts/build_vendored_libffi.sh "$(SAN_LIBFFI_BUILD)"
+$(SAN_LIBFFI_A): | $(SAN_LIBFFI_STAMP)
+$(patsubst %.cpp,$(TEST_DIR)/san/%.o,$(PARSER_SOURCES)): | $(SAN_LIBFFI_STAMP)
 
-$(SAN_LIBFFI_A): | san-libffi-check
-$(patsubst %.cpp,$(TEST_DIR)/san/%.o,$(PARSER_SOURCES)): | san-libffi-check
-
-$(TSAN_LIBFFI_STAMP): scripts/build_vendored_libffi.sh scripts/check_vendored_libffi.py third_party/libffi/NIFT-PROVENANCE.md
+$(TSAN_LIBFFI_STAMP): scripts/build_vendored_libffi.sh scripts/check_vendored_libffi.py third_party/libffi/NIFT-PROVENANCE.md $(TSAN_LIBFFI_SIGNATURE)
 	CC="$(CC)" CXX="$(CXX)" CFLAGS="$(LIBFFI_CFLAGS) $(TSAN_FLAGS)" bash scripts/build_vendored_libffi.sh "$(TSAN_LIBFFI_BUILD)"
 
-tsan-libffi-check: $(TSAN_LIBFFI_STAMP) FORCE
-	CC="$(CC)" CXX="$(CXX)" CFLAGS="$(LIBFFI_CFLAGS) $(TSAN_FLAGS)" bash scripts/build_vendored_libffi.sh "$(TSAN_LIBFFI_BUILD)"
-
-$(TSAN_LIBFFI_A): | tsan-libffi-check
-$(patsubst %.cpp,$(TEST_DIR)/tsan/%.o,$(PARSER_SOURCES)): | tsan-libffi-check
+$(TSAN_LIBFFI_A): | $(TSAN_LIBFFI_STAMP)
+$(patsubst %.cpp,$(TEST_DIR)/tsan/%.o,$(PARSER_SOURCES)): | $(TSAN_LIBFFI_STAMP)
 
 %.o: %.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -MMD -MP -c $< -o $@
@@ -1023,7 +1044,11 @@ uninstall:
 
 clean:
 	rm -f $(OBJECTS) $(DEPFILES) "$(TARGET)"
-	rm -rf "$(TEST_DIR)"
+	# Ordinary development clean removes Nift build products but PRESERVES the
+	# reusable vendored libffi dependency cache so clean+make does not re-pay
+	# the configure/build/install bootstrap. Use `make distclean` (or
+	# `make pristine`) for a fully cold state.
+	@if [ -d "$(TEST_DIR)" ]; then find "$(TEST_DIR)" -mindepth 1 -maxdepth 1 ! -name libffi -exec rm -rf {} + 2>/dev/null || true; rmdir "$(TEST_DIR)" 2>/dev/null || true; fi
 	rm -f libnift_c.a libnift_c.so libnift_c.dylib bindings/go/embed-harness
 	rm -rf dist/embed-prefix bindings/node/build bindings/python/build
 	rm -f bindings/python/nift/_nift*.so
@@ -1032,6 +1057,15 @@ clean:
 	rm -rf bindings/csharp/apps/NiftAspDogfood/bin bindings/csharp/apps/NiftAspDogfood/obj
 	rm -rf bindings/csharp/tests/Nift.Tests/bin bindings/csharp/tests/Nift.Tests/obj
 	rm -rf bindings/csharp/bench/bin bindings/csharp/bench/obj
+
+# Fully cold state: remove .build entirely, including the vendored libffi
+# dependency cache, so the next build re-bootstraps libffi from scratch.
+distclean: clean
+	rm -rf "$(TEST_DIR)"
+	rm -f $(OBJECTS) $(DEPFILES) "$(TARGET)"
+
+# Alias for distclean.
+pristine: distclean
 	rm -rf bindings/python/__pycache__ bindings/python/nift/__pycache__ \
 		bindings/python/tests/__pycache__ packaging/__pycache__
 	find bindings/python packaging tests scripts -type f -name '*.pyc' -delete 2>/dev/null || true
@@ -1039,7 +1073,7 @@ clean:
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
-.PHONY: FORCE libffi-check san-libffi-check tsan-libffi-check test-ffi-abi test-libffi-source test-gate6ar-ffi test-libffi-static-archive test-libffi-dependencies test-libffi-private-symbols test-pic-depfiles test-node-package-licenses test-v45-adversarial-runtime test-v45-integration-dogfood test-v45-embed-contracts test-v45-embed-staged-consumer test-v45-concurrency test-v45-job-control test-v45-target test-v45-native-runtime embed go-binding csharp-binding node-binding python-binding bindings test-build-boundary test-embed test-go-binding test-csharp-binding test-node-binding test-python-binding test-bindings test-all test benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-markuppp-sync test-json test-json-schema test-runtime-value test-cp15-numeric-repair test-cp17-bytes test-cp18-bytes test-cp19-bytes test-cp21-bytes test-cp18-bytes-sanitize test-cp18-bytes-tsan test-console test-progress-render test-progress-pty test-snap-contract test-distribution-summary test-version-consistency test-diagnostics test-minify test-json-schema-integration test-markup-json-directives test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke test-host-seam benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-alias test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets test-init-lock test-unreadable-source test-incremental-modified-immediate test-v41-certification test-v42-language test-v42-struct test-v43-language test-macos-runner-policy install uninstall
+.PHONY: FORCE test-ffi-abi test-libffi-source test-gate6ar-ffi test-libffi-static-archive test-libffi-dependencies test-libffi-private-symbols test-pic-depfiles test-node-package-licenses test-v45-adversarial-runtime test-v45-integration-dogfood test-v45-embed-contracts test-v45-embed-staged-consumer test-v45-concurrency test-v45-job-control test-v45-target test-v45-native-runtime embed go-binding csharp-binding node-binding python-binding bindings test-build-boundary test-embed test-go-binding test-csharp-binding test-node-binding test-python-binding test-bindings test-all test benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-markuppp-sync test-json test-json-schema test-runtime-value test-cp15-numeric-repair test-cp17-bytes test-cp18-bytes test-cp19-bytes test-cp21-bytes test-cp18-bytes-sanitize test-cp18-bytes-tsan test-console test-progress-render test-progress-pty test-snap-contract test-distribution-summary test-version-consistency test-diagnostics test-minify test-json-schema-integration test-markup-json-directives test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke test-host-seam benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-alias test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets test-init-lock test-unreadable-source test-incremental-modified-immediate test-v41-certification test-v42-language test-v42-struct test-v43-language test-macos-runner-policy install uninstall clean distclean pristine
 
 
 .PHONY: test-v45-concurrency-sanitize test-v45-concurrency-tsan

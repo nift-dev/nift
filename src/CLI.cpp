@@ -494,7 +494,7 @@ static int package_query_cli(int argc,char**argv){
     for(int i=2;i<argc;++i){std::string a=argv[i];if(a=="--json")want_json=true;else if(name_set){console::error("packages takes at most one package name");return 1;}else{name=a;name_set=true;}}
     std::string error;package_metadata::Manifest manifest;
     if(!load_project_manifest(false,manifest,error)){console::error(error);return 1;}
-    json::Document lock_doc;bool lock_exists=false;
+    json::Document lock_doc;
     if(!filesystem::path_exists(package_lock_path())){console::error("packages.lock.json is missing; run nift install first");return 1;}
     if(!load_json_file(package_lock_path(),lock_doc,error)){console::error(error);return 1;}
     const package_graph::LockFormat format=package_graph::detect_lock_format(lock_doc);
