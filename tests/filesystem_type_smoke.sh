@@ -12,9 +12,15 @@ mkdir -p "$t/dir" "$t/dir with spaces" "$t/unicode-dir-ü"
 printf 'abc' > "$t/file.txt"
 echo "x" > "$t/file with spaces.txt"
 echo "y" > "$t/ünïcode.txt"
-ln -sf file.txt "$t/link_to_file"
-ln -sfn dir "$t/link_to_dir"
-ln -sfn missing_target "$t/dangling_link"
+
+# Symlinks require native support (Windows needs privilege/Developer Mode); skip
+# the symlink assertions when the environment cannot create them.
+SYMLINKS=0
+if ln -sf file.txt "$t/link_to_file" 2>/dev/null \
+   && ln -sfn dir "$t/link_to_dir" 2>/dev/null \
+   && ln -sfn missing_target "$t/dangling_link" 2>/dev/null; then
+  SYMLINKS=1
+fi
 
 cat > "$t/probe.f" <<'EOF'
 print("exists_file:" + exists("file.txt").to_string())
@@ -58,9 +64,13 @@ echo "$out"
 check "exists file/dir/missing" [ "$(echo "$out" | grep -E '^exists_file:|^exists_dir:|^exists_missing:' | tr '\n' ' ')" = "exists_file:true exists_dir:true exists_missing:false " ]
 check "is_file file/dir/missing" [ "$(echo "$out" | grep -E '^is_file_' | tr '\n' ' ')" = "is_file_file:true is_file_dir:false is_file_missing:false " ]
 check "is_dir dir/file/missing" [ "$(echo "$out" | grep -E '^is_dir_dir:|^is_dir_file:|^is_dir_missing:' | tr '\n' ' ')" = "is_dir_dir:true is_dir_file:false is_dir_missing:false " ]
-check "symlink follows to file" [ "$(echo "$out" | grep -E '^link_file_' | tr '\n' ' ')" = "link_file_is_file:true link_file_is_dir:false " ]
-check "symlink follows to dir" [ "$(echo "$out" | grep -E '^link_dir_is_dir:')" = "link_dir_is_dir:true" ]
-check "dangling symlink all false" [ "$(echo "$out" | grep -E '^dangling_' | tr '\n' ' ')" = "dangling_exists:false dangling_is_file:false dangling_is_dir:false " ]
+if [ "$SYMLINKS" -eq 1 ]; then
+  check "symlink follows to file" [ "$(echo "$out" | grep -E '^link_file_' | tr '\n' ' ')" = "link_file_is_file:true link_file_is_dir:false " ]
+  check "symlink follows to dir" [ "$(echo "$out" | grep -E '^link_dir_is_dir:')" = "link_dir_is_dir:true" ]
+  check "dangling symlink all false" [ "$(echo "$out" | grep -E '^dangling_' | tr '\n' ' ')" = "dangling_exists:false dangling_is_file:false dangling_is_dir:false " ]
+else
+  echo "SKIP symlink assertions (cannot create symlinks here)"
+fi
 check "spaces/unicode/trailing/relative" [ "$(echo "$out" | grep -E '^spaces_|^unicode_|^trailing_slash:|^relative_dot:|^nested_dotdot:|^absolute:' | tr '\n' ' ')" = "spaces_file:true spaces_dir:true unicode_file:true unicode_dir:true trailing_slash:true relative_dot:true nested_dotdot:true absolute:true " ]
 check "stat file exists/type/size" [ "$(echo "$out" | grep -E '^stat_file_' | tr '\n' ' ')" = "stat_file_exists:true stat_file_type:file stat_file_size:3 " ]
 check "stat dir type / no size key / missing exists" [ "$(echo "$out" | grep -E '^stat_dir_type:|^stat_dir_has_size:|^stat_missing_exists:' | tr '\n' ' ')" = "stat_dir_type:directory stat_dir_has_size:false stat_missing_exists:false " ]
@@ -96,8 +106,7 @@ print("win_missing:" + is_file(drive + "/Windows/definitely_missing.exe").to_str
 WINEOF
   wout=$(cd "$t" && "$NIFT" win.f)
   echo "--- windows output ---"; echo "$wout"
-  check "win drive/backslash/forward/trailing" [ "$(echo "$wout" | grep -E '^win_' | tr '
-' ' ')" = "win_drive_file:true win_backslash_dir:true win_forward_dir:true win_trailing_backslash:true win_missing:false " ]
+  check "win drive/backslash/forward/trailing" [ "$(echo "$wout" | grep -E '^win_' | tr '\n' ' ')" = "win_drive_file:true win_backslash_dir:true win_forward_dir:true win_trailing_backslash:true win_missing:false " ]
 fi
 
 if [ "$fails" -ne 0 ]; then echo "FAILED"; exit 1; fi
