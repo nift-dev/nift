@@ -217,6 +217,106 @@ inline std::string expand_tabs(std::string_view text, std::size_t tab_width = 8)
     return out;
 }
 
+// Bounded source excerpt for diagnostics. Long (possibly generated/minified)
+// source lines are cropped around the error span so diagnostic output stays
+// compact regardless of source-line length. The caret position is reported
+// relative to the rendered excerpt, never the original line column.
+struct SourceExcerpt {
+    std::string excerpt;              // rendered excerpt (with "..." markers)
+    std::size_t span_byte_start = 0;  // byte offset of the error span within excerpt
+    std::size_t span_byte_length = 0; // byte length of the (possibly cropped) span
+    std::size_t underline_columns = 1;// display columns of the span underline
+    std::size_t caret_columns = 0;    // display columns of the span start within excerpt
+};
+
+inline SourceExcerpt render_source_excerpt(std::string_view source_line,
+                                          std::size_t column,
+                                          std::size_t source_length,
+                                          std::size_t left_columns = 80,
+                                          std::size_t right_columns = 80,
+                                          std::size_t max_span_columns = 40) {
+    const std::size_t byte_start = column ? std::min(column - 1, source_line.size()) : 0;
+    const std::size_t byte_length = std::min(source_length, source_line.size() - byte_start);
+    const std::string expanded = expand_tabs(source_line);
+    const std::size_t span_start = expand_tabs(source_line.substr(0, byte_start)).size();
+    const std::size_t span_len = expand_tabs(source_line.substr(byte_start, byte_length)).size();
+    const std::size_t span_end = span_start + span_len;
+    const std::size_t line_len = expanded.size();
+
+    // Left context: last `left_columns` display columns of expanded[0, span_start).
+    std::size_t left_keep = 0;
+    {
+        std::size_t cols = 0;
+        std::size_t i = span_start;
+        while (i > 0 && cols < left_columns) {
+            std::size_t s = i - 1;
+            while (s > 0 && (static_cast<unsigned char>(expanded[s]) & 0xc0) == 0x80) --s;
+            const unsigned char c = static_cast<unsigned char>(expanded[s]);
+            if (c >= 0x20 && c != 0x7f) ++cols;
+            i = s;
+        }
+        left_keep = i;
+    }
+    const bool cropped_left = left_keep > 0;
+    const std::string_view left_context =
+        std::string_view(expanded).substr(left_keep, span_start - left_keep);
+
+    // Right context: first `right_columns` display columns of expanded[span_end, ...).
+    std::size_t right_keep = 0;
+    {
+        std::size_t cols = 0;
+        std::size_t i = span_end;
+        while (i < line_len && cols < right_columns) {
+            const unsigned char c = static_cast<unsigned char>(expanded[i]);
+            if (c >= 0x20 && c != 0x7f) ++cols;
+            ++i;
+            if (c >= 0x80)
+                while (i < line_len && (static_cast<unsigned char>(expanded[i]) & 0xc0) == 0x80) ++i;
+        }
+        right_keep = i;
+    }
+    const bool cropped_right = right_keep < line_len;
+    const std::string_view right_context =
+        std::string_view(expanded).substr(span_end, right_keep - span_end);
+
+    // Span: show at most `max_span_columns` display columns; cap the underline.
+    std::size_t span_show = span_end;
+    {
+        std::size_t cols = 0;
+        std::size_t i = span_start;
+        while (i < span_end && cols < max_span_columns) {
+            const unsigned char c = static_cast<unsigned char>(expanded[i]);
+            if (c >= 0x20 && c != 0x7f) ++cols;
+            ++i;
+            if (c >= 0x80)
+                while (i < span_end && (static_cast<unsigned char>(expanded[i]) & 0xc0) == 0x80) ++i;
+        }
+        span_show = i;
+    }
+    const bool span_cropped = span_show < span_end;
+    const std::string_view span_displayed =
+        std::string_view(expanded).substr(span_start, span_show - span_start);
+
+    std::string excerpt;
+    if (cropped_left) excerpt += "...";
+    const std::size_t left_context_columns = display_width(left_context);
+    excerpt.append(left_context.begin(), left_context.end());
+    const std::size_t excerpt_span_start = excerpt.size();
+    excerpt.append(span_displayed.begin(), span_displayed.end());
+    const std::size_t excerpt_span_len = span_displayed.size();
+    if (span_cropped) excerpt += "...";
+    excerpt.append(right_context.begin(), right_context.end());
+    if (cropped_right) excerpt += "...";
+
+    SourceExcerpt result;
+    result.excerpt = std::move(excerpt);
+    result.span_byte_start = excerpt_span_start;
+    result.span_byte_length = excerpt_span_len;
+    result.underline_columns = std::max<std::size_t>(1, display_width(span_displayed));
+    result.caret_columns = (cropped_left ? 3 : 0) + left_context_columns;
+    return result;
+}
+
 
 inline bool nift_function_char(unsigned char c) {
     return c >= 'a' && c <= 'z';

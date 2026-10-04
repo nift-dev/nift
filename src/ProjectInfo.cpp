@@ -693,20 +693,14 @@ void ProjectInfo::print_build_error(const BuildError& error) const {
     }
     std::cerr << "  " << console::highlight_diagnostic_message(error.message) << '\n';
     if (!error.source_line.empty()) {
-        const std::size_t byte_start = error.column ? std::min(error.column - 1, error.source_line.size()) : 0;
-        const std::size_t byte_length = std::min(error.source_length, error.source_line.size() - byte_start);
-        const auto source_prefix = std::string_view(error.source_line).substr(0, byte_start);
-        const auto source_span = std::string_view(error.source_line).substr(byte_start, byte_length);
-        const std::size_t display_start = console::display_width(source_prefix);
-        const std::size_t display_length = std::max<std::size_t>(1, console::display_width(source_span));
-        const std::string expanded_prefix = console::expand_tabs(source_prefix);
-        const std::string expanded_span = console::expand_tabs(source_span);
-        const std::string expanded = console::expand_tabs(error.source_line);
+        const console::SourceExcerpt excerpt = console::render_source_excerpt(
+            error.source_line, error.column, error.source_length);
         std::cerr << "    " << console::highlight_nift_source(
-            expanded, expanded_prefix.size(), expanded_span.size()) << '\n';
+            excerpt.excerpt, excerpt.span_byte_start, excerpt.span_byte_length) << '\n';
         if (error.column) {
-            const std::string marker = "^" + std::string(display_length > 1 ? display_length - 1 : 0, '~');
-            std::cerr << "    " << std::string(display_start, ' ')
+            const std::string marker =
+                "^" + std::string(excerpt.underline_columns > 1 ? excerpt.underline_columns - 1 : 0, '~');
+            std::cerr << "    " << std::string(excerpt.caret_columns, ' ')
                       << console::diagnostic_offender(marker) << '\n';
         }
     }
