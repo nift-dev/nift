@@ -76,6 +76,9 @@ check "stat file exists/type/size" [ "$(echo "$out" | grep -E '^stat_file_' | tr
 check "stat dir type / no size key / missing exists" [ "$(echo "$out" | grep -E '^stat_dir_type:|^stat_dir_has_size:|^stat_missing_exists:' | tr '\n' ' ')" = "stat_dir_type:directory stat_dir_has_size:false stat_missing_exists:false " ]
 
 # Recoverable error on a genuine metadata failure (permission denied).
+# POSIX permission bits are meaningless on Windows, so this reproduces only on
+# POSIX hosts.
+if [ "$(uname -s 2>/dev/null | cut -c1-7)" != "MINGW" ] && [ "$(uname -s 2>/dev/null | cut -c1-5)" != "MSYS" ]; then
 mkdir -p "$t/locked"; echo "secret" > "$t/locked/secret.txt"; chmod 000 "$t/locked"
 if [ "$(id -u)" != "0" ]; then
   cat > "$t/perm.f" <<'EOF'
@@ -92,6 +95,7 @@ EOF
   check "permission-denied is recoverable error" [ "$(echo "$pout" | grep -E '^perm_is_file_error:')" = "perm_is_file_error:true" ]
 fi
 chmod 755 "$t/locked"
+fi
 
 # Windows-specific path forms (drive letters, backslashes, trailing backslash).
 if [ "$(uname -s 2>/dev/null | cut -c1-7)" = "MINGW" ] || [ "$(uname -s 2>/dev/null | cut -c1-5)" = "MSYS" ]; then
