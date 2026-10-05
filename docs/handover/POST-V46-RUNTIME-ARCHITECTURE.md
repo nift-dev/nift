@@ -59,9 +59,47 @@ closure-captures-binding; recursion cap 64; cyclic-reference rejection;
 Bytes/Timer/Error non-serializable; prepared ≡ legacy observably; C ABI 1.3;
 website build behavior.
 
-## CP1 — prepared execution for ordinary script bodies
+## CP1 — prepared execution for ordinary script bodies (accepted — CLEAR WIN)
 
-_(pending)_
+Starting local SHA: `55f166a`.
+
+Change: `prepare_loop_body` now accepts a bare user-function call `$[foo(args)]`
+(previously it required a dotted native-handle call via `split_native_call`), and
+`execute_prepared` evaluates such an Expression statement through
+`nift::ast::evaluate(st.expr, ...)` — which retains the `arg_is_location`
+fallback to the legacy evaluator (the oracle) — instead of the handle-only
+`execute_native_call`. Files: `src/ParserTemplate.cpp`.
+
+Result (callgrind Ir):
+
+| workload | 8862add | CP1 | Δ vs baseline | Δ vs v4.5.0 |
+|---|---:|---:|---:|---:|
+| fn_empty | 4,236,118,647 | 145,833,959 | **−96.6%** | 3,547,467,727 → **−95.9%** |
+| fn_args | 5,049,144,118 | 249,661,678 | **−95.1%** | 4,260,580,754 → **−94.1%** |
+| lambda | 4,803,119,092 | 2,565,910,898 | −46.6% | 4,100,611,240 → −37.4% |
+| numeric_loop | 2,466,361,138 | 2,463,362,324 | ~0 | — |
+| array_push_index | 3,380,057,771 | 3,378,638,266 | ~0 | — |
+| map_set_new / get / contains / iterate | — | ~unchanged | ~0 | — |
+
+Classification: **CLEAR WIN** on the targeted residual (fn_empty/fn_args far
+below v4.5), no unrelated regression. lambda improvement is partial (lambdas are
+not yet on the prepared path → CP2).
+
+Correctness: `v44_ast_differential_corpus.sh` PASS (20 programs, legacy-
+equivalent), `v44_ast_expression_smoke.sh` PASS, `v44_ast_fuzz.py` PASS (120
+runs, prepared == legacy), `make test-v43-language test-collections
+test-v44-language-foundation` PASS, `tests/v43_review_smoke.sh` PASS. Alias case
+`bump(c)` (array pass-by-value) is unchanged across v4.5.0/v4.6.0/CP1.
+
+Rejected in CP1 (reverted): routing the map `@for` body through its prepared
+body. It exposed a **pre-existing** defect where prepared execution of a map
+collection method call (`$[m.get(k)]`, `$[m.size()]`, `$[m.has(k)]`) falls
+through `execute_native_call` to a legacy fallback that returns empty. The map
+`@for` continues to use `parse` (legacy) for now; the prepared map-body path is a
+CP2 candidate once that collection-method dispatch is fixed. Recorded, not
+carried forward.
+
+Commit: see the CP1 commit (message prefix `perf:`).
 
 ## CP2 — callable prepared execution
 
