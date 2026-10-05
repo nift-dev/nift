@@ -162,7 +162,11 @@ with tempfile.TemporaryDirectory(prefix='nift-cp9-fuzz-') as td:
 
     (root/'templates/template.html').write_text('<main>@content</main>\n')
     (root/'content/index.html').write_text(('content-$[title]-'*400000)+'\n')
-    rc,elapsed=run_case(root,'<main>@content</main>\n','content-6m',15.0)
+    # Large-input boundary case (6.4 MB content with 400k $[title] interpolations)
+    # under the sanitized build. The timeout is a sanity bound, not a performance
+    # assertion: ASan/UBSan make this case ~7x slower than the normal build, and
+    # the accepted v4.6 interpreter residual adds ~15%, so keep generous margin.
+    rc,elapsed=run_case(root,'<main>@content</main>\n','content-6m',40.0)
     max_elapsed=max(max_elapsed,elapsed)
     successful += rc==0; controlled_errors += rc!=0
     boundary_results.append({'name':'content-6m','exit':rc,'elapsed_seconds':round(elapsed,6)})
