@@ -20,19 +20,18 @@ whether it is a regression.
 ## Current identity
 
 - Product: **Nift**, a website generator and dependency-aware website build layer.
-- Current executable identity: `Nift v4.6.0` (local development), following the
-  public v4.5.0 release.
+- Current executable identity: `Nift v4.7.0` (local development), following the
+  public v4.6.0 release.
 - Language/toolchain: C++17 and Make.
 - Output convention for modern projects: `public/`.
 - Current branch: `main` in this checkout.
-- Current project phase: **v4.6 development after the public v4.5.0 release**.
+- Current project phase: **v4.7 development after the public v4.6.0 release**.
   The local Phase 4 development transition is committed and may remain unpushed
-  while normal v4.6 development continues. Chocolatey v4.5.0 is pending
-  automated review; Snap v4.5.0 follow-up is maintainer-managed by Nick;
-  Homebrew propagation is external and automatic. Completed v4.5 certification
-  remains in
-  `docs/handover/V4.5-CODEX-REVIEW-REPORT.md` and
-  `docs/evidence/release-4.5.0/release-verification.md`.
+  while normal v4.7 development continues. The v4.6.0 GitHub release is published
+  and immutable (tag `v4.6.0` at `bb6e9f2`); Chocolatey v4.6.0 is submitted and
+  pending automated review; Snap v4.6.0 follow-up is maintainer-managed by Nick;
+  Homebrew propagation is external and automatic. Completed v4.6 certification
+  remains in `docs/evidence/release-4.6.0/release-verification.md`.
 - Public documentation: the separate `nift-dev.github.io` repository.
 - External contract: the separate `nift-regression-suite` repository.
 - Embedded minifier: `minifypp/`, synchronized with standalone Minify++.

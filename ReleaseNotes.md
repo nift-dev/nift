@@ -1,5 +1,10 @@
 # Nift release notes
 
+## v4.7.0 (unreleased development)
+
+Development has advanced to v4.7.0 after the completed v4.6.0 release. No
+v4.7.0 user-visible changes have been recorded yet.
+
 ## v4.6.0 (released 2026-10-05)
 
 Nift v4.6 adds first-class immutable `bytes` and byte I/O, recoverable

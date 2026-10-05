@@ -7,12 +7,21 @@ approved release is packaged and published.
 
 ## Authority and current state
 
-The local development executable reports `Nift v4.6.0` and
-`snap/snapcraft.yaml` also declares `4.6.0`, following the public v4.5.0
+The local development executable reports `Nift v4.7.0` and
+`snap/snapcraft.yaml` also declares `4.7.0`, following the public v4.6.0
 release. This local Phase 4 transition is committed and may remain unpushed
 until normal subsequent development is ready. Exact tag, artifact and public
-release history remains documented below; completed v4.5.0 evidence must not be
+release history remains documented below; completed v4.6.0 evidence must not be
 rewritten.
+
+### v4.6.0 release status (2026-10-05)
+
+The v4.6.0 GitHub release is published and immutable: annotated tag `v4.6.0` at
+`bb6e9f2`; release workflow #37310682044 passed including all three
+`installer-public-smoke` jobs. Chocolatey v4.6.0 is submitted and pending
+automated review; Snap v4.6.0 (including riscv64) remains maintainer-managed by
+Nick; Homebrew propagation is automatic. See
+`docs/evidence/release-4.6.0/release-verification.md`.
 
 ### v4.5.0 candidate status (2026-09-27)
 
