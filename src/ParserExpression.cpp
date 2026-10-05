@@ -168,6 +168,10 @@ int Parser::expression_type(const std::string& source) const {
         const auto l = source.find_last_not_of(" \t\r\n");
         return source.substr(f, l - f + 1);
     }();
+    // Static type inference is only a hint (the runtime type is authoritative);
+    // skip the recursive inference for very large expressions so a long flat
+    // chain cannot exhaust the stack here.
+    if (t.size() > 2048) return -1;
     bool wrapped = true;
     while (wrapped && t.size() >= 2 && t.front() == '(' && t.back() == ')') {
         wrapped = false;
@@ -1077,6 +1081,10 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
         std::string text=trim_copy(raw);
         if (text.empty()) { error="expression cannot be empty"; return false; }
         while (encloses(text)) text=trim_copy(text.substr(1,text.size()-2));
+        // Generative recursion guard: flat binary chains are folded iteratively
+        // above, so this depth only grows with genuine syntactic nesting. Fail
+        // deterministically instead of exhausting the C++ stack.
+        if(depth>24){error="expression nesting exceeds parser limit";return false;}
 
         auto find_binding = [&](const std::string& name) -> VariableBinding* {
             for (auto scope=variable_scopes_.rbegin(); scope!=variable_scopes_.rend(); ++scope) { auto it=scope->find(name); if(it!=scope->end()) { it->second.sync(); return &it->second; } }
@@ -2444,7 +2452,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                             bool okcall=true;
                             source_context_stack_.push_back(SourceContext{fn->source_path,fn->source_provenance});
                             if(fn->block){std::string bt=trim_copy(fn->body);const bool rendered=!bt.empty()&&bt.front()=='<';if(rendered){auto nested=parse(fn->body,fn->source_path,1,fn->source_provenance);if(!nested.ok){error=nested.error.message;if(nested.diagnostic)active_diagnostic_=nested.diagnostic;okcall=false;}else out=nift::RuntimeValue(nested.output);}else{++function_call_depth_;auto nested=execute_native_program(fn->body,fn->source_path,1,fn->source_provenance);--function_call_depth_;if(!nested.ok){error=nested.error.message;if(nested.diagnostic)active_diagnostic_=nested.diagnostic;okcall=false;}else if(pending_control_.kind==ControlFlow::Return){consume_return(out);}else out=nift::RuntimeValue(nullptr);}}
-                            else { okcall=eval(fn->body,out,depth+1); if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0) error="lambda body error: "+error; VariableBinding lr; if(try_location_ref(fn->body,lr)&&lr.is_location_ref()&&lr.value){last_call_return_loc_root_=lr.ref_root_slot;last_call_return_loc_path_=lr.ref_path;} }
+                            else { okcall=eval(fn->body,out,1); if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0) error="lambda body error: "+error; VariableBinding lr; if(try_location_ref(fn->body,lr)&&lr.is_location_ref()&&lr.value){last_call_return_loc_root_=lr.ref_root_slot;last_call_return_loc_path_=lr.ref_path;} }
                             source_context_stack_.pop_back();pop_variable_scope();leave_lexical_environment(std::move(lexical_env));--callable_call_depth_;if(!okcall)append_diagnostic_frame(nift::detail::DiagnosticFrameKind::Lambda,"lambda");return okcall;
                         }
                     }
@@ -3150,19 +3158,18 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             return true;
         }
 
-        if (const auto p=find_top_level_op("||"); p!=std::string::npos) {
-            nift::RuntimeValue left;
-            if (!eval(text.substr(0,p),left,depth+1)) return false;
-            if (truthy_value(left)) { out=nift::RuntimeValue(true); return true; }
-            nift::RuntimeValue right; if (!eval(text.substr(p+2),right,depth+1)) return false;
-            out=nift::RuntimeValue(truthy_value(right)); return true;
+        // Split at every top-level occurrence of a binary operator string so a
+        // flat chain folds iteratively rather than recursing per operator.
+        auto split_op=[&](const std::string& op,std::vector<std::string>& parts)->bool{
+            parts.clear();bool quoted=false;char quote=0;int parens=0,brackets=0,braces=0;std::size_t start=0;
+            for(std::size_t i=0;i+op.size()<=text.size();++i){char c=text[i];if(quoted){if(c=='\\')++i;else if(c==quote)quoted=false;continue;}if(c=='\''||c=='"'){quoted=true;quote=c;continue;}if(c=='('){++parens;continue;}if(c==')'){if(parens)--parens;continue;}if(c=='['){++brackets;continue;}if(c==']'){if(brackets)--brackets;continue;}if(c=='{'){++braces;continue;}if(c=='}'){if(braces)--braces;continue;}if(parens||brackets||braces)continue;if(text.compare(i,op.size(),op)==0){parts.push_back(text.substr(start,i-start));i+=op.size()-1;start=i+1;}}
+            if(parts.empty())return false;parts.push_back(text.substr(start));return true;
+        };
+        { std::vector<std::string> parts;
+          if (split_op("||",parts)) { nift::RuntimeValue v; for(const auto& pt:parts){if(!eval(pt,v,depth+1))return false;if(truthy_value(v)){out=nift::RuntimeValue(true);return true;}} out=nift::RuntimeValue(truthy_value(v)); return true; }
         }
-        if (const auto p=find_top_level_op("&&"); p!=std::string::npos) {
-            nift::RuntimeValue left;
-            if (!eval(text.substr(0,p),left,depth+1)) return false;
-            if (!truthy_value(left)) { out=nift::RuntimeValue(false); return true; }
-            nift::RuntimeValue right; if (!eval(text.substr(p+2),right,depth+1)) return false;
-            out=nift::RuntimeValue(truthy_value(right)); return true;
+        { std::vector<std::string> parts;
+          if (split_op("&&",parts)) { nift::RuntimeValue v; for(const auto& pt:parts){if(!eval(pt,v,depth+1))return false;if(!truthy_value(v)){out=nift::RuntimeValue(false);return true;}} out=nift::RuntimeValue(truthy_value(v)); return true; }
         }
         // Stream insertion/extraction operators. Handled lazily inside the comparison
         // loop below so expressions without a top-level << or >> pay nothing
@@ -3251,7 +3258,6 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             out=nift::RuntimeValue(!truthy_value(operand)); return true;
         }
 
-        { std::size_t cp=std::string::npos;bool q=false;char qc=0;int pa=0,br=0,bc=0;for(size_t z=text.size();z-- >0;){char c=text[z];if(q){if(c==qc&&(z==0||text[z-1]!='\\'))q=false;continue;}if(c=='\''||c=='"'){q=true;qc=c;continue;}if(c==')')++pa;else if(c=='(')--pa;else if(c==']')++br;else if(c=='[')--br;else if(c=='}')++bc;else if(c=='{')--bc;else if(c=='+'&&!pa&&!br&&!bc){if((z>0&&std::string("+-*/%(<>=!&|?:,").find(text[z-1])!=std::string::npos)||numeric_exponent_sign(text,z))continue;cp=z;break;}}if(cp!=std::string::npos){nift::RuntimeValue l,r;if(!eval(text.substr(0,cp),l,depth+1)||!eval(text.substr(cp+1),r,depth+1))return false;nift::RuntimeValue ls,rs;if(!atomic_scalar(l,ls)||!atomic_scalar(r,rs))return false;l=std::move(ls);r=std::move(rs);if(l.is_array()&&r.is_array()){out=nift::RuntimeValue::make_array();out.array.reserve(l.array.size()+r.array.size());out.array.insert(out.array.end(),l.array.begin(),l.array.end());out.array.insert(out.array.end(),r.array.begin(),r.array.end());return true;}if(l.is_bytes()||r.is_bytes()){if(!l.is_bytes()||!r.is_bytes()){error="bytes values cannot be rendered as text; bytes concatenation requires two bytes values";return false;}nift::RuntimeBytes joined;if(l.bytes)joined.insert(joined.end(),l.bytes->begin(),l.bytes->end());if(r.bytes)joined.insert(joined.end(),r.bytes->begin(),r.bytes->end());out=nift::RuntimeValue(std::move(joined));return true;}if(l.is_string()||r.is_string()){auto safe=[&](const nift::RuntimeValue& v,std::string& z){if(v.is_error()||v.is_timer()||v.is_bytes()||v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0&&v.string.rfind("\x1fnift:timer:",0)!=0))return false;z=render_expression_value(v);return true;};std::string a,b;if(!safe(l,a)||!safe(r,b)){error="string concatenation requires renderable scalar values";return false;}out=nift::RuntimeValue(a+b);return true;}return numeric_binary(l,r,'+',out);}}
 
         auto find_binary = [&](const std::string& ops) -> std::size_t {
             bool quoted=false; char quote=0; int parens=0; int brackets=0;
@@ -3273,18 +3279,31 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             return std::string::npos;
         };
 
-        std::size_t pos=find_binary("+-");
-        if (pos==std::string::npos) pos=find_binary("*/%");
-        if (pos!=std::string::npos) {
-            nift::RuntimeValue left,right;
-            if (!eval(text.substr(0,pos),left,depth+1) || !eval(text.substr(pos+1),right,depth+1)) return false;
+        // Apply one arithmetic operator with the existing semantics (array/bytes/
+        // string concatenation, otherwise numeric). Factored so a flat chain can
+        // be folded iteratively instead of recursing per operator.
+        auto apply_arithmetic=[&](char op,nift::RuntimeValue left,nift::RuntimeValue right,nift::RuntimeValue& dst)->bool{
             nift::RuntimeValue ls,rs;if(!atomic_scalar(left,ls)||!atomic_scalar(right,rs))return false;left=std::move(ls);right=std::move(rs);
-            const char op=text[pos];
-            if(op=='+' && left.is_array() && right.is_array()){out=nift::RuntimeValue::make_array();out.array.reserve(left.array.size()+right.array.size());out.array.insert(out.array.end(),left.array.begin(),left.array.end());out.array.insert(out.array.end(),right.array.begin(),right.array.end());return true;}
-            if(op=='+' && (left.is_bytes()||right.is_bytes())){if(!left.is_bytes()||!right.is_bytes()){error="bytes values cannot be rendered as text; bytes concatenation requires two bytes values";return false;}nift::RuntimeBytes joined;if(left.bytes)joined.insert(joined.end(),left.bytes->begin(),left.bytes->end());if(right.bytes)joined.insert(joined.end(),right.bytes->begin(),right.bytes->end());out=nift::RuntimeValue(std::move(joined));return true;}
-            if(op=='+' && (left.is_string()||right.is_string())) { auto safe=[&](const nift::RuntimeValue& v,std::string& r){if(v.is_error()||v.is_timer()||v.is_bytes()||v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0&&v.string.rfind("\x1fnift:timer:",0)!=0))return false;r=render_expression_value(v);return true;};std::string l,r;if(!safe(left,l)||!safe(right,r)){error="string concatenation requires renderable scalar values";return false;}out=nift::RuntimeValue(l+r);return true; }
+            if(op=='+' && left.is_array() && right.is_array()){dst=nift::RuntimeValue::make_array();dst.array.reserve(left.array.size()+right.array.size());dst.array.insert(dst.array.end(),left.array.begin(),left.array.end());dst.array.insert(dst.array.end(),right.array.begin(),right.array.end());return true;}
+            if(op=='+' && (left.is_bytes()||right.is_bytes())){if(!left.is_bytes()||!right.is_bytes()){error="bytes values cannot be rendered as text; bytes concatenation requires two bytes values";return false;}nift::RuntimeBytes joined;if(left.bytes)joined.insert(joined.end(),left.bytes->begin(),left.bytes->end());if(right.bytes)joined.insert(joined.end(),right.bytes->begin(),right.bytes->end());dst=nift::RuntimeValue(std::move(joined));return true;}
+            if(op=='+' && (left.is_string()||right.is_string())) { auto safe=[&](const nift::RuntimeValue& v,std::string& r){if(v.is_error()||v.is_timer()||v.is_bytes()||v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0&&v.string.rfind("\x1fnift:timer:",0)!=0))return false;r=render_expression_value(v);return true;};std::string l,r;if(!safe(left,l)||!safe(right,r)){error="string concatenation requires renderable scalar values";return false;}dst=nift::RuntimeValue(l+r);return true; }
             if (!left.is_number() || !right.is_number()) { error="arithmetic operators require numeric operands"; return false; }
-            return numeric_binary(left,right,op,out);
+            return numeric_binary(left,right,op,dst);
+        };
+        // Split at every top-level operator in `ops` (left to right) so a flat
+        // left-associative chain can be folded iteratively; this removes the
+        // O(chain length) C++ recursion that previously exhausted the stack.
+        auto split_arithmetic=[&](const std::string& ops,std::vector<std::string>& parts,std::vector<char>& opchars)->bool{
+            parts.clear();opchars.clear();bool quoted=false;char quote=0;int parens=0,brackets=0,braces=0;std::size_t start=0;
+            for(std::size_t i=0;i<text.size();++i){char c=text[i];if(quoted){if(c=='\\'&&i+1<text.size())++i;else if(c==quote)quoted=false;continue;}if(c=='\''||c=='"'){quoted=true;quote=c;continue;}if(c=='('){++parens;continue;}if(c==')'){if(parens)--parens;continue;}if(c=='['){++brackets;continue;}if(c==']'){if(brackets)--brackets;continue;}if(c=='{'){++braces;continue;}if(c=='}'){if(braces)--braces;continue;}if(parens||brackets||braces)continue;if(ops.find(c)==std::string::npos)continue;if(c=='+'||c=='-'){std::size_t j=i;while(j>0&&(text[j-1]==' '||text[j-1]=='\t'))--j;if(j==0||std::string("+-*/%(<>=!&|?:,").find(text[j-1])!=std::string::npos||numeric_exponent_sign(text,i))continue;}parts.push_back(text.substr(start,i-start));opchars.push_back(c);start=i+1;}
+            if(opchars.empty())return false;parts.push_back(text.substr(start));return true;
+        };
+        { std::vector<std::string> parts;std::vector<char> opchars;
+          if (split_arithmetic("+-",parts,opchars)||split_arithmetic("*/%",parts,opchars)) {
+            nift::RuntimeValue acc;if(!eval(parts[0],acc,depth+1))return false;
+            for(std::size_t k=0;k<opchars.size();++k){nift::RuntimeValue rhs;if(!eval(parts[k+1],rhs,depth+1))return false;nift::RuntimeValue next;if(!apply_arithmetic(opchars[k],std::move(acc),std::move(rhs),next))return false;acc=std::move(next);}
+            out=std::move(acc);return true;
+          }
         }
 
         if ((text.front()=='+' || text.front()=='-') && text.size()>1) {

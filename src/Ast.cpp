@@ -10,11 +10,12 @@
 namespace nift::ast {
 namespace {
 struct P {
- const std::string& s; std::size_t p=0; std::string error;
+ struct G{int&d;G(int&x):d(x){++d;}~G(){--d;}};
+ const std::string& s; std::size_t p=0; std::string error; int depth=0;
  void ws(){while(p<s.size()&&std::isspace((unsigned char)s[p]))++p;}
  bool take(const std::string& x){ws();if(s.compare(p,x.size(),x)==0){p+=x.size();return true;}return false;}
  std::unique_ptr<Expr> node(Kind k,std::size_t b){auto n=std::make_unique<Expr>();n->kind=k;n->span={b,p};return n;}
- std::unique_ptr<Expr> primary(){ws();auto b=p;if(p>=s.size()){error="expected expression";return{};}
+ std::unique_ptr<Expr> primary(){G g(depth);if(depth>128){error="expression nesting exceeds parser limit";return{};}ws();auto b=p;if(p>=s.size()){error="expected expression";return{};}
    if(s[p]=='('){++p;auto n=logical_or();ws();if(p>=s.size()||s[p]!=')'){error="expected ')'";return{};}++p;if(n)n->span={b,p};return n;}
    if(s[p]=='['){++p;auto n=node(Kind::Array,b);ws();if(p<s.size()&&s[p]==']'){++p;n->span.end=p;return n;}while(true){auto v=coalesce();if(!v)return{};n->items.push_back(std::move(v));ws();if(p<s.size()&&s[p]==','){++p;continue;}if(p<s.size()&&s[p]==']'){++p;n->span.end=p;return n;}error="expected ',' or ']' in array literal";return{};}}
    if(s[p]=='\''||s[p]=='\"'){char q=s[p++];std::string v;while(p<s.size()&&s[p]!=q){if(s[p]=='\\'&&p+1<s.size()){char e=s[++p];v+=e=='n'?'\n':e=='t'?'\t':e;}else v+=s[p];++p;}if(p>=s.size()){error="unterminated string";return{};}++p;auto n=node(Kind::Literal,b);n->literal=nift::RuntimeValue(v);return n;}
@@ -29,7 +30,7 @@ struct P {
    error="unsupported primary";return{};
  }
  std::unique_ptr<Expr> postfix(){auto l=primary();if(!l)return{};while(true){ws();if(p+1<s.size()&&s[p]=='?'&&s[p+1]=='.'){auto b=l->span.begin;p+=2;ws();auto st=p;if(p>=s.size()||!(std::isalpha((unsigned char)s[p])||s[p]=='_')){error="expected member name";return{};}++p;while(p<s.size()&&(std::isalnum((unsigned char)s[p])||s[p]=='_'))++p;auto n=node(Kind::SafeMember,b);n->name=s.substr(st,p-st);n->left=std::move(l);l=std::move(n);continue;}if(p+1<s.size()&&s[p]=='?'&&s[p+1]=='['){auto b=l->span.begin;p+=2;auto idx=coalesce();ws();if(!idx||p>=s.size()||s[p]!=']'){error="expected ']'";return{};}++p;auto n=node(Kind::SafeIndex,b);n->left=std::move(l);n->right=std::move(idx);l=std::move(n);continue;}if(p<s.size()&&s[p]=='.'){auto b=l->span.begin;++p;ws();auto st=p;if(p>=s.size()||!(std::isalpha((unsigned char)s[p])||s[p]=='_')){error="expected member name";return{};}++p;while(p<s.size()&&(std::isalnum((unsigned char)s[p])||s[p]=='_'))++p;auto n=node(Kind::Member,b);n->name=s.substr(st,p-st);n->left=std::move(l);l=std::move(n);continue;}if(p<s.size()&&s[p]=='['){auto b=l->span.begin;++p;auto idx=coalesce();ws();if(!idx||p>=s.size()||s[p]!=']'){error="expected ']'";return{};}++p;auto n=node(Kind::Index,b);n->left=std::move(l);n->right=std::move(idx);l=std::move(n);continue;}if(p<s.size()&&s[p]=='('){auto b=l->span.begin;int d=0;bool q=false;char qc=0;do{char ch=s[p++];if(q){if(ch=='\\'&&p<s.size())++p;else if(ch==qc)q=false;}else if(ch=='\''||ch=='"'){q=true;qc=ch;}else if(ch=='(')++d;else if(ch==')')--d;}while(p<s.size()&&d>0);if(d!=0){error="unterminated call";return{};}auto n=node(Kind::Call,b);n->text=s.substr(b,p-b);n->left=std::move(l);l=std::move(n);continue;}break;}return l;}
- std::unique_ptr<Expr> unary(){ws();auto b=p;if(take("!")){auto r=unary();if(!r)return{};auto n=node(Kind::Unary,b);n->op="!";n->right=std::move(r);return n;}if(take("-")){auto r=unary();if(!r)return{};auto n=node(Kind::Unary,b);n->op="-";n->right=std::move(r);return n;}if(take("+")){auto r=unary();if(!r)return{};auto n=node(Kind::Unary,b);n->op="+";n->right=std::move(r);return n;}return postfix();}
+ std::unique_ptr<Expr> unary(){G g(depth);if(depth>128){error="expression nesting exceeds parser limit";return{};}ws();auto b=p;if(take("!")){auto r=unary();if(!r)return{};auto n=node(Kind::Unary,b);n->op="!";n->right=std::move(r);return n;}if(take("-")){auto r=unary();if(!r)return{};auto n=node(Kind::Unary,b);n->op="-";n->right=std::move(r);return n;}if(take("+")){auto r=unary();if(!r)return{};auto n=node(Kind::Unary,b);n->op="+";n->right=std::move(r);return n;}return postfix();}
  template<class Next> std::unique_ptr<Expr> chain(Next next,const std::initializer_list<const char*> ops){auto l=(this->*next)();if(!l)return{};while(true){ws();std::string op;for(auto x:ops)if(s.compare(p,std::char_traits<char>::length(x),x)==0){op=x;break;}if(op.empty())break;auto b=l->span.begin;p+=op.size();auto r=(this->*next)();if(!r)return{};auto n=node(Kind::Binary,b);n->op=op;n->left=std::move(l);n->right=std::move(r);l=std::move(n);}return l;}
  std::unique_ptr<Expr> mul(){return chain(&P::unary,{"*","/","%"});}
  std::unique_ptr<Expr> add(){return chain(&P::mul,{"+","-"});}
@@ -91,6 +92,13 @@ void fold_constants(Expr& e){
 }
 
 ParseResult parse_expression(const std::string& source){
+ // The prepared AST is recursive (fold/evaluate/destruct) so it must not build
+ // a pathologically large or deeply nested tree. Beyond these bounds the
+ // expression is reported unsupported and the robust legacy evaluator (which
+ // handles flat chains iteratively) evaluates it instead, so behaviour is
+ // preserved and the parser never exhausts the C++ stack.
+ {std::size_t depth=0,maxdepth=0;bool q=false;char qc=0;for(std::size_t i=0;i<source.size();++i){char c=source[i];if(q){if(c=='\\')++i;else if(c==qc)q=false;continue;}if(c=='\''||c=='"'){q=true;qc=c;continue;}if(c=='('||c=='['||c=='{'){if(++depth>maxdepth)maxdepth=depth;}else if(c==')'||c==']'||c=='}'){if(depth)--depth;}}
+  if(source.size()>8192||maxdepth>256)return{{},std::string("expression is too large for the prepared parser"),false};}
  {auto arrow=source.find("=>");if(arrow!=std::string::npos){auto lhs=source.substr(0,arrow);auto trim=[](std::string x){auto b=x.find_first_not_of(" \t\r\n");if(b==std::string::npos)return std::string();auto e=x.find_last_not_of(" \t\r\n");return x.substr(b,e-b+1);};lhs=trim(lhs);if(lhs.size()>=2&&lhs.front()=='('&&lhs.back()==')'){auto n=std::make_unique<Expr>();n->kind=Kind::Lambda;n->span={0,source.size()};n->text=source;std::string ps=lhs.substr(1,lhs.size()-2);std::size_t p=0;while(p<=ps.size()){auto c=ps.find(',',p);auto v=trim(ps.substr(p,c==std::string::npos?std::string::npos:c-p));if(!v.empty()){if(v.rfind("...",0)==0){n->op="variadic:"+trim(v.substr(3));n->params.push_back(trim(v.substr(3)));}else n->params.push_back(v);}if(c==std::string::npos)break;p=c+1;}return{std::move(n),{},true};}}}
  P p{source,0,{}};auto e=p.coalesce();p.ws();if(!e||p.p!=source.size())return{{},p.error.empty()?"unsupported expression":p.error,false};fold_constants(*e);return{std::move(e),{},true};}
 TemplateParseResult parse_template(const std::string& source){

@@ -160,6 +160,17 @@ with tempfile.TemporaryDirectory(prefix='nift-cp9-fuzz-') as td:
                 raise RuntimeError(f'{name} unexpectedly exceeded the parser depth boundary')
         boundary_results.append({'name':name,'exit':rc,'elapsed_seconds':round(elapsed,6)})
 
+    # DEEP-EXPRESSION-PARSER-HARDENING: a large flat binary chain must parse and
+    # evaluate (previously ~2000 terms exhausted the recursive parser stack and
+    # segfaulted); a pathologically nested expression must fail with a controlled
+    # diagnostic, never a signal. run_case raises on any signal/sanitizer finding.
+    rc,elapsed=run_case(root,'@content\n$[1'+' + 1'*50000+']\n','deep-flat-chain-50k',40.0)
+    max_elapsed=max(max_elapsed,elapsed); successful += rc==0; controlled_errors += rc!=0
+    boundary_results.append({'name':'deep-flat-chain-50k','exit':rc,'elapsed_seconds':round(elapsed,6)})
+    rc,elapsed=run_case(root,'@content\n$['+'!'*5000+'true]\n','deep-unary-nesting-5k',40.0)
+    max_elapsed=max(max_elapsed,elapsed); successful += rc==0; controlled_errors += rc!=0
+    boundary_results.append({'name':'deep-unary-nesting-5k','exit':rc,'elapsed_seconds':round(elapsed,6)})
+
     (root/'templates/template.html').write_text('<main>@content</main>\n')
     (root/'content/index.html').write_text(('content-$[title]-'*400000)+'\n')
     # Large-input boundary case (6.4 MB content with 400k $[title] interpolations)
@@ -170,7 +181,7 @@ with tempfile.TemporaryDirectory(prefix='nift-cp9-fuzz-') as td:
     max_elapsed=max(max_elapsed,elapsed)
     successful += rc==0; controlled_errors += rc!=0
     boundary_results.append({'name':'content-6m','exit':rc,'elapsed_seconds':round(elapsed,6)})
-    boundary_count=len(boundaries)+1
+    boundary_count=len(boundary_results)
 
 out=pathlib.Path(a.output); out.parent.mkdir(parents=True,exist_ok=True)
 generated_total=a.cases*len(seeds)
