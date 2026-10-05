@@ -146,6 +146,13 @@ The lesson is broader than one container choice: measure CPU, peak memory,
 representation, and lifetime. Do not improve benchmarks by skipping safety work.
 `PERFORMANCE.md` records current retained evidence.
 
+**CURRENT:** the v4.5→v4.6 runtime performance campaign is recorded in
+`docs/handover/POST-V46-RUNTIME-PERFORMANCE.md`. After the v4.6 release, run the
+`POST-V46-RUNTIME-ARCHITECTURE` campaign it defines **before** treating the
+residual function-call/map interpreter regressions as forgotten or permanently
+accepted. Sequencing is: release v4.6 → runtime architecture campaign → resume
+Nift HTTP work backed by Strut.
+
 ## Testing culture
 
 The most important development habit is:

@@ -145,6 +145,14 @@ This is why I continue to regard Nift as **release-near rather than fundamentall
 
 If testing uncovers a deep architectural problem, that assessment changes.
 
+**Post-v4.6 sequencing (CURRENT, do not drop):** after the v4.6 release, run the
+`POST-V46-RUNTIME-ARCHITECTURE` campaign in
+`docs/handover/POST-V46-RUNTIME-PERFORMANCE.md` (RuntimeValue representation,
+VariableBinding/call-frame ownership, prepared-execution coverage, map
+architecture) to recover the residual function-call/map interpreter regressions
+before resuming the Strut-backed Nift HTTP work. Order: release v4.6 → runtime
+architecture campaign → resume HTTP.
+
 ---
 
 # 5. Minify++'s immediate path
