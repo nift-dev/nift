@@ -41,13 +41,14 @@ Development has advanced to v4.6.0 after the completed v4.5.0 release.
 ### Language and runtime
 
 - **First-class immutable `bytes`.** `bytes(...)` constructs an immutable,
-  shared-backed byte value from arrays/strings; byte indexing, `size`/`empty`,
-  concatenation, slicing/take/skip, `contains`, comparison, `to_hex`/`from_hex`,
-  and strict UTF-8 `decode` are supported, with controlled errors for invalid
-  UTF-8, out-of-range indexing, and non-byte operations. Bytes preserve shared
-  identity across assignment, copy/deepcopy, closures, nested aggregates,
-  mutexes, threads and async transfer. Text/value serialization and JSON reject
-  bytes; conversion is explicit.
+  shared-backed byte value from an array of byte integers; `length`/`size`,
+  `empty`, integer indexing (`b[i]` / `b?[i]`), `slice`, `+` concatenation and
+  `==`/`!=` equality are supported, with strict UTF-8 `decode("utf-8")`
+  (`encode("utf-8")` on strings) and controlled errors for invalid UTF-8,
+  out-of-range indexing, non-byte elements, and non-byte operations. Bytes
+  preserve shared identity across assignment, copy/deepcopy, closures, nested
+  aggregates, mutexes, threads and async transfer. Text/value serialization and
+  JSON reject bytes; conversion is explicit.
 - **Byte I/O.** `open_bytes(path)` / stream and managed-file byte reads plus
   exact raw byte writes are additive; existing text I/O is unchanged.
 - **Recoverable operational errors.** External/operational failures now
