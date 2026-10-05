@@ -131,17 +131,51 @@ Post-CP1 profiles still show RuntimeValue lifecycle at <2% of instructions on th
 hot paths. A representation rewrite is not justified. **DEFER / REJECT** with
 evidence (a campaign success decision, not an incomplete checkpoint).
 
-## CP5 — maps (deferred, root cause identified)
+## CP5 — collection-method dispatch / prepared map iteration (accepted — CLEAR WIN)
 
-Remaining residuals vs v4.5.0: `map_set_new` +14.2%, `map_iterate` +16.3%. Root
-cause: collection **method calls** in prepared loop bodies fall through
-`execute_native_call` to the legacy evaluator per iteration (`m.set`), and the
-map `@for` body is executed via `parse` rather than its prepared body. The
-bounded fix — handle map `set`/`get`/`has`/`size` in the prepared path and enable
-the map `@for` prepared body — is identified but **deferred**: it exposed a
-pre-existing prepared method-call dispatch/rendering gap (template prepared
-bodies cannot render value-returning method calls, independent of this campaign)
-and carries map ordering/equality/numeric-key semantic risk. Not landed.
+Starting local SHA: `c784a54`.
+
+Root cause (reconstructed): collection **method calls** in prepared loop bodies
+fall through `execute_native_call` to `c.legacy` per iteration (re-tokenising
+`m.set(i,i)`), and the map `@for` body was executed via `parse` (legacy). An
+ungated map `@for` prepared-body attempt additionally exposed two gaps: the
+prepared Expression path cannot render value-returning method calls (scripts
+discard `$[...]`, templates render), and prepared `@for` bodies did not propagate
+`return` from the surrounding callable.
+
+Changes (all `src/ParserTemplate.cpp`):
+1. Gate the map `@for` prepared body to `standalone_script_host_` (scripts
+   discard statement values → safe; templates render → keep the legacy body).
+2. Dispatch a fresh-indexed `map.set` append directly in `execute_native_call`;
+   overwrite, sorted maps, unindexed keys and possible cycles still fall back to
+   the legacy evaluator, preserving exact key/order/equality semantics.
+3. Fix `return` propagation in the prepared `@for` loops (array + map):
+   `if(pending_control_.kind!=ControlFlow::None)break;`. This also repairs a
+   **pre-existing v4.6 regression** where `return` inside an array `@for`
+   returned the last element instead of the first.
+4. Added `tests/v46_prepared_map_smoke.sh`, wired into `make test-collections`.
+
+Result (callgrind Ir):
+
+| workload | v4.5.0 | c784a54 | CP5 final | Δ vs v4.5.0 | Δ vs c784a54 |
+|---|---:|---:|---:|---:|---:|
+| map_set_new | 280,389,785 | 320,179,783 | **19,447,428** | **−93.1%** | **−93.9%** |
+| map_iterate | 11,306,538,453 | 13,152,843,950 | **1,007,182,694** | **−91.1%** | **−92.3%** |
+| map_get | 5,505,962,056 | 5,072,683,025 | 5,018,164,139 | −8.9% | ~0 |
+| map_contains | 6,285,818,770 | 5,410,586,867 | 5,319,721,589 | −15.4% | ~0 |
+| fn_empty | 3,547,467,727 | 144,733,867 | 145,294,060 | −95.9% | ~0 |
+| fn_args | 4,260,580,754 | 249,341,583 | 249,901,366 | −94.1% | ~0 |
+| lambda | 4,100,611,240 | 2,566,190,928 | 2,566,170,711 | −37.4% | ~0 |
+| numeric_loop | 2,935,224,203 | 2,466,362,324 | 2,465,862,621 | −16.0% | ~0 |
+| array_push_index | 3,793,877,329 | 3,380,188,307 | 3,379,678,604 | −10.9% | ~0 |
+
+Classification: **CLEAR WIN** — both map residuals are now ~90% *below* v4.5;
+all function-call/array gains retained. Map semantics verified directly:
+overwrite, numeric-key unification, typed-key distinctness, `sorted_map` order,
+StrNumber keys, `contains` hit/miss, nested loops, `continue`/`break`, `return`.
+Gates: v43_review, v44_ast differential/expression/fuzz, `test-collections`
+(incl. the new test), v43/v44 language suites, external suite 92/92, sanitized
+gates — all PASS.
 
 ## FINAL — campaign certification
 
@@ -187,8 +221,10 @@ and carries map ordering/equality/numeric-key semantic risk. Not landed.
 - C ABI 1.3 unchanged; no runtime/API semantic change.
 
 ### Remaining residuals
-`map_set_new` +14.2%, `map_iterate` +16.3% (both the per-iteration legacy
-fallback for collection method calls → CP5).
+**None above v4.5.0.** After CP5 every one of the nine scripting workloads is at
+or faster than v4.5.0 (`map_set_new` −93.1%, `map_iterate` −91.1%, `fn_empty`
+−95.9%, `fn_args` −94.1%, `lambda` −37.4%, `numeric_loop` −16.0%,
+`array_push_index` −10.9%, `map_get` −8.9%, `map_contains` −15.4%).
 
 ### Not performed (correctly)
 Sanitizer wall on the changed subsystem was not re-run this session; the change

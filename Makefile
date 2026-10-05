@@ -874,6 +874,7 @@ test-macos-runner-policy:
 
 test-collections: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/collection_ops_smoke.sh
+	NIFT="$(CURDIR)/$(TARGET)" bash tests/v46_prepared_map_smoke.sh
 
 test-commands: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/commands_smoke.sh

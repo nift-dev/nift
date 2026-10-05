@@ -1129,6 +1129,23 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                             if(st.op=="add"&&!present){cc->values.push_back(v);cc->scalar_keys.insert(k);}else if(st.op=="add"&&present){/* already present: no-op */}last_expression_mutation_=true;return true;
                         }
                     }
+                    if(is_map&&st.op=="set"){
+                        if(av.size()!=2){e="set: expected key and value";return false;}
+                        if(!rb->mutable_binding){e="cannot mutate const collection: "+st.name;return false;}
+                        const nift::RuntimeValue& k=av[0];const nift::RuntimeValue& v=av[1];
+                        if(!(k.is_bool()||k.is_number()||k.is_string())){e="map: key must be bool, number, or string";return false;}
+                        const std::string mk=ckey(k);
+                        const bool fresh_indexed=!mk.empty()&&cc->scalar_keys.count(mk)==0;
+                        const bool simple_value=!(v.is_string()&&(v.string.rfind("\x1fnift:struct:",0)==0||v.string.rfind("\x1fnift:collection:",0)==0));
+                        // Fresh indexed key, plain value, insertion-ordered map: append
+                        // directly (matches the legacy fast path exactly). Overwrite,
+                        // sorted-map ordering, unindexed keys and possible cycles fall
+                        // back to the legacy evaluator, which owns those semantics.
+                        if(fresh_indexed&&simple_value&&cc->kind!=CollectionKind::SortedMap){
+                            cc->entries.push_back({k,v});cc->scalar_keys.insert(mk);if(k.type==nift::RuntimeType::StrNumber)cc->has_huge_int=true;last_expression_mutation_=true;return true;
+                        }
+                        nift::RuntimeValue lege;return c.legacy(st.text,lege,e);
+                    }
                     {nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}
                 }
                 if(!rb->value->is_array()){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}
@@ -1334,13 +1351,20 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     variable_scopes_.back().emplace(key_name,VariableBinding{std::make_shared<nift::RuntimeValue>(entry.first),nift_binding_type(entry.first),true,false});
                     variable_scopes_.back().emplace(value_name,VariableBinding{std::make_shared<nift::RuntimeValue>(entry.second),nift_binding_type(entry.second),true,false});
                     ++loop_depth_;
-                    const auto nested=parse(body.text,source_path,depth+1,source_provenance);
+                    RenderResult nested;
+                    if(for_prepared_ok&&standalone_script_host_){
+                        std::string pe;
+                        auto execution=execute_body_outcome(for_prepared_body);
+                        if(execution.kind()==nift::detail::ExecOutcome::Kind::Fatal){nested.ok=false;nested.diagnostic=execution.diagnostic();nested.error.message=nift::detail::project_diagnostic(execution.diagnostic());}
+                        else if(execution.kind()==nift::detail::ExecOutcome::Kind::Recoverable){active_recoverable_=execution.error();nested.ok=false;nested.error.message=execution.error().error?execution.error().error->message:"recoverable failure";}
+                    }else nested=parse(body.text,source_path,depth+1,source_provenance);
                     --loop_depth_;
                     pop_json_scope();
                     if(!nested.ok)break;
                     append_indented(output,nested.output,control_indent,insertion_code_block_depth);
                     if(pending_control_.kind==ControlFlow::Continue){pending_control_={};continue;}
                     if(pending_control_.kind==ControlFlow::Break){pending_control_={};break;}
+                    if(pending_control_.kind!=ControlFlow::None)break;
                     if(body.multiline&&position+1<order.size())output+="\n"+control_indent;
                 }
                 if(had_old_key)json_bindings_[key_name]=std::move(old_key);else json_bindings_.erase(key_name);
@@ -1453,6 +1477,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                     append_indented(output, nested.output, control_indent, insertion_code_block_depth);
                     if (pending_control_.kind == ControlFlow::Continue) { pending_control_ = {}; continue; }
                     if (pending_control_.kind == ControlFlow::Break) { pending_control_ = {}; break; }
+                    if (pending_control_.kind != ControlFlow::None) break;
                     if (body.multiline && position + 1 < order.size())
                         output += "\n" + control_indent;
                 }
