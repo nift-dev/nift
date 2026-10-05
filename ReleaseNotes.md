@@ -38,6 +38,61 @@ Development has advanced to v4.6.0 after the completed v4.5.0 release.
   `--fs-root` values remain anchored across `cd()`; package-owned path checks use
   scoped provenance validation and return path strings without a lasting lease.
 
+### Language and runtime
+
+- **First-class immutable `bytes`.** `bytes(...)` constructs an immutable,
+  shared-backed byte value from arrays/strings; byte indexing, `size`/`empty`,
+  concatenation, slicing/take/skip, `contains`, comparison, `to_hex`/`from_hex`,
+  and strict UTF-8 `decode` are supported, with controlled errors for invalid
+  UTF-8, out-of-range indexing, and non-byte operations. Bytes preserve shared
+  identity across assignment, copy/deepcopy, closures, nested aggregates,
+  mutexes, threads and async transfer. Text/value serialization and JSON reject
+  bytes; conversion is explicit.
+- **Byte I/O.** `open_bytes(path)` / stream and managed-file byte reads plus
+  exact raw byte writes are additive; existing text I/O is unchanged.
+- **Recoverable operational errors.** External/operational failures now
+  propagate to a caller that deliberately handles them: FFI loader and symbol
+  lookup failures, import-source acquisition failures, approved filesystem and
+  `FileValue` backend failures, stream backend failures, and JSON parse/schema
+  rejections are recoverable, while programmer/invariant/policy failures remain
+  fatal. This is a runtime error-handling contract, not a general exception
+  system.
+- **Structured diagnostic outcomes.** Failures carry structured diagnostic
+  outcomes (code, disposition, source origin, frames) instead of only a message
+  string, improving error reporting across script, template, import and
+  embedding paths.
+- **Filesystem type inspection primitives.** `exists(path)`, `is_file(path)`,
+  `is_dir(path)`, and `stat(path)` are available; symlinks are followed, missing
+  paths return `false`, and permission/metadata failures return a controlled
+  recoverable error rather than a wrong answer.
+- **Exact-number (StrNumber) semantics.** Runtime numeric values retain an exact
+  decimal spelling when conversion to `double` would lose its JSON-number
+  semantics, so large integers and exact decimals round-trip and compare
+  correctly.
+- **Stream insertion and extraction operators.** `<<`/`>>` style insertion and
+  extraction for the supported stream surface, with recoverable backend
+  failures and a complete stream lifecycle API.
+
+### Packages, imports and modules
+
+- **Deterministic package graph.** A v2 package-graph lock representation, a
+  deterministic transitive graph resolver, and package inspection/certification
+  commands; the resolved graph is reproducible and inspectable.
+- Relative import ownership (above) and explicit module/package resource paths
+  (above) round out the import/module behavior.
+
+### Concurrency
+
+- **Worker/concurrency hardening.** Worker parsers deep-copy module graphs so
+  nested worker imports cannot mutate parent or sibling state; concurrency and
+  worker behavior were re-certified.
+
+### Embedding / C ABI
+
+- The C ABI is now **1.3** (1.2 added copied Engine/Context byte inputs and
+  result-owned top-level immutable byte views; 1.3 added the execution-scoped
+  output sinks). Checked JSON extraction is lazy and synchronized.
+
 ## v4.5.0 (released 2026-09-27)
 
 Nift v4.5 promotes the native language into a reusable scripting/runtime layer while preserving Nift's website-generation core. Independent review, sanitizer and cross-platform certification, the release-artifacts rehearsal, and final publication gates passed before release.
