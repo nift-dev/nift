@@ -93,6 +93,24 @@ Development has advanced to v4.6.0 after the completed v4.5.0 release.
   result-owned top-level immutable byte views; 1.3 added the execution-scoped
   output sinks). Checked JSON extraction is lazy and synchronized.
 
+### Bug fixes and hardening
+
+- Diagnostics for very long (generated/minified) source lines now render a
+  bounded excerpt with the true `file:line:column`, instead of emitting the
+  whole line and a caret padded to the original column.
+- Windows process spawn now quotes empty-string arguments correctly; MSVC
+  portability for recoverable-error origin sources; Windows reparse containment.
+- Parser robustness: object literals with embedded unescaped quotes,
+  object-literal string-concat values evaluated as expressions, bytes-index
+  binding in loop bodies, and struct-method dispatch via the instance's own
+  definition (including exported module struct types).
+- Package integrity: strict package-metadata validation, transactional package
+  updates, v2 graph-lock recovery, package self-cycle rejection, and package
+  import frame labels pinned to the attempted package root.
+- Error persistence boundary closed (Error values cannot be persisted); timer
+  transfer boundaries preserved; script resource rollback scoping; HTML comment
+  state preserved across template parsing; REPL executable paths may contain `(`.
+
 ## v4.5.0 (released 2026-09-27)
 
 Nift v4.5 promotes the native language into a reusable scripting/runtime layer while preserving Nift's website-generation core. Independent review, sanitizer and cross-platform certification, the release-artifacts rehearsal, and final publication gates passed before release.
