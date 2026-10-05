@@ -70,6 +70,15 @@ Change: `prepare_loop_body` now accepts a bare user-function call `$[foo(args)]`
 fallback to the legacy evaluator (the oracle) — instead of the handle-only
 `execute_native_call`. Files: `src/ParserTemplate.cpp`.
 
+Correctness guard (discovered during CP1): scripts *discard* `$[...]` statement
+values while templates *render* them, and the prepared executor does not render.
+The bare-call acceptance is therefore **gated to `standalone_script_host_`**
+(script execution). A first, ungated attempt regressed template rendering
+(`@for(i:[1,2,3]){$[dbl(i)]}` rendered empty instead of `246`); the gate restores
+template behavior while keeping the script win. This also documents a
+pre-existing gap (method-call value expressions in template prepared bodies
+render empty, independent of CP1) left untouched.
+
 Result (callgrind Ir):
 
 | workload | 8862add | CP1 | Δ vs baseline | Δ vs v4.5.0 |
