@@ -1,8 +1,12 @@
 # Nift release notes
 
-## v4.6.0 (unreleased development)
+## v4.6.0 (released 2026-10-05)
 
-Development has advanced to v4.6.0 after the completed v4.5.0 release.
+Nift v4.6 adds first-class immutable `bytes` and byte I/O, recoverable
+operational errors with structured diagnostics, filesystem type inspection,
+exact-number semantics, stream operators, native time/random utilities,
+execution-scoped stdout/stderr sinks, deterministic package graph resolution,
+relative-import ownership, and an additive C ABI 1.3.
 
 - Native `epoch()` returns the current Unix epoch as an integer number of
   milliseconds. `sleep(ms)` blocks the current script execution thread for a
