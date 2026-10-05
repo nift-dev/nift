@@ -40,6 +40,11 @@ p=$(python3 -c 'print("("*8000+"7"+")"*8000)')
 assert_eq "paren 8000" "$(run "x := $p
 print(x)")" 7
 
+# True nesting up to 64 is supported (raised from the pre-hardening ~24).
+assert_eq "nesting 64" "$(run "$(python3 -c 'print("print("+"!"*64+"true)")')")" true
+assert_eq "callnest 64" "$(run "fn(id(x)) { return x }
+print($(python3 -c 'print("id("*64+"1"+")"*64)'))")" 1
+
 # Operator semantics preserved: precedence, associativity, unary signs, strings.
 assert_eq "precedence" "$(run 'print(1 + 2 * 3 - 4)')" 3
 assert_eq "assoc"      "$(run 'print(20 - 5 - 3)')" 12

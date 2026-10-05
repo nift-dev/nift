@@ -65,7 +65,13 @@ LIBFFI_INCLUDE := $(LIBFFI_BUILD)/install/include
 # suppression applies only to the libffi build, never to Nift's own sources.
 LIBFFI_CFLAGS ?= -O2 -fPIC -Wno-deprecated-declarations
 CPPFLAGS += -I$(LIBFFI_INCLUDE)
-SANITIZER_FLAGS ?= -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined
+# -fno-sanitize-address-use-after-scope: with it enabled, ASan keeps each local
+# variable's stack slot alive for its whole lexical scope (no slot reuse), which
+# inflates the stack frame of the very large evaluate_expression_impl lambda by
+# ~16x (229 KB vs 14 KB) and makes deep-but-legitimate recursion overflow the
+# stack long before the language's own limits. Heap/stack overflow, UAF and UBSan
+# detection are unaffected; only lifetime-scoped stack-use-after-scope is dropped.
+SANITIZER_FLAGS ?= -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-address-use-after-scope
 SAN_TARGET := $(TEST_DIR)/nift-sanitize$(EXEEXT)
 SAN_OBJECTS := $(patsubst %.cpp,$(TEST_DIR)/san/%.o,$(SOURCES)) $(patsubst %.c,$(TEST_DIR)/san/%.o,$(MARKUP_C_SOURCES))
 SAN_LIBFFI_BUILD := $(TEST_DIR)/libffi/sanitize-$(LIBFFI_TARGET)

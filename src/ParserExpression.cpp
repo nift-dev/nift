@@ -1084,7 +1084,7 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
         // Generative recursion guard: flat binary chains are folded iteratively
         // above, so this depth only grows with genuine syntactic nesting. Fail
         // deterministically instead of exhausting the C++ stack.
-        if(depth>24){error="expression nesting exceeds parser limit";return false;}
+        if(depth>96){error="expression nesting exceeds parser limit";return false;}
 
         auto find_binding = [&](const std::string& name) -> VariableBinding* {
             for (auto scope=variable_scopes_.rbegin(); scope!=variable_scopes_.rend(); ++scope) { auto it=scope->find(name); if(it!=scope->end()) { it->second.sync(); return &it->second; } }
