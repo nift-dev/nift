@@ -47,73 +47,11 @@ Use this compact shape for new entries:
 
 ## Open items
 
-### Native time functions
-
-- Status: pending
-- Earliest release: 4.6.0
-- Website scope: scripting API reference and runtime concurrency documentation
-- Required update: document `epoch()` as integer Unix milliseconds and
-  `sleep(ms)` as a signed-64-bit, non-negative blocking delay on the current
-  execution thread. Document `timer()` as a stopped monotonic stopwatch with
-  `start()`, `elapsed()`, `pause()`, `resume()`, `stop()`, `reset()`,
-  `running()`, and `paused()`, including opaque identity semantics and the v1
-  prohibition on thread/future or embedding transfer.
-- Timing: do not publish before a Nift release containing these functions
-
-### Native secure random bytes
-
-- Status: pending
-- Earliest release: 4.6.0
-- Website scope: scripting/bytes API and security/reproducibility guidance
-- Required update: document `secure_random_bytes(n)`, its 10,000,000-byte cap,
-  native-OS-only CSPRNG contract, ordinary non-erased heap storage, and that use
-  in templates makes generated output nondeterministic
-- Timing: do not publish before a Nift release containing this function
-
-### Execution output separation
-
-- Status: pending
-- Earliest release: 4.6.0
-- Website scope: scripting console API and all embedding/binding result references
-- Required update: document `err(value)`, CLI stdout/stderr behavior, per-operation
-  embedding captures on success and failure, worker inheritance and atomic writes,
-  and the separation from return values, diagnostics, and rendered content
-- Timing: do not publish before a Nift release containing this behavior
-
-### Relative import module ownership
-
-- Status: pending
-- Earliest release: 4.6.0
-- Website scope: scripting imports and package authoring guidance
-- Required update: document that path-shaped relative imports resolve from the
-  source module containing the import, including escaped package callables and
-  nested/re-exported modules; missing siblings never fall through to the
-  consumer root. Document canonical package-root confinement, frozen package
-  lock provenance, short per-operation read locks, stale-owner rejection, live
-  local-source behavior, and worker-local module snapshots. Explain that locks
-  are released before child code executes, avoiding synchronous child package
-  command deadlocks, and that failed imports roll back cleanly. Keep bare
-  package-name and absolute-path behavior distinct.
-- Timing: do not publish before a Nift release containing this behavior
-
-### Explicit module and package resource paths
-
-- Status: pending
-- Earliest release: 4.6.0
-- Website scope: scripting path API, package authoring guidance, completion list,
-  embedding source semantics, and filesystem authority/restriction guidance
-- Required update: document `module_path()` / `module_path(relative)` and
-  `package_path()` / `package_path(relative)`, including absolute normalized
-  output, defining-module ownership across escaped callables and workers,
-  deliberate empty-string rejection, root-qualified/traversal rejection,
-  canonical package containment with missing leaves allowed, controlled
-  no-source/no-package errors, and the fact that existing filesystem APIs keep
-  their prior CWD/project authority and existence semantics. Cover copied
-  project/`--fs-root` resource authority in workers, one-time canonical authority
-  snapshots that do not move after `cd()`, explicit file-backed vs logical/in-memory
-  provenance rather than path-string inference, short package provenance checks,
-  and the inherent TOCTOU after a validated path string is returned.
-- Timing: do not publish before a Nift release containing these functions
+None for the current candidate. All five items targeted at v4.6.0 (native time
+functions, native secure random bytes, execution output separation, relative
+import module ownership, explicit module/package resource paths) were completed
+in the website source during v4.6 release preparation and verified against the
+candidate; see the v4.6.0 release-verification evidence.
 
 ## Completed items
 
