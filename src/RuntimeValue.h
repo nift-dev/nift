@@ -62,6 +62,50 @@ public:
     explicit RuntimeValue(RuntimeBytes value)
         : type(RuntimeType::Bytes), bytes(std::make_shared<const RuntimeBytes>(std::move(value))) {}
 
+    // Scalar-aware copy: for Null/Boolean/Number/StrNumber the container and
+    // resource members are empty/null, so copying only the scalar fields avoids
+    // the empty string/vector copies and three null shared_ptr refcount bumps.
+    // The resulting value is identical to a full member-wise copy.
+    RuntimeValue(const RuntimeValue& other)
+        : type(other.type), num(other.num), boolean(other.boolean) {
+        switch (other.type) {
+            case RuntimeType::String: string = other.string; break;
+            case RuntimeType::StrNumber: string = other.string; break;
+            case RuntimeType::Array: array = other.array; break;
+            case RuntimeType::Object: object = other.object; break;
+            case RuntimeType::Bytes: bytes = other.bytes; break;
+            case RuntimeType::Timer: timer = other.timer; break;
+            case RuntimeType::Error: error = other.error; break;
+            default: break;
+        }
+    }
+    RuntimeValue& operator=(const RuntimeValue& other) {
+        if (this != &other) {
+            type = other.type;
+            num = other.num;
+            boolean = other.boolean;
+            string.clear();
+            array.clear();
+            object.clear();
+            bytes.reset();
+            timer.reset();
+            error.reset();
+            switch (other.type) {
+                case RuntimeType::String: string = other.string; break;
+                case RuntimeType::StrNumber: string = other.string; break;
+                case RuntimeType::Array: array = other.array; break;
+                case RuntimeType::Object: object = other.object; break;
+                case RuntimeType::Bytes: bytes = other.bytes; break;
+                case RuntimeType::Timer: timer = other.timer; break;
+                case RuntimeType::Error: error = other.error; break;
+                default: break;
+            }
+        }
+        return *this;
+    }
+    RuntimeValue(RuntimeValue&&) noexcept = default;
+    RuntimeValue& operator=(RuntimeValue&&) noexcept = default;
+
     static RuntimeValue make_array() { RuntimeValue value; value.type = RuntimeType::Array; return value; }
     static RuntimeValue make_object() { RuntimeValue value; value.type = RuntimeType::Object; return value; }
     static RuntimeValue make_timer(std::uint64_t owner, std::uint64_t instance) {
