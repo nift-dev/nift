@@ -59,7 +59,9 @@ loop
 array_index
 fn_calls
 # Baselines on a development host: loop ~1.3s, array_index ~1.9s, fn_calls ~1.7s.
-# 4x ceiling is robust under shared-CI load and still catches ~4x+ regressions.
+# The effective ceiling multiple is ~3-6x of the dev-host baseline; this is a
+# robust catastrophic-regression tripwire (it catches order-of-magnitude
+# scripting blowups, not a ~40% linear regression).
 check loop 8000 1300
 check array_index 8000 1900
 check fn_calls 8000 1700
