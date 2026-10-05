@@ -1,0 +1,84 @@
+# POST-V46-RUNTIME-ARCHITECTURE campaign log
+
+Campaign authority: `docs/handover/POST-V46-RUNTIME-ARCHITECTURE-REVIEW.md`
+(plan). This file is the running result log (CP0 → FINAL). Campaign runs while
+Nift `main` is frozen (remote `main` = `52536b9`); all commits are local and
+unpushed.
+
+## Method
+
+- Harness: `benchmarks/runtime_arch_review.py` (tracked; single source of truth).
+  `--callgrind` for instruction counts (primary, load-independent), native
+  wall-clock median for corroboration.
+- Baselines built in isolated worktrees (`/home/nick/Repositories/nift/.review-wt`):
+  `v4.5.0` = `560863b`, `v4.6.0` = `bb6e9f2`.
+- Post-release pre-campaign baseline: `8862add` (runtime source identical to
+  `bb6e9f2`; differs only by the v4.7.0 version bump and docs).
+- Classification: CLEAR WIN ≥10% Ir reduction, no unrelated regression; KEEP
+  3–10% or clear simplification; NEUTRAL; REJECT; REGRESSION.
+
+## CP0 — baseline + semantic locks (accepted)
+
+Starting local SHA: `8862add`. Harness added; baseline matrix recorded.
+
+### Callgrind instruction-count matrix
+
+| workload | v4.5.0 | v4.6.0 | 8862add | v4.6/v4.5 |
+|---|---:|---:|---:|---:|
+| numeric_loop | 2,935,224,203 | 2,457,362,198 | 2,466,361,138 | −16.3% |
+| array_push_index | 3,793,877,329 | 3,380,058,231 | 3,380,057,771 | −10.9% |
+| fn_empty | 3,547,467,727 | 4,236,959,086 | 4,236,118,647 | +19.4% |
+| fn_args | 4,260,580,754 | 5,048,547,267 | 5,049,144,118 | +18.5% |
+| lambda | 4,100,611,240 | 4,802,981,223 | 4,803,119,092 | +17.1% |
+| map_set_new | 280,389,785 | 320,025,597 | 320,025,238 | +14.1% |
+| map_get | 5,505,962,056 | 5,089,553,305 | 5,084,751,920 | −7.6% |
+| map_contains | 6,285,818,770 | 5,405,046,410 | 5,385,763,156 | −14.0% |
+| map_iterate | 11,306,538,453 | 13,150,597,687 | 13,150,363,185 | +16.3% |
+
+The `8862add` baseline is instruction-identical to `v4.6.0` (runtime source
+unchanged), confirming the campaign starts from the released runtime.
+
+### Semantic locks (medium gate)
+
+Any prepared-execution change must keep green, at minimum:
+
+```text
+make test-v43-language test-collections test-v44-language-foundation
+tests/v44_ast_differential_corpus.sh, tests/v44_ast_fuzz.py   (prepared ≡ legacy)
+tests/v44_element_assignment_smoke.sh, tests/v43_readval_writeval_smoke.sh  (location identity)
+tests/v44_scalar_conversion_smoke.sh, tests/v43_recursion_guard_smoke.sh
+make test-scripting-perf
+nift-regression-suite: 92 external contract modules
+```
+
+Invariants: RuntimeType ordinals/fingerprints; deep-copy-on-value-copy; exact
+Number/StrNumber equality/order/NaN/±inf; object equality order-insensitive but
+duplicate-aware; map numeric-key unification + typed-key distinctness + insertion
+order + `sorted_map` order; location/reference identity across calls;
+closure-captures-binding; recursion cap 64; cyclic-reference rejection;
+Bytes/Timer/Error non-serializable; prepared ≡ legacy observably; C ABI 1.3;
+website build behavior.
+
+## CP1 — prepared execution for ordinary script bodies
+
+_(pending)_
+
+## CP2 — callable prepared execution
+
+_(pending)_
+
+## CP3 — call frames / VariableBinding
+
+_(pending)_
+
+## CP4 — RuntimeValue (conditional)
+
+_(pending)_
+
+## CP5 — maps (conditional)
+
+_(pending)_
+
+## FINAL — campaign certification
+
+_(pending)_
