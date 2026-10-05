@@ -79,6 +79,16 @@ SAN_LIBFFI_STAMP := $(SAN_LIBFFI_BUILD)/.nift-built
 SAN_LIBFFI_A := $(SAN_LIBFFI_BUILD)/install/lib/libffi.a
 SAN_LIBFFI_INCLUDE := $(SAN_LIBFFI_BUILD)/install/include
 SAN_CPPFLAGS = $(filter-out -I$(LIBFFI_INCLUDE),$(CPPFLAGS)) -I$(SAN_LIBFFI_INCLUDE)
+# Lifetime sanitizer: the same ASan/UBSan profile as the default sanitizer but
+# WITH stack use-after-scope instrumentation retained, so lifetime bugs are
+# still caught. It deliberately runs only a shallow corpus (see
+# test-sanitize-lifetime): use-after-scope inflates every local's stack slot
+# (evaluate_expression_impl's frame ~16x, to ~229 KB) and only becomes unsafe at
+# the deep-recursion limits the default deep-capable sanitizer exists to test.
+# The two profiles are intentionally different; do not consolidate them.
+SAN_LIFETIME_FLAGS ?= -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined
+SAN_LIFETIME_TARGET := $(TEST_DIR)/nift-sanitize-lifetime$(EXEEXT)
+SAN_LIFETIME_OBJECTS := $(patsubst %.cpp,$(TEST_DIR)/san-lifetime/%.o,$(SOURCES)) $(patsubst %.c,$(TEST_DIR)/san-lifetime/%.o,$(MARKUP_C_SOURCES))
 TSAN_FLAGS ?= -O1 -g -fno-omit-frame-pointer -fsanitize=thread
 TSAN_TARGET := $(TEST_DIR)/nift-tsan$(EXEEXT)
 TSAN_OBJECTS := $(patsubst %.cpp,$(TEST_DIR)/tsan/%.o,$(SOURCES)) $(patsubst %.c,$(TEST_DIR)/tsan/%.o,$(MARKUP_C_SOURCES))
@@ -1090,7 +1100,7 @@ pristine: distclean
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
-.PHONY: FORCE test-scripting-perf test-ffi-abi test-libffi-source test-gate6ar-ffi test-libffi-static-archive test-libffi-dependencies test-libffi-private-symbols test-pic-depfiles test-node-package-licenses test-v45-adversarial-runtime test-v45-integration-dogfood test-v45-embed-contracts test-v45-embed-staged-consumer test-v45-concurrency test-v45-job-control test-v45-target test-v45-native-runtime embed go-binding csharp-binding node-binding python-binding bindings test-build-boundary test-embed test-go-binding test-csharp-binding test-node-binding test-python-binding test-bindings test-all test benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize memory-safety-smoke all clean test-jsonic test-jsonic-sync test-markuppp-sync test-json test-json-schema test-runtime-value test-cp15-numeric-repair test-cp17-bytes test-cp18-bytes test-cp19-bytes test-cp21-bytes test-cp18-bytes-sanitize test-cp18-bytes-tsan test-console test-progress-render test-progress-pty test-snap-contract test-distribution-summary test-version-consistency test-diagnostics test-minify test-json-schema-integration test-markup-json-directives test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke test-host-seam benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-alias test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets test-init-lock test-unreadable-source test-incremental-modified-immediate test-v41-certification test-v42-language test-v42-struct test-v43-language test-parser-hardening test-macos-runner-policy install uninstall clean distclean pristine
+.PHONY: FORCE test-scripting-perf test-ffi-abi test-libffi-source test-gate6ar-ffi test-libffi-static-archive test-libffi-dependencies test-libffi-private-symbols test-pic-depfiles test-node-package-licenses test-v45-adversarial-runtime test-v45-integration-dogfood test-v45-embed-contracts test-v45-embed-staged-consumer test-v45-concurrency test-v45-job-control test-v45-target test-v45-native-runtime embed go-binding csharp-binding node-binding python-binding bindings test-build-boundary test-embed test-go-binding test-csharp-binding test-node-binding test-python-binding test-bindings test-all test benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize test-sanitize-lifetime memory-safety-smoke all clean test-jsonic test-jsonic-sync test-markuppp-sync test-json test-json-schema test-runtime-value test-cp15-numeric-repair test-cp17-bytes test-cp18-bytes test-cp19-bytes test-cp21-bytes test-cp18-bytes-sanitize test-cp18-bytes-tsan test-console test-progress-render test-progress-pty test-snap-contract test-distribution-summary test-version-consistency test-diagnostics test-minify test-json-schema-integration test-markup-json-directives test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke test-host-seam benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-alias test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets test-init-lock test-unreadable-source test-incremental-modified-immediate test-v41-certification test-v42-language test-v42-struct test-v43-language test-parser-hardening test-macos-runner-policy install uninstall clean distclean pristine
 
 
 .PHONY: test-v45-concurrency-sanitize test-v45-concurrency-tsan
@@ -1181,6 +1191,47 @@ $(SAN_TARGET): $(SAN_OBJECTS) $(SAN_LIBFFI_A)
 
 test-sanitize: $(SAN_TARGET)
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 "$(SAN_TARGET)" --version
+
+# --- Lifetime sanitizer (ASan/UBSan with stack use-after-scope retained) -------
+LIFETIME_RUN = env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1
+
+$(TEST_DIR)/san-lifetime/%.o: %.cpp
+	mkdir -p "$(dir $@)"
+	$(CXX) $(SAN_CPPFLAGS) -std=c++17 -Wall -Wextra -pedantic -pthread $(SAN_LIFETIME_FLAGS) -MMD -MP -c "$<" -o "$@"
+
+$(TEST_DIR)/san-lifetime/%.o: %.c
+	mkdir -p "$(dir $@)"
+	$(CC) -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic $(SAN_LIFETIME_FLAGS) -MMD -MP -c "$<" -o "$@"
+
+$(SAN_LIFETIME_TARGET): $(SAN_LIFETIME_OBJECTS) $(SAN_LIBFFI_A)
+	mkdir -p "$(TEST_DIR)"
+	$(CXX) -std=c++17 -pthread $(SAN_LIFETIME_FLAGS) $(SAN_LIFETIME_OBJECTS) $(SAN_LIBFFI_A) -o "$@"
+
+# Prove the two sanitizer profiles genuinely differ (lifetime traps
+# stack-use-after-scope; deep does not), then run a representative SHALLOW
+# corpus under the lifetime sanitizer. Deep-recursion tests belong to the
+# deep-capable profile only (the instrumentation inflates the evaluator frame).
+test-sanitize-lifetime: $(SAN_LIFETIME_TARGET)
+	@set -e; \
+	$(CXX) $(SAN_LIFETIME_FLAGS) -pthread tests/sanitizer_use_after_scope_canary.cpp -o "$(TEST_DIR)/canary-lifetime"; \
+	if err=$$(env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 "$(TEST_DIR)/canary-lifetime" 2>&1); then \
+	  echo "FAIL: lifetime sanitizer did not trap stack-use-after-scope" >&2; exit 1; fi; \
+	printf '%s' "$$err" | grep -q 'stack-use-after-scope' || { echo "FAIL: lifetime sanitizer lacks use-after-scope instrumentation:" >&2; printf '%s\n' "$$err" >&2; exit 1; }; \
+	$(CXX) $(SANITIZER_FLAGS) -pthread tests/sanitizer_use_after_scope_canary.cpp -o "$(TEST_DIR)/canary-deep"; \
+	err=$$(env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=0:halt_on_error=1 "$(TEST_DIR)/canary-deep" 2>&1) || true; \
+	printf '%s' "$$err" | grep -q 'stack-use-after-scope' && { echo "FAIL: deep sanitizer unexpectedly has use-after-scope instrumentation" >&2; exit 1; } || true; \
+	echo "sanitizer profiles differ: lifetime use-after-scope ON, deep OFF"
+	$(LIFETIME_RUN) "$(SAN_LIFETIME_TARGET)" --version
+	$(LIFETIME_RUN) NIFT_BIN="$(CURDIR)/$(SAN_LIFETIME_TARGET)" tests/v43_cp0_cp14_smoke.sh
+	$(LIFETIME_RUN) NIFT_BIN="$(CURDIR)/$(SAN_LIFETIME_TARGET)" tests/v43_cp15_cp34_smoke.sh
+	$(LIFETIME_RUN) NIFT_BIN="$(CURDIR)/$(SAN_LIFETIME_TARGET)" tests/collection_ops_smoke.sh
+	$(LIFETIME_RUN) NIFT_BIN="$(CURDIR)/$(SAN_LIFETIME_TARGET)" tests/v43_cp117_object_methods_smoke.sh
+	$(LIFETIME_RUN) NIFT_BIN="$(CURDIR)/$(SAN_LIFETIME_TARGET)" tests/v43_cp51_cp70_scripting_smoke.sh
+	$(LIFETIME_RUN) NIFT_BIN="$(CURDIR)/$(SAN_LIFETIME_TARGET)" tests/v46_b4_cp3_recoverable_errors.sh
+	$(LIFETIME_RUN) NIFT_BIN="$(CURDIR)/$(SAN_LIFETIME_TARGET)" tests/v45_threads.sh
+	$(LIFETIME_RUN) NIFT_BIN="$(CURDIR)/$(SAN_LIFETIME_TARGET)" tests/v44_ast_expression_smoke.sh
+	$(LIFETIME_RUN) NIFT_BIN="$(CURDIR)/$(SAN_LIFETIME_TARGET)" bash tests/v44_ast_differential_corpus.sh
+	echo "lifetime sanitizer shallow corpus passed"
 
 test-v45-concurrency-sanitize: $(SAN_TARGET)
 	env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$$(test "$$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT_BIN="$(CURDIR)/$(SAN_TARGET)" tests/v45_async.sh
