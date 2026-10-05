@@ -413,6 +413,9 @@ bool finite_integer_digits(const NumericForm& form, std::size_t limit,
 
 bool runtime_number_is_zero(const RuntimeValue& value) {
     if (!value.is_number()) return false;
+    // Plain double fast path (mirrors the exact-number decimal path: a double's
+    // exact decimal form has sign 0 iff num == 0.0).
+    if (value.type == RuntimeType::Number) return value.num == 0.0;
     const NumericForm form = numeric_form(value);
     return form.kind == NumericKind::Finite && form.sign == 0;
 }
@@ -476,6 +479,12 @@ bool runtime_number_is_integer(const RuntimeValue& value) {
 
 bool runtime_number_to_size(const RuntimeValue& value, std::size_t& result) {
     if (!value.is_number()) return false;
+    if (value.type == RuntimeType::Number) {
+        if (!std::isfinite(value.num) || value.num < 0.0 || std::trunc(value.num) != value.num ||
+            value.num > static_cast<double>(std::numeric_limits<std::size_t>::max())) return false;
+        result = static_cast<std::size_t>(value.num);
+        return true;
+    }
     const NumericForm form = numeric_form(value);
     if (form.sign < 0) return false;
     std::string digits;
