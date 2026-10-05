@@ -334,6 +334,26 @@ sanitizers
 
 The methodology is evidence-driven, not ceremonial.
 
+## User-visible changes must add external coverage during the checkpoint
+
+Any change to the user-visible language, runtime, package, CLI or embedding
+surface should normally add **all three** as part of the checkpoint that
+introduces the behavior:
+
+```text
+implementation-local tests
+independent external regression-suite coverage (nift-regression-suite)
+docs and release-note updates where the behavior is public
+```
+
+Do not defer them to release preparation. The v4.6 release exposed the cost of
+deferring the middle layer: the external suite was last certified against the
+v4.5 contract while a large amount of v4.6 behavior landed, and the drift was
+only discovered by an explicit release-time reconciliation. A test file that the
+canonical suite runner never executes is not external coverage; wire it in.
+External regression coverage is a completion criterion for user-visible work,
+not a later polish step.
+
 ---
 
 # 9. Suggested checkpoint lifecycle
