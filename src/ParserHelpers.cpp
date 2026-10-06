@@ -82,20 +82,19 @@ bool nift_unix_epoch_milliseconds(std::int64_t& value, std::string& error) {
         return false;
     }
     using Seconds = decltype(now.tv_sec);
-    if constexpr (std::numeric_limits<Seconds>::is_signed) {
-        if constexpr (std::numeric_limits<Seconds>::digits > std::numeric_limits<std::int64_t>::digits) {
-            if (now.tv_sec < static_cast<Seconds>(std::numeric_limits<std::int64_t>::min()) ||
-                now.tv_sec > static_cast<Seconds>(std::numeric_limits<std::int64_t>::max())) {
-                error = "epoch: system time is outside the signed 64-bit millisecond range";
-                return false;
-            }
+    const auto seconds_raw = now.tv_sec;
+    if constexpr (!std::is_signed_v<Seconds>) {
+        if (static_cast<std::uintmax_t>(seconds_raw) >
+            static_cast<std::uintmax_t>(std::numeric_limits<std::int64_t>::max())) {
+            error = "epoch: system time is outside the signed 64-bit millisecond range";
+            return false;
         }
-    } else if (static_cast<std::uintmax_t>(now.tv_sec) >
-               static_cast<std::uintmax_t>(std::numeric_limits<std::int64_t>::max())) {
+    }
+    const std::int64_t seconds = static_cast<std::int64_t>(seconds_raw);
+    if (static_cast<Seconds>(seconds) != seconds_raw) {
         error = "epoch: system time is outside the signed 64-bit millisecond range";
         return false;
     }
-    const auto seconds = static_cast<std::int64_t>(now.tv_sec);
     if (seconds < std::numeric_limits<std::int64_t>::min() / 1000 ||
         seconds > std::numeric_limits<std::int64_t>::max() / 1000) {
         error = "epoch: system time is outside the signed 64-bit millisecond range";
