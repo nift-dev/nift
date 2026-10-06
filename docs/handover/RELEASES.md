@@ -23,7 +23,7 @@ warnings-as-errors gate. The prepared method-call argument parity regression is
 fixed and covered by core + external contract tests (regression suite
 `cf34587`, 94 modules; external contract run #37486924459, 94/94 PASS).
 Chocolatey v4.7.2 is submitted (run #37511255214) and pending automated review;
-Snap v4.7.2 (including riscv64) remains maintainer-managed by Nick; Homebrew
+Snap v4.7.2 release work was completed by the maintainer (Nick); Homebrew
 propagation is automatic. See
 `docs/evidence/release-4.7.2/release-verification.md`.
 
@@ -187,6 +187,24 @@ Proportionately include:
     ```text
     A RELEASE CANDIDATE IS NOT GREEN IF FIRST-PARTY NIFT CODE PRODUCES
     COMPILER WARNINGS ON A SUPPORTED RELEASE TOOLCHAIN.
+    ```
+
+16. **Package-ecosystem compatibility gate.** Run `packages-regression-suite`
+    (12 modules) against the exact candidate Nift SHA and require **12/12
+    PASS**. The `package-ecosystem-contract` job builds Nift at the exact
+    `github.sha` under certification, checks out
+    `nift-dev/packages-regression-suite` at a recorded ref, resolves clean
+    official `nift-packages/<name>@main` sources, and records a deterministic
+    `package-sources.json` manifest of the exact 40-char package SHAs each run
+    certified. It is a dependency of both `publish` and `rehearse` in the
+    release workflow and a job of the Deep guards workflow, so a package
+    mismatch blocks rehearsal and publication fail-closed. Permanent invariant:
+
+    ```text
+    OFFICIAL-PACKAGE ECOSYSTEM COMPATIBILITY IS RELEASE-BLOCKING.
+    NIFT CANDIDATES MUST PASS packages-regression-suite AGAINST CLEAN CURRENT
+    OFFICIAL PACKAGE SOURCES. EACH HOSTED RUN RECORDS THE EXACT PACKAGE SOURCE
+    SHAS USED FOR CERTIFICATION.
     ```
 
 Repository tests passing does not prove a release archive is usable. After the

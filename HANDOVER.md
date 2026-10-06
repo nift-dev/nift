@@ -26,15 +26,16 @@ whether it is a regression.
 - Output convention for modern projects: `public/`.
 - Current branch: `main` in this checkout.
 - Current project phase: **v4.8 development after the public v4.7.2 release**.
-  The local Phase 4 development transition is committed and may remain unpushed
-  while normal v4.8 development continues. The v4.7.2 GitHub release is published
-  and immutable (tag `v4.7.2` at `4950129`); the prepared method-call argument
-  parity fix from v4.7.2 remains locked into the core regression test and the
-  external contract (regression suite `cf34587`, 94 modules); Chocolatey v4.7.2
-  is submitted and pending automated review; Snap v4.7.2 follow-up is
-  maintainer-managed by Nick; Homebrew propagation is external and automatic.
-  Completed v4.7.2 certification remains in
-  `docs/evidence/release-4.7.2/release-verification.md`.
+  The v4.8.0 development transition and the fail-closed package-ecosystem
+  certification gate are committed. The prepared method-call argument parity
+  fix from v4.7.2 remains locked into the core regression test and external
+  contracts (nift-regression-suite `7d00d0d`, 88 modules;
+  packages-regression-suite `eb54146`, 12 modules, release-blocking). The
+  v4.7.2 GitHub release is published and immutable (tag `v4.7.2` at
+  `4950129`); Chocolatey v4.7.2 is submitted and pending automated review; the
+  Snap v4.7.2 release work was completed by the maintainer (Nick); Homebrew
+  propagation is external and automatic. Completed v4.7.2 certification
+  remains in `docs/evidence/release-4.7.2/release-verification.md`.
 - Public documentation: the separate `nift-dev.github.io` repository.
 - External contract: the separate `nift-regression-suite` repository.
 - Embedded minifier: `minifypp/`, synchronized with standalone Minify++.

@@ -44,6 +44,18 @@ jobs:
           set -euo pipefail
           make test-warnings
 
+  package-ecosystem-contract:
+    name: Package ecosystem contract (12/12)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Build Nift (exact certified SHA)
+        run: make -j2
+      - uses: nift-dev/packages-regression-suite/.github/actions/package-contract@f502604c3081d7f7dc12671e81a1469dfb2e23bd
+        with:
+          nift-sha: ${{ github.sha }}
+
   unix:
     needs: validate_version_consistency
     strategy:
@@ -198,7 +210,7 @@ jobs:
 
   publish:
     if: github.event_name == 'push'
-    needs: [unix, windows, installer-preflight, public-installer-preflight, warnings]
+    needs: [unix, windows, installer-preflight, public-installer-preflight, warnings, package-ecosystem-contract]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -240,7 +252,7 @@ jobs:
 
   rehearse:
     if: github.event_name == 'workflow_dispatch'
-    needs: [unix, windows, installer-preflight, public-installer-preflight, warnings]
+    needs: [unix, windows, installer-preflight, public-installer-preflight, warnings, package-ecosystem-contract]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09

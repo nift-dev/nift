@@ -104,3 +104,15 @@ jobs:
         run: |
           set -euo pipefail
           make test-warnings
+
+  package-ecosystem-contract:
+    name: Package ecosystem contract (12/12)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build Nift (exact SHA under certification)
+        run: make -j2
+      - uses: nift-dev/packages-regression-suite/.github/actions/package-contract@f502604c3081d7f7dc12671e81a1469dfb2e23bd
+        with:
+          nift-sha: ${{ github.sha }}
