@@ -1,6 +1,11 @@
 # Nift release notes
 
-## v4.7.1 (unreleased development)
+## v4.7.2 (unreleased development)
+
+Development has advanced to v4.7.2 after the completed v4.7.1 release. No
+v4.7.2 user-visible changes have been recorded yet.
+
+## v4.7.1 (released 2026-10-06)
 
 Nift v4.7.1 is a maintenance patch following v4.7.0.
 

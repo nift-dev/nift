@@ -7,13 +7,22 @@ approved release is packaged and published.
 
 ## Authority and current state
 
-The local development executable reports `Nift v4.7.1` and
-`snap/snapcraft.yaml` also declares `4.7.1`, following the public v4.7.0
-release. The v4.7.1 candidate (warning cleanup, a release-blocking
-warnings-as-errors gate, version metadata and release notes) is prepared for
-Phase 1 release certification. Exact tag, artifact and public
-release history remains documented below; completed v4.7.0 evidence must not be
+The local development executable reports `Nift v4.7.2` and
+`snap/snapcraft.yaml` also declares `4.7.2`, following the public v4.7.1
+release. This local Phase 4 transition is committed and may remain unpushed
+until normal subsequent development is ready. Exact tag, artifact and public
+release history remains documented below; completed v4.7.1 evidence must not be
 rewritten.
+
+### v4.7.1 release status (2026-10-06)
+
+The v4.7.1 GitHub release is published and immutable: annotated tag `v4.7.1` at
+`8eeeb67`; release workflow #37422842656 passed including all three
+`installer-public-smoke` jobs and the new first-party warnings-as-errors gate.
+Chocolatey v4.7.1 is submitted (run #37426911164) and pending automated review;
+Snap v4.7.1 (including riscv64) remains maintainer-managed by Nick; Homebrew
+propagation is automatic. See
+`docs/evidence/release-4.7.1/release-verification.md`.
 
 ### v4.7.0 release status (2026-10-06)
 
