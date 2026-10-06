@@ -119,7 +119,7 @@ jobs:
           set -euo pipefail
           git clone --filter=blob:none --no-checkout \
             https://github.com/nift-dev/packages-regression-suite.git packages-regression-suite
-          git -C packages-regression-suite fetch --no-tags origin 26a8a0fb281a4329a9eb32f130320ffdf8b2c42d
+          git -C packages-regression-suite fetch --no-tags origin 1da43659da269c96af21aea7234799d2ad56b2df
           git -C packages-regression-suite checkout -q FETCH_HEAD
           echo "packages-regression-suite=$(git -C packages-regression-suite rev-parse HEAD)"
       - name: Resolve clean official package sources + source manifest
