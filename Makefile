@@ -236,6 +236,30 @@ test-version-consistency:
 	python3 tests/version_consistency_test.py
 	python3 scripts/check_version_consistency.py
 
+# First-party zero-warning gate. Every Nift-owned translation unit under src/
+# (including src/embed/) must compile clean with the release warning set
+# promoted to errors (-Wall -Wextra -pedantic -Werror). Embedded third-party
+# tree (minifypp/, markuppp/, jsonic/, vendored libffi and cmark) follows its
+# own upstream warning policy and is intentionally excluded from this gate.
+# The default run uses the configured compiler and adds a Clang pass when
+# clang++ is available; hosted release certification runs both passes
+# explicitly. This gate is release-blocking: a candidate with first-party
+# compiler warnings must never receive a release GO.
+WARN_SOURCES := $(filter src/%,$(SOURCES))
+
+.PHONY: test-warnings warnings-check
+test-warnings:
+	@$(MAKE) warnings-check
+	@if command -v clang++ >/dev/null 2>&1; then echo "== clang++ first-party warnings pass =="; $(MAKE) warnings-check CXX=clang++; else echo "clang++ not available; Clang warnings pass skipped locally"; fi
+
+warnings-check: $(LIBFFI_A)
+	@set -e; \
+	for f in $(WARN_SOURCES); do \
+	  echo "  $(CXX): $$f"; \
+	  $(CXX) $(CXXFLAGS) -Werror $(CPPFLAGS) -fsyntax-only "$$f"; \
+	done
+	@echo "PASS: zero first-party compiler warnings ($(CXX))"
+
 # Focused unit tests for the Distribution Verification summary classification:
 # Snap edge must never be reported as stable success, and stable/edge/mismatch/
 # install-runtime states are distinguished. No network access.

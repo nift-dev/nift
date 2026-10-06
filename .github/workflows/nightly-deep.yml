@@ -93,3 +93,14 @@ jobs:
             --seeds 8 \
             --steps 30 \
             --output .build/checkpoint-7/incremental-equivalence.json
+
+  warnings:
+    name: First-party warnings as errors (GCC + Clang)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Zero first-party compiler warnings (release-blocking invariant)
+        shell: bash
+        run: |
+          set -euo pipefail
+          make test-warnings

@@ -33,6 +33,17 @@ jobs:
             python3 scripts/check_version_consistency.py --expected "${{ inputs.version }}"
           fi
 
+  warnings:
+    name: First-party warnings as errors (GCC + Clang)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Zero first-party compiler warnings (release-blocking)
+        shell: bash
+        run: |
+          set -euo pipefail
+          make test-warnings
+
   unix:
     needs: validate_version_consistency
     strategy:
@@ -187,7 +198,7 @@ jobs:
 
   publish:
     if: github.event_name == 'push'
-    needs: [unix, windows, installer-preflight, public-installer-preflight]
+    needs: [unix, windows, installer-preflight, public-installer-preflight, warnings]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -229,7 +240,7 @@ jobs:
 
   rehearse:
     if: github.event_name == 'workflow_dispatch'
-    needs: [unix, windows, installer-preflight, public-installer-preflight]
+    needs: [unix, windows, installer-preflight, public-installer-preflight, warnings]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
