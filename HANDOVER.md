@@ -20,18 +20,21 @@ whether it is a regression.
 ## Current identity
 
 - Product: **Nift**, a website generator and dependency-aware website build layer.
-- Current executable identity: `Nift v4.7.2` (local development), following the
-  public v4.7.1 release.
+- Current executable identity: `Nift v4.8.0` (local development), following the
+  public v4.7.2 release.
 - Language/toolchain: C++17 and Make.
 - Output convention for modern projects: `public/`.
 - Current branch: `main` in this checkout.
-- Current project phase: **v4.7.2 development after the public v4.7.1 release**.
+- Current project phase: **v4.8 development after the public v4.7.2 release**.
   The local Phase 4 development transition is committed and may remain unpushed
-  while normal v4.7.2 development continues. The v4.7.1 GitHub release is published
-  and immutable (tag `v4.7.1` at `8eeeb67`); Chocolatey v4.7.1 is submitted and
-  pending automated review; Snap v4.7.1 follow-up is maintainer-managed by Nick;
-  Homebrew propagation is external and automatic. Completed v4.7.1 certification
-  remains in `docs/evidence/release-4.7.1/release-verification.md`.
+  while normal v4.8 development continues. The v4.7.2 GitHub release is published
+  and immutable (tag `v4.7.2` at `4950129`); the prepared method-call argument
+  parity fix from v4.7.2 remains locked into the core regression test and the
+  external contract (regression suite `cf34587`, 94 modules); Chocolatey v4.7.2
+  is submitted and pending automated review; Snap v4.7.2 follow-up is
+  maintainer-managed by Nick; Homebrew propagation is external and automatic.
+  Completed v4.7.2 certification remains in
+  `docs/evidence/release-4.7.2/release-verification.md`.
 - Public documentation: the separate `nift-dev.github.io` repository.
 - External contract: the separate `nift-regression-suite` repository.
 - Embedded minifier: `minifypp/`, synchronized with standalone Minify++.

@@ -7,12 +7,25 @@ approved release is packaged and published.
 
 ## Authority and current state
 
-The local development executable reports `Nift v4.7.2` and
-`snap/snapcraft.yaml` also declares `4.7.2`, following the public v4.7.1
+The local development executable reports `Nift v4.8.0` and
+`snap/snapcraft.yaml` also declares `4.8.0`, following the public v4.7.2
 release. This local Phase 4 transition is committed and may remain unpushed
 until normal subsequent development is ready. Exact tag, artifact and public
-release history remains documented below; completed v4.7.1 evidence must not be
+release history remains documented below; completed v4.7.2 evidence must not be
 rewritten.
+
+### v4.7.2 release status (2026-10-06)
+
+The v4.7.2 GitHub release is published and immutable: annotated tag `v4.7.2` at
+`495012966756c9d2910a714c453359c8ff60bab1`; release workflow #37499165416
+passed including all three `installer-public-smoke` jobs and the first-party
+warnings-as-errors gate. The prepared method-call argument parity regression is
+fixed and covered by core + external contract tests (regression suite
+`cf34587`, 94 modules; external contract run #37486924459, 94/94 PASS).
+Chocolatey v4.7.2 is submitted (run #37511255214) and pending automated review;
+Snap v4.7.2 (including riscv64) remains maintainer-managed by Nick; Homebrew
+propagation is automatic. See
+`docs/evidence/release-4.7.2/release-verification.md`.
 
 ### v4.7.1 release status (2026-10-06)
 
