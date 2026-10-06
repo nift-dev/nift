@@ -7,12 +7,22 @@ approved release is packaged and published.
 
 ## Authority and current state
 
-The local development executable reports `Nift v4.7.0` and
-`snap/snapcraft.yaml` also declares `4.7.0`, following the public v4.6.0
-release. This local Phase 4 transition is committed and may remain unpushed
-until normal subsequent development is ready. Exact tag, artifact and public
-release history remains documented below; completed v4.6.0 evidence must not be
+The local development executable reports `Nift v4.7.1` and
+`snap/snapcraft.yaml` also declares `4.7.1`, following the public v4.7.0
+release. The v4.7.1 candidate (warning cleanup, a release-blocking
+warnings-as-errors gate, version metadata and release notes) is prepared for
+Phase 1 release certification. Exact tag, artifact and public
+release history remains documented below; completed v4.7.0 evidence must not be
 rewritten.
+
+### v4.7.0 release status (2026-10-06)
+
+The v4.7.0 GitHub release is published and immutable: annotated tag `v4.7.0` at
+`e31cd00`; release workflow #37396227898 passed including all three
+`installer-public-smoke` jobs. Chocolatey v4.7.0 is submitted (run
+#37404078431) and pending automated review; Snap v4.7.0 (including riscv64)
+remains maintainer-managed by Nick; Homebrew propagation is automatic. See
+`docs/evidence/release-4.7.0/release-verification.md`.
 
 ### v4.6.0 release status (2026-10-05)
 
@@ -144,6 +154,18 @@ Proportionately include:
       prove the same live public installer actually installs the newly
       published artifacts (equality alone does not prove the script can install
       them).
+15. **First-party warnings-as-errors gate.** Run `make test-warnings` (every
+    Nift-owned `src/` translation unit under
+    `-Wall -Wextra -pedantic -Werror`, GCC and Clang) on the exact candidate
+    SHA and require **zero first-party compiler warnings**. The `warnings` job
+    is a dependency of both `publish` and `rehearse` in the release workflow
+    and of the Deep guards workflow, so a warning-bearing candidate cannot
+    pass the rehearsal or be published. This is a permanent invariant:
+
+    ```text
+    A RELEASE CANDIDATE IS NOT GREEN IF FIRST-PARTY NIFT CODE PRODUCES
+    COMPILER WARNINGS ON A SUPPORTED RELEASE TOOLCHAIN.
+    ```
 
 Repository tests passing does not prove a release archive is usable. After the
 release is public, the separate distribution-verification workflow tests the

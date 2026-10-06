@@ -1,6 +1,25 @@
 # Nift release notes
 
-## v4.7.0 (unreleased development)
+## v4.7.1 (unreleased development)
+
+Nift v4.7.1 is a maintenance patch following v4.7.0.
+
+- Removes the three compiler warnings introduced in the v4.7 expression-parser
+  hardening: two misleading-indentation sites and an obsolete, now-unused parser
+  helper (`find_binary`) left after the iterative-expression changes. No parser,
+  language or runtime behavior changed.
+- Makes first-party compiler warnings a release-blocking invariant: every
+  Nift-owned `src/` translation unit must compile clean under
+  `-Wall -Wextra -pedantic -Werror` with both GCC and Clang before a candidate
+  can pass the release rehearsal or be published. The gate is a job in the
+  release workflow (required by both the rehearsal and publication jobs) and in
+  the Deep guards workflow, closing the process hole that let a warning-bearing
+  v4.7.0 candidate reach release.
+
+No language semantics, runtime API, package API, or C ABI changes.
+C ABI remains 1.3.
+
+## v4.7.0 (released 2026-10-06)
 
 Nift v4.7.0 is a runtime-performance and robustness release. It expands prepared
 execution so ordinary script loops stop re-running the legacy string evaluator
