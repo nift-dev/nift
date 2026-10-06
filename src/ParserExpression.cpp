@@ -3163,7 +3163,10 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
         auto split_op=[&](const std::string& op,std::vector<std::string>& parts)->bool{
             parts.clear();bool quoted=false;char quote=0;int parens=0,brackets=0,braces=0;std::size_t start=0;
             for(std::size_t i=0;i+op.size()<=text.size();++i){char c=text[i];if(quoted){if(c=='\\')++i;else if(c==quote)quoted=false;continue;}if(c=='\''||c=='"'){quoted=true;quote=c;continue;}if(c=='('){++parens;continue;}if(c==')'){if(parens)--parens;continue;}if(c=='['){++brackets;continue;}if(c==']'){if(brackets)--brackets;continue;}if(c=='{'){++braces;continue;}if(c=='}'){if(braces)--braces;continue;}if(parens||brackets||braces)continue;if(text.compare(i,op.size(),op)==0){parts.push_back(text.substr(start,i-start));i+=op.size()-1;start=i+1;}}
-            if(parts.empty())return false;parts.push_back(text.substr(start));return true;
+            if (parts.empty())
+                return false;
+            parts.push_back(text.substr(start));
+            return true;
         };
         { std::vector<std::string> parts;
           if (split_op("||",parts)) { nift::RuntimeValue v; for(const auto& pt:parts){if(!eval(pt,v,depth+1))return false;if(truthy_value(v)){out=nift::RuntimeValue(true);return true;}} out=nift::RuntimeValue(truthy_value(v)); return true; }
@@ -3259,26 +3262,6 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
         }
 
 
-        auto find_binary = [&](const std::string& ops) -> std::size_t {
-            bool quoted=false; char quote=0; int parens=0; int brackets=0;
-            for (std::size_t i=text.size(); i-- > 0;) {
-                char c=text[i];
-                if (quoted) { if (c==quote && (i==0 || text[i-1]!='\\')) quoted=false; continue; }
-                if (c=='\'' || c=='"') { quoted=true; quote=c; continue; }
-                if (c==']') { ++brackets; continue; }
-                if (c=='[') { if (brackets) --brackets; continue; }
-                if (brackets) continue;
-                if (c==')') { ++parens; continue; }
-                if (c=='(') { if (parens) --parens; continue; }
-                if (parens || ops.find(c)==std::string::npos) continue;
-                if ((c=='+' || c=='-') &&
-                    (i==0 || std::string("+-*/%(<>=!&|?:,").find(text[i-1])!=std::string::npos ||
-                     numeric_exponent_sign(text,i))) continue;
-                return i;
-            }
-            return std::string::npos;
-        };
-
         // Apply one arithmetic operator with the existing semantics (array/bytes/
         // string concatenation, otherwise numeric). Factored so a flat chain can
         // be folded iteratively instead of recursing per operator.
@@ -3296,7 +3279,10 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
         auto split_arithmetic=[&](const std::string& ops,std::vector<std::string>& parts,std::vector<char>& opchars)->bool{
             parts.clear();opchars.clear();bool quoted=false;char quote=0;int parens=0,brackets=0,braces=0;std::size_t start=0;
             for(std::size_t i=0;i<text.size();++i){char c=text[i];if(quoted){if(c=='\\'&&i+1<text.size())++i;else if(c==quote)quoted=false;continue;}if(c=='\''||c=='"'){quoted=true;quote=c;continue;}if(c=='('){++parens;continue;}if(c==')'){if(parens)--parens;continue;}if(c=='['){++brackets;continue;}if(c==']'){if(brackets)--brackets;continue;}if(c=='{'){++braces;continue;}if(c=='}'){if(braces)--braces;continue;}if(parens||brackets||braces)continue;if(ops.find(c)==std::string::npos)continue;if(c=='+'||c=='-'){std::size_t j=i;while(j>0&&(text[j-1]==' '||text[j-1]=='\t'))--j;if(j==0||std::string("+-*/%(<>=!&|?:,").find(text[j-1])!=std::string::npos||numeric_exponent_sign(text,i))continue;}parts.push_back(text.substr(start,i-start));opchars.push_back(c);start=i+1;}
-            if(opchars.empty())return false;parts.push_back(text.substr(start));return true;
+            if (opchars.empty())
+                return false;
+            parts.push_back(text.substr(start));
+            return true;
         };
         { std::vector<std::string> parts;std::vector<char> opchars;
           if (split_arithmetic("+-",parts,opchars)||split_arithmetic("*/%",parts,opchars)) {
