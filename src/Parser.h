@@ -331,6 +331,14 @@ private:
         // scan. has_huge_int tracks any StrNumber so a Number add never misses
         // a numerically-equal big-integer member (Number vs StrNumber equality).
         std::unordered_set<std::string> scalar_keys;
+        // Scalar-key -> vector position for Map/SortedMap, keyed by the same
+        // runtime_scalar_key canon as scalar_keys. Locates the entries-vector
+        // entry in O(1) for get/contains/replacement while the ordered vector
+        // remains authoritative. Callers must re-confirm structural equality
+        // at the located position: canonical keys can be over-broad (every
+        // NaN fingerprints identically), so a mismatch falls back to the
+        // linear scan. Rebuilt after erase and after sorted_map re-sorts.
+        std::unordered_map<std::string, std::size_t> scalar_positions;
         bool has_huge_int = false;
     };
     std::unordered_map<std::string, std::shared_ptr<CollectionInstance>> collection_instances_;

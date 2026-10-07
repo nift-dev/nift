@@ -1127,9 +1127,13 @@ e="unknown value or malformed expression: "+name;return false;};c.legacy=[&](con
                             if(av.size()!=1){e=st.op+": expected one value";return false;}
                             const nift::RuntimeValue& v=av[0];
                             const std::string k=ckey(v);
-                            const bool indexed=!k.empty();
+                            // The canonical key is injective for actual values
+                            // except NaN, which never equals itself; a scalar
+                            // membership hit therefore needs no value scan.
+                            const bool nan_key=v.is_number()&&nift::runtime_numeric_fingerprint(v)=="nan";
+                            const bool indexed=!k.empty()&&!nan_key;
                             if(!indexed){nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}
-                            const bool present=cc->scalar_keys.count(k)!=0&&std::any_of(cc->values.begin(),cc->values.end(),[&](const auto& item){return ckey(item)==k&&nift::runtime_equal(item,v);});
+                            const bool present=cc->scalar_keys.count(k)!=0;
                             if(st.op=="contains"){return true;}
                             if(!rb->mutable_binding){e="cannot mutate const collection: "+st.name;return false;}
                             if(st.op=="add"&&!present){cc->values.push_back(v);cc->scalar_keys.insert(k);}else if(st.op=="add"&&present){/* already present: no-op */}last_expression_mutation_=true;return true;
@@ -1148,7 +1152,7 @@ e="unknown value or malformed expression: "+name;return false;};c.legacy=[&](con
                         // sorted-map ordering, unindexed keys and possible cycles fall
                         // back to the legacy evaluator, which owns those semantics.
                         if(fresh_indexed&&simple_value&&cc->kind!=CollectionKind::SortedMap){
-                            cc->entries.push_back({k,v});cc->scalar_keys.insert(mk);if(k.type==nift::RuntimeType::StrNumber)cc->has_huge_int=true;last_expression_mutation_=true;return true;
+                            cc->entries.push_back({k,v});cc->scalar_keys.insert(mk);cc->scalar_positions[mk]=cc->entries.size()-1;if(k.type==nift::RuntimeType::StrNumber)cc->has_huge_int=true;last_expression_mutation_=true;return true;
                         }
                         nift::RuntimeValue lege;return c.legacy(st.text,lege,e);
                     }

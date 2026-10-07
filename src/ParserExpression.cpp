@@ -2252,7 +2252,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         }
                         if(method=="map"||method=="filter")out=arr;else if(method=="reduce")out=acc;else if(method=="any")out=nift::RuntimeValue(false);else if(method=="all")out=nift::RuntimeValue(true);else if(method=="find")out=nift::RuntimeValue(nullptr);else out=nift::RuntimeValue(cnt);return true;
                     }
-                    if(method=="size"||method=="empty"||method=="clear"){if(!args.empty()){error=method+": expected no arguments";return false;}size_t n=(c->kind==CollectionKind::Map||c->kind==CollectionKind::SortedMap)?c->entries.size():c->values.size();if(method=="size")out=nift::RuntimeValue((double)n);else if(method=="empty")out=nift::RuntimeValue(n==0);else{if(!need_mut())return false;c->values.clear();c->entries.clear();c->scalar_keys.clear();c->has_huge_int=false;out=nift::RuntimeValue(nullptr);last_expression_mutation_=true;}return true;}
+                    if(method=="size"||method=="empty"||method=="clear"){if(!args.empty()){error=method+": expected no arguments";return false;}size_t n=(c->kind==CollectionKind::Map||c->kind==CollectionKind::SortedMap)?c->entries.size():c->values.size();if(method=="size")out=nift::RuntimeValue((double)n);else if(method=="empty")out=nift::RuntimeValue(n==0);else{if(!need_mut())return false;c->values.clear();c->entries.clear();c->scalar_keys.clear();c->scalar_positions.clear();c->has_huge_int=false;out=nift::RuntimeValue(nullptr);last_expression_mutation_=true;}return true;}
                     if(c->kind==CollectionKind::Stack||c->kind==CollectionKind::Queue||c->kind==CollectionKind::PriQue){
                         if(method=="push"){if(args.size()!=1){error="push: expected one value";return false;}if(!need_mut())return false;nift::RuntimeValue v;if(quoted_args.size()>0&&quoted_args[0])v=nift::RuntimeValue(args[0]);else if(!eval(args[0],v,depth+1))return false;if(c->kind==CollectionKind::PriQue&&runtime_contains_bytes(v)){error="prique: bytes values are not supported";return false;}if(v.is_string()&&(v.string.rfind("\x1fnift:struct:",0)==0||v.string.rfind("\x1fnift:collection:",0)==0)){if(reference_would_cycle(v.string,rb->value->string)){error="push would create a cyclic reference";return false;}}c->values.push_back(v);if(c->kind==CollectionKind::PriQue){std::stable_sort(c->values.begin(),c->values.end(),[&](const auto&a,const auto&b){int z=0;return scalar_order(a,b,z)&&z<0;});}out=v;last_expression_mutation_=true;return true;}
                         if(method=="pop"||method=="top"||method=="front"){if(!args.empty()){error=method+": expected no arguments";return false;}if(c->values.empty()){error=method+": collection is empty";return false;}size_t i=(c->kind==CollectionKind::Stack&&(method=="pop"||method=="top"))?c->values.size()-1:0;out=c->values[i];if(method=="pop"){if(!need_mut())return false;c->values.erase(c->values.begin()+i);last_expression_mutation_=true;}return true;}
@@ -2261,27 +2261,67 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     if(c->kind==CollectionKind::Set||c->kind==CollectionKind::SortedSet){
                         if(method=="add"||method=="contains"||method=="remove"){if(args.size()!=1){error=method+": expected one value";return false;}nift::RuntimeValue v;if(quoted_args.size()>0&&quoted_args[0])v=nift::RuntimeValue(args[0]);else if(!eval(args[0],v,depth+1))return false;if(!(v.is_bool()||v.is_number()||v.is_string())){error=method+": set values must be bool, number, or string";return false;}
                          auto set_scalar_key=[&](const nift::RuntimeValue& x)->std::string{return runtime_scalar_key(x);};
-                        auto set_indexed=[&](const nift::RuntimeValue& x)->bool{const std::string k=set_scalar_key(x);return !k.empty()&&c->scalar_keys.count(k)!=0;};
                         auto set_find=[&](const nift::RuntimeValue& x)->size_t{size_t j=0;for(;j<c->values.size();++j)if(structural_equal(c->values[j],x))break;return j;};
-                         // Fingerprints select candidate buckets; equality still
-                         // confirms identity, notably leaving NaNs distinct.
-                         const bool indexed=!set_scalar_key(v).empty();
-                        const size_t i=indexed?(set_indexed(v)?set_find(v):c->values.size()):set_find(v);
-                        if(method=="contains"){out=nift::RuntimeValue(i<c->values.size());return true;}if(!need_mut())return false;
-                        if(method=="add"&&i==c->values.size()){c->values.push_back(v);const std::string k=set_scalar_key(v);if(!k.empty())c->scalar_keys.insert(k);if(v.type==nift::RuntimeType::StrNumber)c->has_huge_int=true;if(c->kind==CollectionKind::SortedSet)std::stable_sort(c->values.begin(),c->values.end(),[&](const auto&a,const auto&b){int z=0;if(!scalar_order(a,b,z)){error="sorted_set: incomparable values";return false;}return z<0;});}
-                         else if(method=="remove"&&i<c->values.size()){const std::string k=set_scalar_key(v);c->values.erase(c->values.begin()+i);if(!k.empty()&&std::none_of(c->values.begin(),c->values.end(),[&](const auto& item){return set_scalar_key(item)==k;}))c->scalar_keys.erase(k);}
+                         // The canonical key is injective for actual values
+                         // (distinct bools/strings/finite numbers -> distinct
+                         // keys); only NaN fingerprints collide, and NaN never
+                         // equals itself. So an injective scalar hit means the
+                         // value is present without scanning; NaN and
+                         // marker/reference strings keep the linear fallback.
+                         const std::string sk=set_scalar_key(v);
+                        const bool nan_key=v.is_number()&&nift::runtime_numeric_fingerprint(v)=="nan";
+                        const bool indexed=!sk.empty()&&!nan_key;
+                        if(method=="contains"){const bool present=indexed?c->scalar_keys.count(sk)!=0:(set_find(v)<c->values.size());out=nift::RuntimeValue(present);return true;}if(!need_mut())return false;
+                        if(method=="add"){
+                            if(indexed){if(!c->scalar_keys.count(sk)){c->values.push_back(v);c->scalar_keys.insert(sk);if(v.type==nift::RuntimeType::StrNumber)c->has_huge_int=true;if(c->kind==CollectionKind::SortedSet)std::stable_sort(c->values.begin(),c->values.end(),[&](const auto&a,const auto&b){int z=0;if(!scalar_order(a,b,z)){error="sorted_set: incomparable values";return false;}return z<0;});}}
+                            else{const size_t i=set_find(v);if(i==c->values.size())c->values.push_back(v);}
+                            out=v;last_expression_mutation_=true;return true;}
+                         const size_t i=indexed?(c->scalar_keys.count(sk)?set_find(v):c->values.size()):set_find(v);
+                         if(method=="remove"&&i<c->values.size()){const std::string k=set_scalar_key(v);c->values.erase(c->values.begin()+i);if(!k.empty()&&std::none_of(c->values.begin(),c->values.end(),[&](const auto& item){return set_scalar_key(item)==k;}))c->scalar_keys.erase(k);}
                         out=v;last_expression_mutation_=true;return true;}
                     }
                     if(c->kind==CollectionKind::Map||c->kind==CollectionKind::SortedMap){
                          auto mkey=[&](const nift::RuntimeValue& x)->std::string{return runtime_scalar_key(x);};
+                        // Rebuild both scalar indexes from the authoritative
+                        // entries vector after erase or a sorted_map sort.
+                        auto rebuild_indexes=[&](){c->scalar_keys.clear();c->scalar_positions.clear();c->has_huge_int=false;for(std::size_t j=0;j<c->entries.size();++j){const nift::RuntimeValue& ekey=c->entries[j].first;const std::string q=mkey(ekey);if(!q.empty()){c->scalar_keys.insert(q);c->scalar_positions[q]=j;}if(ekey.type==nift::RuntimeType::StrNumber)c->has_huge_int=true;}};
+                        // Locate a key in the entries vector. Scalar keys use the
+                        // position index (O(1) expected); the located entry is
+                        // re-confirmed by structural equality because canonical
+                        // keys can be over-broad (NaN fingerprints collide).
+                        // On mismatch or a marked/reference key, fall back to
+                        // the exact linear scan.
+                        auto locate=[&](const nift::RuntimeValue& key,std::size_t& idx)->bool{
+                            const std::string kk=mkey(key);
+                            if(kk.empty()){for(std::size_t j=0;j<c->entries.size();++j)if(structural_equal(c->entries[j].first,key)){idx=j;return true;}return false;}
+                            auto pt=c->scalar_positions.find(kk);
+                            if(pt!=c->scalar_positions.end()&&pt->second<c->entries.size()){
+                                if(structural_equal(c->entries[pt->second].first,key)){idx=pt->second;return true;}
+                                // Over-broad canonical key (e.g. every NaN
+                                // fingerprints identically): confirm with the
+                                // exact linear scan.
+                                for(std::size_t j=0;j<c->entries.size();++j)if(structural_equal(c->entries[j].first,key)){idx=j;return true;}
+                                return false;
+                            }
+                            // No entry with this canonical key exists, and an
+                            // equal entry would have registered the same key,
+                            // so the key is absent in O(1).
+                            return false;
+                        };
                         if(method=="set"){if(args.size()!=2){error="set: expected key and value";return false;}if(!need_mut())return false;nift::RuntimeValue k,v;if(quoted_args.size()>0&&quoted_args[0])k=nift::RuntimeValue(args[0]);else if(!eval(args[0],k,depth+1))return false;if(quoted_args.size()>1&&quoted_args[1])v=nift::RuntimeValue(args[1]);else if(!eval(args[1],v,depth+1))return false;if(!(k.is_bool()||k.is_number()||k.is_string())){error="map: key must be bool, number, or string";return false;}if(v.is_string()&&(v.string.rfind("\x1fnift:struct:",0)==0||v.string.rfind("\x1fnift:collection:",0)==0)){if(reference_would_cycle(v.string,rb->value->string)){error="set would create a cyclic reference";return false;}}
-                         const std::string mk=mkey(k);const bool mind=!mk.empty();
-                        size_t i;if(mind&&c->scalar_keys.count(mk)){for(i=0;i<c->entries.size();++i)if(structural_equal(c->entries[i].first,k))break;}else if(mind){i=c->entries.size();}else{for(i=0;i<c->entries.size();++i)if(structural_equal(c->entries[i].first,k))break;}
-                        if(i<c->entries.size())c->entries[i].second=v;else{c->entries.push_back({k,v});if(mind)c->scalar_keys.insert(mk);}if(k.type==nift::RuntimeType::StrNumber)c->has_huge_int=true;if(c->kind==CollectionKind::SortedMap)std::stable_sort(c->entries.begin(),c->entries.end(),[&](const auto&a,const auto&b){int z=0;if(!scalar_order(a.first,b.first,z)){error="sorted_map: incomparable keys";return false;}return z<0;});out=v;last_expression_mutation_=true;return true;}
+                         const std::string mk=mkey(k);
+                        std::size_t i=0;const bool found=locate(k,i);
+                        if(found)c->entries[i].second=v;
+                        else{c->entries.push_back({k,v});if(!mk.empty()){c->scalar_keys.insert(mk);c->scalar_positions[mk]=c->entries.size()-1;}}
+                        if(k.type==nift::RuntimeType::StrNumber)c->has_huge_int=true;
+                        if(c->kind==CollectionKind::SortedMap)std::stable_sort(c->entries.begin(),c->entries.end(),[&](const auto&a,const auto&b){int z=0;if(!scalar_order(a.first,b.first,z)){error="sorted_map: incomparable keys";return false;}return z<0;});
+                        if(c->kind==CollectionKind::SortedMap)rebuild_indexes();
+                        out=v;last_expression_mutation_=true;return true;}
                         if(method=="contains"||method=="get"||method=="remove"){if(args.size()!=1){error=method+": expected one key";return false;}nift::RuntimeValue k;if(quoted_args.size()>0&&quoted_args[0])k=nift::RuntimeValue(args[0]);else if(!eval(args[0],k,depth+1))return false;
-                         const std::string mk=mkey(k);const bool mind=!mk.empty();
-                        size_t i;if(mind&&c->scalar_keys.count(mk)){for(i=0;i<c->entries.size();++i)if(structural_equal(c->entries[i].first,k))break;}else{for(i=0;i<c->entries.size();++i)if(structural_equal(c->entries[i].first,k))break;}
-                         if(method=="contains"){out=nift::RuntimeValue(i<c->entries.size());return true;}if(i==c->entries.size()){error=method+": key not found";return false;}out=c->entries[i].second;if(method=="remove"){if(!need_mut())return false;c->entries.erase(c->entries.begin()+i);if(mind&&std::none_of(c->entries.begin(),c->entries.end(),[&](const auto& entry){return mkey(entry.first)==mk;}))c->scalar_keys.erase(mk);last_expression_mutation_=true;}return true;}
+                        std::size_t i=0;const bool has=locate(k,i);
+                        if(method=="contains"){out=nift::RuntimeValue(has);return true;}if(!has){error=method+": key not found";return false;}out=c->entries[i].second;
+                        if(method=="remove"&&has){if(!need_mut())return false;c->entries.erase(c->entries.begin()+i);rebuild_indexes();last_expression_mutation_=true;}
+                        return true;}
                     }
                 }
             }}
@@ -2517,7 +2557,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             std::unordered_map<std::string,std::string> seen;
             std::function<bool(const nift::RuntimeValue&,nift::RuntimeValue&)> clone;
             clone=[&](const nift::RuntimeValue& in,nift::RuntimeValue& dst)->bool{
-                if(in.is_string()&&in.string.rfind("\x1fnift:collection:",0)==0){auto it=collection_instances_.find(in.string.substr(17));if(it==collection_instances_.end()){error="deepcopy: invalid collection";return false;}auto nc=std::make_shared<CollectionInstance>();nc->kind=it->second->kind;for(const auto& v:it->second->values){nift::RuntimeValue cv;if(!clone(v,cv))return false;nc->values.push_back(std::move(cv));if(nc->kind==CollectionKind::Set||nc->kind==CollectionKind::SortedSet){std::string k=runtime_scalar_key(cv);if(!k.empty())nc->scalar_keys.insert(k);if(cv.type==nift::RuntimeType::StrNumber)nc->has_huge_int=true;}}for(const auto& e:it->second->entries){nift::RuntimeValue ck,cv;if(!clone(e.first,ck)||!clone(e.second,cv))return false;nc->entries.push_back({std::move(ck),std::move(cv)});if(nc->kind==CollectionKind::Map||nc->kind==CollectionKind::SortedMap){std::string kk=runtime_scalar_key(nc->entries.back().first);if(!kk.empty())nc->scalar_keys.insert(kk);if(nc->entries.back().first.type==nift::RuntimeType::StrNumber)nc->has_huge_int=true;}}const std::string id=std::to_string(next_collection_instance_id_++);collection_instances_[id]=nc;dst=nift::RuntimeValue(std::string("\x1fnift:collection:")+id);return true;}
+                if(in.is_string()&&in.string.rfind("\x1fnift:collection:",0)==0){auto it=collection_instances_.find(in.string.substr(17));if(it==collection_instances_.end()){error="deepcopy: invalid collection";return false;}auto nc=std::make_shared<CollectionInstance>();nc->kind=it->second->kind;for(const auto& v:it->second->values){nift::RuntimeValue cv;if(!clone(v,cv))return false;nc->values.push_back(std::move(cv));if(nc->kind==CollectionKind::Set||nc->kind==CollectionKind::SortedSet){std::string k=runtime_scalar_key(cv);if(!k.empty())nc->scalar_keys.insert(k);if(cv.type==nift::RuntimeType::StrNumber)nc->has_huge_int=true;}}for(const auto& e:it->second->entries){nift::RuntimeValue ck,cv;if(!clone(e.first,ck)||!clone(e.second,cv))return false;nc->entries.push_back({std::move(ck),std::move(cv)});if(nc->kind==CollectionKind::Map||nc->kind==CollectionKind::SortedMap){std::string kk=runtime_scalar_key(nc->entries.back().first);if(!kk.empty()){nc->scalar_keys.insert(kk);nc->scalar_positions[kk]=nc->entries.size()-1;}if(nc->entries.back().first.type==nift::RuntimeType::StrNumber)nc->has_huge_int=true;}}const std::string id=std::to_string(next_collection_instance_id_++);collection_instances_[id]=nc;dst=nift::RuntimeValue(std::string("\x1fnift:collection:")+id);return true;}
                 if(in.is_string()&&in.string.rfind("\x1fnift:struct:",0)==0){const std::string old=in.string.substr(13);auto sit=seen.find(old);if(sit!=seen.end()){dst=nift::RuntimeValue(std::string("\x1fnift:struct:")+sit->second);return true;}auto it=struct_instances_.find(old);if(it==struct_instances_.end()){error="deepcopy: invalid struct instance";return false;}auto ni=std::make_shared<StructInstance>();ni->type_name=it->second->type_name;ni->definition=it->second->definition;const std::string id=std::to_string(next_struct_instance_id_++);seen[old]=id;struct_instances_[id]=ni;for(const auto& f:it->second->fields){nift::RuntimeValue cv;if(!clone(*f.second.value,cv))return false;auto sp=std::make_shared<nift::RuntimeValue>(std::move(cv));ni->fields.emplace(f.first,VariableBinding{sp,f.second.type,f.second.mutable_binding,f.second.deep_readonly});}dst=nift::RuntimeValue(std::string("\x1fnift:struct:")+id);return true;}
                 dst=in;if(in.is_array()){dst.array.clear();for(const auto& v:in.array){nift::RuntimeValue cv;if(!clone(v,cv))return false;dst.array.push_back(std::move(cv));}}else if(in.is_object()){dst.object.clear();for(const auto& e:in.object){nift::RuntimeValue cv;if(!clone(e.second,cv))return false;dst.object.emplace_back(e.first,std::move(cv));}}return true;
             };

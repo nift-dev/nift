@@ -37,6 +37,16 @@ v4.8.0 user-visible changes have been recorded yet.
   callable value as in ordinary evaluation. Lambdas already travelled
   correctly. Callable identity, arity checks, shadowing, and throw behaviour
   are unchanged.
+- Improved scalar-key `map`/`sorted_map` and `set`/`sorted_set` scaling: the
+  ordered entries/values vectors remain authoritative (insertion order,
+  iteration, replacement position, determinism unchanged), but successful
+  scalar-key `map.get`/`contains`/replacement and `set.contains` now use an
+  auxiliary scalar-key index instead of a linear scan, so repeated lookups no
+  longer degrade to quadratic aggregate behaviour as the collection grows
+  (100k-key `contains`-then-`set` construction drops from minutes to well
+  under a second). Marked/reference-bearing keys and ordered JSON objects keep
+  their existing linear semantics; key `remove` and `sorted_map` mutation
+  remain O(n). Adds a small per-key position-index memory cost for maps.
 
 ## v4.7.2 (released 2026-10-06)
 
