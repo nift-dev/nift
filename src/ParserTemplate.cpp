@@ -979,6 +979,33 @@ e="unknown value or malformed expression: "+name;return false;};c.legacy=[&](con
             if(pending_control_.kind==ControlFlow::Return)consume_return(out);
             else out=nift::RuntimeValue(nullptr);
             return true;};c.resolve_ref=[&](const std::string& name,std::shared_ptr<const nift::RuntimeValue>& out,std::string& e){for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(name);if(it!=sc->end()){it->second.sync();if(!it->second.value){e="reference target no longer exists: "+name;return false;}out=it->second.value;return true;}}e="unknown value or malformed expression: "+name;return false;};c.native_method=[&](const nift::RuntimeValue& recv,const std::string& method,std::vector<nift::RuntimeValue>&& args,nift::RuntimeValue& out,std::string& e)->bool{
+             // Read-only collection lookups reuse the canonical scalar-key index
+             // (CP-D2) instead of falling back to the legacy string evaluator.
+             // Marked/reference or over-broad (NaN) keys fall through so
+             // ordinary semantics are never approximated; mutation stays on the
+             // legacy path until proven separately.
+             if(recv.is_string()&&recv.string.rfind("\x1fnift:collection:",0)==0){
+                 auto cit=collection_instances_.find(recv.string.substr(17));
+                 if(cit!=collection_instances_.end()){
+                     auto& coll=cit->second;
+                     const bool is_map=coll->kind==CollectionKind::Map||coll->kind==CollectionKind::SortedMap;
+                     if(is_map&&(method=="contains"||method=="get")){
+                         if(args.size()!=1){e=method+": expected one key";return false;}
+                         const std::string mk=nift::detail::runtime_scalar_key(args[0]);
+                         if(mk.empty()||(args[0].is_number()&&nift::runtime_numeric_fingerprint(args[0])=="nan"))return false;
+                         auto pt=coll->scalar_positions.find(mk);
+                         if(pt==coll->scalar_positions.end()||pt->second>=coll->entries.size()||!nift::runtime_equal(coll->entries[pt->second].first,args[0]))return false;
+                         if(method=="contains"){out=nift::RuntimeValue(true);return true;}
+                         out=coll->entries[pt->second].second;return true;
+                     }
+                     if(!is_map&&(coll->kind==CollectionKind::Set||coll->kind==CollectionKind::SortedSet)&&method=="contains"){
+                         if(args.size()!=1){e="contains: expected one value";return false;}
+                         const std::string sk=nift::detail::runtime_scalar_key(args[0]);
+                         if(sk.empty()||(args[0].is_number()&&nift::runtime_numeric_fingerprint(args[0])=="nan"))return false;
+                         out=nift::RuntimeValue(coll->scalar_keys.count(sk)!=0);return true;
+                     }
+                 }
+             }
             if(recv.is_string()&&recv.string.rfind("\x1fnift:atomic:",0)==0){
                 auto ai=atomic_instances_.find(recv.string.substr(13));if(ai==atomic_instances_.end()){e="atomic: invalid handle";return false;}auto st=ai->second;
                 auto int_doc=[](std::int64_t v){nift::RuntimeValue d(static_cast<double>(v));if(v>9007199254740992LL||v<-9007199254740992LL){d.type=nift::RuntimeType::StrNumber;d.string=std::to_string(v);}return d;};
@@ -1147,12 +1174,15 @@ e="unknown value or malformed expression: "+name;return false;};c.legacy=[&](con
                         const std::string mk=ckey(k);
                         const bool fresh_indexed=!mk.empty()&&cc->scalar_keys.count(mk)==0;
                         const bool simple_value=!(v.is_string()&&(v.string.rfind("\x1fnift:struct:",0)==0||v.string.rfind("\x1fnift:collection:",0)==0));
-                        // Fresh indexed key, plain value, insertion-ordered map: append
-                        // directly (matches the legacy fast path exactly). Overwrite,
-                        // sorted-map ordering, unindexed keys and possible cycles fall
-                        // back to the legacy evaluator, which owns those semantics.
-                        if(fresh_indexed&&simple_value&&cc->kind!=CollectionKind::SortedMap){
-                            cc->entries.push_back({k,v});cc->scalar_keys.insert(mk);cc->scalar_positions[mk]=cc->entries.size()-1;if(k.type==nift::RuntimeType::StrNumber)cc->has_huge_int=true;last_expression_mutation_=true;return true;
+                        // Indexed scalar key, plain value, insertion-ordered map:
+                        // append a fresh key or update an existing key in place
+                        // (both match the canonical legacy semantics exactly).
+                        // Sorted-map ordering, unindexed/marked keys and possible
+                        // cycles fall back to the legacy evaluator.
+                        if(simple_value&&cc->kind!=CollectionKind::SortedMap){
+                            if(fresh_indexed){cc->entries.push_back({k,v});cc->scalar_keys.insert(mk);cc->scalar_positions[mk]=cc->entries.size()-1;if(k.type==nift::RuntimeType::StrNumber)cc->has_huge_int=true;last_expression_mutation_=true;return true;}
+                            auto pt=cc->scalar_positions.find(mk);
+                            if(!mk.empty()&&pt!=cc->scalar_positions.end()&&pt->second<cc->entries.size()&&nift::runtime_equal(cc->entries[pt->second].first,k)){cc->entries[pt->second].second=v;last_expression_mutation_=true;return true;}
                         }
                         nift::RuntimeValue lege;return c.legacy(st.text,lege,e);
                     }

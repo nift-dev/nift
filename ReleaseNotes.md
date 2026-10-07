@@ -62,6 +62,13 @@ v4.8.0 user-visible changes have been recorded yet.
   and escaped keys keep the legacy path. JSON transform-style workloads run
   roughly an order of magnitude faster. Also fixes argument splitting so commas
   inside object-literal arguments are not mistaken for argument separators.
+- Improved prepared execution of collection methods: read-only scalar-key
+  lookups (`map.contains`/`map.get`, `set.contains`) and `map.set` inside
+  prepared loop/body and template execution now reuse the canonical collection
+  runtime (including the CP-D2 scalar-key positions) instead of falling back to
+  the legacy string evaluator on every iteration. Marked/reference and
+  over-broad (NaN) keys keep the legacy path; results, errors, mutability,
+  numeric/StrNumber key parity, ordering and mutation tracking are unchanged.
 
 ## v4.7.2 (released 2026-10-06)
 
