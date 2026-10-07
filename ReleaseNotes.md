@@ -11,6 +11,10 @@ v4.8.0 user-visible changes have been recorded yet.
   templates. `warn(value)` emits one canonical `warning: <value>` line to
   stderr, continues execution, leaves stdout/template output unchanged, and
   returns `null` like `print`/`err`. See `docs/output-primitives.md`.
+- Fixed bytes variable-index parity: `bytes([...])[variable]` now accepts a
+  computed index everywhere an array does (top-level, function
+  parameters/locals/returns, arguments, loop/conditional bodies, template
+  execution). Bounds and type errors are unchanged.
 
 ## v4.7.2 (released 2026-10-06)
 

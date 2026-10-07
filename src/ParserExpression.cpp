@@ -946,7 +946,7 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
             }
             if (walk_ok) { out = *cur; return true; }
             if (error.empty() && path_only && root_it->second.value &&
-                (root_it->second.value->is_object() || root_it->second.value->is_array())) {
+                (root_it->second.value->is_object() || root_it->second.value->is_array() || root_it->second.value->is_bytes())) {
                 std::shared_ptr<const nift::RuntimeValue> resolved;
                 std::string path_error;
                 if (resolve_json_value(text, resolved, path_error)) {

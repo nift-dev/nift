@@ -1180,7 +1180,7 @@ bool Parser::resolve_json_value(const std::string& expression,
         // root slot + path so template paths never read a stale interior alias.
         local_binding->sync();
     }
-    if (local_binding && local_binding->value && (local_binding->value->is_object() || local_binding->value->is_array())) {
+    if (local_binding && local_binding->value && (local_binding->value->is_object() || local_binding->value->is_array() || local_binding->value->is_bytes())) {
         current = local_binding->value;
     } else if (const auto* supplied = host_.binding(root_name)) {
         current = *supplied;
