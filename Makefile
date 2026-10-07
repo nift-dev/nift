@@ -744,6 +744,7 @@ test: test-parser-hardening test-content test-commands test-comments test-contra
 	test-v48-prepared-object-literal-parity test-v48-prepared-object-literal-guard \
 	test-v48-prepared-collection-parity test-v48-prepared-collection-guard \
 	test-location-method-receiver \
+	test-v48-identifier-parity test-v48-identifier-guard \
 	test-v46-time-cli test-v46-timer test-v46-secure-random-cli test-v46-output-cli test-v46-relative-imports test-progress-render $(PROGRESS_PTY_TARGET) test-snap-contract test-distribution-summary test-version-consistency test-unreadable-source test-incremental-modified-immediate
 
 test-cp15-numeric-repair: $(TARGET)
@@ -902,6 +903,13 @@ test-v48-prepared-collection-guard: $(TARGET)
 .PHONY: test-location-method-receiver
 test-location-method-receiver: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" bash tests/location_method_receiver.sh
+
+.PHONY: test-v48-identifier-parity test-v48-identifier-guard
+test-v48-identifier-parity: $(TARGET)
+	NIFT="$(CURDIR)/$(TARGET)" bash tests/v48_identifier_parity.sh
+
+test-v48-identifier-guard: $(TARGET)
+	NIFT="$(CURDIR)/$(TARGET)" python3 tests/v48_identifier_guard.py
 
 test-v43-language: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp0_cp14_smoke.sh

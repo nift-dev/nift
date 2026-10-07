@@ -1258,6 +1258,14 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
             out = nift::RuntimeValue(named_callable_tag(text,named_owner));
             return true;
         }
+        // A bare name cannot match the call/operator forms below. Keep named
+        // callable precedence, then use the same resolver as the compatibility
+        // path (including location synchronization, receivers and metadata).
+        // Unresolved names retain the existing fallback and diagnostics.
+        if (valid_binding_identifier(text)) {
+            if (resolve_direct(text, out)) return true;
+            if (!error.empty()) return false;
+        }
         {
             std::size_t arrow = std::string::npos; int pd=0, bd=0, cd=0; bool iq=false; char qc=0;
             for(std::size_t ai=0;ai+1<text.size();++ai){char ch=text[ai];if(iq){if(ch=='\\')++ai;else if(ch==qc)iq=false;continue;}if(ch=='\"'||ch=='\''){iq=true;qc=ch;continue;}if(ch=='(')++pd;else if(ch==')')--pd;else if(ch=='[')++bd;else if(ch==']')--bd;else if(ch=='{')++cd;else if(ch=='}')--cd;else if(ch=='='&&text[ai+1]=='>'&&pd==0&&bd==0&&cd==0){arrow=ai;break;}}
