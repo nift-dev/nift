@@ -13,6 +13,7 @@
 #include "ProjectOwnership.h"
 #include "WatchList.h"
 #include "handover_content.h"
+#include "migration_content.h"
 #include "Parser.h"
 #include "Proc.h"
 #include "RenderHost.h"
@@ -365,7 +366,7 @@ void print_commands() {
     row("packages", "[name]", "Explain why packages are installed (dependency graph)");
 
     std::cout << '\n' << console::dim("General") << '\n';
-    row("init", "[--target=platform] [--ext=.ext] [--handover]", "Create a Nift project");
+    row("init", "[--target=platform] [--ext=.ext] [--handover] [--migration] [--migration-existing=POLICY]", "Create a Nift project; --migration adds agent-ready migration files");
     row("minify", "[-i|--in-place] <files...>", "Minify to *.min.ext by default; -i overwrites sources");
     row("about", "", "About Nift and where to learn more");
     row("version", "", "Show version information");
@@ -565,6 +566,8 @@ struct InitOptions {
     std::string extension = ".html";
     std::string target;
     bool handover = false;
+    bool migration = false;
+    std::string migration_existing = "error";
 };
 
 struct InitTarget {
@@ -651,6 +654,25 @@ bool parse_init_options(int argc, char** argv, InitOptions& options) {
         if (arg == "--handover") {
             options.handover = true;
             continue;
+        }
+        if (arg == "--migration") {
+            options.migration = true;
+            continue;
+        }
+        if (arg.rfind("--migration-existing=", 0) == 0) {
+            options.migration_existing = arg.substr(std::string("--migration-existing=").size());
+            if (options.migration_existing != "error" &&
+                options.migration_existing != "keep" &&
+                options.migration_existing != "append" &&
+                options.migration_existing != "replace") {
+                console::error("--migration-existing must be one of: error, keep, append, replace");
+                return false;
+            }
+            continue;
+        }
+        if (arg == "--migration-existing") {
+            console::error("--migration-existing requires '=POLICY', for example '--migration-existing=keep'");
+            return false;
         }
         if (!arg.empty() && arg[0] == '-') {
             console::error("unknown init option '" + arg + "'");
@@ -772,6 +794,141 @@ bool write_target_files(const InitOptions& options) {
     return true;
 }
 
+namespace {
+
+constexpr const char* investigation_readme =
+    "# investigation\n"
+    "\n"
+    "Baseline evidence, reproductions, audit notes, route inventories, browser-matrix\n"
+    "metadata, benchmark data and compatibility findings for the migration. See\n"
+    "MIGRATION.md.\n";
+
+constexpr const char* kAgentsMigrationBlock =
+    "<!-- nift:migration:start -->\n"
+    "## Nift migration\n"
+    "\n"
+    "This project is being migrated to Nift.\n"
+    "\n"
+    "Read MIGRATION.md before making migration changes.\n"
+    "Read HANDOVER.md for current state and next work.\n"
+    "Preserve the source baseline until parity verification is complete.\n"
+    "Follow migration checkpoints.\n"
+    "Maintain route/content/behaviour parity unless divergence is explicitly approved.\n"
+    "Record and classify known divergences.\n"
+    "Do not modify Nift core to solve source-project compatibility gaps without\n"
+    "stopping and reporting the requirement.\n"
+    "Prefer compatibility adapters/stages over rewriting source semantics solely for\n"
+    "cleanliness.\n"
+    "Run the required parity/build checks before checkpoint commits.\n"
+    "Update HANDOVER.md after meaningful checkpoints.\n"
+    "Do not declare completion without clean-checkout verification.\n"
+    "<!-- nift:migration:end -->\n";
+
+enum class MigrationPolicy { Error, Keep, Append, Replace };
+
+MigrationPolicy migration_policy(const std::string& value) {
+    if (value == "keep") return MigrationPolicy::Keep;
+    if (value == "append") return MigrationPolicy::Append;
+    if (value == "replace") return MigrationPolicy::Replace;
+    return MigrationPolicy::Error;
+}
+
+std::size_t count_substrings(const std::string& text, const std::string& needle) {
+    std::size_t count = 0, pos = 0;
+    while ((pos = text.find(needle, pos)) != std::string::npos) { ++count; pos += needle.size(); }
+    return count;
+}
+
+// Write a canonical template under an existing-file policy. Fresh generation
+// (error/replace) and keep write canonical bytes unchanged; append wraps the
+// guidance in a deterministic marker block and never duplicates; incomplete or
+// multiple owned blocks fail safely.
+bool write_migration_file(const std::string& path, const std::string& content,
+                          MigrationPolicy policy, const std::string& start_marker,
+                          const std::string& end_marker, bool exists) {
+    if (policy == MigrationPolicy::Error) {
+        if (exists) {
+            std::cerr << "  " << path << " already exists (use --migration-existing=keep, append, or replace)\n";
+            return false;
+        }
+        return filesystem::write_file(path, content);
+    }
+    if (policy == MigrationPolicy::Keep) {
+        if (exists) return true;
+        return filesystem::write_file(path, content);
+    }
+    if (policy == MigrationPolicy::Replace)
+        return filesystem::write_file(path, content);
+    // Append: managed block, idempotent, fail-safe on malformed state.
+    std::string existing;
+    if (exists) {
+        existing = filesystem::read_file(path);
+        const std::size_t sc = count_substrings(existing, start_marker);
+        const std::size_t ec = count_substrings(existing, end_marker);
+        if (sc == 1 && ec == 1 && existing.find(start_marker) < existing.find(end_marker)) return true;
+        if (sc != 0 || ec != 0) return false;
+    }
+    std::string block = start_marker + "\n" + content;
+    if (content.empty() || content.back() != '\n') block += "\n";
+    block += end_marker + "\n";
+    std::string merged = existing;
+    if (!merged.empty() && merged.back() != '\n') merged += "\n";
+    merged += block;
+    return filesystem::write_file(path, merged);
+}
+
+// AGENTS.md managed-block state classification.
+enum class AgentsState { None, Valid, StartOnly, EndOnly, Multiple };
+
+AgentsState agents_block_state(const std::string& text) {
+    const std::string start = "<!-- nift:migration:start -->";
+    const std::string end = "<!-- nift:migration:end -->";
+    const std::size_t sc = count_substrings(text, start);
+    const std::size_t ec = count_substrings(text, end);
+    if (sc > 1 || ec > 1) return AgentsState::Multiple;
+    if (sc == 1 && ec == 1) {
+        if (text.find(start) < text.find(end)) return AgentsState::Valid;
+        return AgentsState::Multiple;
+    }
+    if (sc == 1 || ec == 1) return AgentsState::StartOnly;
+    return AgentsState::None;
+}
+
+// Augment AGENTS.md with Nift's managed migration block: create the file when
+// absent, append the block when no block exists, replace exactly one valid
+// block, and fail safely on incomplete/multiple markers.
+bool augment_agents_file() {
+    const std::string start = "<!-- nift:migration:start -->";
+    const std::string end = "<!-- nift:migration:end -->";
+    std::string existing;
+    if (fs::exists("AGENTS.md")) existing = filesystem::read_file("AGENTS.md");
+    const AgentsState state = agents_block_state(existing);
+    if (state == AgentsState::Multiple) {
+        std::cerr << "  AGENTS.md has an invalid Nift migration block; refusing to modify it\n";
+        return false;
+    }
+    if (state == AgentsState::StartOnly || state == AgentsState::EndOnly) {
+        std::cerr << "  AGENTS.md has an incomplete Nift migration marker; refusing to modify it\n";
+        return false;
+    }
+    if (state == AgentsState::Valid) {
+        const std::size_t s = existing.find(start);
+        const std::size_t e = existing.find(end);
+        const std::size_t block_end = e + end.size();
+        std::string updated = existing.substr(0, s) + kAgentsMigrationBlock;
+        if (block_end < existing.size()) updated += existing.substr(block_end);
+        if (!updated.empty() && updated.back() != '\n') updated += "\n";
+        return filesystem::write_file("AGENTS.md", updated);
+    }
+    std::string merged = existing;
+    if (!merged.empty() && merged.back() != '\n') merged += "\n";
+    if (!merged.empty()) merged += "\n";
+    merged += kAgentsMigrationBlock;
+    return filesystem::write_file("AGENTS.md", merged);
+}
+
+}  // namespace
+
 bool initialise_project(const InitOptions& options) {
     // Refuse to initialize over an existing Nift project. A project root is
     // identified by its project configuration; a partial .nift directory that
@@ -782,6 +939,33 @@ bool initialise_project(const InitOptions& options) {
         console::error("cannot initialise project");
         std::cerr << "  this directory is already a Nift project\n";
         return false;
+    }
+
+    // Migration preflight: with the default policy (error) the run must not
+    // leave a confusing partial result, so conflict with an existing
+    // MIGRATION.md or HANDOVER.md is detected before any scaffold is written.
+    const MigrationPolicy policy = migration_policy(options.migration_existing);
+    if (options.migration) {
+        // A malformed AGENTS.md managed block is an error for every policy:
+        // Nift refuses to modify a file it cannot deterministically own.
+        if (fs::exists("AGENTS.md")) {
+            const AgentsState agents = agents_block_state(filesystem::read_file("AGENTS.md"));
+            if (agents != AgentsState::None && agents != AgentsState::Valid) {
+                console::error("cannot initialise migration project: AGENTS.md has an invalid Nift migration block");
+                return false;
+            }
+        }
+    }
+    if (options.migration && policy == MigrationPolicy::Error) {
+        std::vector<std::string> conflicts;
+        if (fs::exists("MIGRATION.md")) conflicts.emplace_back("MIGRATION.md");
+        if (fs::exists("HANDOVER.md")) conflicts.emplace_back("HANDOVER.md");
+        if (!conflicts.empty()) {
+            console::error("cannot initialise migration project: existing files conflict");
+            for (const auto& c : conflicts) std::cerr << "  " << c << " already exists\n";
+            std::cerr << "  use --migration-existing=keep, append, or replace to handle existing migration files\n";
+            return false;
+        }
     }
 
     const InitTarget* target = options.target.empty() ? nullptr : find_init_target(options.target);
@@ -857,7 +1041,33 @@ bool initialise_project(const InitOptions& options) {
     // for an unrelated reason. It goes in the project root (never under the
     // output directory) and stays writable as a living document the user keeps
     // alongside the source.
-    if (options.handover) {
+    if (options.migration) {
+        const bool m_exists = fs::exists("MIGRATION.md");
+        const bool h_exists = fs::exists("HANDOVER.md");
+        if (!write_migration_file("MIGRATION.md", std::string(migration_content), policy,
+                                  "<!-- nift:migration-template:start -->", "<!-- nift:migration-template:end -->",
+                                  m_exists)) {
+            console::error("failed to write MIGRATION.md per the existing-file policy");
+            return false;
+        }
+        if (!write_migration_file("HANDOVER.md", std::string(handover_content), policy,
+                                  "<!-- nift:handover-template:start -->", "<!-- nift:handover-template:end -->",
+                                  h_exists)) {
+            console::error("failed to write HANDOVER.md per the existing-file policy");
+            return false;
+        }
+        if (!augment_agents_file()) {
+            console::error("failed to update AGENTS.md");
+            return false;
+        }
+        if (!fs::exists("investigation")) fs::create_directories("investigation");
+        if (!fs::exists("investigation/README.md")) {
+            if (!filesystem::write_file("investigation/README.md", std::string(investigation_readme))) {
+                console::error("failed to write investigation/README.md");
+                return false;
+            }
+        }
+    } else if (options.handover) {
         if (!filesystem::write_file("HANDOVER.md", std::string(handover_content))) {
             console::error("failed to write HANDOVER.md");
             return false;

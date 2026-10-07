@@ -15,6 +15,12 @@ v4.8.0 user-visible changes have been recorded yet.
   computed index everywhere an array does (top-level, function
   parameters/locals/returns, arguments, loop/conditional bodies, template
   execution). Bounds and type errors are unchanged.
+- Added `nift init --migration` for agent-ready migration workspaces: a normal
+  Nift project plus a canonical `MIGRATION.md` playbook, `HANDOVER.md`, a safe
+  `AGENTS.md` managed migration block, and `investigation/`. Existing-file
+  conflict policies (`error` default, `keep`, `append`, `replace`) are
+  explicit and non-destructive; AGENTS augmentation is idempotent and
+  malformed-safe. No automatic source-framework conversion.
 
 ## v4.7.2 (released 2026-10-06)
 
