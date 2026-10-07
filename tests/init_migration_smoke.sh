@@ -16,7 +16,7 @@ TMP="$(mktemp -d "${TMPDIR:-/tmp}/nift-init-migration.XXXXXX")"
 trap 'rm -rf "$TMP"' EXIT
 
 fail() { echo "init-migration FAIL: $*" >&2; exit 1; }
-blocks() { rg -c "$1" "$2" 2>/dev/null || echo 0; }
+blocks() { grep -c "$1" "$2" 2>/dev/null || echo 0; }
 
 # Embedded literals must decode to the fixtures.
 python3 - "$MIG_FIXTURE" "$HAND_FIXTURE" <<'PY' || fail "embedded canonical literals mismatch"
@@ -71,8 +71,8 @@ P="$TMP/hand"; mkdir -p "$P"
 for existing in MIGRATION.md HANDOVER.md; do
   Q="$TMP/conf-$existing"; mkdir -p "$Q"; printf 'keep 中\n' > "$Q/$existing"
   if (cd "$Q" && "$NIFT_BIN" init --migration >/dev/null 2>err); then fail "conflict accepted for $existing"; fi
-  rg -q "cannot initialise migration project" "$Q/err" || fail "no conflict diagnostic for $existing"
-  rg -q "$existing already exists" "$Q/err" || fail "conflicting file not listed for $existing"
+  grep -q "cannot initialise migration project" "$Q/err" || fail "no conflict diagnostic for $existing"
+  grep -q "$existing already exists" "$Q/err" || fail "conflicting file not listed for $existing"
   [ -f "$Q/.nift/config.json" ] && fail "partial project left for $existing"
   [ "$(cat "$Q/$existing")" = "keep 中" ] || fail "$existing was modified"
 done
@@ -92,7 +92,7 @@ Q="$TMP/replace"; mkdir -p "$Q"; printf 'old\n' > "$Q/MIGRATION.md"; printf 'old
 # append: existing content preserved, guidance added once, rerun-idempotent.
 Q="$TMP/append"; mkdir -p "$Q"; printf 'my doc 中\n' > "$Q/MIGRATION.md"
 (cd "$Q" && "$NIFT_BIN" init --migration --migration-existing=append >/dev/null 2>&1) || fail "append failed"
-rg -qx 'my doc 中' "$Q/MIGRATION.md" || fail "append lost user content"
+grep -qx 'my doc 中' "$Q/MIGRATION.md" || fail "append lost user content"
 [ "$(blocks nift:migration-template:start "$Q/MIGRATION.md")" = "1" ] || fail "append did not add exactly one block"
 R="$TMP/append2"; mkdir -p "$R"; cp "$Q/MIGRATION.md" "$R/MIGRATION.md"
 (cd "$R" && "$NIFT_BIN" init --migration --migration-existing=append >/dev/null 2>&1) || fail "append rerun failed"
@@ -109,14 +109,14 @@ Q="$TMP/ag-none"; mkdir -p "$Q"
 
 Q="$TMP/ag-existing"; mkdir -p "$Q"; printf '# my agents 中\n\ninstructions...\n' > "$Q/AGENTS.md"
 (cd "$Q" && "$NIFT_BIN" init --migration >/dev/null 2>&1) || fail "AGENTS augment failed"
-rg -q 'my agents 中' "$Q/AGENTS.md" || fail "AGENTS unrelated content lost"
+grep -q 'my agents 中' "$Q/AGENTS.md" || fail "AGENTS unrelated content lost"
 [ "$(blocks nift:migration:start "$Q/AGENTS.md")" = "1" ] || fail "AGENTS block not appended exactly once"
 
 Q="$TMP/ag-update"; mkdir -p "$Q"; printf 'head\n\n<!-- nift:migration:start -->\n## old\nold text\n<!-- nift:migration:end -->\n\ntail 中\n' > "$Q/AGENTS.md"
 (cd "$Q" && "$NIFT_BIN" init --migration >/dev/null 2>&1) || fail "AGENTS replace failed"
-rg -q 'head' "$Q/AGENTS.md" && rg -q 'tail 中' "$Q/AGENTS.md" || fail "AGENTS unrelated content lost on replace"
+grep -q 'head' "$Q/AGENTS.md" && grep -q 'tail 中' "$Q/AGENTS.md" || fail "AGENTS unrelated content lost on replace"
 [ "$(blocks nift:migration:start "$Q/AGENTS.md")" = "1" ] || fail "AGENTS block duplicated"
-rg -q '## old' "$Q/AGENTS.md" && fail "AGENTS stale block body not replaced"
+grep -q '## old' "$Q/AGENTS.md" && fail "AGENTS stale block body not replaced"
 
 # AGENTS malformed states fail safely for every policy, preflight leaves no project.
 for marker in start end; do
