@@ -53,6 +53,15 @@ v4.8.0 user-visible changes have been recorded yet.
   under a second). Marked/reference-bearing keys and ordered JSON objects keep
   their existing linear semantics; key `remove` and `sorted_map` mutation
   remain O(n). Adds a small per-key position-index memory cost for maps.
+- Improved prepared execution of object literals: `nift` now prepares the
+  unambiguous object-literal form (double-quoted keys, expression-valued
+  members) so object-heavy loops such as `arr.push({"k": i, "v": i + 1})` no
+  longer fall back to the legacy string evaluator on every iteration. Ordinary
+  object-literal semantics are preserved exactly (ordinal member order, values
+  evaluated once left-to-right, duplicate-key rejection); string-valued members
+  and escaped keys keep the legacy path. JSON transform-style workloads run
+  roughly an order of magnitude faster. Also fixes argument splitting so commas
+  inside object-literal arguments are not mistaken for argument separators.
 
 ## v4.7.2 (released 2026-10-06)
 

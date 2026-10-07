@@ -741,6 +741,7 @@ test: test-parser-hardening test-content test-commands test-comments test-contra
 	test-v48-comparison-parity \
 	test-v48-callable-parity \
 	test-v48-map-set-index test-v48-map-set-scaling \
+	test-v48-prepared-object-literal-parity test-v48-prepared-object-literal-guard \
 	test-v46-time-cli test-v46-timer test-v46-secure-random-cli test-v46-output-cli test-v46-relative-imports test-progress-render $(PROGRESS_PTY_TARGET) test-snap-contract test-distribution-summary test-version-consistency test-unreadable-source test-incremental-modified-immediate
 
 test-cp15-numeric-repair: $(TARGET)
@@ -883,6 +884,12 @@ test-v48-map-set-index: $(TARGET)
 
 test-v48-map-set-scaling: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" bash tests/v48_map_set_scaling_guard.sh
+
+test-v48-prepared-object-literal-parity: $(TARGET)
+	NIFT="$(CURDIR)/$(TARGET)" bash tests/v48_prepared_object_literal_parity.sh
+
+test-v48-prepared-object-literal-guard: $(TARGET)
+	NIFT="$(CURDIR)/$(TARGET)" bash tests/v48_prepared_object_literal_guard.sh
 
 test-v43-language: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp0_cp14_smoke.sh
@@ -1162,7 +1169,7 @@ pristine: distclean
 	$(MAKE) -C minifypp clean
 	$(MAKE) -C jsonic clean
 
-.PHONY: FORCE test-scripting-perf test-ffi-abi test-libffi-source test-gate6ar-ffi test-libffi-static-archive test-libffi-dependencies test-libffi-private-symbols test-pic-depfiles test-node-package-licenses test-v45-adversarial-runtime test-v45-integration-dogfood test-v45-embed-contracts test-v45-embed-staged-consumer test-v45-concurrency test-v45-job-control test-v45-target test-v45-native-runtime embed go-binding csharp-binding node-binding python-binding bindings test-build-boundary test-embed test-go-binding test-csharp-binding test-node-binding test-python-binding test-bindings test-all test benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize test-sanitize-lifetime memory-safety-smoke all clean test-jsonic test-jsonic-sync test-markuppp-sync test-json test-json-schema test-runtime-value test-cp15-numeric-repair test-cp17-bytes test-cp18-bytes test-cp19-bytes test-cp21-bytes test-cp18-bytes-sanitize test-cp18-bytes-tsan test-console test-progress-render test-progress-pty test-snap-contract test-distribution-summary test-version-consistency test-diagnostics test-minify test-json-schema-integration test-markup-json-directives test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke test-host-seam benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-alias test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets test-init-lock test-unreadable-source test-incremental-modified-immediate test-v41-certification test-v42-language test-v42-struct test-v43-language test-parser-hardening test-prepared-method-parity test-v48-warn test-v48-bytes-index-parity test-v48-comparison-parity test-v48-callable-parity test-v48-map-set-index test-v48-map-set-scaling test-init-migration test-macos-runner-policy install uninstall clean distclean pristine
+.PHONY: FORCE test-scripting-perf test-ffi-abi test-libffi-source test-gate6ar-ffi test-libffi-static-archive test-libffi-dependencies test-libffi-private-symbols test-pic-depfiles test-node-package-licenses test-v45-adversarial-runtime test-v45-integration-dogfood test-v45-embed-contracts test-v45-embed-staged-consumer test-v45-concurrency test-v45-job-control test-v45-target test-v45-native-runtime embed go-binding csharp-binding node-binding python-binding bindings test-build-boundary test-embed test-go-binding test-csharp-binding test-node-binding test-python-binding test-bindings test-all test benchmark-memory-10k benchmark-10k test-tracking-scaling test-full-build-scaling test-recovery-epoch test-performance-scaling test-sanitize test-sanitize-lifetime memory-safety-smoke all clean test-jsonic test-jsonic-sync test-markuppp-sync test-json test-json-schema test-runtime-value test-cp15-numeric-repair test-cp17-bytes test-cp18-bytes test-cp19-bytes test-cp21-bytes test-cp18-bytes-sanitize test-cp18-bytes-tsan test-console test-progress-render test-progress-pty test-snap-contract test-distribution-summary test-version-consistency test-diagnostics test-minify test-json-schema-integration test-markup-json-directives test-engine test-engine-bindings test-engine-loaders test-engine-source-read test-engine-pathto test-engine-concurrency test-engine-project test-engine-reload test-engine-pagination-snapshot test-c-abi test-c-abi-c-smoke test-host-seam benchmark-c-abi test-project-state test-project-host test-public-header test-conformance test-content test-commands test-comments test-ownership-concurrency test-zero-mutation test-repair-campaign test-pagination-ordering test-json-binding test-control-flow test-requirements test-path-alias test-path-safety test-metadata-safety test-template-optional test-contracts test-init-targets test-init-lock test-unreadable-source test-incremental-modified-immediate test-v41-certification test-v42-language test-v42-struct test-v43-language test-parser-hardening test-prepared-method-parity test-v48-warn test-v48-bytes-index-parity test-v48-comparison-parity test-v48-callable-parity test-v48-map-set-index test-v48-map-set-scaling test-v48-prepared-object-literal-parity test-v48-prepared-object-literal-guard test-init-migration test-macos-runner-policy install uninstall clean distclean pristine
 
 
 .PHONY: test-v45-concurrency-sanitize test-v45-concurrency-tsan

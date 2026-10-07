@@ -887,7 +887,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 if(!valid_binding_identifier(root)||!valid_binding_identifier(method))return false;
                 const std::string body=text.substr(lp+1,text.size()-lp-2);
                 std::vector<std::string> arg_texts;std::string cur;int dep=0;bool q=false;char qc=0;
-                for(std::size_t k=0;k<body.size();++k){char ch=body[k];if(q){if(ch=='\\'&&k+1<body.size())++k;else if(ch==qc)q=false;cur+=ch;continue;}if(ch=='\''||ch=='"'){q=true;qc=ch;cur+=ch;continue;}if(ch=='('||ch=='[')++dep;else if(ch==')'||ch==']')--dep;if(ch==','&&dep==0){arg_texts.push_back(cur);cur.clear();continue;}cur+=ch;}
+                for(std::size_t k=0;k<body.size();++k){char ch=body[k];if(q){if(ch=='\\'&&k+1<body.size())++k;else if(ch==qc)q=false;cur+=ch;continue;}if(ch=='\''||ch=='"'){q=true;qc=ch;cur+=ch;continue;}if(ch=='('||ch=='['||ch=='{')++dep;else if(ch==')'||ch==']'||ch=='}')--dep;if(ch==','&&dep==0){arg_texts.push_back(cur);cur.clear();continue;}cur+=ch;}
                 arg_texts.push_back(cur);
                 for(const auto& at:arg_texts){std::string a=trim_copy(at);if(a.empty())continue;auto r=nift::ast::parse_expression(a);if(!r.supported)return false;args.push_back(std::move(r.expr));}
                 return true;};
