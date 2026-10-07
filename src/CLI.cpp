@@ -799,9 +799,190 @@ namespace {
 constexpr const char* investigation_readme =
     "# investigation\n"
     "\n"
-    "Baseline evidence, reproductions, audit notes, route inventories, browser-matrix\n"
-    "metadata, benchmark data and compatibility findings for the migration. See\n"
-    "MIGRATION.md.\n";
+    "Migration investigation state and evidence. These files accumulate during the\n"
+    "migration and are preserved across reruns:\n"
+    "\n"
+    "- `STATUS.md` - resumable checkpoint ledger: where the migration is now.\n"
+    "- `BASELINE.md` - upstream reference, source model and frozen baseline.\n"
+    "- `EXTERNAL-INPUTS.md` - external/generated inputs a Git SHA does not capture.\n"
+    "- `KNOWN-DIVERGENCES.md` - divergence ledger (upstream vs migration regression).\n"
+    "- `PARITY-CONTRACT.md` - what parity means for this migration.\n"
+    "\n"
+    "Methodology lives in MIGRATION.md. Keep STATUS.md current after each\n"
+    "checkpoint.\n";
+
+constexpr const char* migration_readme =
+    "# Migration project\n"
+    "\n"
+    "This project is being migrated to Nift. This README is a concise operational\n"
+    "entry point; the full method is in MIGRATION.md.\n"
+    "\n"
+    "- Status: see `investigation/STATUS.md`.\n"
+    "- Upstream reference: see `investigation/BASELINE.md`.\n"
+    "- Source model (authored / rendered / hybrid): see `investigation/BASELINE.md`.\n"
+    "- Production-equivalent build: <record command in investigation/BASELINE.md>.\n"
+    "- Validation / parity command: <record command in investigation/PARITY-CONTRACT.md>.\n"
+    "- Method: `MIGRATION.md`. Current state: `HANDOVER.md`. Agent instructions: `AGENTS.md`.\n"
+    "\n"
+    "The initial Nift scaffold is placeholder material and must not be counted as\n"
+    "migrated content in parity or benchmark claims.\n";
+
+constexpr const char* investigation_baseline =
+    "# BASELINE.md\n"
+    "\n"
+    "The frozen upstream reference. Complete this before migrating content.\n"
+    "\n"
+    "## Upstream reference\n"
+    "\n"
+    "- Upstream repository:\n"
+    "- Upstream commit SHA:\n"
+    "- Upstream source directory:\n"
+    "- Production build command:\n"
+    "- Toolchain / runtime versions:\n"
+    "- Tool/binary hashes (where relevant):\n"
+    "\n"
+    "## Source model\n"
+    "\n"
+    "Choose exactly one and describe it:\n"
+    "\n"
+    "- [ ] authored (human + agent; Markdown/MDX/frontmatter preserved)\n"
+    "- [ ] rendered (agent-primary; rendered HTML/CSS/JS + explicit metadata/nav)\n"
+    "- [ ] hybrid (describe):\n"
+    "\n"
+    "Publication/behaviour parity does not require different source models to\n"
+    "preserve identical source semantics.\n"
+    "\n"
+    "## Complete production pipeline\n"
+    "\n"
+    "A successful build is not necessarily the complete publication. List every\n"
+    "production step in order (build, search/index generation, post-processing,\n"
+    "API/reference generation, downloads/exports, asset processing, deployment\n"
+    "transforms, registry-generated data, multi-stage re-builds):\n"
+    "\n"
+    "1.\n"
+    "\n"
+    "## Frozen reference output\n"
+    "\n"
+    "REFERENCE OUTPUT (immutable, upstream):\n"
+    "    <absolute path>\n"
+    "MIGRATION OUTPUT (Nift, changes over time):\n"
+    "    <absolute path>\n"
+    "\n"
+    "Never point parity comparison at MIGRATION OUTPUT on both sides.\n"
+    "\n"
+    "## Upstream nondeterminism classification\n"
+    "\n"
+    "- [ ] byte deterministic\n"
+    "- [ ] semantic deterministic\n"
+    "- [ ] nondeterministic but bounded/understood (describe)\n"
+    "- [ ] unresolved\n"
+    "\n"
+    "## Baseline measurements\n"
+    "\n"
+    "- Upstream build time (method, median/range):\n"
+    "- Upstream peak RSS:\n"
+    "- Environment / hardware:\n";
+
+constexpr const char* investigation_external_inputs =
+    "# EXTERNAL-INPUTS.md\n"
+    "\n"
+    "A pinned Git SHA does not necessarily define the complete production input\n"
+    "set. Inventory inputs that can move independently of Git or the toolchain.\n"
+    "\n"
+    "Only fill in rows that apply; this is a checklist, not bureaucracy.\n"
+    "\n"
+    "## Inventory\n"
+    "\n"
+    "For each relevant input record: source URL/system; version/revision; captured\n"
+    "body/hash; capture date; deterministic (yes/no/unknown); can move independently\n"
+    "of Git SHA (yes/no); credentials required; cache boundary; must be frozen for\n"
+    "parity (yes/no).\n"
+    "\n"
+    "| Input | Source | Version/revision | Captured hash | Date | Deterministic | Moves w/o Git | Creds | Cache boundary | Freeze |\n"
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n"
+    "| | | | | | | | | | |\n"
+    "\n"
+    "## Categories to consider\n"
+    "\n"
+    "- network-fetched inputs;\n"
+    "- registry-derived inputs;\n"
+    "- generated API/reference data;\n"
+    "- environment-derived inputs;\n"
+    "- tool-version-derived inputs;\n"
+    "- search/index inputs;\n"
+    "- other generated publication inputs.\n";
+
+constexpr const char* investigation_known_divergences =
+    "# KNOWN-DIVERGENCES.md\n"
+    "\n"
+    "Every difference from the frozen reference must be recorded and classified.\n"
+    "Distinguish inherited upstream behaviour from a migration regression.\n"
+    "\n"
+    "| ID | Route/component | Observed behaviour | Classification | Evidence | Approval/rationale | Resolution |\n"
+    "| --- | --- | --- | --- | --- | --- | --- |\n"
+    "| | | | | | | |\n"
+    "\n"
+    "Classification: inherited upstream / intentional migration difference /\n"
+    "unresolved / blocking.\n"
+    "\n"
+    "A migration is not complete while any entry is unresolved or blocking.\n";
+
+constexpr const char* investigation_status =
+    "# STATUS.md\n"
+    "\n"
+    "Resumable migration state. A new agent should be able to read `AGENTS.md`,\n"
+    "`MIGRATION.md`, this file and `HANDOVER.md` and know exactly where the\n"
+    "migration is without reconstructing history.\n"
+    "\n"
+    "## Phases\n"
+    "\n"
+    "Mark each: not started / in progress / blocked / done.\n"
+    "\n"
+    "| Phase | Status | Acceptance criteria | Required evidence | Commands | Commit |\n"
+    "| --- | --- | --- | --- | --- | --- |\n"
+    "| 1 Baseline frozen | | | | | |\n"
+    "| 2 Parity contract + fixtures | | | | | |\n"
+    "| 3 Initial Nift structure | | | | | |\n"
+    "| 4 Shared shells/templates | | | | | |\n"
+    "| 5 Authored content | | | | | |\n"
+    "| 6 Source compatibility | | | | | |\n"
+    "| 7 Route/content/render parity | | | | | |\n"
+    "| 8 Incremental correctness | | | | | |\n"
+    "| 9 Benchmark | | | | | |\n"
+    "| 10 Clean-checkout verification | | | | | |\n"
+    "| 11 Handover / final report | | | | | |\n"
+    "\n"
+    "GATE: compatibility proof must precede broad content translation. Do not mark\n"
+    "phase 5 in progress until phases 1-4 acceptance criteria are met.\n"
+    "\n"
+    "## Current\n"
+    "\n"
+    "- Checkpoint:\n"
+    "- Commit SHA:\n"
+    "- Known blockers:\n"
+    "- Next checkpoint:\n";
+
+constexpr const char* investigation_parity_contract =
+    "# PARITY-CONTRACT.md\n"
+    "\n"
+    "What \"parity\" means for THIS migration. Select what applies and record the\n"
+    "exact rule and command for each.\n"
+    "\n"
+    "- [ ] route parity\n"
+    "- [ ] generated-file parity\n"
+    "- [ ] content parity\n"
+    "- [ ] browser/visual parity (viewports):\n"
+    "- [ ] runtime/interactive behaviour\n"
+    "- [ ] keyboard/accessibility behaviour\n"
+    "- [ ] redirects\n"
+    "- [ ] search/indexing\n"
+    "- [ ] downloads/exports\n"
+    "\n"
+    "Equality rule per item (byte vs semantic):\n"
+    "\n"
+    "- Allowed divergences: see `KNOWN-DIVERGENCES.md`.\n"
+    "- Parity command(s):\n"
+    "- Reference used for comparison: see `BASELINE.md` frozen reference output.\n";
 
 constexpr const char* kAgentsMigrationBlock =
     "<!-- nift:migration:start -->\n"
@@ -809,20 +990,23 @@ constexpr const char* kAgentsMigrationBlock =
     "\n"
     "This project is being migrated to Nift.\n"
     "\n"
-    "Read MIGRATION.md before making migration changes.\n"
-    "Read HANDOVER.md for current state and next work.\n"
+    "Read MIGRATION.md for the method, investigation/STATUS.md for where the\n"
+    "migration is, and HANDOVER.md for current state.\n"
+    "The initial Nift scaffold is placeholder; the baseline must be frozen before\n"
+    "any content translation.\n"
     "Preserve the source baseline until parity verification is complete.\n"
     "Follow migration checkpoints.\n"
     "Maintain route/content/behaviour parity unless divergence is explicitly approved.\n"
-    "Record and classify known divergences.\n"
+    "Record and classify known divergences (investigation/KNOWN-DIVERGENCES.md).\n"
     "Do not modify Nift core to solve source-project compatibility gaps without\n"
     "stopping and reporting the requirement.\n"
     "Prefer compatibility adapters/stages over rewriting source semantics solely for\n"
     "cleanliness.\n"
     "Run the required parity/build checks before checkpoint commits.\n"
-    "Update HANDOVER.md after meaningful checkpoints.\n"
+    "Update HANDOVER.md and investigation/STATUS.md after meaningful checkpoints.\n"
     "Do not declare completion without clean-checkout verification.\n"
     "<!-- nift:migration:end -->\n";
+
 
 enum class MigrationPolicy { Error, Keep, Append, Replace };
 
@@ -1024,7 +1208,7 @@ bool initialise_project(const InitOptions& options) {
         if (!filesystem::write_file(fs::path(output_dir) / "assets/css/style.css", "")) return false;
         if (!filesystem::write_file(fs::path(output_dir) / "assets/js/script.js", "")) return false;
         if (!filesystem::write_file("templates/head.html", "<meta charset=\"utf-8\">\n<title>$[title]</title>\n")) return false;
-        if (!filesystem::write_file("templates/template.html", "<!doctype html>\n<html lang=\"en\">\n\t<head>\n\t\t@input(\"templates/head.html\")\n\t</head>\n\t<body>\n\t\t@content\n\t</body>\n</html>\n")) return false;
+        if (!filesystem::write_file("templates/template.html", "<!doctype html>\n<html lang=\"en\">\n\t<head>\n\t\t@input(\"templates/head.html\")\n\t</head>\n\t<body>\n@content\n\t</body>\n</html>\n")) return false;
     }
 
     if (!write_target_files(options)) return false;
@@ -1060,12 +1244,29 @@ bool initialise_project(const InitOptions& options) {
             console::error("failed to update AGENTS.md");
             return false;
         }
+        // Guidance/state files (README + investigation/) are non-destructive:
+        // under the default `error` policy an existing file is kept rather than
+        // aborting, and `keep`/`append`/`replace` are honoured explicitly. The
+        // canonical MIGRATION.md/HANDOVER.md above remain fail-closed.
+        auto write_guidance = [&](const std::string& path, const char* content,
+                                  const std::string& marker) -> bool {
+            const bool exists = fs::exists(path);
+            const MigrationPolicy effective =
+                (policy == MigrationPolicy::Error && exists) ? MigrationPolicy::Keep : policy;
+            return write_migration_file(path, std::string(content), effective,
+                                        "<!-- nift:" + marker + ":start -->",
+                                        "<!-- nift:" + marker + ":end -->", exists);
+        };
         if (!fs::exists("investigation")) fs::create_directories("investigation");
-        if (!fs::exists("investigation/README.md")) {
-            if (!filesystem::write_file("investigation/README.md", std::string(investigation_readme))) {
-                console::error("failed to write investigation/README.md");
-                return false;
-            }
+        if (!write_guidance("README.md", migration_readme, "migration-readme") ||
+            !write_guidance("investigation/README.md", investigation_readme, "migration-investigation") ||
+            !write_guidance("investigation/STATUS.md", investigation_status, "migration-status") ||
+            !write_guidance("investigation/BASELINE.md", investigation_baseline, "migration-baseline") ||
+            !write_guidance("investigation/EXTERNAL-INPUTS.md", investigation_external_inputs, "migration-external-inputs") ||
+            !write_guidance("investigation/KNOWN-DIVERGENCES.md", investigation_known_divergences, "migration-known-divergences") ||
+            !write_guidance("investigation/PARITY-CONTRACT.md", investigation_parity_contract, "migration-parity-contract")) {
+            console::error("failed to write migration guidance files");
+            return false;
         }
     } else if (options.handover) {
         if (!filesystem::write_file("HANDOVER.md", std::string(handover_content))) {

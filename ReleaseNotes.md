@@ -17,10 +17,16 @@ v4.8.0 user-visible changes have been recorded yet.
   execution). Bounds and type errors are unchanged.
 - Added `nift init --migration` for agent-ready migration workspaces: a normal
   Nift project plus a canonical `MIGRATION.md` playbook, `HANDOVER.md`, a safe
-  `AGENTS.md` managed migration block, and `investigation/`. Existing-file
-  conflict policies (`error` default, `keep`, `append`, `replace`) are
-  explicit and non-destructive; AGENTS augmentation is idempotent and
-  malformed-safe. No automatic source-framework conversion.
+  `AGENTS.md` managed migration block, a concise `README.md`, and an
+  `investigation/` scaffold (`STATUS.md` resumable ledger, `BASELINE.md`,
+  `EXTERNAL-INPUTS.md`, `KNOWN-DIVERGENCES.md`, `PARITY-CONTRACT.md`). The
+  playbook now makes the scaffold-versus-migration distinction, placeholder
+  scaffold, complete-production-pipeline baseline, upstream nondeterminism
+  classification, source model, and benchmark methodology explicit. Existing-file
+  conflict policies (`error` default, `keep`, `append`, `replace`) are explicit
+  and non-destructive; a pre-existing `README.md` or investigation record is
+  kept rather than aborting the default run; AGENTS augmentation is idempotent
+  and malformed-safe. No automatic source-framework conversion.
 - Fixed prepared condition comparison parity: `if(...)`/`while(...)`/`@if(...)`
   conditions now accept the same `==`/`!=` values as ordinary expression
   evaluation and prepared execution. Direct conditions on arrays, objects,

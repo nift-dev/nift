@@ -54,12 +54,56 @@ P="$TMP/plain"; mkdir -p "$P"
 # Fresh migration project.
 P="$TMP/fresh"; mkdir -p "$P"
 (cd "$P" && "$NIFT_BIN" init --migration >/dev/null 2>&1) || fail "init --migration failed"
-for f in MIGRATION.md HANDOVER.md AGENTS.md; do [ -f "$P/$f" ] || fail "expected $f"; done
-[ -d "$P/investigation" ] || fail "investigation/ missing"
-[ -f "$P/investigation/README.md" ] || fail "investigation/README.md missing"
+for f in MIGRATION.md HANDOVER.md AGENTS.md README.md; do [ -f "$P/$f" ] || fail "expected $f"; done
+for f in README.md STATUS.md BASELINE.md EXTERNAL-INPUTS.md KNOWN-DIVERGENCES.md PARITY-CONTRACT.md; do
+  [ -f "$P/investigation/$f" ] || fail "expected investigation/$f"
+done
 [ "$(sha256sum "$P/MIGRATION.md" | cut -d' ' -f1)" = "$MIG_SHA" ] || fail "MIGRATION.md not byte-identical to fixture"
 [ "$(sha256sum "$P/HANDOVER.md" | cut -d' ' -f1)" = "$HAND_SHA" ] || fail "HANDOVER.md not byte-identical to fixture"
 [ "$(blocks nift:migration:start "$P/AGENTS.md")" = "1" ] || fail "AGENTS.md must contain exactly one managed block"
+
+# Guidance content: source model, placeholder warning, production pipeline, gates.
+grep -q 'Source model' "$P/investigation/BASELINE.md" || fail "BASELINE.md lacks source model"
+grep -q 'authored' "$P/investigation/BASELINE.md" || fail "BASELINE.md lacks source-model options"
+grep -q 'REFERENCE OUTPUT' "$P/investigation/BASELINE.md" || fail "BASELINE.md lacks reference/output distinction"
+grep -q 'A pinned Git SHA does not necessarily define' "$P/investigation/EXTERNAL-INPUTS.md" || fail "EXTERNAL-INPUTS.md lacks Git-SHA warning"
+grep -q 'inherited upstream' "$P/investigation/KNOWN-DIVERGENCES.md" || fail "KNOWN-DIVERGENCES.md lacks classification"
+grep -q 'GATE: compatibility proof must precede broad content translation' "$P/investigation/STATUS.md" || fail "STATUS.md lacks compatibility gate"
+grep -q 'route parity' "$P/investigation/PARITY-CONTRACT.md" || fail "PARITY-CONTRACT.md lacks parity items"
+grep -qi 'placeholder material' "$P/MIGRATION.md" || fail "MIGRATION.md lacks placeholder-scaffold warning"
+grep -q 'Complete production pipeline' "$P/MIGRATION.md" || fail "MIGRATION.md lacks complete-pipeline warning"
+grep -qi 'byte deterministic' "$P/MIGRATION.md" || fail "MIGRATION.md lacks nondeterminism classification"
+grep -qi 'placeholder material' "$P/README.md" || fail "README.md lacks placeholder note"
+
+# Determinism: two fresh inits produce byte-identical guidance/state files.
+P2="$TMP/fresh2"; mkdir -p "$P2"
+(cd "$P2" && "$NIFT_BIN" init --migration >/dev/null 2>&1) || fail "second fresh init failed"
+for f in README.md MIGRATION.md HANDOVER.md investigation/README.md investigation/STATUS.md \
+         investigation/BASELINE.md investigation/EXTERNAL-INPUTS.md investigation/KNOWN-DIVERGENCES.md \
+         investigation/PARITY-CONTRACT.md; do
+  [ "$(sha256sum "$P/$f" | cut -d' ' -f1)" = "$(sha256sum "$P2/$f" | cut -d' ' -f1)" ] || fail "nondeterministic $f"
+done
+
+# Whitespace hygiene: a fresh migration project has no whitespace errors.
+( cd "$P" && git init -q && git add -A && git diff --cached --check ) || fail "fresh migration project fails git diff --check"
+
+# README is non-destructive: default (error) policy keeps an existing README,
+# creates the rest, and never aborts.
+R="$TMP/readme-existing"; mkdir -p "$R"; printf '# my project 中\n' > "$R/README.md"
+(cd "$R" && "$NIFT_BIN" init --migration >/dev/null 2>&1) || fail "existing README aborted default migration"
+[ "$(cat "$R/README.md")" = "# my project 中" ] || fail "existing README was overwritten"
+[ -f "$R/MIGRATION.md" ] || fail "existing README prevented other scaffold"
+# Explicit replace refreshes generated README.
+R2="$TMP/readme-replace"; mkdir -p "$R2"; printf 'old\n' > "$R2/README.md"
+(cd "$R2" && "$NIFT_BIN" init --migration --migration-existing=replace >/dev/null 2>&1) || fail "README replace failed"
+grep -q 'Migration project' "$R2/README.md" || fail "replace did not refresh README"
+
+# Guidance files are also non-destructive under default policy (existing kept).
+G="$TMP/guidance-existing"; mkdir -p "$G/investigation"; printf 'my status\n' > "$G/investigation/STATUS.md"
+(cd "$G" && "$NIFT_BIN" init --migration >/dev/null 2>&1) || fail "existing guidance aborted migration"
+[ "$(cat "$G/investigation/STATUS.md")" = "my status" ] || fail "existing investigation/STATUS.md overwritten"
+[ -f "$G/investigation/BASELINE.md" ] || fail "missing guidance not created"
+
 
 # --handover stays single-file and is unchanged.
 P="$TMP/hand"; mkdir -p "$P"
@@ -138,4 +182,4 @@ Q="$TMP/${TMPDIR:+nested}/nested/deep"; mkdir -p "$Q"
 (cd "$Q" && "$NIFT_BIN" init --migration >/dev/null 2>&1) || fail "nested --migration failed"
 [ -f "$Q/MIGRATION.md" ] || fail "nested MIGRATION.md missing"
 
-echo "init-migration smoke test passed: fresh files canonical; error/keep/append/replace policies; AGENTS create/augment/replace/idempotent/malformed-safe; plain init unchanged"
+echo "init-migration smoke test passed: full scaffold deterministic + canonical; guidance content; README/investigation non-destructive; error/keep/append/replace policies; AGENTS create/augment/replace/idempotent/malformed-safe; whitespace clean; plain init unchanged"
