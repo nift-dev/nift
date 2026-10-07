@@ -42,6 +42,7 @@
 #include <limits>
 #include <cstdint>
 #include <cerrno>
+#include <cstdio>
 #ifdef _WIN32
 #include <windows.h>
 #else
@@ -72,6 +73,84 @@ Parser::FfiLibraryInstance::~FfiLibraryInstance() {
 }
 
 namespace {
+// Only immutable syntax is cached: no bindings, module owners, source context,
+// results or callable identity. Bounded thread-local caches are safe across
+// parser instances and workers; invocation always resolves its live environment.
+constexpr std::size_t kLambdaCodeCacheLimit = 256;
+struct LambdaSyntax {
+    std::vector<std::string> params;
+    std::string variadic_param, body;
+    bool block = false, async = false;
+};
+thread_local std::unordered_map<std::string, std::shared_ptr<const LambdaSyntax>> lambda_syntax_cache;
+struct NumericLambdaPlan {
+    std::unique_ptr<const nift::ast::Expr> expression;
+    unsigned depth = 0;
+};
+thread_local std::unordered_map<std::string, std::shared_ptr<const NumericLambdaPlan>> numeric_lambda_cache;
+
+#ifdef NIFT_TEST_LAMBDA_CACHE_STATS
+struct LambdaCacheStats {
+    std::atomic<unsigned long long> syntax{0}, numeric{0}, instances{0}, prepared{0}, legacy{0};
+    ~LambdaCacheStats() {
+        if (std::getenv("NIFT_TEST_LAMBDA_CACHE_STATS"))
+            std::fprintf(stderr, "lambda-cache syntax=%llu numeric=%llu instances=%llu prepared=%llu legacy=%llu\n",
+                         syntax.load(), numeric.load(), instances.load(), prepared.load(), legacy.load());
+    }
+} lambda_cache_stats;
+#define NIFT_LAMBDA_COUNT(field) (++lambda_cache_stats.field)
+#else
+#define NIFT_LAMBDA_COUNT(field) ((void)0)
+#endif
+
+std::shared_ptr<const NumericLambdaPlan> numeric_lambda_plan(const std::string& body) {
+    auto found = numeric_lambda_cache.find(body);
+    if (found != numeric_lambda_cache.end()) return found->second;
+    if (numeric_lambda_cache.size() >= kLambdaCodeCacheLimit || body.size() > 4096) return {};
+    NIFT_LAMBDA_COUNT(numeric);
+    // The AST parser treats adjacent +/- as nested unary operators, whereas
+    // compatibility syntax includes mutating ++/--. Hexadecimal literals also
+    // differ between parsers. Keep both forms on compatibility dispatch.
+    if (body.find("++") != std::string::npos || body.find("--") != std::string::npos ||
+        body.find("0x") != std::string::npos || body.find("0X") != std::string::npos) {
+        numeric_lambda_cache.emplace(body, nullptr);
+        return {};
+    }
+    auto parsed = nift::ast::parse_expression(body);
+    unsigned nodes = 0, max_depth = 0;
+    std::function<bool(const nift::ast::Expr&, unsigned)> supported;
+    supported = [&](const nift::ast::Expr& expr, unsigned depth) {
+        if (++nodes > 64 || depth > 16) return false;
+        max_depth = std::max(max_depth, depth);
+        using K = nift::ast::Kind;
+        if (expr.kind == K::Binding) return true;
+        if (expr.kind == K::Literal) return expr.literal.is_number() && std::isfinite(expr.literal.num);
+        if (expr.kind == K::Unary)
+            return (expr.op == "+" || expr.op == "-") && expr.right && supported(*expr.right, depth + 1);
+        if (expr.kind == K::Binary)
+            return expr.op.size() == 1 && std::string("+-*/%").find(expr.op[0]) != std::string::npos &&
+                   expr.left && expr.right && supported(*expr.left, depth + 1) && supported(*expr.right, depth + 1);
+        return false;
+    };
+    std::shared_ptr<const NumericLambdaPlan> result;
+    if (parsed.supported && parsed.expr &&
+        (parsed.expr->kind == nift::ast::Kind::Binary || parsed.expr->kind == nift::ast::Kind::Unary) &&
+        ((supported(*parsed.expr, 0)) ||
+         (parsed.expr->kind == nift::ast::Kind::Binary &&
+          (parsed.expr->op == "<" || parsed.expr->op == "<=" || parsed.expr->op == ">" || parsed.expr->op == ">=" ||
+           parsed.expr->op == "==" || parsed.expr->op == "!=") &&
+          parsed.expr->left && parsed.expr->right &&
+          supported(*parsed.expr->left, 1) && supported(*parsed.expr->right, 1)))) {
+        auto plan = std::make_shared<NumericLambdaPlan>();
+        plan->expression = std::move(parsed.expr);
+        plan->depth = max_depth;
+        result = std::move(plan);
+    }
+    // Negative entries avoid repeatedly preparing unsupported syntax. Parse
+    // errors stay deferred to the compatibility evaluator, exactly as before.
+    numeric_lambda_cache.emplace(body, result);
+    return result;
+}
 
 thread_local Parser* nift_ffi_callback_parser = nullptr;
 thread_local std::string nift_ffi_callback_tag;
@@ -1101,6 +1180,74 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
             }
         }
 
+        auto atomic_scalar = [&](const nift::RuntimeValue& in, nift::RuntimeValue& scalar)->bool {
+            if(!(in.is_string()&&in.string.rfind("\x1fnift:atomic:",0)==0)){scalar=in;return true;}
+            auto it=atomic_instances_.find(in.string.substr(13));if(it==atomic_instances_.end()){error="atomic: invalid handle";return false;}
+            if(it->second->kind==AtomicInstance::Kind::Bool)scalar=nift::RuntimeValue(it->second->bool_value.load());
+            else{auto v=it->second->int_value.load();scalar=nift::RuntimeValue(static_cast<double>(v));if(v>9007199254740992LL||v<-9007199254740992LL){scalar.type=nift::RuntimeType::StrNumber;scalar.string=std::to_string(v);}}return true;
+        };
+
+        auto numeric_binary = [&](const nift::RuntimeValue& left_in, const nift::RuntimeValue& right_in, char op, nift::RuntimeValue& result)->bool {
+            nift::RuntimeValue left,right;if(!atomic_scalar(left_in,left)||!atomic_scalar(right_in,right))return false;
+            auto as_i64=[](const nift::RuntimeValue& d,std::int64_t& v)->bool{
+                return nift::runtime_number_to_i64(d,v);};
+            std::int64_t a=0,b=0; if(as_i64(left,a)&&as_i64(right,b)&&op!='/'){std::int64_t r=0;bool overflow=false;
+                if(op=='+')overflow=__builtin_add_overflow(a,b,&r);else if(op=='-')overflow=__builtin_sub_overflow(a,b,&r);else if(op=='*')overflow=__builtin_mul_overflow(a,b,&r);else if(op=='%'){if(b==0){error="modulo by zero";return false;}if(a==std::numeric_limits<std::int64_t>::min()&&b==-1)r=0;else r=a%b;}else return false;
+                if(overflow){error="signed 64-bit integer overflow";return false;}result=nift::RuntimeValue(static_cast<double>(r));if(r>9007199254740992LL||r<-9007199254740992LL){result.type=nift::RuntimeType::StrNumber;result.string=std::to_string(r);}return true;}
+            if(!left.is_number()||!right.is_number()){error="arithmetic operators require numeric operands";return false;}double r=0;if(op=='+')r=left.num+right.num;else if(op=='-')r=left.num-right.num;else if(op=='*')r=left.num*right.num;else if(op=='/'){if(nift::runtime_number_is_zero(right)){error="division by zero";return false;}r=left.num/right.num;}else if(op=='%'){if(nift::runtime_number_is_zero(right)){error="modulo by zero";return false;}if(!nift::runtime_number_is_integer(left)||!nift::runtime_number_is_integer(right)){error="modulo requires integer-valued operands";return false;}r=std::fmod(left.num,right.num);}if(!std::isfinite(r)){error="arithmetic result is not finite";return false;}result=nift::RuntimeValue(r);return true;
+        };
+
+        auto numeric_ordering = [&](const nift::RuntimeValue& left, const nift::RuntimeValue& right,
+                                    const std::string& op, nift::RuntimeValue& result) {
+            int ordering = 0;
+            const bool comparable = nift::runtime_compare_numbers_relational(left, right, ordering);
+            result = nift::RuntimeValue(comparable &&
+                (op == "<" ? ordering < 0 : op == "<=" ? ordering <= 0 :
+                 op == ">" ? ordering > 0 : ordering >= 0));
+            return true;
+        };
+
+        // Execute only pure numeric expression plans. The existing leaf evaluator
+        // and numeric operator remain the semantic oracle. Non-numeric bindings,
+        // calls, locations, blocks and other shapes retain compatibility dispatch.
+        auto eval_expression_lambda = [&](const std::string& body, nift::RuntimeValue& result, int body_depth) {
+            auto legacy = [&] { NIFT_LAMBDA_COUNT(legacy); return eval(body, result, body_depth); };
+            if (valid_binding_identifier(body)) return legacy();
+            auto plan = numeric_lambda_plan(body);
+            if (!plan || body_depth + static_cast<int>(plan->depth) + 1 > 96) return legacy();
+            bool unsupported = false;
+            std::function<bool(const nift::ast::Expr&, nift::RuntimeValue&)> execute;
+            execute = [&](const nift::ast::Expr& expr, nift::RuntimeValue& value) {
+                using K = nift::ast::Kind;
+                if (expr.kind == K::Literal) { value = expr.literal; return true; }
+                if (expr.kind == K::Binding) {
+                    if (!eval(expr.name, value, body_depth + 1)) return false;
+                    if (!value.is_number()) { unsupported = true; return false; }
+                    return true;
+                }
+                if (expr.kind == K::Unary) {
+                    nift::RuntimeValue operand;
+                    if (!execute(*expr.right, operand)) return false;
+                    value = expr.op == "-" ? nift::runtime_number_negate(operand) : operand;
+                    return true;
+                }
+                nift::RuntimeValue left, right;
+                if (!execute(*expr.left, left) || !execute(*expr.right, right)) return false;
+                if (expr.op == "==" || expr.op == "!=") {
+                    const bool equal = nift::runtime_numbers_equal(left, right);
+                    value = nift::RuntimeValue(expr.op == "==" ? equal : !equal);
+                    return true;
+                }
+                if (expr.op == "<" || expr.op == "<=" || expr.op == ">" || expr.op == ">=")
+                    return numeric_ordering(left, right, expr.op, value);
+                return numeric_binary(left, right, expr.op[0], value);
+            };
+            const bool ok = execute(*plan->expression, result);
+            if (unsupported) return legacy();
+            NIFT_LAMBDA_COUNT(prepared);
+            return ok;
+        };
+
         auto bind_temporary = [&](nift::RuntimeValue value) {
             if (variable_scopes_.empty()) variable_scopes_.emplace_back();
             std::string name;
@@ -1267,6 +1414,21 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
             if (!error.empty()) return false;
         }
         {
+            auto instantiate_lambda = [&](const LambdaSyntax& code) {
+                NIFT_LAMBDA_COUNT(instances);
+                auto li = std::make_shared<LambdaInstance>();
+                li->params = code.params; li->variadic_param = code.variadic_param;
+                li->async = code.async; li->block = code.block; li->body = code.body;
+                if(!source_path_stack_.empty()) li->source_path=source_path_stack_.back();
+                li->source_provenance=(active_module_env_?active_module_env_->source_provenance:(loading_module_env_?loading_module_env_->source_provenance:(source_context_stack_.empty()?SourceProvenance::InMemory:source_context_stack_.back().provenance)));
+                for(const auto& scope:variable_scopes_) for(const auto& kv:scope) li->captures[kv.first]=kv.second;
+                li->module_env=active_module_env_ ? active_module_env_ : loading_module_env_;
+                const std::string id=std::to_string(next_lambda_instance_id_++); lambda_instances_[id]=li;
+                out=nift::RuntimeValue(std::string("\x1fnift:callable:lambda:")+id);
+                return true;
+            };
+            auto cached = lambda_syntax_cache.find(text);
+            if (cached != lambda_syntax_cache.end()) return instantiate_lambda(*cached->second);
             std::size_t arrow = std::string::npos; int pd=0, bd=0, cd=0; bool iq=false; char qc=0;
             for(std::size_t ai=0;ai+1<text.size();++ai){char ch=text[ai];if(iq){if(ch=='\\')++ai;else if(ch==qc)iq=false;continue;}if(ch=='\"'||ch=='\''){iq=true;qc=ch;continue;}if(ch=='(')++pd;else if(ch==')')--pd;else if(ch=='[')++bd;else if(ch==']')--bd;else if(ch=='{')++cd;else if(ch=='}')--cd;else if(ch=='='&&text[ai+1]=='>'&&pd==0&&bd==0&&cd==0){arrow=ai;break;}}
             if (arrow != std::string::npos && text.substr(0, arrow).find(":=") == std::string::npos && text.substr(0, arrow).find(" = ") == std::string::npos) {
@@ -1280,15 +1442,14 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
                     if(!parse_callable_parameters(lhs.substr(1,lhs.size()-2),params,variadic_param)){error="lambda: malformed parameter list";return false;}
                 } else if (valid_binding_identifier(lhs)) params.push_back(lhs);
                 else { error="lambda: expected identifier or parenthesized parameter list"; return false; }
-                auto li=std::make_shared<LambdaInstance>(); li->params=params; li->variadic_param=variadic_param; li->async=async_lambda;
-                li->block=rhs.size()>=2&&rhs.front()=='{'&&rhs.back()=='}';
-                li->body=li->block?rhs.substr(1,rhs.size()-2):rhs;
-                if(!source_path_stack_.empty()) li->source_path=source_path_stack_.back();
-                li->source_provenance=(active_module_env_?active_module_env_->source_provenance:(loading_module_env_?loading_module_env_->source_provenance:(source_context_stack_.empty()?SourceProvenance::InMemory:source_context_stack_.back().provenance)));
-                for(const auto& scope:variable_scopes_) for(const auto& kv:scope) li->captures[kv.first]=kv.second;
-                li->module_env=active_module_env_ ? active_module_env_ : loading_module_env_;
-                const std::string id=std::to_string(next_lambda_instance_id_++); lambda_instances_[id]=li;
-                out=nift::RuntimeValue(std::string("\x1fnift:callable:lambda:")+id); return true;
+                NIFT_LAMBDA_COUNT(syntax);
+                auto code = std::make_shared<LambdaSyntax>();
+                code->params = std::move(params); code->variadic_param = std::move(variadic_param);
+                code->async = async_lambda; code->block = rhs.size()>=2&&rhs.front()=='{'&&rhs.back()=='}';
+                code->body = code->block ? rhs.substr(1,rhs.size()-2) : rhs;
+                if (lambda_syntax_cache.size() < kLambdaCodeCacheLimit && text.size() <= 4096)
+                    lambda_syntax_cache.emplace(text, code);
+                return instantiate_lambda(*code);
             }
         }
 
@@ -2080,7 +2241,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                                 bool okcall=true;
                                 source_context_stack_.push_back(SourceContext{fn->source_path,fn->source_provenance});
                                 if(fn->block){std::string bt=trim_copy(fn->body);const bool rendered=!bt.empty()&&bt.front()=='<';if(rendered){auto nested=parse(fn->body,fn->source_path,1,fn->source_provenance);if(!nested.ok){error=nested.error.message;if(nested.diagnostic)active_diagnostic_=nested.diagnostic;okcall=false;}else result=nift::RuntimeValue(nested.output);}else{okcall=eval(fn->body,result,depth+1);if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0)error="lambda body error: "+error;}}
-                                else{okcall=eval(fn->body,result,depth+1);if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0)error="lambda body error: "+error;}
+                                else{okcall=eval_expression_lambda(fn->body,result,depth+1);if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0)error="lambda body error: "+error;}
                                 source_context_stack_.pop_back();
                                 pop_variable_scope();leave_lexical_environment(std::move(lexical_env));--callable_call_depth_;if(!okcall)append_diagnostic_frame(nift::detail::DiagnosticFrameKind::Callback,"collection callback");return okcall;
                             }
@@ -2505,7 +2666,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                             bool okcall=true;
                             source_context_stack_.push_back(SourceContext{fn->source_path,fn->source_provenance});
                             if(fn->block){std::string bt=trim_copy(fn->body);const bool rendered=!bt.empty()&&bt.front()=='<';if(rendered){auto nested=parse(fn->body,fn->source_path,1,fn->source_provenance);if(!nested.ok){error=nested.error.message;if(nested.diagnostic)active_diagnostic_=nested.diagnostic;okcall=false;}else out=nift::RuntimeValue(nested.output);}else{++function_call_depth_;auto nested=execute_native_program(fn->body,fn->source_path,1,fn->source_provenance);--function_call_depth_;if(!nested.ok){error=nested.error.message;if(nested.diagnostic)active_diagnostic_=nested.diagnostic;okcall=false;}else if(pending_control_.kind==ControlFlow::Return){consume_return(out);}else out=nift::RuntimeValue(nullptr);}}
-                            else { okcall=eval(fn->body,out,1); if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0) error="lambda body error: "+error; VariableBinding lr; if(try_location_ref(fn->body,lr)&&lr.is_location_ref()&&lr.value){last_call_return_loc_root_=lr.ref_root_slot;last_call_return_loc_path_=lr.ref_path;} }
+                            else { okcall=eval_expression_lambda(fn->body,out,1); if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0) error="lambda body error: "+error; VariableBinding lr; if(try_location_ref(fn->body,lr)&&lr.is_location_ref()&&lr.value){last_call_return_loc_root_=lr.ref_root_slot;last_call_return_loc_path_=lr.ref_path;} }
                             source_context_stack_.pop_back();pop_variable_scope();leave_lexical_environment(std::move(lexical_env));--callable_call_depth_;if(!okcall)append_diagnostic_frame(nift::detail::DiagnosticFrameKind::Lambda,"lambda");return okcall;
                         }
                     }
@@ -2954,23 +3115,6 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             return std::string::npos;
         };
 
-        auto atomic_scalar = [&](const nift::RuntimeValue& in, nift::RuntimeValue& scalar)->bool {
-            if(!(in.is_string()&&in.string.rfind("\x1fnift:atomic:",0)==0)){scalar=in;return true;}
-            auto it=atomic_instances_.find(in.string.substr(13));if(it==atomic_instances_.end()){error="atomic: invalid handle";return false;}
-            if(it->second->kind==AtomicInstance::Kind::Bool)scalar=nift::RuntimeValue(it->second->bool_value.load());
-            else{auto v=it->second->int_value.load();scalar=nift::RuntimeValue(static_cast<double>(v));if(v>9007199254740992LL||v<-9007199254740992LL){scalar.type=nift::RuntimeType::StrNumber;scalar.string=std::to_string(v);}}return true;
-        };
-
-        auto numeric_binary = [&](const nift::RuntimeValue& left_in, const nift::RuntimeValue& right_in, char op, nift::RuntimeValue& result)->bool {
-            nift::RuntimeValue left,right;if(!atomic_scalar(left_in,left)||!atomic_scalar(right_in,right))return false;
-            auto as_i64=[](const nift::RuntimeValue& d,std::int64_t& v)->bool{
-                return nift::runtime_number_to_i64(d,v);};
-            std::int64_t a=0,b=0; if(as_i64(left,a)&&as_i64(right,b)&&op!='/'){std::int64_t r=0;bool overflow=false;
-                if(op=='+')overflow=__builtin_add_overflow(a,b,&r);else if(op=='-')overflow=__builtin_sub_overflow(a,b,&r);else if(op=='*')overflow=__builtin_mul_overflow(a,b,&r);else if(op=='%'){if(b==0){error="modulo by zero";return false;}if(a==std::numeric_limits<std::int64_t>::min()&&b==-1)r=0;else r=a%b;}else return false;
-                if(overflow){error="signed 64-bit integer overflow";return false;}result=nift::RuntimeValue(static_cast<double>(r));if(r>9007199254740992LL||r<-9007199254740992LL){result.type=nift::RuntimeType::StrNumber;result.string=std::to_string(r);}return true;}
-            if(!left.is_number()||!right.is_number()){error="arithmetic operators require numeric operands";return false;}double r=0;if(op=='+')r=left.num+right.num;else if(op=='-')r=left.num-right.num;else if(op=='*')r=left.num*right.num;else if(op=='/'){if(nift::runtime_number_is_zero(right)){error="division by zero";return false;}r=left.num/right.num;}else if(op=='%'){if(nift::runtime_number_is_zero(right)){error="modulo by zero";return false;}if(!nift::runtime_number_is_integer(left)||!nift::runtime_number_is_integer(right)){error="modulo requires integer-valued operands";return false;}r=std::fmod(left.num,right.num);}if(!std::isfinite(r)){error="arithmetic result is not finite";return false;}result=nift::RuntimeValue(r);return true;
-        };
-
         // Compound assignment is a true mutation expression. Current assignable
         // paths are identifiers and struct member paths; both are side-effect-free
         // to resolve, so the target is read once and written once. For a plain
@@ -3301,9 +3445,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 if ((!left.is_number() || !right.is_number()) && !(left.is_string() && right.is_string())) { error="ordering comparisons require two numbers or two strings"; return false; }
                 int ordering=0;
                 if (left.is_number() && right.is_number()) {
-                    if (!nift::runtime_compare_numbers_relational(left,right,ordering)) {
-                        out=nift::RuntimeValue(false); return true;
-                    }
+                    return numeric_ordering(left, right, op, out);
                 } else ordering=left.string<right.string?-1:(left.string>right.string?1:0);
                 if (op=="<") result=ordering<0; else if (op=="<=") result=ordering<=0; else if (op==">") result=ordering>0; else result=ordering>=0;
             }

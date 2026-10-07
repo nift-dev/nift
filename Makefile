@@ -745,6 +745,7 @@ test: test-parser-hardening test-content test-commands test-comments test-contra
 	test-v48-prepared-collection-parity test-v48-prepared-collection-guard \
 	test-location-method-receiver \
 	test-v48-identifier-parity test-v48-identifier-guard \
+	test-v48-callback-parity test-v48-callback-guard \
 	test-v46-time-cli test-v46-timer test-v46-secure-random-cli test-v46-output-cli test-v46-relative-imports test-progress-render $(PROGRESS_PTY_TARGET) test-snap-contract test-distribution-summary test-version-consistency test-unreadable-source test-incremental-modified-immediate
 
 test-cp15-numeric-repair: $(TARGET)
@@ -910,6 +911,25 @@ test-v48-identifier-parity: $(TARGET)
 
 test-v48-identifier-guard: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" python3 tests/v48_identifier_guard.py
+
+.PHONY: test-v48-callback-parity test-v48-callback-guard
+test-v48-callback-parity: $(TARGET)
+	NIFT="$(CURDIR)/$(TARGET)" bash tests/v48_callback_parity.sh
+	NIFT="$(CURDIR)/$(TARGET)" python3 tests/v48_callback_numeric_parity.py
+
+# Only this object contains counters; ordinary CLI/library/ABI layouts and
+# output have no instrumentation. Reuse the other ordinary CLI objects.
+$(TEST_DIR)/lambda-cache/ParserExpression.o: src/ParserExpression.cpp
+	mkdir -p "$(dir $@)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_TEST_LAMBDA_CACHE_STATS -MMD -MP -c $< -o $@
+
+-include $(TEST_DIR)/lambda-cache/ParserExpression.d
+LAMBDA_CACHE_GUARD := $(TEST_DIR)/nift-lambda-cache-guard$(EXEEXT)
+$(LAMBDA_CACHE_GUARD): $(filter-out src/ParserExpression.o,$(CLI_OBJECTS)) $(TEST_DIR)/lambda-cache/ParserExpression.o $(LIBFFI_A)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/ParserExpression.o,$(CLI_OBJECTS)) $(TEST_DIR)/lambda-cache/ParserExpression.o $(LDLIBS) -o $@
+
+test-v48-callback-guard: $(LAMBDA_CACHE_GUARD)
+	NIFT="$(CURDIR)/$(LAMBDA_CACHE_GUARD)" python3 tests/v48_callback_guard.py
 
 test-v43-language: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp0_cp14_smoke.sh

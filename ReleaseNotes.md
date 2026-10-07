@@ -7,6 +7,11 @@ v4.8.0 user-visible changes have been recorded yet.
 
 ### Development note
 
+- Cache bounded immutable lambda syntax and pure numeric expression plans across
+  callbacks, while retaining fresh closure identities, live captures and existing
+  invocation routes. Arithmetic and numeric predicates reuse runtime numeric
+  helpers; unsupported syntax and operand types retain compatibility evaluation.
+
 - Resolve plain identifiers through the canonical resolver before generic
   expression classification, preserving named-callable precedence and reference
   semantics while reducing callback-heavy evaluator overhead.
