@@ -743,6 +743,7 @@ test: test-parser-hardening test-content test-commands test-comments test-contra
 	test-v48-map-set-index test-v48-map-set-scaling \
 	test-v48-prepared-object-literal-parity test-v48-prepared-object-literal-guard \
 	test-v48-prepared-collection-parity test-v48-prepared-collection-guard \
+	test-location-method-receiver \
 	test-v46-time-cli test-v46-timer test-v46-secure-random-cli test-v46-output-cli test-v46-relative-imports test-progress-render $(PROGRESS_PTY_TARGET) test-snap-contract test-distribution-summary test-version-consistency test-unreadable-source test-incremental-modified-immediate
 
 test-cp15-numeric-repair: $(TARGET)
@@ -897,6 +898,10 @@ test-v48-prepared-collection-parity: $(TARGET)
 
 test-v48-prepared-collection-guard: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" bash tests/v48_prepared_collection_guard.sh
+
+.PHONY: test-location-method-receiver
+test-location-method-receiver: $(TARGET)
+	NIFT="$(CURDIR)/$(TARGET)" bash tests/location_method_receiver.sh
 
 test-v43-language: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/v43_cp0_cp14_smoke.sh

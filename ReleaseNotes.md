@@ -7,6 +7,8 @@ v4.8.0 user-visible changes have been recorded yet.
 
 ### Development note
 
+- Refresh location-backed method receivers before module detection, avoiding a
+  stale receiver read after the parent array reallocates or removes the location.
 - Added `warn(...)` for first-class non-fatal warnings in scripts and
   templates. `warn(value)` emits one canonical `warning: <value>` line to
   stderr, continues execution, leaves stdout/template output unchanged, and

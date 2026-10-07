@@ -1776,6 +1776,10 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         const auto it = scope->find(rroot);
                         if (it != scope->end()) { rb2 = &it->second; break; }
                     }
+                    if (rb2) {
+                        rb2->sync();
+                        if (!rb2->value) { error = "reference target no longer exists: " + rroot; return false; }
+                    }
                     const bool receiver_is_module = !rb2 || (rb2->value &&
                         (rb2->value->is_object() ||
                          (rb2->value->is_string() && rb2->value->string.rfind("\x1fnift:struct:", 0) == 0)));
