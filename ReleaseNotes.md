@@ -5,6 +5,13 @@
 Development has advanced to v4.8.0 after the completed v4.7.2 release. No
 v4.8.0 user-visible changes have been recorded yet.
 
+### Development note
+
+- Added `warn(...)` for first-class non-fatal warnings in scripts and
+  templates. `warn(value)` emits one canonical `warning: <value>` line to
+  stderr, continues execution, leaves stdout/template output unchanged, and
+  returns `null` like `print`/`err`. See `docs/output-primitives.md`.
+
 ## v4.7.2 (released 2026-10-06)
 
 Nift v4.7.2 is a maintenance patch fixing a prepared-execution regression present

@@ -37,14 +37,17 @@ public:
     explicit ExecutionOutput(bool capture = false) : capture_(capture) {}
     void write_stdout(const std::string& text);
     void write_stderr(const std::string& text);
+    void write_warning(const std::string& text);
     std::string stdout_text() const;
     std::string stderr_text() const;
+    std::string warning_text() const;
 
 private:
     bool capture_ = false;
     mutable std::mutex mutex_;
     std::string stdout_text_;
     std::string stderr_text_;
+    std::string warning_text_;
 };
 
 class Parser {

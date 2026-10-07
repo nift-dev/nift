@@ -70,6 +70,25 @@ void ExecutionOutput::write_stderr(const std::string& text) {
     }
 }
 
+// Warnings keep their identity at the output boundary (dedicated warning_text_
+// when captured) and render through the existing stderr machinery today, so a
+// richer warning consumer can be added later without prefix-scanning output.
+// When captured, the canonical form also flows to stderr_text_ so existing
+// embedding consumers observe warnings on their stderr channel as they do for
+// err(); warning_text_ is the distinct, future-facing identity.
+void ExecutionOutput::write_warning(const std::string& text) {
+    const std::string rendered = "warning: " + text;
+    if (capture_) {
+        std::lock_guard<std::mutex> lock(mutex_);
+        warning_text_ += rendered;
+        stderr_text_ += rendered;
+    } else {
+        static std::mutex console_warning_mutex;
+        std::lock_guard<std::mutex> lock(console_warning_mutex);
+        std::cerr << rendered; std::cerr.flush();
+    }
+}
+
 std::string ExecutionOutput::stdout_text() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return stdout_text_;
@@ -78,6 +97,11 @@ std::string ExecutionOutput::stdout_text() const {
 std::string ExecutionOutput::stderr_text() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return stderr_text_;
+}
+
+std::string ExecutionOutput::warning_text() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return warning_text_;
 }
 
 Parser::Parser(RenderHost& host, TrackedInfo& tracked_info,
