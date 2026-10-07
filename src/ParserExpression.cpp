@@ -3406,15 +3406,7 @@ bool Parser::evaluate_condition(const std::string& expression, bool& value, std:
                 !resolve_operand(condition.substr(op_position + op.size()), right)) return false;
 
             if (op == "==" || op == "!=") {
-                bool equal = false;
-                if (left->is_number() && right->is_number()) equal = nift::runtime_numbers_equal(*left, *right);
-                else if (left->type == right->type) {
-                    if (left->is_null()) equal = true;
-                    else if (left->is_bool()) equal = left->boolean == right->boolean;
-                    else if (left->is_string()) equal = left->string == right->string;
-                    else if (left->is_bytes()) equal = nift::runtime_equal(*left,*right);
-                    else { error = "@if comparisons are only supported for scalar JSON values"; return false; }
-                }
+                const bool equal = nift::runtime_equal(*left, *right);
                 result = op == "==" ? equal : !equal;
                 return true;
             }

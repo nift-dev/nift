@@ -293,7 +293,14 @@ expect_failure if-no-close "@if has no matching ')'" '@if(site.enabled{hello' '{
 expect_failure if-no-block "@if(...) must be followed by a '{...}' block" '@if(site.enabled) hello' '{"enabled":true}'
 expect_failure if-unclosed-block "@if block has no matching '}'" '@if(site.enabled){hello' '{"enabled":true}'
 expect_failure if-missing-value "JSON value 'site' has no member 'missing'" $'@json(site, "data/site.json")\n@if(site.missing){x}' '{}'
-expect_failure if-object-comparison '@if comparisons are only supported for scalar JSON values' $'@json(site, "data/site.json")\n@if(site.obj == site.obj){x}' '{"obj":{"x":1}}'
+# @if conditions accept object equality, matching ordinary/prepared equality
+# semantics (v4.8 comparison parity); the previous scalar-only restriction no
+# longer applies.
+make_project "$TMP/if-object-equal"
+printf '%s\n' '{"obj":{"x":1}}' >"$TMP/if-object-equal/data/site.json"
+printf '%s\n' $'@json(site, "data/site.json")\n@if(site.obj == site.obj){RENDERED}\n@content' >"$TMP/if-object-equal/templates/template.html"
+(cd "$TMP/if-object-equal" && "$NIFT_BIN" build --all >/dev/null 2>&1) || { echo "if-object-comparison unexpectedly failed" >&2; exit 1; }
+grep -q 'RENDERED' "$TMP/if-object-equal/public/index.html" || { echo "if-object-comparison did not render equal objects" >&2; exit 1; }
 expect_failure if-order-mixed '@if ordering comparisons require two numbers or two strings of the same type' $'@json(site, "data/site.json")\n@if(site.value < "3"){x}' '{"value":3}'
 expect_failure if-order-bool '@if ordering comparisons require two numbers or two strings of the same type' $'@json(site, "data/site.json")\n@if(site.value >= false){x}' '{"value":true}'
 expect_failure for-no-in "@for header must contain ':'" $'@json(site, "data/site.json")\n@for(item site.items){x}' '{"items":[]}'

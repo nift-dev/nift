@@ -21,6 +21,14 @@ v4.8.0 user-visible changes have been recorded yet.
   conflict policies (`error` default, `keep`, `append`, `replace`) are
   explicit and non-destructive; AGENTS augmentation is idempotent and
   malformed-safe. No automatic source-framework conversion.
+- Fixed prepared condition comparison parity: `if(...)`/`while(...)`/`@if(...)`
+  conditions now accept the same `==`/`!=` values as ordinary expression
+  evaluation and prepared execution. Direct conditions on arrays, objects,
+  bytes, and nested collections previously raised "@if comparisons are only
+  supported for scalar JSON values"; they now use the same canonical deep
+  equality as `a == b` anywhere else, and precomputed equality
+  (`same := a == b; if(same) {...}`) is interchangeable with the direct form.
+  Ordering (`<`, `<=`, `>`, `>=`) remains numbers/strings-only.
 
 ## v4.7.2 (released 2026-10-06)
 
