@@ -29,6 +29,14 @@ v4.8.0 user-visible changes have been recorded yet.
   equality as `a == b` anywhere else, and precomputed equality
   (`same := a == b; if(same) {...}`) is interchangeable with the direct form.
   Ordering (`<`, `<=`, `>`, `>=`) remains numbers/strings-only.
+- Fixed first-class callable values losing parity inside prepared loop/body and
+  template execution. A bare named function used as a value (passed as an
+  argument such as `call_it(g)`, assigned to a variable, or returned through
+  an identity/pass-through function) previously failed inside prepared bodies
+  with "unknown value or malformed expression"; it now resolves to the same
+  callable value as in ordinary evaluation. Lambdas already travelled
+  correctly. Callable identity, arity checks, shadowing, and throw behaviour
+  are unchanged.
 
 ## v4.7.2 (released 2026-10-06)
 
