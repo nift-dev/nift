@@ -35,7 +35,8 @@ with tempfile.TemporaryDirectory() as directory:
             for suffix in (f"print({expression})\n",
                            f"f := (a,b,c) => {expression}\nprint(f(a,b,c))\n"):
                 path.write_text(prefix + suffix)
-                results.append(subprocess.run([binary, str(path)], capture_output=True, text=True))
+                result = subprocess.run([binary, str(path)], capture_output=True, text=True)
+                results.append(result)
             ordinary, callback = results
             if (ordinary.returncode == 0) != (callback.returncode == 0):
                 raise SystemExit(f"FAIL status parity: {expression}, {(a,b,c)}, {results}")
