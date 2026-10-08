@@ -1,19 +1,33 @@
 # Nift maintained roadmap
 
-## Current status
+## Current status — v4.9 orientation
 
-Nift is in **v4.5 release-candidate preparation** on top of the public v4.4.0 release. The CP1–CP34 v4.5 campaign has locally implemented and exercised unified scripting invocation, native job control/concurrency, FFI, and supported embedding. CP35 is the independent Codex review/repair handoff; CP36 owns final release gates.
+Public v4.8.0 is released at immutable `1bfc4a54b373da3477b497106fa4db59111e2770`.
+Development is v4.9.0 after `9de5c3e3e62291c929702271b34f2c870ec2a442`.
+The v4.8 feature/performance campaign and release are closed. Historical campaign
+records remain evidence; they do not authorize more implementation.
 
-The immediate priority is not another feature checkpoint. It is to run the complete clean optimized GCC/Clang, sanitizer/TSan, unprivileged independent regression, maintained binding, and Linux/macOS/Windows walls described in `V4.5-CODEX-REVIEW-HANDOFF.md`, repair anything found with permanent regressions, then obtain explicit maintainer approval before tagging/publishing.
+## Near-term checkpoints
 
-Do not weaken flags, delete difficult tests, or rewrite repository history to make a gate green. Local tool-window limitations documented in CP31–CP34 are deferred evidence requirements, not waivers.
+1. **CP49-0:** reconcile living roadmap, decisions and handovers with release reality.
+2. **CP49-1:** reproduce and repair maintained binding warnings, validate builds/tests
+   and aggregate gate, clarify support. No public API/ABI or packaging redesign.
+3. **CP49-2:** investigate current performance: scaling, profiles, allocations,
+   isolated reproducers and shared root-cause ranking. Stop for review before optimization.
+4. **CP49-3+:** choose bounded implementation checkpoints from accepted profiler evidence,
+   with semantic, aliasing, ownership and cross-platform safety gates.
+5. **Later:** a new formal benchmark series, dedicated-node lab.nift.dev update and
+   post-benchmark prioritization. Series `20261008-v480` is complete and frozen;
+   never mutate or rerun it, alter workloads/presentation or provision nodes in this checkpoint.
 
-## Current phase: v4.5 release-candidate review
+Do not commit to bytecode/JIT, RuntimeValue/object redesign or a broad runtime rewrite.
+Rank shared causes by demonstrated cost, breadth, confidence and semantic/lifetime risk.
+Use BFS as a cross-check; separate raw Jsonic++ parse from Nift conversion/value work.
+Standalone Jsonic++ remains canonical for parser changes.
 
-1. Independent architectural review and bounded repair commits.
-2. Complete source/regression/sanitizer/binding/cross-platform CI walls.
-3. Reconcile release artifacts/version/package recipes from committed state.
-4. Push/tag/publish only on explicit maintainer instruction and follow `RELEASES.md` / `PACKAGING.md` manual gates.
+Deferred architecture: explicit FFI resource-release API, further rewrite/redesign
+dogfooding, binding publication/support reassessment, and closure/capture/storage
+work only if profiles justify it. No package publication is authorized here.
 
 ## Distribution validation direction
 

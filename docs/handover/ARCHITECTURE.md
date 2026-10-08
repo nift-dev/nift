@@ -502,3 +502,7 @@ and simplify the documentation whenever the implementation becomes simpler.
 ## Jsonic++ parser ownership
 
 Nift core does not independently own its JSON grammar implementation. The canonical parser is standalone Jsonic++ `include/json.h`, vendored exactly as `jsonic/include/json.h`; `src/Json.h` exists only to preserve stable internal include paths. Nift owns integration semantics such as config loading, schemas, project contracts and dependency invalidation around that parser.
+
+## Post-v4.8 architecture boundary
+
+Development is v4.9.0; ABI remains 1.3. CP49-2 measures current call frames, scopes, value/path handling, collections, evaluator dispatch and JSON/filesystem layers before proposing changes. No large redesign is selected. Future changes to aliasing, closures, references or cached state require relevant ASan/UBSan/LSan and cross-platform contracts; raw Jsonic++ changes belong upstream.

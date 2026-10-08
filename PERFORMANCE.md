@@ -94,3 +94,7 @@ common modified-mode no-op/full cases, so current Nift is back in that range.
 The remembered ~8 MiB low-water mark may have occurred in another workload or
 earlier build, but it is not supported by the retained 10k benchmark CSV.
 
+
+## v4.9 investigation status
+
+The v4.8 campaign is closed and public v4.8.0 is released. Current development is v4.9.0. Series `20261008-v480` is complete and frozen; figures above remain historical machine-specific evidence. CP49-2 measures current HEAD locally with scaling/profiles and ranks shared root causes. It does not rerun official measurements, change benchmark workloads/presentation or authorize optimization. A later official run must create a new series.

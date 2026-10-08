@@ -145,3 +145,7 @@ Every substantial checkpoint must ask whether architecture, tests, website,
 handover knowledge, production confidence, or the next priority changed. Update
 durable principles rather than appending a diary entry. Roadmaps may grow,
 shrink, reorder, or change scope as evidence changes.
+
+## Current v4.9 checkpoint boundary
+
+v4.8.0 is released; the feature campaign is closed. Follow ROADMAP.md CP49-0/1/2: living-document reconciliation, binding warning maintenance, then investigation/ranking. Keep binding fixes separate from profiling evidence. Use independent local reproducers; do not mutate frozen `20261008-v480`. Stop before runtime optimization for review.

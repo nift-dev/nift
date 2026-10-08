@@ -29,7 +29,7 @@ primitive.
 
 ## Native scripting/runtime
 
-**Status:** ACCEPTED/CURRENT FOR v4.5
+**Status:** ACCEPTED/CURRENT (introduced in v4.5)
 
 Nift now owns a native scripting/runtime layer implemented in Nift itself: direct scripts/REPL, process interoperability and job control, packages, real native concurrency, FFI and an embeddable Engine. This does **not** reverse the decision to remove LuaJIT/ExprTk or make arbitrary third-party runtimes part of the template engine. Template rendering and script execution remain distinct entry contexts with explicit host/security boundaries.
 
@@ -172,9 +172,9 @@ The design rule is contract-first: state the guarantee, prove Nift can enforce i
 
 ## v4.0.3 bounded language/distribution programme
 
-**Status:** ACTIVE CONTRACT-FIRST WORK (2026-08-19)
+**Status:** HISTORICAL v4.0.3 CAMPAIGN RECORD (2026-08-19)
 
-The next development sequence is intentionally limited to templating/artifact-generation capability and distribution UX. Each checkpoint must establish tests before implementation and commit at its boundary.
+That historical development sequence was intentionally limited to templating/artifact-generation capability and distribution UX. Each checkpoint must establish tests before implementation and commit at its boundary.
 
 - Templated tracked items must execute exactly one `@content` across the executed template/`@input` graph. Comments and skipped branches do not count. Template-less tracked items remain direct content renders.
 - Conditions retain `!` and will add short-circuit `&&`/`||` with ordinary precedence; ternary uses the same evaluator.
@@ -188,3 +188,13 @@ The next development sequence is intentionally limited to templating/artifact-ge
 - Distribution work includes an evidence-backed `curl -fsSL https://nift.dev/install | bash` path and an experimental strict-confined Snap in a non-stable channel before any stable promotion.
 
 Do not use this programme as authorization to restore old Nift's general scripting/runtime surface.
+
+## v4.9 investigation boundary
+
+**Status:** CURRENT (post-v4.8 release)
+
+CP49-0 reconciles living status; CP49-1 handles binding warning/build maintenance;
+CP49-2 profiles current HEAD and ranks shared runtime costs. The v4.8 campaign is
+closed. Frozen benchmark series `20261008-v480` is an external oracle and must
+remain unchanged. Stop for review before optimization, including small proposed
+fast paths. No formal binding publication or broad runtime redesign is authorized.

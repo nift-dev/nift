@@ -32,7 +32,7 @@ whether it is a regression.
   `docs/evidence/release-4.8.0/release-verification.md`.
   External contracts remain NRS `34b1c2ff4d1a3f591176f3ce79b74ad2958b6852`
   (93 modules) and PRS `1da43659da269c96af21aea7234799d2ad56b2df` (12 modules).
-  No new feature or performance campaign is authorized by this version transition.
+  The version transition itself authorized no feature or performance campaign; the subsequently authorized bounded CP49-0/1/2 investigation is described below.
 - Public documentation: the separate `nift-dev.github.io` repository.
 - External contract: the separate `nift-regression-suite` repository.
 - Embedded minifier: `minifypp/`, synchronized with standalone Minify++.
@@ -472,3 +472,7 @@ canonical workbooks in `tests/fixtures/` synchronized through
 After hosted closeout, the feature queue is CLOSED: stabilization and release
 preparation follow; no further runtime-feature campaign is authorized here.
 Release workflows, tags and release artifacts remain outside this tranche.
+
+## v4.9 orientation
+
+CP49-0 reconciles living status; CP49-1 resumes deferred binding warning maintenance; CP49-2 investigates/ranks current shared runtime costs and stops for review. Post-v4.8 work is evidence-driven. Frozen series `20261008-v480` remains unchanged; no official rerun, node provisioning, feature campaign or optimization is authorized by this checkpoint.
