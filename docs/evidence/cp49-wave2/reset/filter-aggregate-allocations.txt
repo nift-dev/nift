@@ -1,0 +1,39 @@
+--------------------------------------------------------------------------------
+Profile data file '.build/cp49-wave2/reset/filter-aggregate.xtree' (creator: xtree-1)
+--------------------------------------------------------------------------------
+Profiled target:  /home/nick/Repositories/nift/nift/.build/cp49-wave2/start-nift /home/nick/Repositories/nift/nift/.build/cp49-campaign/extra/filter-aggregate-2000.f (PID 1634361)
+Events recorded:  curB curBk totB totBk totFdB totFdBk
+Events shown:     totB totBk
+Event sort order: totB
+Thresholds:       90
+Include dirs:     
+User annotated:   
+Auto-annotation:  off
+
+--------------------------------------------------------------------------------
+totB                totBk            
+--------------------------------------------------------------------------------
+26,354,780 (100.0%) 106,577 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+totB                totBk             file:function
+--------------------------------------------------------------------------------
+45,358,937 (172.1%) 190,431 (178.7%)  UnknownFile???:Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const::{lambda()#1}::operator()() const
+42,482,204 (161.2%) 178,436 (167.4%)  UnknownFile???:Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const
+28,272,000 (107.3%)  90,002 (84.45%)  UnknownFile???:nift::RuntimeValue::RuntimeValue(nift::RuntimeValue const&)
+21,109,378 (80.10%)  90,152 (84.59%)  UnknownFile???:std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const
+18,382,318 (69.75%)  74,260 (69.68%)  UnknownFile???:Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)
+16,688,000 (63.32%)  56,000 (52.54%)  UnknownFile???:std::vector<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, nift::RuntimeValue>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, nift::RuntimeValue> > >::operator=(std::vector<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, nift::RuntimeValue>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, nift::RuntimeValue> > > const&) [clone .isra.0]
+15,920,000 (60.41%)  46,003 (43.16%)  UnknownFile???:std::vector<nift::RuntimeValue, std::allocator<nift::RuntimeValue> >::operator=(std::vector<nift::RuntimeValue, std::allocator<nift::RuntimeValue> > const&) [clone .isra.0]
+15,693,338 (59.55%)  62,244 (58.40%)  UnknownFile???:Parser::evaluate_expression(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)
+11,811,741 (44.82%)  58,010 (54.43%)  UnknownFile???:json::Document::Parser<false>::parse_value(unsigned long)
+10,653,881 (40.42%)  50,222 (47.12%)  UnknownFile???:Parser::evaluate_expression(nift::detail::SourceText const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)
+ 7,013,324 (26.61%)  36,222 (33.99%)  UnknownFile???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)
+ 6,847,741 (25.98%)  34,010 (31.91%)  UnknownFile???:json::Document::Parser<false>::parse_array(unsigned long)
+ 6,631,741 (25.16%)  28,011 (26.28%)  UnknownFile???:nift::detail::parse_runtime_json(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)
+ 5,984,000 (22.71%)  18,001 (16.89%)  UnknownFile???:nift::runtime_from_json(json::Document const&)
+ 5,547,048 (21.05%)  40,016 (37.55%)  UnknownFile???:Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const::{lambda()#1}::operator()() const::{lambda(nift::RuntimeValue const&, std::vector<nift::RuntimeValue, std::allocator<nift::RuntimeValue> > const&, nift::RuntimeValue&)#2}::operator()(nift::RuntimeValue const&, std::vector<nift::RuntimeValue, std::allocator<nift::RuntimeValue> > const&, nift::RuntimeValue&) const
+ 4,964,000 (18.84%)  24,000 (22.52%)  UnknownFile???:json::Document::Parser<false>::parse_object(unsigned long)
+ 4,640,504 (17.61%)  12,005 (11.26%)  UnknownFile???:std::shared_ptr<nift::RuntimeValue>::shared_ptr<std::allocator<void>, nift::RuntimeValue&>(std::_Sp_alloc_shared_tag<std::allocator<void> >, nift::RuntimeValue&)
+ 2,320,728 ( 8.81%)   6,015 ( 5.64%)  UnknownFile???:Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&)#1}::operator()(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&) const
+

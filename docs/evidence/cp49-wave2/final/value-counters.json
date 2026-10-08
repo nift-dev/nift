@@ -1,0 +1,170 @@
+[
+  {
+    "name": "loops",
+    "counts": "value-counts ctor=24045 copy_ctor=3 move_ctor=8002 copy_assign=12006 move_assign=6018 dtor=32050\n"
+  },
+  {
+    "name": "array-build",
+    "counts": "value-counts ctor=24048 copy_ctor=3 move_ctor=10049 copy_assign=10005 move_assign=4017 dtor=34100\n"
+  },
+  {
+    "name": "call-noarg",
+    "counts": "value-counts ctor=34047 copy_ctor=3 move_ctor=16002 copy_assign=12006 move_assign=10019 dtor=50052\n"
+  },
+  {
+    "name": "call-scalar",
+    "counts": "value-counts ctor=42050 copy_ctor=3 move_ctor=20002 copy_assign=16006 move_assign=12019 dtor=62055\n"
+  },
+  {
+    "name": "call-multi",
+    "counts": "value-counts ctor=60055 copy_ctor=3 move_ctor=34002 copy_assign=22006 move_assign=18020 dtor=94060\n"
+  },
+  {
+    "name": "call-locals",
+    "counts": "value-counts ctor=60055 copy_ctor=3 move_ctor=24002 copy_assign=22006 move_assign=14020 dtor=84060\n"
+  },
+  {
+    "name": "call-recursion",
+    "counts": "value-counts ctor=192061 copy_ctor=3 move_ctor=56002 copy_assign=48006 move_assign=50023 dtor=248066\n"
+  },
+  {
+    "name": "call-closure",
+    "counts": "value-counts ctor=48059 copy_ctor=5 move_ctor=14002 copy_assign=22006 move_assign=8024 dtor=62066\n"
+  },
+  {
+    "name": "call-callback",
+    "counts": "value-counts ctor=64057 copy_ctor=4 move_ctor=32002 copy_assign=26006 move_assign=14021 dtor=96063\n"
+  },
+  {
+    "name": "array-index",
+    "counts": "value-counts ctor=50070 copy_ctor=4 move_ctor=18050 copy_assign=24009 move_assign=10025 dtor=68124\n"
+  },
+  {
+    "name": "sort-identity",
+    "counts": "value-counts ctor=44068 copy_ctor=8004 move_ctor=18763 copy_assign=16006 move_assign=38074 dtor=70835\n"
+  },
+  {
+    "name": "sort-index",
+    "counts": "value-counts ctor=44071 copy_ctor=8004 move_ctor=18763 copy_assign=16006 move_assign=35527 dtor=70838\n"
+  },
+  {
+    "name": "sort-arithmetic",
+    "counts": "value-counts ctor=54072 copy_ctor=8004 move_ctor=18763 copy_assign=22006 move_assign=40075 dtor=80839\n"
+  },
+  {
+    "name": "map-identity",
+    "counts": "value-counts ctor=26059 copy_ctor=8004 move_ctor=14096 copy_assign=12006 move_assign=4020 dtor=48159\n"
+  },
+  {
+    "name": "map-index",
+    "counts": "value-counts ctor=26062 copy_ctor=8004 move_ctor=14096 copy_assign=12006 move_assign=4020 dtor=48162\n"
+  },
+  {
+    "name": "map-arithmetic",
+    "counts": "value-counts ctor=36063 copy_ctor=8004 move_ctor=14096 copy_assign=18006 move_assign=6021 dtor=58163\n"
+  },
+  {
+    "name": "frequency",
+    "counts": "value-counts ctor=79962 copy_ctor=77 move_ctor=35943 copy_assign=27969 move_assign=17947 dtor=115982\n"
+  },
+  {
+    "name": "map-set",
+    "counts": "value-counts ctor=40066 copy_ctor=6004 move_ctor=22143 copy_assign=16006 move_assign=6021 dtor=68213\n"
+  },
+  {
+    "name": "sliding-window",
+    "counts": "value-counts ctor=63917 copy_ctor=4 move_ctor=18018 copy_assign=29929 move_assign=13986 dtor=81939\n"
+  },
+  {
+    "name": "json-parse-convert",
+    "counts": "value-counts ctor=8031 copy_ctor=6002 move_ctor=6002 copy_assign=3 move_assign=2013 dtor=20035\n"
+  },
+  {
+    "name": "json-traverse",
+    "counts": "value-counts ctor=38038 copy_ctor=18003 move_ctor=36002 copy_assign=4004 move_assign=14016 dtor=92043\n"
+  },
+  {
+    "name": "json-mutate",
+    "counts": "value-counts ctor=56049 copy_ctor=18003 move_ctor=44002 copy_assign=12004 move_assign=18019 dtor=118054\n"
+  },
+  {
+    "name": "json-serialize",
+    "counts": "value-counts ctor=12053 copy_ctor=12004 move_ctor=6002 copy_assign=7 move_assign=2024 dtor=30059\n"
+  },
+  {
+    "name": "construct-destroy",
+    "counts": "value-counts ctor=44052 copy_ctor=2 move_ctor=16002 copy_assign=16005 move_assign=14019 dtor=60056\n"
+  },
+  {
+    "name": "bfs",
+    "counts": "value-counts ctor=192087 copy_ctor=13998 move_ctor=56126 copy_assign=53997 move_assign=38030 dtor=262211\n"
+  },
+  {
+    "name": "filesystem",
+    "counts": "value-counts ctor=2031 copy_ctor=2002 move_ctor=2049 copy_assign=3 move_assign=12 dtor=6082\n"
+  },
+  {
+    "name": "empty",
+    "counts": "value-counts ctor=19 copy_ctor=1 move_ctor=2 copy_assign=3 move_assign=6 dtor=22\n"
+  },
+  {
+    "name": "map-aggregate",
+    "counts": "value-counts ctor=22042 copy_ctor=82003 move_ctor=18049 copy_assign=2004 move_assign=6016 dtor=122094\n"
+  },
+  {
+    "name": "filter-aggregate",
+    "counts": "value-counts ctor=26042 copy_ctor=84003 move_ctor=16049 copy_assign=4 move_assign=10016 dtor=126094\n"
+  },
+  {
+    "name": "group-unique",
+    "counts": "value-counts ctor=24045 copy_ctor=102003 move_ctor=26143 copy_assign=2004 move_assign=6016 dtor=152191\n"
+  },
+  {
+    "name": "group-repeated",
+    "counts": "value-counts ctor=32064 copy_ctor=100019 move_ctor=24159 copy_assign=8004 move_assign=8017 dtor=156242\n"
+  },
+  {
+    "name": "sort-aggregate",
+    "counts": "value-counts ctor=28045 copy_ctor=70003 move_ctor=22716 copy_assign=2005 move_assign=36725 dtor=120764\n"
+  },
+  {
+    "name": "call-imported",
+    "counts": "value-counts ctor=42053 copy_ctor=3 move_ctor=20002 copy_assign=16006 move_assign=12021 dtor=62058\n"
+  },
+  {
+    "name": "call-aggregate",
+    "counts": "value-counts ctor=46079 copy_ctor=24010 move_ctor=26011 copy_assign=14006 move_assign=14032 dtor=96100\n"
+  },
+  {
+    "name": "sort-multi",
+    "counts": "value-counts ctor=44050 copy_ctor=98003 move_ctor=24716 copy_assign=10005 move_assign=35589 dtor=166769\n"
+  },
+  {
+    "name": "json-wide",
+    "counts": "value-counts ctor=22039 copy_ctor=24003 move_ctor=12002 copy_assign=5 move_assign=4015 dtor=58044\n"
+  },
+  {
+    "name": "json-deep",
+    "counts": "value-counts ctor=8183 copy_ctor=8099 move_ctor=4050 copy_assign=5 move_assign=2063 dtor=20332\n"
+  },
+  {
+    "name": "json-mixed",
+    "counts": "value-counts ctor=24039 copy_ctor=24003 move_ctor=12002 copy_assign=5 move_assign=6015 dtor=60044\n"
+  },
+  {
+    "name": "bfs-queue",
+    "counts": "value-counts ctor=54073 copy_ctor=4 move_ctor=22052 copy_assign=22008 move_assign=14026 dtor=76129\n"
+  },
+  {
+    "name": "bfs-set-visit",
+    "counts": "value-counts ctor=62073 copy_ctor=2004 move_ctor=22050 copy_assign=24009 move_assign=14026 dtor=86127\n"
+  },
+  {
+    "name": "bfs-map-update",
+    "counts": "value-counts ctor=32057 copy_ctor=77 move_ctor=10202 copy_assign=15969 move_assign=6019 dtor=42336\n"
+  },
+  {
+    "name": "bfs-nested-index",
+    "counts": "value-counts ctor=64083 copy_ctor=4 move_ctor=22050 copy_assign=30009 move_assign=14028 dtor=86137\n"
+  }
+]

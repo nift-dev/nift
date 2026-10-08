@@ -1,0 +1,398 @@
+[
+  {
+    "binary": "/home/nick/Repositories/nift/nift/.build/cp49-campaign/start-nift",
+    "outputs": 23,
+    "output_sha256": {
+      "p8.html": "d73fdcaf70626f9bd219fde5dc03e1b3afbaa0d216f3b6fd812a0871d0043815",
+      "p13.html": "da88ab106e1393c18f7d5649aacc580b466b8842b1a0148bbafcbffc20af0998",
+      "p16.html": "77499416e1ab84f7a9191ea26cc03545f8252a7a3e73c35f460d00ce49f5d03f",
+      "p15.html": "ea42389b3641e6a339cc8d1b6f6dd5f5888fca8abe3aaec92a2d594c9fcc18b3",
+      "p9.html": "817d12a1015b623e1eda69dca65dcd993fc5253c44f3ebf19015f5f75054bc24",
+      "p10.html": "367946a9b25389210c2e450bd67cb03b9674f9194b4b5ce702dfcbe2a8600c82",
+      "p4.html": "2e64d3e12ca8cd966ff33d6eb3870d7157ac52db2384a7a1eda3a037aaf46de6",
+      "p18.html": "213fdfdcf949b3d9143e36389d27a2998e1181818ee029e1de4e618b8037f8e6",
+      "p0.html": "ae1f2f63a73b35c4bd38acb7f655afabfb8510fd6b17ea2ca7642913fec04704",
+      "p3.html": "761456f1c4e77dba2d471f2ca980de3dc17d566fef141f9ad9541b0da7e69694",
+      "p11.html": "459e5a1085f064662524b04bb0793345105ccf0fa9f19b59949077d1f8d8c804",
+      "p17.html": "4dc72844b41cbbb000206f525def96605ab0e932de8cf42f4e1a2b56174b2b3a",
+      "p6.html": "dbe6444dda12d49cd03a316fc49013f3b8e120724212a2e17f9c825a621a4291",
+      "p1.html": "4309b7fd40d6f08e06831f98020ae8faac1c42120925dc8da228a9e40199adfd",
+      "p2.html": "cfc4820a4476ea50b4d5b430d10ec8aebd588f2875dc31071b2a26896168ce9c",
+      "p12.html": "fc728cc6e0f5a8ed38b5f549771c0a2e79a1ea0c32137d86b575922e42fc4469",
+      "p7.html": "b1cf76391dd201c0325c67b9f2bdc75a1c9182e1887bf1135ce2541af97098ba",
+      "index.html": "ce2c5faade0697d543461edc5b5ede7da9d9aab21ba862519bcbbd6d4407aad7",
+      "p5.html": "443401fd99ca9f33e79c2f17b601d4982eaf086f615d357426aab2834ea7e360",
+      "p19.html": "078d1ce46ece901958ac4ed561fe1d829ba17f9ffd71f5bec0b1829a4d95f78d",
+      "p14.html": "d5c59a0220de59db51b51a66fb58e035819c364b1b898bef3d48677619149fa6",
+      "assets/css/style.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "assets/js/script.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "samples": [
+      {
+        "phase": "load",
+        "cpu_ms": 2.8630000000000115,
+        "wall_ms": 3.102886024862528
+      },
+      {
+        "phase": "load",
+        "cpu_ms": 2.6319999999999815,
+        "wall_ms": 2.953683026134968
+      },
+      {
+        "phase": "load",
+        "cpu_ms": 2.692999999999987,
+        "wall_ms": 3.6970069631934166
+      },
+      {
+        "phase": "load",
+        "cpu_ms": 2.458000000000002,
+        "wall_ms": 2.7722720988094807
+      },
+      {
+        "phase": "load",
+        "cpu_ms": 2.0689999999999946,
+        "wall_ms": 2.273041056469083
+      },
+      {
+        "phase": "status",
+        "cpu_ms": 7.901000000000012,
+        "wall_ms": 2.9168049804866314
+      },
+      {
+        "phase": "status",
+        "cpu_ms": 6.856000000000008,
+        "wall_ms": 2.7935761027038097
+      },
+      {
+        "phase": "status",
+        "cpu_ms": 6.2599999999999945,
+        "wall_ms": 2.9248411301523447
+      },
+      {
+        "phase": "status",
+        "cpu_ms": 6.141000000000007,
+        "wall_ms": 2.745451871305704
+      },
+      {
+        "phase": "status",
+        "cpu_ms": 6.653999999999993,
+        "wall_ms": 3.0360680539160967
+      },
+      {
+        "phase": "fullbuild",
+        "cpu_ms": 79.34800000000003,
+        "wall_ms": 10.39301510900259
+      },
+      {
+        "phase": "fullbuild",
+        "cpu_ms": 87.06400000000001,
+        "wall_ms": 14.240447897464037
+      },
+      {
+        "phase": "fullbuild",
+        "cpu_ms": 82.63499999999996,
+        "wall_ms": 11.47987600415945
+      },
+      {
+        "phase": "fullbuild",
+        "cpu_ms": 83.71000000000005,
+        "wall_ms": 12.392803793773055
+      },
+      {
+        "phase": "fullbuild",
+        "cpu_ms": 94.06900000000002,
+        "wall_ms": 12.957188999280334
+      },
+      {
+        "phase": "incremental",
+        "cpu_ms": 8.536000000000016,
+        "wall_ms": 4.7170850448310375
+      },
+      {
+        "phase": "incremental",
+        "cpu_ms": 7.779000000000064,
+        "wall_ms": 4.423134960234165
+      },
+      {
+        "phase": "incremental",
+        "cpu_ms": 8.130999999999943,
+        "wall_ms": 4.356524907052517
+      },
+      {
+        "phase": "incremental",
+        "cpu_ms": 6.862000000000035,
+        "wall_ms": 3.5206249449402094
+      },
+      {
+        "phase": "incremental",
+        "cpu_ms": 6.657999999999969,
+        "wall_ms": 3.273406997323036
+      }
+    ],
+    "dependency_matches_fullbuild": true
+  },
+  {
+    "binary": "/home/nick/Repositories/nift/nift/.build/cp49-wave2/start-nift",
+    "outputs": 23,
+    "output_sha256": {
+      "p8.html": "d73fdcaf70626f9bd219fde5dc03e1b3afbaa0d216f3b6fd812a0871d0043815",
+      "p13.html": "da88ab106e1393c18f7d5649aacc580b466b8842b1a0148bbafcbffc20af0998",
+      "p16.html": "77499416e1ab84f7a9191ea26cc03545f8252a7a3e73c35f460d00ce49f5d03f",
+      "p15.html": "ea42389b3641e6a339cc8d1b6f6dd5f5888fca8abe3aaec92a2d594c9fcc18b3",
+      "p9.html": "817d12a1015b623e1eda69dca65dcd993fc5253c44f3ebf19015f5f75054bc24",
+      "p10.html": "367946a9b25389210c2e450bd67cb03b9674f9194b4b5ce702dfcbe2a8600c82",
+      "p4.html": "2e64d3e12ca8cd966ff33d6eb3870d7157ac52db2384a7a1eda3a037aaf46de6",
+      "p18.html": "213fdfdcf949b3d9143e36389d27a2998e1181818ee029e1de4e618b8037f8e6",
+      "p0.html": "ae1f2f63a73b35c4bd38acb7f655afabfb8510fd6b17ea2ca7642913fec04704",
+      "p3.html": "761456f1c4e77dba2d471f2ca980de3dc17d566fef141f9ad9541b0da7e69694",
+      "p11.html": "459e5a1085f064662524b04bb0793345105ccf0fa9f19b59949077d1f8d8c804",
+      "p17.html": "4dc72844b41cbbb000206f525def96605ab0e932de8cf42f4e1a2b56174b2b3a",
+      "p6.html": "dbe6444dda12d49cd03a316fc49013f3b8e120724212a2e17f9c825a621a4291",
+      "p1.html": "4309b7fd40d6f08e06831f98020ae8faac1c42120925dc8da228a9e40199adfd",
+      "p2.html": "cfc4820a4476ea50b4d5b430d10ec8aebd588f2875dc31071b2a26896168ce9c",
+      "p12.html": "fc728cc6e0f5a8ed38b5f549771c0a2e79a1ea0c32137d86b575922e42fc4469",
+      "p7.html": "b1cf76391dd201c0325c67b9f2bdc75a1c9182e1887bf1135ce2541af97098ba",
+      "index.html": "ce2c5faade0697d543461edc5b5ede7da9d9aab21ba862519bcbbd6d4407aad7",
+      "p5.html": "443401fd99ca9f33e79c2f17b601d4982eaf086f615d357426aab2834ea7e360",
+      "p19.html": "078d1ce46ece901958ac4ed561fe1d829ba17f9ffd71f5bec0b1829a4d95f78d",
+      "p14.html": "d5c59a0220de59db51b51a66fb58e035819c364b1b898bef3d48677619149fa6",
+      "assets/css/style.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "assets/js/script.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "samples": [
+      {
+        "phase": "load",
+        "cpu_ms": 2.621999999999902,
+        "wall_ms": 2.89561809040606
+      },
+      {
+        "phase": "load",
+        "cpu_ms": 2.9899999999999927,
+        "wall_ms": 3.228228073567152
+      },
+      {
+        "phase": "load",
+        "cpu_ms": 2.252999999999922,
+        "wall_ms": 2.606109017506242
+      },
+      {
+        "phase": "load",
+        "cpu_ms": 2.0220000000000518,
+        "wall_ms": 2.2187880240380764
+      },
+      {
+        "phase": "load",
+        "cpu_ms": 2.0479999999998832,
+        "wall_ms": 2.20918795093894
+      },
+      {
+        "phase": "status",
+        "cpu_ms": 7.424999999999987,
+        "wall_ms": 3.202358027920127
+      },
+      {
+        "phase": "status",
+        "cpu_ms": 6.026000000000087,
+        "wall_ms": 2.3311800323426723
+      },
+      {
+        "phase": "status",
+        "cpu_ms": 6.026000000000003,
+        "wall_ms": 2.370503032580018
+      },
+      {
+        "phase": "status",
+        "cpu_ms": 6.366999999999984,
+        "wall_ms": 2.810155972838402
+      },
+      {
+        "phase": "status",
+        "cpu_ms": 6.408999999999998,
+        "wall_ms": 2.780738053843379
+      },
+      {
+        "phase": "fullbuild",
+        "cpu_ms": 81.4100000000001,
+        "wall_ms": 11.38563291169703
+      },
+      {
+        "phase": "fullbuild",
+        "cpu_ms": 82.11299999999999,
+        "wall_ms": 13.77616892568767
+      },
+      {
+        "phase": "fullbuild",
+        "cpu_ms": 90.88900000000005,
+        "wall_ms": 11.149609927088022
+      },
+      {
+        "phase": "fullbuild",
+        "cpu_ms": 92.05700000000012,
+        "wall_ms": 13.727756915614009
+      },
+      {
+        "phase": "fullbuild",
+        "cpu_ms": 91.28199999999997,
+        "wall_ms": 12.340367073193192
+      },
+      {
+        "phase": "incremental",
+        "cpu_ms": 8.632000000000195,
+        "wall_ms": 4.95459302328527
+      },
+      {
+        "phase": "incremental",
+        "cpu_ms": 7.524999999999782,
+        "wall_ms": 4.436822142452002
+      },
+      {
+        "phase": "incremental",
+        "cpu_ms": 8.100000000000108,
+        "wall_ms": 4.523961804807186
+      },
+      {
+        "phase": "incremental",
+        "cpu_ms": 7.674999999999876,
+        "wall_ms": 4.11426997743547
+      },
+      {
+        "phase": "incremental",
+        "cpu_ms": 6.825000000000026,
+        "wall_ms": 3.88216320425272
+      }
+    ],
+    "dependency_matches_fullbuild": true
+  },
+  {
+    "binary": "/home/nick/Repositories/nift/nift/.build/cp49-wave2/final-nift",
+    "outputs": 23,
+    "output_sha256": {
+      "p8.html": "d73fdcaf70626f9bd219fde5dc03e1b3afbaa0d216f3b6fd812a0871d0043815",
+      "p13.html": "da88ab106e1393c18f7d5649aacc580b466b8842b1a0148bbafcbffc20af0998",
+      "p16.html": "77499416e1ab84f7a9191ea26cc03545f8252a7a3e73c35f460d00ce49f5d03f",
+      "p15.html": "ea42389b3641e6a339cc8d1b6f6dd5f5888fca8abe3aaec92a2d594c9fcc18b3",
+      "p9.html": "817d12a1015b623e1eda69dca65dcd993fc5253c44f3ebf19015f5f75054bc24",
+      "p10.html": "367946a9b25389210c2e450bd67cb03b9674f9194b4b5ce702dfcbe2a8600c82",
+      "p4.html": "2e64d3e12ca8cd966ff33d6eb3870d7157ac52db2384a7a1eda3a037aaf46de6",
+      "p18.html": "213fdfdcf949b3d9143e36389d27a2998e1181818ee029e1de4e618b8037f8e6",
+      "p0.html": "ae1f2f63a73b35c4bd38acb7f655afabfb8510fd6b17ea2ca7642913fec04704",
+      "p3.html": "761456f1c4e77dba2d471f2ca980de3dc17d566fef141f9ad9541b0da7e69694",
+      "p11.html": "459e5a1085f064662524b04bb0793345105ccf0fa9f19b59949077d1f8d8c804",
+      "p17.html": "4dc72844b41cbbb000206f525def96605ab0e932de8cf42f4e1a2b56174b2b3a",
+      "p6.html": "dbe6444dda12d49cd03a316fc49013f3b8e120724212a2e17f9c825a621a4291",
+      "p1.html": "4309b7fd40d6f08e06831f98020ae8faac1c42120925dc8da228a9e40199adfd",
+      "p2.html": "cfc4820a4476ea50b4d5b430d10ec8aebd588f2875dc31071b2a26896168ce9c",
+      "p12.html": "fc728cc6e0f5a8ed38b5f549771c0a2e79a1ea0c32137d86b575922e42fc4469",
+      "p7.html": "b1cf76391dd201c0325c67b9f2bdc75a1c9182e1887bf1135ce2541af97098ba",
+      "index.html": "ce2c5faade0697d543461edc5b5ede7da9d9aab21ba862519bcbbd6d4407aad7",
+      "p5.html": "443401fd99ca9f33e79c2f17b601d4982eaf086f615d357426aab2834ea7e360",
+      "p19.html": "078d1ce46ece901958ac4ed561fe1d829ba17f9ffd71f5bec0b1829a4d95f78d",
+      "p14.html": "d5c59a0220de59db51b51a66fb58e035819c364b1b898bef3d48677619149fa6",
+      "assets/css/style.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "assets/js/script.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "samples": [
+      {
+        "phase": "load",
+        "cpu_ms": 3.217000000000192,
+        "wall_ms": 3.4683539997786283
+      },
+      {
+        "phase": "load",
+        "cpu_ms": 2.6560000000001027,
+        "wall_ms": 2.9094929341226816
+      },
+      {
+        "phase": "load",
+        "cpu_ms": 2.087000000000061,
+        "wall_ms": 2.4684539530426264
+      },
+      {
+        "phase": "load",
+        "cpu_ms": 2.2899999999998477,
+        "wall_ms": 3.2690849620848894
+      },
+      {
+        "phase": "load",
+        "cpu_ms": 2.1909999999999985,
+        "wall_ms": 2.364739077165723
+      },
+      {
+        "phase": "status",
+        "cpu_ms": 6.855999999999918,
+        "wall_ms": 3.1270598992705345
+      },
+      {
+        "phase": "status",
+        "cpu_ms": 5.940000000000001,
+        "wall_ms": 2.764643868431449
+      },
+      {
+        "phase": "status",
+        "cpu_ms": 6.119000000000041,
+        "wall_ms": 2.6902169920504093
+      },
+      {
+        "phase": "status",
+        "cpu_ms": 5.697000000000063,
+        "wall_ms": 2.3187000770121813
+      },
+      {
+        "phase": "status",
+        "cpu_ms": 5.768999999999968,
+        "wall_ms": 2.5120300706475973
+      },
+      {
+        "phase": "fullbuild",
+        "cpu_ms": 70.19500000000006,
+        "wall_ms": 10.49302821047604
+      },
+      {
+        "phase": "fullbuild",
+        "cpu_ms": 74.8390000000001,
+        "wall_ms": 11.44290785305202
+      },
+      {
+        "phase": "fullbuild",
+        "cpu_ms": 76.84499999999989,
+        "wall_ms": 10.102144908159971
+      },
+      {
+        "phase": "fullbuild",
+        "cpu_ms": 75.39400000000023,
+        "wall_ms": 11.257324134930968
+      },
+      {
+        "phase": "fullbuild",
+        "cpu_ms": 62.23499999999993,
+        "wall_ms": 8.997594006359577
+      },
+      {
+        "phase": "incremental",
+        "cpu_ms": 8.908000000000138,
+        "wall_ms": 4.628369119018316
+      },
+      {
+        "phase": "incremental",
+        "cpu_ms": 7.466999999999835,
+        "wall_ms": 3.6891410127282143
+      },
+      {
+        "phase": "incremental",
+        "cpu_ms": 6.265999999999938,
+        "wall_ms": 2.8770610224455595
+      },
+      {
+        "phase": "incremental",
+        "cpu_ms": 6.4710000000001155,
+        "wall_ms": 3.259032964706421
+      },
+      {
+        "phase": "incremental",
+        "cpu_ms": 6.413000000000335,
+        "wall_ms": 3.4618570934981108
+      }
+    ],
+    "dependency_matches_fullbuild": true
+  }
+]

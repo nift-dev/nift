@@ -1,0 +1,48 @@
+--------------------------------------------------------------------------------
+Profile data file '.build/cp49-wave2/reset/array-index.callgrind' (creator: callgrind-3.26.0)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 4942305
+Trigger: Program termination
+Profiled target:  /home/nick/Repositories/nift/nift/.build/cp49-wave2/start-nift /home/nick/Repositories/nift/nift/.build/cp49/probes/array-index-2000.f (PID 1633755, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       90
+Include dirs:     
+User annotated:   
+Auto-annotation:  off
+
+--------------------------------------------------------------------------------
+Ir                  
+--------------------------------------------------------------------------------
+23,524,126 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                   file:function
+--------------------------------------------------------------------------------
+23,524,126 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+21,272,218 (90.43%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp49-wave2/start-nift]
+21,272,206 (90.43%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+21,271,938 (90.43%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+21,257,989 (90.37%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp49-wave2/start-nift]
+21,257,987 (90.37%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp49-wave2/start-nift]
+21,229,881 (90.25%)  ???:run_script_file(std::filesystem::__cxx11::path const&, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&, bool, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) [/home/nick/Repositories/nift/nift/.build/cp49-wave2/start-nift]
+21,182,768 (90.05%)  ???:run_script_source(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&, std::filesystem::__cxx11::path const&, bool, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp49-wave2/start-nift]
+21,005,019 (89.29%)  ???:Parser::run_script(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&) [/home/nick/Repositories/nift/nift/.build/cp49-wave2/start-nift]
+20,999,796 (89.27%)  ???:Parser::execute_native_program(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, bool, nift::detail::SourceView) [/home/nick/Repositories/nift/nift/.build/cp49-wave2/start-nift]
+20,895,053 (88.82%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView) [/home/nick/Repositories/nift/nift/.build/cp49-wave2/start-nift]
+14,165,121 (60.22%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(std::vector<std::unique_ptr<nift::ast::Stmt, std::default_delete<nift::ast::Stmt> >, std::allocator<std::unique_ptr<nift::ast::Stmt, std::default_delete<nift::ast::Stmt> > > > const&, nift::detail::SourceView const&)#1}::operator()(std::vector<std::unique_ptr<nift::ast::Stmt, std::default_delete<nift::ast::Stmt> >, std::allocator<std::unique_ptr<nift::ast::Stmt, std::default_delete<nift::ast::Stmt> > > > const&, nift::detail::SourceView const&) const [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp49-wave2/start-nift]
+14,061,121 (59.77%)  ???:std::_Function_handler<nift::detail::ExecOutcome (std::vector<std::unique_ptr<nift::ast::Stmt, std::default_delete<nift::ast::Stmt> >, std::allocator<std::unique_ptr<nift::ast::Stmt, std::default_delete<nift::ast::Stmt> > > > const&), Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(std::vector<std::unique_ptr<nift::ast::Stmt, std::default_delete<nift::ast::Stmt> >, std::allocator<std::unique_ptr<nift::ast::Stmt, std::default_delete<nift::ast::Stmt> > > > const&)#1}>::_M_invoke(std::_Any_data const&, std::vector<std::unique_ptr<nift::ast::Stmt, std::default_delete<nift::ast::Stmt> >, std::allocator<std::unique_ptr<nift::ast::Stmt, std::default_delete<nift::ast::Stmt> > > > const&) [/home/nick/Repositories/nift/nift/.build/cp49-wave2/start-nift]
+13,809,121 (58.70%)  ???:std::_Function_handler<nift::detail::ExecOutcome (nift::ast::Stmt const&), Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&)#1}>::_M_invoke(std::_Any_data const&, nift::ast::Stmt const&) [/home/nick/Repositories/nift/nift/.build/cp49-wave2/start-nift]
+13,689,121 (58.19%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&)#1}::operator()(nift::ast::Stmt const&) const [/home/nick/Repositories/nift/nift/.build/cp49-wave2/start-nift]
+13,281,121 (56.46%)  ???:std::_Function_handler<bool (nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&), Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}>::_M_invoke(std::_Any_data const&, nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) [/home/nick/Repositories/nift/nift/.build/cp49-wave2/start-nift]
+13,257,121 (56.36%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const [/home/nick/Repositories/nift/nift/.build/cp49-wave2/start-nift]
+ 6,475,852 (27.53%)  ???:nift::ast::evaluate(nift::ast::Expr const&, nift::ast::Context&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) [/home/nick/Repositories/nift/nift/.build/cp49-wave2/start-nift]
+ 6,199,806 (26.36%)  ???:nift::ast::evaluate(nift::ast::Expr const&, nift::ast::Context&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)::{lambda()#1}::operator()() const [/home/nick/Repositories/nift/nift/.build/cp49-wave2/start-nift]
+ 3,130,000 (13.31%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#1}::operator()(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const [/home/nick/Repositories/nift/nift/.build/cp49-wave2/start-nift]
+ 2,515,274 (10.69%)  ???:std::_Hashtable<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding> >, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::find(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) [/home/nick/Repositories/nift/nift/.build/cp49-wave2/start-nift]
+ 2,256,938 ( 9.59%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp49-wave2/start-nift]
+

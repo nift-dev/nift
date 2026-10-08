@@ -1,0 +1,126 @@
+[
+  {
+    "name": "loops",
+    "counters": "lambda-cache syntax=0 numeric=0 instances=0 prepared=0 legacy=0\ncp49 expressions=7 prepared_calls=0 scopes=2000 captures=0\n"
+  },
+  {
+    "name": "array-build",
+    "counters": "lambda-cache syntax=0 numeric=0 instances=0 prepared=0 legacy=0\ncp49 expressions=7 prepared_calls=0 scopes=2000 captures=0\n"
+  },
+  {
+    "name": "call-noarg",
+    "counters": "lambda-cache syntax=0 numeric=0 instances=0 prepared=0 legacy=0\ncp49 expressions=7 prepared_calls=2000 scopes=4000 captures=0\n"
+  },
+  {
+    "name": "call-scalar",
+    "counters": "lambda-cache syntax=0 numeric=0 instances=0 prepared=0 legacy=0\ncp49 expressions=7 prepared_calls=2000 scopes=4000 captures=0\n"
+  },
+  {
+    "name": "call-multi",
+    "counters": "lambda-cache syntax=0 numeric=0 instances=0 prepared=0 legacy=0\ncp49 expressions=7 prepared_calls=2000 scopes=4000 captures=0\n"
+  },
+  {
+    "name": "call-locals",
+    "counters": "lambda-cache syntax=0 numeric=0 instances=0 prepared=0 legacy=0\ncp49 expressions=7 prepared_calls=2000 scopes=4000 captures=0\n"
+  },
+  {
+    "name": "call-recursion",
+    "counters": "lambda-cache syntax=0 numeric=0 instances=0 prepared=0 legacy=0\ncp49 expressions=7 prepared_calls=8000 scopes=10000 captures=0\n"
+  },
+  {
+    "name": "call-closure",
+    "counters": "lambda-cache syntax=1 numeric=1 instances=1 prepared=2000 legacy=0\ncp49 expressions=2009 prepared_calls=0 scopes=4000 captures=3\nlegacy-shape 2000 f(i)\n"
+  },
+  {
+    "name": "call-callback",
+    "counters": "lambda-cache syntax=1 numeric=1 instances=1 prepared=2000 legacy=0\ncp49 expressions=2008 prepared_calls=2000 scopes=6000 captures=2\nlegacy-shape 2000 f(x)\n"
+  },
+  {
+    "name": "array-index",
+    "counters": "lambda-cache syntax=0 numeric=0 instances=0 prepared=0 legacy=0\ncp49 expressions=9 prepared_calls=0 scopes=4000 captures=0\n"
+  },
+  {
+    "name": "sort-identity",
+    "counters": "lambda-cache syntax=1 numeric=0 instances=2000 prepared=2000 legacy=0\ncp49 expressions=8 prepared_calls=0 scopes=4000 captures=10000\n"
+  },
+  {
+    "name": "sort-index",
+    "counters": "lambda-cache syntax=1 numeric=1 instances=2000 prepared=2000 legacy=0\ncp49 expressions=8 prepared_calls=0 scopes=4000 captures=10000\n"
+  },
+  {
+    "name": "sort-arithmetic",
+    "counters": "lambda-cache syntax=1 numeric=1 instances=2000 prepared=2000 legacy=0\ncp49 expressions=8 prepared_calls=0 scopes=4000 captures=10000\n"
+  },
+  {
+    "name": "map-identity",
+    "counters": "lambda-cache syntax=1 numeric=0 instances=1 prepared=2000 legacy=0\ncp49 expressions=8 prepared_calls=0 scopes=4000 captures=5\n"
+  },
+  {
+    "name": "map-index",
+    "counters": "lambda-cache syntax=1 numeric=1 instances=1 prepared=2000 legacy=0\ncp49 expressions=8 prepared_calls=0 scopes=4000 captures=5\n"
+  },
+  {
+    "name": "map-arithmetic",
+    "counters": "lambda-cache syntax=1 numeric=1 instances=1 prepared=2000 legacy=0\ncp49 expressions=8 prepared_calls=0 scopes=4000 captures=5\n"
+  },
+  {
+    "name": "frequency",
+    "counters": "lambda-cache syntax=0 numeric=0 instances=0 prepared=0 legacy=0\ncp49 expressions=44 prepared_calls=0 scopes=2000 captures=0\nlegacy-shape 37 m.contains(k)\n"
+  },
+  {
+    "name": "map-set",
+    "counters": "lambda-cache syntax=0 numeric=0 instances=0 prepared=0 legacy=0\ncp49 expressions=8 prepared_calls=0 scopes=2000 captures=0\n"
+  },
+  {
+    "name": "sliding-window",
+    "counters": "lambda-cache syntax=0 numeric=0 instances=0 prepared=0 legacy=0\ncp49 expressions=9 prepared_calls=0 scopes=3992 captures=0\n"
+  },
+  {
+    "name": "json-parse-convert",
+    "counters": "lambda-cache syntax=0 numeric=0 instances=0 prepared=0 legacy=0\ncp49 expressions=6 prepared_calls=0 scopes=0 captures=0\n"
+  },
+  {
+    "name": "json-traverse",
+    "counters": "lambda-cache syntax=0 numeric=0 instances=0 prepared=0 legacy=0\ncp49 expressions=7 prepared_calls=0 scopes=2000 captures=0\n"
+  },
+  {
+    "name": "json-mutate",
+    "counters": "lambda-cache syntax=0 numeric=0 instances=0 prepared=0 legacy=0\ncp49 expressions=7 prepared_calls=0 scopes=2000 captures=0\n"
+  },
+  {
+    "name": "json-serialize",
+    "counters": "lambda-cache syntax=0 numeric=0 instances=0 prepared=0 legacy=0\ncp49 expressions=8 prepared_calls=0 scopes=0 captures=0\n"
+  },
+  {
+    "name": "construct-destroy",
+    "counters": "lambda-cache syntax=0 numeric=0 instances=0 prepared=0 legacy=0\ncp49 expressions=6 prepared_calls=0 scopes=2000 captures=0\n"
+  },
+  {
+    "name": "bfs",
+    "counters": "lambda-cache syntax=0 numeric=0 instances=0 prepared=0 legacy=0\ncp49 expressions=11 prepared_calls=0 scopes=7997 captures=0\n"
+  },
+  {
+    "name": "filesystem",
+    "counters": "lambda-cache syntax=0 numeric=0 instances=0 prepared=0 legacy=0\ncp49 expressions=6 prepared_calls=0 scopes=0 captures=0\n"
+  },
+  {
+    "name": "empty",
+    "counters": "lambda-cache syntax=0 numeric=0 instances=0 prepared=0 legacy=0\ncp49 expressions=4 prepared_calls=0 scopes=0 captures=0\n"
+  },
+  {
+    "name": "map-aggregate",
+    "counters": "lambda-cache syntax=1 numeric=0 instances=1 prepared=0 legacy=2000\ncp49 expressions=7 prepared_calls=0 scopes=2000 captures=4\n"
+  },
+  {
+    "name": "filter-aggregate",
+    "counters": "lambda-cache syntax=1 numeric=0 instances=1 prepared=0 legacy=2000\ncp49 expressions=7 prepared_calls=0 scopes=2000 captures=4\n"
+  },
+  {
+    "name": "group-unique",
+    "counters": "lambda-cache syntax=1 numeric=1 instances=1 prepared=0 legacy=2000\ncp49 expressions=7 prepared_calls=0 scopes=2000 captures=4\n"
+  },
+  {
+    "name": "group-repeated",
+    "counters": "lambda-cache syntax=1 numeric=1 instances=1 prepared=0 legacy=2000\ncp49 expressions=7 prepared_calls=0 scopes=2000 captures=4\n"
+  }
+]

@@ -484,7 +484,16 @@ remain deferred. See [campaign evidence](docs/evidence/cp49-campaign/report.md).
 Version remains 4.9.0 and C ABI 1.3. Frozen `20261008-v480`, official workloads,
 release identities and vendored Jsonic++ remain unchanged. No official rerun,
 release, provisioning or architecture redesign is authorized by this campaign.
-The bounded campaign is complete: all required local and hosted certification
-is green. Recommendation: READY FOR NEW OFFICIAL BENCHMARK SERIES. Stop here;
-no new official series has been started. Full certificates and tradeoffs are
-recorded in the campaign evidence.
+The first tranche is accepted and its local and hosted certification is green.
+The user reopened local investigation as CP49-23 through CP49-50; see
+[second-tranche evidence](docs/evidence/cp49-wave2/report.md). The intervening
+official handoff was canceled before any measurements; its two new nodes were
+deleted and independently verified absent. Official reruns remain deferred
+until after the v4.9 release unless the user changes that decision.
+
+Second local CP49 tranche complete: runtime `3c0a5b22c24da50f749e1f385d84d52ce1a4543d` retains seven measured
+call/aggregate/key/provenance improvements. Native/binding, strict GCC/Clang,
+ASan/UBSan/LSan, NRS 93/93 and PRS 12/12 pass; ABI 1.3 and all frozen hashes
+remain unchanged. See [the final report](docs/evidence/cp49-wave2/report.md).
+Stop before frame/storage/dispatch architecture decisions. Official reruns remain
+deferred until after v4.9 release; this closeout is local and unpublished.

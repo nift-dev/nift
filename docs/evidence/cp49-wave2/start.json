@@ -1,0 +1,19 @@
+{
+  "starting_sha": "d9b85f22c4dab11d0ab68a8778a1471bf35ba488",
+  "version": "4.9.0",
+  "abi": "1.3",
+  "binaries": {
+    "original": {
+      "path": ".build/cp49-campaign/start-nift",
+      "sha256": "f8da5147504226c0353559de11b9366820ba6064d07aced5e8ca366b49e7679e"
+    },
+    "wave1": {
+      "path": ".build/cp49-campaign/final/nift",
+      "sha256": "7f7098b453331b61eabc39aa880ec4c728cbd6cf7f3015f34ceef2032999d951"
+    },
+    "wave2_start": {
+      "path": ".build/cp49-wave2/start-nift",
+      "sha256": "7f7098b453331b61eabc39aa880ec4c728cbd6cf7f3015f34ceef2032999d951"
+    }
+  }
+}

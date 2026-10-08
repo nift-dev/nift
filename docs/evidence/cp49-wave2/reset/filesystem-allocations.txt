@@ -1,0 +1,37 @@
+--------------------------------------------------------------------------------
+Profile data file '.build/cp49-wave2/reset/filesystem.xtree' (creator: xtree-1)
+--------------------------------------------------------------------------------
+Profiled target:  /home/nick/Repositories/nift/nift/.build/cp49-wave2/start-nift /home/nick/Repositories/nift/nift/.build/cp49/probes/filesystem-2000.f (PID 1634245)
+Events recorded:  curB curBk totB totBk totFdB totFdBk
+Events shown:     totB totBk
+Event sort order: totB
+Thresholds:       90
+Include dirs:     
+User annotated:   
+Auto-annotation:  off
+
+--------------------------------------------------------------------------------
+totB                totBk           
+--------------------------------------------------------------------------------
+22,452,309 (100.0%) 69,418 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+totB                 totBk             file:function
+--------------------------------------------------------------------------------
+156,168,879 (695.6%) 476,459 (686.4%)  UnknownFile???:nift::detail::(anonymous namespace)::glob_walk(std::filesystem::__cxx11::path const&, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&, unsigned long, std::vector<std::filesystem::__cxx11::path, std::allocator<std::filesystem::__cxx11::path> >&)
+ 17,106,312 (76.19%)  42,418 (61.11%)  UnknownFile???:UnknownFn???
+  8,651,370 (38.53%)  23,988 (34.56%)  UnknownFile???:std::filesystem::__cxx11::directory_iterator::increment(std::error_code&)
+  8,053,150 (35.87%)  14,144 (20.38%)  UnknownFile???:std::filesystem::__cxx11::path::_List::_List(std::filesystem::__cxx11::path::_List const&)
+  5,246,086 (23.37%)  18,310 (26.38%)  UnknownFile???:Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const::{lambda()#1}::operator()() const
+  5,244,733 (23.36%)  18,309 (26.38%)  UnknownFile???:Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const
+  4,089,588 (18.21%)  18,074 (26.04%)  UnknownFile???:std::filesystem::__cxx11::path::operator/=(std::filesystem::__cxx11::path const&)
+  4,081,944 (18.18%)  18,040 (25.99%)  UnknownFile???:std::filesystem::__cxx11::path::lexically_normal() const
+  3,755,122 (16.72%)  11,422 (16.45%)  UnknownFile???:std::filesystem::__cxx11::path::path(std::filesystem::__cxx11::path const&)
+  3,658,120 (16.29%)   8,080 (11.64%)  UnknownFile???:std::filesystem::__cxx11::path::_M_append(std::basic_string_view<char, std::char_traits<char> >)
+  2,851,589 (12.70%)  10,209 (14.71%)  UnknownFile???:Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)
+  2,850,445 (12.70%)  10,201 (14.70%)  UnknownFile???:Parser::evaluate_expression(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)
+  2,843,353 (12.66%)  10,181 (14.67%)  UnknownFile???:Parser::evaluate_expression(nift::detail::SourceText const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)
+  2,692,661 (11.99%)   8,187 (11.79%)  UnknownFile???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)
+  2,391,787 (10.65%)   8,088 (11.65%)  UnknownFile???:std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const
+  1,498,768 ( 6.68%)     420 ( 0.61%)  UnknownFile???:std::filesystem::__cxx11::directory_iterator::directory_iterator(std::filesystem::__cxx11::path const&, std::filesystem::directory_options, std::error_code*)
+

@@ -1,0 +1,30 @@
+--------------------------------------------------------------------------------
+Profile data file '.build/cp49-wave2/reset/empty.xtree' (creator: xtree-1)
+--------------------------------------------------------------------------------
+Profiled target:  /home/nick/Repositories/nift/nift/.build/cp49-wave2/start-nift /home/nick/Repositories/nift/nift/.build/cp49/probes/empty-0.f (PID 1634312)
+Events recorded:  curB curBk totB totBk totFdB totFdBk
+Events shown:     totB totBk
+Event sort order: totB
+Thresholds:       90
+Include dirs:     
+User annotated:   
+Auto-annotation:  off
+
+--------------------------------------------------------------------------------
+totB             totBk        
+--------------------------------------------------------------------------------
+121,084 (100.0%) 323 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+totB             totBk         file:function
+--------------------------------------------------------------------------------
+385,504 (318.4%)  69 (21.36%)  UnknownFile???:UnknownFn???
+ 73,728 (60.89%)   1 ( 0.31%)  ./elf/./elf/dl-init.c:_dl_init
+ 73,728 (60.89%)   1 ( 0.31%)  ./elf/./elf/dl-init.c:call_init.part.0
+ 39,417 (32.55%) 232 (71.83%)  UnknownFile???:run_cli(int, char**)
+ 39,113 (32.30%) 225 (69.66%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main)
+ 36,994 (30.55%) 233 (72.14%)  UnknownFile???:run_script_file(std::filesystem::__cxx11::path const&, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&, bool, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)
+ 26,115 (21.57%) 244 (75.54%)  UnknownFile???:run_script_source(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&, std::filesystem::__cxx11::path const&, bool, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) [clone .isra.0]
+ 12,125 (10.01%)  92 (28.48%)  UnknownFile???:ScriptRenderHost::ScriptRenderHost(std::filesystem::__cxx11::path, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >)
+  9,814 ( 8.11%)  48 (14.86%)  UnknownFile???:std::filesystem::__cxx11::path::operator/=(std::filesystem::__cxx11::path const&)
+

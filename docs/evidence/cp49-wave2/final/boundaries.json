@@ -1,0 +1,13 @@
+{
+  "frozen_paths_checked": 2828,
+  "frozen_changes": [],
+  "version": "4.9.0",
+  "abi": "1.3",
+  "production_binary_sha256": "790bbce6325b0eadce6d98fbb27527ccd4c43fa082b23d1ca3667e54022bc862",
+  "release_tag_object": "eb6b8e0a77bbbc41acd9e3c40de324c1b9e10055",
+  "release_tag_target": "1bfc4a54b373da3477b497106fa4db59111e2770",
+  "release_notes_sha256": "d7d8d4f8a8eb646e21ab5356c2cb62a4ba1bacab739fc8cbe41061eba23d8e29",
+  "public_header_diff": [],
+  "starting_source": "d9b85f22c4dab11d0ab68a8778a1471bf35ba488",
+  "final_runtime_source": "3c0a5b22c24da50f749e1f385d84d52ce1a4543d"
+}
