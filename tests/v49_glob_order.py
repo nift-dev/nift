@@ -16,7 +16,10 @@ with tempfile.TemporaryDirectory() as d:
  if posix_links:
   (root/'tree'/'link.txt').symlink_to(root/'tree'/'z.txt')
   (root/'tree'/'dirlink').symlink_to(root/'tree'/'a',target_is_directory=True)
- patterns=['tree/*.txt','tree/**/*.txt','tree/**/**/end.txt','tree/.*.txt','tree/**/.private/*.txt','tree/missing/*.txt','tree/?/*.txt',str(root/'tree'/'*.txt')]
+ native_tree=(root/'tree').as_posix()
+ if os.environ.get('MSYSTEM'):
+  native_tree=subprocess.check_output(['cygpath','-m',str(root/'tree')],text=True,encoding='utf-8').strip()
+ patterns=['tree/*.txt','tree/**/*.txt','tree/**/**/end.txt','tree/.*.txt','tree/**/.private/*.txt','tree/missing/*.txt','tree/?/*.txt',native_tree+'/*.txt']
  path=root/'probe.f';path.write_text('\n'.join('print(ls('+json.dumps(p,ensure_ascii=False)+').stringify())' for p in patterns)+'\n',encoding='utf-8')
  p=subprocess.run([binary,str(path)],cwd=root,text=True,capture_output=True)
  assert p.returncode==0,p.stderr
@@ -30,6 +33,9 @@ with tempfile.TemporaryDirectory() as d:
  assert results[3]==['tree/.hidden.txt'],results[3]
  assert results[4]==['tree/.private/secret.txt'],results[4]
  assert results[5]==[],results[5]
+ absolute_names=[n for n in names if '/' not in n and not n.startswith('.')]
+ if posix_links: absolute_names.append('link.txt')
+ assert results[7]==sorted(native_tree+'/'+n for n in absolute_names),results[7]
  assert not any('/.private/' in p for p in results[1]),results[1]
  assert not any('/dirlink/' in p for p in results[1]),results[1]
  # ls resolves symlink targets after glob ordering; duplicate rendered paths
