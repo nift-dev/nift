@@ -1,0 +1,24 @@
+In file included from /usr/include/c++/15/bits/stl_algobase.h:71,
+                 from /usr/include/c++/15/bits/specfun.h:43,
+                 from /usr/include/c++/15/cmath:3913,
+                 from src/../jsonic/include/json.h:5,
+                 from src/Json.h:6,
+                 from src/JsonFile.h:2,
+                 from .build/cp410/baseline-warning/ParserExpression.cpp:1:
+In constructor ‘constexpr __gnu_cxx::__ops::_Iter_comp_iter<_Compare>::_Iter_comp_iter(_Compare) [with _Compare = Parser::evaluate_collection_value(const std::string&, nift::RuntimeValue&, std::string&)::<lambda(auto:7, auto:8)>]’,
+    inlined from ‘constexpr __gnu_cxx::__ops::_Iter_comp_iter<_Compare> __gnu_cxx::__ops::__iter_comp_iter(_Compare) [with _Compare = Parser::evaluate_collection_value(const std::string&, nift::RuntimeValue&, std::string&)::<lambda(auto:7, auto:8)>]’ at /usr/include/c++/15/bits/predefined_ops.h:165:61,
+    inlined from ‘void std::stable_sort(_RAIter, _RAIter, _Compare) [with _RAIter = __gnu_cxx::__normal_iterator<long unsigned int*, vector<long unsigned int> >; _Compare = Parser::evaluate_collection_value(const std::string&, nift::RuntimeValue&, std::string&)::<lambda(auto:7, auto:8)>]’ at /usr/include/c++/15/bits/stl_algo.h:5108:36,
+    inlined from ‘bool Parser::evaluate_collection_value(const std::string&, nift::RuntimeValue&, std::string&)’ at .build/cp410/baseline-warning/ParserExpression.cpp:877:21:
+/usr/include/c++/15/bits/predefined_ops.h:151:11: warning: ‘SR.25273’ may be used uninitialized [-Wmaybe-uninitialized]
+  151 |         : _M_comp(_GLIBCXX_MOVE(__comp))
+      |           ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /usr/include/c++/15/algorithm:63,
+                 from src/../jsonic/include/json.h:8:
+/usr/include/c++/15/bits/stl_algo.h: In member function ‘bool Parser::evaluate_collection_value(const std::string&, nift::RuntimeValue&, std::string&)’:
+/usr/include/c++/15/bits/stl_algo.h:5108:36: note: ‘SR.25273’ was declared here
+ 5108 |       _GLIBCXX_STD_A::__stable_sort(__first, __last,
+      |                                    ^
+.build/cp410/baseline-warning/ParserExpression.cpp: In lambda function:
+.build/cp410/baseline-warning/ParserExpression.cpp:1213:37: note: variable tracking size limit exceeded with ‘-fvar-tracking-assignments’, retrying without
+ 1213 |         const auto evaluate_slice = [&]() -> bool {
+      |                                     ^

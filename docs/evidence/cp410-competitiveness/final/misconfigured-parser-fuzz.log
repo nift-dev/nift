@@ -1,0 +1,42 @@
+Traceback (most recent call last):
+  File "/home/nick/Repositories/nift/nift/scripts/checkpoint9_parser_fuzz.py", line 170, in <module>
+    rc,elapsed=run_case(root,'@content\n$['+'!'*5000+'true]\n','deep-unary-nesting-5k',40.0)
+               ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/nick/Repositories/nift/nift/scripts/checkpoint9_parser_fuzz.py", line 111, in run_case
+    raise RuntimeError(f'case {case_id} sanitizer finding {finding}:\n{combined[-4000:]}')
+RuntimeError: case deep-unary-nesting-5k sanitizer finding ERROR: AddressSanitizer:
+bcb in Parser::evaluate_expression(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView) src/ParserExpression.cpp:891
+    #218 0x60ccd1ae31cd in Parser::evaluate_expression(nift::detail::SourceText const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) src/Parser.h:469
+    #219 0x60ccd1a62554 in Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView) src/ParserTemplate.cpp:602
+    #220 0x60ccd1ac6fab in Parser::render_composed(RenderSource const&, std::optional<RenderSource> const&, bool) src/ParserTemplate.cpp:2496
+    #221 0x60ccd1acbe2f in Parser::render() src/ParserTemplate.cpp:2549
+    #222 0x60ccd1b6393a in ProjectInfo::build_one(TrackedInfo&, std::optional<BuildError>*) src/ProjectInfo.cpp:837
+    #223 0x60ccd1b688b7 in operator() src/ProjectInfo.cpp:970
+    #224 0x60ccd1b6a72b in __invoke_impl<void, ProjectInfo::build_many(const std::vector<BuildJob>&, bool, bool, std::size_t)::<lambda()> > /usr/include/c++/15/bits/invoke.h:63
+    #225 0x60ccd1b6a72b in __invoke<ProjectInfo::build_many(const std::vector<BuildJob>&, bool, bool, std::size_t)::<lambda()> > /usr/include/c++/15/bits/invoke.h:98
+    #226 0x60ccd1b6a72b in _M_invoke<0> /usr/include/c++/15/bits/std_thread.h:303
+    #227 0x60ccd1b6a72b in operator() /usr/include/c++/15/bits/std_thread.h:310
+    #228 0x60ccd1b6a72b in _M_run /usr/include/c++/15/bits/std_thread.h:255
+    #229 0x783cf68f5ef8  (/usr/lib/x86_64-linux-gnu/libstdc++.so.6+0xf5ef8) (BuildId: 3a7a8c6bd922e6314edb7a710fdc0293265c2c42)
+    #230 0x783cf6c63a80 in asan_thread_start ../../../../src/libsanitizer/asan/asan_interceptors.cpp:246
+    #231 0x783cf5ca3df9 in start_thread nptl/pthread_create.c:454
+    #232 0x783cf5d375cb in __clone3 ../sysdeps/unix/sysv/linux/x86_64/clone3.S:78
+
+SUMMARY: AddressSanitizer: stack-overflow src/ParserExpression.cpp:1214 in operator()
+Thread T1 created by T0 here:
+    #0 0x783cf6d21f80 in pthread_create ../../../../src/libsanitizer/asan/asan_interceptors.cpp:257
+    #1 0x783cf68f5ff0 in std::thread::_M_start_thread(std::unique_ptr<std::thread::_State, std::default_delete<std::thread::_State> >, void (*)()) (/usr/lib/x86_64-linux-gnu/libstdc++.so.6+0xf5ff0) (BuildId: 3a7a8c6bd922e6314edb7a710fdc0293265c2c42)
+    #2 0x60ccd1b71752 in thread<ProjectInfo::build_many(const std::vector<BuildJob>&, bool, bool, std::size_t)::<lambda()>&> /usr/include/c++/15/bits/std_thread.h:175
+    #3 0x60ccd1b71752 in construct<std::thread, ProjectInfo::build_many(const std::vector<BuildJob>&, bool, bool, std::size_t)::<lambda()>&> /usr/include/c++/15/bits/new_allocator.h:191
+    #4 0x60ccd1b71752 in construct<std::thread, ProjectInfo::build_many(const std::vector<BuildJob>&, bool, bool, std::size_t)::<lambda()>&> /usr/include/c++/15/bits/alloc_traits.h:674
+    #5 0x60ccd1b71752 in emplace_back<ProjectInfo::build_many(const std::vector<BuildJob>&, bool, bool, std::size_t)::<lambda()>&> /usr/include/c++/15/bits/vector.tcc:117
+    #6 0x60ccd1b71752 in ProjectInfo::build_many(std::vector<ProjectInfo::BuildJob, std::allocator<ProjectInfo::BuildJob> > const&, bool, bool, unsigned long) src/ProjectInfo.cpp:986
+    #7 0x60ccd1ba039f in ProjectInfo::build_all(bool, bool, bool) src/ProjectInfo.cpp:1154
+    #8 0x60ccd0cb2c1e in run_cli(int, char**) src/CLI.cpp:2156
+    #9 0x60ccd0b2d0f5 in main src/nift.cpp:18
+    #10 0x783cf5c2a600 in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:59
+    #11 0x783cf5c2a717 in __libc_start_main_impl ../csu/libc-start.c:360
+    #12 0x60ccd0b2d024 in _start (/home/nick/Repositories/nift/nift/.build/nift-sanitize-lifetime+0x347c024) (BuildId: d68b3a9e83da4e601cde4e072ef995f9a5f3aa72)
+
+==2383492==ABORTING
+

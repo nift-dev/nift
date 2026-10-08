@@ -1,0 +1,11 @@
+START native-bindings
+PASS native-bindings
+START warnings
+PASS warnings
+START binding-warnings
+PASS binding-warnings
+START nrs
+PASS nrs
+START prs
+PASS prs
+COMPLETE

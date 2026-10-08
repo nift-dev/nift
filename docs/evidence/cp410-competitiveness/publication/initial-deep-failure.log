@@ -1,0 +1,107 @@
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	﻿2026-10-08T22:11:27.5863143Z ##[group]Run set -euo pipefail
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:11:27.5863361Z [36;1mset -euo pipefail[0m
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:11:27.5863538Z [36;1mNIFT_BIN="$PWD/nift" NIFT_EXPECT_VERSION=4.9.0 \[0m
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:11:27.5863762Z [36;1m  NIFT_EMBED_PREFIX="$PWD/dist/embed-prefix" \[0m
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:11:27.5863979Z [36;1m  bash nift-regression-suite/run-contract.sh[0m
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:11:27.5921591Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:11:27.5921808Z ##[endgroup]
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:09.1768695Z FAIL  historical + ruthless regression contract
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:09.1777124Z FAIL [test 001]: nift version did not report v4.9.0
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:09.1777496Z Ruthless adversarial extension: 192 checks, 0 failures
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:09.1777802Z FAIL: 1 of 574 assertions/tests failed
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:09.3285041Z PASS  contract/json_schema_integration_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:09.4204364Z PASS  contract/parser_content_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:09.4519868Z PASS  contract/diagnostics_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:09.4758497Z PASS  contract/comments_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:09.7500757Z PASS  contract/json_binding_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:10.3285846Z PASS  contract/control_flow_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:10.4279820Z PASS  contract/collection_ops_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:10.7028566Z PASS  contract/pagination_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:10.8612489Z PASS  contract/requirements_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:10.9005050Z PASS  contract/path_alias_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:10.9219182Z PASS  contract/path_security_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:10.9602414Z PASS  contract/path_safety_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:11.0562952Z PASS  contract/metadata_safety_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:11.1772182Z PASS  contract/cross_feature_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:20.3298153Z PASS  contract/incremental_new_features_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:34.5949025Z PASS  contract/parameter_interpolation_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:34.7812898Z PASS  contract/contracts_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:35.0645375Z PASS  contract/persistence_concurrency_failure_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:35.7516286Z PASS  contract/filesystem_recovery_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:36.0403348Z PASS  contract/minify_integration_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:36.1398261Z PASS  contract/template_optional_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:36.3746351Z PASS  contract/init_targets_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:36.4579923Z PASS  contract/unreadable_source_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:38.5917363Z PASS  contract/json_six_forms_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:39.7204946Z PASS  contract/markup_directives_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:39.7536876Z PASS  contract/v41_template_variables_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:39.7734303Z PASS  contract/v41_language_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:39.7854850Z PASS  contract/v41_operator_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:40.8023485Z PASS  contract/v41_inject_dependency.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:40.8564002Z PASS  contract/v41_duplicate_key_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:40.9898041Z PASS  contract/v41_certification_adversarial.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:41.0038256Z PASS  contract/v42_structs_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:41.0282120Z PASS  contract/v42_numeric_literals_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:41.1746403Z PASS  contract/v43_language_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:41.1858554Z PASS  contract/v43_scripting_io_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:41.2368591Z PASS  contract/v43_scripting_inspection_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:41.2787855Z PASS  contract/v43_scripting_ergonomics_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:41.2929369Z PASS  contract/v43_managed_file_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:41.3618077Z PASS  contract/v43_managed_file_editing_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:41.4551357Z PASS  contract/v43_scripting_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:41.6043254Z PASS  contract/v43_typed_content_taxonomy_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:41.6854579Z PASS  contract/v43_frontend_algebra_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:42.1754399Z PASS  contract/v43_final_language_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:42.2482008Z PASS  contract/v43_object_expressions_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:42.3234307Z PASS  contract/v43_hierarchy_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:42.3981076Z PASS  contract/v43_mundane_surface_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:42.4073498Z PASS  contract/v44_language_foundation_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:42.4205818Z PASS  contract/v44_execution_shell_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:42.4344812Z PASS  contract/v44_packages_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:42.4566588Z PASS  contract/v44_automation_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:42.4829128Z PASS  contract/v44_hooks_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:42.5124695Z PASS  contract/v44_restricted_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:42.5357787Z PASS  contract/v44_package_hardening_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:42.5510022Z PASS  contract/v44_module_export_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:42.5793591Z PASS  contract/v44_minify_native_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:42.7118449Z PASS  contract/v44_executable_script_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:42.7387249Z PASS  contract/v44_shell_bare_command_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:42.8253197Z PASS  contract/v45_cli_invocation_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:42.8404051Z PASS  contract/v45_host_introspection_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:42.8692195Z PASS  contract/v45_target_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:43.1766418Z PASS  contract/v45_jobs_background_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:43.3542032Z PASS  contract/v45_job_control_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:43.3714132Z PASS  contract/v45_threads_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:43.4095295Z PASS  contract/v45_mutex_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:43.4274368Z PASS  contract/v45_atomics_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:43.4490680Z PASS  contract/v45_async_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:43.4808024Z PASS  contract/v45_ffi_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:43.5935487Z PASS  contract/v45_embed_consumer_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:43.6043813Z PASS  contract/v45_integration_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:43.6371505Z PASS  contract/v46_bytes_ffi_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:43.6776210Z PASS  contract/v46_bytes_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:43.6827428Z FAIL  contract/v46_cli_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:43.6834712Z version: Nift v4.10.0 (expected v4.9.0)
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:43.7007729Z PASS  contract/v46_concurrency_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:43.7223290Z PASS  contract/v46_diagnostics_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:43.8344540Z PASS  contract/v46_embed_consumer_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:43.8620341Z PASS  contract/v46_exact_numbers_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:43.8828708Z PASS  contract/v46_filesystem_types_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:43.9170392Z PASS  contract/v46_import_ownership_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:43.9404692Z PASS  contract/v46_output_channels_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:43.9872786Z PASS  contract/v46_package_graph_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:44.0443228Z PASS  contract/v46_package_metadata_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:44.1033485Z PASS  contract/v46_recoverable_errors_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:44.1808020Z PASS  contract/v46_runtime_utilities_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:44.2223799Z PASS  contract/v46_streams_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:44.5192033Z PASS  contract/v47_deep_expression_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:44.5539009Z PASS  contract/v47_prepared_method_parity_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:44.5743250Z PASS  contract/v48_package_combined_fixture_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:44.6043706Z PASS  contract/v48_warn_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:44.6353971Z PASS  contract/v48_bytes_index_parity_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:44.8399800Z PASS  contract/v48_init_migration_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:44.8799197Z PASS  contract/v48_comparison_parity_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:44.9129824Z PASS  contract/v48_callable_parity_smoke.sh
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:44.9132117Z 
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:44.9132248Z FAIL: 2 of 93 contract modules failed
+Independent NRS contract (93 modules)	Run independent contract with embedding consumers enabled	2026-10-08T22:12:44.9374487Z ##[error]Process completed with exit code 1.

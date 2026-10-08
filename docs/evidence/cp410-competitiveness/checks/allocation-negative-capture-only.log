@@ -1,0 +1,15 @@
+[
+  {
+    "low": 100,
+    "high": 200,
+    "capture_slope": 2.25,
+    "dispatch_slope": 39.0
+  },
+  {
+    "low": 200,
+    "high": 400,
+    "capture_slope": 2.25,
+    "dispatch_slope": 39.0
+  }
+]
+FAIL allocation guard: dispatch allocations/call=39.00 > 36; dispatch allocations/call=39.00 > 36

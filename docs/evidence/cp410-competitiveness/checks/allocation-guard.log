@@ -1,0 +1,15 @@
+[
+  {
+    "low": 100,
+    "high": 200,
+    "capture_slope": 2.25,
+    "dispatch_slope": 33.0
+  },
+  {
+    "low": 200,
+    "high": 400,
+    "capture_slope": 2.25,
+    "dispatch_slope": 33.0
+  }
+]
+PASS capture and native-dispatch allocation slopes (N/2N/4N)

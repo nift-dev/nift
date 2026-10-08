@@ -1,0 +1,5 @@
+PASS 19 exact factory/capture/identity/lifetime/async contracts
+PASS 58 selector/capture/location/error contracts with exact A/B diagnostics
+root+path reference smoke: PASS
+PASS v4.4 root+path corruption reproducers (destruct/growth/structarr/mapstruct/formap/forarr)
+v4.5 async/future smoke passed
