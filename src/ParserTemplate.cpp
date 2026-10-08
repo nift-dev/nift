@@ -466,7 +466,7 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
             std::size_t bo=header_close+1; while(bo<source.size()&&std::isspace(static_cast<unsigned char>(source[bo])))++bo; std::size_t bc=0;
             if(bo>=source.size()||source[bo]!='{'||!find_balanced(source,bo,'{','}',bc)){fail(source_path,source,i,"callable definition requires a block");break;}
             const auto def_body = normalize_control_block_body(source.substr(bo+1,bc-bo-1));
-            callables_[name]=Callable{params,variadic_param,def_body.text,source_path,fragment,async,active_module_env_ ? active_module_env_ : loading_module_env_,source_provenance}; i=bc+1; continue;
+            callables_[name]=Callable{params,variadic_param,def_body.text,source_path,fragment,async,active_module_env_ ? active_module_env_ : loading_module_env_,source_provenance,def_body.view}; i=bc+1; continue;
         }
 
         if (source.compare(i, 4, "@:=(") == 0) {

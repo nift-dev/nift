@@ -216,7 +216,7 @@ private:
         std::string commit;   // exact commit or "local"
     };
     struct ModuleEnv;
-    struct Callable { std::vector<std::string> params; std::string variadic_param; std::string body; std::filesystem::path source_path; bool fragment = false; bool async = false; std::shared_ptr<ModuleEnv> module_env; SourceProvenance source_provenance = SourceProvenance::FileBacked; };
+    struct Callable { std::vector<std::string> params; std::string variadic_param; std::string body; std::filesystem::path source_path; bool fragment = false; bool async = false; std::shared_ptr<ModuleEnv> module_env; SourceProvenance source_provenance = SourceProvenance::FileBacked; nift::detail::SourceView body_view{}; };
     struct ModuleEnv {
         std::uint64_t identity = 0;
         std::filesystem::path source_path;
@@ -254,6 +254,7 @@ private:
         SourceProvenance source_provenance = SourceProvenance::FileBacked;
         std::unordered_map<std::string, VariableBinding> captures;
         std::shared_ptr<ModuleEnv> module_env;
+        nift::detail::SourceView body_view{};
     };
     std::unordered_map<std::string, std::shared_ptr<LambdaInstance>> lambda_instances_;
     std::uint64_t next_lambda_instance_id_ = 1;

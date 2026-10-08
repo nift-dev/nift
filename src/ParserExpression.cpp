@@ -81,6 +81,7 @@ struct LambdaSyntax {
     std::vector<std::string> params;
     std::string variadic_param, body;
     bool block = false, async = false;
+    std::size_t body_offset = 0;
 };
 thread_local std::unordered_map<std::string, std::shared_ptr<const LambdaSyntax>> lambda_syntax_cache;
 struct NumericLambdaPlan {
@@ -1216,7 +1217,7 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
         // Execute only pure numeric expression plans. The existing leaf evaluator
         // and numeric operator remain the semantic oracle. Non-numeric bindings,
         // calls, locations, blocks and other shapes retain compatibility dispatch.
-        auto eval_expression_lambda = [&](const std::string& body, nift::RuntimeValue& result, int body_depth) {
+        auto eval_expression_lambda = [&](const nift::detail::SourceText& body, nift::RuntimeValue& result, int body_depth) {
             auto legacy = [&] { NIFT_LAMBDA_COUNT(legacy); return eval(body, result, body_depth); };
             if (valid_binding_identifier(body)) return legacy();
             auto plan = numeric_lambda_plan(body);
@@ -1227,7 +1228,7 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
                 using K = nift::ast::Kind;
                 if (expr.kind == K::Literal) { value = expr.literal; return true; }
                 if (expr.kind == K::Binding) {
-                    if (!eval(expr.name, value, body_depth + 1)) return false;
+                    if (!eval(nift::detail::SourceText(expr.name,body.view.slice(expr.span.begin,expr.span.end-expr.span.begin)), value, body_depth + 1)) return false;
                     if (!value.is_number()) { unsupported = true; return false; }
                     return true;
                 }
@@ -1249,6 +1250,7 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
                 return numeric_binary(left, right, expr.op[0], value);
             };
             const bool ok = execute(*plan->expression, result);
+            if (!ok && !unsupported && !expression_failure_view_ && body.view) expression_failure_view_ = body.view;
             if (unsupported) return legacy();
             NIFT_LAMBDA_COUNT(prepared);
             return ok;
@@ -1425,6 +1427,7 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
                 auto li = std::make_shared<LambdaInstance>();
                 li->params = code.params; li->variadic_param = code.variadic_param;
                 li->async = code.async; li->block = code.block; li->body = code.body;
+                li->body_view = text.view.slice(code.body_offset, code.body.size());
                 if(!source_path_stack_.empty()) li->source_path=source_path_stack_.back();
                 li->source_provenance=(active_module_env_?active_module_env_->source_provenance:(loading_module_env_?loading_module_env_->source_provenance:(source_context_stack_.empty()?SourceProvenance::InMemory:source_context_stack_.back().provenance)));
                 for(const auto& scope:variable_scopes_) for(const auto& kv:scope) li->captures[kv.first]=kv.second;
@@ -1439,7 +1442,7 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
             for(std::size_t ai=0;ai+1<text.size();++ai){char ch=text[ai];if(iq){if(ch=='\\')++ai;else if(ch==qc)iq=false;continue;}if(ch=='\"'||ch=='\''){iq=true;qc=ch;continue;}if(ch=='(')++pd;else if(ch==')')--pd;else if(ch=='[')++bd;else if(ch==']')--bd;else if(ch=='{')++cd;else if(ch=='}')--cd;else if(ch=='='&&text[ai+1]=='>'&&pd==0&&bd==0&&cd==0){arrow=ai;break;}}
             if (arrow != std::string::npos && text.substr(0, arrow).find(":=") == std::string::npos && text.substr(0, arrow).find(" = ") == std::string::npos) {
                 std::string lhs = trim_copy(text.substr(0, arrow));
-                std::string rhs = trim_copy(text.substr(arrow + 2));
+                auto rhs = trim_copy(text.substr(arrow + 2));
                 bool async_lambda=false;
                 if(lhs.rfind("async ",0)==0){async_lambda=true;lhs=trim_copy(lhs.substr(6));}
                 std::vector<std::string> params;
@@ -1453,6 +1456,7 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
                 code->params = std::move(params); code->variadic_param = std::move(variadic_param);
                 code->async = async_lambda; code->block = rhs.size()>=2&&rhs.front()=='{'&&rhs.back()=='}';
                 code->body = code->block ? rhs.substr(1,rhs.size()-2) : rhs;
+                code->body_offset = text.find_first_not_of(" \t\r\n", arrow + 2) + (code->block ? 1 : 0);
                 if (lambda_syntax_cache.size() < kLambdaCodeCacheLimit && text.size() <= 4096)
                     lambda_syntax_cache.emplace(text, code);
                 return instantiate_lambda(*code);
@@ -2245,9 +2249,9 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                                 for(std::size_t ai=0;ai<fn->params.size();++ai){auto sp=std::make_shared<nift::RuntimeValue>(av[ai]);sc[fn->params[ai]]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
                                 if(!fn->variadic_param.empty()){nift::RuntimeValue rest=nift::RuntimeValue::make_array();for(std::size_t ai=fn->params.size();ai<av.size();++ai)rest.array.push_back(av[ai]);auto sp=std::make_shared<nift::RuntimeValue>(std::move(rest));sc[fn->variadic_param]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
                                 bool okcall=true;
-                                source_context_stack_.push_back(SourceContext{fn->source_path,fn->source_provenance});
-                                if(fn->block){std::string bt=trim_copy(fn->body);const bool rendered=!bt.empty()&&bt.front()=='<';if(rendered){auto nested=parse(fn->body,fn->source_path,1,fn->source_provenance);if(!nested.ok){error=nested.error.message;if(nested.diagnostic)active_diagnostic_=nested.diagnostic;okcall=false;}else result=nift::RuntimeValue(nested.output);}else{okcall=eval(fn->body,result,depth+1);if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0)error="lambda body error: "+error;}}
-                                else{okcall=eval_expression_lambda(fn->body,result,depth+1);if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0)error="lambda body error: "+error;}
+                                source_context_stack_.push_back(SourceContext{fn->source_path,fn->source_provenance,fn->body_view});
+                                if(fn->block){std::string bt=trim_copy(fn->body);const bool rendered=!bt.empty()&&bt.front()=='<';if(rendered){auto nested=parse(fn->body,fn->source_path,1,fn->source_provenance,fn->body_view);if(!nested.ok){error=nested.error.message;if(nested.diagnostic)active_diagnostic_=nested.diagnostic;okcall=false;}else result=nift::RuntimeValue(nested.output);}else{okcall=eval(nift::detail::SourceText(fn->body,fn->body_view),result,depth+1);if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0)error="lambda body error: "+error;}}
+                                else{okcall=eval_expression_lambda(nift::detail::SourceText(fn->body,fn->body_view),result,depth+1);if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0)error="lambda body error: "+error;}
                                 source_context_stack_.pop_back();
                                 pop_variable_scope();leave_lexical_environment(std::move(lexical_env));--callable_call_depth_;if(!okcall)append_diagnostic_frame(nift::detail::DiagnosticFrameKind::Callback,"collection callback");return okcall;
                             }
@@ -2261,8 +2265,8 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                                 if(!callee.variadic_param.empty()){nift::RuntimeValue rest=nift::RuntimeValue::make_array();for(std::size_t ai=callee.params.size();ai<av.size();++ai)rest.array.push_back(av[ai]);auto sp=std::make_shared<nift::RuntimeValue>(std::move(rest));scope.emplace(callee.variadic_param,VariableBinding{sp,nift_binding_type(*sp),true,false});}
                                 const int caller_loop_depth=loop_depth_;loop_depth_=0;pending_control_={};
                                 bool call_ok=true;std::string call_error;
-                                if(callee.fragment){const bool saved_fragment=in_fragment_body_;in_fragment_body_=true;auto nested=parse(callee.body,callee.source_path,1,callee.source_provenance);in_fragment_body_=saved_fragment;if(!nested.ok){call_ok=false;call_error=nested.error.message;if(nested.diagnostic)active_diagnostic_=nested.diagnostic;}else result=nift::RuntimeValue(nested.output);}
-                                else{++function_call_depth_;auto body_result=execute_native_program(callee.body,callee.source_path,1,callee.source_provenance);--function_call_depth_;if(!body_result.ok){call_ok=false;call_error=body_result.error.message;if(body_result.diagnostic)active_diagnostic_=body_result.diagnostic;}else if(pending_control_.kind==ControlFlow::None)result=nift::RuntimeValue(nullptr);else consume_return(result);}
+                                if(callee.fragment){const bool saved_fragment=in_fragment_body_;in_fragment_body_=true;auto nested=parse(callee.body,callee.source_path,1,callee.source_provenance,callee.body_view);in_fragment_body_=saved_fragment;if(!nested.ok){call_ok=false;call_error=nested.error.message;if(nested.diagnostic)active_diagnostic_=nested.diagnostic;}else result=nift::RuntimeValue(nested.output);}
+                                else{++function_call_depth_;auto body_result=execute_native_program(callee.body,callee.source_path,1,callee.source_provenance,true,callee.body_view);--function_call_depth_;if(!body_result.ok){call_ok=false;call_error=body_result.error.message;if(body_result.diagnostic)active_diagnostic_=body_result.diagnostic;}else if(pending_control_.kind==ControlFlow::None)result=nift::RuntimeValue(nullptr);else consume_return(result);}
                                 loop_depth_=caller_loop_depth;pop_variable_scope();leave_lexical_environment(std::move(lexical_env));--callable_call_depth_;
                                 if(!call_ok){error=call_error;append_diagnostic_frame(nift::detail::DiagnosticFrameKind::Callback,"collection callback");return false;}return true;
                             }
@@ -2670,9 +2674,9 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                             auto lexical_env=enter_lexical_environment(fn->module_env);
                             push_variable_scope();auto& sc=variable_scopes_.back();for(const auto& kv:fn->captures)sc[kv.first]=kv.second;for(size_t ai=0;ai<fn->params.size();++ai)sc[fn->params[ai]]=std::move(parameter_bindings[ai]);if(!fn->variadic_param.empty()){nift::RuntimeValue rest=nift::RuntimeValue::make_array();for(size_t ai=fn->params.size();ai<av.size();++ai)rest.array.push_back(std::move(av[ai]));auto sp=std::make_shared<nift::RuntimeValue>(std::move(rest));sc[fn->variadic_param]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
                             bool okcall=true;
-                            source_context_stack_.push_back(SourceContext{fn->source_path,fn->source_provenance});
-                            if(fn->block){std::string bt=trim_copy(fn->body);const bool rendered=!bt.empty()&&bt.front()=='<';if(rendered){auto nested=parse(fn->body,fn->source_path,1,fn->source_provenance);if(!nested.ok){error=nested.error.message;if(nested.diagnostic)active_diagnostic_=nested.diagnostic;okcall=false;}else out=nift::RuntimeValue(nested.output);}else{++function_call_depth_;auto nested=execute_native_program(fn->body,fn->source_path,1,fn->source_provenance);--function_call_depth_;if(!nested.ok){error=nested.error.message;if(nested.diagnostic)active_diagnostic_=nested.diagnostic;okcall=false;}else if(pending_control_.kind==ControlFlow::Return){consume_return(out);}else out=nift::RuntimeValue(nullptr);}}
-                            else { okcall=eval_expression_lambda(fn->body,out,1); if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0) error="lambda body error: "+error; VariableBinding lr; if(try_location_ref(fn->body,lr)&&lr.is_location_ref()&&lr.value){last_call_return_loc_root_=lr.ref_root_slot;last_call_return_loc_path_=lr.ref_path;} }
+                            source_context_stack_.push_back(SourceContext{fn->source_path,fn->source_provenance,fn->body_view});
+                            if(fn->block){std::string bt=trim_copy(fn->body);const bool rendered=!bt.empty()&&bt.front()=='<';if(rendered){auto nested=parse(fn->body,fn->source_path,1,fn->source_provenance,fn->body_view);if(!nested.ok){error=nested.error.message;if(nested.diagnostic)active_diagnostic_=nested.diagnostic;okcall=false;}else out=nift::RuntimeValue(nested.output);}else{++function_call_depth_;auto nested=execute_native_program(fn->body,fn->source_path,1,fn->source_provenance,true,fn->body_view);--function_call_depth_;if(!nested.ok){error=nested.error.message;if(nested.diagnostic)active_diagnostic_=nested.diagnostic;okcall=false;}else if(pending_control_.kind==ControlFlow::Return){consume_return(out);}else out=nift::RuntimeValue(nullptr);}}
+                            else { okcall=eval_expression_lambda(nift::detail::SourceText(fn->body,fn->body_view),out,1); if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0) error="lambda body error: "+error; VariableBinding lr; if(try_location_ref(fn->body,lr)&&lr.is_location_ref()&&lr.value){last_call_return_loc_root_=lr.ref_root_slot;last_call_return_loc_path_=lr.ref_path;} }
                             source_context_stack_.pop_back();pop_variable_scope();leave_lexical_environment(std::move(lexical_env));--callable_call_depth_;if(!okcall)append_diagnostic_frame(nift::detail::DiagnosticFrameKind::Lambda,"lambda");return okcall;
                         }
                     }
@@ -2697,14 +2701,14 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     bool call_ok = true; std::string call_error;
                     if (callee->fragment) {
                         const bool saved_fragment = in_fragment_body_; in_fragment_body_ = true;
-                        auto nested = parse(callee->body, callee->source_path, 1, callee->source_provenance);
+                        auto nested = parse(callee->body, callee->source_path, 1, callee->source_provenance, callee->body_view);
                         in_fragment_body_ = saved_fragment;
                         if (!nested.ok) { call_ok = false; call_error = nested.error.message; if(nested.diagnostic)active_diagnostic_=nested.diagnostic; }
                         else { out = nift::RuntimeValue(nested.output); if (pending_control_.kind == ControlFlow::Return) pending_control_ = {}; }
                     } else {
                         ++function_call_depth_;
                         if (pending_control_.kind != ControlFlow::None) { pending_control_ = {}; }
-                        auto body_result = execute_native_program(callee->body, callee->source_path, 1, callee->source_provenance);
+                        auto body_result = execute_native_program(callee->body, callee->source_path, 1, callee->source_provenance,true,callee->body_view);
                         --function_call_depth_;
                         if (!body_result.ok) { call_ok = false; call_error = body_result.error.message; if(body_result.diagnostic)active_diagnostic_=body_result.diagnostic; }
                         else if (pending_control_.kind == ControlFlow::None) { out = nift::RuntimeValue(nullptr); }
@@ -3714,7 +3718,7 @@ bool Parser::invoke_struct_method(std::shared_ptr<StructInstance> instance,
     for(const auto& e:struct_instances_) if(e.second==instance){id=e.first;break;}
     auto thisv=std::make_shared<nift::RuntimeValue>(std::string("\x1fnift:struct:")+id); variable_scopes_[scope_index]["this"]=VariableBinding{thisv,nift_binding_type(*thisv),false,false};
     receiver_stack_.push_back(instance); ++function_call_depth_; pending_control_={};
-    RenderResult rr=execute_native_program(method.callable.body,method.callable.source_path,1,method.callable.source_provenance);
+    RenderResult rr=execute_native_program(method.callable.body,method.callable.source_path,1,method.callable.source_provenance,true,method.callable.body_view);
     --function_call_depth_; receiver_stack_.pop_back();
     pop_variable_scope();
     leave_lexical_environment(std::move(lexical_env)); loop_depth_=caller_loop_depth; --callable_call_depth_;
