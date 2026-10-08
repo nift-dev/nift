@@ -50,3 +50,20 @@ Final release preparation must repeat local/exact-candidate hosted checks, run
 non-publishing rehearsal and inspect its real artifacts. This source/note audit
 is not a claim that those subsequent gates have already passed. No tag,
 publication, Chocolatey submission, official benchmark or node is authorized.
+
+## Hosted diagnostic runner acquisition
+
+During exact-candidate certification, diagnostic run 37799657123 attempt 1
+failed because GitHub never assigned a macOS ARM64 runner. Its macOS job had
+no executed steps; the check annotation says: “The job was not acquired by
+Runner of type hosted even after multiple attempts.” GitHub also reported
+macOS ARM64 capacity constraints. Windows completed successfully. This was
+an infrastructure acquisition failure, not a failed or flaky test.
+
+The general compiler diagnostic now uses `macos-26-intel`, already exercised
+by the native packaging matrix. This reduces this redundant diagnostic's
+reliance on the constrained ARM64 pool. Dedicated cross-platform/FFI gates and
+the canonical macOS ARM64 release archive retain native ARM64 coverage. No test,
+warning setting, failure handling, release architecture, or runtime code was
+changed. The updated diagnostic must pass on the final candidate before
+rehearsal; changing runner pools cannot guarantee GitHub service availability.

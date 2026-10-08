@@ -22,7 +22,10 @@ jobs:
       matrix:
         include:
           - id: macos
-            runner: macos-latest
+            # Keep this general compiler diagnostic off the capacity-constrained
+            # ARM64 pool. Dedicated cross-platform/FFI and release jobs retain
+            # native macOS ARM64 coverage; packaging also exercises this image.
+            runner: macos-26-intel
           - id: windows
             runner: windows-latest
     runs-on: ${{ matrix.runner }}
