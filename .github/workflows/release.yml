@@ -151,6 +151,7 @@ jobs:
       - name: Build and stage archive
         shell: msys2 {0}
         run: |
+          make warnings-check
           make -j2 LDFLAGS='-static -static-libgcc -static-libstdc++'
           if objdump -p nift.exe | sed -n 's/.*DLL Name: //p' | grep -Eiq '^(libgcc|libstdc\+\+|libwinpthread)'; then
             echo "Windows release executable still depends on a MinGW runtime DLL" >&2

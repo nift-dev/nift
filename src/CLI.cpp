@@ -1744,7 +1744,10 @@ ShellRead interactive_read_line(Parser& parser, const std::string& prompt, std::
 #endif
 static int run_script_shell_loop(Parser& parser, bool load_rc) {
     std::string pending; ShellJobTable jobs;
-    auto history=load_nift_history(); size_t hist_pos=history.size();
+    auto history=load_nift_history();
+#ifndef _WIN32
+    size_t hist_pos=history.size();
+#endif
 #ifndef _WIN32
     const bool interactive = isatty(STDIN_FILENO);
 #endif
@@ -1760,7 +1763,11 @@ static int run_script_shell_loop(Parser& parser, bool load_rc) {
         std::string line;if(_isatty(_fileno(stdin)))std::cout<<prompt<<std::flush;if(!std::getline(std::cin,line))break;
 #endif
         if(pending.empty()&&(line=="exit"||line=="quit"))break;
-        if(pending.empty()&&!line.empty()){append_nift_history(line);if(history.size()>=1000)history.erase(history.begin());history.push_back(line);hist_pos=history.size();}
+        if(pending.empty()&&!line.empty()){append_nift_history(line);if(history.size()>=1000)history.erase(history.begin());history.push_back(line);
+#ifndef _WIN32
+            hist_pos=history.size();
+#endif
+        }
         pending+=line+"\n";
         // CP85: the parser reports whether the accumulated input is complete,
         // an incomplete prefix (keep reading), or invalid (balanced but

@@ -12,7 +12,7 @@
 namespace nift { class RuntimeValue; }
 class RenderHost;
 
-#if defined(__GNUC__) || defined(__clang__)
+#if !defined(_WIN32) && (defined(__GNUC__) || defined(__clang__))
 #define NIFT_PARSER_HELPER_HIDDEN __attribute__((visibility("hidden")))
 #else
 #define NIFT_PARSER_HELPER_HIDDEN

@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstring>
 #include <limits>
 #include <sstream>
 #include <type_traits>
@@ -140,7 +141,13 @@ bool nift_secure_random_bytes(std::size_t count, nift::RuntimeValue& value,
         bcrypt_path += L"\\bcrypt.dll";
     }
     HMODULE module = bcrypt_path.empty() ? nullptr : LoadLibraryW(bcrypt_path.c_str());
-    auto generate = module ? reinterpret_cast<BCryptGenRandomFn>(GetProcAddress(module, "BCryptGenRandom")) : nullptr;
+    BCryptGenRandomFn generate = nullptr;
+    if (module) {
+        const FARPROC address = GetProcAddress(module, "BCryptGenRandom");
+        // Windows procedure addresses share the representation of typed function pointers.
+        static_assert(sizeof(generate) == sizeof(address));
+        std::memcpy(&generate, &address, sizeof(generate));
+    }
     std::size_t offset = 0;
     while (generate && offset < count) {
         const auto chunk = static_cast<unsigned long>(std::min<std::size_t>(count - offset, std::numeric_limits<unsigned long>::max()));
