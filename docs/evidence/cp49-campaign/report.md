@@ -101,3 +101,39 @@ contracts. Exact current lifetime-sanitized build passes the 30 contracts,
 location receiver guard and full callback matrix (including module ownership,
 escaped captures and async worker behavior), ASan/UBSan/LSan enabled. Data in
 [3b](3b/).
+
+## CP49-5 / CP49-13: cached exact filesystem ordering keys
+
+**KEEP**. A shared internal decoration helper computes the exact existing
+`path.generic_string()` once per entry, sorts those keys, then moves the original
+paths/directory entries back. Both glob_walk directory ordering boundaries and
+glob_expand final ordering use it. Traversal, hidden/symlink policy, permission
+handling, normalized paths, and final `std::unique(path)` are unchanged. Empty or
+singleton vectors require no ordering conversion. No native/case/locale ordering
+substitution. Memory is bounded O(N) and transient within each ordering boundary.
+
+N=2,000 whole traversal: 207,839,261 → 82,149,896 instructions (-60.47%);
+seven paired CPU medians 25.01 → 17.71 ms (-29.19%). Control instruction changes
+are all below 0.02% (loops, scalar call, BFS, JSON serialize, indexed map).
+Control CPU variation has no corresponding instruction increase; do not claim
+those tiny changes as gains/regressions. Memcheck allocations 175,761 → 69,422
+(-60.50%); cumulative bytes 29,851,364 → 22,454,838 (-24.78%); zero errors,
+all heap freed. N=16,000 RSS medians 25,072 → 25,408 KiB (+336 KiB, 1.34%)
+with overlapping ranges. This small bounded tradeoff is accepted for the much
+larger instruction/allocation reduction.
+
+Deterministic test-only instrumentation (not compiled into ordinary CLI/ABI)
+requires exactly 2N conversions for flat N-file probes at N=100/200/400: one
+per directory entry plus one per final result. New eight-pattern exact A/B
+contracts cover Unicode/spaces, relative and absolute paths, recursive wildcard
+ordering, repeated-recursion dedup, hidden entries, symlinks and missing dirs;
+existing glob/copy/remove smoke passes. `ls` symlink rendering can produce
+identical displayed targets after glob dedup; this existing behavior is retained.
+Exact current ASan/UBSan/LSan lifetime build passes both new and existing glob
+corpora. Existing path safety/containment and unreadable-source gates remain
+required in final certification, including hosted Windows path behavior.
+
+strace confirms unchanged dominant syscall counts: 2,058 newfstatat and 84
+getdents64 (same baseline). Remaining traversal includes real filesystem work;
+no syscall-count reduction is claimed. strace instrumentation timing is not
+native wall time. Data in [5](5/).

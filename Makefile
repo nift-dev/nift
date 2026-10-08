@@ -730,7 +730,7 @@ test-all: test test-embed test-bindings test-build-boundary
 
 # Plain `make test` = the ordinary Nift/CLI regression surface (C++ toolchain
 # only). Embedding and binding suites are run through the focused targets.
-test: test-v49-selector-parity test-parser-hardening test-content test-commands test-comments test-contracts test-json test-runtime-value test-cp15-numeric-repair test-cp17-bytes test-cp18-bytes test-cp19-bytes test-cp20-bytes test-cp21-bytes \
+test: test-v49-glob-key-guard test-v49-glob-order test-v49-selector-parity test-parser-hardening test-content test-commands test-comments test-contracts test-json test-runtime-value test-cp15-numeric-repair test-cp17-bytes test-cp18-bytes test-cp19-bytes test-cp20-bytes test-cp21-bytes \
 	test-json-schema test-console test-diagnostics test-minify \
 	test-json-schema-integration test-markup-json-directives test-pagination test-pagination-ordering \
 	test-template-optional test-requirements test-path-alias test-path-safety test-metadata-safety \
@@ -1788,3 +1788,19 @@ test: test-source-map
 .PHONY: test-v49-selector-parity
 test-v49-selector-parity: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" python3 tests/v49_selector_parity.py
+
+.PHONY: test-v49-glob-order
+test-v49-glob-order: $(TARGET)
+	NIFT="$(CURDIR)/$(TARGET)" python3 tests/v49_glob_order.py
+
+# Dedicated test-only path conversion instrumentation.
+$(TEST_DIR)/glob-keys/ParserHelpers.o: src/ParserHelpers.cpp
+	mkdir -p "$(dir $@)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_TEST_GLOB_KEY_STATS -MMD -MP -c $< -o $@
+-include $(TEST_DIR)/glob-keys/ParserHelpers.d
+GLOB_KEY_GUARD := $(TEST_DIR)/nift-glob-key-guard$(EXEEXT)
+$(GLOB_KEY_GUARD): $(filter-out src/ParserHelpers.o,$(CLI_OBJECTS)) $(TEST_DIR)/glob-keys/ParserHelpers.o $(LIBFFI_A)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/ParserHelpers.o,$(CLI_OBJECTS)) $(TEST_DIR)/glob-keys/ParserHelpers.o $(LDLIBS) -o $@
+.PHONY: test-v49-glob-key-guard
+test-v49-glob-key-guard: $(GLOB_KEY_GUARD)
+	NIFT="$(CURDIR)/$(GLOB_KEY_GUARD)" python3 tests/v49_glob_key_guard.py

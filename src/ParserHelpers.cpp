@@ -8,6 +8,10 @@
 
 #include <algorithm>
 #include <cctype>
+#ifdef NIFT_TEST_GLOB_KEY_STATS
+#include <cstdio>
+#include <cstdlib>
+#endif
 #include <cstring>
 #include <limits>
 #include <sstream>
@@ -239,6 +243,35 @@ bool glob_has_magic(const std::string& s) {
 
 namespace {
 
+#ifdef NIFT_TEST_GLOB_KEY_STATS
+struct GlobKeyStats {
+    std::size_t conversions = 0;
+    ~GlobKeyStats() {
+        if (std::getenv("NIFT_TEST_GLOB_KEY_STATS"))
+            std::fprintf(stderr, "glob-order conversions=%zu\n", conversions);
+    }
+} glob_key_stats;
+#endif
+
+// Order by exactly the existing generic path representation, computing it
+// once per entry rather than allocating it in every sort comparison.
+template<class T, class PathOf>
+void sort_glob_paths(std::vector<T>& values, PathOf path_of) {
+    if (values.size() < 2) return;
+    struct Keyed { std::string key; T value; };
+    std::vector<Keyed> keyed;
+    keyed.reserve(values.size());
+    for (auto& value : values) {
+        auto key = path_of(value).generic_string();
+#ifdef NIFT_TEST_GLOB_KEY_STATS
+        ++glob_key_stats.conversions;
+#endif
+        keyed.push_back({std::move(key), std::move(value)});
+    }
+    std::sort(keyed.begin(), keyed.end(), [](const auto& a, const auto& b) { return a.key < b.key; });
+    for (std::size_t i = 0; i < values.size(); ++i) values[i] = std::move(keyed[i].value);
+}
+
 void glob_walk(const fs::path& base,const std::vector<std::string>& parts,std::size_t i,std::vector<fs::path>& out){
     if(i==parts.size()){std::error_code ec;if(fs::exists(base,ec)&&!ec)out.push_back(fs::absolute(base).lexically_normal());return;}
     const auto& part=parts[i];
@@ -246,13 +279,13 @@ void glob_walk(const fs::path& base,const std::vector<std::string>& parts,std::s
         glob_walk(base,parts,i+1,out);
         std::error_code ec; if(!fs::is_directory(base,ec)||ec)return;
         std::vector<fs::directory_entry> entries; for(fs::directory_iterator it(base,fs::directory_options::skip_permission_denied,ec),end;!ec&&it!=end;it.increment(ec))entries.push_back(*it);
-        std::sort(entries.begin(),entries.end(),[](const auto&a,const auto&b){return a.path().generic_string()<b.path().generic_string();});
+        sort_glob_paths(entries, [](const auto& entry) -> const fs::path& { return entry.path(); });
         for(const auto& e:entries){auto name=e.path().filename().string();if(!name.empty()&&name[0]=='.')continue;std::error_code sec;if(e.is_directory(sec)&&!e.is_symlink(sec))glob_walk(e.path(),parts,i,out);}
         return;
     }
     if(!glob_has_magic(part)){std::string literal;literal.reserve(part.size());for(std::size_t k=0;k<part.size();++k){if(part[k]=='\\'&&k+1<part.size())literal+=part[++k];else literal+=part[k];}glob_walk(base/literal,parts,i+1,out);return;}
     std::error_code ec;if(!fs::is_directory(base,ec)||ec)return;std::vector<fs::directory_entry> entries;for(fs::directory_iterator it(base,fs::directory_options::skip_permission_denied,ec),end;!ec&&it!=end;it.increment(ec))entries.push_back(*it);
-    std::sort(entries.begin(),entries.end(),[](const auto&a,const auto&b){return a.path().generic_string()<b.path().generic_string();});for(const auto&e:entries)if(glob_component_match(part,e.path().filename().string()))glob_walk(e.path(),parts,i+1,out);
+    sort_glob_paths(entries, [](const auto& entry) -> const fs::path& { return entry.path(); });for(const auto&e:entries)if(glob_component_match(part,e.path().filename().string()))glob_walk(e.path(),parts,i+1,out);
 }
 
 bool is_single_quoted_parameter(const std::string& text) {
@@ -301,7 +334,7 @@ bool glob_component_match(const std::string& pattern,const std::string& name){
 }
 
 std::vector<fs::path> glob_expand(const fs::path& resolved_pattern){
-    std::string g=resolved_pattern.generic_string();fs::path root=resolved_pattern.root_path();std::string rel=root.empty()?g:g.substr(root.generic_string().size());while(!rel.empty()&&rel.front()=='/')rel.erase(rel.begin());std::vector<std::string> parts;std::stringstream ss(rel);std::string part;while(std::getline(ss,part,'/'))if(!part.empty())parts.push_back(part);std::vector<fs::path> out;glob_walk(root.empty()?fs::path("."):root,parts,0,out);std::sort(out.begin(),out.end(),[](const auto&a,const auto&b){return a.generic_string()<b.generic_string();});out.erase(std::unique(out.begin(),out.end()),out.end());return out;
+    std::string g=resolved_pattern.generic_string();fs::path root=resolved_pattern.root_path();std::string rel=root.empty()?g:g.substr(root.generic_string().size());while(!rel.empty()&&rel.front()=='/')rel.erase(rel.begin());std::vector<std::string> parts;std::stringstream ss(rel);std::string part;while(std::getline(ss,part,'/'))if(!part.empty())parts.push_back(part);std::vector<fs::path> out;glob_walk(root.empty()?fs::path("."):root,parts,0,out);sort_glob_paths(out, [](const auto& path) -> const fs::path& { return path; });out.erase(std::unique(out.begin(),out.end()),out.end());return out;
 }
 
 // Presentation-method chain recognizer (.stringify()/.prettify()/.highlight()).
