@@ -1,9 +1,9 @@
 {
   "baseline": {
-    "development_version": "4.8.0",
-    "note": "BH1 is guarantee-durability infrastructure. Existing evidence remains valid unless falsified; UNPROVEN test-of-test status means guard liveness has not yet been demonstrated during this campaign. Baseline advanced for the v4.7.2 release (released 4.7.2 at 4950129; development now 4.8.0).",
-    "release_commit": "495012966756c9d2910a714c453359c8ff60bab1",
-    "released_version": "4.7.2"
+    "development_version": "4.9.0",
+    "note": "BH1 is guarantee-durability infrastructure. Existing evidence remains valid unless falsified; UNPROVEN test-of-test status means guard liveness has not yet been demonstrated during this campaign. Baseline advanced for the v4.8.0 release (released 4.8.0 at 1bfc4a5; development now 4.9.0).",
+    "release_commit": "1bfc4a54b373da3477b497106fa4db59111e2770",
+    "released_version": "4.8.0"
   },
   "campaign": "battle-hardening-2026-08",
   "evidence_classes": [

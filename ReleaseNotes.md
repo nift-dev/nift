@@ -1,6 +1,11 @@
 # Nift release notes
 
-## v4.8.0 (release candidate; not yet published)
+## v4.9.0 (unreleased development)
+
+Development has advanced to v4.9.0 after the completed v4.8.0 release. No
+v4.9.0 user-visible changes have been recorded yet.
+
+## v4.8.0 (released 2026-10-08)
 
 Nift v4.8 adds agent-oriented transformation workspaces, improves scripting hot
 paths, fixes prepared/ordinary evaluation parity, and reports diagnostics against
@@ -127,9 +132,9 @@ sources and certification identities are recorded rather than inferred from a
 successful build. The installer smoke now deterministically corrupts negative
 checksums, including digests whose first byte is `00`.
 
-These reviewed notes prepare the v4.8.0 release. A passing Release artifacts
-rehearsal and explicit release authorization are still required before tagging
-or publication. The existing fail-closed reviewed-notes requirement is retained.
+v4.8.0 was published after the accepted rehearsal and explicit authorization.
+See `docs/evidence/release-4.8.0/release-verification.md` for final verification.
+The existing fail-closed reviewed-notes requirement is retained.
 
 ## v4.7.2 (released 2026-10-06)
 

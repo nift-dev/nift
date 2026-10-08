@@ -20,22 +20,19 @@ whether it is a regression.
 ## Current identity
 
 - Product: **Nift**, a website generator and dependency-aware website build layer.
-- Current executable identity: `Nift v4.8.0` (local development), following the
-  public v4.7.2 release.
+- Current executable identity: `Nift v4.9.0` (development), following the public v4.8.0 release.
 - Language/toolchain: C++17 and Make.
 - Output convention for modern projects: `public/`.
 - Current branch: `main` in this checkout.
-- Current project phase: **v4.8 hard feature freeze; release preparation**.
-  The accepted feature baseline is `9533ad90e2dc9f87b8533b9b0e8114e98fedfa03`.
-  The feature queue and CP-F are closed. Stabilization and reviewed release notes
-  are the remaining work; a release artifact rehearsal, tag, and publication
-  require a separate decision. External contracts are pinned to
-  nift-regression-suite `34b1c2ff4d1a3f591176f3ce79b74ad2958b6852` (93 modules)
-  and packages-regression-suite `1da43659da269c96af21aea7234799d2ad56b2df`
-  (12 modules, release-blocking). Reviewed v4.8 notes belong in
-  `docs/evidence/release-4.8.0/release-notes-4.8.0.md`.
-  The public v4.7.2 release remains the preceding release; its historical
-  certification is in `docs/evidence/release-4.7.2/release-verification.md`.
+- Current project phase: **post-v4.8 release; v4.9 development**.
+  The immutable v4.8.0 tag targets `1bfc4a54b373da3477b497106fa4db59111e2770`.
+  Release workflow #37746497666 and all public installer lanes passed.
+  Chocolatey 4.8.0 was submitted via #37747611875 and remains pending moderation.
+  Release verification and deferred work are recorded in
+  `docs/evidence/release-4.8.0/release-verification.md`.
+  External contracts remain NRS `34b1c2ff4d1a3f591176f3ce79b74ad2958b6852`
+  (93 modules) and PRS `1da43659da269c96af21aea7234799d2ad56b2df` (12 modules).
+  No new feature or performance campaign is authorized by this version transition.
 - Public documentation: the separate `nift-dev.github.io` repository.
 - External contract: the separate `nift-regression-suite` repository.
 - Embedded minifier: `minifypp/`, synchronized with standalone Minify++.

@@ -7,20 +7,20 @@ approved release is packaged and published.
 
 ## Authority and current state
 
-The executable and Snap recipe declare `4.8.0`, but v4.8 is not published.
-The accepted feature baseline is `9533ad90e2dc9f87b8533b9b0e8114e98fedfa03`.
-Hard feature freeze is active: the feature queue and CP-F are closed.
-Release preparation includes stabilization, first-party warning certification,
-reviewed notes, and the existing fail-closed package certification.
-The external suites are NRS `34b1c2ff4d1a3f591176f3ce79b74ad2958b6852`
-(93 modules) and PRS `1da43659da269c96af21aea7234799d2ad56b2df` (12 modules).
+The executable and Snap recipe declare `4.9.0` for development after the completed
+v4.8.0 GitHub release. The immutable annotated `v4.8.0` tag targets
+`1bfc4a54b373da3477b497106fa4db59111e2770`; release workflow #37746497666 passed
+including all three public installer lanes. Exactly five public assets were
+independently verified. Chocolatey 4.8.0 was submitted through #37747611875 and
+is pending moderation. Snap remains maintainer-managed; Homebrew is automatic
+downstream propagation and was not checked in this task.
 
-The reviewed notes required by Release artifacts are
-`docs/evidence/release-4.8.0/release-notes-4.8.0.md`. Do not replace them with
-placeholder evidence or relax the release gate. The warning/notes audit must
-stop before the artifact rehearsal. A tag and publication remain separate
-explicit decisions. Prior release entries below are historical records,
-including their package-manager submission status at the time.
+See `docs/evidence/release-4.8.0/release-verification.md` for final checksums and
+evidence. Canonical reviewed notes remain unchanged at
+`docs/evidence/release-4.8.0/release-notes-4.8.0.md`. External suites remain NRS
+`34b1c2ff4d1a3f591176f3ce79b74ad2958b6852` (93 modules) and PRS
+`1da43659da269c96af21aea7234799d2ad56b2df` (12 modules). Future tags and package
+publication require explicit authorization. Prior entries are historical records.
 
 ### v4.7.2 release status (2026-10-06)
 

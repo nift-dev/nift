@@ -8,7 +8,7 @@ For documentation, examples and downloads, visit **[nift.dev](https://nift.dev)*
 
 ## Project status
 
-Nift has completed its planned Checkpoints 0–10 deliberate hardening campaign and the v4.2–v4.8 language, runtime, shell, packaging and embedding campaigns. The current development tree is `Nift v4.8.0`, following the public v4.7.2 release. Existing regression, sanitizer, filesystem, parser, incremental, cross-platform, performance and packaging gates remain maintained; new hardening work should be driven by concrete findings or newly justified guarantees rather than arbitrary checkpoint numbers.
+Nift has completed its planned Checkpoints 0–10 deliberate hardening campaign and the v4.2–v4.8 language, runtime, shell, packaging and embedding campaigns. The current development tree is `Nift v4.9.0`, following the public v4.8.0 release. Existing regression, sanitizer, filesystem, parser, incremental, cross-platform, performance and packaging gates remain maintained; new hardening work should be driven by concrete findings or newly justified guarantees rather than arbitrary checkpoint numbers.
 
 ## Features
 
@@ -201,7 +201,7 @@ The stripped rewrite is guided by an explicit design checklist in [`ARCHITECTURE
 
 The embedded `minifypp/` subtree follows the same boundary: it is a self-contained library/CLI/test project that Nift consumes through a public header, so it can be extracted later without depending on Nift's project model.
 
-## Existing-project transformation workspaces (v4.8 development)
+## Existing-project transformation workspaces (introduced in v4.8)
 
 `nift init --migration` scaffolds a parity-first faithful port. Experimental
 `nift init --rewrite` preserves the product/design/behaviour with a new
