@@ -235,7 +235,7 @@ private:
     std::vector<SavedLexicalScopes> saved_lexical_scopes_;
     std::unordered_map<std::string, Callable> callables_;
     // Prepared AST bodies for user callables, cached on first prepared call.
-    struct PreparedCallable { bool ready=false; std::vector<std::unique_ptr<nift::ast::Stmt>> stmts; };
+    struct PreparedCallable { nift::detail::SourceView view; bool ready=false; std::vector<std::unique_ptr<nift::ast::Stmt>> stmts; };
     std::unordered_map<const Callable*, PreparedCallable> prepared_callables_;
     std::shared_ptr<ModuleEnv> active_module_env_;
     std::shared_ptr<ModuleEnv> loading_module_env_;

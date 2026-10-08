@@ -66,10 +66,11 @@ struct P {
 // Resolve an Index/Member/Binding chain by reference so that collections are
 // not deep-copied on every intermediate access (a[i] must not copy all of a).
 bool eval_chain(const Expr& e,Context& c,std::shared_ptr<const nift::RuntimeValue>& out,std::string& error){
+ const auto execute=[&]() -> bool {
  if(e.kind==Kind::Binding){if(c.resolve_ref)return c.resolve_ref(e.name,out,error);nift::RuntimeValue v;if(!c.resolve(e.name,v,error))return false;out=std::make_shared<const nift::RuntimeValue>(std::move(v));return true;}
  if(e.kind==Kind::Member){std::shared_ptr<const nift::RuntimeValue> base;if(!eval_chain(*e.left,c,base,error))return false;if(!base->is_object()||!base->has(e.name)){error="value has no member: "+e.name;return false;}out=std::shared_ptr<const nift::RuntimeValue>(base,&(*base)[e.name]);return true;}
   if(e.kind==Kind::Index){std::shared_ptr<const nift::RuntimeValue> base;if(!eval_chain(*e.left,c,base,error))return false;nift::RuntimeValue i;if(!evaluate(*e.right,c,i,error))return false;std::size_t index=0;if(base->is_array()&&nift::runtime_number_to_size(i,index)&&index<base->array.size()){out=std::shared_ptr<const nift::RuntimeValue>(base,&base->array[index]);return true;}if(base->is_bytes()&&nift::runtime_number_to_size(i,index)&&base->bytes&&index<base->bytes->size()){out=std::make_shared<const nift::RuntimeValue>(static_cast<int>((*base->bytes)[index]));return true;}if(base->is_object()&&i.is_string()&&base->has(i.string)){out=std::shared_ptr<const nift::RuntimeValue>(base,&(*base)[i.string]);return true;}error="invalid index";return false;}
- nift::RuntimeValue v;if(!evaluate(e,c,v,error))return false;out=std::make_shared<const nift::RuntimeValue>(std::move(v));return true;}
+ nift::RuntimeValue v;if(!evaluate(e,c,v,error))return false;out=std::make_shared<const nift::RuntimeValue>(std::move(v));return true;};const bool ok=execute();if(!ok&&c.failure_origin)c.failure_origin(e.span);return ok;}
 bool eq(const nift::RuntimeValue&a,const nift::RuntimeValue&b){return nift::runtime_equal(a,b);}
 }
 
