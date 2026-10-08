@@ -249,6 +249,8 @@ jobs:
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
           path: dist
+          # Keep the package-source certification manifest in its separate artifact.
+          pattern: "{linux-x86_64,macos-arm64,macos-x86_64,windows-x86_64}"
           merge-multiple: true
       - name: Create checksums
         working-directory: dist
@@ -303,6 +305,8 @@ jobs:
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
         with:
           path: dist
+          # Keep the package-source certification manifest in its separate artifact.
+          pattern: "{linux-x86_64,macos-arm64,macos-x86_64,windows-x86_64}"
           merge-multiple: true
       - name: Build rehearsal checksum manifest and validate exact asset set
         shell: bash
