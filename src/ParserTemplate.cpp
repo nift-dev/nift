@@ -160,12 +160,13 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
 }
 
 RenderResult Parser::parse(const std::string& source, const fs::path& source_path, int depth,
-                           SourceProvenance source_provenance) {
+                           SourceProvenance source_provenance, nift::detail::SourceView view) {
     if (depth > 64) {
         fail(source_path, source, 0, "maximum template parse depth exceeded (possible recursion)");
         return result_;
     }
-    source_context_stack_.push_back(SourceContext{source_path,source_provenance});
+    if(!view)view=nift::detail::SourceView::identity(source_path,source);
+    source_context_stack_.push_back(SourceContext{source_path,source_provenance,view});
     source_path_stack_.push_back(source_path);
     struct SourceContextGuard {
         std::vector<SourceContext>& stack;

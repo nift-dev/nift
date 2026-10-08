@@ -495,7 +495,8 @@ int compare_sort_keys(const nift::RuntimeValue& left, const nift::RuntimeValue& 
     return left.string < right.string ? -1 : (left.string > right.string ? 1 : 0);
 }
 
-ControlBlockBody normalize_control_block_body(std::string body) {
+ControlBlockBody normalize_control_block_body(std::string body, SourceView view) {
+    if(!view)view=SourceView::identity({},body);
     ControlBlockBody result;
 
     // A block written in the usual form
@@ -513,6 +514,7 @@ ControlBlockBody normalize_control_block_body(std::string body) {
         result.multiline = true;
         if (body[first] == '\r' && first + 1 < body.size() && body[first + 1] == '\n') ++first;
         body.erase(0, first + 1);
+        view=view.slice(first+1);
 
         while (!body.empty() && (body.back() == ' ' || body.back() == '\t')) body.pop_back();
         if (!body.empty() && body.back() == '\n') {
@@ -520,6 +522,7 @@ ControlBlockBody normalize_control_block_body(std::string body) {
             if (!body.empty() && body.back() == '\r') body.pop_back();
         }
 
+        view=view.slice(0,body.size());
         std::size_t common = std::string::npos;
         std::size_t line_start = 0;
         while (line_start <= body.size()) {
@@ -533,6 +536,7 @@ ControlBlockBody normalize_control_block_body(std::string body) {
         }
 
         if (common != std::string::npos && common > 0) {
+            SourceBuilder mapped(view);
             std::string dedented;
             dedented.reserve(body.size());
             line_start = 0;
@@ -545,15 +549,19 @@ ControlBlockBody normalize_control_block_body(std::string body) {
                     ++remove;
                 }
                 dedented.append(body, line_start + remove, end - (line_start + remove));
+                mapped.copy(body,line_start+remove,end-line_start-remove);
                 if (line_end == std::string::npos) break;
                 dedented += '\n';
+                mapped.copy(body,end,1);
                 line_start = line_end + 1;
             }
             body = std::move(dedented);
+            view=std::move(mapped).finish().view;
         }
     }
 
     result.text = std::move(body);
+    result.view=std::move(view);
     return result;
 }
 

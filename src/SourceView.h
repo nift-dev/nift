@@ -92,7 +92,11 @@ public:
         length = std::min(length, size_ - start);
         if (!spans_) return SourceView(document_, {}, base_ + start, length, base_ + start + length);
         std::vector<SourceSpanMapping> clipped;
-        for (const auto& span : *spans_) {
+        auto first = std::upper_bound(spans_->begin(), spans_->end(), start,
+            [](std::size_t n, const SourceSpanMapping& span) { return n < span.begin; });
+        if (first != spans_->begin()) --first;
+        for (auto it = first; it != spans_->end() && it->begin < start + length; ++it) {
+            const auto& span = *it;
             const auto begin = std::max(start, span.begin);
             const auto end = std::min(start + length, span.begin + span.length);
             if (begin >= end) continue;
@@ -128,6 +132,7 @@ struct MappedSource { std::string text; SourceView view; };
 class SourceBuilder {
 public:
     explicit SourceBuilder(SourceView input) : input_(std::move(input)) {}
+    const std::string& text() const { return text_; }
     void copy(std::string_view text, std::size_t start, std::size_t length) {
         append(text.substr(start, length), input_.slice(start, length));
     }

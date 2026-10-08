@@ -1738,3 +1738,13 @@ test-source-view: $(TEST_DIR)/source-view-unit$(EXEEXT)
 	$(TEST_DIR)/source-view-unit$(EXEEXT)
 
 test: test-source-view
+
+$(TEST_DIR)/source-translation-unit$(EXEEXT): tests/source_translation_unit.cpp $(filter-out src/nift.o src/CLI.o,$(CLI_OBJECTS))
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/source_translation_unit.cpp $(filter-out src/nift.o src/CLI.o,$(CLI_OBJECTS)) $(LDLIBS) -o $@
+
+.PHONY: test-source-translation
+test-source-translation: $(TEST_DIR)/source-translation-unit$(EXEEXT)
+	$(TEST_DIR)/source-translation-unit$(EXEEXT)
+
+test: test-source-translation

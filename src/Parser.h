@@ -1,5 +1,6 @@
 #pragma once
 #include "Types.h"
+#include "SourceView.h"
 #include "RenderHost.h"
 #include <filesystem>
 #include <optional>
@@ -51,6 +52,7 @@ private:
 };
 
 class Parser {
+    friend struct SourceTranslationTestAccess;
 public:
     // Shared filesystem type-inspection result backing exists/is_file/is_dir/stat.
     // One metadata query (std::filesystem::status) derives exists + type; size is
@@ -197,6 +199,7 @@ private:
     struct SourceContext {
         std::filesystem::path path;
         SourceProvenance provenance = SourceProvenance::FileBacked;
+        nift::detail::SourceView view{};
     };
     struct ResourcePathAuthority {
         std::filesystem::path project_root;
@@ -426,11 +429,13 @@ private:
     std::filesystem::path pagination_current_output_;
 
     RenderResult parse(const std::string& source, const std::filesystem::path& source_path, int depth,
-                       SourceProvenance source_provenance);
+                       SourceProvenance source_provenance, nift::detail::SourceView view = {});
     RenderResult parse(const std::string& source, const std::filesystem::path& source_path, int depth);
-    bool translate_function_program(const std::string& source, std::string& translated, std::string& error) const;
+    bool translate_function_program(const std::string& source, std::string& translated, std::string& error,
+        nift::detail::SourceView input_view = {}, nift::detail::SourceView* output_view = nullptr,
+        nift::detail::DiagnosticOrigin* failure_origin = nullptr) const;
     RenderResult execute_native_program(const std::string& source, const std::filesystem::path& source_path, int depth,
-                                         SourceProvenance source_provenance, bool rollback_files_on_failure = true);
+                                         SourceProvenance source_provenance, bool rollback_files_on_failure = true, nift::detail::SourceView view = {});
     bool execute_import_file(const std::string& argument, const std::filesystem::path& caller_path, int depth, bool legacy_syntax, std::string& error);
     std::string metadata(const std::string& key) const;
     bool json_value(const std::string& expression, std::string& value, std::string& error);

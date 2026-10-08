@@ -37,11 +37,19 @@ fs::path stable_import_identity(const fs::path& path) {
 }
 }
 
-bool Parser::translate_function_program(const std::string& source, std::string& translated, std::string& error) const {
-    std::function<bool(const std::string&, std::string&, std::size_t, std::size_t)> convert;
-    convert = [&](const std::string& in, std::string& out, std::size_t base_line, std::size_t base_column) -> bool {
+bool Parser::translate_function_program(const std::string& source, std::string& translated, std::string& error, nift::detail::SourceView input_view, nift::detail::SourceView* output_view, nift::detail::DiagnosticOrigin* failure_origin) const {
+    using nift::detail::SourceView;
+    if(!input_view) input_view=SourceView::identity({},source);
+    std::function<bool(const std::string&, std::string&, SourceView, SourceView&)> convert;
+    convert = [&](const std::string& in, std::string& out, SourceView view, SourceView& translated_view) -> bool {
         std::size_t i=0;
-        auto source_position=[&](std::size_t offset){std::size_t line=base_line,column=base_column;for(std::size_t p=0;p<offset&&p<in.size();++p){if(in[p]=='\n'){++line;column=1;}else ++column;}return std::pair<std::size_t,std::size_t>{line,column};};
+        nift::detail::SourceBuilder mapped(view);
+        auto generated=[&](std::string_view text,std::size_t anchor,std::size_t length=1){mapped.generated(text,anchor,length);};
+        auto copied=[&](std::size_t start,std::size_t length){mapped.copy(in,start,length);};
+        auto nested=[&](const std::string& text,const SourceView& child){mapped.append(text,child);};
+        auto finish=[&](){auto completed=std::move(mapped).finish();out=std::move(completed.text);translated_view=std::move(completed.view);return true;};
+        auto translation_failure=[&](){if(failure_origin)*failure_origin=view.locate(i);return false;};
+        auto source_position=[&](std::size_t offset){auto position=view.locate(offset);return std::pair<std::size_t,std::size_t>{position.line,position.column};};
         auto boundary=[&](std::size_t p,const std::string& kw){return in.compare(p,kw.size(),kw)==0 && (p+kw.size()==in.size() || (!std::isalnum((unsigned char)in[p+kw.size()]) && in[p+kw.size()]!='_'));};
         while(i<in.size()) {
             while(i<in.size() && std::isspace((unsigned char)in[i])) ++i;
@@ -50,120 +58,120 @@ bool Parser::translate_function_program(const std::string& source, std::string& 
                 std::size_t p=i+2; while(p<in.size()&&std::isspace((unsigned char)in[p]))++p; bool async=false;
                 if(p+7<=in.size() && in.compare(p,7,"[async]")==0){async=true;p+=7;while(p<in.size()&&std::isspace((unsigned char)in[p]))++p;}
                 std::size_t pc=0;
-                if(p>=in.size()||in[p]!='('||!find_balanced(in,p,'(',')',pc)){error="fn requires '(name(args))'";return false;}
+                if(p>=in.size()||in[p]!='('||!find_balanced(in,p,'(',')',pc)){error="fn requires '(name(args))'";return translation_failure();}
                 std::size_t bo=pc+1; while(bo<in.size()&&std::isspace((unsigned char)in[bo]))++bo; std::size_t bc=0;
-                if(bo>=in.size()||in[bo]!='{'||!find_balanced(in,bo,'{','}',bc)){error="fn requires a block";return false;}
-                std::string body;const auto body_position=source_position(bo+1);if(!convert(in.substr(bo+1,bc-bo-1),body,body_position.first,body_position.second))return false;
-                out += async?"@fn[async](":"@fn("; out+=in.substr(p+1,pc-p-1)+"){"+body+"}"; i=bc+1; continue;
+                if(bo>=in.size()||in[bo]!='{'||!find_balanced(in,bo,'{','}',bc)){error="fn requires a block";return translation_failure();}
+                std::string body;SourceView body_view;if(!convert(in.substr(bo+1,bc-bo-1),body,view.slice(bo+1,bc-bo-1),body_view))return false;
+                generated(async?"@fn[async](":"@fn(",i);copied(p+1,pc-p-1);generated("){",bo);nested(body,body_view);generated("}",bc); i=bc+1; continue;
             }
             if(boundary(i,"enum")) {
                 std::size_t p=i+4;while(p<in.size()&&std::isspace((unsigned char)in[p]))++p;std::size_t ns=p;while(p<in.size()&&(std::isalnum((unsigned char)in[p])||in[p]=='_'))++p;std::string name=in.substr(ns,p-ns);while(p<in.size()&&std::isspace((unsigned char)in[p]))++p;std::size_t bc=0;
-                if(name.empty()||p>=in.size()||in[p]!='{'||!find_balanced(in,p,'{','}',bc)){error="enum requires 'Name { members }'";return false;}out+="@enum("+name+"){"+in.substr(p+1,bc-p-1)+"}";i=bc+1;continue;
+                if(name.empty()||p>=in.size()||in[p]!='{'||!find_balanced(in,p,'{','}',bc)){error="enum requires 'Name { members }'";return translation_failure();}generated("@enum(",i);copied(ns,name.size());generated("){",p);copied(p+1,bc-p-1);generated("}",bc);i=bc+1;continue;
             }
             if(boundary(i,"struct")) {
                 std::size_t p=i+6; while(p<in.size()&&std::isspace((unsigned char)in[p]))++p; std::size_t pc=0;
-                if(p>=in.size()||in[p]!='('||!find_balanced(in,p,'(',')',pc)){error="struct requires '(name)'";return false;}
+                if(p>=in.size()||in[p]!='('||!find_balanced(in,p,'(',')',pc)){error="struct requires '(name)'";return translation_failure();}
                 std::size_t bo=pc+1; while(bo<in.size()&&std::isspace((unsigned char)in[bo]))++bo; std::size_t bc=0;
-                if(bo>=in.size()||in[bo]!='{'||!find_balanced(in,bo,'{','}',bc)){error="struct requires a block";return false;}
-                out += "@struct("+in.substr(p+1,pc-p-1)+"){"+in.substr(bo+1,bc-bo-1)+"}"; i=bc+1; continue;
+                if(bo>=in.size()||in[bo]!='{'||!find_balanced(in,bo,'{','}',bc)){error="struct requires a block";return translation_failure();}
+                generated("@struct(",i);copied(p+1,pc-p-1);generated("){",bo);copied(bo+1,bc-bo-1);generated("}",bc); i=bc+1; continue;
             }
             if(boundary(i,"export")) {
                 std::size_t p=i+6; while(p<in.size()&&std::isspace((unsigned char)in[p]))++p; std::size_t pc=0;
-                if(p>=in.size()||in[p]!='('||!find_balanced(in,p,'(',')',pc)){error="export requires '(binding)'";return false;}
-                out += "@__export("+in.substr(p+1,pc-p-1)+")"; i=pc+1; if(i<in.size()&&in[i]==';')++i; continue;
+                if(p>=in.size()||in[p]!='('||!find_balanced(in,p,'(',')',pc)){error="export requires '(binding)'";return translation_failure();}
+                generated("@__export(",i);copied(p+1,pc-p-1);generated(")",pc); i=pc+1; if(i<in.size()&&in[i]==';')++i; continue;
             }
             if(boundary(i,"import")) {
                 std::size_t p=i+6; while(p<in.size()&&std::isspace((unsigned char)in[p]))++p;
-                if(p<in.size()&&in[p]=='('){const auto source_lines=std::count(in.begin(),in.begin()+i,'\n');const auto output_lines=std::count(out.begin(),out.end(),'\n');if(output_lines<source_lines)out.append(source_lines-output_lines,'\n');const auto line_start=in.rfind('\n',i);const auto indent_start=line_start==std::string::npos?0:line_start+1;if(std::all_of(in.begin()+indent_start,in.begin()+i,[](char c){return c==' '||c=='\t';}))out+=in.substr(indent_start,i-indent_start);std::size_t pc=0;if(!find_balanced(in,p,'(',')',pc)){out+=in.substr(i);return true;}out+=in.substr(i,pc-i+1);i=pc+1;if(i<in.size()&&in[i]==';')++i;continue;}
+                if(p<in.size()&&in[p]=='('){const auto source_lines=std::count(in.begin(),in.begin()+i,'\n');const auto output_lines=std::count(mapped.text().begin(),mapped.text().end(),'\n');if(output_lines<source_lines)generated(std::string(source_lines-output_lines,'\n'),i);const auto line_start=in.rfind('\n',i);const auto indent_start=line_start==std::string::npos?0:line_start+1;if(std::all_of(in.begin()+indent_start,in.begin()+i,[](char c){return c==' '||c=='\t';}))copied(indent_start,i-indent_start);std::size_t pc=0;if(!find_balanced(in,p,'(',')',pc)){copied(i,in.size()-i);return finish();}copied(i,pc-i+1);i=pc+1;if(i<in.size()&&in[i]==';')++i;continue;}
             }
             // A single-line @// comment must be consumed to end-of-line BEFORE
             // statement splitting, so a ';' inside the comment cannot turn the
             // rest of the comment into a statement.
             if (in.compare(i, 3, "@//") == 0) {
                 std::size_t line_end = in.find('\n', i);
-                out += '\n';
+                generated("\n",i);
                 i = (line_end == std::string::npos) ? in.size() : line_end;
                 continue;
             }
             // Script-land single-line comment without the template '@' prefix.
             if (in.compare(i, 2, "//") == 0) {
                 std::size_t line_end = in.find('\n', i);
-                out += '\n';
+                generated("\n",i);
                 i = (line_end == std::string::npos) ? in.size() : line_end;
                 continue;
             }
             if (in.compare(i, 3, "@/*") == 0) {
                 std::size_t block_end = in.find("*/", i + 3);
-                if (block_end == std::string::npos) { error = "open comment '@/*' has no close '*/'"; return false; }
+                if (block_end == std::string::npos) { error = "open comment '@/*' has no close '*/'"; return translation_failure(); }
                 i = block_end + 2;
                 continue;
             }
             // Script-land block comment without the template '@' prefix.
             if (in.compare(i, 2, "/*") == 0) {
                 std::size_t block_end = in.find("*/", i + 2);
-                if (block_end == std::string::npos) { error = "open comment '/*' has no close '*/'"; return false; }
+                if (block_end == std::string::npos) { error = "open comment '/*' has no close '*/'"; return translation_failure(); }
                 const auto line_count=std::count(in.begin()+i,in.begin()+block_end+2,'\n');
-                if(line_count)out.append(line_count,'\n');else out+=' ';
+                if(line_count)generated(std::string(line_count,'\n'),i);else generated(" ",i);
                 i = block_end + 2;
                 continue;
             }
             if(boundary(i,"while")) {
                 std::size_t p=i+5;while(p<in.size()&&std::isspace((unsigned char)in[p]))++p;std::size_t pc=0;
-                if(p>=in.size()||in[p]!='('||!find_balanced(in,p,'(',')',pc)){error="function while requires '(...)'";return false;}
+                if(p>=in.size()||in[p]!='('||!find_balanced(in,p,'(',')',pc)){error="function while requires '(...)'";return translation_failure();}
                 std::size_t bo=pc+1;while(bo<in.size()&&std::isspace((unsigned char)in[bo]))++bo;std::size_t bc=0;
-                if(bo>=in.size()||in[bo]!='{'||!find_balanced(in,bo,'{','}',bc)){error="function while requires a block";return false;}
-                std::string body;const auto body_position=source_position(bo+1);if(!convert(in.substr(bo+1,bc-bo-1),body,body_position.first,body_position.second))return false;out+="@while("+in.substr(p+1,pc-p-1)+"){"+body+"}";i=bc+1;continue;
+                if(bo>=in.size()||in[bo]!='{'||!find_balanced(in,bo,'{','}',bc)){error="function while requires a block";return translation_failure();}
+                std::string body;SourceView body_view;if(!convert(in.substr(bo+1,bc-bo-1),body,view.slice(bo+1,bc-bo-1),body_view))return false;generated("@while(",i);copied(p+1,pc-p-1);generated("){",bo);nested(body,body_view);generated("}",bc);i=bc+1;continue;
             }
             if(boundary(i,"try")) {
                 std::size_t bo=i+3;while(bo<in.size()&&std::isspace((unsigned char)in[bo]))++bo;
                 if(bo<in.size()&&in[bo]=='{'){
-                    std::size_t bc=0;if(!find_balanced(in,bo,'{','}',bc)){error="try requires a balanced block";return false;}
+                    std::size_t bc=0;if(!find_balanced(in,bo,'{','}',bc)){error="try requires a balanced block";return translation_failure();}
                     std::size_t cp=bc+1;while(cp<in.size()&&std::isspace((unsigned char)in[cp]))++cp;
-                    if(!boundary(cp,"catch")){error="try requires catch(identifier)";return false;}
+                    if(!boundary(cp,"catch")){error="try requires catch(identifier)";return translation_failure();}
                     cp+=5;while(cp<in.size()&&std::isspace((unsigned char)in[cp]))++cp;std::size_t cc=0;
-                    if(cp>=in.size()||in[cp]!='('||!find_balanced(in,cp,'(',')',cc)){error="catch requires '(identifier)'";return false;}
+                    if(cp>=in.size()||in[cp]!='('||!find_balanced(in,cp,'(',')',cc)){error="catch requires '(identifier)'";return translation_failure();}
                     const std::string binding=trim_copy(in.substr(cp+1,cc-cp-1));
-                    if(!valid_binding_identifier(binding)){error="catch requires one valid identifier";return false;}
+                    if(!valid_binding_identifier(binding)){error="catch requires one valid identifier";return translation_failure();}
                     std::size_t cbo=cc+1;while(cbo<in.size()&&std::isspace((unsigned char)in[cbo]))++cbo;std::size_t cbc=0;
-                    if(cbo>=in.size()||in[cbo]!='{'||!find_balanced(in,cbo,'{','}',cbc)){error="catch(identifier) requires a block";return false;}
-                    std::string try_body,catch_body;const auto try_position=source_position(bo+1);const auto catch_position=source_position(cbo+1);if(!convert(in.substr(bo+1,bc-bo-1),try_body,try_position.first,try_position.second)||!convert(in.substr(cbo+1,cbc-cbo-1),catch_body,catch_position.first,catch_position.second))return false;
-                    out+="@__try("+binding+"){"+try_body+"}{"+catch_body+"}";i=cbc+1;continue;
+                    if(cbo>=in.size()||in[cbo]!='{'||!find_balanced(in,cbo,'{','}',cbc)){error="catch(identifier) requires a block";return translation_failure();}
+                    std::string try_body,catch_body;SourceView try_view;SourceView catch_view;if(!convert(in.substr(bo+1,bc-bo-1),try_body,view.slice(bo+1,bc-bo-1),try_view)||!convert(in.substr(cbo+1,cbc-cbo-1),catch_body,view.slice(cbo+1,cbc-cbo-1),catch_view))return false;
+                    generated("@__try(",i);copied(cp+1+in.substr(cp+1,cc-cp-1).find_first_not_of(" \t\r\n"),binding.size());generated("){",bo);nested(try_body,try_view);generated("}{",cbo);nested(catch_body,catch_view);generated("}",cbc);i=cbc+1;continue;
                 }
             }
             if(boundary(i,"for")) {
                 std::size_t p=i+3; while(p<in.size()&&std::isspace((unsigned char)in[p]))++p;
-                std::size_t pc=0; if(p>=in.size()||in[p]!='('||!find_balanced(in,p,'(',')',pc)){error="function for requires '(...)'";return false;}
+                std::size_t pc=0; if(p>=in.size()||in[p]!='('||!find_balanced(in,p,'(',')',pc)){error="function for requires '(...)'";return translation_failure();}
                 std::size_t bo=pc+1;while(bo<in.size()&&std::isspace((unsigned char)in[bo]))++bo;std::size_t bc=0;
-                if(bo>=in.size()||in[bo]!='{'||!find_balanced(in,bo,'{','}',bc)){error="function for requires a block";return false;}
-                std::string body;const auto body_position=source_position(bo+1);if(!convert(in.substr(bo+1,bc-bo-1),body,body_position.first,body_position.second))return false;
-                out += "@for("+in.substr(p+1,pc-p-1)+"){"+body+"}";i=bc+1;continue;
+                if(bo>=in.size()||in[bo]!='{'||!find_balanced(in,bo,'{','}',bc)){error="function for requires a block";return translation_failure();}
+                std::string body;SourceView body_view;if(!convert(in.substr(bo+1,bc-bo-1),body,view.slice(bo+1,bc-bo-1),body_view))return false;
+                generated("@for(",i);copied(p+1,pc-p-1);generated("){",bo);nested(body,body_view);generated("}",bc);i=bc+1;continue;
             }
             if(boundary(i,"if")) {
                 std::size_t p=i+2; while(p<in.size()&&std::isspace((unsigned char)in[p]))++p;
-                if(p>=in.size()||in[p]!='('){error="function if requires '(...)'";return false;}
-                std::size_t pc=0; if(!find_balanced(in,p,'(',')',pc)){error="function if has no matching ')'";return false;}
+                if(p>=in.size()||in[p]!='('){error="function if requires '(...)'";return translation_failure();}
+                std::size_t pc=0; if(!find_balanced(in,p,'(',')',pc)){error="function if has no matching ')'";return translation_failure();}
                 std::size_t bo=pc+1; while(bo<in.size()&&std::isspace((unsigned char)in[bo]))++bo;
-                std::size_t bc=0; if(bo>=in.size()||in[bo]!='{'||!find_balanced(in,bo,'{','}',bc)){error="function if requires a block";return false;}
-                std::string body;const auto body_position=source_position(bo+1); if(!convert(in.substr(bo+1,bc-bo-1),body,body_position.first,body_position.second))return false;
-                out += "@if("+in.substr(p+1,pc-p-1)+"){"+body+"}"; i=bc+1;
+                std::size_t bc=0; if(bo>=in.size()||in[bo]!='{'||!find_balanced(in,bo,'{','}',bc)){error="function if requires a block";return translation_failure();}
+                std::string body;SourceView body_view; if(!convert(in.substr(bo+1,bc-bo-1),body,view.slice(bo+1,bc-bo-1),body_view))return false;
+                generated("@if(",i);copied(p+1,pc-p-1);generated("){",bo);nested(body,body_view);generated("}",bc); i=bc+1;
                 while(true){std::size_t e=i;while(e<in.size()&&std::isspace((unsigned char)in[e]))++e;if(!boundary(e,"else"))break;e+=4;while(e<in.size()&&std::isspace((unsigned char)in[e]))++e;
-                    if(boundary(e,"if")){std::size_t q=e+2;while(q<in.size()&&std::isspace((unsigned char)in[q]))++q;std::size_t qc=0;if(q>=in.size()||in[q]!='('||!find_balanced(in,q,'(',')',qc)){error="function else if malformed";return false;}std::size_t eb=qc+1;while(eb<in.size()&&std::isspace((unsigned char)in[eb]))++eb;std::size_t ec=0;if(eb>=in.size()||in[eb]!='{'||!find_balanced(in,eb,'{','}',ec)){error="function else if requires block";return false;}std::string body2;const auto body2_position=source_position(eb+1);if(!convert(in.substr(eb+1,ec-eb-1),body2,body2_position.first,body2_position.second))return false;out+=" else if("+in.substr(q+1,qc-q-1)+"){"+body2+"}";i=ec+1;continue;}
-                    std::size_t ec=0;if(e>=in.size()||in[e]!='{'||!find_balanced(in,e,'{','}',ec)){error="function else requires block";return false;}std::string body2;const auto body2_position=source_position(e+1);if(!convert(in.substr(e+1,ec-e-1),body2,body2_position.first,body2_position.second))return false;out+=" else {"+body2+"}";i=ec+1;break;}
+                    if(boundary(e,"if")){std::size_t q=e+2;while(q<in.size()&&std::isspace((unsigned char)in[q]))++q;std::size_t qc=0;if(q>=in.size()||in[q]!='('||!find_balanced(in,q,'(',')',qc)){error="function else if malformed";return translation_failure();}std::size_t eb=qc+1;while(eb<in.size()&&std::isspace((unsigned char)in[eb]))++eb;std::size_t ec=0;if(eb>=in.size()||in[eb]!='{'||!find_balanced(in,eb,'{','}',ec)){error="function else if requires block";return translation_failure();}std::string body2;SourceView body2_view;if(!convert(in.substr(eb+1,ec-eb-1),body2,view.slice(eb+1,ec-eb-1),body2_view))return false;generated(" else if(",e);copied(q+1,qc-q-1);generated("){",eb);nested(body2,body2_view);generated("}",ec);i=ec+1;continue;}
+                    std::size_t ec=0;if(e>=in.size()||in[e]!='{'||!find_balanced(in,e,'{','}',ec)){error="function else requires block";return translation_failure();}std::string body2;SourceView body2_view;if(!convert(in.substr(e+1,ec-e-1),body2,view.slice(e+1,ec-e-1),body2_view))return false;generated(" else {",e);nested(body2,body2_view);generated("}",ec);i=ec+1;break;}
                 continue;
             }
             if(boundary(i,"return")) {
                 std::size_t e=i+6; bool quoted=false;char quote=0;
                 while(e<in.size()&&in[e]!='\n'&&in[e]!=';' ) { char c=in[e]; if(quoted){if(c=='\\'&&e+1<in.size())++e;else if(c==quote)quoted=false;}else if(c=='\''||c=='"'){quoted=true;quote=c;}++e; }
-                std::string expr=trim_copy(in.substr(i+6,e-(i+6))); out += expr.empty()?"@__bare_return()":"@return("+expr+")"; i=e<in.size()?e+1:e; continue;
+                std::string expr=trim_copy(in.substr(i+6,e-(i+6))); if(expr.empty())generated("@__bare_return()",i);else{generated("@return(",i);copied(i+6+in.substr(i+6,e-i-6).find_first_not_of(" \t\r\n"),expr.size());generated(")",e);}  i=e<in.size()?e+1:e; continue;
             }
             if(boundary(i,"throw") && i+5<in.size() && std::isspace((unsigned char)in[i+5]) && trim_copy(in.substr(i+5)).rfind(":=",0)!=0 && trim_copy(in.substr(i+5)).rfind("=",0)!=0 && trim_copy(in.substr(i+5)).rfind("+=",0)!=0 && trim_copy(in.substr(i+5)).rfind("-=",0)!=0 && trim_copy(in.substr(i+5)).rfind("*=",0)!=0 && trim_copy(in.substr(i+5)).rfind("/=",0)!=0 && trim_copy(in.substr(i+5)).rfind("%=",0)!=0) {
                 std::size_t e=i+6;bool quoted=false;char quote=0;int par=0,br=0,bc=0;
                 for(;e<in.size();++e){char c=in[e];if(quoted){if(c=='\\'&&e+1<in.size())++e;else if(c==quote)quoted=false;continue;}if(c=='\''||c=='"'){quoted=true;quote=c;continue;}if(c=='(')++par;else if(c==')')--par;else if(c=='[')++br;else if(c==']')--br;else if(c=='{')++bc;else if(c=='}')--bc;if(!par&&!br&&!bc&&(c==';'||c=='\n'))break;}
-                const std::string expr=trim_copy(in.substr(i+5,e-(i+5)));if(expr.empty()){error="throw requires an Error expression";return false;}
-                const auto throw_position=source_position(i);out+="@__throw("+std::to_string(throw_position.first)+","+std::to_string(throw_position.second)+","+expr+")";i=e<in.size()?e+1:e;continue;
+                const std::string expr=trim_copy(in.substr(i+5,e-(i+5)));if(expr.empty()){error="throw requires an Error expression";return translation_failure();}
+                const auto throw_position=source_position(i);generated("@__throw("+std::to_string(throw_position.first)+","+std::to_string(throw_position.second)+",",i);copied(i+5+in.substr(i+5,e-i-5).find_first_not_of(" \t\r\n"),expr.size());generated(")",e);i=e<in.size()?e+1:e;continue;
             }
-            if(boundary(i,"break")) { std::size_t e=i+5; while(e<in.size()&&std::isspace((unsigned char)in[e])&&in[e]!='\n')++e; if(e==in.size()||in[e]==';'||in[e]=='\n') { out += "break"; i=e<in.size()?e+1:e; continue; } }
-            if(boundary(i,"continue")) { std::size_t e=i+8; while(e<in.size()&&std::isspace((unsigned char)in[e])&&in[e]!='\n')++e; if(e==in.size()||in[e]==';'||in[e]=='\n') { out += "continue"; i=e<in.size()?e+1:e; continue; } }
+            if(boundary(i,"break")) { std::size_t e=i+5; while(e<in.size()&&std::isspace((unsigned char)in[e])&&in[e]!='\n')++e; if(e==in.size()||in[e]==';'||in[e]=='\n') { copied(i,5); i=e<in.size()?e+1:e; continue; } }
+            if(boundary(i,"continue")) { std::size_t e=i+8; while(e<in.size()&&std::isspace((unsigned char)in[e])&&in[e]!='\n')++e; if(e==in.size()||in[e]==';'||in[e]=='\n') { copied(i,8); i=e<in.size()?e+1:e; continue; } }
             std::size_t start=i; bool quoted=false;char quote=0;int par=0,br=0,bc=0;
             for(;i<in.size();++i){char c=in[i];if(quoted){if(c=='\\'&&i+1<in.size())++i;else if(c==quote)quoted=false;continue;}if(c=='\''||c=='"'){quoted=true;quote=c;continue;}if(c=='(')++par;else if(c==')')--par;else if(c=='[')++br;else if(c==']')--br;else if(c=='{')++bc;else if(c=='}')--bc;if(!par&&!br&&!bc&&(c==';'||c=='\n'))break;}
             std::string stmt=trim_copy(in.substr(start,i-start));
@@ -177,18 +185,18 @@ bool Parser::translate_function_program(const std::string& source, std::string& 
                     // Only a leading file shebang is stripped by CLI source
                     // loading. Elsewhere the same marker remains inert comment
                     // text; never reinterpret it as an external path command.
-                    out += "@//" + stmt.substr(2) + "\n";
+                    generated("@//",start);copied(start+2,stmt.size()-2);generated("\n",i);
                 } else if(stmt[0]=='@'||stmt[0]=='$'){
-                    out+=stmt;
+                    copied(start,stmt.size());
                     // A verbatim single-line comment has no terminating newline
                     // once inter-statement whitespace is stripped; emit one so it
                     // cannot swallow the following statement.
-                    if(stmt.rfind("@//",0)==0) out+='\n';
+                    if(stmt.rfind("@//",0)==0) generated("\n",i);
                 } else {
                     // `await future` is a language expression even though it is
                     // a multi-token statement; never route it through shell-style
                     // external command dispatch.
-                    if(stmt.rfind("await ",0)==0){ out += "$["+stmt+"]"; if(i<in.size())++i; continue; }
+                    if(stmt.rfind("await ",0)==0){ generated("$[",start,stmt.size());copied(start,stmt.size());generated("]",i); if(i<in.size())++i; continue; }
                     // Executable-path command style: a statement whose first
                     // token is a filesystem path (./x, ../x, /x, dir/x) runs the
                     // executable as an ordinary external process (executable .f
@@ -218,15 +226,15 @@ bool Parser::translate_function_program(const std::string& source, std::string& 
                     // works.
                     bool cmd_like=(path_first||multi_token)&&!assignment_form; bool qq=false;char qc=0;int pp=0,bb=0,cc2=0;bool saw_delim=false;
                     for(std::size_t k=0;k<stmt.size()&&cmd_like;++k){char c=stmt[k];if(qq){if(c=='\\')++k;else if(c==qc)qq=false;continue;}if(c=='\''||c=='"'){qq=true;qc=c;continue;}if(c=='('){++pp;saw_delim=true;}else if(c==')'){--pp;saw_delim=true;}else if(c=='['){++bb;saw_delim=true;}else if(c==']'){--bb;saw_delim=true;}else if(c=='{'){++cc2;saw_delim=true;}else if(c=='}'){--cc2;saw_delim=true;}else if((c=='='||c==':')&&pp==0&&bb==0&&cc2==0){cmd_like=false;}}
-                    if(cmd_like&&!saw_delim&&pp==0&&bb==0&&cc2==0) out += "@__nift_cmd(" + stmt + ")";
-                    else out+="$["+stmt+"]";
+                    if(cmd_like&&!saw_delim&&pp==0&&bb==0&&cc2==0) {generated("@__nift_cmd(",start,stmt.size());copied(start,stmt.size());generated(")",i);}
+                    else {generated("$[",start,stmt.size());copied(start,stmt.size());generated("]",i);}
                 }
             }
             if(i<in.size())++i;
         }
-        return true;
+        return finish();
     };
-    translated.clear(); return convert(source,translated,1,1);
+    translated.clear();SourceView translated_view;const bool ok=convert(source,translated,input_view,translated_view);if(output_view)*output_view=std::move(translated_view);return ok;
 }
 
 Parser::StatementState Parser::statement_state(const std::string& raw) const {
@@ -392,15 +400,16 @@ RenderResult Parser::run_statement(const std::string& source, const fs::path& so
 void Parser::reset_script_control() { pending_control_={}; active_recoverable_.reset(); result_=RenderResult{}; }
 
 RenderResult Parser::execute_native_program(const std::string& source, const fs::path& source_path, int depth,
-                                            SourceProvenance source_provenance, bool rollback_files_on_failure) {
+                                            SourceProvenance source_provenance, bool rollback_files_on_failure, nift::detail::SourceView view) {
     const std::uint64_t file_checkpoint = begin_file_operation();
-    std::string program, error;
-    if (!translate_function_program(source, program, error)) {
-        RenderResult failed; failed.ok=false; failed.error.message=error;failed.diagnostic=nift::detail::make_diagnostic(nift::detail::DiagnosticCode::NativeTranslationError,error);if(rollback_files_on_failure)rollback_file_operation(file_checkpoint);return failed;
+    if(!view)view=nift::detail::SourceView::identity(source_path,source);
+    std::string program, error;nift::detail::SourceView program_view;nift::detail::DiagnosticOrigin translation_origin;
+    if (!translate_function_program(source, program, error,view,&program_view,&translation_origin)) {
+        RenderResult failed; failed.ok=false; failed.error.message=error;failed.diagnostic=nift::detail::make_diagnostic(nift::detail::DiagnosticCode::NativeTranslationError,error,std::move(translation_origin));if(rollback_files_on_failure)rollback_file_operation(file_checkpoint);return failed;
     }
     RenderResult rr;
     try {
-        rr=parse(program, source_path, depth, source_provenance);
+        rr=parse(program, source_path, depth, source_provenance,program_view);
     } catch (const std::exception& exception) {
         rr.ok=false;
         rr.error.message=exception.what();
