@@ -11,6 +11,18 @@ Read this file first. Then read `investigation/STATUS.md` for where the
 migration actually is, and `HANDOVER.md` for the current operational state.
 `AGENTS.md` (created or augmented by init) points agents here.
 
+## Choose the transformation intent
+
+Migration is a faithful port: preserve the product, visual design, routes,
+content and behaviour, and implementation intent where practical. Differences
+are regressions unless explicitly approved.
+
+For the same product/design with a freely replaced implementation, use the
+experimental v4.8 `nift init --rewrite` and `REWRITE.md`. For deliberately new
+UX/design under an explicit requirements/content/capability contract, use
+experimental `nift init --redesign` and `REDESIGN.md`. Do not silently switch
+intent. Authored/rendered/hybrid source models are independent choices.
+
 ## Operating contract
 
 These rules are the migration contract. Do not violate them without explicit

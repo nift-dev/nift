@@ -61,3 +61,15 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: python scripts/init_targets_cross_platform.py --nift "$PWD\nift.exe"
+
+      - name: Run transformation contracts
+        if: runner.os != 'Windows'
+        run: |
+          python tests/init_transformation_smoke.py --mode rewrite --nift "$PWD/nift"
+          python tests/init_transformation_smoke.py --mode redesign --nift "$PWD/nift"
+      - name: Run transformation contracts on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          python tests/init_transformation_smoke.py --mode rewrite --nift "$PWD\nift.exe"
+          python tests/init_transformation_smoke.py --mode redesign --nift "$PWD\nift.exe"

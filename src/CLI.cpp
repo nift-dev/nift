@@ -14,6 +14,8 @@
 #include "WatchList.h"
 #include "handover_content.h"
 #include "migration_content.h"
+#include "rewrite_content.h"
+#include "redesign_content.h"
 #include "Parser.h"
 #include "Proc.h"
 #include "RenderHost.h"
@@ -366,7 +368,7 @@ void print_commands() {
     row("packages", "[name]", "Explain why packages are installed (dependency graph)");
 
     std::cout << '\n' << console::dim("General") << '\n';
-    row("init", "[--target=platform] [--ext=.ext] [--handover] [--migration] [--migration-existing=POLICY]", "Create a Nift project; --migration adds agent-ready migration files");
+    row("init", "[--target=platform] [--ext=.ext] [--handover] [--migration|--rewrite|--redesign] [--MODE-existing=POLICY]", "Create a Nift project; transformation modes add agent-ready workbooks (rewrite/redesign experimental)");
     row("minify", "[-i|--in-place] <files...>", "Minify to *.min.ext by default; -i overwrites sources");
     row("about", "", "About Nift and where to learn more");
     row("version", "", "Show version information");
@@ -562,12 +564,27 @@ void remove_page_build_state(const ProjectInfo& project, const TrackedInfo& info
     filesystem::remove_owned_file(filesystem::hash_file_path(project.root, user_dependencies_path(project, info)));
 }
 
+enum class TransformationMode { None, Migration, Rewrite, Redesign };
+
+std::string transformation_name(TransformationMode mode) {
+    if (mode == TransformationMode::Migration) return "migration";
+    if (mode == TransformationMode::Rewrite) return "rewrite";
+    if (mode == TransformationMode::Redesign) return "redesign";
+    return "";
+}
+
+std::string transformation_workbook(TransformationMode mode) {
+    if (mode == TransformationMode::Migration) return "MIGRATION.md";
+    if (mode == TransformationMode::Rewrite) return "REWRITE.md";
+    return "REDESIGN.md";
+}
+
 struct InitOptions {
     std::string extension = ".html";
     std::string target;
     bool handover = false;
-    bool migration = false;
-    std::string migration_existing = "error";
+    TransformationMode mode = TransformationMode::None;
+    std::string existing = "error";
 };
 
 struct InitTarget {
@@ -613,6 +630,7 @@ void print_init_targets() {
 bool parse_init_options(int argc, char** argv, InitOptions& options) {
     bool saw_ext = false;
     bool saw_target = false;
+    std::map<TransformationMode, std::string> policies;
 
     for (int i = 2; i < argc; ++i) {
         const std::string arg = argv[i];
@@ -655,25 +673,35 @@ bool parse_init_options(int argc, char** argv, InitOptions& options) {
             options.handover = true;
             continue;
         }
-        if (arg == "--migration") {
-            options.migration = true;
-            continue;
-        }
-        if (arg.rfind("--migration-existing=", 0) == 0) {
-            options.migration_existing = arg.substr(std::string("--migration-existing=").size());
-            if (options.migration_existing != "error" &&
-                options.migration_existing != "keep" &&
-                options.migration_existing != "append" &&
-                options.migration_existing != "replace") {
-                console::error("--migration-existing must be one of: error, keep, append, replace");
+        bool transformation_option = false;
+        for (const auto mode : {TransformationMode::Migration, TransformationMode::Rewrite, TransformationMode::Redesign}) {
+            const std::string flag = "--" + transformation_name(mode);
+            const std::string policy_flag = flag + "-existing";
+            if (arg == flag) {
+                if (options.mode != TransformationMode::None && options.mode != mode) {
+                    console::error("init transformation modes are mutually exclusive");
+                    return false;
+                }
+                options.mode = mode;
+                transformation_option = true;
+                break;
+            }
+            if (arg == policy_flag) {
+                console::error(policy_flag + " requires '=POLICY', for example '" + policy_flag + "=keep'");
                 return false;
             }
-            continue;
+            if (arg.rfind(policy_flag + "=", 0) == 0) {
+                const std::string value = arg.substr(policy_flag.size() + 1);
+                if (value != "error" && value != "keep" && value != "append" && value != "replace") {
+                    console::error(policy_flag + " must be one of: error, keep, append, replace");
+                    return false;
+                }
+                policies[mode] = value;
+                transformation_option = true;
+                break;
+            }
         }
-        if (arg == "--migration-existing") {
-            console::error("--migration-existing requires '=POLICY', for example '--migration-existing=keep'");
-            return false;
-        }
+        if (transformation_option) continue;
         if (!arg.empty() && arg[0] == '-') {
             console::error("unknown init option '" + arg + "'");
             return false;
@@ -685,6 +713,16 @@ bool parse_init_options(int argc, char** argv, InitOptions& options) {
         else
             std::cerr << "  use 'nift init', '--ext=.ext', and/or '--target=platform'\n";
         return false;
+    }
+
+    for (const auto& entry : policies) {
+        // Preserve the historical migration-policy-only no-op for plain init.
+        if (options.mode == TransformationMode::None && entry.first == TransformationMode::Migration) continue;
+        if (entry.first != options.mode) {
+            console::error("existing-file policy does not match the selected transformation mode");
+            return false;
+        }
+        options.existing = entry.second;
     }
 
     if (!filesystem::valid_extension(options.extension)) {
@@ -1044,10 +1082,11 @@ std::size_t count_substrings(const std::string& text, const std::string& needle)
 // multiple owned blocks fail safely.
 bool write_migration_file(const std::string& path, const std::string& content,
                           MigrationPolicy policy, const std::string& start_marker,
-                          const std::string& end_marker, bool exists) {
+                          const std::string& end_marker, bool exists,
+                          const std::string& mode = "migration") {
     if (policy == MigrationPolicy::Error) {
         if (exists) {
-            std::cerr << "  " << path << " already exists (use --migration-existing=keep, append, or replace)\n";
+            std::cerr << "  " << path << " already exists (use --" << mode << "-existing=keep, append, or replace)\n";
             return false;
         }
         return filesystem::write_file(path, content);
@@ -1079,9 +1118,9 @@ bool write_migration_file(const std::string& path, const std::string& content,
 // AGENTS.md managed-block state classification.
 enum class AgentsState { None, Valid, StartOnly, EndOnly, Multiple };
 
-AgentsState agents_block_state(const std::string& text) {
-    const std::string start = "<!-- nift:migration:start -->";
-    const std::string end = "<!-- nift:migration:end -->";
+AgentsState agents_block_state(const std::string& text, const std::string& mode = "migration") {
+    const std::string start = "<!-- nift:" + mode + ":start -->";
+    const std::string end = "<!-- nift:" + mode + ":end -->";
     const std::size_t sc = count_substrings(text, start);
     const std::size_t ec = count_substrings(text, end);
     if (sc > 1 || ec > 1) return AgentsState::Multiple;
@@ -1096,12 +1135,12 @@ AgentsState agents_block_state(const std::string& text) {
 // Augment AGENTS.md with Nift's managed migration block: create the file when
 // absent, append the block when no block exists, replace exactly one valid
 // block, and fail safely on incomplete/multiple markers.
-bool augment_agents_file() {
-    const std::string start = "<!-- nift:migration:start -->";
-    const std::string end = "<!-- nift:migration:end -->";
+bool augment_agents_file(const std::string& mode, const std::string& block) {
+    const std::string start = "<!-- nift:" + mode + ":start -->";
+    const std::string end = "<!-- nift:" + mode + ":end -->";
     std::string existing;
     if (fs::exists("AGENTS.md")) existing = filesystem::read_file("AGENTS.md");
-    const AgentsState state = agents_block_state(existing);
+    const AgentsState state = agents_block_state(existing, mode);
     if (state == AgentsState::Multiple) {
         std::cerr << "  AGENTS.md has an invalid Nift migration block; refusing to modify it\n";
         return false;
@@ -1113,8 +1152,9 @@ bool augment_agents_file() {
     if (state == AgentsState::Valid) {
         const std::size_t s = existing.find(start);
         const std::size_t e = existing.find(end);
-        const std::size_t block_end = e + end.size();
-        std::string updated = existing.substr(0, s) + kAgentsMigrationBlock;
+        std::size_t block_end = e + end.size();
+        if (block_end < existing.size() && existing[block_end] == '\n') ++block_end;
+        std::string updated = existing.substr(0, s) + block;
         if (block_end < existing.size()) updated += existing.substr(block_end);
         if (!updated.empty() && updated.back() != '\n') updated += "\n";
         return filesystem::write_file("AGENTS.md", updated);
@@ -1122,9 +1162,134 @@ bool augment_agents_file() {
     std::string merged = existing;
     if (!merged.empty() && merged.back() != '\n') merged += "\n";
     if (!merged.empty()) merged += "\n";
-    merged += kAgentsMigrationBlock;
+    merged += block;
     return filesystem::write_file("AGENTS.md", merged);
 }
+
+using GuidanceFiles = std::vector<std::pair<std::string, std::string>>;
+
+std::string guidance_marker(const std::string& path) {
+    if (path == "README.md") return "readme";
+    if (path == "investigation/README.md") return "investigation";
+    std::string name = fs::path(path).stem().string();
+    std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return name;
+}
+
+bool valid_template_boundary(const std::string& path, const std::string& marker) {
+    if (!fs::exists(path)) return true;
+    const std::string text = filesystem::read_file(path);
+    const std::string start = "<!-- nift:" + marker + ":start -->";
+    const std::string end = "<!-- nift:" + marker + ":end -->";
+    const auto sc = count_substrings(text, start), ec = count_substrings(text, end);
+    if ((sc == 0 && ec == 0) || (sc == 1 && ec == 1 && text.find(start) < text.find(end))) return true;
+    console::error("cannot initialise transformation project: invalid managed boundary in " + path);
+    return false;
+}
+
+std::string transformation_agents(TransformationMode mode) {
+    if (mode == TransformationMode::Migration) return kAgentsMigrationBlock;
+    const std::string name = transformation_name(mode), workbook = transformation_workbook(mode);
+    const std::string contract = mode == TransformationMode::Rewrite ?
+        "Preserve the product, visual design, routes, content, browser/keyboard/accessibility and SEO behaviour.\n"
+        "Replace implementation freely; old architecture is reference evidence, not a constraint.\n" :
+        "Replace implementation and deliberately redesign the UX. Protect explicitly inventoried requirements,\n"
+        "content, capabilities, legal/accessibility obligations and SEO/inbound route value.\n"
+        "Approve design direction before broad implementation; record every route redirect or retirement.\n";
+    return "<!-- nift:" + name + ":start -->\n## Nift " + name + " (EXPERIMENTAL, v4.8)\n\n" + contract +
+        "Read " + workbook + ", investigation/STATUS.md and HANDOVER.md before work.\n"
+        "The initial scaffold is placeholder material. Freeze reference evidence before building.\n"
+        "Transformation intent is independent of authored/rendered/hybrid source model.\n"
+        "React, Vue, Svelte, Solid, Web Components and vanilla JavaScript islands are valid architecture;\n"
+        "prepare browser-side bundles independently of Nift generation. Record accessibility/state/cost tradeoffs.\n"
+        "Validate the full contract, run a performance campaign, fully revalidate, then benchmark the final pipeline.\n"
+        "Stop and report any requirement to modify Nift core; do not silently change runtime semantics.\n"
+        "Record approved differences in investigation/KNOWN-DIVERGENCES.md; unresolved blockers prevent completion.\n"
+        "Update STATUS.md and HANDOVER.md at checkpoints. Require clean-checkout proof before completion.\n"
+        "Publication, destructive changes and changes of transformation intent require explicit authorization.\n"
+        "<!-- nift:" + name + ":end -->\n";
+}
+
+GuidanceFiles transformation_guidance(TransformationMode mode) {
+    if (mode == TransformationMode::Migration) return {
+        {"README.md", migration_readme}, {"investigation/README.md", investigation_readme},
+        {"investigation/STATUS.md", investigation_status}, {"investigation/BASELINE.md", investigation_baseline},
+        {"investigation/EXTERNAL-INPUTS.md", investigation_external_inputs},
+        {"investigation/KNOWN-DIVERGENCES.md", investigation_known_divergences},
+        {"investigation/PARITY-CONTRACT.md", investigation_parity_contract}};
+    const bool rewrite = mode == TransformationMode::Rewrite;
+    const std::string name = transformation_name(mode), workbook = transformation_workbook(mode);
+    const std::string reference = rewrite ? "REFERENCE.md" : "DESIGN-BRIEF.md";
+    const std::vector<std::string> phases = rewrite ? std::vector<std::string>{
+        "Understand old product", "Freeze design/behaviour reference", "Inventory content/routes/features",
+        "Extract requirements", "Choose Nift-native architecture", "Prove representative vertical slice",
+        "Rebuild shared structure", "Rebuild full corpus", "Validate design/behaviour parity",
+        "Performance campaign", "Full parity revalidation", "Final benchmarks", "Clean-checkout proof", "Handover"} :
+        std::vector<std::string>{"Audit existing project", "Extract immutable requirements",
+        "Identify strengths/failures/obsolete parts", "Inventory content/capabilities/routes", "Define redesign goals",
+        "Define information architecture", "Define design system", "Define interaction model", "Choose source model",
+        "Build representative prototype", "Validate and approve direction", "Build complete project",
+        "Accessibility/browser validation", "Performance campaign", "Final contract revalidation",
+        "Final meaningful benchmark/comparison", "Clean-checkout proof", "Handover"};
+    std::string status = "# STATUS.md\n\nResumable " + name + " state (EXPERIMENTAL, v4.8). Read " + workbook +
+        ", AGENTS.md and HANDOVER.md.\n\nMark each phase: not started / in progress / blocked / done.\n\n"
+        "| Phase | Status | Acceptance criteria | Required evidence | Commands | Commit |\n"
+        "| --- | --- | --- | --- | --- | --- |\n";
+    for (std::size_t i = 0; i < phases.size(); ++i)
+        status += "| " + std::to_string(i + 1) + " " + phases[i] + " | | | | | |\n";
+    status += rewrite ? "\nGATE: freeze product/design/behaviour evidence and prove a vertical slice before broad rebuilding.\n" :
+        "\nGATE: approve representative design direction against protected requirements before broad rebuilding.\n";
+    status += "GATE: complete validation precedes profiling/optimization; full revalidation precedes final benchmarks.\n\n"
+        "## Architecture and campaign evidence\n\n"
+        "- Significant retained/introduced islands; source model, accessibility/shared-state/maintenance/cost reasons:\n"
+        "- Complete production pipeline, including independently prepared browser-side bundles:\n"
+        "- Profiles/hotspots, general improvements, before/after measurements and justified deferrals:\n"
+        "- Final validation command/result and equivalent benchmark workloads (qualify changed workloads):\n\n"
+        "## Current\n\n- Checkpoint:\n- Commit SHA:\n- Blockers/approved decisions:\n- Next checkpoint:\n";
+    GuidanceFiles files = {
+        {"README.md", "# " + name + " project\n\nEXPERIMENTAL agent-oriented workflow, v4.8.\n\nRead " + workbook +
+            " for methodology, investigation/STATUS.md for checkpoints, HANDOVER.md for current state and AGENTS.md for the contract.\n"
+            "The initial scaffold is placeholder material, excluded from parity and benchmark claims.\n"
+            "Record authored/rendered/hybrid source model and the complete production pipeline in investigation/" + reference + ".\n"
+            "Nift generation may compose with independently prepared browser-side islands/bundles.\n"},
+        {"investigation/STATUS.md", status},
+        {"investigation/EXTERNAL-INPUTS.md", investigation_external_inputs},
+        {"investigation/KNOWN-DIVERGENCES.md", "# KNOWN-DIVERGENCES.md\n\nRecord differences from frozen evidence; distinguish inherited defects, approved decisions and regressions.\n\n"
+            "| ID | Route/component | Difference | Classification | Evidence | Approval/rationale | Resolution |\n"
+            "| --- | --- | --- | --- | --- | --- | --- |\n| | | | | | | |\n\nUnresolved or blocking entries prevent completion.\n"},
+        {"investigation/CONTENT-INVENTORY.md", "# CONTENT-INVENTORY.md\n\nInventory routes, content, assets, metadata, search/download/export and client interactions.\n\n"
+            "| Item/route | Source | Requirement | Proposed disposition | Owner/approval | Validation evidence |\n"
+            "| --- | --- | --- | --- | --- | --- |\n| | | | | | |\n"}};
+    const std::string source_model = "\n## Source model and production pipeline\n\nChoose authored / rendered / hybrid independently of transformation intent.\n"
+        "Record source SHA, immutable reference output, candidate output, toolchain/binary hashes, external inputs,\n"
+        "all production stages including island/bundle preparation, deployment transforms, search and exports.\n"
+        "Never compare candidate output against itself. Record nondeterminism and byte/semantic equality rules.\n";
+    if (rewrite) {
+        files.push_back({"investigation/REFERENCE.md", "# REFERENCE.md\n\nFreeze the old product's design and behaviour as immutable evidence.\n"
+            "Record repository/SHA, screenshots/viewports, routes, content, browser/keyboard/accessibility/SEO behaviour and reference build command.\n"
+            "Old implementation is evidence, not architecture to copy.\n" + source_model});
+        files.push_back({"investigation/BEHAVIOR-CONTRACT.md", "# BEHAVIOR-CONTRACT.md\n\nSpecify route/content, redirects, search/download/export, responsive/browser interactions, keyboard/accessibility and SEO/meta parity.\n"
+            "Record equality rule, fixtures and validation command for each. Differences require explicit approval.\n"});
+        files.push_back({"investigation/DESIGN-CONTRACT.md", "# DESIGN-CONTRACT.md\n\nFreeze visual design, layout, typography, breakpoints, assets and interaction states.\n"
+            "Record reference viewports and comparison tolerances; new internal architecture does not authorize design changes.\n"});
+    } else {
+        files.push_back({"investigation/REQUIREMENTS.md", "# REQUIREMENTS.md\n\nExtract immutable requirements and protected content/capabilities, legal/compliance material, accessibility,\n"
+            "SEO/inbound route value, downloads/exports/search and retained brand assets.\n"
+            "For each requirement record source evidence, acceptance command and approval for any deliberate change.\n"});
+        files.push_back({"investigation/DESIGN-BRIEF.md", "# DESIGN-BRIEF.md\n\nDefine goals, information architecture, visual/design system, typography/layout/navigation and interaction model.\n"
+            "The old project is source material, not a visual or architecture specification.\n"
+            "Record representative prototype, user approval and protected-requirement validation before broad rebuilding.\n" + source_model});
+        files.push_back({"investigation/ROUTE-MAP.md", "# ROUTE-MAP.md\n\nRoute changes require deliberate decisions and evidence. Preserve inbound value with redirects where appropriate.\n\n"
+            "| Old route | New route | Redirect/retirement decision | Approval | Evidence/test |\n"
+            "| --- | --- | --- | --- | --- |\n| | | | | |\n"});
+    }
+    std::string index = "# investigation\n\n" + name + " state and evidence. Methodology: " + workbook + ". Keep STATUS.md current at each checkpoint.\n\n";
+    for (const auto& file : files) if (file.first.rfind("investigation/", 0) == 0)
+        index += "- `" + fs::path(file.first).filename().string() + "`\n";
+    files.push_back({"investigation/README.md", index});
+    return files;
+}
+
 
 }  // namespace
 
@@ -1140,30 +1305,41 @@ bool initialise_project(const InitOptions& options) {
         return false;
     }
 
-    // Migration preflight: with the default policy (error) the run must not
-    // leave a confusing partial result, so conflict with an existing
-    // MIGRATION.md or HANDOVER.md is detected before any scaffold is written.
-    const MigrationPolicy policy = migration_policy(options.migration_existing);
-    if (options.migration) {
-        // A malformed AGENTS.md managed block is an error for every policy:
-        // Nift refuses to modify a file it cannot deterministically own.
-        if (fs::exists("AGENTS.md")) {
-            const AgentsState agents = agents_block_state(filesystem::read_file("AGENTS.md"));
-            if (agents != AgentsState::None && agents != AgentsState::Valid) {
-                console::error("cannot initialise migration project: AGENTS.md has an invalid Nift migration block");
+    const MigrationPolicy policy = migration_policy(options.existing);
+    const bool transforming = options.mode != TransformationMode::None;
+    const std::string mode = transformation_name(options.mode);
+    const std::string workbook = transforming ? transformation_workbook(options.mode) : "";
+    if (transforming) {
+        const std::string agents = fs::exists("AGENTS.md") ? filesystem::read_file("AGENTS.md") : "";
+        for (const auto other : {TransformationMode::Migration, TransformationMode::Rewrite, TransformationMode::Redesign}) {
+            const std::string name = transformation_name(other);
+            const AgentsState state = agents_block_state(agents, name);
+            if (other != options.mode && (fs::exists(transformation_workbook(other)) || state != AgentsState::None)) {
+                console::error("cannot initialise " + mode + " project: existing " + name + " contract conflicts");
+                return false;
+            }
+            if (state != AgentsState::None && state != AgentsState::Valid) {
+                console::error("cannot initialise " + mode + " project: AGENTS.md has an invalid Nift " + name + " block");
                 return false;
             }
         }
-    }
-    if (options.migration && policy == MigrationPolicy::Error) {
-        std::vector<std::string> conflicts;
-        if (fs::exists("MIGRATION.md")) conflicts.emplace_back("MIGRATION.md");
-        if (fs::exists("HANDOVER.md")) conflicts.emplace_back("HANDOVER.md");
-        if (!conflicts.empty()) {
-            console::error("cannot initialise migration project: existing files conflict");
-            for (const auto& c : conflicts) std::cerr << "  " << c << " already exists\n";
-            std::cerr << "  use --migration-existing=keep, append, or replace to handle existing migration files\n";
-            return false;
+        // Check every owned append boundary before creating any project files.
+        // A malformed boundary never grants ownership, even under replace/keep.
+        for (const auto& file : transformation_guidance(options.mode)) {
+            if (!valid_template_boundary(file.first, mode + "-" + guidance_marker(file.first))) return false;
+        }
+        if (!valid_template_boundary(workbook, mode + "-template") ||
+            !valid_template_boundary("HANDOVER.md", "handover-template")) return false;
+        if (policy == MigrationPolicy::Error) {
+            std::vector<std::string> conflicts;
+            if (fs::exists(workbook)) conflicts.push_back(workbook);
+            if (fs::exists("HANDOVER.md")) conflicts.emplace_back("HANDOVER.md");
+            if (!conflicts.empty()) {
+                console::error("cannot initialise " + mode + " project: existing files conflict");
+                for (const auto& c : conflicts) std::cerr << "  " << c << " already exists\n";
+                std::cerr << "  use --" << mode << "-existing=keep, append, or replace to handle existing " << mode << " files\n";
+                return false;
+            }
         }
     }
 
@@ -1240,48 +1416,29 @@ bool initialise_project(const InitOptions& options) {
     // for an unrelated reason. It goes in the project root (never under the
     // output directory) and stays writable as a living document the user keeps
     // alongside the source.
-    if (options.migration) {
-        const bool m_exists = fs::exists("MIGRATION.md");
-        const bool h_exists = fs::exists("HANDOVER.md");
-        if (!write_migration_file("MIGRATION.md", std::string(migration_content), policy,
-                                  "<!-- nift:migration-template:start -->", "<!-- nift:migration-template:end -->",
-                                  m_exists)) {
-            console::error("failed to write MIGRATION.md per the existing-file policy");
+    if (transforming) {
+        const char* content = options.mode == TransformationMode::Migration ? migration_content :
+                              options.mode == TransformationMode::Rewrite ? rewrite_content : redesign_content;
+        if (!write_migration_file(workbook, content, policy,
+                "<!-- nift:" + mode + "-template:start -->", "<!-- nift:" + mode + "-template:end -->",
+                fs::exists(workbook), mode) ||
+            !write_migration_file("HANDOVER.md", handover_content, policy,
+                "<!-- nift:handover-template:start -->", "<!-- nift:handover-template:end -->",
+                fs::exists("HANDOVER.md"), mode) ||
+            !augment_agents_file(mode, transformation_agents(options.mode))) {
+            console::error("failed to write " + mode + " contract files");
             return false;
         }
-        if (!write_migration_file("HANDOVER.md", std::string(handover_content), policy,
-                                  "<!-- nift:handover-template:start -->", "<!-- nift:handover-template:end -->",
-                                  h_exists)) {
-            console::error("failed to write HANDOVER.md per the existing-file policy");
-            return false;
-        }
-        if (!augment_agents_file()) {
-            console::error("failed to update AGENTS.md");
-            return false;
-        }
-        // Guidance/state files (README + investigation/) are non-destructive:
-        // under the default `error` policy an existing file is kept rather than
-        // aborting, and `keep`/`append`/`replace` are honoured explicitly. The
-        // canonical MIGRATION.md/HANDOVER.md above remain fail-closed.
-        auto write_guidance = [&](const std::string& path, const char* content,
-                                  const std::string& marker) -> bool {
-            const bool exists = fs::exists(path);
-            const MigrationPolicy effective =
-                (policy == MigrationPolicy::Error && exists) ? MigrationPolicy::Keep : policy;
-            return write_migration_file(path, std::string(content), effective,
-                                        "<!-- nift:" + marker + ":start -->",
-                                        "<!-- nift:" + marker + ":end -->", exists);
-        };
-        if (!fs::exists("investigation")) fs::create_directories("investigation");
-        if (!write_guidance("README.md", migration_readme, "migration-readme") ||
-            !write_guidance("investigation/README.md", investigation_readme, "migration-investigation") ||
-            !write_guidance("investigation/STATUS.md", investigation_status, "migration-status") ||
-            !write_guidance("investigation/BASELINE.md", investigation_baseline, "migration-baseline") ||
-            !write_guidance("investigation/EXTERNAL-INPUTS.md", investigation_external_inputs, "migration-external-inputs") ||
-            !write_guidance("investigation/KNOWN-DIVERGENCES.md", investigation_known_divergences, "migration-known-divergences") ||
-            !write_guidance("investigation/PARITY-CONTRACT.md", investigation_parity_contract, "migration-parity-contract")) {
-            console::error("failed to write migration guidance files");
-            return false;
+        fs::create_directories("investigation");
+        for (const auto& file : transformation_guidance(options.mode)) {
+            const bool exists = fs::exists(file.first);
+            const MigrationPolicy effective = policy == MigrationPolicy::Error && exists ? MigrationPolicy::Keep : policy;
+            const std::string marker = mode + "-" + guidance_marker(file.first);
+            if (!write_migration_file(file.first, file.second, effective,
+                    "<!-- nift:" + marker + ":start -->", "<!-- nift:" + marker + ":end -->", exists, mode)) {
+                console::error("failed to write " + mode + " guidance files");
+                return false;
+            }
         }
     } else if (options.handover) {
         if (!filesystem::write_file("HANDOVER.md", std::string(handover_content))) {

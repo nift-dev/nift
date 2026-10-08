@@ -200,3 +200,21 @@ Copyright © Nicholas Ham and Nift contributors.
 The stripped rewrite is guided by an explicit design checklist in [`ARCHITECTURE_RULES.md`](ARCHITECTURE_RULES.md). The short version is that Nift owns dependency-aware build-time composition and may optionally optimise final outputs, while source-language compilation, arbitrary shell execution and neighbouring tool domains remain external.
 
 The embedded `minifypp/` subtree follows the same boundary: it is a self-contained library/CLI/test project that Nift consumes through a public header, so it can be extracted later without depending on Nift's project model.
+
+## Existing-project transformation workspaces (v4.8 development)
+
+`nift init --migration` scaffolds a parity-first faithful port. Experimental
+`nift init --rewrite` preserves the product/design/behaviour with a new
+implementation; experimental `nift init --redesign` protects explicit
+requirements/content/capabilities while deliberately changing design and
+implementation. Each emits its canonical workbook, HANDOVER, a mode-owned
+AGENTS block and resumable investigation records. These commands scaffold a
+method; they do not automatically convert a framework. Source model and
+interactive-island architecture remain independent choices.
+
+Choose one mode. `--migration-existing`, `--rewrite-existing` and
+`--redesign-existing` accept `error` (default), `keep`, `append` or `replace`.
+Cross-mode contracts and malformed owned boundaries fail before scaffold writes.
+See [Migrations](https://nift.dev/docs/existing-sites.html),
+[Rewrites](https://nift.dev/docs/rewrites.html) and
+[Redesigns](https://nift.dev/docs/redesigns.html).

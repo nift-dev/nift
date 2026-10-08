@@ -731,7 +731,7 @@ test: test-parser-hardening test-content test-commands test-comments test-contra
 	test-json-schema test-console test-diagnostics test-minify \
 	test-json-schema-integration test-markup-json-directives test-pagination test-pagination-ordering \
 	test-template-optional test-requirements test-path-alias test-path-safety test-metadata-safety \
-	test-init-targets test-init-lock test-init-migration test-control-flow test-template-variables test-cross-feature test-v41-certification test-v42-language test-v42-struct test-v43-language test-config-validation \
+	test-init-targets test-init-lock test-init-migration test-init-transformations test-control-flow test-template-variables test-cross-feature test-v41-certification test-v42-language test-v42-struct test-v43-language test-config-validation \
 	test-zero-mutation test-repair-campaign test-ownership-concurrency \
 	test-macos-runner-policy \
 	test-v44-execution-shell test-v44-language-foundation test-v44-shell-restricted \
@@ -1087,6 +1087,17 @@ test-init-handover: $(TARGET)
 # idempotent/malformed-safe AGENTS augmentation.
 test-init-migration: $(TARGET)
 	NIFT_BIN="$(CURDIR)/$(TARGET)" tests/init_migration_smoke.sh
+
+test-init-rewrite: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 tests/init_transformation_smoke.py --mode rewrite
+
+test-init-redesign: $(TARGET)
+	NIFT_BIN="$(CURDIR)/$(TARGET)" python3 tests/init_transformation_smoke.py --mode redesign
+
+test-init-transformations: test-init-rewrite test-init-redesign
+	python3 scripts/gen_migration_content.py --check
+
+.PHONY: test-init-rewrite test-init-redesign test-init-transformations
 
 # Network-gated: the vendored canonical handover and migration fixtures must
 # match the live downloads. Skipped unless NIFT_LIVE_TESTS=1.

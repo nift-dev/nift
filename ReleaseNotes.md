@@ -2,10 +2,22 @@
 
 ## v4.8.0 (unreleased development)
 
-Development has advanced to v4.8.0 after the completed v4.7.2 release. No
-v4.8.0 user-visible changes have been recorded yet.
+Development has advanced to v4.8.0 after the completed v4.7.2 release.
+The changes below are development work, pending release stabilization.
 
 ### Development note
+
+- Added experimental `nift init --rewrite` and `nift init --redesign` agent-oriented
+  workspaces with distinct canonical workbooks and investigation records. Rewrite
+  preserves the product/design/behaviour while replacing implementation; redesign
+  protects explicit requirements/content/capabilities while deliberately changing
+  design and implementation. Shared init ownership checks reject cross-mode
+  contracts and malformed managed markers before scaffolding. Mode-specific
+  `--rewrite-existing` / `--redesign-existing` policies match migration policies.
+- All transformation methods support independently prepared interactive islands
+  and require validation, a performance campaign, full revalidation, then final
+  production-pipeline benchmarks. Migration retains its parity-first contract.
+
 
 - Cache bounded immutable lambda syntax and pure numeric expression plans across
   callbacks, while retaining fresh closure identities, live captures and existing

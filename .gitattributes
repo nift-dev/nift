@@ -1,1 +1,7 @@
 third_party/libffi/** -text
+
+# Canonical workbook bytes are a cross-platform public contract.
+tests/fixtures/HANDOVER.md text eol=lf
+tests/fixtures/MIGRATION.md text eol=lf
+tests/fixtures/REWRITE.md text eol=lf
+tests/fixtures/REDESIGN.md text eol=lf

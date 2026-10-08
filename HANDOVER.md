@@ -460,3 +460,18 @@ The active v4.1 language campaign is specified and tracked in `docs/handover/V4.
 An independent review + adversarial certification campaign was run against the v4.1 implementation (review first, adversarial testing second, repair third, then rerun from scratch). The campaign treated the implementation as a candidate to challenge rather than something to approve. It found and fixed seven genuine v4.1 language defects (mutation-suppression scoping, conditional `@return`, `@for` loop-binding shadowing, undefined-callable errors, structured-binding array indexing, structured-literal callable/`validate()` arguments, and unbounded callable recursion), plus two historical JSON/minifier regressions introduced by the Jsonic++ v1.0.0 and Minify++ v1.1.3 imports (duplicate-key strictness and JS trailing-semicolon elision).
 
 All fixes are committed in small reviewable commits on `main` and protected by `tests/v41_certification_adversarial.sh` and `v41_duplicate_key_smoke.sh` (mirrored in the independent regression suite). The complete native wall, the 32-module independent regression suite, ASan/UBSan/Valgrind walls, a 1300+ case v4.1 fuzz sweep, scenario 11, website dogfooding and the v4.1-vs-v4.0.13 performance comparison all pass; existing-template workloads show no material performance regression. The vendored Jsonic++ v1.0.0 and Minify++ v1.1.3 trees are verified byte-identical to their release tags by a release-tag-based synchronization check (the check compares against the sibling release tag for the declared vendored version, not sibling HEAD, so it stays green when the siblings advance to development heads). See `docs/handover/V4.1-TEMPLATE-LANGUAGE.md` (CP25) and `docs/evidence/v41-independent-certification.md` for the full record.
+
+## Final v4.8 pre-freeze tranche
+
+CP-F is CLOSED at `b11e48b44607bc96898a45c42e66b7a737af2630`: all applicable
+hosted walls and pinned external NRS 93/PRS 12 passed. See
+`docs/evidence/v48-cp-f-final.md` for scope and costs.
+
+The final approved tranche adds shared migration/rewrite/redesign init machinery,
+experimental distinct rewrite/redesign contracts, islands and performance gates,
+and separate website pages with an October opinion/drift reconciliation. Keep
+canonical workbooks in `tests/fixtures/` synchronized through
+`scripts/gen_migration_content.py --check`; website mirrors are not authority.
+After hosted closeout, the feature queue is CLOSED: stabilization and release
+preparation follow; no further runtime-feature campaign is authorized here.
+Release workflows, tags and release artifacts remain outside this tranche.

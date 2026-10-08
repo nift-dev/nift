@@ -1,45 +1,13 @@
 #!/usr/bin/env python3
-"""Regenerate src/migration_content.h from tests/fixtures/MIGRATION.md.
+"""Generate/check canonical migration, rewrite and redesign workbook literals.
 
-The embedded literal uses the same encoding style as src/handover_content.h:
-\\n for newlines, \\" and \\\\ for quotes/backslashes, and octal escapes for any
-non-ASCII byte (compiler source-charset independence). Byte-exact.
-
-Usage: python3 scripts/gen_migration_content.py
+Core fixtures own the bytes. Non-ASCII bytes use octal escapes for compiler
+source-charset independence. --check verifies drift without rewriting files.
 """
 from pathlib import Path
+import argparse
 
 ROOT = Path(__file__).resolve().parent.parent
-FIXTURE = ROOT / "tests" / "fixtures" / "MIGRATION.md"
-HEADER = ROOT / "src" / "migration_content.h"
-
-data = FIXTURE.read_bytes()
-out = bytearray()
-for b in data:
-    if b == 0x0A:
-        out += b"\\n"
-    elif b in (ord('\\'), ord('"')):
-        out += b"\\" + bytes([b])
-    elif 0x20 <= b <= 0x7E:
-        out.append(b)
-    else:
-        out += f"\\{b:03o}".encode("ascii")
-
-header = (
-    "// Embedded canonical init --migration content.\n"
-    "// Update tests/fixtures/MIGRATION.md and regenerate this byte-exact literal together.\n"
-    "// Non-ASCII bytes are octal escaped for compiler source-charset independence.\n"
-    "//\n"
-    "// Regenerate with: python3 scripts/gen_migration_content.py\n"
-    "\n"
-    "#pragma once\n"
-    "\n"
-    "constexpr const char* migration_content =\n"
-    '    "' + out.decode("ascii") + '";\n'
-)
-HEADER.write_text(header, encoding="ascii")
-print(f"{HEADER.relative_to(ROOT)} regenerated ({len(out)} bytes fixture)")
-
 
 def verify(symbol: str, fixture: Path, header: Path) -> None:
     text = header.read_text()
@@ -66,5 +34,42 @@ def verify(symbol: str, fixture: Path, header: Path) -> None:
     assert bytes(decoded) == fixture.read_bytes(), f"{header.name} does not decode to {fixture.name}"
 
 
-verify("migration_content", FIXTURE, HEADER)
-print("verify: src/migration_content.h decodes byte-exact to tests/fixtures/MIGRATION.md")
+
+def generate(name: str) -> tuple[Path, Path, str]:
+    fixture = ROOT / "tests" / "fixtures" / (name.upper() + ".md")
+    header = ROOT / "src" / (name + "_content.h")
+    out = bytearray()
+    for b in fixture.read_bytes():
+        if b == 10:
+            out += b"\\n"
+        elif b in (92, 34):
+            out += bytes([92, b])
+        elif 32 <= b <= 126:
+            out.append(b)
+        else:
+            out += f"\\{b:03o}".encode("ascii")
+    content = (f"// Embedded canonical init --{name} content.\n"
+               f"// Update tests/fixtures/{name.upper()}.md and regenerate this byte-exact literal together.\n"
+               "// Non-ASCII bytes are octal escaped for compiler source-charset independence.\n"
+               "//\n// Regenerate with: python3 scripts/gen_migration_content.py\n\n#pragma once\n\n"
+               f"constexpr const char* {name}_content =\n    \"" + out.decode("ascii") + "\";\n")
+    return fixture, header, content
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--check", action="store_true")
+    args = parser.parse_args()
+    for name in ("migration", "rewrite", "redesign"):
+        fixture, header, content = generate(name)
+        if args.check:
+            if not header.exists() or header.read_text(encoding="ascii") != content:
+                raise SystemExit(f"canonical drift: {header.relative_to(ROOT)}")
+        elif not header.exists() or header.read_text(encoding="ascii") != content:
+            header.write_text(content, encoding="ascii")
+        verify(name + "_content", fixture, header)
+        print(f"verify: {header.relative_to(ROOT)} byte-exact ({len(fixture.read_bytes())} bytes)")
+
+
+if __name__ == "__main__":
+    main()
