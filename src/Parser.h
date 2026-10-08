@@ -195,6 +195,9 @@ private:
         }
         void rebind(std::shared_ptr<nift::RuntimeValue> v) { ref_root_slot.reset(); ref_path.clear(); ref_valid=true; value=std::move(v); if(slot)*slot=value; }
     };
+    static void copy_capture_bindings(
+        std::unordered_map<std::string, VariableBinding>& destination,
+        const std::unordered_map<std::string, VariableBinding>& source);
     std::vector<std::unordered_map<std::string, VariableBinding>> variable_scopes_;
     enum class SourceProvenance { FileBacked, InMemory };
     // Prepared calls retain an immutable defining path. Other contexts own their

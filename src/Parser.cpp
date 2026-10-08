@@ -717,6 +717,15 @@ Parser::~Parser() {
     finalize_execution_workers();
 }
 
+void Parser::copy_capture_bindings(
+    std::unordered_map<std::string, VariableBinding>& destination,
+    const std::unordered_map<std::string, VariableBinding>& source) {
+    // Preserve shared binding slots and overwrite shadowed names directly.
+    // Keep this insertion machinery outside the expression dispatch body.
+    for (const auto& binding : source)
+        destination.insert_or_assign(binding.first, binding.second);
+}
+
 void Parser::finalize_execution_workers() {
     for(auto& st:owned_async_instances_){std::unique_lock<std::mutex> lk(st->mutex);while(st->completion.pending()){lk.unlock();if(nift::detail::NiftAsyncPool::is_worker_thread()&&nift::detail::NiftAsyncPool::instance().run_one()){lk.lock();continue;}lk.lock();st->cv.wait_for(lk,std::chrono::milliseconds(1),[&]{return !st->completion.pending();});}}
     for(auto& st:owned_thread_instances_){std::lock_guard<std::mutex> guard(st->join_mutex);if(st->worker.joinable())st->worker.join();}
