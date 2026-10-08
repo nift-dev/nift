@@ -1,0 +1,467 @@
+{
+  "top-level": {
+    "ok": false,
+    "stdout": "",
+    "message": "unknown value or malformed expression: missing_value",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": []
+  },
+  "top-level-tabs": {
+    "ok": false,
+    "stdout": "",
+    "message": "unknown value or malformed expression: missing_value",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": []
+  },
+  "while": {
+    "ok": false,
+    "stdout": "",
+    "message": "unknown value or malformed expression: missing_value",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": []
+  },
+  "for": {
+    "ok": false,
+    "stdout": "",
+    "message": "unknown value or malformed expression: missing_value",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": []
+  },
+  "nested-if": {
+    "ok": false,
+    "stdout": "",
+    "message": "unknown value or malformed expression: missing_value",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": []
+  },
+  "function-loop": {
+    "ok": false,
+    "stdout": "",
+    "message": "unknown value or malformed expression: missing_value",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": [
+      {
+        "kind": 0,
+        "label": "fail_loop",
+        "prefix": "",
+        "path": "function-loop.n",
+        "line": 0,
+        "column": 0
+      }
+    ]
+  },
+  "function-nested-loops": {
+    "ok": false,
+    "stdout": "",
+    "message": "unknown value or malformed expression: missing_value",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": [
+      {
+        "kind": 0,
+        "label": "fail_loop",
+        "prefix": "",
+        "path": "function-nested-loops.n",
+        "line": 0,
+        "column": 0
+      }
+    ]
+  },
+  "prepared-callable": {
+    "ok": false,
+    "stdout": "",
+    "message": "division by zero",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": [
+      {
+        "kind": 0,
+        "label": "bad",
+        "prefix": "",
+        "path": "",
+        "line": 0,
+        "column": 0
+      }
+    ]
+  },
+  "array-index": {
+    "ok": false,
+    "stdout": "",
+    "message": "JSON array index 9 is out of range in 'a[9]'",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": []
+  },
+  "object-member": {
+    "ok": false,
+    "stdout": "",
+    "message": "value has no member: absent",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": []
+  },
+  "array-expression": {
+    "ok": false,
+    "stdout": "",
+    "message": "unknown value or malformed expression: missing_value",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": []
+  },
+  "object-expression": {
+    "ok": false,
+    "stdout": "",
+    "message": "unknown value or malformed expression: missing_value",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": []
+  },
+  "multiline-args": {
+    "ok": false,
+    "stdout": "",
+    "message": "unknown value or malformed expression: missing_value",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": []
+  },
+  "multiline-array": {
+    "ok": false,
+    "stdout": "",
+    "message": "unknown value or malformed expression: missing_value",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": []
+  },
+  "multiline-object": {
+    "ok": false,
+    "stdout": "",
+    "message": "unknown value or malformed expression: missing_value",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": []
+  },
+  "multiline-arithmetic": {
+    "ok": false,
+    "stdout": "",
+    "message": "unknown value or malformed expression: missing_value",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": []
+  },
+  "multiline-boolean": {
+    "ok": false,
+    "stdout": "",
+    "message": "unknown value or malformed expression: missing_value",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": []
+  },
+  "nested-calls": {
+    "ok": false,
+    "stdout": "",
+    "message": "unknown value or malformed expression: missing_value",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": []
+  },
+  "chained-index": {
+    "ok": false,
+    "stdout": "",
+    "message": "JSON array index 9 is out of range in 'a[0].x[9]'",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": []
+  },
+  "malformed": {
+    "ok": false,
+    "stdout": "",
+    "message": "expression cannot be empty",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": []
+  },
+  "invalid-callable": {
+    "ok": false,
+    "stdout": "",
+    "message": "undefined callable: absent_callable",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": []
+  },
+  "invalid-collection": {
+    "ok": false,
+    "stdout": "",
+    "message": "pop: array is empty",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": []
+  },
+  "legacy-fallback": {
+    "ok": false,
+    "stdout": "",
+    "message": "bytes: array values must be integers from 0 to 255",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": []
+  },
+  "expression-lambda": {
+    "ok": false,
+    "stdout": "",
+    "message": "lambda body error: unknown value or malformed expression: missing_value",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": []
+  },
+  "block-lambda": {
+    "ok": false,
+    "stdout": "",
+    "message": "return: unknown value or malformed expression: missing_value",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": [
+      {
+        "kind": 2,
+        "label": "lambda",
+        "prefix": "",
+        "path": "block-lambda.n",
+        "line": 0,
+        "column": 0
+      }
+    ]
+  },
+  "named-callable-value": {
+    "ok": false,
+    "stdout": "",
+    "message": "return: division by zero",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": [
+      {
+        "kind": 0,
+        "label": "f",
+        "prefix": "",
+        "path": "named-callable-value.n",
+        "line": 0,
+        "column": 0
+      }
+    ]
+  },
+  "callback-map": {
+    "ok": false,
+    "stdout": "",
+    "message": "return: division by zero",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": [
+      {
+        "kind": 3,
+        "label": "collection callback",
+        "prefix": "",
+        "path": "callback-map.n",
+        "line": 0,
+        "column": 0
+      }
+    ]
+  },
+  "callback-filter": {
+    "ok": false,
+    "stdout": "",
+    "message": "return: division by zero",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": [
+      {
+        "kind": 3,
+        "label": "collection callback",
+        "prefix": "",
+        "path": "callback-filter.n",
+        "line": 0,
+        "column": 0
+      }
+    ]
+  },
+  "callback-reduce": {
+    "ok": false,
+    "stdout": "",
+    "message": "return: division by zero",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": [
+      {
+        "kind": 3,
+        "label": "collection callback",
+        "prefix": "",
+        "path": "callback-reduce.n",
+        "line": 0,
+        "column": 0
+      }
+    ]
+  },
+  "callback-sort_by": {
+    "ok": false,
+    "stdout": "",
+    "message": "return: division by zero",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": [
+      {
+        "kind": 3,
+        "label": "collection callback",
+        "prefix": "",
+        "path": "callback-sort_by.n",
+        "line": 0,
+        "column": 0
+      }
+    ]
+  },
+  "numeric-plan-fallback": {
+    "ok": false,
+    "stdout": "",
+    "message": "lambda body error: division by zero",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": []
+  },
+  "template-expression": {
+    "ok": false,
+    "stdout": "",
+    "message": "division by zero",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": []
+  },
+  "template-for": {
+    "ok": false,
+    "stdout": "",
+    "message": "division by zero",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": []
+  },
+  "template-nested": {
+    "ok": false,
+    "stdout": "",
+    "message": "division by zero",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": []
+  },
+  "template-script": {
+    "ok": false,
+    "stdout": "",
+    "message": "unknown value or malformed expression: missing_value",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": [
+      {
+        "kind": 6,
+        "label": "@script",
+        "prefix": "",
+        "path": "",
+        "line": 0,
+        "column": 0
+      }
+    ]
+  },
+  "template-include": {
+    "ok": false,
+    "stdout": "",
+    "message": "division by zero",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": []
+  },
+  "import-module": {
+    "ok": false,
+    "stdout": "",
+    "message": "import: unknown value or malformed expression: missing_value",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": [
+      {
+        "kind": 4,
+        "label": "module.n",
+        "prefix": "import: ",
+        "path": "",
+        "line": 0,
+        "column": 0
+      }
+    ]
+  },
+  "recoverable": {
+    "ok": false,
+    "stdout": "",
+    "message": "ffi_open: ./missing-library-cpf.so: cannot open shared object file: No such file or directory",
+    "code": "ffi.library_load_failed",
+    "disposition": "recoverable",
+    "frames": []
+  },
+  "explicit-throw": {
+    "ok": false,
+    "stdout": "",
+    "message": "sample",
+    "code": "user.raised",
+    "disposition": "recoverable",
+    "frames": []
+  },
+  "imported-callable": {
+    "ok": false,
+    "stdout": "",
+    "message": "division by zero",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": [
+      {
+        "kind": 0,
+        "label": "module_bad",
+        "prefix": "",
+        "path": "",
+        "line": 0,
+        "column": 0
+      }
+    ]
+  },
+  "same-lambda-text": {
+    "ok": false,
+    "stdout": "",
+    "message": "lambda body error: unknown value or malformed expression: missing_value",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": []
+  },
+  "try-catch": {
+    "ok": true,
+    "stdout": "ffi.library_load_failed\n",
+    "message": ""
+  },
+  "translation-malformed": {
+    "ok": false,
+    "stdout": "",
+    "message": "function while requires a block",
+    "code": "native.translation_error",
+    "disposition": "fatal",
+    "frames": []
+  },
+  "template-multiline": {
+    "ok": false,
+    "stdout": "",
+    "message": "division by zero",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": []
+  },
+  "content-file": {
+    "ok": false,
+    "stdout": "",
+    "message": "division by zero",
+    "code": "internal.legacy_failure",
+    "disposition": "fatal",
+    "frames": []
+  }
+}

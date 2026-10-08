@@ -1901,7 +1901,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
         // receiver makes literals and call/expression results chain naturally without
         // teaching each primitive about every possible trailing method.
         {
-            auto final_postfix = [&](std::string& receiver, std::string& method, std::string& arg_text)->bool {
+            auto final_postfix = [&](nift::detail::SourceText& receiver, std::string& method, nift::detail::SourceText& arg_text)->bool {
                 if (text.empty() || text.back() != ')') return false;
                 bool quoted=false; char quote=0; int parens=0;
                 std::size_t lp=std::string::npos;
@@ -1925,7 +1925,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 { bool q=false; char qc=0; int pa=0,br=0,bc=0; for(std::size_t j=0;j<receiver.size();++j){ char c=receiver[j]; if(q){ if(c=='\\') ++j; else if(c==qc) q=false; continue; } if(c=='\'' || c=='"'){ q=true; qc=c; continue; } if(c=='(')++pa; else if(c==')')--pa; else if(c=='[')++br; else if(c==']')--br; else if(c=='{')++bc; else if(c=='}')--bc; else if(!pa&&!br&&!bc&&std::string("+-*/%<>=!&|?:,").find(c)!=std::string::npos) return false; } }
                 return !receiver.empty();
             };
-            std::string receiver, method, arg_text;
+            nift::detail::SourceText receiver, arg_text;std::string method;
             if (final_postfix(receiver,method,arg_text)) {
                 const bool known = method=="length"||method=="split"||method=="index_of"||method=="last_index_of"||
                     method=="contains"||method=="starts_with"||method=="ends_with"||method=="trim"||method=="encode"||method=="decode"||
@@ -2840,7 +2840,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     std::size_t colon=std::string::npos;bool q=false;char qc=0;int pa=0,br=0,bc=0;
                     for(std::size_t z=0;z<raw.size();++z){char c=raw[z];if(q){if(c=='\\'&&z+1<raw.size())++z;else if(c==qc)q=false;continue;}if(c=='\''||c=='"'){q=true;qc=c;continue;}if(c=='(')++pa;else if(c==')')--pa;else if(c=='[')++br;else if(c==']')--br;else if(c=='{')++bc;else if(c=='}')--bc;if(c==':'&&!q&&!pa&&!br&&!bc){colon=z;break;}}
                     if(colon==std::string::npos){error="object literal: expected 'key: value' member";return false;}
-                    std::string key=trim_copy(raw.substr(0,colon));std::string value=trim_copy(raw.substr(colon+1));
+                    std::string key=trim_copy(raw.substr(0,colon));auto value=trim_copy(raw.substr(colon+1));
                     if(key.size()<2||key.front()!='"'||key.back()!='"'){error="object literal: keys must be double-quoted strings";return false;}
                     key=unescape_parameter_string(key.substr(1,key.size()-2));
                     if(out.has(key)){error="object literal: duplicate object key '"+key+"'";return false;}
@@ -3510,7 +3510,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
         };
         const bool ok = evaluate_slice();
         if (ok) expression_failure_view_ = previous_failure;
-        else if (!expression_failure_view_ && text.view) expression_failure_view_ = text.view;
+        else if (!expression_failure_view_ && text.view && !text.empty()) expression_failure_view_ = text.view;
         return ok;
     };
     return eval(nift::detail::SourceText(expression,std::move(view)),value,0);

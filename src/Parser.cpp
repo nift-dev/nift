@@ -785,6 +785,14 @@ void Parser::fail(const fs::path& source_path, const std::string& source, std::s
     origin.column = result_.error.column;
     origin.source_length = result_.error.source_length;
     origin.source_line = result_.error.source_line;
+    if (!source_context_stack_.empty() && source_context_stack_.back().view) {
+        const auto& view = source_context_stack_.back().view;
+        const auto original = view.original_range(offset, result_.error.source_length);
+        const bool directive_anchor = view.document()->text.compare(original.first, 2, "$[") == 0;
+        origin = expression_failure_view_ && !directive_anchor
+            ? expression_failure_view_.locate(0,expression_failure_view_.size())
+            : view.locate(offset, result_.error.source_length);
+    }
     if (active_diagnostic_) {
         result_.diagnostic = std::move(active_diagnostic_);
         active_diagnostic_.reset();
@@ -800,10 +808,7 @@ void Parser::fail(const fs::path& source_path, const std::string& source, std::s
         result_.diagnostic = nift::detail::make_diagnostic(
             nift::detail::DiagnosticCode::InternalLegacyFailure, message, std::move(origin));
     }
-    if (result_.diagnostic &&
-        nift::detail::diagnostic_code_info(result_.diagnostic->code).disposition ==
-            nift::detail::DiagnosticDisposition::Recoverable &&
-        !result_.diagnostic->origin.source.empty()) {
+    if (result_.diagnostic && !result_.diagnostic->origin.source.empty()) {
         result_.error.source_file = result_.diagnostic->origin.source;
         result_.error.line = result_.diagnostic->origin.line;
         result_.error.column = result_.diagnostic->origin.column;

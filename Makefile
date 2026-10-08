@@ -1758,3 +1758,13 @@ test-ast-source: $(TEST_DIR)/ast-source-unit$(EXEEXT)
 	$(TEST_DIR)/ast-source-unit$(EXEEXT)
 
 test: test-ast-source
+
+$(TEST_DIR)/source-map-probe$(EXEEXT): tests/source_map_probe.cpp $(filter-out src/nift.o src/CLI.o,$(CLI_OBJECTS))
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/source_map_probe.cpp $(filter-out src/nift.o src/CLI.o,$(CLI_OBJECTS)) $(LDLIBS) -o $@
+
+.PHONY: test-source-map
+test-source-map: $(TEST_DIR)/source-map-probe$(EXEEXT)
+	python3 tests/source_map_matrix.py $(TEST_DIR)/source-map-probe$(EXEEXT)
+
+test: test-source-map

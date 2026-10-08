@@ -405,7 +405,7 @@ RenderResult Parser::execute_native_program(const std::string& source, const fs:
     if(!view)view=nift::detail::SourceView::identity(source_path,source);
     std::string program, error;nift::detail::SourceView program_view;nift::detail::DiagnosticOrigin translation_origin;
     if (!translate_function_program(source, program, error,view,&program_view,&translation_origin)) {
-        RenderResult failed; failed.ok=false; failed.error.message=error;failed.diagnostic=nift::detail::make_diagnostic(nift::detail::DiagnosticCode::NativeTranslationError,error,std::move(translation_origin));if(rollback_files_on_failure)rollback_file_operation(file_checkpoint);return failed;
+        RenderResult failed; failed.ok=false; failed.error.message=error;failed.error.source_file=translation_origin.source;failed.error.line=translation_origin.line;failed.error.column=translation_origin.column;failed.error.source_length=translation_origin.source_length;failed.error.source_line=translation_origin.source_line;failed.diagnostic=nift::detail::make_diagnostic(nift::detail::DiagnosticCode::NativeTranslationError,error,std::move(translation_origin));if(rollback_files_on_failure)rollback_file_operation(file_checkpoint);return failed;
     }
     RenderResult rr;
     try {
@@ -418,12 +418,6 @@ RenderResult Parser::execute_native_program(const std::string& source, const fs:
         rr.ok=false;
         rr.error.message="script evaluation failed";
         rr.diagnostic=nift::detail::make_diagnostic(nift::detail::DiagnosticCode::InternalUnexpectedException,rr.error.message);
-    }
-    if(!rr.ok&&rr.error.line>0&&rr.error.message.rfind("import",0)==0){
-        auto line_at=[](const std::string& text,std::size_t line){std::size_t begin=0;for(std::size_t n=1;n<line;++n){begin=text.find('\n',begin);if(begin==std::string::npos)return std::string{};++begin;}const auto end=text.find('\n',begin);return text.substr(begin,end==std::string::npos?std::string::npos:end-begin);};
-        auto imports=[](const std::string& line){std::vector<std::size_t> found;bool quoted=false;char quote=0;for(std::size_t p=0;p<line.size();++p){const char c=line[p];if(quoted){if(c=='\\')++p;else if(c==quote)quoted=false;continue;}if(c=='\''||c=='"'){quoted=true;quote=c;continue;}if(line.compare(p,6,"import")!=0)continue;const bool left=p==0||(!std::isalnum(static_cast<unsigned char>(line[p-1]))&&line[p-1]!='_');std::size_t q=p+6;const bool right=q==line.size()||(!std::isalnum(static_cast<unsigned char>(line[q]))&&line[q]!='_');while(q<line.size()&&std::isspace(static_cast<unsigned char>(line[q])))++q;if(left&&right&&q<line.size()&&line[q]=='(')found.push_back(p);}return found;};
-        const std::string original_line=line_at(source,rr.error.line);const auto original_imports=imports(original_line);const auto translated_imports=imports(rr.error.source_line);
-        if(!original_imports.empty()){std::size_t occurrence=0;for(std::size_t n=0;n<translated_imports.size();++n)if(translated_imports[n]+1<=rr.error.column)occurrence=n;occurrence=std::min(occurrence,original_imports.size()-1);const auto position=original_imports[occurrence];rr.error.column=position+1;rr.error.source_line=original_line;std::size_t open=position+6;while(open<original_line.size()&&std::isspace(static_cast<unsigned char>(original_line[open])))++open;std::size_t close=0;rr.error.source_length=open<original_line.size()&&find_balanced(original_line,open,'(',')',close)?close-position+1:6;}
     }
     if(!rr.ok){if(!rr.diagnostic)rr.diagnostic=nift::detail::make_diagnostic(nift::detail::DiagnosticCode::InternalLegacyFailure,rr.error.message);if(rr.diagnostic->origin.source.empty()){rr.diagnostic->origin.source=rr.error.source_file;rr.diagnostic->origin.line=rr.error.line;rr.diagnostic->origin.column=rr.error.column;rr.diagnostic->origin.source_length=rr.error.source_length;rr.diagnostic->origin.source_line=rr.error.source_line;}}
     if (!rr.ok && rollback_files_on_failure) rollback_file_operation(file_checkpoint);
