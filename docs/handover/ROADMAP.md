@@ -1,30 +1,38 @@
 # Nift maintained roadmap
 
-## Current status — v4.9 release preparation
+## Current status — v4.10 scripting competitiveness review
 
-Public v4.8.0 is released at immutable `1bfc4a54b373da3477b497106fa4db59111e2770`.
-Version is v4.9.0; FEATURE FREEZE is ACTIVE and the PERFORMANCE CAMPAIGN is CLOSED.
-Runtime `3c0a5b2`, hosted-green identity `02e3793` and accepted documentation-only
-investigation `cc60913` are the release-preparation starting identities.
-The v4.8 feature/performance campaign and release are closed. Historical campaign
-records remain evidence; they do not authorize more implementation.
+Public v4.9.0 targets immutable `aaadeb31219251b7cc02a62fbf75360ac3e11aaf`.
+Release/public installer verification and Chocolatey submission are recorded in
+[release verification](../evidence/release-4.9.0/release-verification.md).
+Development is 4.10.0 with C ABI 1.3. The v4.9 performance campaign is closed;
+the separately authorized v4.10 investigation starts at local `629b1f2`.
 
-## Release-preparation order
+The [v4.10 candidate report](../evidence/cp410-competitiveness/report.md) explains
+fresh callback/frame/capture, native dispatch, value lifecycle and wide-object
+costs. Both bounded changes are accepted: canonical capture insertion and
+allocation-free native name probes. Normal commits/push and exact-SHA hosted
+certification are authorized. The peer competitiveness target remains unmet;
+the frozen `20261009-v490` series stays immutable. No campaign Labs edits,
+benchmark rerun, node provisioning or new release are authorized.
 
-1. Accepted investigation evidence pushed; no production changes after wave 2.
-2. Review canonical v4.9 notes covering both waves and maintained bindings.
-3. Repeat local native/binding/sanitizer/NRS/PRS/performance and zero-warning gates.
-4. Run appropriate exact-SHA hosted non-release readiness walls.
-5. Run canonical non-publishing Release artifacts rehearsal for 4.9.0; inspect
-   actual four public archives and checksum manifest.
-6. STOP for explicit final tag/release authorization. No Chocolatey submission.
+## Next review boundary
 
-The optional third performance tranche is declined for v4.9. Capture insertion,
-owned keys, callable plans/instances, captures/frames/arenas, persistent slots or
-indexes, RuntimeValue/root-path/storage and VM/JIT remain post-release work.
-Only correctness/regression/release blockers and release documentation/process
-fixes are permitted during freeze. Official benchmarks remain post-release;
-frozen `20261008-v480`, Labs and official workloads stay unchanged. No nodes.
+1. Commit the accepted runtime and guards/evidence coherently, repeat focused
+   checks, push normally, and require all relevant hosted certification green.
+2. Prioritize sort/selector factory, capture, frame, instance and retention costs.
+   Extend exact semantic contracts and quantify the post-acceptance decomposition.
+   Design immutable plans plus fresh instances; return ownership, diagnostics,
+   captures, module and async proof for review before architecture implementation.
+3. As a secondary bounded experiment, implement one-fetch member access after
+   baseline alias/root-path/mutation oracles; retain only a measured safe win.
+4. Investigate canonical standalone Jsonic++ wide duplicate-key checking and
+   propose a fix. No standalone implementation or vendored-only patch is authorized.
+5. Persistent indexing and RuntimeValue layout remain review boundaries. A new
+   official series requires meaningful accepted changes and separate authorization.
+
+No speculative reclamation, reusable frames, arenas, compiler-wide slots,
+bytecode/JIT or capture/identity semantic changes are part of this checkpoint.
 
 ## Distribution validation direction
 

@@ -1,0 +1,170 @@
+[
+  {
+    "name": "empty",
+    "n": 0,
+    "baseline": {
+      "samples_kib": [
+        6120,
+        6276,
+        6284,
+        6316,
+        6212
+      ],
+      "median_kib": 6276
+    },
+    "final": {
+      "samples_kib": [
+        6052,
+        6092,
+        6044,
+        6100,
+        6216
+      ],
+      "median_kib": 6092
+    }
+  },
+  {
+    "name": "loops",
+    "n": 8000,
+    "baseline": {
+      "samples_kib": [
+        7360,
+        7348,
+        7364,
+        6784,
+        7348
+      ],
+      "median_kib": 7348
+    },
+    "final": {
+      "samples_kib": [
+        6856,
+        7344,
+        7304,
+        7392,
+        7104
+      ],
+      "median_kib": 7304
+    }
+  },
+  {
+    "name": "official-sort",
+    "n": 4000,
+    "baseline": {
+      "samples_kib": [
+        16668,
+        16564,
+        16752,
+        16784,
+        16700
+      ],
+      "median_kib": 16700
+    },
+    "final": {
+      "samples_kib": [
+        16596,
+        16892,
+        16912,
+        16796,
+        16956
+      ],
+      "median_kib": 16892
+    }
+  },
+  {
+    "name": "captured-sort",
+    "n": 4000,
+    "baseline": {
+      "samples_kib": [
+        17496,
+        17400,
+        17380,
+        17628,
+        17340
+      ],
+      "median_kib": 17400
+    },
+    "final": {
+      "samples_kib": [
+        17132,
+        17384,
+        17404,
+        17444,
+        17400
+      ],
+      "median_kib": 17400
+    }
+  },
+  {
+    "name": "call-closure",
+    "n": 8000,
+    "baseline": {
+      "samples_kib": [
+        7472,
+        7212,
+        7336,
+        7052,
+        7288
+      ],
+      "median_kib": 7288
+    },
+    "final": {
+      "samples_kib": [
+        7360,
+        7192,
+        7216,
+        7120,
+        7536
+      ],
+      "median_kib": 7216
+    }
+  },
+  {
+    "name": "map-identity",
+    "n": 8000,
+    "baseline": {
+      "samples_kib": [
+        10996,
+        11168,
+        11008,
+        11056,
+        11268
+      ],
+      "median_kib": 11056
+    },
+    "final": {
+      "samples_kib": [
+        10996,
+        11216,
+        10856,
+        11160,
+        11028
+      ],
+      "median_kib": 11028
+    }
+  },
+  {
+    "name": "wide-object-8000",
+    "n": 2000,
+    "baseline": {
+      "samples_kib": [
+        10592,
+        11000,
+        10732,
+        10784,
+        10576
+      ],
+      "median_kib": 10732
+    },
+    "final": {
+      "samples_kib": [
+        10456,
+        10704,
+        10680,
+        10768,
+        10340
+      ],
+      "median_kib": 10680
+    }
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "sha": "629b1f23afbb5b3be97dac66b6cea1a9d5b3d1fc",
+  "origin": "aaadeb31219251b7cc02a62fbf75360ac3e11aaf",
+  "version": "4.10.0",
+  "abi": "1.3",
+  "clean": true,
+  "ahead": 2,
+  "behind": 0,
+  "binary_sha256": "86d9dfb2e169aa09d30b890b09edf7dda4105b5e2946c661c23460364fdb09e2"
+}

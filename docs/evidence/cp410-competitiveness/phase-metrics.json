@@ -1,0 +1,1096 @@
+[
+  {
+    "name": "official-sort",
+    "n": 2000,
+    "phases": {
+      "factory": {
+        "calls": 2000,
+        "allocations": 34012,
+        "bytes": 3660256,
+        "instructions": 16784624
+      },
+      "instance": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 576000,
+        "instructions": 761878
+      },
+      "metadata": {
+        "calls": 2000,
+        "allocations": 8000,
+        "bytes": 1232000,
+        "instructions": 3996579
+      },
+      "capture": {
+        "calls": 2000,
+        "allocations": 18000,
+        "bytes": 1552000,
+        "instructions": 6145025
+      },
+      "registration": {
+        "calls": 2000,
+        "allocations": 6008,
+        "bytes": 299936,
+        "instructions": 3392285
+      },
+      "arguments": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "instructions": 761985
+      },
+      "frame": {
+        "calls": 2000,
+        "allocations": 32001,
+        "bytes": 3456240,
+        "instructions": 14028426
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 724000
+      },
+      "key": {
+        "calls": 4000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "instructions": 638000
+      },
+      "decoration": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 454000
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 176000,
+        "instructions": 5114887
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 304000,
+        "instructions": 174652
+      },
+      "cleanup": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 2192000
+      },
+      "returned_key": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 152000
+      },
+      "destruction": {
+        "calls": 1,
+        "allocations": 0,
+        "bytes": 0
+      }
+    },
+    "events": {
+      "instances": 2000,
+      "capture_entries": 8000,
+      "frame_capture_entries": 8000,
+      "comparisons": 9580
+    }
+  },
+  {
+    "name": "captured-sort",
+    "n": 2000,
+    "phases": {
+      "factory": {
+        "calls": 2000,
+        "allocations": 38012,
+        "bytes": 3996256,
+        "instructions": 18000514
+      },
+      "instance": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 576000,
+        "instructions": 761829
+      },
+      "metadata": {
+        "calls": 2000,
+        "allocations": 8000,
+        "bytes": 1232000,
+        "instructions": 4036918
+      },
+      "capture": {
+        "calls": 2000,
+        "allocations": 22000,
+        "bytes": 1888000,
+        "instructions": 7559109
+      },
+      "registration": {
+        "calls": 2000,
+        "allocations": 6008,
+        "bytes": 299936,
+        "instructions": 3120596
+      },
+      "arguments": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "instructions": 761893
+      },
+      "frame": {
+        "calls": 2000,
+        "allocations": 36001,
+        "bytes": 3792240,
+        "instructions": 15751708
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 2007,
+        "bytes": 129232,
+        "instructions": 9796086
+      },
+      "key": {
+        "calls": 4000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "instructions": 638000
+      },
+      "decoration": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 454000
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 176000,
+        "instructions": 5114887
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 304000,
+        "instructions": 174652
+      },
+      "cleanup": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 2374000
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "destruction": {
+        "calls": 1,
+        "allocations": 0,
+        "bytes": 0
+      }
+    },
+    "events": {
+      "instances": 2000,
+      "capture_entries": 10000,
+      "frame_capture_entries": 10000,
+      "comparisons": 9580
+    }
+  },
+  {
+    "name": "sort-index",
+    "n": 2000,
+    "phases": {
+      "factory": {
+        "calls": 2000,
+        "allocations": 34012,
+        "bytes": 3648256,
+        "instructions": 16807561
+      },
+      "instance": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 576000,
+        "instructions": 762236
+      },
+      "metadata": {
+        "calls": 2000,
+        "allocations": 8000,
+        "bytes": 1220000,
+        "instructions": 4040812
+      },
+      "capture": {
+        "calls": 2000,
+        "allocations": 18000,
+        "bytes": 1552000,
+        "instructions": 6144908
+      },
+      "registration": {
+        "calls": 2000,
+        "allocations": 6008,
+        "bytes": 299936,
+        "instructions": 3392448
+      },
+      "arguments": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "instructions": 762546
+      },
+      "frame": {
+        "calls": 2000,
+        "allocations": 32001,
+        "bytes": 3444240,
+        "instructions": 14026723
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 7,
+        "bytes": 1232,
+        "instructions": 1414858
+      },
+      "key": {
+        "calls": 4000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "instructions": 638000
+      },
+      "decoration": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 454000
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 176000,
+        "instructions": 5582314
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 304000,
+        "instructions": 174652
+      },
+      "cleanup": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 2192000
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "destruction": {
+        "calls": 1,
+        "allocations": 0,
+        "bytes": 0
+      }
+    },
+    "events": {
+      "instances": 2000,
+      "capture_entries": 8000,
+      "frame_capture_entries": 8000,
+      "comparisons": 21864
+    }
+  },
+  {
+    "name": "sort-identity",
+    "n": 2000,
+    "phases": {
+      "factory": {
+        "calls": 2000,
+        "allocations": 34012,
+        "bytes": 3660256
+      },
+      "instance": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 576000
+      },
+      "metadata": {
+        "calls": 2000,
+        "allocations": 8000,
+        "bytes": 1232000
+      },
+      "capture": {
+        "calls": 2000,
+        "allocations": 18000,
+        "bytes": 1552000
+      },
+      "registration": {
+        "calls": 2000,
+        "allocations": 6008,
+        "bytes": 299936
+      },
+      "arguments": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 304000
+      },
+      "frame": {
+        "calls": 2000,
+        "allocations": 32001,
+        "bytes": 3456240
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "key": {
+        "calls": 4000,
+        "allocations": 2000,
+        "bytes": 304000
+      },
+      "decoration": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 176000
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 304000
+      },
+      "cleanup": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "returned_key": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "destruction": {
+        "calls": 1,
+        "allocations": 0,
+        "bytes": 0
+      }
+    },
+    "events": {
+      "instances": 2000,
+      "capture_entries": 8000,
+      "frame_capture_entries": 8000,
+      "comparisons": 18533
+    }
+  },
+  {
+    "name": "map-identity",
+    "n": 2000,
+    "phases": {
+      "factory": {
+        "calls": 1,
+        "allocations": 22,
+        "bytes": 2234,
+        "instructions": 18421
+      },
+      "instance": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 288,
+        "instructions": 245
+      },
+      "metadata": {
+        "calls": 1,
+        "allocations": 4,
+        "bytes": 614,
+        "instructions": 2272
+      },
+      "capture": {
+        "calls": 1,
+        "allocations": 9,
+        "bytes": 776,
+        "instructions": 3752
+      },
+      "registration": {
+        "calls": 1,
+        "allocations": 4,
+        "bytes": 236,
+        "instructions": 1856
+      },
+      "arguments": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "instructions": 490000
+      },
+      "frame": {
+        "calls": 2000,
+        "allocations": 32001,
+        "bytes": 3452240,
+        "instructions": 11865545
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 724000
+      },
+      "key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "decoration": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "sorting": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "result": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "cleanup": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 2220000
+      },
+      "returned_key": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 152000
+      },
+      "destruction": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      }
+    },
+    "events": {
+      "instances": 1,
+      "capture_entries": 4,
+      "frame_capture_entries": 8000,
+      "comparisons": 0
+    }
+  },
+  {
+    "name": "sort-arithmetic",
+    "n": 2000,
+    "phases": {
+      "factory": {
+        "calls": 2000,
+        "allocations": 34012,
+        "bytes": 3668256
+      },
+      "instance": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 576000
+      },
+      "metadata": {
+        "calls": 2000,
+        "allocations": 8000,
+        "bytes": 1240000
+      },
+      "capture": {
+        "calls": 2000,
+        "allocations": 18000,
+        "bytes": 1552000
+      },
+      "registration": {
+        "calls": 2000,
+        "allocations": 6008,
+        "bytes": 299936
+      },
+      "arguments": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 304000
+      },
+      "frame": {
+        "calls": 2000,
+        "allocations": 32001,
+        "bytes": 3464240
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 2007,
+        "bytes": 129232
+      },
+      "key": {
+        "calls": 4000,
+        "allocations": 2000,
+        "bytes": 304000
+      },
+      "decoration": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 176000
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 304000
+      },
+      "cleanup": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "destruction": {
+        "calls": 1,
+        "allocations": 0,
+        "bytes": 0
+      }
+    },
+    "events": {
+      "instances": 2000,
+      "capture_entries": 8000,
+      "frame_capture_entries": 8000,
+      "comparisons": 18533
+    }
+  },
+  {
+    "name": "call-scalar",
+    "n": 2000,
+    "phases": {
+      "factory": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "instance": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "metadata": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "capture": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "registration": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "arguments": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "frame": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "body": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "decoration": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "sorting": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "result": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "cleanup": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "destruction": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      }
+    },
+    "events": {
+      "instances": 0,
+      "capture_entries": 0,
+      "frame_capture_entries": 0,
+      "comparisons": 0
+    }
+  },
+  {
+    "name": "call-closure",
+    "n": 2000,
+    "phases": {
+      "factory": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "instance": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 288
+      },
+      "metadata": {
+        "calls": 1,
+        "allocations": 4,
+        "bytes": 614
+      },
+      "capture": {
+        "calls": 1,
+        "allocations": 7,
+        "bytes": 608
+      },
+      "registration": {
+        "calls": 1,
+        "allocations": 4,
+        "bytes": 236
+      },
+      "arguments": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "frame": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 2007,
+        "bytes": 129232
+      },
+      "key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "decoration": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "sorting": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "result": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "cleanup": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "destruction": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      }
+    },
+    "events": {
+      "instances": 1,
+      "capture_entries": 3,
+      "frame_capture_entries": 0,
+      "comparisons": 0
+    }
+  },
+  {
+    "name": "call-callback",
+    "n": 2000,
+    "phases": {
+      "factory": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "instance": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 288
+      },
+      "metadata": {
+        "calls": 1,
+        "allocations": 4,
+        "bytes": 616
+      },
+      "capture": {
+        "calls": 1,
+        "allocations": 5,
+        "bytes": 440
+      },
+      "registration": {
+        "calls": 1,
+        "allocations": 4,
+        "bytes": 236
+      },
+      "arguments": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "frame": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 2007,
+        "bytes": 129232
+      },
+      "key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "decoration": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "sorting": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "result": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "cleanup": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "destruction": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      }
+    },
+    "events": {
+      "instances": 1,
+      "capture_entries": 2,
+      "frame_capture_entries": 0,
+      "comparisons": 0
+    }
+  },
+  {
+    "name": "official-bfs",
+    "n": 1000,
+    "phases": {
+      "factory": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "instance": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "metadata": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "capture": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "registration": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "arguments": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "frame": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "body": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "decoration": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "sorting": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "result": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "cleanup": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "destruction": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      }
+    },
+    "events": {
+      "instances": 0,
+      "capture_entries": 0,
+      "frame_capture_entries": 0,
+      "comparisons": 0
+    }
+  },
+  {
+    "name": "official-json-transform",
+    "n": 1000,
+    "phases": {
+      "factory": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "instance": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "metadata": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "capture": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "registration": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "arguments": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "frame": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "body": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "decoration": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "sorting": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "result": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "cleanup": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "destruction": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      }
+    },
+    "events": {
+      "instances": 0,
+      "capture_entries": 0,
+      "frame_capture_entries": 0,
+      "comparisons": 0
+    }
+  },
+  {
+    "name": "frequency",
+    "n": 2000,
+    "phases": {
+      "factory": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "instance": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "metadata": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "capture": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "registration": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "arguments": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "frame": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "body": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "decoration": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "sorting": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "result": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "cleanup": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "destruction": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      }
+    },
+    "events": {
+      "instances": 0,
+      "capture_entries": 0,
+      "frame_capture_entries": 0,
+      "comparisons": 0
+    }
+  }
+]

@@ -1,0 +1,37 @@
+unused0 := 0
+unused1 := 1
+unused2 := 2
+unused3 := 3
+unused4 := 4
+unused5 := 5
+unused6 := 6
+unused7 := 7
+unused8 := 8
+unused9 := 9
+unused10 := 10
+unused11 := 11
+unused12 := 12
+unused13 := 13
+unused14 := 14
+unused15 := 15
+unused16 := 16
+unused17 := 17
+unused18 := 18
+unused19 := 19
+unused20 := 20
+unused21 := 21
+unused22 := 22
+unused23 := 23
+unused24 := 24
+unused25 := 25
+unused26 := 26
+unused27 := 27
+unused28 := 28
+unused29 := 29
+unused30 := 30
+unused31 := 31
+a := []
+i := 1
+while(i <= 4000) { a.push(4000-i+1); i += 1 }
+a = a.sort_by(x => x)
+print(a[0]); print(a[4000-1]); print(a[2000-1])

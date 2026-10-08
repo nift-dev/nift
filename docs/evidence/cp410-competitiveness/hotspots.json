@@ -1,0 +1,1341 @@
+[
+  {
+    "name": "loops",
+    "n": 2000,
+    "self": [
+      "1,089,160 ( 8.64%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,004,000 ( 7.96%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "706,271 ( 5.60%)  ???:std::_Hashtable<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding> >, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::find(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "612,507 ( 4.86%)  ./elf/./elf/dl-lookup.c:do_lookup_x [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "612,153 ( 4.85%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue const&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "595,181 ( 4.72%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "12,609,240 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "10,357,140 (82.14%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "10,357,128 (82.14%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "10,356,860 (82.14%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "10,343,249 (82.03%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "10,343,247 (82.03%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "array-build",
+    "n": 2000,
+    "self": [
+      "1,123,256 ( 9.45%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,031,269 ( 8.68%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "612,739 ( 5.16%)  ./elf/./elf/dl-lookup.c:do_lookup_x [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "576,078 ( 4.85%)  ./elf/../sysdeps/generic/dl-new-hash.h:_dl_lookup_symbol_x",
+      "560,183 ( 4.72%)  ???:std::_Hashtable<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding> >, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::find(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "510,102 ( 4.29%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue const&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "11,880,246 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "9,628,146 (81.04%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "9,628,134 (81.04%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "9,627,866 (81.04%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "9,614,255 (80.93%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "9,614,253 (80.93%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "call-noarg",
+    "n": 2000,
+    "self": [
+      "1,701,228 ( 9.44%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,004,000 ( 5.57%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "989,280 ( 5.49%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "780,271 ( 4.33%)  ???:std::_Hashtable<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding> >, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::find(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "612,747 ( 3.40%)  ./elf/./elf/dl-lookup.c:do_lookup_x [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "612,153 ( 3.40%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue const&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "18,013,446 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "15,761,346 (87.50%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "15,761,334 (87.50%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "15,761,066 (87.50%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "15,747,455 (87.42%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "15,747,453 (87.42%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "call-scalar",
+    "n": 2000,
+    "self": [
+      "2,041,330 ( 8.47%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,187,280 ( 4.93%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,078,271 ( 4.48%)  ???:std::_Hashtable<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding> >, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::find(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,004,000 ( 4.17%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "816,153 ( 3.39%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue const&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "718,073 ( 2.98%)  ???:nift::ast::evaluate(nift::ast::Expr const&, nift::ast::Context&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)::{lambda()#1}::operator()() const'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "24,092,487 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "21,840,387 (90.65%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "21,840,375 (90.65%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "21,840,107 (90.65%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "21,826,256 (90.59%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "21,826,254 (90.59%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "call-multi",
+    "n": 2000,
+    "self": [
+      "2,789,500 ( 5.94%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,781,379 ( 3.80%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,542,216 ( 3.29%)  ./string/../sysdeps/x86_64/multiarch/strlen-avx2.S:__strlen_avx2 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,399,097 ( 2.98%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,326,005 ( 2.83%)  ???:nift::ast::(anonymous namespace)::P::compare() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,300,271 ( 2.77%)  ???:std::_Hashtable<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding> >, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::find(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "46,927,073 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "44,674,973 (95.20%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "44,674,961 (95.20%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "44,674,693 (95.20%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "44,660,586 (95.17%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "44,660,584 (95.17%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "call-locals",
+    "n": 2000,
+    "self": [
+      "2,789,500 ( 8.57%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,450,000 ( 4.45%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,385,379 ( 4.25%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,292,073 ( 3.97%)  ???:nift::ast::evaluate(nift::ast::Expr const&, nift::ast::Context&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)::{lambda()#1}::operator()() const'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,276,271 ( 3.92%)  ???:std::_Hashtable<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding> >, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::find(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,122,153 ( 3.45%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue const&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "32,561,685 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "30,309,585 (93.08%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "30,309,573 (93.08%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "30,309,305 (93.08%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "30,295,192 (93.04%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "30,295,190 (93.04%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "call-recursion",
+    "n": 2000,
+    "self": [
+      "8,161,704 ( 7.33%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "5,374,073 ( 4.82%)  ???:nift::ast::evaluate(nift::ast::Expr const&, nift::ast::Context&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)::{lambda()#1}::operator()() const'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "4,943,676 ( 4.44%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "4,486,734 ( 4.03%)  ./string/../sysdeps/x86_64/multiarch/strlen-avx2.S:__strlen_avx2 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "2,998,866 ( 2.69%)  ???:bool std::operator==<char, std::char_traits<char>, std::allocator<char> >(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, char const*) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "2,988,000 ( 2.68%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "338,461,961 (303.8%)  ???:nift::ast::evaluate(nift::ast::Expr const&, nift::ast::Context&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "336,897,915 (302.4%)  ???:nift::ast::evaluate(nift::ast::Expr const&, nift::ast::Context&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)::{lambda()#1}::operator()() const'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "178,481,360 (160.2%)  ???:std::_Function_handler<bool (nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&), Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}>::_M_invoke(std::_Any_data const&, nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "178,433,360 (160.2%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "178,177,088 (159.9%)  ???:std::_Function_handler<nift::detail::ExecOutcome (std::vector<std::unique_ptr<nift::ast::Stmt, std::default_delete<nift::ast::Stmt> >, std::allocator<std::unique_ptr<nift::ast::Stmt, std::default_delete<nift::ast::Stmt> > > > const&), Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(std::vector<std::unique_ptr<nift::ast::Stmt, std::default_delete<nift::ast::Stmt> >, std::allocator<std::unique_ptr<nift::ast::Stmt, std::default_delete<nift::ast::Stmt> > > > const&)#1}>::_M_invoke(std::_Any_data const&, std::vector<std::unique_ptr<nift::ast::Stmt, std::default_delete<nift::ast::Stmt> >, std::allocator<std::unique_ptr<nift::ast::Stmt, std::default_delete<nift::ast::Stmt> > > > const&)'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "177,769,088 (159.6%)  ???:std::_Function_handler<nift::detail::ExecOutcome (nift::ast::Stmt const&), Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&)#1}>::_M_invoke(std::_Any_data const&, nift::ast::Stmt const&)'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "call-closure",
+    "n": 2000,
+    "self": [
+      "12,945,083 ( 8.87%)  ???:std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_append(char const*, unsigned long) [/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.35]",
+      "8,790,886 ( 6.02%)  ???:std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::basic_string<std::allocator<char> >(char const*, std::allocator<char> const&) [clone .constprop.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "8,694,738 ( 5.96%)  ???:Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const::{lambda()#1}::operator()() const::{lambda(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::vector<nift::detail::SourceText, std::allocator<nift::detail::SourceText> >&, std::vector<bool, std::allocator<bool> >&)#1}::operator()(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::vector<nift::detail::SourceText, std::allocator<nift::detail::SourceText> >&, std::vector<bool, std::allocator<bool> >&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "8,348,844 ( 5.72%)  ???:std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > std::operator+<char, std::char_traits<char>, std::allocator<char> >(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, char const*) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "7,930,873 ( 5.43%)  ./string/../sysdeps/x86_64/multiarch/strlen-avx2.S:__strlen_avx2 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "7,461,872 ( 5.11%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]"
+    ],
+    "inclusive": [
+      "145,995,810 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "143,743,724 (98.46%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "143,743,712 (98.46%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "143,743,444 (98.46%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "143,728,390 (98.45%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "143,728,388 (98.45%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "call-callback",
+    "n": 2000,
+    "self": [
+      "12,932,378 ( 8.23%)  ???:std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_append(char const*, unsigned long) [/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.35]",
+      "8,783,048 ( 5.59%)  ???:std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::basic_string<std::allocator<char> >(char const*, std::allocator<char> const&) [clone .constprop.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "8,686,078 ( 5.53%)  ???:Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const::{lambda()#1}::operator()() const::{lambda(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::vector<nift::detail::SourceText, std::allocator<nift::detail::SourceText> >&, std::vector<bool, std::allocator<bool> >&)#1}::operator()(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::vector<nift::detail::SourceText, std::allocator<nift::detail::SourceText> >&, std::vector<bool, std::allocator<bool> >&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "8,340,528 ( 5.31%)  ???:std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > std::operator+<char, std::char_traits<char>, std::allocator<char> >(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, char const*) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "8,068,817 ( 5.14%)  ./string/../sysdeps/x86_64/multiarch/strlen-avx2.S:__strlen_avx2 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "7,374,480 ( 4.70%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]"
+    ],
+    "inclusive": [
+      "157,062,050 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "154,809,950 (98.57%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "154,809,938 (98.57%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "154,809,670 (98.57%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "154,794,349 (98.56%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "154,794,347 (98.56%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "array-index",
+    "n": 2000,
+    "self": [
+      "2,188,085 ( 9.47%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "2,127,256 ( 9.20%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,326,537 ( 5.74%)  ???:std::_Hashtable<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding> >, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::find(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,224,306 ( 5.30%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue const&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "994,294 ( 4.30%)  ???:nift::ast::evaluate(nift::ast::Expr const&, nift::ast::Context&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)::{lambda()#1}::operator()() const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "991,870 ( 4.29%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "23,113,355 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "20,861,255 (90.26%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "20,861,243 (90.26%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "20,860,975 (90.26%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "20,847,214 (90.20%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "20,847,212 (90.20%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "sort-identity",
+    "n": 2000,
+    "self": [
+      "3,691,120 ( 6.30%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "2,918,971 ( 4.98%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "2,522,426 ( 4.30%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "2,099,648 ( 3.58%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,974,280 ( 3.37%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,880,412 ( 3.21%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]"
+    ],
+    "inclusive": [
+      "58,621,617 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "56,369,517 (96.16%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "56,369,505 (96.16%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "56,369,237 (96.16%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "56,354,235 (96.13%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "56,354,233 (96.13%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "sort-index",
+    "n": 2000,
+    "self": [
+      "3,309,998 ( 5.58%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "2,919,468 ( 4.93%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "2,522,657 ( 4.26%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "2,099,850 ( 3.54%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,974,382 ( 3.33%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,881,936 ( 3.18%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]"
+    ],
+    "inclusive": [
+      "59,272,988 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "57,020,888 (96.20%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "57,020,876 (96.20%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "57,020,608 (96.20%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "57,004,573 (96.17%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "57,004,571 (96.17%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "sort-arithmetic",
+    "n": 2000,
+    "self": [
+      "3,887,219 ( 6.06%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "2,919,528 ( 4.55%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "2,588,657 ( 4.04%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "2,314,416 ( 3.61%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "2,159,834 ( 3.37%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,887,947 ( 2.95%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]"
+    ],
+    "inclusive": [
+      "64,101,721 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "61,849,621 (96.49%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "61,849,609 (96.49%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "61,849,341 (96.49%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "61,833,306 (96.46%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "61,833,304 (96.46%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "map-identity",
+    "n": 2000,
+    "self": [
+      "1,334,097 ( 5.03%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,267,298 ( 4.78%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,211,348 ( 4.57%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,123,256 ( 4.24%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "880,000 ( 3.32%)  ???:Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const::{lambda()#1}::operator()() const::{lambda(nift::RuntimeValue const&, std::vector<nift::RuntimeValue, std::allocator<nift::RuntimeValue> > const&, nift::RuntimeValue&)#2}::operator()(nift::RuntimeValue const&, std::vector<nift::RuntimeValue, std::allocator<nift::RuntimeValue> > const&, nift::RuntimeValue&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "824,394 ( 3.11%)  ???:std::_Hash_bytes(void const*, unsigned long, unsigned long) [/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.35]"
+    ],
+    "inclusive": [
+      "26,518,709 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "24,266,623 (91.51%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "24,266,611 (91.51%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "24,266,343 (91.51%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "24,252,491 (91.45%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "24,252,489 (91.45%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "map-index",
+    "n": 2000,
+    "self": [
+      "1,334,625 ( 4.88%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,267,400 ( 4.63%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,211,788 ( 4.43%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,123,256 ( 4.11%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "900,413 ( 3.29%)  ???:std::_Hash_bytes(void const*, unsigned long, unsigned long) [/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.35]",
+      "880,000 ( 3.22%)  ???:Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const::{lambda()#1}::operator()() const::{lambda(nift::RuntimeValue const&, std::vector<nift::RuntimeValue, std::allocator<nift::RuntimeValue> > const&, nift::RuntimeValue&)#2}::operator()(nift::RuntimeValue const&, std::vector<nift::RuntimeValue, std::allocator<nift::RuntimeValue> > const&, nift::RuntimeValue&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "27,344,711 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "25,092,611 (91.76%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "25,092,599 (91.76%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "25,092,331 (91.76%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "25,077,654 (91.71%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "25,077,652 (91.71%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "map-arithmetic",
+    "n": 2000,
+    "self": [
+      "1,607,434 ( 5.01%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,400,460 ( 4.37%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,271,646 ( 3.97%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,123,256 ( 3.50%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "918,159 ( 2.86%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue const&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "880,000 ( 2.75%)  ???:Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const::{lambda()#1}::operator()() const::{lambda(nift::RuntimeValue const&, std::vector<nift::RuntimeValue, std::allocator<nift::RuntimeValue> > const&, nift::RuntimeValue&)#2}::operator()(nift::RuntimeValue const&, std::vector<nift::RuntimeValue, std::allocator<nift::RuntimeValue> > const&, nift::RuntimeValue&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "32,052,776 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "29,800,676 (92.97%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "29,800,664 (92.97%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "29,800,396 (92.97%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "29,785,959 (92.93%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "29,785,957 (92.93%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "frequency",
+    "n": 2000,
+    "self": [
+      "3,742,928 ( 8.20%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "2,523,114 ( 5.52%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,764,523 ( 3.86%)  ???:nift::ast::evaluate(nift::ast::Expr const&, nift::ast::Context&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)::{lambda()#1}::operator()() const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,764,109 ( 3.86%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,762,895 ( 3.86%)  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,462,494 ( 3.20%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue const&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "45,672,074 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "43,419,974 (95.07%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "43,419,962 (95.07%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "43,419,694 (95.07%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "43,403,909 (95.03%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "43,403,907 (95.03%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "map-set",
+    "n": 2000,
+    "self": [
+      "2,513,149 ( 7.33%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "2,045,114 ( 5.96%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,710,537 ( 4.99%)  ???:nift::(anonymous namespace)::parse_finite_decimal(std::basic_string_view<char, std::char_traits<char> >, nift::(anonymous namespace)::NumericForm&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,163,874 ( 3.39%)  ???:nift::runtime_numeric_fingerprint[abi:cxx11](nift::RuntimeValue const&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,154,418 ( 3.37%)  ???:std::to_chars(char*, char*, double, std::chars_format) [/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.35]",
+      "1,102,340 ( 3.21%)  ???:std::_Hash_bytes(void const*, unsigned long, unsigned long) [/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.35]"
+    ],
+    "inclusive": [
+      "34,290,351 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "32,038,251 (93.43%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "32,038,239 (93.43%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "32,037,971 (93.43%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "32,022,398 (93.39%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "32,022,396 (93.39%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "sliding-window",
+    "n": 2000,
+    "self": [
+      "2,657,795 ( 9.54%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "2,123,240 ( 7.62%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,526,226 ( 5.48%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue const&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,468,889 ( 5.27%)  ???:std::_Hashtable<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding> >, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::find(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,384,009 ( 4.97%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,281,568 ( 4.60%)  ???:bool std::operator==<char, std::char_traits<char>, std::allocator<char> >(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, char const*) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "27,856,199 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "25,604,099 (91.92%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "25,604,087 (91.92%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "25,603,819 (91.91%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "25,590,200 (91.87%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "25,590,198 (91.87%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "json-parse-convert",
+    "n": 2000,
+    "self": [
+      "886,000 ( 7.07%)  ???:json::Document::Parser<false>::parse_object(unsigned long) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "739,937 ( 5.90%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "613,687 ( 4.89%)  ./elf/./elf/dl-lookup.c:do_lookup_x [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "577,482 ( 4.61%)  ./elf/../sysdeps/generic/dl-new-hash.h:_dl_lookup_symbol_x",
+      "504,000 ( 4.02%)  ???:nift::RuntimeValue::~RuntimeValue()'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "497,398 ( 3.97%)  ???:json::Document::Parser<false>::parse_number() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "12,539,806 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "10,287,706 (82.04%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "10,287,694 (82.04%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "10,287,426 (82.04%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "10,275,949 (81.95%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "10,275,947 (81.95%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "json-traverse",
+    "n": 2000,
+    "self": [
+      "2,326,938 ( 7.06%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "2,166,000 ( 6.57%)  ???:void std::vector<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, nift::RuntimeValue>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, nift::RuntimeValue> > >::_M_realloc_append<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue>(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,367,829 ( 4.15%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,273,904 ( 3.87%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,185,200 ( 3.60%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,146,957 ( 3.48%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "32,955,550 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "30,703,450 (93.17%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "30,703,438 (93.17%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "30,703,170 (93.17%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "30,689,559 (93.12%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "30,689,557 (93.12%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "json-mutate",
+    "n": 2000,
+    "self": [
+      "3,143,312 ( 7.77%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "2,770,000 ( 6.85%)  ???:void std::vector<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, nift::RuntimeValue>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, nift::RuntimeValue> > >::_M_realloc_append<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue>(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,543,264 ( 3.82%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,434,671 ( 3.55%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,434,109 ( 3.55%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,222,185 ( 3.02%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]"
+    ],
+    "inclusive": [
+      "40,433,801 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "38,181,701 (94.43%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "38,181,689 (94.43%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "38,181,421 (94.43%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "38,167,810 (94.40%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "38,167,808 (94.40%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "json-serialize",
+    "n": 2000,
+    "self": [
+      "1,940,447 ( 6.99%)  ???:Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const::{lambda()#1}::operator()() const::{lambda(unsigned long&)#1}::operator()(unsigned long&) const [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,836,384 ( 6.61%)  ???:void std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > >::_M_realloc_append<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,012,000 ( 3.65%)  ???:Parser::serialize_value(nift::RuntimeValue const&, bool, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, int, bool) const'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "991,057 ( 3.57%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "886,000 ( 3.19%)  ???:json::Document::Parser<false>::parse_object(unsigned long) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "858,819 ( 3.09%)  ???:void std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_construct<char const*>(char const*, char const*, std::forward_iterator_tag) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "28,399,554 (102.3%)  ???:std::_Function_handler<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int), Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}>::_M_invoke(std::_Any_data const&, nift::detail::SourceText const&, nift::RuntimeValue&, int&&)'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "28,399,522 (102.3%)  ???:Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "28,395,292 (102.3%)  ???:Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const::{lambda()#1}::operator()() const'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "27,761,692 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "25,509,592 (91.89%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "25,509,580 (91.89%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]"
+    ]
+  },
+  {
+    "name": "construct-destroy",
+    "n": 2000,
+    "self": [
+      "1,817,364 ( 9.04%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,387,295 ( 6.90%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,040,073 ( 5.18%)  ???:nift::ast::evaluate(nift::ast::Expr const&, nift::ast::Context&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)::{lambda()#1}::operator()() const'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "968,000 ( 4.82%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "816,102 ( 4.06%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue const&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "714,168 ( 3.55%)  ???:std::_Hashtable<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding> >, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::find(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "20,097,521 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "17,845,421 (88.79%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "17,845,409 (88.79%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "17,845,141 (88.79%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "17,831,006 (88.72%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "17,831,004 (88.72%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "bfs",
+    "n": 2000,
+    "self": [
+      "7,978,270 ( 8.52%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "3,900,914 ( 4.17%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "3,764,352 ( 4.02%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "3,179,432 ( 3.40%)  ???:nift::ast::evaluate(nift::ast::Expr const&, nift::ast::Context&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)::{lambda()#1}::operator()() const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "3,167,621 ( 3.38%)  ???:bool std::operator==<char, std::char_traits<char>, std::allocator<char> >(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, char const*) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "2,944,338 ( 3.14%)  ???:std::_Hash_bytes(void const*, unsigned long, unsigned long) [/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.35]"
+    ],
+    "inclusive": [
+      "93,640,950 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "91,388,850 (97.59%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "91,388,838 (97.59%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "91,388,570 (97.59%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "91,372,735 (97.58%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "91,372,733 (97.58%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "filesystem",
+    "n": 2000,
+    "self": [
+      "5,549,367 ( 6.78%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "5,227,707 ( 6.39%)  ???:0x00000000001c0180 [/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.35]",
+      "5,087,911 ( 6.22%)  ???:std::filesystem::__cxx11::path::_List::_Impl_deleter::operator()(std::filesystem::__cxx11::path::_List::_Impl*) const [/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.35]",
+      "4,493,631 ( 5.49%)  ???:std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_append(char const*, unsigned long) [/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.35]",
+      "4,317,007 ( 5.27%)  ???:std::filesystem::__cxx11::path::_List::_List(std::filesystem::__cxx11::path::_List const&) [/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.35]",
+      "4,068,191 ( 4.97%)  ???:void std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_construct<true>(char const*, unsigned long) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "687,146,317 (839.6%)  ???:nift::detail::(anonymous namespace)::glob_walk(std::filesystem::__cxx11::path const&, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&, unsigned long, std::vector<std::filesystem::__cxx11::path, std::allocator<std::filesystem::__cxx11::path> >&)'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "81,839,203 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "79,587,103 (97.25%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "79,587,091 (97.25%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "79,586,823 (97.25%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "79,575,728 (97.23%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "empty",
+    "n": 0,
+    "self": [
+      "611,144 (24.96%)  ./elf/./elf/dl-lookup.c:do_lookup_x [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "574,404 (23.46%)  ./elf/../sysdeps/generic/dl-new-hash.h:_dl_lookup_symbol_x",
+      "210,358 ( 8.59%)  ./elf/./elf/dl-lookup.c:_dl_lookup_symbol_x [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "166,828 ( 6.81%)  ./elf/./elf/dl-reloc.c:_dl_relocate_object_no_relro [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "150,768 ( 6.16%)  ./elf/../sysdeps/x86_64/dl-machine.h:_dl_relocate_object_no_relro",
+      "140,332 ( 5.73%)  ./elf/./elf/dl-lookup.c:check_match [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]"
+    ],
+    "inclusive": [
+      "2,448,961 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "2,158,385 (88.13%)  ./elf/./elf/rtld.c:_dl_start [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "2,157,765 (88.11%)  ./elf/../sysdeps/unix/sysv/linux/dl-sysdep.c:_dl_sysdep_start [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "2,124,133 (86.74%)  ./elf/./elf/rtld.c:dl_main [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "2,041,626 (83.37%)  ./elf/./elf/dl-reloc.c:_dl_relocate_object_no_relro [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "2,041,599 (83.37%)  ./elf/./elf/dl-reloc.c:_dl_relocate_object [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]"
+    ]
+  },
+  {
+    "name": "map-aggregate",
+    "n": 2000,
+    "self": [
+      "4,364,050 ( 7.40%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "3,774,000 ( 6.40%)  ???:nift::RuntimeValue::~RuntimeValue()'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "3,182,395 ( 5.40%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "2,820,136 ( 4.78%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "2,604,490 ( 4.42%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "2,458,000 ( 4.17%)  ???:nift::RuntimeValue::RuntimeValue(nift::RuntimeValue const&)'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "58,976,492 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "56,724,392 (96.18%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "56,724,380 (96.18%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "56,724,112 (96.18%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "56,712,344 (96.16%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "56,712,342 (96.16%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "filter-aggregate",
+    "n": 2000,
+    "self": [
+      "4,363,847 ( 6.79%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "3,774,000 ( 5.88%)  ???:nift::RuntimeValue::~RuntimeValue()'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "3,183,187 ( 4.96%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "2,820,698 ( 4.39%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "2,605,130 ( 4.06%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "2,592,000 ( 4.04%)  ???:nift::RuntimeValue::RuntimeValue(nift::RuntimeValue const&)'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "64,228,955 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "61,976,869 (96.49%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "61,976,857 (96.49%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "61,976,589 (96.49%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "61,962,590 (96.47%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "61,962,588 (96.47%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "group-unique",
+    "n": 2000,
+    "self": [
+      "6,071,254 ( 8.87%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "4,440,000 ( 6.49%)  ???:nift::RuntimeValue::~RuntimeValue()'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "3,711,128 ( 5.42%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "3,710,053 ( 5.42%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "3,084,000 ( 4.51%)  ???:nift::RuntimeValue::RuntimeValue(nift::RuntimeValue const&)'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "2,973,102 ( 4.34%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]"
+    ],
+    "inclusive": [
+      "68,452,180 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "66,200,094 (96.71%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "66,200,082 (96.71%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "66,199,814 (96.71%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "66,186,116 (96.69%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "66,186,114 (96.69%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "group-repeated",
+    "n": 2000,
+    "self": [
+      "5,142,194 ( 7.70%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "4,277,312 ( 6.41%)  ???:nift::RuntimeValue::~RuntimeValue()'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "3,516,685 ( 5.27%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "3,144,445 ( 4.71%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "2,994,720 ( 4.49%)  ???:nift::RuntimeValue::RuntimeValue(nift::RuntimeValue const&)'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "2,859,341 ( 4.28%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]"
+    ],
+    "inclusive": [
+      "66,748,848 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "64,496,748 (96.63%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "64,496,736 (96.63%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "64,496,468 (96.63%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "64,482,112 (96.60%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "64,482,110 (96.60%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "official-sort-index",
+    "n": 1000,
+    "self": [
+      "1,900,248 ( 6.21%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,471,053 ( 4.81%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,271,131 ( 4.15%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,058,092 ( 3.46%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "989,332 ( 3.23%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "938,911 ( 3.07%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]"
+    ],
+    "inclusive": [
+      "30,598,146 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "28,346,046 (92.64%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "28,346,034 (92.64%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "28,345,766 (92.64%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "28,330,748 (92.59%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "28,330,746 (92.59%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "official-scan",
+    "n": 1000,
+    "self": [
+      "647,228 ( 7.20%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "612,507 ( 6.81%)  ./elf/./elf/dl-lookup.c:do_lookup_x [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "575,680 ( 6.40%)  ./elf/../sysdeps/generic/dl-new-hash.h:_dl_lookup_symbol_x",
+      "502,000 ( 5.58%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "421,916 ( 4.69%)  ???:bool std::operator==<char, std::char_traits<char>, std::allocator<char> >(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, char const*) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "397,181 ( 4.42%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "8,992,236 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "6,740,150 (74.96%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "6,740,138 (74.96%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "6,739,870 (74.95%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "6,726,259 (74.80%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "6,726,257 (74.80%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "official-frequency-count",
+    "n": 1000,
+    "self": [
+      "1,873,324 ( 7.66%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,258,374 ( 5.15%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,248,222 ( 5.10%)  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "896,640 ( 3.67%)  ???:nift::ast::evaluate(nift::ast::Expr const&, nift::ast::Context&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)::{lambda()#1}::operator()() const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "884,685 ( 3.62%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "748,445 ( 3.06%)  ???:bool std::operator==<char, std::char_traits<char>, std::allocator<char> >(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, char const*) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "24,453,486 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "22,201,386 (90.79%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "22,201,374 (90.79%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "22,201,106 (90.79%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "22,185,261 (90.72%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "22,185,259 (90.72%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "official-map-set",
+    "n": 1000,
+    "self": [
+      "613,104 ( 4.94%)  ./elf/./elf/dl-lookup.c:do_lookup_x [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "604,000 ( 4.87%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "576,128 ( 4.64%)  ./elf/../sysdeps/generic/dl-new-hash.h:_dl_lookup_symbol_x",
+      "563,692 ( 4.54%)  ???:nift::(anonymous namespace)::parse_finite_decimal(std::basic_string_view<char, std::char_traits<char> >, nift::(anonymous namespace)::NumericForm&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "512,122 ( 4.13%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "385,356 ( 3.10%)  ???:std::to_chars(char*, char*, double, std::chars_format) [/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.35]"
+    ],
+    "inclusive": [
+      "12,413,915 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "10,161,815 (81.86%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "10,161,803 (81.86%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "10,161,535 (81.86%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "10,146,138 (81.73%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "10,146,136 (81.73%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "official-sliding-window",
+    "n": 1000,
+    "self": [
+      "1,738,875 ( 9.19%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,103,818 ( 5.83%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "974,673 ( 5.15%)  ???:std::_Hashtable<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding> >, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::find(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "914,244 ( 4.83%)  ???:bool std::operator==<char, std::char_traits<char>, std::allocator<char> >(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, char const*) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "887,910 ( 4.69%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue const&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "831,319 ( 4.39%)  ???:nift::ast::evaluate(nift::ast::Expr const&, nift::ast::Context&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)::{lambda()#1}::operator()() const'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "18,924,741 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "16,672,641 (88.10%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "16,672,629 (88.10%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "16,672,361 (88.10%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "16,658,226 (88.02%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "16,658,224 (88.02%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "official-bfs",
+    "n": 1000,
+    "self": [
+      "4,443,066 ( 9.19%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "4,222,531 ( 8.73%)  ???:nift::ast::evaluate(nift::ast::Expr const&, nift::ast::Context&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)::{lambda()#1}::operator()() const'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "2,695,535 ( 5.57%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "2,576,005 ( 5.33%)  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "2,309,280 ( 4.78%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue const&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "2,257,685 ( 4.67%)  ???:bool std::operator==<char, std::char_traits<char>, std::allocator<char> >(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, char const*) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "68,064,614 (140.8%)  ???:nift::ast::evaluate(nift::ast::Expr const&, nift::ast::Context&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "66,749,888 (138.1%)  ???:nift::ast::evaluate(nift::ast::Expr const&, nift::ast::Context&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)::{lambda()#1}::operator()() const'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "48,351,269 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "46,099,169 (95.34%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "46,099,157 (95.34%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "46,098,889 (95.34%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]"
+    ]
+  },
+  {
+    "name": "official-json-parse",
+    "n": 1000,
+    "self": [
+      "613,687 ( 8.01%)  ./elf/./elf/dl-lookup.c:do_lookup_x [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "577,482 ( 7.54%)  ./elf/../sysdeps/generic/dl-new-hash.h:_dl_lookup_symbol_x",
+      "443,000 ( 5.79%)  ???:json::Document::Parser<false>::parse_object(unsigned long) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "380,826 ( 4.97%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "252,000 ( 3.29%)  ???:nift::RuntimeValue::~RuntimeValue()'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "244,292 ( 3.19%)  ???:json::Document::Parser<false>::parse_number() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "7,657,552 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "5,405,452 (70.59%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "5,405,440 (70.59%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "5,405,172 (70.59%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "5,393,957 (70.44%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "5,393,955 (70.44%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "official-json-transform",
+    "n": 1000,
+    "self": [
+      "2,248,527 ( 8.94%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,704,000 ( 6.77%)  ???:void std::vector<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, nift::RuntimeValue>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, nift::RuntimeValue> > >::_M_realloc_append<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue>(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,268,306 ( 5.04%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "979,318 ( 3.89%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "715,489 ( 2.84%)  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "686,468 ( 2.73%)  ???:bool std::operator==<char, std::char_traits<char>, std::allocator<char> >(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, char const*) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "25,161,216 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "22,909,116 (91.05%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "22,909,104 (91.05%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "22,908,836 (91.05%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "22,894,659 (90.99%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "22,894,657 (90.99%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "official-function-calls",
+    "n": 1000,
+    "self": [
+      "987,330 ( 7.42%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "612,979 ( 4.61%)  ./elf/./elf/dl-lookup.c:do_lookup_x [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "576,560 ( 4.34%)  ./elf/../sysdeps/generic/dl-new-hash.h:_dl_lookup_symbol_x",
+      "495,280 ( 3.72%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "465,247 ( 3.50%)  ???:std::_Hashtable<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding> >, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::find(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "409,000 ( 3.08%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "13,297,590 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "11,045,490 (83.06%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "11,045,478 (83.06%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "11,045,210 (83.06%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "11,031,053 (82.96%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "11,031,051 (82.96%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "official-json-traverse",
+    "n": 1000,
+    "self": [
+      "1,163,938 ( 6.46%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,083,000 ( 6.01%)  ???:void std::vector<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, nift::RuntimeValue>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, nift::RuntimeValue> > >::_M_realloc_append<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue>(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "691,142 ( 3.84%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "655,858 ( 3.64%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "613,687 ( 3.41%)  ./elf/./elf/dl-lookup.c:do_lookup_x [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "598,497 ( 3.32%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]"
+    ],
+    "inclusive": [
+      "18,009,225 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "15,757,125 (87.49%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "15,757,113 (87.49%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "15,756,845 (87.49%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "15,742,830 (87.42%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "15,742,828 (87.42%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "official-sort",
+    "n": 1000,
+    "self": [
+      "1,900,248 ( 6.21%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,471,110 ( 4.81%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,271,131 ( 4.16%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,058,092 ( 3.46%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "989,332 ( 3.23%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "938,938 ( 3.07%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]"
+    ],
+    "inclusive": [
+      "30,592,383 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "28,340,283 (92.64%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "28,340,271 (92.64%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "28,340,003 (92.64%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "28,325,029 (92.59%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "28,325,027 (92.59%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "captured-sort",
+    "n": 1000,
+    "self": [
+      "1,998,641 ( 5.45%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,593,200 ( 4.34%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,437,022 ( 3.92%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,200,830 ( 3.27%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,159,672 ( 3.16%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,022,370 ( 2.79%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]"
+    ],
+    "inclusive": [
+      "36,693,564 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "34,441,464 (93.86%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "34,441,452 (93.86%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "34,441,184 (93.86%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "34,425,170 (93.82%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "34,425,168 (93.82%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "unused-captures",
+    "n": 1000,
+    "self": [
+      "8,894,011 ( 9.58%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "5,917,182 ( 6.37%)  ???:std::__detail::_Map_base<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding> >, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true>, true>::operator[](std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "5,648,516 ( 6.08%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "5,276,933 ( 5.68%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "5,061,640 ( 5.45%)  ???:std::_Hashtable<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding> >, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::_M_insert_unique_node(unsigned long, unsigned long, std::__detail::_Hash_node<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding>, true>*, unsigned long) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "4,615,196 ( 4.97%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]"
+    ],
+    "inclusive": [
+      "98,357,035 (105.9%)  ???:std::_Function_handler<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int), Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}>::_M_invoke(std::_Any_data const&, nift::detail::SourceText const&, nift::RuntimeValue&, int&&)'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "98,352,855 (105.9%)  ???:Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "97,891,126 (105.4%)  ???:Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const::{lambda()#1}::operator()() const'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "92,856,226 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "90,604,126 (97.57%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "90,604,114 (97.57%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]"
+    ]
+  },
+  {
+    "name": "official-sort",
+    "n": 2000,
+    "self": [
+      "3,798,920 ( 6.57%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "2,919,391 ( 5.05%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "2,525,396 ( 4.37%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "2,102,316 ( 3.64%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,975,504 ( 3.42%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,880,586 ( 3.25%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]"
+    ],
+    "inclusive": [
+      "57,830,201 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "55,578,101 (96.11%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "55,578,089 (96.11%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "55,577,821 (96.11%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "55,562,847 (96.08%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "55,562,845 (96.08%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "captured-sort",
+    "n": 2000,
+    "self": [
+      "3,995,313 ( 5.72%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "3,162,384 ( 4.52%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "2,856,287 ( 4.09%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "2,387,054 ( 3.41%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "2,315,844 ( 3.31%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "2,046,545 ( 2.93%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]"
+    ],
+    "inclusive": [
+      "69,906,605 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "67,654,505 (96.78%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "67,654,493 (96.78%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "67,654,225 (96.78%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "67,638,211 (96.76%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "67,638,209 (96.76%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "unused-captures",
+    "n": 2000,
+    "self": [
+      "17,729,640 ( 9.94%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "11,830,182 ( 6.63%)  ???:std::__detail::_Map_base<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding> >, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true>, true>::operator[](std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "11,258,781 ( 6.31%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "10,120,640 ( 5.68%)  ???:std::_Hashtable<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding> >, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::_M_insert_unique_node(unsigned long, unsigned long, std::__detail::_Hash_node<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding>, true>*, unsigned long) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "10,021,607 ( 5.62%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "9,199,772 ( 5.16%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]"
+    ],
+    "inclusive": [
+      "194,524,469 (109.1%)  ???:std::_Function_handler<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int), Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}>::_M_invoke(std::_Any_data const&, nift::detail::SourceText const&, nift::RuntimeValue&, int&&)'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "194,516,289 (109.1%)  ???:Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "193,614,563 (108.6%)  ???:Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const::{lambda()#1}::operator()() const'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "178,321,409 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "176,069,309 (98.74%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "176,069,297 (98.74%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]"
+    ]
+  },
+  {
+    "name": "official-sort",
+    "n": 4000,
+    "self": [
+      "8,378,500 ( 7.39%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "5,815,243 ( 5.13%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "5,033,430 ( 4.44%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "4,190,338 ( 3.70%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "3,947,780 ( 3.48%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "3,545,757 ( 3.13%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]"
+    ],
+    "inclusive": [
+      "113,324,466 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "111,072,366 (98.01%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "111,072,354 (98.01%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "111,072,086 (98.01%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "111,057,227 (98.00%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "111,057,225 (98.00%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "captured-sort",
+    "n": 4000,
+    "self": [
+      "8,770,893 ( 6.39%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "6,300,030 ( 4.59%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "5,694,321 ( 4.15%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "4,759,076 ( 3.47%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "4,628,120 ( 3.37%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "3,928,398 ( 2.86%)  ???:std::_Hash_bytes(void const*, unsigned long, unsigned long) [/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.35]"
+    ],
+    "inclusive": [
+      "137,331,794 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "135,079,694 (98.36%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "135,079,682 (98.36%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "135,079,414 (98.36%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "135,063,530 (98.35%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "135,063,528 (98.35%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "unused-captures",
+    "n": 4000,
+    "self": [
+      "35,437,153 (10.10%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "23,656,182 ( 6.74%)  ???:std::__detail::_Map_base<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding> >, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true>, true>::operator[](std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "22,478,815 ( 6.41%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "20,238,640 ( 5.77%)  ???:std::_Hashtable<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding> >, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::_M_insert_unique_node(unsigned long, unsigned long, std::__detail::_Hash_node<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding>, true>*, unsigned long) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "19,906,372 ( 5.67%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "18,364,138 ( 5.23%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]"
+    ],
+    "inclusive": [
+      "388,077,703 (110.6%)  ???:std::_Function_handler<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int), Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}>::_M_invoke(std::_Any_data const&, nift::detail::SourceText const&, nift::RuntimeValue&, int&&)'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "388,061,523 (110.6%)  ???:Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "386,279,797 (110.1%)  ???:Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const::{lambda()#1}::operator()() const'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "350,918,094 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "348,665,994 (99.36%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "348,665,982 (99.36%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]"
+    ]
+  },
+  {
+    "name": "wide-object-8",
+    "n": 2000,
+    "self": [
+      "1,158,982 ( 7.80%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,151,523 ( 7.75%)  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,004,000 ( 6.76%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "726,153 ( 4.89%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue const&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "612,507 ( 4.12%)  ./elf/./elf/dl-lookup.c:do_lookup_x [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "597,181 ( 4.02%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "14,858,677 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "12,606,591 (84.84%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "12,606,579 (84.84%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "12,606,311 (84.84%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "12,592,700 (84.75%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "12,592,698 (84.75%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "wide-object-32",
+    "n": 2000,
+    "self": [
+      "2,578,405 (14.64%)  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,163,494 ( 6.60%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,004,000 ( 5.70%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "754,000 ( 4.28%)  ???:nift::RuntimeValue::has(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "738,000 ( 4.19%)  ???:nift::RuntimeValue::operator[](std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "726,153 ( 4.12%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue const&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "17,617,944 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "15,365,844 (87.22%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "15,365,832 (87.22%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "15,365,564 (87.22%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "15,351,953 (87.14%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "15,351,951 (87.14%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "wide-object-128",
+    "n": 2000,
+    "self": [
+      "3,199,725 (14.79%)  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,974,000 ( 9.12%)  ???:nift::RuntimeValue::operator[](std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,770,000 ( 8.18%)  ???:nift::RuntimeValue::has(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,181,542 ( 5.46%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,004,000 ( 4.64%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "726,153 ( 3.36%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue const&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "21,635,822 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "19,383,722 (89.59%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "19,383,710 (89.59%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "19,383,442 (89.59%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "19,369,641 (89.53%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "19,369,639 (89.53%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "wide-object-512",
+    "n": 2000,
+    "self": [
+      "42,038,886 (46.99%)  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "12,330,000 (13.78%)  ???:nift::RuntimeValue::has(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "11,958,000 (13.37%)  ???:nift::RuntimeValue::operator[](std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "3,539,564 ( 3.96%)  ???:0x0000000004014780 [???]",
+      "1,345,368 ( 1.50%)  ???:json::Document::has(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) const [clone .part.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,253,734 ( 1.40%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "89,465,215 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "87,213,115 (97.48%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "87,213,103 (97.48%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "87,212,835 (97.48%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "87,199,224 (97.47%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "87,199,222 (97.47%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "wide-object-2000",
+    "n": 2000,
+    "self": [
+      "118,514,310 (48.23%)  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "38,046,000 (15.48%)  ???:nift::RuntimeValue::operator[](std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "37,050,000 (15.08%)  ???:nift::RuntimeValue::has(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "16,815,792 ( 6.84%)  ???:json::Document::has(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) const [clone .part.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "9,864,918 ( 4.01%)  ???:0x0000000004014780 [???]",
+      "3,522,100 ( 1.43%)  ???:Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const::{lambda()#1}::operator()() const::{lambda(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)#2}::operator()(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "245,732,590 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "243,480,490 (99.08%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "243,480,478 (99.08%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "243,480,210 (99.08%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "243,466,599 (99.08%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "243,466,597 (99.08%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "wide-object-8000",
+    "n": 2000,
+    "self": [
+      "1,281,811,944 (58.24%)  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "351,444,792 (15.97%)  ???:json::Document::has(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) const [clone .part.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "202,050,000 ( 9.18%)  ???:nift::RuntimeValue::has(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "194,046,000 ( 8.82%)  ???:nift::RuntimeValue::operator[](std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "105,858,918 ( 4.81%)  ???:0x0000000004014780 [???]"
+    ],
+    "inclusive": [
+      "2,200,832,756 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "2,198,580,656 (99.90%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "2,198,580,644 (99.90%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "2,198,580,376 (99.90%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "2,198,566,746 (99.90%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "2,198,566,744 (99.90%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "sort-aggregate",
+    "n": 2000,
+    "self": [
+      "6,289,242 ( 7.98%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "4,107,384 ( 5.21%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "3,841,714 ( 4.87%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "3,598,438 ( 4.57%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "3,317,114 ( 4.21%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "3,244,000 ( 4.12%)  ???:nift::RuntimeValue::~RuntimeValue()'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "78,814,550 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "76,562,450 (97.14%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "76,562,438 (97.14%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "76,562,170 (97.14%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "76,548,851 (97.13%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "76,548,849 (97.13%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "call-imported",
+    "n": 2000,
+    "self": [
+      "2,041,432 ( 6.98%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,187,486 ( 4.06%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,139,569 ( 3.90%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,046,311 ( 3.58%)  ???:std::_Hashtable<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding> >, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::find(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,034,281 ( 3.54%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,004,000 ( 3.43%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "29,244,266 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "26,992,166 (92.30%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "26,992,154 (92.30%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "26,991,886 (92.30%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "26,977,195 (92.25%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "26,977,193 (92.25%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "call-aggregate",
+    "n": 2000,
+    "self": [
+      "2,470,496 ( 7.40%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,470,000 ( 4.41%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,460,451 ( 4.38%)  ???:std::_Hashtable<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding> >, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::find(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,386,542 ( 4.15%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,270,001 ( 3.81%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,153,020 ( 3.46%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]"
+    ],
+    "inclusive": [
+      "33,371,021 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "31,118,921 (93.25%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "31,118,909 (93.25%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "31,118,641 (93.25%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "31,104,484 (93.21%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "31,104,482 (93.21%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "sort-multi",
+    "n": 2000,
+    "self": [
+      "8,927,848 ( 7.49%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "6,615,929 ( 5.55%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "5,437,469 ( 4.56%)  ./malloc/./malloc/malloc.c:malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "5,374,335 ( 4.51%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "4,028,000 ( 3.38%)  ???:nift::RuntimeValue::~RuntimeValue()'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "3,733,435 ( 3.13%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]"
+    ],
+    "inclusive": [
+      "120,335,805 (100.9%)  ???:std::_Function_handler<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int), Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}>::_M_invoke(std::_Any_data const&, nift::detail::SourceText const&, nift::RuntimeValue&, int&&)'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "120,319,785 (100.9%)  ???:Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "119,236,830 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "118,544,935 (99.42%)  ???:Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const::{lambda()#1}::operator()() const'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "116,984,730 (98.11%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "116,984,718 (98.11%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]"
+    ]
+  },
+  {
+    "name": "json-wide",
+    "n": 2000,
+    "self": [
+      "22,384,647 (23.92%)  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "16,915,792 (18.07%)  ???:json::Document::has(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) const [clone .part.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "4,942,947 ( 5.28%)  ???:Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const::{lambda()#1}::operator()() const::{lambda(unsigned long&)#1}::operator()(unsigned long&) const [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "3,671,475 ( 3.92%)  ???:void std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > >::_M_realloc_append<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "2,181,402 ( 2.33%)  ???:void std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_construct<char const*>(char const*, char const*, std::forward_iterator_tag) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,956,179 ( 2.09%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]"
+    ],
+    "inclusive": [
+      "93,592,751 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "91,340,651 (97.59%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "91,340,639 (97.59%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "91,340,371 (97.59%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "91,329,156 (97.58%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "91,329,154 (97.58%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "json-deep",
+    "n": 2000,
+    "self": [
+      "2,502,954 (11.95%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,257,945 ( 6.01%)  ???:Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const::{lambda()#1}::operator()() const::{lambda(unsigned long&)#1}::operator()(unsigned long&) const [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,028,396 ( 4.91%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "918,797 ( 4.39%)  ???:void std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > >::_M_realloc_append<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "635,469 ( 3.04%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "633,936 ( 3.03%)  ???:Parser::serialize_value(nift::RuntimeValue const&, bool, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, int, bool) const'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "280,169,370 (1338.1%)  ???:Parser::serialize_value(nift::RuntimeValue const&, bool, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, int, bool) const'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "150,875,883 (720.6%)  ???:json::Document::Parser<false>::parse_value(unsigned long)'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "147,106,679 (702.6%)  ???:json::Document::Parser<false>::parse_object(unsigned long)'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "83,215,929 (397.5%)  ???:nift::RuntimeValue::~RuntimeValue()'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "74,015,116 (353.5%)  ???:nift::RuntimeValue::RuntimeValue(nift::RuntimeValue const&)'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "73,431,109 (350.7%)  ???:nift::runtime_from_json(json::Document const&)'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "json-mixed",
+    "n": 2000,
+    "self": [
+      "4,300,437 ( 7.94%)  ???:Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const::{lambda()#1}::operator()() const::{lambda(unsigned long&)#1}::operator()(unsigned long&) const [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "3,671,475 ( 6.78%)  ???:void std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > >::_M_realloc_append<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "2,913,597 ( 5.38%)  ./malloc/./malloc/malloc.c:_int_malloc [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "1,952,000 ( 3.61%)  ???:Parser::serialize_value(nift::RuntimeValue const&, bool, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, int, bool) const'2 [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,898,262 ( 3.51%)  ???:void std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_construct<char const*>(char const*, char const*, std::forward_iterator_tag) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,872,736 ( 3.46%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]"
+    ],
+    "inclusive": [
+      "54,144,506 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "51,892,406 (95.84%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "51,892,394 (95.84%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "51,892,126 (95.84%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "51,880,769 (95.82%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "51,880,767 (95.82%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "bfs-queue",
+    "n": 2000,
+    "self": [
+      "2,460,255 ( 9.40%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "2,127,256 ( 8.12%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,387,969 ( 5.30%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,326,507 ( 5.07%)  ???:std::_Hashtable<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding> >, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::find(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,122,255 ( 4.29%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue const&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,117,619 ( 4.27%)  ???:bool std::operator==<char, std::char_traits<char>, std::allocator<char> >(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, char const*) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "26,182,732 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "23,930,632 (91.40%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "23,930,620 (91.40%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "23,930,352 (91.40%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "23,916,769 (91.35%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "23,916,767 (91.35%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "bfs-set-visit",
+    "n": 2000,
+    "self": [
+      "2,722,184 ( 6.83%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,986,000 ( 4.99%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,710,537 ( 4.29%)  ???:nift::(anonymous namespace)::parse_finite_decimal(std::basic_string_view<char, std::char_traits<char> >, nift::(anonymous namespace)::NumericForm&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,472,507 ( 3.70%)  ???:std::_Hashtable<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding> >, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::find(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,387,963 ( 3.48%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,224,306 ( 3.07%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue const&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "39,835,051 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "37,582,951 (94.35%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "37,582,939 (94.35%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "37,582,671 (94.35%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "37,567,246 (94.31%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "37,567,244 (94.31%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "bfs-map-update",
+    "n": 2000,
+    "self": [
+      "1,369,632 ( 6.80%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,307,329 ( 6.49%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "836,147 ( 4.15%)  ???:nift::ast::evaluate(nift::ast::Expr const&, nift::ast::Context&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)::{lambda()#1}::operator()() const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "814,272 ( 4.04%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue const&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "793,756 ( 3.94%)  ???:bool std::operator==<char, std::char_traits<char>, std::allocator<char> >(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, char const*) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "676,231 ( 3.36%)  ???:std::_Hashtable<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding> >, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::find(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "20,150,205 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "17,898,105 (88.82%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "17,898,093 (88.82%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "17,897,825 (88.82%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "17,882,520 (88.75%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "17,882,518 (88.75%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "bfs-nested-index",
+    "n": 2000,
+    "self": [
+      "2,664,527 ( 9.51%)  ???:nift::RuntimeValue::~RuntimeValue() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "2,127,256 ( 7.59%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)#2}::operator()(nift::ast::Stmt const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,530,306 ( 5.46%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue const&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,442,507 ( 5.15%)  ???:std::_Hashtable<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding> >, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::find(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,388,167 ( 4.96%)  ???:nift::RuntimeValue::operator=(nift::RuntimeValue&&) [clone .isra.0] [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "1,164,294 ( 4.16%)  ???:nift::ast::evaluate(nift::ast::Expr const&, nift::ast::Context&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&)::{lambda()#1}::operator()() const [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ],
+    "inclusive": [
+      "28,012,881 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]",
+      "25,760,795 (91.96%)  ???:(below main) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "25,760,783 (91.96%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "25,760,515 (91.96%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]",
+      "25,746,904 (91.91%)  ???:main [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]",
+      "25,746,902 (91.91%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  }
+]

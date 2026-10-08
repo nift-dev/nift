@@ -6,6 +6,7 @@ on:
       - 'src/**'
       - 'tests/*scaling_benchmark.py'
       - 'tests/recovery_epoch_guard.cpp'
+      - 'tests/v410_allocation_guard.py'
       - 'Makefile'
       - 'docs/guarantees/**'
       - '.github/workflows/performance-regression.yml'
@@ -20,6 +21,7 @@ on:
       - 'src/**'
       - 'tests/*scaling_benchmark.py'
       - 'tests/recovery_epoch_guard.cpp'
+      - 'tests/v410_allocation_guard.py'
       - 'Makefile'
       - 'docs/guarantees/**'
       - '.github/workflows/performance-regression.yml'
@@ -43,3 +45,5 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y valgrind
       - name: Guard grouping construction instruction scaling
         run: make test-v49-group-scaling
+      - name: Guard capture and native-dispatch allocation slopes
+        run: make test-v410-allocation-guard

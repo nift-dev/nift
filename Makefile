@@ -1826,3 +1826,8 @@ test-v49-call-outcome: $(TEST_DIR)/v49-call-outcome-unit$(EXEEXT)
 	$(TEST_DIR)/v49-call-outcome-unit$(EXEEXT)
 
 test: test-v49-call-outcome
+
+# Explicit Valgrind allocation guard; no wall-clock threshold.
+.PHONY: test-v410-allocation-guard
+test-v410-allocation-guard: $(TARGET)
+	NIFT="$(CURDIR)/$(TARGET)" python3 tests/v410_allocation_guard.py

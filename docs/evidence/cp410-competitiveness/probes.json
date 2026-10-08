@@ -1,0 +1,844 @@
+[
+  {
+    "name": "loops",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/loops-2000.f",
+    "expected": "1999000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "array-build",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/array-build-2000.f",
+    "expected": "2000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "call-noarg",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/call-noarg-2000.f",
+    "expected": "2000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "call-scalar",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/call-scalar-2000.f",
+    "expected": "2001000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "call-multi",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/call-multi-2000.f",
+    "expected": "2005000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "call-locals",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/call-locals-2000.f",
+    "expected": "4002000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "call-recursion",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/call-recursion-2000.f",
+    "expected": "6000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "call-closure",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/call-closure-2000.f",
+    "expected": "2001000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "call-callback",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/call-callback-2000.f",
+    "expected": "2001000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "array-index",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/array-index-2000.f",
+    "expected": "1999000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "sort-identity",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/sort-identity-2000.f",
+    "expected": "2000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "sort-index",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/sort-index-2000.f",
+    "expected": "2000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "sort-arithmetic",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/sort-arithmetic-2000.f",
+    "expected": "2000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "map-identity",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/map-identity-2000.f",
+    "expected": "2000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "map-index",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/map-index-2000.f",
+    "expected": "2000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "map-arithmetic",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/map-arithmetic-2000.f",
+    "expected": "2000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "frequency",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/frequency-2000.f",
+    "expected": "37",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "map-set",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/map-set-2000.f",
+    "expected": "2000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "sliding-window",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/sliding-window-2000.f",
+    "expected": "13944",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "json-parse-convert",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/json-parse-convert-2000.f",
+    "expected": "2000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "json-traverse",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/json-traverse-2000.f",
+    "expected": "5995",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "json-mutate",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/json-mutate-2000.f",
+    "expected": "11990",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "json-serialize",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/json-serialize-2000.f",
+    "expected": "true",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "construct-destroy",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/construct-destroy-2000.f",
+    "expected": "2000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "bfs",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/bfs-2000.f",
+    "expected": "2000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "filesystem",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/filesystem-2000.f",
+    "expected": "2000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "loops",
+    "n": 4000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/loops-4000.f",
+    "expected": "7998000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "array-build",
+    "n": 4000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/array-build-4000.f",
+    "expected": "4000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "call-noarg",
+    "n": 4000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/call-noarg-4000.f",
+    "expected": "4000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "call-scalar",
+    "n": 4000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/call-scalar-4000.f",
+    "expected": "8002000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "call-multi",
+    "n": 4000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/call-multi-4000.f",
+    "expected": "8010000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "call-locals",
+    "n": 4000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/call-locals-4000.f",
+    "expected": "16004000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "call-recursion",
+    "n": 4000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/call-recursion-4000.f",
+    "expected": "12000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "call-closure",
+    "n": 4000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/call-closure-4000.f",
+    "expected": "8002000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "call-callback",
+    "n": 4000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/call-callback-4000.f",
+    "expected": "8002000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "array-index",
+    "n": 4000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/array-index-4000.f",
+    "expected": "7998000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "sort-identity",
+    "n": 4000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/sort-identity-4000.f",
+    "expected": "4000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "sort-index",
+    "n": 4000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/sort-index-4000.f",
+    "expected": "4000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "sort-arithmetic",
+    "n": 4000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/sort-arithmetic-4000.f",
+    "expected": "4000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "map-identity",
+    "n": 4000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/map-identity-4000.f",
+    "expected": "4000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "map-index",
+    "n": 4000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/map-index-4000.f",
+    "expected": "4000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "map-arithmetic",
+    "n": 4000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/map-arithmetic-4000.f",
+    "expected": "4000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "frequency",
+    "n": 4000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/frequency-4000.f",
+    "expected": "37",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "map-set",
+    "n": 4000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/map-set-4000.f",
+    "expected": "4000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "sliding-window",
+    "n": 4000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/sliding-window-4000.f",
+    "expected": "27944",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "json-parse-convert",
+    "n": 4000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/json-parse-convert-4000.f",
+    "expected": "4000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "json-traverse",
+    "n": 4000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/json-traverse-4000.f",
+    "expected": "11994",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "json-mutate",
+    "n": 4000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/json-mutate-4000.f",
+    "expected": "23988",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "json-serialize",
+    "n": 4000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/json-serialize-4000.f",
+    "expected": "true",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "construct-destroy",
+    "n": 4000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/construct-destroy-4000.f",
+    "expected": "4000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "bfs",
+    "n": 4000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/bfs-4000.f",
+    "expected": "4000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "filesystem",
+    "n": 4000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/filesystem-4000.f",
+    "expected": "4000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "loops",
+    "n": 8000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/loops-8000.f",
+    "expected": "31996000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "array-build",
+    "n": 8000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/array-build-8000.f",
+    "expected": "8000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "call-noarg",
+    "n": 8000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/call-noarg-8000.f",
+    "expected": "8000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "call-scalar",
+    "n": 8000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/call-scalar-8000.f",
+    "expected": "32004000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "call-multi",
+    "n": 8000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/call-multi-8000.f",
+    "expected": "32020000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "call-locals",
+    "n": 8000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/call-locals-8000.f",
+    "expected": "64008000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "call-recursion",
+    "n": 8000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/call-recursion-8000.f",
+    "expected": "24000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "call-closure",
+    "n": 8000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/call-closure-8000.f",
+    "expected": "32004000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "call-callback",
+    "n": 8000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/call-callback-8000.f",
+    "expected": "32004000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "array-index",
+    "n": 8000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/array-index-8000.f",
+    "expected": "31996000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "sort-identity",
+    "n": 8000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/sort-identity-8000.f",
+    "expected": "8000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "sort-index",
+    "n": 8000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/sort-index-8000.f",
+    "expected": "8000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "sort-arithmetic",
+    "n": 8000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/sort-arithmetic-8000.f",
+    "expected": "8000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "map-identity",
+    "n": 8000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/map-identity-8000.f",
+    "expected": "8000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "map-index",
+    "n": 8000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/map-index-8000.f",
+    "expected": "8000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "map-arithmetic",
+    "n": 8000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/map-arithmetic-8000.f",
+    "expected": "8000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "frequency",
+    "n": 8000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/frequency-8000.f",
+    "expected": "37",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "map-set",
+    "n": 8000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/map-set-8000.f",
+    "expected": "8000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "sliding-window",
+    "n": 8000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/sliding-window-8000.f",
+    "expected": "55944",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "json-parse-convert",
+    "n": 8000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/json-parse-convert-8000.f",
+    "expected": "8000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "json-traverse",
+    "n": 8000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/json-traverse-8000.f",
+    "expected": "23997",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "json-mutate",
+    "n": 8000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/json-mutate-8000.f",
+    "expected": "47994",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "json-serialize",
+    "n": 8000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/json-serialize-8000.f",
+    "expected": "true",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "construct-destroy",
+    "n": 8000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/construct-destroy-8000.f",
+    "expected": "8000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "bfs",
+    "n": 8000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/bfs-8000.f",
+    "expected": "8000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "filesystem",
+    "n": 8000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/filesystem-8000.f",
+    "expected": "8000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "empty",
+    "n": 0,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/empty-0.f",
+    "expected": "",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "map-aggregate",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/map-aggregate-2000.f",
+    "expected": "2000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "filter-aggregate",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/filter-aggregate-2000.f",
+    "expected": "2000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "group-unique",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/group-unique-2000.f",
+    "expected": "2000",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "group-repeated",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/group-repeated-2000.f",
+    "expected": "16",
+    "source": "independent component probe; external process timing, no captured timer"
+  },
+  {
+    "name": "official-sort-index",
+    "n": 1000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/official-sort-index.f",
+    "expected": "1\n1000\n500",
+    "source": "/home/nick/Repositories/nift/scripting-benchmark/benchmarks/sources/arrays-strings-hash/sort-index/small.f",
+    "source_sha256": "52c2055b34a2a62286622e52cff44bbe79cfd4c23c5710e3f5f5675bf2d25515"
+  },
+  {
+    "name": "official-scan",
+    "n": 1000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/official-scan.f",
+    "expected": "333833500",
+    "source": "/home/nick/Repositories/nift/scripting-benchmark/benchmarks/sources/arrays-strings-hash/scan/small.f",
+    "source_sha256": "2cceceef3832bd2b845fe2cfe2816ae2063dd4361a8d2b804c624427c7348d3f"
+  },
+  {
+    "name": "official-frequency-count",
+    "n": 1000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/official-frequency-count.f",
+    "expected": "10\n100",
+    "source": "/home/nick/Repositories/nift/scripting-benchmark/benchmarks/sources/arrays-strings-hash/frequency-count/small.f",
+    "source_sha256": "68df45eb2b5606e0e29e0ad6b9627e9189cda092e415a57ee0c5e13fae7a39fa"
+  },
+  {
+    "name": "official-map-set",
+    "n": 1000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/official-map-set.f",
+    "expected": "1000\n1\n0",
+    "source": "/home/nick/Repositories/nift/scripting-benchmark/benchmarks/sources/arrays-strings-hash/map-set/small.f",
+    "source_sha256": "873ce480b65b26bf5d9bd2f21082e7a1334d1477e53febd8ea7cac0fc779477b"
+  },
+  {
+    "name": "official-sliding-window",
+    "n": 1000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/official-sliding-window.f",
+    "expected": "95050",
+    "source": "/home/nick/Repositories/nift/scripting-benchmark/benchmarks/sources/arrays-strings-hash/sliding-window/small.f",
+    "source_sha256": "ccc8297280e3ec11c2be0334c760b678024fc97dcbd42a585bf4fee35825b3bc"
+  },
+  {
+    "name": "official-bfs",
+    "n": 1000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/official-bfs.f",
+    "expected": "38",
+    "source": "/home/nick/Repositories/nift/scripting-benchmark/benchmarks/sources/graphs-trees-search/bfs/small.f",
+    "source_sha256": "d41efd1989af7ecddbd79c2bad4559b1cedf52bf8157185b406d49b4b166f54f"
+  },
+  {
+    "name": "official-json-parse",
+    "n": 1000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/official-json-parse.f",
+    "expected": "1000",
+    "source": "/home/nick/Repositories/nift/scripting-benchmark/benchmarks/sources/structured-data/json-parse/small.f",
+    "source_sha256": "fdecce5b34b4a2848ca0ef727f59080bc0697fb1a418e21aea93d17999c393f1"
+  },
+  {
+    "name": "official-json-transform",
+    "n": 1000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/official-json-transform.f",
+    "expected": "6006",
+    "source": "/home/nick/Repositories/nift/scripting-benchmark/benchmarks/sources/structured-data/json-transform/small.f",
+    "source_sha256": "e5c92837f0483d1eac3ec93103d62c825a96d6d68137e33e181b700f1d07a6c2"
+  },
+  {
+    "name": "official-function-calls",
+    "n": 1000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/official-function-calls.f",
+    "expected": "1000",
+    "source": "/home/nick/Repositories/nift/scripting-benchmark/benchmarks/sources/sanity/function-calls/small.f",
+    "source_sha256": "66c5b5cf126ae6b9e47d556a19bba9d7e8896263c3886a5959c254d87acefe62"
+  },
+  {
+    "name": "official-json-traverse",
+    "n": 1000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/official-json-traverse.f",
+    "expected": "3003",
+    "source": "/home/nick/Repositories/nift/scripting-benchmark/benchmarks/sources/structured-data/json-traverse/small.f"
+  },
+  {
+    "name": "official-sort",
+    "n": 1000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/official-sort-1000.f",
+    "expected": "1\n1000\n500",
+    "source": "official-equivalent descending identity sort, deterministic scaled size"
+  },
+  {
+    "name": "captured-sort",
+    "n": 1000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/captured-sort-1000.f",
+    "expected": "1\n1000\n500",
+    "source": "official-equivalent descending identity sort, deterministic scaled size"
+  },
+  {
+    "name": "unused-captures",
+    "n": 1000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/unused-captures-1000.f",
+    "expected": "1\n1000\n500",
+    "source": "official-equivalent descending identity sort, deterministic scaled size"
+  },
+  {
+    "name": "official-sort",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/official-sort-2000.f",
+    "expected": "1\n2000\n1000",
+    "source": "official-equivalent descending identity sort, deterministic scaled size"
+  },
+  {
+    "name": "captured-sort",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/captured-sort-2000.f",
+    "expected": "1\n2000\n1000",
+    "source": "official-equivalent descending identity sort, deterministic scaled size"
+  },
+  {
+    "name": "unused-captures",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/unused-captures-2000.f",
+    "expected": "1\n2000\n1000",
+    "source": "official-equivalent descending identity sort, deterministic scaled size"
+  },
+  {
+    "name": "official-sort",
+    "n": 4000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/official-sort-4000.f",
+    "expected": "1\n4000\n2000",
+    "source": "official-equivalent descending identity sort, deterministic scaled size"
+  },
+  {
+    "name": "captured-sort",
+    "n": 4000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/captured-sort-4000.f",
+    "expected": "1\n4000\n2000",
+    "source": "official-equivalent descending identity sort, deterministic scaled size"
+  },
+  {
+    "name": "unused-captures",
+    "n": 4000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/unused-captures-4000.f",
+    "expected": "1\n4000\n2000",
+    "source": "official-equivalent descending identity sort, deterministic scaled size"
+  },
+  {
+    "name": "wide-object-8",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/wide-object-8.f",
+    "expected": "14000",
+    "source": "same repeated last-member read, size varies; construction included, separate phase profiling planned"
+  },
+  {
+    "name": "wide-object-32",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/wide-object-32.f",
+    "expected": "62000",
+    "source": "same repeated last-member read, size varies; construction included, separate phase profiling planned"
+  },
+  {
+    "name": "wide-object-128",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/wide-object-128.f",
+    "expected": "254000",
+    "source": "same repeated last-member read, size varies; construction included, separate phase profiling planned"
+  },
+  {
+    "name": "wide-object-512",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/wide-object-512.f",
+    "expected": "1022000",
+    "source": "same repeated last-member read, size varies; construction included, separate phase profiling planned"
+  },
+  {
+    "name": "wide-object-2000",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/wide-object-2000.f",
+    "expected": "3998000",
+    "source": "same repeated last-member read, size varies; construction included, separate phase profiling planned"
+  },
+  {
+    "name": "wide-object-8000",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/wide-object-8000.f",
+    "expected": "15998000",
+    "source": "same repeated last-member read, size varies; construction included, separate phase profiling planned"
+  },
+  {
+    "name": "sort-aggregate",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/sort-aggregate-2000.f",
+    "expected": "1999\n2000",
+    "source": "independent aggregate/module/graph/JSON component probe"
+  },
+  {
+    "name": "call-imported",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/call-imported-2000.f",
+    "expected": "2001000",
+    "source": "independent aggregate/module/graph/JSON component probe"
+  },
+  {
+    "name": "call-aggregate",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/call-aggregate-2000.f",
+    "expected": "6000",
+    "source": "independent aggregate/module/graph/JSON component probe"
+  },
+  {
+    "name": "sort-multi",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/sort-multi-2000.f",
+    "expected": "2000\n1995",
+    "source": "independent aggregate/module/graph/JSON component probe"
+  },
+  {
+    "name": "json-wide",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/json-wide-2000.f",
+    "expected": "83781",
+    "source": "independent aggregate/module/graph/JSON component probe"
+  },
+  {
+    "name": "json-deep",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/json-deep-2000.f",
+    "expected": "21323",
+    "source": "independent aggregate/module/graph/JSON component probe"
+  },
+  {
+    "name": "json-mixed",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/json-mixed-2000.f",
+    "expected": "72891",
+    "source": "independent aggregate/module/graph/JSON component probe"
+  },
+  {
+    "name": "bfs-queue",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/bfs-queue-2000.f",
+    "expected": "1999000",
+    "source": "independent aggregate/module/graph/JSON component probe"
+  },
+  {
+    "name": "bfs-set-visit",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/bfs-set-visit-2000.f",
+    "expected": "2000",
+    "source": "independent aggregate/module/graph/JSON component probe"
+  },
+  {
+    "name": "bfs-map-update",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/bfs-map-update-2000.f",
+    "expected": "37",
+    "source": "independent aggregate/module/graph/JSON component probe"
+  },
+  {
+    "name": "bfs-nested-index",
+    "n": 2000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410/probes/bfs-nested-index-2000.f",
+    "expected": "2001000",
+    "source": "independent aggregate/module/graph/JSON component probe"
+  }
+]

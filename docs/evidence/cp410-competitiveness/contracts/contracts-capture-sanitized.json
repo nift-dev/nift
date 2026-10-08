@@ -1,0 +1,135 @@
+[
+  {
+    "name": "factory-count",
+    "exit": 0,
+    "stdout": "[1,2,3]\n3\n[3,1,2]\n4\n[]\n4\n[]\n5\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "factory-order",
+    "exit": 0,
+    "stdout": "1\n2\n3\n4\n5\n6\n[1,2,3]\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "fresh-identity",
+    "exit": 0,
+    "stdout": "false\ntrue\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "escape-identities",
+    "exit": 0,
+    "stdout": "[1,2]\nfalse\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "capture-mutation",
+    "exit": 0,
+    "stdout": "[3,1,2]\n3\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "factory-capture-change",
+    "exit": 0,
+    "stdout": "[3,1,2]\n3\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "dynamic-capture-dependency",
+    "exit": 0,
+    "stdout": "7\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "changing-outer",
+    "exit": 0,
+    "stdout": "3\n9\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "shadowing",
+    "exit": 0,
+    "stdout": "3\n99\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "named-precedence",
+    "exit": 0,
+    "stdout": "function\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "escaped-local-captures",
+    "exit": 0,
+    "stdout": "2\n8\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "returned-callables",
+    "exit": 0,
+    "stdout": "2\n7\nfalse\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "root-path-growth",
+    "exit": 0,
+    "stdout": "1\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "unused-timer-observable",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "error: /home/nick/Repositories/nift/nift/.build/cp410/contracts/unused-timer-observable.f:3:6: async function capture contains a non-transferable timer\n",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "async-invoke",
+    "exit": 0,
+    "stdout": "4\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "async-callback-current",
+    "exit": 0,
+    "stdout": "[1,2,3]\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "throwing-factory",
+    "exit": 0,
+    "stdout": "stop\n2\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "bad-key-cleanup",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "error: /home/nick/Repositories/nift/nift/.build/cp410/contracts/bad-key-cleanup.f:1:1: sort_by: key must be scalar\n",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "module-ownership",
+    "exit": 0,
+    "stdout": "8\n[1,2,3]\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  }
+]

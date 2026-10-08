@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "checkpoint": "9-parser-fuzz",
+  "commit": "629b1f23afbb5b3be97dac66b6cea1a9d5b3d1fc",
+  "platform": "Linux-7.0.0-29-generic-x86_64-with-glibc2.43",
+  "seeds": [
+    9001,
+    17713,
+    424242
+  ],
+  "generated_cases_per_seed": 400,
+  "generated_cases": 1200,
+  "boundary_cases": 19,
+  "boundary_results": [
+    {
+      "name": "nested-if-16",
+      "exit": 0,
+      "elapsed_seconds": 0.110944
+    },
+    {
+      "name": "nested-if-32",
+      "exit": 0,
+      "elapsed_seconds": 0.121911
+    },
+    {
+      "name": "nested-if-63",
+      "exit": 0,
+      "elapsed_seconds": 0.127097
+    },
+    {
+      "name": "nested-if-64",
+      "exit": 0,
+      "elapsed_seconds": 0.120263
+    },
+    {
+      "name": "nested-if-65",
+      "exit": 1,
+      "elapsed_seconds": 0.121527
+    },
+    {
+      "name": "nested-if-80",
+      "exit": 1,
+      "elapsed_seconds": 0.120862
+    },
+    {
+      "name": "nested-if-128",
+      "exit": 1,
+      "elapsed_seconds": 0.122516
+    },
+    {
+      "name": "literal-1m",
+      "exit": 0,
+      "elapsed_seconds": 0.130563
+    },
+    {
+      "name": "literal-8m",
+      "exit": 0,
+      "elapsed_seconds": 0.26479
+    },
+    {
+      "name": "block-comment-4m",
+      "exit": 0,
+      "elapsed_seconds": 0.140636
+    },
+    {
+      "name": "html-comment-4m",
+      "exit": 0,
+      "elapsed_seconds": 0.203982
+    },
+    {
+      "name": "line-comment-2m",
+      "exit": 0,
+      "elapsed_seconds": 0.127126
+    },
+    {
+      "name": "parameter-1m",
+      "exit": 0,
+      "elapsed_seconds": 0.165097
+    },
+    {
+      "name": "balanced-parens-100k",
+      "exit": 0,
+      "elapsed_seconds": 9.086642
+    },
+    {
+      "name": "interpolation-1m",
+      "exit": 0,
+      "elapsed_seconds": 0.828862
+    },
+    {
+      "name": "unicode-volume",
+      "exit": 0,
+      "elapsed_seconds": 0.213865
+    },
+    {
+      "name": "deep-flat-chain-50k",
+      "exit": 0,
+      "elapsed_seconds": 0.821709
+    },
+    {
+      "name": "deep-unary-nesting-5k",
+      "exit": 1,
+      "elapsed_seconds": 0.399483
+    },
+    {
+      "name": "content-6m",
+      "exit": 0,
+      "elapsed_seconds": 4.259478
+    }
+  ],
+  "total_cases": 1219,
+  "successful_builds": 232,
+  "controlled_errors": 987,
+  "timeouts": 0,
+  "crashes": 0,
+  "sanitizer_findings": 0,
+  "max_case_seconds": 9.086642,
+  "elapsed_seconds": 173.513,
+  "pass": true
+}

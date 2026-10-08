@@ -1,0 +1,46 @@
+{
+  "/home/nick/Repositories/nift/nift/.build/cp49/probes/records-2000.json": {
+    "file": "0-records-2000.json",
+    "sha256": "fa4954a7c209af9a7d62d7035b9c2bbbb17b66351484459714351ea0aaa7cfa9"
+  },
+  "/home/nick/Repositories/nift/nift/.build/cp49/probes/tree-2000/**/*.txt": {
+    "tree": "tree-tree-2000.json",
+    "count": 2000
+  },
+  "/home/nick/Repositories/nift/nift/.build/cp49/probes/records-4000.json": {
+    "file": "2-records-4000.json",
+    "sha256": "fc885ec8d1da1dd06f2507050bdbc953adde3657e2772f5e6f672004b7e30428"
+  },
+  "/home/nick/Repositories/nift/nift/.build/cp49/probes/tree-4000/**/*.txt": {
+    "tree": "tree-tree-4000.json",
+    "count": 4000
+  },
+  "/home/nick/Repositories/nift/nift/.build/cp49/probes/records-8000.json": {
+    "file": "4-records-8000.json",
+    "sha256": "2bfdcf74a580076a45c993501634f5cb394e56ef28edfbe61857f800f601fc3e"
+  },
+  "/home/nick/Repositories/nift/nift/.build/cp49/probes/tree-8000/**/*.txt": {
+    "tree": "tree-tree-8000.json",
+    "count": 8000
+  },
+  "/home/nick/Repositories/nift/nift/.build/cp49-campaign/extra/records-2000.json": {
+    "file": "6-records-2000.json",
+    "sha256": "0d9366ff5d9b32a1153e3da9f7c091b6f13eca356b6a0b9b139b71a8585e6906"
+  },
+  "/home/nick/Repositories/nift/scripting-benchmark/benchmarks/fixtures/structured-data/records-small.json": {
+    "file": "7-records-small.json",
+    "sha256": "67082fc72b7b581636c4e48f86486d7aa65fff2312295f8fee1f5439c0de4318"
+  },
+  "/home/nick/Repositories/nift/nift/.build/cp49-campaign/10/wide-2000.json": {
+    "file": "8-wide-2000.json",
+    "sha256": "b807f40e68dcd8c7af009b293e0cc167d2c5797c4a030486a5a5a0378f0acdfd"
+  },
+  "/home/nick/Repositories/nift/nift/.build/cp49-campaign/10/deep-2000.json": {
+    "file": "9-deep-2000.json",
+    "sha256": "c8b0caa143952aecfc909585864fe0e9de45d7d60b9c88a214706362ac925ef7"
+  },
+  "/home/nick/Repositories/nift/nift/.build/cp49-campaign/10/mixed-2000.json": {
+    "file": "10-mixed-2000.json",
+    "sha256": "38f58eb3dfe98c6b0d4420481c7b2e97aef02de20eb9ade018381b34c238e62e"
+  }
+}

@@ -1,0 +1,44 @@
+[
+  {
+    "name": "official-sort",
+    "n": 2000,
+    "parser_destructor_inclusive": [
+      " 5,361,951 ( 9.27%)  ???:Parser::~Parser() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "captured-sort",
+    "n": 2000,
+    "parser_destructor_inclusive": [
+      " 5,846,052 ( 8.36%)  ???:Parser::~Parser() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "map-identity",
+    "n": 2000,
+    "parser_destructor_inclusive": [
+      "   160,782 ( 0.61%)  ???:Parser::~Parser() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "call-closure",
+    "n": 2000,
+    "parser_destructor_inclusive": [
+      "      4,973 ( 0.00%)  ???:Parser::~Parser() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "official-bfs",
+    "n": 1000,
+    "parser_destructor_inclusive": [
+      "   147,407 ( 0.30%)  ???:Parser::~Parser() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  },
+  {
+    "name": "official-json-transform",
+    "n": 1000,
+    "parser_destructor_inclusive": [
+      "   366,583 ( 1.46%)  ???:Parser::~Parser() [/home/nick/Repositories/nift/nift/.build/cp410/baseline/nift]"
+    ]
+  }
+]

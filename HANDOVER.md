@@ -33,8 +33,15 @@ whether it is a regression.
   `docs/evidence/release-4.9.0/release-verification.md`.
   External contracts remain NRS `34b1c2ff4d1a3f591176f3ce79b74ad2958b6852`
   (93 modules) and PRS `1da43659da269c96af21aea7234799d2ad56b2df` (12 modules).
-  The v4.9 performance campaign is CLOSED. This transition authorizes no new feature,
-  optimization, official benchmark run, Labs change or provisioning.
+  The v4.9 performance campaign is CLOSED. The user separately authorized the
+  bounded v4.10 scripting competitiveness investigation; its accepted candidate
+  and review boundaries are in `docs/evidence/cp410-competitiveness/report.md`.
+  Frozen `20261009-v490` results and official workloads remain unchanged.
+  Concurrent external Labs presentation edits are preserved and recorded in the audit. Normal commit/push and exact-SHA non-release hosted certification are authorized.
+  Hosted green is required before the next runtime checkpoint. Sort/selector
+  architecture is the primary target: design the plan/instance split for review;
+  bounded one-fetch object access and canonical Jsonic++ investigation are secondary.
+  No official rerun, release or provisioning is authorized.
 - Public documentation: the separate `nift-dev.github.io` repository.
 - External contract: the separate `nift-regression-suite` repository.
 - Embedded minifier: `minifypp/`, synchronized with standalone Minify++.
@@ -167,10 +174,16 @@ Performance entry points currently include `make benchmark-10k`,
 scaling guards plus the direct recovery-epoch complexity guard. Keep them: Nift has independently suffered O(n²) regressions in
 tracked-project validation and in per-output transactional filesystem recovery.
 
-The current Makefile does not define named ASan/UBSan targets. When sanitizer
-validation is appropriate, derive flags from the current build safely and record
-the exact command/workload used; do not claim sanitizer evidence from a normal
-build.
+The current Makefile defines `test-sanitize` and `test-sanitize-lifetime` for
+ASan/UBSan validation; the lifetime target also enables LSan on Linux. Deep
+recursion/fuzz walls use the maintained `checkpoint-9-parser-fuzz` target and
+deep-capable sanitizer. Keep the profiles separate: use-after-scope instrumentation
+inflates evaluator stack frames, so the lifetime corpus is intentionally shallow. Inspect
+the current targets and record actual commands/results. `test-warnings` checks
+GCC/Clang first-party code, and `test-binding-warnings` checks native wrappers.
+`test-v410-allocation-guard` is an explicit Valgrind capture/dispatch regression
+guard registered in the performance workflow. Normal builds are not sanitizer
+evidence.
 
 ## Development checkpoint rule
 

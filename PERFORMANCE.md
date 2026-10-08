@@ -7,6 +7,29 @@ Campaign status and evidence appear at the end and in
 `docs/evidence/cp49/report.md`.
 
 
+## v4.10 scripting competitiveness investigation — accepted bounded candidate
+
+Fresh profiling starts at local `629b1f2`, version 4.10.0, C ABI 1.3. The frozen
+`20261009-v490` series is the external oracle and has not been rerun. The bounded
+candidate removes discarded default capture slots and native-probe temporary
+name strings. Identity sort saves about 5.77% instructions at N=2,000; closure
+calls save about 35.08%. These local results do not establish new peer ratios or
+satisfy the practical competitiveness goal.
+
+The [full investigation](docs/evidence/cp410-competitiveness/report.md) retains
+fresh profiles, phase/lifecycle counters, paired trials, preliminary noisy
+results and follow-ups, allocation/RSS/scaling evidence, exact safety checks and
+architecture options. `make test-v410-allocation-guard` protects capture and
+generic-call allocation slopes with N/2N/4N and verified negative controls.
+
+STOP FOR REVIEW before callable plan/instance ownership, retention/reclamation,
+persistent member indexing, RuntimeValue layout, canonical Jsonic++ changes,
+frames/arenas or VM/JIT work. Commit/push and non-release hosted certification
+are authorized; hosted green must precede the next runtime checkpoint. Sort is
+the primary target; bounded one-fetch access and Jsonic++ investigation are
+secondary. No new official series is authorized.
+
+
 ## 10,000-page regression recovery
 
 The v1.0.39 checkpoint exposed a large-project regression in `ProjectInfo::load_tracking()`: duplicate-name and derived-path collision validation repeatedly scanned the already-loaded tracking vector. At 10,000 tracked pages that created roughly 50 million comparisons plus repeated path derivation, making project open approximately O(n²).

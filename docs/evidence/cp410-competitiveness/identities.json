@@ -1,0 +1,27 @@
+{
+  "baseline/nift": {
+    "sha256": "86d9dfb2e169aa09d30b890b09edf7dda4105b5e2946c661c23460364fdb09e2",
+    "bytes": 4947352
+  },
+  "capture-nift": {
+    "sha256": "fd71270fbb77b8ee3ed583179dbbc6d57ad8c2914a757e1e95cd1a1002326aaf",
+    "bytes": 4947544
+  },
+  "capture-outlined-nift": {
+    "sha256": "6df266da2a196eeb0fb5514916fa19d3523bca7351e9c2283155d76b4c348b34",
+    "bytes": 4951848
+  },
+  "prefix-nift": {
+    "sha256": "15dfefb789b5c2f58a8d8d5b1bd4ecb108c0e65970310829ee484074cd5ca103",
+    "bytes": 4951896
+  },
+  "src/Parser.cpp": {
+    "sha256": "d4c813506eda9bcdef9ce9d633d90f1947d5d146e99d100c928bb814719471f9"
+  },
+  "src/Parser.h": {
+    "sha256": "525363a78ce81ae1fc075a4bef0c7b3b33650b038daa8989706779ecb0ee7149"
+  },
+  "src/ParserExpression.cpp": {
+    "sha256": "d766795055e699451c980dd9b394a277219bc634cafa5281307d83752bf4a1cc"
+  }
+}

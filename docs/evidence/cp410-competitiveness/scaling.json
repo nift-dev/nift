@@ -1,0 +1,164 @@
+[
+  {
+    "name": "loops",
+    "n": 2000,
+    "baseline": 12609240,
+    "final": 12512019
+  },
+  {
+    "name": "call-scalar",
+    "n": 2000,
+    "baseline": 24092487,
+    "final": 23995268
+  },
+  {
+    "name": "frequency",
+    "n": 2000,
+    "baseline": 45672074,
+    "final": 44592532
+  },
+  {
+    "name": "map-set",
+    "n": 2000,
+    "baseline": 34290351,
+    "final": 34116124
+  },
+  {
+    "name": "sliding-window",
+    "n": 2000,
+    "baseline": 27856199,
+    "final": 27685488
+  },
+  {
+    "name": "json-traverse",
+    "n": 2000,
+    "baseline": 32955550,
+    "final": 32857023
+  },
+  {
+    "name": "json-mutate",
+    "n": 2000,
+    "baseline": 40433801,
+    "final": 40335204
+  },
+  {
+    "name": "bfs",
+    "n": 2000,
+    "baseline": 93640950,
+    "final": 93370645
+  },
+  {
+    "name": "filesystem",
+    "n": 2000,
+    "baseline": 81839203,
+    "final": 81749100
+  },
+  {
+    "name": "loops",
+    "n": 4000,
+    "baseline": 22433240,
+    "final": 22362019
+  },
+  {
+    "name": "call-scalar",
+    "n": 4000,
+    "baseline": 45340487,
+    "final": 45269268
+  },
+  {
+    "name": "frequency",
+    "n": 4000,
+    "baseline": 86432764,
+    "final": 85379222
+  },
+  {
+    "name": "map-set",
+    "n": 4000,
+    "baseline": 65427938,
+    "final": 65279711
+  },
+  {
+    "name": "sliding-window",
+    "n": 4000,
+    "baseline": 52694664,
+    "final": 52575953
+  },
+  {
+    "name": "json-traverse",
+    "n": 4000,
+    "baseline": 63111117,
+    "final": 63038590
+  },
+  {
+    "name": "json-mutate",
+    "n": 4000,
+    "baseline": 78013307,
+    "final": 77940710
+  },
+  {
+    "name": "bfs",
+    "n": 4000,
+    "baseline": 183420344,
+    "final": 183254039
+  },
+  {
+    "name": "filesystem",
+    "n": 4000,
+    "baseline": 160731162,
+    "final": 160643059
+  },
+  {
+    "name": "loops",
+    "n": 8000,
+    "baseline": 42081251,
+    "final": 42062030
+  },
+  {
+    "name": "call-scalar",
+    "n": 8000,
+    "baseline": 87836498,
+    "final": 87817279
+  },
+  {
+    "name": "frequency",
+    "n": 8000,
+    "baseline": 167954300,
+    "final": 166952758
+  },
+  {
+    "name": "map-set",
+    "n": 8000,
+    "baseline": 127740284,
+    "final": 127644057
+  },
+  {
+    "name": "sliding-window",
+    "n": 8000,
+    "baseline": 102371161,
+    "final": 102356450
+  },
+  {
+    "name": "json-traverse",
+    "n": 8000,
+    "baseline": 123353568,
+    "final": 123333041
+  },
+  {
+    "name": "json-mutate",
+    "n": 8000,
+    "baseline": 153207853,
+    "final": 153187256
+  },
+  {
+    "name": "bfs",
+    "n": 8000,
+    "baseline": 363017203,
+    "final": 363058898
+  },
+  {
+    "name": "filesystem",
+    "n": 8000,
+    "baseline": 318332347,
+    "final": 318248244
+  }
+]

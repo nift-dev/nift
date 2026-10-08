@@ -1,0 +1,170 @@
+[
+  {
+    "shape": "wide",
+    "mode": "parse",
+    "samples": [
+      {
+        "rounds": 0,
+        "instructions": 16,
+        "allocations": 15,
+        "bytes": 147909
+      },
+      {
+        "rounds": 10,
+        "instructions": 455087688,
+        "allocations": 40105,
+        "bytes": 7032669
+      }
+    ],
+    "instructions_per_round": 45508767.2,
+    "allocations_per_round": 4009.0,
+    "bytes_per_round": 688476.0
+  },
+  {
+    "shape": "wide",
+    "mode": "convert",
+    "samples": [
+      {
+        "rounds": 0,
+        "instructions": 16,
+        "allocations": 4024,
+        "bytes": 836385
+      },
+      {
+        "rounds": 10,
+        "instructions": 5046678,
+        "allocations": 4034,
+        "bytes": 4516385
+      }
+    ],
+    "instructions_per_round": 504666.2,
+    "allocations_per_round": 1.0,
+    "bytes_per_round": 368000.0
+  },
+  {
+    "shape": "deep",
+    "mode": "parse",
+    "samples": [
+      {
+        "rounds": 0,
+        "instructions": 16,
+        "allocations": 10,
+        "bytes": 88384
+      },
+      {
+        "rounds": 10,
+        "instructions": 622138,
+        "allocations": 1290,
+        "bytes": 455744
+      }
+    ],
+    "instructions_per_round": 62212.2,
+    "allocations_per_round": 128.0,
+    "bytes_per_round": 36736.0
+  },
+  {
+    "shape": "deep",
+    "mode": "convert",
+    "samples": [
+      {
+        "rounds": 0,
+        "instructions": 16,
+        "allocations": 138,
+        "bytes": 125120
+      },
+      {
+        "rounds": 10,
+        "instructions": 490405,
+        "allocations": 778,
+        "bytes": 242880
+      }
+    ],
+    "instructions_per_round": 49038.9,
+    "allocations_per_round": 64.0,
+    "bytes_per_round": 11776.0
+  },
+  {
+    "shape": "array",
+    "mode": "parse",
+    "samples": [
+      {
+        "rounds": 0,
+        "instructions": 16,
+        "allocations": 14,
+        "bytes": 117188
+      },
+      {
+        "rounds": 10,
+        "instructions": 12452241,
+        "allocations": 20114,
+        "bytes": 5074598
+      }
+    ],
+    "instructions_per_round": 1245222.5,
+    "allocations_per_round": 2010.0,
+    "bytes_per_round": 495741.0
+  },
+  {
+    "shape": "array",
+    "mode": "convert",
+    "samples": [
+      {
+        "rounds": 0,
+        "instructions": 16,
+        "allocations": 2024,
+        "bytes": 612929
+      },
+      {
+        "rounds": 10,
+        "instructions": 3706410,
+        "allocations": 2034,
+        "bytes": 3652929
+      }
+    ],
+    "instructions_per_round": 370639.4,
+    "allocations_per_round": 1.0,
+    "bytes_per_round": 304000.0
+  },
+  {
+    "shape": "mixed",
+    "mode": "parse",
+    "samples": [
+      {
+        "rounds": 0,
+        "instructions": 16,
+        "allocations": 16,
+        "bytes": 209350
+      },
+      {
+        "rounds": 10,
+        "instructions": 44669936,
+        "allocations": 90106,
+        "bytes": 17256840
+      }
+    ],
+    "instructions_per_round": 4466992.0,
+    "allocations_per_round": 9009.0,
+    "bytes_per_round": 1704749.0
+  },
+  {
+    "shape": "mixed",
+    "mode": "convert",
+    "samples": [
+      {
+        "rounds": 0,
+        "instructions": 16,
+        "allocations": 9025,
+        "bytes": 1914099
+      },
+      {
+        "rounds": 10,
+        "instructions": 30920253,
+        "allocations": 39035,
+        "bytes": 11994099
+      }
+    ],
+    "instructions_per_round": 3092023.7,
+    "allocations_per_round": 3001.0,
+    "bytes_per_round": 1008000.0
+  }
+]

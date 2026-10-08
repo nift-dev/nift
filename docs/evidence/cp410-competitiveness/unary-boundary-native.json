@@ -1,0 +1,16 @@
+[
+  {
+    "name": "baseline",
+    "exit": 1,
+    "stdout": "0 of 1 files built successfully\ntime taken: 0.0573 seconds\n",
+    "stderr": "error: while building /\n  templates/template.html:2:1\n  expression nesting exceeds parser limit\n    $[!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!...\n    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
+    "stdout_without_elapsed": "0 of 1 files built successfully\n"
+  },
+  {
+    "name": "final",
+    "exit": 1,
+    "stdout": "0 of 1 files built successfully\ntime taken: 0.052121 seconds\n",
+    "stderr": "error: while building /\n  templates/template.html:2:1\n  expression nesting exceeds parser limit\n    $[!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!...\n    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n",
+    "stdout_without_elapsed": "0 of 1 files built successfully\n"
+  }
+]

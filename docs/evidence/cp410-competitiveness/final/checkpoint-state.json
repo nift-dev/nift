@@ -1,0 +1,12 @@
+{
+  "audited_at_utc": "2026-10-08T21:50:29.794329+00:00",
+  "head": "629b1f23afbb5b3be97dac66b6cea1a9d5b3d1fc",
+  "origin": "aaadeb31219251b7cc02a62fbf75360ac3e11aaf",
+  "ahead": 2,
+  "behind": 0,
+  "candidate_committed": false,
+  "pushed": false,
+  "official_results_unchanged": true,
+  "concurrent_labs_shell_presentation_changes_preserved": true,
+  "production_binary_matches_measured": true
+}

@@ -1,0 +1,170 @@
+[
+  {
+    "name": "official-sort",
+    "n": 2000,
+    "counts": {
+      "constructors": 44085,
+      "copy_constructors": 8002,
+      "move_constructors": 18768,
+      "copy_assignments": 16015,
+      "move_assignments": 38744,
+      "destructors": 70855,
+      "aggregate_copy_operations": 3,
+      "immediate_children_copied": 4000
+    }
+  },
+  {
+    "name": "captured-sort",
+    "n": 2000,
+    "counts": {
+      "constructors": 54094,
+      "copy_constructors": 8003,
+      "move_constructors": 18768,
+      "copy_assignments": 22015,
+      "move_assignments": 40748,
+      "destructors": 80865,
+      "aggregate_copy_operations": 3,
+      "immediate_children_copied": 4000
+    }
+  },
+  {
+    "name": "sort-index",
+    "n": 2000,
+    "counts": {
+      "constructors": 44056,
+      "copy_constructors": 8003,
+      "move_constructors": 18763,
+      "copy_assignments": 16003,
+      "move_assignments": 35521,
+      "destructors": 70822,
+      "aggregate_copy_operations": 3,
+      "immediate_children_copied": 4000
+    }
+  },
+  {
+    "name": "sort-identity",
+    "n": 2000,
+    "counts": {
+      "constructors": 44053,
+      "copy_constructors": 8003,
+      "move_constructors": 18763,
+      "copy_assignments": 16003,
+      "move_assignments": 38068,
+      "destructors": 70819,
+      "aggregate_copy_operations": 3,
+      "immediate_children_copied": 4000
+    }
+  },
+  {
+    "name": "map-identity",
+    "n": 2000,
+    "counts": {
+      "constructors": 26044,
+      "copy_constructors": 8003,
+      "move_constructors": 14096,
+      "copy_assignments": 12003,
+      "move_assignments": 4014,
+      "destructors": 48143,
+      "aggregate_copy_operations": 3,
+      "immediate_children_copied": 4000
+    }
+  },
+  {
+    "name": "sort-arithmetic",
+    "n": 2000,
+    "counts": {
+      "constructors": 54057,
+      "copy_constructors": 8003,
+      "move_constructors": 18763,
+      "copy_assignments": 22003,
+      "move_assignments": 40069,
+      "destructors": 80823,
+      "aggregate_copy_operations": 3,
+      "immediate_children_copied": 4000
+    }
+  },
+  {
+    "name": "call-scalar",
+    "n": 2000,
+    "counts": {
+      "constructors": 42035,
+      "copy_constructors": 2,
+      "move_constructors": 20002,
+      "copy_assignments": 16003,
+      "move_assignments": 12013,
+      "destructors": 62039,
+      "aggregate_copy_operations": 0,
+      "immediate_children_copied": 0
+    }
+  },
+  {
+    "name": "call-closure",
+    "n": 2000,
+    "counts": {
+      "constructors": 48044,
+      "copy_constructors": 4,
+      "move_constructors": 14002,
+      "copy_assignments": 22003,
+      "move_assignments": 8018,
+      "destructors": 62050,
+      "aggregate_copy_operations": 0,
+      "immediate_children_copied": 0
+    }
+  },
+  {
+    "name": "call-callback",
+    "n": 2000,
+    "counts": {
+      "constructors": 64042,
+      "copy_constructors": 3,
+      "move_constructors": 32002,
+      "copy_assignments": 26003,
+      "move_assignments": 14015,
+      "destructors": 96047,
+      "aggregate_copy_operations": 0,
+      "immediate_children_copied": 0
+    }
+  },
+  {
+    "name": "official-bfs",
+    "n": 1000,
+    "counts": {
+      "constructors": 118917,
+      "copy_constructors": 5478,
+      "move_constructors": 16790,
+      "copy_assignments": 45236,
+      "move_assignments": 27228,
+      "destructors": 141185,
+      "aggregate_copy_operations": 1710,
+      "immediate_children_copied": 4135
+    }
+  },
+  {
+    "name": "official-json-transform",
+    "n": 1000,
+    "counts": {
+      "constructors": 44069,
+      "copy_constructors": 6003,
+      "move_constructors": 27025,
+      "copy_assignments": 13003,
+      "move_assignments": 14023,
+      "destructors": 77097,
+      "aggregate_copy_operations": 2001,
+      "immediate_children_copied": 4000
+    }
+  },
+  {
+    "name": "frequency",
+    "n": 2000,
+    "counts": {
+      "constructors": 79947,
+      "copy_constructors": 76,
+      "move_constructors": 35943,
+      "copy_assignments": 27966,
+      "move_assignments": 17941,
+      "destructors": 115966,
+      "aggregate_copy_operations": 0,
+      "immediate_children_copied": 0
+    }
+  }
+]

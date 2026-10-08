@@ -1,0 +1,9 @@
+{
+  "platform": "Linux-7.0.0-29-generic-x86_64-with-glibc2.43",
+  "tools": {
+    "g++": "g++ (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
+    "clang++": "Ubuntu clang version 21.1.8 (6ubuntu1)",
+    "valgrind": "valgrind-3.26.0",
+    "strace": "strace -- version 6.19"
+  }
+}
