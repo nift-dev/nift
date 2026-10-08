@@ -1,0 +1,1122 @@
+[
+  {
+    "mode": "pointer",
+    "n": 1000,
+    "size": 0,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6752\ncount=1000 payload=0 mode=pointer baseline=4192 scope=6752 destroyed=6732 trimmed=6608 peak=12188 ms=36.4428\n",
+    "error": ""
+  },
+  {
+    "mode": "pointer",
+    "n": 1000,
+    "size": 1,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6844\ncount=1000 payload=1 mode=pointer baseline=4156 scope=6844 destroyed=6824 trimmed=6564 peak=12360 ms=38.6538\n",
+    "error": ""
+  },
+  {
+    "mode": "pointer",
+    "n": 1000,
+    "size": 23,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6896\ncount=1000 payload=23 mode=pointer baseline=4196 scope=6896 destroyed=6876 trimmed=6608 peak=12360 ms=38.2557\n",
+    "error": ""
+  },
+  {
+    "mode": "pointer",
+    "n": 1000,
+    "size": 100,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6996\ncount=1000 payload=100 mode=pointer baseline=4200 scope=6996 destroyed=6976 trimmed=6640 peak=12360 ms=38.392\n",
+    "error": ""
+  },
+  {
+    "mode": "pointer",
+    "n": 1000,
+    "size": 1024,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=7800\ncount=1000 payload=1024 mode=pointer baseline=4236 scope=7800 destroyed=7780 trimmed=6580 peak=12360 ms=41.1082\n",
+    "error": ""
+  },
+  {
+    "mode": "pointer",
+    "n": 10000,
+    "size": 0,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=8008\ncount=10000 payload=0 mode=pointer baseline=4188 scope=8008 destroyed=7960 trimmed=6460 peak=12360 ms=358.089\n",
+    "error": ""
+  },
+  {
+    "mode": "pointer",
+    "n": 10000,
+    "size": 1,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=9184\ncount=10000 payload=1 mode=pointer baseline=4284 scope=9184 destroyed=8948 trimmed=6628 peak=12360 ms=407.218\n",
+    "error": ""
+  },
+  {
+    "mode": "pointer",
+    "n": 10000,
+    "size": 23,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=9164\ncount=10000 payload=23 mode=pointer baseline=4172 scope=9168 destroyed=8932 trimmed=6608 peak=12360 ms=373.88\n",
+    "error": ""
+  },
+  {
+    "mode": "pointer",
+    "n": 10000,
+    "size": 100,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=9900\ncount=10000 payload=100 mode=pointer baseline=4196 scope=9904 destroyed=9668 trimmed=6572 peak=12360 ms=380.356\n",
+    "error": ""
+  },
+  {
+    "mode": "pointer",
+    "n": 10000,
+    "size": 1024,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=18868\ncount=10000 payload=1024 mode=pointer baseline=4208 scope=18872 destroyed=18636 trimmed=6508 peak=19044 ms=407.535\n",
+    "error": ""
+  },
+  {
+    "mode": "pointer",
+    "n": 100000,
+    "size": 0,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=21264\ncount=100000 payload=0 mode=pointer baseline=4204 scope=21268 destroyed=19112 trimmed=6648 peak=22360 ms=3697.17\n",
+    "error": ""
+  },
+  {
+    "mode": "pointer",
+    "n": 100000,
+    "size": 1,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=33332\ncount=100000 payload=1 mode=pointer baseline=4176 scope=33332 destroyed=31076 trimmed=6524 peak=37408 ms=3877.66\n",
+    "error": ""
+  },
+  {
+    "mode": "pointer",
+    "n": 100000,
+    "size": 23,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=33436\ncount=100000 payload=23 mode=pointer baseline=4284 scope=33440 destroyed=28480 trimmed=6624 peak=36844 ms=3921.84\n",
+    "error": ""
+  },
+  {
+    "mode": "pointer",
+    "n": 100000,
+    "size": 100,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=41224\ncount=100000 payload=100 mode=pointer baseline=4192 scope=41224 destroyed=36264 trimmed=6608 peak=45124 ms=3946.6\n",
+    "error": ""
+  },
+  {
+    "mode": "pointer",
+    "n": 100000,
+    "size": 1024,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=131756\ncount=100000 payload=1024 mode=pointer baseline=4180 scope=131760 destroyed=126800 trimmed=6544 peak=135228 ms=4181.07\n",
+    "error": ""
+  },
+  {
+    "mode": "pointer",
+    "n": 200000,
+    "size": 0,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=35908\ncount=200000 payload=0 mode=pointer baseline=4196 scope=35912 destroyed=31584 trimmed=6624 peak=37880 ms=7811.57\n",
+    "error": ""
+  },
+  {
+    "mode": "pointer",
+    "n": 200000,
+    "size": 1,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=60392\ncount=200000 payload=1 mode=pointer baseline=4188 scope=60396 destroyed=55796 trimmed=6584 peak=68848 ms=7724.73\n",
+    "error": ""
+  },
+  {
+    "mode": "pointer",
+    "n": 200000,
+    "size": 23,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=60428\ncount=200000 payload=23 mode=pointer baseline=4196 scope=60428 destroyed=50340 trimmed=6612 peak=69324 ms=7987.95\n",
+    "error": ""
+  },
+  {
+    "mode": "pointer",
+    "n": 200000,
+    "size": 100,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=75940\ncount=200000 payload=100 mode=pointer baseline=4172 scope=75940 destroyed=65852 trimmed=6508 peak=84640 ms=8012.68\n",
+    "error": ""
+  },
+  {
+    "mode": "pointer",
+    "n": 200000,
+    "size": 1024,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=257304\ncount=200000 payload=1024 mode=pointer baseline=4288 scope=257308 destroyed=247220 trimmed=6656 peak=265104 ms=8418.5\n",
+    "error": ""
+  },
+  {
+    "mode": "callback",
+    "n": 1000,
+    "size": 0,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6768\ncount=1000 payload=0 mode=callback baseline=4192 scope=6772 destroyed=6752 trimmed=6636 peak=12360 ms=46.1624\n",
+    "error": ""
+  },
+  {
+    "mode": "callback",
+    "n": 1000,
+    "size": 1,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6752\ncount=1000 payload=1 mode=callback baseline=4188 scope=6756 destroyed=6736 trimmed=6584 peak=12360 ms=45.3989\n",
+    "error": ""
+  },
+  {
+    "mode": "callback",
+    "n": 1000,
+    "size": 23,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6740\ncount=1000 payload=23 mode=callback baseline=4216 scope=6740 destroyed=6720 trimmed=6592 peak=12360 ms=45.9617\n",
+    "error": ""
+  },
+  {
+    "mode": "callback",
+    "n": 1000,
+    "size": 100,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6824\ncount=1000 payload=100 mode=callback baseline=4220 scope=6824 destroyed=6804 trimmed=6588 peak=12360 ms=46.3807\n",
+    "error": ""
+  },
+  {
+    "mode": "callback",
+    "n": 1000,
+    "size": 1024,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=7720\ncount=1000 payload=1024 mode=callback baseline=4156 scope=7720 destroyed=7700 trimmed=6652 peak=12360 ms=68.9532\n",
+    "error": ""
+  },
+  {
+    "mode": "callback",
+    "n": 10000,
+    "size": 0,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=7900\ncount=10000 payload=0 mode=callback baseline=4172 scope=7900 destroyed=7880 trimmed=6552 peak=12360 ms=417.709\n",
+    "error": ""
+  },
+  {
+    "mode": "callback",
+    "n": 10000,
+    "size": 1,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=8308\ncount=10000 payload=1 mode=callback baseline=4176 scope=8308 destroyed=8288 trimmed=6640 peak=12360 ms=476.096\n",
+    "error": ""
+  },
+  {
+    "mode": "callback",
+    "n": 10000,
+    "size": 23,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=8300\ncount=10000 payload=23 mode=callback baseline=4272 scope=8300 destroyed=8280 trimmed=6680 peak=12360 ms=667.456\n",
+    "error": ""
+  },
+  {
+    "mode": "callback",
+    "n": 10000,
+    "size": 100,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=9004\ncount=10000 payload=100 mode=callback baseline=4220 scope=9004 destroyed=8984 trimmed=6604 peak=12360 ms=1066.94\n",
+    "error": ""
+  },
+  {
+    "mode": "callback",
+    "n": 10000,
+    "size": 1024,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=18168\ncount=10000 payload=1024 mode=callback baseline=4280 scope=18168 destroyed=18148 trimmed=6764 peak=17352 ms=1762.37\n",
+    "error": ""
+  },
+  {
+    "mode": "callback",
+    "n": 100000,
+    "size": 0,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=20724\ncount=100000 payload=0 mode=callback baseline=4188 scope=20724 destroyed=19352 trimmed=6608 peak=20244 ms=9019.47\n",
+    "error": ""
+  },
+  {
+    "mode": "callback",
+    "n": 100000,
+    "size": 1,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=23844\ncount=100000 payload=1 mode=callback baseline=4220 scope=23844 destroyed=22472 trimmed=6596 peak=23180 ms=9917.17\n",
+    "error": ""
+  },
+  {
+    "mode": "callback",
+    "n": 100000,
+    "size": 23,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=23860\ncount=100000 payload=23 mode=callback baseline=4184 scope=23860 destroyed=22488 trimmed=6644 peak=22716 ms=10666.2\n",
+    "error": ""
+  },
+  {
+    "mode": "callback",
+    "n": 100000,
+    "size": 100,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=31616\ncount=100000 payload=100 mode=callback baseline=4192 scope=31616 destroyed=30244 trimmed=6616 peak=30580 ms=10944.3\n",
+    "error": ""
+  },
+  {
+    "mode": "callback",
+    "n": 100000,
+    "size": 1024,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=122332\ncount=100000 payload=1024 mode=callback baseline=4204 scope=122332 destroyed=120960 trimmed=6724 peak=120952 ms=17158.2\n",
+    "error": ""
+  },
+  {
+    "mode": "callback",
+    "n": 200000,
+    "size": 0,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=34944\ncount=200000 payload=0 mode=callback baseline=4180 scope=34944 destroyed=32180 trimmed=6648 peak=34024 ms=19907.5\n",
+    "error": ""
+  },
+  {
+    "mode": "callback",
+    "n": 200000,
+    "size": 1,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=41100\ncount=200000 payload=1 mode=callback baseline=4192 scope=41100 destroyed=38336 trimmed=6552 peak=39724 ms=13420.3\n",
+    "error": ""
+  },
+  {
+    "mode": "callback",
+    "n": 200000,
+    "size": 23,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=41192\ncount=200000 payload=23 mode=callback baseline=4276 scope=41192 destroyed=38428 trimmed=6664 peak=40420 ms=12123\n",
+    "error": ""
+  },
+  {
+    "mode": "callback",
+    "n": 200000,
+    "size": 100,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=56732\ncount=200000 payload=100 mode=callback baseline=4252 scope=56732 destroyed=53968 trimmed=6612 peak=55704 ms=12823.3\n",
+    "error": ""
+  },
+  {
+    "mode": "callback",
+    "n": 200000,
+    "size": 1024,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=238028\ncount=200000 payload=1024 mode=callback baseline=4196 scope=238028 destroyed=235264 trimmed=6668 peak=236824 ms=17429.1\n",
+    "error": ""
+  },
+  {
+    "mode": "retain",
+    "n": 1000,
+    "size": 0,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6708\ncount=1000 payload=0 mode=retain baseline=4192 scope=6556 destroyed=6556 trimmed=6408 peak=12360 ms=3.18187\n",
+    "error": ""
+  },
+  {
+    "mode": "retain",
+    "n": 1000,
+    "size": 1,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6804\ncount=1000 payload=1 mode=retain baseline=4136 scope=6652 destroyed=6652 trimmed=6460 peak=12360 ms=3.46875\n",
+    "error": ""
+  },
+  {
+    "mode": "retain",
+    "n": 1000,
+    "size": 23,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6736\ncount=1000 payload=23 mode=retain baseline=4220 scope=6584 destroyed=6584 trimmed=6392 peak=12360 ms=3.33573\n",
+    "error": ""
+  },
+  {
+    "mode": "retain",
+    "n": 1000,
+    "size": 100,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6796\ncount=1000 payload=100 mode=retain baseline=4140 scope=6644 destroyed=6644 trimmed=6388 peak=12360 ms=3.45375\n",
+    "error": ""
+  },
+  {
+    "mode": "retain",
+    "n": 1000,
+    "size": 1024,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=7756\ncount=1000 payload=1024 mode=retain baseline=4184 scope=7604 destroyed=7604 trimmed=6500 peak=12360 ms=4.41593\n",
+    "error": ""
+  },
+  {
+    "mode": "retain",
+    "n": 10000,
+    "size": 0,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=9588\ncount=10000 payload=0 mode=retain baseline=4184 scope=8100 destroyed=8100 trimmed=6336 peak=12360 ms=29.0429\n",
+    "error": ""
+  },
+  {
+    "mode": "retain",
+    "n": 10000,
+    "size": 1,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=9976\ncount=10000 payload=1 mode=retain baseline=4220 scope=8488 destroyed=8488 trimmed=6408 peak=12360 ms=28.4127\n",
+    "error": ""
+  },
+  {
+    "mode": "retain",
+    "n": 10000,
+    "size": 23,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=9992\ncount=10000 payload=23 mode=retain baseline=4212 scope=8504 destroyed=8504 trimmed=6424 peak=12360 ms=30.6094\n",
+    "error": ""
+  },
+  {
+    "mode": "retain",
+    "n": 10000,
+    "size": 100,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=10796\ncount=10000 payload=100 mode=retain baseline=4176 scope=9312 destroyed=9312 trimmed=6452 peak=12360 ms=25.7512\n",
+    "error": ""
+  },
+  {
+    "mode": "retain",
+    "n": 10000,
+    "size": 1024,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=19776\ncount=10000 payload=1024 mode=retain baseline=4184 scope=18288 destroyed=18288 trimmed=6412 peak=19572 ms=33.4454\n",
+    "error": ""
+  },
+  {
+    "mode": "retain",
+    "n": 100000,
+    "size": 0,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=39756\ncount=100000 payload=0 mode=retain baseline=4196 scope=24916 destroyed=24916 trimmed=6420 peak=39500 ms=289.983\n",
+    "error": ""
+  },
+  {
+    "mode": "retain",
+    "n": 100000,
+    "size": 1,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=42876\ncount=100000 payload=1 mode=retain baseline=4196 scope=28032 destroyed=28032 trimmed=6408 peak=42368 ms=430.426\n",
+    "error": ""
+  },
+  {
+    "mode": "retain",
+    "n": 100000,
+    "size": 23,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=42884\ncount=100000 payload=23 mode=retain baseline=4204 scope=28040 destroyed=28040 trimmed=6416 peak=42388 ms=340.743\n",
+    "error": ""
+  },
+  {
+    "mode": "retain",
+    "n": 100000,
+    "size": 100,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=50728\ncount=100000 payload=100 mode=retain baseline=4172 scope=35884 destroyed=35884 trimmed=6444 peak=50308 ms=354.674\n",
+    "error": ""
+  },
+  {
+    "mode": "retain",
+    "n": 100000,
+    "size": 1024,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=141428\ncount=100000 payload=1024 mode=retain baseline=4184 scope=126588 destroyed=126588 trimmed=6560 peak=141108 ms=441.301\n",
+    "error": ""
+  },
+  {
+    "mode": "retain",
+    "n": 200000,
+    "size": 0,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=73144\ncount=200000 payload=0 mode=retain baseline=4140 scope=43460 destroyed=43460 trimmed=6388 peak=72756 ms=644.601\n",
+    "error": ""
+  },
+  {
+    "mode": "retain",
+    "n": 200000,
+    "size": 1,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=79424\ncount=200000 payload=1 mode=retain baseline=4196 scope=49736 destroyed=49736 trimmed=6408 peak=78928 ms=721.177\n",
+    "error": ""
+  },
+  {
+    "mode": "retain",
+    "n": 200000,
+    "size": 23,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=79392\ncount=200000 payload=23 mode=retain baseline=4192 scope=49704 destroyed=49704 trimmed=6376 peak=79008 ms=695.694\n",
+    "error": ""
+  },
+  {
+    "mode": "retain",
+    "n": 200000,
+    "size": 100,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=95052\ncount=200000 payload=100 mode=retain baseline=4144 scope=65368 destroyed=65368 trimmed=6408 peak=94756 ms=627.547\n",
+    "error": ""
+  },
+  {
+    "mode": "retain",
+    "n": 200000,
+    "size": 1024,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=276432\ncount=200000 payload=1024 mode=retain baseline=4264 scope=246744 destroyed=246744 trimmed=6580 peak=276204 ms=874.288\n",
+    "error": ""
+  },
+  {
+    "mode": "reuse",
+    "n": 1000,
+    "size": 0,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6432\ncount=1000 payload=0 mode=reuse baseline=4256 scope=6436 destroyed=6436 trimmed=6432 peak=12360 ms=1.03293\n",
+    "error": ""
+  },
+  {
+    "mode": "reuse",
+    "n": 1000,
+    "size": 1,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6404\ncount=1000 payload=1 mode=reuse baseline=4184 scope=6408 destroyed=6408 trimmed=6404 peak=12360 ms=1.01374\n",
+    "error": ""
+  },
+  {
+    "mode": "reuse",
+    "n": 1000,
+    "size": 23,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6396\ncount=1000 payload=23 mode=reuse baseline=4224 scope=6400 destroyed=6400 trimmed=6396 peak=12360 ms=0.982636\n",
+    "error": ""
+  },
+  {
+    "mode": "reuse",
+    "n": 1000,
+    "size": 100,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6324\ncount=1000 payload=100 mode=reuse baseline=4188 scope=6324 destroyed=6324 trimmed=6324 peak=12360 ms=0.661214\n",
+    "error": ""
+  },
+  {
+    "mode": "reuse",
+    "n": 1000,
+    "size": 1024,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6320\ncount=1000 payload=1024 mode=reuse baseline=4200 scope=6320 destroyed=6320 trimmed=6320 peak=12360 ms=0.913432\n",
+    "error": ""
+  },
+  {
+    "mode": "reuse",
+    "n": 10000,
+    "size": 0,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6368\ncount=10000 payload=0 mode=reuse baseline=4196 scope=6372 destroyed=6372 trimmed=6368 peak=12360 ms=5.24712\n",
+    "error": ""
+  },
+  {
+    "mode": "reuse",
+    "n": 10000,
+    "size": 1,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6364\ncount=10000 payload=1 mode=reuse baseline=4172 scope=6368 destroyed=6368 trimmed=6364 peak=12360 ms=5.20508\n",
+    "error": ""
+  },
+  {
+    "mode": "reuse",
+    "n": 10000,
+    "size": 23,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6404\ncount=10000 payload=23 mode=reuse baseline=4188 scope=6408 destroyed=6408 trimmed=6404 peak=12360 ms=5.25133\n",
+    "error": ""
+  },
+  {
+    "mode": "reuse",
+    "n": 10000,
+    "size": 100,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6372\ncount=10000 payload=100 mode=reuse baseline=4192 scope=6372 destroyed=6372 trimmed=6372 peak=12360 ms=5.39201\n",
+    "error": ""
+  },
+  {
+    "mode": "reuse",
+    "n": 10000,
+    "size": 1024,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6376\ncount=10000 payload=1024 mode=reuse baseline=4132 scope=6376 destroyed=6376 trimmed=6376 peak=12360 ms=3.82854\n",
+    "error": ""
+  },
+  {
+    "mode": "reuse",
+    "n": 100000,
+    "size": 0,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6364\ncount=100000 payload=0 mode=reuse baseline=4192 scope=6368 destroyed=6368 trimmed=6364 peak=12360 ms=43.1711\n",
+    "error": ""
+  },
+  {
+    "mode": "reuse",
+    "n": 100000,
+    "size": 1,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6360\ncount=100000 payload=1 mode=reuse baseline=4116 scope=6364 destroyed=6364 trimmed=6360 peak=12360 ms=47.8732\n",
+    "error": ""
+  },
+  {
+    "mode": "reuse",
+    "n": 100000,
+    "size": 23,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6444\ncount=100000 payload=23 mode=reuse baseline=4260 scope=6448 destroyed=6448 trimmed=6444 peak=12360 ms=42.8636\n",
+    "error": ""
+  },
+  {
+    "mode": "reuse",
+    "n": 100000,
+    "size": 100,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6304\ncount=100000 payload=100 mode=reuse baseline=4200 scope=6304 destroyed=6304 trimmed=6304 peak=12360 ms=51.8315\n",
+    "error": ""
+  },
+  {
+    "mode": "reuse",
+    "n": 100000,
+    "size": 1024,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6372\ncount=100000 payload=1024 mode=reuse baseline=4140 scope=6372 destroyed=6372 trimmed=6372 peak=12360 ms=47.3205\n",
+    "error": ""
+  },
+  {
+    "mode": "reuse",
+    "n": 200000,
+    "size": 0,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6388\ncount=200000 payload=0 mode=reuse baseline=4160 scope=6392 destroyed=6392 trimmed=6388 peak=12360 ms=92.0367\n",
+    "error": ""
+  },
+  {
+    "mode": "reuse",
+    "n": 200000,
+    "size": 1,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6252\ncount=200000 payload=1 mode=reuse baseline=4080 scope=6256 destroyed=6256 trimmed=6252 peak=12360 ms=88.1443\n",
+    "error": ""
+  },
+  {
+    "mode": "reuse",
+    "n": 200000,
+    "size": 23,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6324\ncount=200000 payload=23 mode=reuse baseline=4192 scope=6328 destroyed=6328 trimmed=6324 peak=12360 ms=92.9868\n",
+    "error": ""
+  },
+  {
+    "mode": "reuse",
+    "n": 200000,
+    "size": 100,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6408\ncount=200000 payload=100 mode=reuse baseline=4176 scope=6408 destroyed=6408 trimmed=6408 peak=12360 ms=114.163\n",
+    "error": ""
+  },
+  {
+    "mode": "reuse",
+    "n": 200000,
+    "size": 1024,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6428\ncount=200000 payload=1024 mode=reuse baseline=4220 scope=6428 destroyed=6428 trimmed=6428 peak=12360 ms=107.307\n",
+    "error": ""
+  },
+  {
+    "mode": "local",
+    "n": 1000,
+    "size": 0,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6612\ncount=1000 payload=0 mode=local baseline=4224 scope=6612 destroyed=6612 trimmed=6508 peak=12360 ms=53.7542\n",
+    "error": ""
+  },
+  {
+    "mode": "local",
+    "n": 1000,
+    "size": 1,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6692\ncount=1000 payload=1 mode=local baseline=4216 scope=6692 destroyed=6692 trimmed=6548 peak=12360 ms=63.7178\n",
+    "error": ""
+  },
+  {
+    "mode": "local",
+    "n": 1000,
+    "size": 23,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6676\ncount=1000 payload=23 mode=local baseline=4192 scope=6676 destroyed=6676 trimmed=6528 peak=12360 ms=40.4251\n",
+    "error": ""
+  },
+  {
+    "mode": "local",
+    "n": 1000,
+    "size": 100,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6692\ncount=1000 payload=100 mode=local baseline=4164 scope=6692 destroyed=6692 trimmed=6476 peak=12360 ms=29.6389\n",
+    "error": ""
+  },
+  {
+    "mode": "local",
+    "n": 1000,
+    "size": 1024,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=7548\ncount=1000 payload=1024 mode=local baseline=4132 scope=7548 destroyed=7548 trimmed=6464 peak=12360 ms=36.1563\n",
+    "error": ""
+  },
+  {
+    "mode": "local",
+    "n": 10000,
+    "size": 0,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=7960\ncount=10000 payload=0 mode=local baseline=4212 scope=7960 destroyed=7960 trimmed=6564 peak=12360 ms=297.345\n",
+    "error": ""
+  },
+  {
+    "mode": "local",
+    "n": 10000,
+    "size": 1,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=8288\ncount=10000 payload=1 mode=local baseline=4220 scope=8288 destroyed=8288 trimmed=6564 peak=12360 ms=313.947\n",
+    "error": ""
+  },
+  {
+    "mode": "local",
+    "n": 10000,
+    "size": 23,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=8156\ncount=10000 payload=23 mode=local baseline=4140 scope=8156 destroyed=8156 trimmed=6428 peak=12360 ms=307.499\n",
+    "error": ""
+  },
+  {
+    "mode": "local",
+    "n": 10000,
+    "size": 100,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=9072\ncount=10000 payload=100 mode=local baseline=4208 scope=9072 destroyed=9072 trimmed=6596 peak=12360 ms=299.854\n",
+    "error": ""
+  },
+  {
+    "mode": "local",
+    "n": 10000,
+    "size": 1024,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=18056\ncount=10000 payload=1024 mode=local baseline=4168 scope=18056 destroyed=18056 trimmed=6528 peak=17676 ms=362.525\n",
+    "error": ""
+  },
+  {
+    "mode": "local",
+    "n": 100000,
+    "size": 0,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=20316\ncount=100000 payload=0 mode=local baseline=4200 scope=20344 destroyed=18992 trimmed=5780 peak=20380 ms=2868.18\n",
+    "error": ""
+  },
+  {
+    "mode": "local",
+    "n": 100000,
+    "size": 1,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=23856\ncount=100000 payload=1 mode=local baseline=3876 scope=23856 destroyed=22504 trimmed=6132 peak=23460 ms=3386.51\n",
+    "error": ""
+  },
+  {
+    "mode": "local",
+    "n": 100000,
+    "size": 23,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=23984\ncount=100000 payload=23 mode=local baseline=4028 scope=23984 destroyed=22632 trimmed=6260 peak=23900 ms=2978.23\n",
+    "error": ""
+  },
+  {
+    "mode": "local",
+    "n": 100000,
+    "size": 100,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=31888\ncount=100000 payload=100 mode=local baseline=4064 scope=31888 destroyed=30536 trimmed=6380 peak=31996 ms=2902.87\n",
+    "error": ""
+  },
+  {
+    "mode": "local",
+    "n": 100000,
+    "size": 1024,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=122412\ncount=100000 payload=1024 mode=local baseline=4016 scope=122412 destroyed=121060 trimmed=6296 peak=122456 ms=2976.7\n",
+    "error": ""
+  },
+  {
+    "mode": "local",
+    "n": 200000,
+    "size": 0,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=35636\ncount=200000 payload=0 mode=local baseline=4064 scope=35636 destroyed=32892 trimmed=6400 peak=35792 ms=6147.67\n",
+    "error": ""
+  },
+  {
+    "mode": "local",
+    "n": 200000,
+    "size": 1,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=41784\ncount=200000 payload=1 mode=local baseline=4032 scope=41784 destroyed=39040 trimmed=6260 peak=41764 ms=5744.25\n",
+    "error": ""
+  },
+  {
+    "mode": "local",
+    "n": 200000,
+    "size": 23,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=41788\ncount=200000 payload=23 mode=local baseline=4080 scope=41788 destroyed=39044 trimmed=6264 peak=41680 ms=6082.6\n",
+    "error": ""
+  },
+  {
+    "mode": "local",
+    "n": 200000,
+    "size": 100,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=57488\ncount=200000 payload=100 mode=local baseline=4124 scope=57488 destroyed=54744 trimmed=6368 peak=57776 ms=5134.92\n",
+    "error": ""
+  },
+  {
+    "mode": "local",
+    "n": 200000,
+    "size": 1024,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=238720\ncount=200000 payload=1024 mode=local baseline=4068 scope=238720 destroyed=235976 trimmed=6372 peak=238960 ms=5257.92\n",
+    "error": ""
+  },
+  {
+    "mode": "subset",
+    "n": 1000,
+    "size": 0,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6364\ncount=1000 payload=0 mode=subset baseline=4132 scope=6364 destroyed=6364 trimmed=6264 peak=12360 ms=3.97641\n",
+    "error": ""
+  },
+  {
+    "mode": "subset",
+    "n": 1000,
+    "size": 1,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6388\ncount=1000 payload=1 mode=subset baseline=4084 scope=6388 destroyed=6388 trimmed=6256 peak=12360 ms=3.98684\n",
+    "error": ""
+  },
+  {
+    "mode": "subset",
+    "n": 1000,
+    "size": 23,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6344\ncount=1000 payload=23 mode=subset baseline=4048 scope=6344 destroyed=6344 trimmed=6204 peak=12360 ms=2.49388\n",
+    "error": ""
+  },
+  {
+    "mode": "subset",
+    "n": 1000,
+    "size": 100,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6476\ncount=1000 payload=100 mode=subset baseline=4096 scope=6476 destroyed=6476 trimmed=6268 peak=12360 ms=4.26661\n",
+    "error": ""
+  },
+  {
+    "mode": "subset",
+    "n": 1000,
+    "size": 1024,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=7424\ncount=1000 payload=1024 mode=subset baseline=4104 scope=7424 destroyed=7424 trimmed=6360 peak=12360 ms=3.68097\n",
+    "error": ""
+  },
+  {
+    "mode": "subset",
+    "n": 10000,
+    "size": 0,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=7580\ncount=10000 payload=0 mode=subset baseline=4100 scope=7584 destroyed=7584 trimmed=6280 peak=12360 ms=19.1353\n",
+    "error": ""
+  },
+  {
+    "mode": "subset",
+    "n": 10000,
+    "size": 1,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=7844\ncount=10000 payload=1 mode=subset baseline=4056 scope=7848 destroyed=7848 trimmed=6224 peak=12360 ms=18.852\n",
+    "error": ""
+  },
+  {
+    "mode": "subset",
+    "n": 10000,
+    "size": 23,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=7880\ncount=10000 payload=23 mode=subset baseline=4040 scope=7880 destroyed=7880 trimmed=6248 peak=12360 ms=19.2185\n",
+    "error": ""
+  },
+  {
+    "mode": "subset",
+    "n": 10000,
+    "size": 100,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=8668\ncount=10000 payload=100 mode=subset baseline=4048 scope=8668 destroyed=8668 trimmed=6260 peak=12360 ms=19.4434\n",
+    "error": ""
+  },
+  {
+    "mode": "subset",
+    "n": 10000,
+    "size": 1024,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=17720\ncount=10000 payload=1024 mode=subset baseline=4104 scope=17720 destroyed=17720 trimmed=6300 peak=17520 ms=34.4706\n",
+    "error": ""
+  },
+  {
+    "mode": "subset",
+    "n": 100000,
+    "size": 0,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=20276\ncount=100000 payload=0 mode=subset baseline=4128 scope=20276 destroyed=18924 trimmed=6284 peak=20016 ms=230.355\n",
+    "error": ""
+  },
+  {
+    "mode": "subset",
+    "n": 100000,
+    "size": 1,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=23424\ncount=100000 payload=1 mode=subset baseline=4060 scope=23424 destroyed=22072 trimmed=6296 peak=23012 ms=237.646\n",
+    "error": ""
+  },
+  {
+    "mode": "subset",
+    "n": 100000,
+    "size": 23,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=23432\ncount=100000 payload=23 mode=subset baseline=4080 scope=23432 destroyed=22080 trimmed=6292 peak=22940 ms=224.209\n",
+    "error": ""
+  },
+  {
+    "mode": "subset",
+    "n": 100000,
+    "size": 100,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=31152\ncount=100000 payload=100 mode=subset baseline=4036 scope=31156 destroyed=29804 trimmed=6204 peak=30812 ms=257.147\n",
+    "error": ""
+  },
+  {
+    "mode": "subset",
+    "n": 100000,
+    "size": 1024,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=121768\ncount=100000 payload=1024 mode=subset baseline=4084 scope=121772 destroyed=120420 trimmed=6248 peak=121368 ms=327.72\n",
+    "error": ""
+  },
+  {
+    "mode": "subset",
+    "n": 200000,
+    "size": 0,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=34348\ncount=200000 payload=0 mode=subset baseline=4084 scope=34352 destroyed=31608 trimmed=6272 peak=34184 ms=466.34\n",
+    "error": ""
+  },
+  {
+    "mode": "subset",
+    "n": 200000,
+    "size": 1,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=40608\ncount=200000 payload=1 mode=subset baseline=4088 scope=40608 destroyed=37864 trimmed=6268 peak=40116 ms=514.652\n",
+    "error": ""
+  },
+  {
+    "mode": "subset",
+    "n": 200000,
+    "size": 23,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=40612\ncount=200000 payload=23 mode=subset baseline=4096 scope=40612 destroyed=37868 trimmed=6260 peak=40328 ms=548.728\n",
+    "error": ""
+  },
+  {
+    "mode": "subset",
+    "n": 200000,
+    "size": 100,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=56268\ncount=200000 payload=100 mode=subset baseline=4084 scope=56272 destroyed=53528 trimmed=6296 peak=55884 ms=598.788\n",
+    "error": ""
+  },
+  {
+    "mode": "subset",
+    "n": 200000,
+    "size": 1024,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=237508\ncount=200000 payload=1024 mode=subset baseline=4104 scope=237508 destroyed=234764 trimmed=6340 peak=237292 ms=747.425\n",
+    "error": ""
+  },
+  {
+    "mode": "alias",
+    "n": 1000,
+    "size": 0,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6344\ncount=1000 payload=0 mode=alias baseline=4084 scope=6344 destroyed=6344 trimmed=6236 peak=12360 ms=5.85664\n",
+    "error": ""
+  },
+  {
+    "mode": "alias",
+    "n": 1000,
+    "size": 1,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6384\ncount=1000 payload=1 mode=alias baseline=4128 scope=6388 destroyed=6388 trimmed=6236 peak=12360 ms=8.65118\n",
+    "error": ""
+  },
+  {
+    "mode": "alias",
+    "n": 1000,
+    "size": 23,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6368\ncount=1000 payload=23 mode=alias baseline=4108 scope=6372 destroyed=6372 trimmed=6220 peak=12360 ms=9.91229\n",
+    "error": ""
+  },
+  {
+    "mode": "alias",
+    "n": 1000,
+    "size": 100,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=6464\ncount=1000 payload=100 mode=alias baseline=4128 scope=6468 destroyed=6468 trimmed=6248 peak=12360 ms=5.78209\n",
+    "error": ""
+  },
+  {
+    "mode": "alias",
+    "n": 1000,
+    "size": 1024,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=7316\ncount=1000 payload=1024 mode=alias baseline=4064 scope=7316 destroyed=7316 trimmed=6236 peak=12360 ms=6.89512\n",
+    "error": ""
+  },
+  {
+    "mode": "alias",
+    "n": 10000,
+    "size": 0,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=7588\ncount=10000 payload=0 mode=alias baseline=4108 scope=7588 destroyed=7588 trimmed=6284 peak=12360 ms=61.9104\n",
+    "error": ""
+  },
+  {
+    "mode": "alias",
+    "n": 10000,
+    "size": 1,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=7852\ncount=10000 payload=1 mode=alias baseline=4024 scope=7852 destroyed=7852 trimmed=6228 peak=12360 ms=68.1789\n",
+    "error": ""
+  },
+  {
+    "mode": "alias",
+    "n": 10000,
+    "size": 23,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=7820\ncount=10000 payload=23 mode=alias baseline=4052 scope=7820 destroyed=7820 trimmed=6196 peak=12360 ms=66.9847\n",
+    "error": ""
+  },
+  {
+    "mode": "alias",
+    "n": 10000,
+    "size": 100,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=8652\ncount=10000 payload=100 mode=alias baseline=4136 scope=8656 destroyed=8656 trimmed=6264 peak=12360 ms=61.0593\n",
+    "error": ""
+  },
+  {
+    "mode": "alias",
+    "n": 10000,
+    "size": 1024,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=17692\ncount=10000 payload=1024 mode=alias baseline=4080 scope=17692 destroyed=17692 trimmed=6260 peak=17584 ms=73.3364\n",
+    "error": ""
+  },
+  {
+    "mode": "alias",
+    "n": 100000,
+    "size": 0,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=20108\ncount=100000 payload=0 mode=alias baseline=4064 scope=20112 destroyed=18760 trimmed=6284 peak=19832 ms=659.964\n",
+    "error": ""
+  },
+  {
+    "mode": "alias",
+    "n": 100000,
+    "size": 1,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=23192\ncount=100000 payload=1 mode=alias baseline=4084 scope=23196 destroyed=21844 trimmed=6228 peak=22708 ms=716.55\n",
+    "error": ""
+  },
+  {
+    "mode": "alias",
+    "n": 100000,
+    "size": 23,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=23196\ncount=100000 payload=23 mode=alias baseline=4048 scope=23200 destroyed=21848 trimmed=6232 peak=22752 ms=728.668\n",
+    "error": ""
+  },
+  {
+    "mode": "alias",
+    "n": 100000,
+    "size": 100,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=31016\ncount=100000 payload=100 mode=alias baseline=4112 scope=31016 destroyed=29664 trimmed=6264 peak=30624 ms=698.077\n",
+    "error": ""
+  },
+  {
+    "mode": "alias",
+    "n": 100000,
+    "size": 1024,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=121628\ncount=100000 payload=1024 mode=alias baseline=4016 scope=121628 destroyed=120276 trimmed=6264 peak=121492 ms=782.114\n",
+    "error": ""
+  },
+  {
+    "mode": "alias",
+    "n": 200000,
+    "size": 0,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=33948\ncount=200000 payload=0 mode=alias baseline=4128 scope=33952 destroyed=31208 trimmed=6232 peak=33748 ms=1456.57\n",
+    "error": ""
+  },
+  {
+    "mode": "alias",
+    "n": 200000,
+    "size": 1,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=40216\ncount=200000 payload=1 mode=alias baseline=4048 scope=40216 destroyed=37472 trimmed=6236 peak=39864 ms=1390.67\n",
+    "error": ""
+  },
+  {
+    "mode": "alias",
+    "n": 200000,
+    "size": 23,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=40188\ncount=200000 payload=23 mode=alias baseline=4064 scope=40188 destroyed=37444 trimmed=6208 peak=39784 ms=1394.81\n",
+    "error": ""
+  },
+  {
+    "mode": "alias",
+    "n": 200000,
+    "size": 100,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=55836\ncount=200000 payload=100 mode=alias baseline=4084 scope=55840 destroyed=53096 trimmed=6256 peak=55468 ms=1505.34\n",
+    "error": ""
+  },
+  {
+    "mode": "alias",
+    "n": 200000,
+    "size": 1024,
+    "returncode": 0,
+    "output": "phase=0 rss_kib=237104\ncount=200000 payload=1024 mode=alias baseline=4136 scope=237108 destroyed=234364 trimmed=6288 peak=236708 ms=1674.21\n",
+    "error": ""
+  }
+]

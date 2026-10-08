@@ -1,0 +1,13 @@
+lib := ffi_open(".build/cp-e/fixture.so")
+b := ffi_buffer([1,2,3])
+a := [b, deepcopy(b), {"b": b}]
+f := () => b
+ffi_call(lib,"mutate","void(buffer)",a[1])
+print(ffi_bytes(b)[0]); print(ffi_bytes(a[2]["b"])[0]); print(ffi_bytes(f())[0])
+p := ffi_call(lib,"identity","ptr(buffer)",b)
+ffi_call(lib,"keep","void(ptr)",p)
+a = []; b = ""; p = ""
+print(ffi_call(lib,"read_saved","i64()"))
+cb := (x) => ffi_bytes(ffi_buffer([x]))[0]
+c := ffi_callback(cb,"i64(i64)")
+print(ffi_call(lib,"callback","i64(callback_i64,i64)",c,42))

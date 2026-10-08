@@ -1,0 +1,5 @@
+lib := ffi_open(".build/cp-e/fixture.so")
+b := ffi_buffer([1])
+i := 0
+while(i < 200000) { ffi_call(lib,"mutate","void(buffer)",b); i += 1 }
+print(ffi_bytes(b)[0])

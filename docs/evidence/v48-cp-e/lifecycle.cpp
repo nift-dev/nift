@@ -1,0 +1,6 @@
+#include "nift/c_abi.h"
+#include <iostream>
+#include <string>
+#include <cstdlib>
+nift_script_result* run(nift_engine*e,const std::string&s){nift_script_result*r=nullptr;if(nift_engine_execute(e,s.data(),s.size(),nullptr,0,nullptr,nullptr,0,&r)!=NIFT_OK||!r||!nift_script_result_ok(r)){nift_string x{};if(r)nift_script_result_error_message(r,&x);std::cerr<<std::string(x.data?x.data:"",x.length);exit(1);}return r;}
+int main(){auto*e=nift_engine_new();auto*r=run(e,"lib := ffi_open(\".build/cp-e/fixture.so\"); b := ffi_buffer([55]); ffi_call(lib,\"keep\",\"void(buffer)\",b); return b");nift_string h{};if(nift_script_result_value_json(r,&h)!=NIFT_OK)return 2;std::cout<<"returned="<<std::string(h.data,h.length)<<"\n";auto*later=run(e,"lib := ffi_open(\".build/cp-e/fixture.so\"); return ffi_call(lib,\"read_saved\",\"i64()\")");nift_string v{};if(nift_script_result_value_json(later,&v)!=NIFT_OK)return 3;std::cout<<"after_new_execution="<<std::string(v.data,v.length)<<"\n";nift_script_result_free(later);const std::string marker="\x1fnift:ffi-buffer:1";std::cout<<"set_reserved_status="<<nift_engine_set_string(e,"b",1,marker.data(),marker.size())<<"\n";nift_engine_free(e);if(nift_script_result_value_json(r,&h)!=NIFT_OK)return 4;std::cout<<"result_after_engine_destruction="<<std::string(h.data,h.length)<<" (text only)\n";nift_script_result_free(r);}

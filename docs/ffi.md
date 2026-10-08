@@ -18,6 +18,21 @@ runtime helpers `ffi_buffer`, `ffi_bytes`, `ffi_snapshot_bytes`, `ffi_sizeof`,
 first-class bytes. Neither bridge aliases storage. The compatibility helper
 `ffi_bytes(buffer)` continues to return an integer array.
 
+FFI buffer storage belongs to the active Parser. An embedded Engine keeps its
+script Parser across `execute` and `evaluate` calls, so repeated buffer creation
+accumulates storage until that owner is destroyed. Dropping or rebinding a script
+handle, leaving a function, clearing a container, or destroying a result does
+not free the buffer. Assignment and `deepcopy` preserve opaque buffer identity;
+all aliases observe native mutations to the same storage. Reuse an existing
+fixed-size buffer for repeated native work where practical.
+
+Native code may retain an address passed through a `buffer` argument. Buffer
+addresses and pointer handles depend on the owning Parser/Engine lifetime;
+a copied result or marker string does not extend it. Failed import rollback can
+also invalidate newly created resources. There is no buffer release API;
+`ffi_close` closes a library, not its buffers. Automatic reclamation and explicit
+release are deferred design work beyond v4.8.
+
 Library filenames remain platform-specific: `.so` on ELF systems, `.dylib` on
 macOS, and `.dll` on Windows. A package should choose the filename from `os()`
 or package configuration; Nift does not silently substitute a different native
