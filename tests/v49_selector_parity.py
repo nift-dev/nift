@@ -57,10 +57,10 @@ errors = {
 with tempfile.TemporaryDirectory() as directory:
  path = Path(directory) / 'selector.f'
  for name,source,expected in cases:
-  path.write_text(source+'\n')
-  candidate = subprocess.run([binary,str(path)],capture_output=True,text=True)
+  path.write_text(source+'\n',encoding='utf-8')
+  candidate = subprocess.run([binary,str(path)],capture_output=True,text=True,encoding="utf-8")
   if baseline:
-   original = subprocess.run([str(Path(baseline).resolve()),str(path)],capture_output=True,text=True)
+   original = subprocess.run([str(Path(baseline).resolve()),str(path)],capture_output=True,text=True,encoding="utf-8")
    if (candidate.returncode,candidate.stdout,candidate.stderr) != (original.returncode,original.stdout,original.stderr):
     raise SystemExit(f'FAIL A/B {name}: {candidate} != {original}')
   if expected is None and (candidate.returncode == 0 or errors[name] not in candidate.stderr):

@@ -296,3 +296,10 @@ the static scanner's bounded call window could not see the trailing check flag.
 No scanner suppression/rule weakening. Static integrity clean (290 files), all
 four GCC/Clang native-wrapper warning passes green, and an injected failing
 compiler proves a nonzero guard outcome. Nift runtime behavior is unaffected.
+
+Hosted guard wiring: the checkpoint-10 Linux/macOS/Windows wall now executes the
+new selector parity, exact glob ordering/conversion counters, JSON preflight
+counter and expanded RuntimeValue contracts plus existing callback parity/
+counters. Unicode source/output explicitly uses UTF-8 in the Python oracle
+helpers. Linux local exact A/B passes; hosted platform results remain pending
+until final certification. No release workflow dispatch or publishing gate added.

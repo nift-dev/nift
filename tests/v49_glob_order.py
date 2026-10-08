@@ -13,7 +13,7 @@ with tempfile.TemporaryDirectory() as d:
   (root/'tree'/'link.txt').symlink_to(root/'tree'/'z.txt')
   (root/'tree'/'dirlink').symlink_to(root/'tree'/'a',target_is_directory=True)
  patterns=['tree/*.txt','tree/**/*.txt','tree/**/**/end.txt','tree/.*.txt','tree/**/.private/*.txt','tree/missing/*.txt','tree/?/*.txt',str(root/'tree'/'*.txt')]
- path=root/'probe.f';path.write_text('\n'.join('print(ls('+json.dumps(p,ensure_ascii=False)+').stringify())' for p in patterns)+'\n')
+ path=root/'probe.f';path.write_text('\n'.join('print(ls('+json.dumps(p,ensure_ascii=False)+').stringify())' for p in patterns)+'\n',encoding='utf-8')
  p=subprocess.run([binary,str(path)],cwd=root,text=True,capture_output=True)
  assert p.returncode==0,p.stderr
  if baseline:
