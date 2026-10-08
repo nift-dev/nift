@@ -164,6 +164,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          NIFT_BIN="$PWD/nift" NIFT_EXPECT_VERSION=4.9.0 \
+          NIFT_BIN="$PWD/nift" NIFT_EXPECT_VERSION=4.10.0 \
             NIFT_EMBED_PREFIX="$PWD/dist/embed-prefix" \
             bash nift-regression-suite/run-contract.sh
