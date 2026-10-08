@@ -1,6 +1,6 @@
 # Nift release notes
 
-## v4.9.0 (release preparation; not yet published)
+## v4.9.0 (released 2026-10-09)
 
 Nift v4.9 is a performance and hardening release following v4.8.0. It reduces
 shared scripting, collection, JSON-conversion and filesystem-ordering overhead
