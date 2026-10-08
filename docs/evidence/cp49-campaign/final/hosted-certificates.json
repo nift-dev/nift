@@ -1,0 +1,82 @@
+[
+  {
+    "id": 37765410181,
+    "name": "Deep guards",
+    "head_sha": "e80a95c6523d3d048a2defbd19831f4fc0670181",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/nift-dev/nift/actions/runs/37765410181"
+  },
+  {
+    "id": 37767455760,
+    "name": "Test integrity guards",
+    "head_sha": "6e67dd72267c2e0061dbf435b39a5b05ff3dc360",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/nift-dev/nift/actions/runs/37767455760"
+  },
+  {
+    "id": 37767455507,
+    "name": "Checkpoint 10 cross-platform equivalence",
+    "head_sha": "6e67dd72267c2e0061dbf435b39a5b05ff3dc360",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/nift-dev/nift/actions/runs/37767455507"
+  },
+  {
+    "id": 37766314672,
+    "name": "Performance regression guards",
+    "head_sha": "b7c5c3392b0ec581829fb41d4c73ab55069a8f44",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/nift-dev/nift/actions/runs/37766314672"
+  },
+  {
+    "id": 37766314653,
+    "name": "Init targets",
+    "head_sha": "b7c5c3392b0ec581829fb41d4c73ab55069a8f44",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/nift-dev/nift/actions/runs/37766314653"
+  },
+  {
+    "id": 37765410272,
+    "name": "Gate 6A-R vendored libffi",
+    "head_sha": "e80a95c6523d3d048a2defbd19831f4fc0670181",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/nift-dev/nift/actions/runs/37765410272"
+  },
+  {
+    "id": 37765410351,
+    "name": "Gate 6B bytes value semantics",
+    "head_sha": "e80a95c6523d3d048a2defbd19831f4fc0670181",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/nift-dev/nift/actions/runs/37765410351"
+  },
+  {
+    "id": 37765410162,
+    "name": "v4.4/v4.5 cross-platform",
+    "head_sha": "e80a95c6523d3d048a2defbd19831f4fc0670181",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/nift-dev/nift/actions/runs/37765410162"
+  },
+  {
+    "id": 37765410144,
+    "name": "Hosted certification diagnostic",
+    "head_sha": "e80a95c6523d3d048a2defbd19831f4fc0670181",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/nift-dev/nift/actions/runs/37765410144"
+  },
+  {
+    "id": 37765410131,
+    "name": "packaging matrix (build-only, non-publishing)",
+    "head_sha": "e80a95c6523d3d048a2defbd19831f4fc0670181",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/nift-dev/nift/actions/runs/37765410131"
+  }
+]

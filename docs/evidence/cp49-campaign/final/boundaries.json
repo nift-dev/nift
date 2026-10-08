@@ -1,0 +1,26 @@
+{
+  "candidate": "e80a95c6523d3d048a2defbd19831f4fc0670181",
+  "runtime_source_commit": "26ab438cf1eb5d6d21f274f279d0c950aedf0d61",
+  "version": "4.9.0",
+  "abi": "1.3",
+  "runtime_files_changed": [
+    "src/ParserExpression.cpp",
+    "src/ParserHelpers.cpp",
+    "src/RuntimeValue.cpp"
+  ],
+  "public_headers_changed": false,
+  "vendored_jsonic_changed": false,
+  "release_tag_object": "eb6b8e0a77bbbc41acd9e3c40de324c1b9e10055",
+  "release_tag_target": "1bfc4a54b373da3477b497106fa4db59111e2770",
+  "official_rerun": false,
+  "labs_changes": false,
+  "provisioning": false,
+  "architecture_redesign": false,
+  "comparison_original_binary_sha256": "f8da5147504226c0353559de11b9366820ba6064d07aced5e8ca366b49e7679e",
+  "comparison_final_binary_sha256": "7f7098b453331b61eabc39aa880ec4c728cbd6cf7f3015f34ceef2032999d951",
+  "rebuilt_cli_matches_profiled_final_binary": true,
+  "certified_guard_commit": "6e67dd72267c2e0061dbf435b39a5b05ff3dc360",
+  "runtime_source_tree": "7abdce6a3d59f5d85980144a2ae3b376dc487242",
+  "public_header_tree": "16229bb28854f13958dc6abe448b17d82c495bad",
+  "vendored_jsonic_tree": "fb804ea19476257053a3bae72613ea6b4935bb0e"
+}

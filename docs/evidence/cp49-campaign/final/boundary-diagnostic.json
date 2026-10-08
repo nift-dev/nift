@@ -1,0 +1,24 @@
+{
+  "diagnostic_only": true,
+  "gate_unchanged": true,
+  "extended_observation_limit_seconds": 90,
+  "case": "balanced-parens-100k",
+  "results": [
+    {
+      "variant": "original",
+      "seconds": 14.92283323011361,
+      "exceeds_unchanged_gate_20s": false,
+      "exit": 0,
+      "stderr": "",
+      "sanitizer_findings": 0
+    },
+    {
+      "variant": "final",
+      "seconds": 13.35732075991109,
+      "exceeds_unchanged_gate_20s": false,
+      "exit": 0,
+      "stderr": "",
+      "sanitizer_findings": 0
+    }
+  ]
+}

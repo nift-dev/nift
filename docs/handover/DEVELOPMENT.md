@@ -157,4 +157,7 @@ remain deferred. See [campaign evidence](../evidence/cp49-campaign/report.md).
 Version remains 4.9.0 and C ABI 1.3. Frozen `20261008-v480`, official workloads,
 release identities and vendored Jsonic++ remain unchanged. No official rerun,
 release, provisioning or architecture redesign is authorized by this campaign.
-Final local and hosted certification is tracked in the campaign evidence.
+The bounded campaign is complete: all required local and hosted certification
+is green. Recommendation: READY FOR NEW OFFICIAL BENCHMARK SERIES. Stop here;
+no new official series has been started. Full certificates and tradeoffs are
+recorded in the campaign evidence.

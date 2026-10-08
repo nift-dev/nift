@@ -1,0 +1,8 @@
+GROUP N=1000: 64159147 instructions
+GROUP N=2000: 150802846 instructions
+GROUP N=4000: 660071679 instructions
+Traceback (most recent call last):
+  File "/home/nick/Repositories/nift/nift/tests/v49_group_scaling.py", line 16, in <module>
+    assert all(ratio<2.6 for ratio in ratios),(counts,ratios)
+           ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ([64159147, 150802846, 660071679], [2.3504496716578855, 4.377050543197308])

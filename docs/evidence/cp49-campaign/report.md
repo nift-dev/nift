@@ -1,11 +1,36 @@
 # NIFT v4.9 performance campaign
 
+**Final outcome: GO / accepted; READY FOR NEW OFFICIAL BENCHMARK SERIES.**
+Six measured bounded changes are retained, the failed reserve experiment is
+reverted, and all required local/hosted certification is green. Stop here: no
+new official series, release, Labs change or provisioning was started.
+
 The user accepted CP49-0/1/2 and authorized the bounded campaign, accepted
 checkpoint commits, normal pushes and non-release certification on 2026-10-08.
 Starting accepted source: e291575f004a601a7d9cbb645ec7810e09bdc325; original
 runtime binary SHA256 f8da5147504226c0353559de11b9366820ba6064d07aced5e8ca366b49e7679e.
 Development version 4.9.0; ABI 1.3. Frozen official series 20261008-v480 remains
 an immutable reference; all probes here are independent local diagnostics.
+
+## Retained results against the original campaign baseline
+
+| Shared cause | Targeted result | Decision |
+|---|---|---|
+| Live numeric identity dispatch | Identity map instructions −7.2% | KEEP |
+| Live array indexed selectors | Indexed map −73.6%; indexed sort −56.3% | KEEP |
+| Repeated glob ordering serialization | Instructions −60.5%; allocations −60.5% | KEEP |
+| Owned map/filter result copies | Aggregate map −8.9%; filter −4.8% instructions; fewer allocations | KEEP |
+| Repeated JSON timer preflights | Deep four-stage JSON probe −36.6% instructions | KEEP |
+| Repeated ordered-group scans | Unique aggregate grouping −44.9% instructions; bounded index RSS +6.63% at 16k | KEEP |
+
+The [full 31-family table](final/comparison.md) includes CPU, wall, allocations,
+bytes and RSS. Numbers are local diagnostic evidence, not official benchmark
+claims. Local indexed-selector probes use `x => a[x]`. The frozen series
+workload named sort-index uses identity `x => x`; the large indexed-selector
+percentages must not be assigned to that official workload. Native timing noise
+limits interpretation of small changes. Broader
+call dispatch/hoisting/frame/root-path/loop architecture changes were deferred;
+parameter-scope reserve failed measurement and was fully reverted.
 
 ## CP49-3A: live numeric identity binding
 
@@ -335,8 +360,8 @@ The rejected scope-reserve experiment remains fully reverted.
 Full `make -j2 test` passes. The complete lifetime ASan/UBSan/LSan suite passes,
 including the sanitizer canary, shallow callback/location contracts, thread
 primitives and AST differential corpus. The deep sanitizer build emits a GCC 15
-`-Wmaybe-uninitialized` diagnostic inside libstdc++ stable_sort; it is not
-suppressed. Canonical strict compiler gates and additional certification results
+`-Wmaybe-uninitialized` diagnostic inside libstdc++ stable_sort; an isolated
+original-baseline sanitized build reproduces it. It is not suppressed. Canonical strict compiler gates and additional certification results
 are recorded separately as they finish. No runtime change is justified by this
 instrumented-library diagnostic alone.
 
@@ -345,3 +370,57 @@ changes. The immutable v4.8 release-notes SHA256 is unchanged. No official run,
 release, package publication, node provisioning, workload/presentation edit,
 public API/ABI change, vendored Jsonic++ edit or architecture redesign took place.
 Development version remains 4.9.0; ABI remains 1.3.
+
+## Hosted certification and closeout (CP49-19–22)
+
+Runtime source is unchanged since `26ab438`. The tranche was normally pushed
+at `e80a95c6523d3d048a2defbd19831f4fc0670181`; non-release Deep Guards
+37765410181 passed all eight jobs, including full sanitizer fuzz (1,219 cases),
+core lifecycle (57 phases), warning gates, NRS 93/93 and PRS 12/12.
+Hosted FFI, bytes, init, performance, compiler diagnostic, v4.4/v4.5 platform
+and build-only packaging checks also passed on that runtime.
+
+The newly wired Windows contracts initially exposed missing Python/diffutils
+runner dependencies, then MSYS link emulation in POSIX fixtures. Isolated test/CI
+fixes preserve runtime behavior and assertions. Final guard commit
+`6e67dd72267c2e0061dbf435b39a5b05ff3dc360` also asserts actual native
+absolute glob paths. Cross-platform run 37767455507 passed Linux, macOS,
+Windows and the normalized comparison. Certificates and remaining local
+resource-limit details are in [final local certification](final/local-certification.md).
+Superseded duplicate Test Integrity runs were cancelled; the final full aggregate
+and binding run is 37767455760. It passed all jobs, including clean serial binding and parallel full aggregate
+rebuilds and the final non-destructive boundary proof.
+
+Final local unchanged fuzz/resource gate passed sequentially on original and
+final sanitized runtimes: each 1,219 cases, 232 successful builds and 987
+controlled errors, with zero timeouts, crashes or sanitizer findings. The large
+parenthesis boundary passed its original 20-second limit in 11.66/12.75 seconds.
+Earlier local timeout attempts and the separate observation are retained; no
+gate threshold changed. All required local certification is now PASS.
+
+Reproduction helpers: [paired timing/instruction harness](../cp49/tools/paired_campaign.py),
+[extra probes](../cp49/tools/extra_campaign_probes.py),
+[allocation/RSS comparison](../cp49/tools/campaign_memory.py),
+[isolated original sanitizer reconstruction](../cp49/tools/original_sanitized_control.py),
+and [unchanged paired fuzz control](../cp49/tools/paired_fuzz_control.py).
+Run from the core repository after generating the original CP49 probe inputs
+and retaining `.build/cp49-campaign/start-nift`; temporary outputs stay under
+`.build/cp49-campaign`. The sanitizer control replaces only the three changed
+translation units with the original source and reuses unchanged current sanitized
+objects/headers with the exact same compiler profile. It does not modify the
+working source, the official benchmark tree or any guard.
+
+## Final recommendation
+
+**READY FOR NEW OFFICIAL BENCHMARK SERIES.** Safe high-value bounded opportunities
+are exhausted for this tranche; do not force additional changes into the
+remaining deferred frame/dispatch/root-path/loop candidates. A new official
+series remains a separately authorized next task. The current frozen series
+remains unchanged (2,828 final hash checks); no benchmark Labs edits, official
+rerun, release, package publication or node provisioning occurred.
+
+All ten [selected hosted certificates](final/hosted-certification.md) are green.
+Fresh-cache local Go normal/race checks also pass. Final source/ABI/version and
+binary fingerprints are in [boundaries](final/boundaries.json). The evidence
+closeout is documentation-only, normally pushed to main; repository HEAD/origin
+and clean 0/0 status are verified after that push and reported in the final reply.
