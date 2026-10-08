@@ -1727,3 +1727,14 @@ test-cp20-bytes: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" tests/cp20_bytes_ffi.sh
 
 .PHONY: test-cp20-bytes
+
+# CP-F1: source coordinate composition is independent of evaluator behavior.
+$(TEST_DIR)/source-view-unit$(EXEEXT): tests/source_view_unit.cpp src/SourceView.h src/Diagnostic.h
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/source_view_unit.cpp -o $@
+
+.PHONY: test-source-view
+test-source-view: $(TEST_DIR)/source-view-unit$(EXEEXT)
+	$(TEST_DIR)/source-view-unit$(EXEEXT)
+
+test: test-source-view
