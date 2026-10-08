@@ -49,7 +49,7 @@ jobs:
         with:
           msystem: UCRT64
           update: true
-          install: make mingw-w64-ucrt-x86_64-gcc
+          install: make diffutils python mingw-w64-ucrt-x86_64-gcc
       - name: Build Nift
         if: runner.os != 'Windows'
         run: make -j2
