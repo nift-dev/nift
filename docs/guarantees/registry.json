@@ -1121,8 +1121,8 @@
           "repo": "website"
         },
         {
-          "needle": "43 contract executions total",
-          "path": "HANDOVER.md",
+          "needle": "PASS: %d contract modules",
+          "path": "run-contract.sh",
           "repo": "regression"
         }
       ],
