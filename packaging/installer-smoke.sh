@@ -11,6 +11,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+python3 "$ROOT/packaging/check_checksum_mutation.py"
 TARGET="${1:?usage: installer-smoke.sh <os>-<arch> <bundle-tgz>}"
 BUNDLE="${2:?usage: installer-smoke.sh <os>-<arch> <bundle-tgz>}"
 OS="${TARGET%%-*}"
@@ -18,6 +19,11 @@ ARCH="${TARGET#*-}"
 [ -f "$BUNDLE" ] || { echo "FAIL: bundle not found: $BUNDLE" >&2; exit 1; }
 
 chk() { if command -v sha256sum >/dev/null 2>&1; then sha256sum "$@"; else shasum -a 256 "$@"; fi; }
+# Always change a digest: replacing its first byte with 00 can be a no-op.
+corrupt_checksum() {
+  awk '{ $1 = (substr($1, 1, 1) == "0" ? "1" : "0") substr($1, 2); print }'
+}
+
 HAS_SHA256SUM=0; command -v sha256sum >/dev/null 2>&1 && HAS_SHA256SUM=1
 
 SERVE="$(mktemp -d /tmp/nift-serve.XXXXXX)"
@@ -94,7 +100,7 @@ echo "libs: $NIFT_LIBS"
 
 echo "=== installer smoke: negative checksum (must fail; nothing installed) ==="
 BADPREFIX="$(mktemp -d /tmp/nift-badprefix.XXXXXX)"
-( cd "$SERVE" && chk "$tarball" | sed 's/^../00/' > SHA256SUMS )
+( cd "$SERVE" && chk "$tarball" | corrupt_checksum > SHA256SUMS )
 if NIFT_EMBED_BASE="$BASE" PREFIX="$BADPREFIX" bash packaging/install-embed.sh >/dev/null 2>&1; then
   echo "FAIL: installer accepted a bad checksum" >&2; exit 1
 fi

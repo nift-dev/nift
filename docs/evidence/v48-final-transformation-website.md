@@ -126,3 +126,23 @@ final closeout, with machine-readable captures under `.build/`. This prepublicat
 record makes local claims only; it does not infer hosted success from local passes.
 Feature queue closes after this tranche; next work is stabilization and release
 preparation. No additional runtime-feature campaign.
+
+## Hosted packaging repair before closeout
+
+The original transformation head `4e081c1871bbd0e0c29f42a226dba9db461fb214`
+passed Deep (including pinned PRS 12/12), NRS 93/93, and the website publication.
+The build-only packaging run [37730110375](https://github.com/nift-dev/nift/actions/runs/37730110375)
+failed its Linux ARM64 negative checksum fixture after the native bundle, C
+consumer and positive installer had passed. The fixture replaced the first byte
+with `00`, which can leave an actual checksum unchanged. This no-op class was
+reproduced locally; the failed log does not separately expose the original digest.
+
+The fixture now flips the first hex character and preserves the archive name.
+An executable regression check exercises the actual shell helper for all 256
+possible leading bytes, including `00`, and rejects the previous no-op helper.
+Bash syntax, archive/clean-consumer smoke, positive installer, and negative
+checksum rejection all pass locally. Local `/tmp` quota interrupted the first
+archive smoke; the completed rerun changed only temporary-directory locations
+to the workspace disk. Hosted native runners exercise the unadapted scripts.
+The installer implementation, runtime, public ABI, and feature scope are unchanged.
+Final hosted certification must use the repair commit before declaring closeout.
