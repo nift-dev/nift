@@ -101,6 +101,15 @@ The remembered ~8 MiB low-water mark may have occurred in another workload or
 earlier build, but it is not supported by the retained 10k benchmark CSV.
 
 
-## v4.9 investigation status
+## v4.9 bounded performance campaign
 
-The v4.8 campaign is closed and public v4.8.0 is released. Current development is v4.9.0. Series `20261008-v480` is complete and frozen; figures above remain historical machine-specific evidence. CP49-2 measures current HEAD locally with scaling/profiles and ranks shared root causes. It does not rerun official measurements, change benchmark workloads/presentation or authorize optimization. A later official run must create a new series.
+The user accepted CP49-0/1/2 and authorized the bounded implementation campaign.
+Six measured changes are retained: live numeric identity/index selectors, cached
+exact glob ordering keys, owned map/filter moves, one JSON timer preflight, and
+ordered group construction indexing. Parameter-scope reserve was rejected and
+reverted. Broader typed dispatch, callable hoisting, root/path and loop redesign
+remain deferred. See [campaign evidence](docs/evidence/cp49-campaign/report.md).
+Version remains 4.9.0 and C ABI 1.3. Frozen `20261008-v480`, official workloads,
+release identities and vendored Jsonic++ remain unchanged. No official rerun,
+release, provisioning or architecture redesign is authorized by this campaign.
+Final local and hosted certification is tracked in the campaign evidence.

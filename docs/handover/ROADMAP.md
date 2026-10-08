@@ -1,6 +1,6 @@
 # Nift maintained roadmap
 
-## Current status — v4.9 orientation
+## Current status — v4.9 bounded campaign
 
 Public v4.8.0 is released at immutable `1bfc4a54b373da3477b497106fa4db59111e2770`.
 Development is v4.9.0 after `9de5c3e3e62291c929702271b34f2c870ec2a442`.
@@ -13,8 +13,8 @@ records remain evidence; they do not authorize more implementation.
 2. **CP49-1:** reproduce and repair maintained binding warnings, validate builds/tests
    and aggregate gate, clarify support. No public API/ABI or packaging redesign.
 3. **CP49-2:** investigate current performance: scaling, profiles, allocations,
-   isolated reproducers and shared root-cause ranking. Stop for review before optimization.
-4. **CP49-3+:** choose bounded implementation checkpoints from accepted profiler evidence,
+   isolated reproducers and shared root-cause ranking. Accepted by the user.
+4. **CP49-3+:** accepted bounded implementation checkpoints from profiler evidence,
    with semantic, aliasing, ownership and cross-platform safety gates.
 5. **Later:** a new formal benchmark series, dedicated-node lab.nift.dev update and
    post-benchmark prioritization. Series `20261008-v480` is complete and frozen;
@@ -87,9 +87,15 @@ This remains a maintained risk assessment. Field findings, release incidents, ne
 
 “Production ready” and “battle tested” are maintained scoped claims, not permanent medals.
 
-## CP49 review checkpoint
+## CP49 accepted campaign checkpoint
 
-CP49-0 reconciliation and CP49-1 binding maintenance are complete locally.
-CP49-2 profiles/ranking are ready for review in `../evidence/cp49/report.md`.
-No runtime optimization is implemented. Review the proposed CP49-3 boundary
-before proceeding; frozen official measurements remain unchanged.
+The user accepted CP49-0/1/2 and authorized the bounded implementation campaign.
+Six measured changes are retained: live numeric identity/index selectors, cached
+exact glob ordering keys, owned map/filter moves, one JSON timer preflight, and
+ordered group construction indexing. Parameter-scope reserve was rejected and
+reverted. Broader typed dispatch, callable hoisting, root/path and loop redesign
+remain deferred. See [campaign evidence](../evidence/cp49-campaign/report.md).
+Version remains 4.9.0 and C ABI 1.3. Frozen `20261008-v480`, official workloads,
+release identities and vendored Jsonic++ remain unchanged. No official rerun,
+release, provisioning or architecture redesign is authorized by this campaign.
+Final local and hosted certification is tracked in the campaign evidence.

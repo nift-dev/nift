@@ -303,3 +303,45 @@ counter and expanded RuntimeValue contracts plus existing callback parity/
 counters. Unicode source/output explicitly uses UTF-8 in the Python oracle
 helpers. Linux local exact A/B passes; hosted platform results remain pending
 until final certification. No release workflow dispatch or publishing gate added.
+
+## Final comparison and remaining boundaries (CP49-11–18)
+
+The runtime implementation is frozen at `26ab438`; subsequent commits change
+only guards, workflow wiring and documentation. The saved original executable
+from `e291575f004a601a7d9cbb645ec7810e09bdc325` is compared against the final
+runtime in [31-family measurements](final/comparison.md), with raw paired timing
+and memory JSON alongside it. This compares the entire retained tranche with the
+original campaign baseline, rather than only comparing successive wins.
+
+All 31 families have unchanged observable output. All 62 Memcheck executions
+have zero errors and all heap blocks freed. Call, loop, JSON and general collection
+controls retain their allocation counts; instruction changes on unaffected
+controls are approximately 0.1% or less. Small native timing differences are
+shared-host variation, not evidence of broad speedups. Aggregate map/filter save
+allocations and large-input RSS; unique grouping's +6.63% large-input RSS tradeoff
+remains explicit above. Filesystem syscall counts remain unchanged: the win is
+path formatting/sorting overhead, not less filesystem work.
+
+Current self/inclusive Callgrind profiles for calls, loops, indexed map/sort and
+filesystem are retained in [final](final/). Inclusive entries overlap and must
+not be summed. Calls still incur canonical scope/value lifecycle, lookup and
+source context work. Loops still execute the interpreter. Removing these costs
+would require broader lifetime/dispatch/frame design or insufficiently isolated
+changes. CP49-11 root/path and CP49-12 loop candidates therefore close as
+**NO CHANGE**: preserve the existing alias model and execution semantics.
+CP49-13 filesystem review closes with the measured exact-key change only.
+The rejected scope-reserve experiment remains fully reverted.
+
+Full `make -j2 test` passes. The complete lifetime ASan/UBSan/LSan suite passes,
+including the sanitizer canary, shallow callback/location contracts, thread
+primitives and AST differential corpus. The deep sanitizer build emits a GCC 15
+`-Wmaybe-uninitialized` diagnostic inside libstdc++ stable_sort; it is not
+suppressed. Canonical strict compiler gates and additional certification results
+are recorded separately as they finish. No runtime change is justified by this
+instrumented-library diagnostic alone.
+
+The final frozen-oracle verification hashes all 2,828 recorded files with zero
+changes. The immutable v4.8 release-notes SHA256 is unchanged. No official run,
+release, package publication, node provisioning, workload/presentation edit,
+public API/ABI change, vendored Jsonic++ edit or architecture redesign took place.
+Development version remains 4.9.0; ABI remains 1.3.

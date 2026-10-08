@@ -148,4 +148,13 @@ shrink, reorder, or change scope as evidence changes.
 
 ## Current v4.9 checkpoint boundary
 
-v4.8.0 is released; the feature campaign is closed. Follow ROADMAP.md CP49-0/1/2: living-document reconciliation, binding warning maintenance, then investigation/ranking. Keep binding fixes separate from profiling evidence. Use independent local reproducers; do not mutate frozen `20261008-v480`. Stop before runtime optimization for review.
+The user accepted CP49-0/1/2 and authorized the bounded implementation campaign.
+Six measured changes are retained: live numeric identity/index selectors, cached
+exact glob ordering keys, owned map/filter moves, one JSON timer preflight, and
+ordered group construction indexing. Parameter-scope reserve was rejected and
+reverted. Broader typed dispatch, callable hoisting, root/path and loop redesign
+remain deferred. See [campaign evidence](../evidence/cp49-campaign/report.md).
+Version remains 4.9.0 and C ABI 1.3. Frozen `20261008-v480`, official workloads,
+release identities and vendored Jsonic++ remain unchanged. No official rerun,
+release, provisioning or architecture redesign is authorized by this campaign.
+Final local and hosted certification is tracked in the campaign evidence.

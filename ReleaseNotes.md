@@ -2,10 +2,19 @@
 
 ## v4.9.0 (unreleased development)
 
-Development has advanced to v4.9.0 after the completed v4.8.0 release. No
-v4.9.0 runtime changes have been recorded yet. Binding maintenance removes native
-Node/Python compiler warnings without changing API or C ABI; the aggregate
-binding gate now includes strict native-wrapper warning checks.
+Development remains v4.9.0; the C ABI remains 1.3. The bounded performance
+campaign prepares live numeric identity/index selectors, computes filesystem glob
+ordering keys once, moves owned map/filter results, avoids repeated JSON timer
+preflights, and indexes ordered array grouping during construction. Public
+semantics, aliasing and ordering are preserved. Unique grouping trades bounded
+temporary index memory for removing repeated linear scans.
+
+Binding maintenance removes native Node/Python compiler warnings without API
+changes. New semantic and deterministic performance guards cover the accepted
+paths across Linux, macOS and Windows. See
+[the campaign evidence](docs/evidence/cp49-campaign/report.md) for measurements,
+tradeoffs and certification. These are independent local measurements; frozen
+`20261008-v480` has not been rerun or modified.
 
 ## v4.8.0 (released 2026-10-08)
 

@@ -1,0 +1,1056 @@
+[
+  {
+    "name": "loops",
+    "n": 2000,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 4435,
+        "frees": 4435,
+        "bytes": 803405,
+        "maxrss_kib": [
+          6740,
+          6820,
+          6768,
+          6504,
+          6748
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 4435,
+        "frees": 4435,
+        "bytes": 803461,
+        "maxrss_kib": [
+          7204,
+          7284,
+          7388,
+          7296,
+          7256
+        ],
+        "errors": 0
+      }
+    ]
+  },
+  {
+    "name": "array-build",
+    "n": 2000,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 4472,
+        "frees": 4472,
+        "bytes": 1395822,
+        "maxrss_kib": [
+          7028,
+          7084,
+          6980,
+          6740,
+          6824
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 4472,
+        "frees": 4472,
+        "bytes": 1395878,
+        "maxrss_kib": [
+          7432,
+          7616,
+          7536,
+          7420,
+          7604
+        ],
+        "errors": 0
+      }
+    ]
+  },
+  {
+    "name": "call-noarg",
+    "n": 2000,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 14479,
+        "frees": 14479,
+        "bytes": 2364130,
+        "maxrss_kib": [
+          6824,
+          6832,
+          6720,
+          6720,
+          6604
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 14479,
+        "frees": 14479,
+        "bytes": 2364186,
+        "maxrss_kib": [
+          7284,
+          6912,
+          7360,
+          7132,
+          7228
+        ],
+        "errors": 0
+      }
+    ]
+  },
+  {
+    "name": "call-scalar",
+    "n": 2000,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 32489,
+        "frees": 32489,
+        "bytes": 4673490,
+        "maxrss_kib": [
+          6720,
+          6676,
+          6704,
+          6700,
+          6608
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 32489,
+        "frees": 32489,
+        "bytes": 4673546,
+        "maxrss_kib": [
+          7292,
+          7460,
+          7360,
+          7360,
+          6980
+        ],
+        "errors": 0
+      }
+    ]
+  },
+  {
+    "name": "call-multi",
+    "n": 2000,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 60503,
+        "frees": 60503,
+        "bytes": 10079681,
+        "maxrss_kib": [
+          6724,
+          6724,
+          6720,
+          6924,
+          6704
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 60503,
+        "frees": 60503,
+        "bytes": 10079737,
+        "maxrss_kib": [
+          7244,
+          7288,
+          7240,
+          7136,
+          7356
+        ],
+        "errors": 0
+      }
+    ]
+  },
+  {
+    "name": "call-locals",
+    "n": 2000,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 44516,
+        "frees": 44516,
+        "bytes": 6024531,
+        "maxrss_kib": [
+          6692,
+          6752,
+          6720,
+          6796,
+          6896
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 44516,
+        "frees": 44516,
+        "bytes": 6024587,
+        "maxrss_kib": [
+          7280,
+          7072,
+          7232,
+          7164,
+          7216
+        ],
+        "errors": 0
+      }
+    ]
+  },
+  {
+    "name": "call-recursion",
+    "n": 2000,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 128530,
+        "frees": 128530,
+        "bytes": 20350066,
+        "maxrss_kib": [
+          7012,
+          6992,
+          6844,
+          6880,
+          7004
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 128530,
+        "frees": 128530,
+        "bytes": 20350122,
+        "maxrss_kib": [
+          7304,
+          7104,
+          6936,
+          7376,
+          7448
+        ],
+        "errors": 0
+      }
+    ]
+  },
+  {
+    "name": "call-closure",
+    "n": 2000,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 92527,
+        "frees": 92527,
+        "bytes": 9881043,
+        "maxrss_kib": [
+          6880,
+          7060,
+          6872,
+          7028,
+          6916
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 92527,
+        "frees": 92527,
+        "bytes": 9897115,
+        "maxrss_kib": [
+          7288,
+          7360,
+          7124,
+          7068,
+          7364
+        ],
+        "errors": 0
+      }
+    ]
+  },
+  {
+    "name": "call-callback",
+    "n": 2000,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 134539,
+        "frees": 134539,
+        "bytes": 15946728,
+        "maxrss_kib": [
+          6800,
+          6780,
+          6848,
+          7000,
+          6888
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 134539,
+        "frees": 134539,
+        "bytes": 15962792,
+        "maxrss_kib": [
+          7648,
+          7436,
+          7612,
+          7468,
+          7004
+        ],
+        "errors": 0
+      }
+    ]
+  },
+  {
+    "name": "array-index",
+    "n": 2000,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 8541,
+        "frees": 8541,
+        "bytes": 2077206,
+        "maxrss_kib": [
+          6940,
+          7060,
+          6964,
+          6928,
+          7000
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 8541,
+        "frees": 8541,
+        "bytes": 2077278,
+        "maxrss_kib": [
+          7344,
+          7448,
+          6980,
+          7720,
+          7644
+        ],
+        "errors": 0
+      }
+    ]
+  },
+  {
+    "name": "sort-identity",
+    "n": 2000,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 84567,
+        "frees": 84567,
+        "bytes": 11608072,
+        "maxrss_kib": [
+          12024,
+          12128,
+          11932,
+          11972,
+          11592
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 84567,
+        "frees": 84567,
+        "bytes": 11608136,
+        "maxrss_kib": [
+          12404,
+          12440,
+          12228,
+          12252,
+          12428
+        ],
+        "errors": 0
+      }
+    ]
+  },
+  {
+    "name": "sort-index",
+    "n": 2000,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 98573,
+        "frees": 98573,
+        "bytes": 11971257,
+        "maxrss_kib": [
+          11908,
+          12072,
+          11932,
+          11972,
+          11984
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 84574,
+        "frees": 84574,
+        "bytes": 11585353,
+        "maxrss_kib": [
+          12436,
+          12196,
+          12376,
+          12560,
+          12412
+        ],
+        "errors": 0
+      }
+    ]
+  },
+  {
+    "name": "sort-arithmetic",
+    "n": 2000,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 86574,
+        "frees": 86574,
+        "bytes": 11737446,
+        "maxrss_kib": [
+          11948,
+          12092,
+          11956,
+          11888,
+          12032
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 86574,
+        "frees": 86574,
+        "bytes": 11737510,
+        "maxrss_kib": [
+          12648,
+          12580,
+          12240,
+          12480,
+          12564
+        ],
+        "errors": 0
+      }
+    ]
+  },
+  {
+    "name": "map-identity",
+    "n": 2000,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 44550,
+        "frees": 44550,
+        "bytes": 7075982,
+        "maxrss_kib": [
+          7932,
+          7952,
+          7884,
+          7900,
+          7820
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 44549,
+        "frees": 44549,
+        "bytes": 6772046,
+        "maxrss_kib": [
+          8180,
+          8032,
+          8240,
+          7976,
+          7776
+        ],
+        "errors": 0
+      }
+    ]
+  },
+  {
+    "name": "map-index",
+    "n": 2000,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 58565,
+        "frees": 58565,
+        "bytes": 7451288,
+        "maxrss_kib": [
+          7920,
+          7936,
+          7684,
+          7788,
+          7960
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 44565,
+        "frees": 44565,
+        "bytes": 6761384,
+        "maxrss_kib": [
+          7920,
+          8144,
+          8120,
+          7764,
+          8208
+        ],
+        "errors": 0
+      }
+    ]
+  },
+  {
+    "name": "map-arithmetic",
+    "n": 2000,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 46561,
+        "frees": 46561,
+        "bytes": 7197364,
+        "maxrss_kib": [
+          8148,
+          7780,
+          8092,
+          7920,
+          8084
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 46560,
+        "frees": 46560,
+        "bytes": 6893428,
+        "maxrss_kib": [
+          8240,
+          7900,
+          8308,
+          8196,
+          8192
+        ],
+        "errors": 0
+      }
+    ]
+  },
+  {
+    "name": "frequency",
+    "n": 2000,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 46990,
+        "frees": 46990,
+        "bytes": 7014620,
+        "maxrss_kib": [
+          6972,
+          6852,
+          6988,
+          6864,
+          6808
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 46990,
+        "frees": 46990,
+        "bytes": 7014972,
+        "maxrss_kib": [
+          7564,
+          7284,
+          7408,
+          7308,
+          7404
+        ],
+        "errors": 0
+      }
+    ]
+  },
+  {
+    "name": "map-set",
+    "n": 2000,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 14558,
+        "frees": 14558,
+        "bytes": 3974747,
+        "maxrss_kib": [
+          8096,
+          8176,
+          8120,
+          7884,
+          7840
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 14558,
+        "frees": 14558,
+        "bytes": 3974811,
+        "maxrss_kib": [
+          8544,
+          8292,
+          8960,
+          8552,
+          8924
+        ],
+        "errors": 0
+      }
+    ]
+  },
+  {
+    "name": "sliding-window",
+    "n": 2000,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 8539,
+        "frees": 8539,
+        "bytes": 2076839,
+        "maxrss_kib": [
+          7056,
+          7096,
+          7140,
+          6988,
+          6992
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 8539,
+        "frees": 8539,
+        "bytes": 2076911,
+        "maxrss_kib": [
+          7604,
+          7292,
+          7600,
+          7396,
+          7616
+        ],
+        "errors": 0
+      }
+    ]
+  },
+  {
+    "name": "json-parse-convert",
+    "n": 2000,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 14472,
+        "frees": 14472,
+        "bytes": 4041469,
+        "maxrss_kib": [
+          8744,
+          8756,
+          8936,
+          8676,
+          8920
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 14472,
+        "frees": 14472,
+        "bytes": 4041517,
+        "maxrss_kib": [
+          9224,
+          8920,
+          9408,
+          9376,
+          9224
+        ],
+        "errors": 0
+      }
+    ]
+  },
+  {
+    "name": "json-traverse",
+    "n": 2000,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 42529,
+        "frees": 42529,
+        "bytes": 13037781,
+        "maxrss_kib": [
+          8664,
+          8936,
+          8744,
+          8712,
+          8932
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 42529,
+        "frees": 42529,
+        "bytes": 13037837,
+        "maxrss_kib": [
+          9396,
+          8964,
+          9288,
+          9464,
+          9340
+        ],
+        "errors": 0
+      }
+    ]
+  },
+  {
+    "name": "json-mutate",
+    "n": 2000,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 44554,
+        "frees": 44554,
+        "bytes": 14514006,
+        "maxrss_kib": [
+          8936,
+          8428,
+          8712,
+          8772,
+          8716
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 44554,
+        "frees": 44554,
+        "bytes": 14514062,
+        "maxrss_kib": [
+          9184,
+          9028,
+          9380,
+          9236,
+          9376
+        ],
+        "errors": 0
+      }
+    ]
+  },
+  {
+    "name": "json-serialize",
+    "n": 2000,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 25611,
+        "frees": 25611,
+        "bytes": 11589508,
+        "maxrss_kib": [
+          10824,
+          10820,
+          10852,
+          11004,
+          10932
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 25611,
+        "frees": 25611,
+        "bytes": 11589572,
+        "maxrss_kib": [
+          11100,
+          10968,
+          11640,
+          11340,
+          11432
+        ],
+        "errors": 0
+      }
+    ]
+  },
+  {
+    "name": "construct-destroy",
+    "n": 2000,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 16456,
+        "frees": 16456,
+        "bytes": 3062023,
+        "maxrss_kib": [
+          6820,
+          6688,
+          6724,
+          6688,
+          6588
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 16456,
+        "frees": 16456,
+        "bytes": 3062071,
+        "maxrss_kib": [
+          7296,
+          7184,
+          7252,
+          6924,
+          7032
+        ],
+        "errors": 0
+      }
+    ]
+  },
+  {
+    "name": "bfs",
+    "n": 2000,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 80752,
+        "frees": 80752,
+        "bytes": 13300193,
+        "maxrss_kib": [
+          8552,
+          8556,
+          8580,
+          8640,
+          8608
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 80752,
+        "frees": 80752,
+        "bytes": 13300281,
+        "maxrss_kib": [
+          8796,
+          9064,
+          9164,
+          8948,
+          8960
+        ],
+        "errors": 0
+      }
+    ]
+  },
+  {
+    "name": "filesystem",
+    "n": 2000,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 175757,
+        "frees": 175757,
+        "bytes": 29848749,
+        "maxrss_kib": [
+          9104,
+          9024,
+          8904,
+          9108,
+          9092
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 69418,
+        "frees": 69418,
+        "bytes": 22452278,
+        "maxrss_kib": [
+          9624,
+          9488,
+          9236,
+          9520,
+          9200
+        ],
+        "errors": 0
+      }
+    ]
+  },
+  {
+    "name": "empty",
+    "n": 0,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 323,
+        "frees": 323,
+        "bytes": 121021,
+        "maxrss_kib": [
+          6504,
+          6508,
+          6460,
+          6512,
+          6696
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 323,
+        "frees": 323,
+        "bytes": 121053,
+        "maxrss_kib": [
+          7128,
+          7336,
+          6960,
+          7128,
+          7068
+        ],
+        "errors": 0
+      }
+    ]
+  },
+  {
+    "name": "map-aggregate",
+    "n": 2000,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 118554,
+        "frees": 118554,
+        "bytes": 30677603,
+        "maxrss_kib": [
+          15700,
+          15752,
+          15812,
+          15852,
+          15824
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 106553,
+        "frees": 106553,
+        "bytes": 26341659,
+        "maxrss_kib": [
+          13808,
+          13864,
+          14136,
+          14052,
+          14084
+        ],
+        "errors": 0
+      }
+    ]
+  },
+  {
+    "name": "filter-aggregate",
+    "n": 2000,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 112578,
+        "frees": 112578,
+        "bytes": 28674693,
+        "maxrss_kib": [
+          15816,
+          15836,
+          15604,
+          15740,
+          15728
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 106577,
+        "frees": 106577,
+        "bytes": 26354749,
+        "maxrss_kib": [
+          14324,
+          14192,
+          14120,
+          14028,
+          13776
+        ],
+        "errors": 0
+      }
+    ]
+  },
+  {
+    "name": "group-unique",
+    "n": 2000,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 130573,
+        "frees": 130573,
+        "bytes": 31222521,
+        "maxrss_kib": [
+          16504,
+          16556,
+          16352,
+          16428,
+          16536
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 132581,
+        "frees": 132581,
+        "bytes": 31370513,
+        "maxrss_kib": [
+          17764,
+          17360,
+          17732,
+          17804,
+          17864
+        ],
+        "errors": 0
+      }
+    ]
+  },
+  {
+    "name": "group-repeated",
+    "n": 2000,
+    "variants": [
+      {
+        "label": "before",
+        "allocations": 156726,
+        "frees": 156726,
+        "bytes": 31577417,
+        "maxrss_kib": [
+          16320,
+          16140,
+          16380,
+          16212,
+          16228
+        ],
+        "errors": 0
+      },
+      {
+        "label": "after",
+        "allocations": 156744,
+        "frees": 156744,
+        "bytes": 31578705,
+        "maxrss_kib": [
+          16844,
+          16456,
+          16804,
+          16312,
+          16680
+        ],
+        "errors": 0
+      }
+    ]
+  }
+]

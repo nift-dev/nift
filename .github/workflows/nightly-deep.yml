@@ -143,3 +143,27 @@ jobs:
         with:
           name: package-sources
           path: package-sources.json
+  independent-regression-contract:
+    name: Independent NRS contract (93 modules)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build exact candidate and staged embedding prefix
+        run: make -j2 all embed
+      - name: Fetch pinned independent regression suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init nift-regression-suite
+          git -C nift-regression-suite remote add origin https://github.com/nift-dev/nift-regression-suite.git
+          git -C nift-regression-suite fetch --depth=1 --no-tags origin 34b1c2ff4d1a3f591176f3ce79b74ad2958b6852
+          git -C nift-regression-suite checkout --detach FETCH_HEAD
+          test "$(git -C nift-regression-suite rev-parse HEAD)" = 34b1c2ff4d1a3f591176f3ce79b74ad2958b6852
+      - name: Run independent contract with embedding consumers enabled
+        shell: bash
+        run: |
+          set -euo pipefail
+          NIFT_BIN="$PWD/nift" NIFT_EXPECT_VERSION=4.9.0 \
+            NIFT_EMBED_PREFIX="$PWD/dist/embed-prefix" \
+            bash nift-regression-suite/run-contract.sh

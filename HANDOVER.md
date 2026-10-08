@@ -32,7 +32,7 @@ whether it is a regression.
   `docs/evidence/release-4.8.0/release-verification.md`.
   External contracts remain NRS `34b1c2ff4d1a3f591176f3ce79b74ad2958b6852`
   (93 modules) and PRS `1da43659da269c96af21aea7234799d2ad56b2df` (12 modules).
-  The version transition itself authorized no feature or performance campaign; the subsequently authorized bounded CP49-0/1/2 investigation is described below.
+  The version transition itself authorized no feature or performance campaign; the subsequently authorized bounded CP49 campaign is described below.
 - Public documentation: the separate `nift-dev.github.io` repository.
 - External contract: the separate `nift-regression-suite` repository.
 - Embedded minifier: `minifypp/`, synchronized with standalone Minify++.
@@ -473,10 +473,15 @@ After hosted closeout, the feature queue is CLOSED: stabilization and release
 preparation follow; no further runtime-feature campaign is authorized here.
 Release workflows, tags and release artifacts remain outside this tranche.
 
-## v4.9 orientation
+## v4.9 bounded performance campaign
 
-CP49-0 reconciles living status; CP49-1 resumes deferred binding warning maintenance; CP49-2 investigates/ranks current shared runtime costs and stops for review. Post-v4.8 work is evidence-driven. Frozen series `20261008-v480` remains unchanged; no official rerun, node provisioning, feature campaign or optimization is authorized by this checkpoint.
-
-CP49-0/1 are complete locally; CP49-2 investigation/ranking is ready for review in
-`docs/evidence/cp49/report.md`. Runtime source/public headers remain unchanged
-from the v4.9 version bump. No performance implementation or official rerun took place.
+The user accepted CP49-0/1/2 and authorized the bounded implementation campaign.
+Six measured changes are retained: live numeric identity/index selectors, cached
+exact glob ordering keys, owned map/filter moves, one JSON timer preflight, and
+ordered group construction indexing. Parameter-scope reserve was rejected and
+reverted. Broader typed dispatch, callable hoisting, root/path and loop redesign
+remain deferred. See [campaign evidence](docs/evidence/cp49-campaign/report.md).
+Version remains 4.9.0 and C ABI 1.3. Frozen `20261008-v480`, official workloads,
+release identities and vendored Jsonic++ remain unchanged. No official rerun,
+release, provisioning or architecture redesign is authorized by this campaign.
+Final local and hosted certification is tracked in the campaign evidence.

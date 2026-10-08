@@ -1,0 +1,36 @@
+--------------------------------------------------------------------------------
+Profile data file '.build/cp49-campaign/final/filesystem1.callgrind' (creator: callgrind-3.26.0)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 19788664
+Trigger: Program termination
+Profiled target:  /home/nick/Repositories/nift/nift/.build/cp49-campaign/final/nift /home/nick/Repositories/nift/nift/.build/cp49/probes/filesystem-2000.f (PID 225, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       25
+Include dirs:     
+User annotated:   
+Auto-annotation:  on
+
+--------------------------------------------------------------------------------
+Ir                  
+--------------------------------------------------------------------------------
+82,178,150 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                  file:function
+--------------------------------------------------------------------------------
+5,566,990 ( 6.77%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+5,227,707 ( 6.36%)  ???:0x00000000001c0180 [/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.35]
+5,087,911 ( 6.19%)  ???:std::filesystem::__cxx11::path::_List::_Impl_deleter::operator()(std::filesystem::__cxx11::path::_List::_Impl*) const [/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.35]
+4,525,517 ( 5.51%)  ???:std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_append(char const*, unsigned long) [/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.35]
+4,317,007 ( 5.25%)  ???:std::filesystem::__cxx11::path::_List::_List(std::filesystem::__cxx11::path::_List const&) [/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.35]
+
+--------------------------------------------------------------------------------
+The following files chosen for auto-annotation could not be found:
+--------------------------------------------------------------------------------
+  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S
+
