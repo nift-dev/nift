@@ -135,3 +135,9 @@ After the required hosted walls pass, CP-F closes the v4.8 feature queue.
 Recommended next phase: feature freeze and stabilization. No new performance,
 FFI release, representation, callback-storage or migration features are authorized
 by this closeout. Release artifacts remain NOT RUN.
+
+## Hosted closeout — CLOSED
+
+CP-F certification head `b11e48b44607bc96898a45c42e66b7a737af2630` is fully hosted-green. All ten applicable Nift workflows passed, including Deep Guards (all seven jobs), Test Integrity (all five jobs), cross-platform, diagnostic, performance and packaging build-only gates. Pinned external NRS 93 and PRS 12 passed against that head. Final binding boundary proof completed 2026-10-08 04:37:18 UTC. No Release workflow was run.
+
+Hosted records: [Test Integrity](https://github.com/nift-dev/nift/actions/runs/37724327248), [Deep Guards](https://github.com/nift-dev/nift/actions/runs/37724325957), [NRS](https://github.com/nift-dev/nift-regression-suite/actions/runs/37724329028). Local machine-readable capture: `.build/cp-f/hosted-certification.json`. This closes CP-F before publishing the subsequent transformation tranche.
