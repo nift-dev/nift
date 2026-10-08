@@ -1,5 +1,10 @@
 # Nift release notes
 
+## v4.10.0 (unreleased development)
+
+Development has advanced to v4.10.0 after the verified v4.9.0 release. No
+v4.10.0 user-visible changes have been recorded yet.
+
 ## v4.9.0 (released 2026-10-09)
 
 Nift v4.9 is a performance and hardening release following v4.8.0. It reduces

@@ -7,20 +7,24 @@ approved release is packaged and published.
 
 ## Authority and current state
 
-The executable and Snap recipe declare `4.9.0` for development after the completed
-v4.8.0 GitHub release. The immutable annotated `v4.8.0` tag targets
-`1bfc4a54b373da3477b497106fa4db59111e2770`; release workflow #37746497666 passed
-including all three public installer lanes. Exactly five public assets were
-independently verified. Chocolatey 4.8.0 was submitted through #37747611875 and
-is pending moderation. Snap remains maintainer-managed; Homebrew is automatic
-downstream propagation and was not checked in this task.
+The executable and Snap recipe declare `4.10.0` for development after the completed
+v4.9.0 GitHub release. The immutable annotated `v4.9.0` tag targets
+`aaadeb31219251b7cc02a62fbf75360ac3e11aaf`; tag object
+`1314a4b169ea2588df8bf63a3f342639ea7b5aa7`. Release workflow #37809541710 passed,
+including all three public installer lanes. Exactly five public assets and the
+live website were independently verified. Chocolatey 4.9.0 was submitted through
+#37812050345; its feed reports Submitted/Pending, not approved. Snap remains
+maintainer-managed; Homebrew downstream propagation was not checked in this task.
 
-See `docs/evidence/release-4.8.0/release-verification.md` for final checksums and
+See `docs/evidence/release-4.9.0/release-verification.md` for final checksums and
 evidence. Canonical reviewed notes remain unchanged at
-`docs/evidence/release-4.8.0/release-notes-4.8.0.md`. External suites remain NRS
+`docs/evidence/release-4.9.0/release-notes-4.9.0.md`. External suites remain NRS
 `34b1c2ff4d1a3f591176f3ce79b74ad2958b6852` (93 modules) and PRS
-`1da43659da269c96af21aea7234799d2ad56b2df` (12 modules). Future tags and package
-publication require explicit authorization. Prior entries are historical records.
+`1da43659da269c96af21aea7234799d2ad56b2df` (12 modules). The v4.9 performance
+campaign is closed. No new feature, optimization, official benchmark campaign,
+Labs change or provisioning is authorized by this development transition.
+Future tags and package publication require explicit authorization.
+Prior entries below are historical records.
 
 ### v4.7.2 release status (2026-10-06)
 

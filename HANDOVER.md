@@ -20,19 +20,21 @@ whether it is a regression.
 ## Current identity
 
 - Product: **Nift**, a website generator and dependency-aware website build layer.
-- Current executable identity: `Nift v4.9.0` (release preparation; not yet published), following the public v4.8.0 release.
+- Current executable identity: `Nift v4.10.0` (development), following the verified public v4.9.0 release.
 - Language/toolchain: C++17 and Make.
 - Output convention for modern projects: `public/`.
 - Current branch: `main` in this checkout.
-- Current project phase: **v4.9 release preparation — feature freeze ACTIVE; performance campaign CLOSED**.
-  The immutable v4.8.0 tag targets `1bfc4a54b373da3477b497106fa4db59111e2770`.
-  Release workflow #37746497666 and all public installer lanes passed.
-  Chocolatey 4.8.0 was submitted via #37747611875 and remains pending moderation.
-  Release verification and deferred work are recorded in
-  `docs/evidence/release-4.8.0/release-verification.md`.
+- Current project phase: **post-v4.9 release; v4.10 development**.
+  The immutable v4.9.0 tag targets `aaadeb31219251b7cc02a62fbf75360ac3e11aaf`.
+  Release workflow #37809541710 and all public installer lanes passed.
+  Exactly five public assets and deployed website bytes were independently verified.
+  Chocolatey 4.9.0 was submitted via #37812050345; its feed reports Submitted/Pending,
+  not approved. Release verification is recorded in
+  `docs/evidence/release-4.9.0/release-verification.md`.
   External contracts remain NRS `34b1c2ff4d1a3f591176f3ce79b74ad2958b6852`
   (93 modules) and PRS `1da43659da269c96af21aea7234799d2ad56b2df` (12 modules).
-  The version transition itself authorized no feature or performance campaign; the subsequently authorized bounded CP49 campaign is described below.
+  The v4.9 performance campaign is CLOSED. This transition authorizes no new feature,
+  optimization, official benchmark run, Labs change or provisioning.
 - Public documentation: the separate `nift-dev.github.io` repository.
 - External contract: the separate `nift-regression-suite` repository.
 - Embedded minifier: `minifypp/`, synchronized with standalone Minify++.
