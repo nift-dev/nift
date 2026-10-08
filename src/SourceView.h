@@ -132,7 +132,7 @@ class SourceText : public std::string {
 public:
     SourceView view;
     SourceText() = default;
-    SourceText(const char* text) : std::string(text) {}
+    explicit SourceText(const char* text) : std::string(text) {}
     SourceText(std::string text, SourceView source = {})
         : std::string(std::move(text)), view(std::move(source)) {}
     SourceText substr(std::size_t start = 0, std::size_t length = npos) const {

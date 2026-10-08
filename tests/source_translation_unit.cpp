@@ -3,6 +3,17 @@
 #include "ScriptHost.h"
 #include <cassert>
 struct SourceTranslationTestAccess {
+    static void evaluate_slices(Parser& parser) {
+        const std::string expression = "[1,\n  missing_value]";
+        nift::RuntimeValue value; std::string message;
+        assert(!parser.evaluate_expression(expression, value, message,
+            nift::detail::SourceView::identity("expression.n", expression)));
+        auto origin = parser.expression_failure_view_.locate(0);
+        assert(origin.source == "expression.n" && origin.line == 2 && origin.column == 3);
+        assert(message == "unknown value or malformed expression: missing_value");
+        assert(parser.evaluate_expression("[1,2]", value, message = ""));
+        assert(parser.expression_failure_view_.locate(0).column == 3);
+    }
     static bool translate(Parser& parser, const std::string& text, std::string& output,
                           nift::detail::SourceView& view, nift::detail::DiagnosticOrigin& error) {
         std::string message;
@@ -21,6 +32,7 @@ int main() {
     assert(parameters[1].substr(10, 7).view.locate(0).column == 20);
     assert(parameters[2] == "a\n,b" && parameters[2].view.locate(2).column == 30);
     ScriptRenderHost host(std::filesystem::current_path());TrackedInfo tracked;Parser parser(host,tracked);
+    SourceTranslationTestAccess::evaluate_slices(parser);
     const std::string input="first := 1\n\nfn(check()) {\n    for(i : [1]) {\n        missing_value\n    }\n}\n";
     std::string output;nift::detail::SourceView view;nift::detail::DiagnosticOrigin error;
     assert(SourceTranslationTestAccess::translate(parser,input,output,view,error));

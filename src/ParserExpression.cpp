@@ -856,10 +856,13 @@ bool Parser::evaluate_collection_value(const std::string& expression, nift::Runt
     value = nift::RuntimeValue::make_array(); for (auto index : order) value.array.push_back(root->array[index]); return true;
 }
 
-bool Parser::evaluate_expression(const std::string& expression, nift::RuntimeValue& value, std::string& error) {
+bool Parser::evaluate_expression(const std::string& expression, nift::RuntimeValue& value, std::string& error, nift::detail::SourceView view) {
     const std::uint64_t file_checkpoint = begin_file_operation();
     try {
-        const bool ok = evaluate_expression_impl(expression, value, error);
+        const auto previous_failure = expression_failure_view_;
+        expression_failure_view_ = {};
+        const bool ok = evaluate_expression_impl(expression, value, error, std::move(view));
+        if (ok) expression_failure_view_ = previous_failure;
         if (!ok) rollback_file_operation(file_checkpoint);
         return ok;
     } catch (...) {
@@ -868,7 +871,7 @@ bool Parser::evaluate_expression(const std::string& expression, nift::RuntimeVal
     }
 }
 
-bool Parser::evaluate_expression_impl(const std::string& expression, nift::RuntimeValue& value, std::string& error) {
+bool Parser::evaluate_expression_impl(const std::string& expression, nift::RuntimeValue& value, std::string& error, nift::detail::SourceView view) {
     last_expression_mutation_ = false;
     auto resolve_direct = [&](const std::string& raw, nift::RuntimeValue& out) -> bool {
         const std::string text = trim_copy(raw);
@@ -1157,7 +1160,10 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
 
     std::function<bool(const nift::detail::SourceText&, nift::RuntimeValue&, int)> eval;
     eval = [&](const nift::detail::SourceText& raw, nift::RuntimeValue& out, int depth) -> bool {
+        const auto previous_failure = expression_failure_view_;
+        expression_failure_view_ = {};
         auto text=trim_copy(raw);
+        const auto evaluate_slice = [&]() -> bool {
         if (text.empty()) { error="expression cannot be empty"; return false; }
         while (encloses(text)) text=trim_copy(text.substr(1,text.size()-2));
         // Generative recursion guard: flat binary chains are folded iteratively
@@ -2392,7 +2398,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
 
         {
             const auto lp=text.find('(');
-            if(lp!=std::string::npos&&text.back()==')'){std::size_t call_close=0;const std::string target=trim_copy(text.substr(0,lp));const auto dot=target.rfind('.');if(dot!=std::string::npos&&find_balanced(text,lp,'(',')',call_close)&&call_close==text.size()-1){
+            if(lp!=std::string::npos&&text.back()==')'){std::size_t call_close=0;auto target = trim_copy(text.substr(0,lp));const auto dot=target.rfind('.');if(dot!=std::string::npos&&find_balanced(text,lp,'(',')',call_close)&&call_close==text.size()-1){
                 const std::string root=target.substr(0,dot), method=target.substr(dot+1); VariableBinding* rb=find_binding(root);
                 if(rb&&rb->value&&rb->value->is_string()&&rb->value->string.rfind("\x1fnift:collection:",0)==0){
                     auto ci=collection_instances_.find(rb->value->string.substr(17));if(ci==collection_instances_.end()){error="invalid collection";return false;}auto c=ci->second;
@@ -2502,7 +2508,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
 
         {
             const auto lp=text.find('(');
-            if(lp!=std::string::npos&&text.back()==')'){std::size_t call_close=0;const std::string target=trim_copy(text.substr(0,lp));const auto dot=target.rfind('.');if(dot!=std::string::npos&&find_balanced(text,lp,'(',')',call_close)&&call_close==text.size()-1){
+            if(lp!=std::string::npos&&text.back()==')'){std::size_t call_close=0;auto target = trim_copy(text.substr(0,lp));const auto dot=target.rfind('.');if(dot!=std::string::npos&&find_balanced(text,lp,'(',')',call_close)&&call_close==text.size()-1){
                 const std::string root=target.substr(0,dot), method=target.substr(dot+1); VariableBinding* rb=find_binding(root);
                 if(rb&&rb->value&&rb->value->is_array()){bool ok=false;std::vector<bool> quoted_args;auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),ok,&quoted_args);if(!ok){error="malformed array method arguments";return false;}auto eval_arg=[&](size_t n,nift::RuntimeValue& v){if(n<quoted_args.size()&&quoted_args[n]){v=nift::RuntimeValue(args[n]);return true;}return eval(args[n],v,depth+1);};auto& a=rb->value->array;
                     auto invoke_callback=[&](const std::string& cbexpr,const std::vector<nift::RuntimeValue>& av,nift::RuntimeValue& result)->bool{
@@ -2546,7 +2552,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
 
         {
             const auto lp=text.find('(');
-            if(lp!=std::string::npos&&text.back()==')'){std::size_t call_close=0;const std::string target=trim_copy(text.substr(0,lp));const auto dot=target.rfind('.');if(dot!=std::string::npos&&find_balanced(text,lp,'(',')',call_close)&&call_close==text.size()-1){
+            if(lp!=std::string::npos&&text.back()==')'){std::size_t call_close=0;auto target = trim_copy(text.substr(0,lp));const auto dot=target.rfind('.');if(dot!=std::string::npos&&find_balanced(text,lp,'(',')',call_close)&&call_close==text.size()-1){
                 const std::string root=target.substr(0,dot),method=target.substr(dot+1);VariableBinding* rb=find_binding(root);
                 if(rb&&rb->value&&rb->value->is_string()&&rb->value->string.rfind("\x1fnift:stream:",0)==0){auto it=stream_instances_.find(rb->value->string.substr(13));if(it==stream_instances_.end()){error="stream is closed or invalid";return false;}auto st=it->second;bool ok=false;std::vector<bool> qq;auto aa=parse_parameters(text.substr(lp+1,text.size()-lp-2),ok,&qq);if(!ok){error="malformed stream method arguments";return false;}
                     if(method=="open"){if(st->open){error="open: stream is already open";return false;}if(aa.size()!=1){error="open: expected one path";return false;}nift::RuntimeValue pv;if(!((!qq.empty()&&qq[0])?(pv=nift::RuntimeValue(aa[0]),true):eval(aa[0],pv,depth+1)))return false;if(!pv.is_string()){error="open: expected string path";return false;}std::string expanded=pv.string;if(standalone_script_host_&&!expanded.empty()&&expanded[0]=='~'&&(expanded.size()==1||expanded[1]=='/'||expanded[1]=='\\')){const char* home=std::getenv("HOME");
@@ -2569,7 +2575,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     if(method=="flush"){if(!aa.empty()||st->kind!=StreamInstance::Kind::Output){error="flush: expected output stream and no arguments";return false;}st->output->flush();if(!*st->output)return fail_recoverable(nift::detail::DiagnosticCode::StreamFlushFailed,"flush: output failure",error);out=nift::RuntimeValue(nullptr);return true;}
                 }
             }}
-            if(lp!=std::string::npos&&text.back()==')'){std::size_t call_close=0;const std::string target=trim_copy(text.substr(0,lp));const auto dot=target.rfind('.');if(dot!=std::string::npos&&find_balanced(text,lp,'(',')',call_close)&&call_close==text.size()-1){
+            if(lp!=std::string::npos&&text.back()==')'){std::size_t call_close=0;auto target = trim_copy(text.substr(0,lp));const auto dot=target.rfind('.');if(dot!=std::string::npos&&find_balanced(text,lp,'(',')',call_close)&&call_close==text.size()-1){
                 const std::string root=target.substr(0,dot),method=target.substr(dot+1);VariableBinding* rb=find_binding(root);
                 if(rb&&rb->value&&rb->value->is_string()&&method=="substr") { bool ok=false;auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),ok);if(!ok||args.empty()||args.size()>2){error="substr: expected pos and optional length";return false;}nift::RuntimeValue pos,len;size_t p=0;if(!eval(args[0],pos,depth+1)||!nift::runtime_number_to_size(pos,p)){error="substr: invalid pos";return false;}if(p>rb->value->string.size())p=rb->value->string.size();size_t n=std::string::npos;if(args.size()==2){if(!eval(args[1],len,depth+1)||!nift::runtime_number_to_size(len,n)){error="substr: invalid length";return false;}}out=nift::RuntimeValue(rb->value->string.substr(p,n));return true;}
             }}
@@ -2608,7 +2614,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 return true;
             };
             if (terminal_call && text.substr(0,lp).find('.') != std::string::npos) {
-                const std::string target=trim_copy(text.substr(0,lp)); const auto dot=target.rfind('.'); const std::string root=target.substr(0,dot), mn=target.substr(dot+1);
+                auto target = trim_copy(text.substr(0,lp)); const auto dot=target.rfind('.'); const std::string root=target.substr(0,dot), mn=target.substr(dot+1);
                 VariableBinding* rb=nullptr;for(auto scope=variable_scopes_.rbegin();scope!=variable_scopes_.rend();++scope){auto it=scope->find(root);if(it!=scope->end()){rb=&it->second;break;}}
                 if(rb&&rb->value->is_string()&&rb->value->string.rfind("\x1fnift:struct:",0)==0){auto inst=struct_instances_.find(rb->value->string.substr(13));if(inst==struct_instances_.end()){error="invalid struct instance";return false;}auto* sd=struct_definition_for(inst->second);if(!sd){error="struct type is not available in this scope: "+inst->second->type_name;return false;}auto mi=sd->methods.find(mn);if((mi==sd->methods.end()||mi->second.constructor)){
                 // A callable FIELD acts as a method (module-style values such as
@@ -2761,10 +2767,10 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
         }
 
         if (text.rfind("inject(", 0) == 0 && text.back() == ')') {
-            std::string arg = trim_copy(text.substr(7, text.size() - 8));
+            auto arg = trim_copy(text.substr(7, text.size() - 8));
             if (arg.size() >= 2 && ((arg.front() == '"' && arg.back() == '"') || (arg.front() == '\'' && arg.back() == '\''))) arg = arg.substr(1, arg.size() - 2);
             else { nift::RuntimeValue av; if (!eval(arg, av, depth + 1) || !av.is_string()) { error = "inject: expected string path"; return false; } arg = av.string; }
-            fs::path path = fs::absolute(host_.root() / arg).lexically_normal();
+            fs::path path = fs::absolute(host_.root() / static_cast<const std::string&>(arg)).lexically_normal();
             if (!standalone_script_host_ && !resource_path_authority_.project_root.empty() && !filesystem::path_within(resource_path_authority_.project_root, path)) { error = "inject: path must stay inside the Nift project"; return false; }
             if (!nift_fs_root_allowed(path,resource_path_authority_.enforce_filesystem_root?resource_path_authority_.filesystem_root:fs::path{},error)) { error = "inject: " + error; return false; }
             if (std::find(input_stack_.begin(), input_stack_.end(), path) != input_stack_.end()) { error = "inject: source cycle through " + path.generic_string(); return false; }
@@ -2797,7 +2803,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
         if (text.size()>=2 && text.front()=='[' && text.back()==']') {
             std::size_t close=0;
             if(find_balanced(text,0,'[',']',close)&&close==text.size()-1){
-                const std::string inner=trim_copy(text.substr(1,text.size()-2));
+                auto inner = trim_copy(text.substr(1,text.size()-2));
                 out=nift::RuntimeValue::make_array();
                 if(inner.empty())return true;
                 bool ok=false;std::vector<bool> quoted;auto elements=parse_parameters(inner,ok,&quoted);
@@ -2818,7 +2824,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             if(find_balanced(text,0,'{','}',close)&&close==text.size()-1){
                 std::string json_error;
                 if(parse_runtime_json(text,out,json_error))return true;
-                const std::string inner=trim_copy(text.substr(1,text.size()-2));
+                auto inner = trim_copy(text.substr(1,text.size()-2));
                 out=nift::RuntimeValue::make_object();
                 if(inner.empty())return true;
                 if(inner.back()==','){error="object literal: trailing comma";return false;}
@@ -3069,7 +3075,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         if (nested>0) { --nested; continue; }
                         nift::RuntimeValue cond;
                         if(!eval(text.substr(0,question),cond,depth+1)) return false;
-                        const std::string selected = truthy_value(cond) ? text.substr(question+1,z-question-1) : text.substr(z+1);
+                        auto selected = truthy_value(cond) ? text.substr(question+1,z-question-1) : text.substr(z+1);
                         return eval(selected,out,depth+1);
                     }
                 }
@@ -3136,7 +3142,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             out = *rebound;
             return true;
         };
-        for(const std::string cop:{"+=","-=","*=","/=","%=","&=","|=","^="}){const auto p=find_top_level_op(cop);if(p!=std::string::npos){const std::string target=trim_copy(text.substr(0,p));
+        for(const std::string cop:{"+=","-=","*=","/=","%=","&=","|=","^="}){const auto p=find_top_level_op(cop);if(p!=std::string::npos){auto target = trim_copy(text.substr(0,p));
             {bool decl=false;bool iq=false;char iqc=0;int ip=0,ib=0;for(std::size_t k=0;k+1<target.size();++k){char cc=target[k];if(iq){if(cc=='\\')++k;else if(cc==iqc)iq=false;continue;}if(cc=='\''||cc=='"'){iq=true;iqc=cc;continue;}if(cc=='(')++ip;else if(cc==')')--ip;else if(cc=='[')++ib;else if(cc==']')--ib;if(ip||ib)continue;if(target.compare(k,2,":=")==0||target.compare(k,2,"=>")==0){decl=true;break;}}if(decl)break;}
             nift::RuntimeValue oldv,rhs,next;if(!eval(target,oldv,depth+1)||!eval(text.substr(p+2),rhs,depth+1))return false;
             if(target.find_first_of(".([")==std::string::npos&&oldv.is_string()&&oldv.string.rfind("\x1fnift:atomic:",0)==0){auto ai=atomic_instances_.find(oldv.string.substr(13));if(ai==atomic_instances_.end()){error="atomic: invalid handle";return false;}if(ai->second->kind!=AtomicInstance::Kind::Int){error=cop+": only valid for atomic<int>";return false;}std::int64_t v=0;if(!exact_i64(rhs,v)){error=cop+": atomic<int> requires signed 64-bit integer";return false;}auto st=ai->second;std::int64_t nv=0;if(cop=="+="||cop=="-="){std::int64_t before=0;if(!nift_atomic_add_sub_checked(st->int_value,v,cop=="-=",before,nv)){error=cop+": integer overflow";return false;}}else if(cop=="&=")nv=st->int_value.fetch_and(v)&v;else if(cop=="|=")nv=st->int_value.fetch_or(v)|v;else if(cop=="^=")nv=st->int_value.fetch_xor(v)^v;else if(cop=="%="){if(v==0){error="modulo by zero";return false;}auto cur=st->int_value.load();for(;;){std::int64_t desired=(cur==std::numeric_limits<std::int64_t>::min()&&v==-1)?0:cur%v;if(st->int_value.compare_exchange_weak(cur,desired)){nv=desired;break;}}}else{error=cop+": not supported for atomic<int>";return false;}out=nift::RuntimeValue(static_cast<double>(nv));if(nv>9007199254740992LL||nv<-9007199254740992LL){out.type=nift::RuntimeType::StrNumber;out.string=std::to_string(nv);}if(depth==0)last_expression_mutation_=true;return true;}
@@ -3212,7 +3218,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             last_call_return_loc_root_.reset(); last_call_return_loc_path_.clear();
             if (!eval(text.substr(p + 2), assigned, depth + 1)) return false;
             std::shared_ptr<nift::RuntimeValue> stored;
-            const std::string rhs_name=trim_copy(text.substr(p+2)); VariableBinding* alias=find_binding(rhs_name);
+            auto rhs_name = trim_copy(text.substr(p+2)); VariableBinding* alias=find_binding(rhs_name);
             if(alias&&alias->value&&alias->value->is_array()) stored=alias->value; else stored=std::make_shared<nift::RuntimeValue>(assigned);
             variable_scopes_.back()[name] = VariableBinding{stored, nift_binding_type_from_text(text.substr(p + 2), assigned), mutable_binding, deep_readonly};
             auto& declared_binding=variable_scopes_.back()[name];
@@ -3397,7 +3403,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             if (it == stream_instances_.end()) { error = "stream is closed or invalid"; return 2; }
             if (!it->second->open) { error = it->second->closed ? "stream is closed or invalid" : "stream is not open"; return 2; }
             auto st = it->second;
-            const std::string rhs_text = trim_copy(text.substr(sop+2));
+            auto rhs_text = trim_copy(text.substr(sop+2));
             if (insert) {
                 if (st->kind != StreamInstance::Kind::Output) { error = "insertion requires an output stream"; return 2; }
                 nift::RuntimeValue v;
@@ -3497,8 +3503,13 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
 
         error="unknown value or malformed expression: " + text;
         return false;
+        };
+        const bool ok = evaluate_slice();
+        if (ok) expression_failure_view_ = previous_failure;
+        else if (!expression_failure_view_ && text.view) expression_failure_view_ = text.view;
+        return ok;
     };
-    return eval(expression,value,0);
+    return eval(nift::detail::SourceText(expression,std::move(view)),value,0);
 }
 
 bool Parser::evaluate_condition(const std::string& expression, bool& value, std::string& error) {

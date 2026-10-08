@@ -140,6 +140,7 @@ private:
     std::vector<std::filesystem::path> input_stack_;
     RenderResult result_;
     std::optional<nift::detail::Diagnostic> active_diagnostic_;
+    nift::detail::SourceView expression_failure_view_;
     std::optional<nift::RuntimeValue> active_recoverable_;
     int code_block_depth_ = 0;
     int html_comment_depth_ = 0;
@@ -306,7 +307,7 @@ private:
                            const std::vector<nift::RuntimeValue>& args,
                            nift::RuntimeValue& out, std::string& error);
     bool callable_contains_timer_resource(const nift::RuntimeValue& callable) const;
-    bool evaluate_expression_impl(const std::string& expression, nift::RuntimeValue& value, std::string& error);
+    bool evaluate_expression_impl(const std::string& expression, nift::RuntimeValue& value, std::string& error, nift::detail::SourceView view);
     struct FfiLibraryInstance {
         void* handle = nullptr;
         bool closed = false;
@@ -445,7 +446,10 @@ private:
     bool resolve_json_value(const std::string& expression,
                             std::shared_ptr<const nift::RuntimeValue>& value,
                             std::string& error);
-    bool evaluate_expression(const std::string& expression, nift::RuntimeValue& value, std::string& error);
+    bool evaluate_expression(const std::string& expression, nift::RuntimeValue& value, std::string& error, nift::detail::SourceView view = {});
+    bool evaluate_expression(const nift::detail::SourceText& expression, nift::RuntimeValue& value, std::string& error) {
+        return evaluate_expression(static_cast<const std::string&>(expression), value, error, expression.view);
+    }
     bool resolve_owned_resource_path(const std::string& name,
                                      const std::vector<nift::RuntimeValue>& args,
                                      nift::RuntimeValue& value,
