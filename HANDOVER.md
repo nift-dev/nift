@@ -25,17 +25,17 @@ whether it is a regression.
 - Language/toolchain: C++17 and Make.
 - Output convention for modern projects: `public/`.
 - Current branch: `main` in this checkout.
-- Current project phase: **v4.8 development after the public v4.7.2 release**.
-  The v4.8.0 development transition and the fail-closed package-ecosystem
-  certification gate are committed. The prepared method-call argument parity
-  fix from v4.7.2 remains locked into the core regression test and external
-  contracts (nift-regression-suite `7d00d0d`, 88 modules;
-  packages-regression-suite `eb54146`, 12 modules, release-blocking). The
-  v4.7.2 GitHub release is published and immutable (tag `v4.7.2` at
-  `4950129`); Chocolatey v4.7.2 is submitted and pending automated review; the
-  Snap v4.7.2 release work was completed by the maintainer (Nick); Homebrew
-  propagation is external and automatic. Completed v4.7.2 certification
-  remains in `docs/evidence/release-4.7.2/release-verification.md`.
+- Current project phase: **v4.8 hard feature freeze; release preparation**.
+  The accepted feature baseline is `9533ad90e2dc9f87b8533b9b0e8114e98fedfa03`.
+  The feature queue and CP-F are closed. Stabilization and reviewed release notes
+  are the remaining work; a release artifact rehearsal, tag, and publication
+  require a separate decision. External contracts are pinned to
+  nift-regression-suite `34b1c2ff4d1a3f591176f3ce79b74ad2958b6852` (93 modules)
+  and packages-regression-suite `1da43659da269c96af21aea7234799d2ad56b2df`
+  (12 modules, release-blocking). Reviewed v4.8 notes belong in
+  `docs/evidence/release-4.8.0/release-notes-4.8.0.md`.
+  The public v4.7.2 release remains the preceding release; its historical
+  certification is in `docs/evidence/release-4.7.2/release-verification.md`.
 - Public documentation: the separate `nift-dev.github.io` repository.
 - External contract: the separate `nift-regression-suite` repository.
 - Embedded minifier: `minifypp/`, synchronized with standalone Minify++.

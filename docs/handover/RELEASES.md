@@ -7,12 +7,20 @@ approved release is packaged and published.
 
 ## Authority and current state
 
-The local development executable reports `Nift v4.8.0` and
-`snap/snapcraft.yaml` also declares `4.8.0`, following the public v4.7.2
-release. This local Phase 4 transition is committed and may remain unpushed
-until normal subsequent development is ready. Exact tag, artifact and public
-release history remains documented below; completed v4.7.2 evidence must not be
-rewritten.
+The executable and Snap recipe declare `4.8.0`, but v4.8 is not published.
+The accepted feature baseline is `9533ad90e2dc9f87b8533b9b0e8114e98fedfa03`.
+Hard feature freeze is active: the feature queue and CP-F are closed.
+Release preparation includes stabilization, first-party warning certification,
+reviewed notes, and the existing fail-closed package certification.
+The external suites are NRS `34b1c2ff4d1a3f591176f3ce79b74ad2958b6852`
+(93 modules) and PRS `1da43659da269c96af21aea7234799d2ad56b2df` (12 modules).
+
+The reviewed notes required by Release artifacts are
+`docs/evidence/release-4.8.0/release-notes-4.8.0.md`. Do not replace them with
+placeholder evidence or relax the release gate. The warning/notes audit must
+stop before the artifact rehearsal. A tag and publication remain separate
+explicit decisions. Prior release entries below are historical records,
+including their package-manager submission status at the time.
 
 ### v4.7.2 release status (2026-10-06)
 
