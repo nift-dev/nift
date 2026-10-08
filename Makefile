@@ -167,7 +167,7 @@ $(patsubst %.cpp,$(TEST_DIR)/tsan/%.o,$(PARSER_SOURCES)): | $(TSAN_LIBFFI_STAMP)
 %.o: %.c
 	$(CC) -Imarkuppp/vendor/cmark $(CFLAGS) -MMD -MP -c $< -o $@
 
--include $(DEPFILES) $(patsubst %.o,%.d,$(SAN_OBJECTS) $(TSAN_OBJECTS))
+-include $(DEPFILES) $(patsubst %.o,%.d,$(SAN_OBJECTS) $(SAN_LIFETIME_OBJECTS) $(TSAN_OBJECTS))
 
 test-jsonic:
 	$(MAKE) -C jsonic test
