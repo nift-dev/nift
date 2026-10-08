@@ -1,0 +1,17 @@
+phase factory calls=0 allocations=0 bytes=0
+phase instance calls=0 allocations=0 bytes=0
+phase metadata calls=0 allocations=0 bytes=0
+phase capture calls=2000 allocations=24000 bytes=1984000
+phase registration calls=0 allocations=0 bytes=0
+phase arguments calls=0 allocations=0 bytes=0
+phase frame calls=2000 allocations=14000 bytes=1664000
+phase body calls=0 allocations=0 bytes=0
+phase key calls=0 allocations=0 bytes=0
+phase decoration calls=0 allocations=0 bytes=0
+phase sorting calls=0 allocations=0 bytes=0
+phase result calls=0 allocations=0 bytes=0
+phase cleanup calls=0 allocations=0 bytes=0
+phase returned_key calls=0 allocations=0 bytes=0
+phase destruction calls=0 allocations=0 bytes=0
+events instances=0 capture_entries=0 frame_capture_entries=0 comparisons=0
+PASS insertion/overwrite/shared-slot/flags/root-path growth mechanism

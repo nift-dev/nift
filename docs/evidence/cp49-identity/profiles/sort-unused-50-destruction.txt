@@ -1,0 +1,55 @@
+--------------------------------------------------------------------------------
+Profile data file '.build/cp49-identity/sort-unused-50-destruction.callgrind' (creator: callgrind-3.26.0)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 52981658
+Trigger: Program termination
+Profiled target:  /home/nick/Repositories/nift/nift/nift /home/nick/Repositories/nift/nift/.build/cp49-identity/sort-unused-50.f (PID 50, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       99
+Include dirs:     
+User annotated:   
+Auto-annotation:  off
+
+--------------------------------------------------------------------------------
+Ir                  
+--------------------------------------------------------------------------------
+29,052,422 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                   file:function
+--------------------------------------------------------------------------------
+29,052,422 (100.0%)  ./csu/../csu/libc-start.c:__libc_start_main@@GLIBC_2.34 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+29,052,422 (100.0%)  ./csu/../sysdeps/nptl/libc_start_call_main.h:(below main) [/usr/lib/x86_64-linux-gnu/libc.so.6]
+29,052,422 (100.0%)  ???:(below main) [/home/nick/Repositories/nift/nift/nift]
+29,052,422 (100.0%)  ???:0x0000000000023340 [/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2]
+29,052,422 (100.0%)  ???:Parser::~Parser() [/home/nick/Repositories/nift/nift/nift]
+29,052,422 (100.0%)  ???:main [/home/nick/Repositories/nift/nift/nift]
+29,052,422 (100.0%)  ???:run_cli(int, char**) [/home/nick/Repositories/nift/nift/nift]
+29,052,422 (100.0%)  ???:run_script_file(std::filesystem::__cxx11::path const&, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&, bool, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) [/home/nick/Repositories/nift/nift/nift]
+29,052,422 (100.0%)  ???:run_script_source(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::vector<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::allocator<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > > > const&, std::filesystem::__cxx11::path const&, bool, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) [clone .isra.0] [/home/nick/Repositories/nift/nift/nift]
+28,857,706 (99.33%)  ???:std::_Hashtable<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, std::shared_ptr<Parser::LambdaInstance> >, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, std::shared_ptr<Parser::LambdaInstance> > >, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::~_Hashtable() [/home/nick/Repositories/nift/nift/nift]
+28,001,917 (96.38%)  ???:std::_Sp_counted_ptr_inplace<Parser::LambdaInstance, std::allocator<void>, (__gnu_cxx::_Lock_policy)2>::_M_dispose() [/home/nick/Repositories/nift/nift/nift]
+26,214,297 (90.23%)  ???:std::_Hashtable<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >, std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding>, std::allocator<std::pair<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const, Parser::VariableBinding> >, std::__detail::_Select1st, std::equal_to<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::hash<std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > >, std::__detail::_Mod_range_hashing, std::__detail::_Default_ranged_hash, std::__detail::_Prime_rehash_policy, std::__detail::_Hashtable_traits<true, false, true> >::~_Hashtable() [/home/nick/Repositories/nift/nift/nift]
+22,076,936 (75.99%)  ???:operator delete(void*, unsigned long) [/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.35]
+21,828,987 (75.14%)  ???:0x0000000004d09540 [???]
+21,610,543 (74.38%)  ???:0x0000000004014d30 [???]
+21,580,615 (74.28%)  ???:operator delete(void*) [/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.35]
+21,332,243 (73.43%)  ???:0x0000000004d09da0 [???]
+21,083,871 (72.57%)  ./malloc/./malloc/malloc.c:free [/usr/lib/x86_64-linux-gnu/libc.so.6]
+16,613,484 (57.18%)  ./malloc/./malloc/malloc.c:_int_free_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]
+14,503,760 (49.92%)  ./malloc/./malloc/malloc.c:_int_free_merge_chunk [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 3,040,309 (10.46%)  ???:std::_Sp_counted_base<(__gnu_cxx::_Lock_policy)2>::_M_release() [/home/nick/Repositories/nift/nift/nift]
+ 2,996,912 (10.32%)  ./malloc/./malloc/malloc.c:_int_free_maybe_trim [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 2,585,345 ( 8.90%)  ./malloc/./malloc/malloc.c:unlink_chunk.isra.0 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+ 1,114,962 ( 3.84%)  ???:0x00000000040145a0 [???]
+ 1,110,952 ( 3.82%)  ???:std::filesystem::__cxx11::path::_List::_Impl_deleter::operator()(std::filesystem::__cxx11::path::_List::_Impl*) const [/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.35]
+   714,759 ( 2.46%)  ???:0x0000000004d0c340 [???]
+   411,245 ( 1.42%)  ???:std::_Sp_counted_ptr_inplace<Parser::LambdaInstance, std::allocator<void>, (__gnu_cxx::_Lock_policy)2>::_M_destroy() [/home/nick/Repositories/nift/nift/nift]
+   372,297 ( 1.28%)  ./malloc/./malloc/arena.c:free
+   158,690 ( 0.55%)  ???:std::_Sp_counted_ptr_inplace<nift::RuntimeValue, std::allocator<void>, (__gnu_cxx::_Lock_policy)2>::_M_dispose() [/home/nick/Repositories/nift/nift/nift]
+

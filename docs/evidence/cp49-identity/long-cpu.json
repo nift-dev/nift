@@ -1,0 +1,862 @@
+[
+  {
+    "name": "call-scalar",
+    "n": 50000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp49-identity/long/call-scalar.f",
+    "expected": "1250025000",
+    "samples": [
+      {
+        "cpu_ms": 49.8879999999996,
+        "wall_ms": 50.426457077264786,
+        "in_process_ms": 46.0
+      },
+      {
+        "cpu_ms": 46.99599999999948,
+        "wall_ms": 47.417601104825735,
+        "in_process_ms": 43.0
+      },
+      {
+        "cpu_ms": 47.84000000000066,
+        "wall_ms": 48.255463130772114,
+        "in_process_ms": 44.0
+      },
+      {
+        "cpu_ms": 50.76600000000031,
+        "wall_ms": 51.2299370020628,
+        "in_process_ms": 47.0
+      },
+      {
+        "cpu_ms": 43.72599999999971,
+        "wall_ms": 44.1264258697629,
+        "in_process_ms": 41.0
+      },
+      {
+        "cpu_ms": 46.55199999999948,
+        "wall_ms": 47.01323201879859,
+        "in_process_ms": 43.0
+      },
+      {
+        "cpu_ms": 43.96100000000147,
+        "wall_ms": 44.31193391792476,
+        "in_process_ms": 41.0
+      },
+      {
+        "cpu_ms": 45.25100000000104,
+        "wall_ms": 45.671461848542094,
+        "in_process_ms": 42.0
+      },
+      {
+        "cpu_ms": 48.95700000000191,
+        "wall_ms": 49.382145050913095,
+        "in_process_ms": 46.0
+      },
+      {
+        "cpu_ms": 50.969999999999516,
+        "wall_ms": 51.40592693351209,
+        "in_process_ms": 48.0
+      },
+      {
+        "cpu_ms": 53.28900000000081,
+        "wall_ms": 53.69751714169979,
+        "in_process_ms": 50.0
+      },
+      {
+        "cpu_ms": 49.71100000000028,
+        "wall_ms": 50.1748719252646,
+        "in_process_ms": 47.0
+      },
+      {
+        "cpu_ms": 43.36700000000127,
+        "wall_ms": 43.651004089042544,
+        "in_process_ms": 40.0
+      },
+      {
+        "cpu_ms": 45.39600000000421,
+        "wall_ms": 45.819178223609924,
+        "in_process_ms": 43.0
+      },
+      {
+        "cpu_ms": 46.36699999999916,
+        "wall_ms": 46.801104908809066,
+        "in_process_ms": 43.0
+      }
+    ],
+    "median_cpu_ms": 46.99599999999948,
+    "median_wall_ms": 47.417601104825735,
+    "median_in_process_ms": 43.0
+  },
+  {
+    "name": "call-closure",
+    "n": 50000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp49-identity/long/call-closure.f",
+    "expected": "1250025000",
+    "samples": [
+      {
+        "cpu_ms": 309.63100000000037,
+        "wall_ms": 310.1316869724542,
+        "in_process_ms": 306.0
+      },
+      {
+        "cpu_ms": 314.36799999999977,
+        "wall_ms": 314.76616207510233,
+        "in_process_ms": 311.0
+      },
+      {
+        "cpu_ms": 308.59900000000016,
+        "wall_ms": 309.24162920564413,
+        "in_process_ms": 305.0
+      },
+      {
+        "cpu_ms": 308.2990000000002,
+        "wall_ms": 308.73477808199823,
+        "in_process_ms": 305.0
+      },
+      {
+        "cpu_ms": 293.23500000000115,
+        "wall_ms": 293.6869841068983,
+        "in_process_ms": 290.0
+      },
+      {
+        "cpu_ms": 302.2260000000008,
+        "wall_ms": 302.6943588629365,
+        "in_process_ms": 299.0
+      },
+      {
+        "cpu_ms": 295.55100000000033,
+        "wall_ms": 295.9697381593287,
+        "in_process_ms": 292.0
+      },
+      {
+        "cpu_ms": 301.00500000000017,
+        "wall_ms": 301.74347083084285,
+        "in_process_ms": 298.0
+      },
+      {
+        "cpu_ms": 301.24899999999946,
+        "wall_ms": 302.1334451623261,
+        "in_process_ms": 298.0
+      },
+      {
+        "cpu_ms": 320.95099999999866,
+        "wall_ms": 321.3248369283974,
+        "in_process_ms": 318.0
+      },
+      {
+        "cpu_ms": 290.4500000000008,
+        "wall_ms": 290.8232060726732,
+        "in_process_ms": 288.0
+      },
+      {
+        "cpu_ms": 307.04699999999787,
+        "wall_ms": 307.4871660210192,
+        "in_process_ms": 304.0
+      },
+      {
+        "cpu_ms": 307.15399999999835,
+        "wall_ms": 307.63047095388174,
+        "in_process_ms": 304.0
+      },
+      {
+        "cpu_ms": 312.0319999999959,
+        "wall_ms": 312.542085070163,
+        "in_process_ms": 309.0
+      },
+      {
+        "cpu_ms": 307.25399999999905,
+        "wall_ms": 307.6286008581519,
+        "in_process_ms": 305.0
+      }
+    ],
+    "median_cpu_ms": 307.15399999999835,
+    "median_wall_ms": 307.6286008581519,
+    "median_in_process_ms": 304.0
+  },
+  {
+    "name": "call-callback",
+    "n": 50000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp49-identity/long/call-callback.f",
+    "expected": "1250025000",
+    "samples": [
+      {
+        "cpu_ms": 343.0830000000001,
+        "wall_ms": 343.57036789879203,
+        "in_process_ms": 340.0
+      },
+      {
+        "cpu_ms": 339.2660000000002,
+        "wall_ms": 339.7944469470531,
+        "in_process_ms": 336.0
+      },
+      {
+        "cpu_ms": 341.085,
+        "wall_ms": 341.5399519726634,
+        "in_process_ms": 338.0
+      },
+      {
+        "cpu_ms": 335.5040000000006,
+        "wall_ms": 335.9700278379023,
+        "in_process_ms": 333.0
+      },
+      {
+        "cpu_ms": 334.222000000001,
+        "wall_ms": 334.71208182163537,
+        "in_process_ms": 331.0
+      },
+      {
+        "cpu_ms": 333.9970000000003,
+        "wall_ms": 335.1051970385015,
+        "in_process_ms": 331.0
+      },
+      {
+        "cpu_ms": 334.42299999999926,
+        "wall_ms": 335.2023351471871,
+        "in_process_ms": 332.0
+      },
+      {
+        "cpu_ms": 328.4550000000006,
+        "wall_ms": 328.91727495007217,
+        "in_process_ms": 325.0
+      },
+      {
+        "cpu_ms": 326.0499999999995,
+        "wall_ms": 326.5613210387528,
+        "in_process_ms": 323.0
+      },
+      {
+        "cpu_ms": 342.99900000000207,
+        "wall_ms": 343.40135799720883,
+        "in_process_ms": 339.0
+      },
+      {
+        "cpu_ms": 335.6129999999977,
+        "wall_ms": 336.0709378030151,
+        "in_process_ms": 332.0
+      },
+      {
+        "cpu_ms": 341.5870000000001,
+        "wall_ms": 342.0488128904253,
+        "in_process_ms": 339.0
+      },
+      {
+        "cpu_ms": 322.62800000000124,
+        "wall_ms": 323.0164679698646,
+        "in_process_ms": 319.0
+      },
+      {
+        "cpu_ms": 343.931,
+        "wall_ms": 345.23540106602013,
+        "in_process_ms": 341.0
+      },
+      {
+        "cpu_ms": 347.9799999999993,
+        "wall_ms": 348.74787903390825,
+        "in_process_ms": 345.0
+      }
+    ],
+    "median_cpu_ms": 335.6129999999977,
+    "median_wall_ms": 336.0709378030151,
+    "median_in_process_ms": 333.0
+  },
+  {
+    "name": "sort-identity",
+    "n": 16000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp49-identity/long/sort-identity.f",
+    "expected": "16000",
+    "samples": [
+      {
+        "cpu_ms": 86.88299999999998,
+        "wall_ms": 87.34166296198964,
+        "in_process_ms": 50.0
+      },
+      {
+        "cpu_ms": 92.80500000000013,
+        "wall_ms": 93.3779759798199,
+        "in_process_ms": 54.0
+      },
+      {
+        "cpu_ms": 91.43600000000008,
+        "wall_ms": 91.94278600625694,
+        "in_process_ms": 51.0
+      },
+      {
+        "cpu_ms": 94.39199999999914,
+        "wall_ms": 94.921002862975,
+        "in_process_ms": 54.0
+      },
+      {
+        "cpu_ms": 86.13900000000018,
+        "wall_ms": 86.66520402766764,
+        "in_process_ms": 50.0
+      },
+      {
+        "cpu_ms": 89.81200000000022,
+        "wall_ms": 90.29591898433864,
+        "in_process_ms": 50.0
+      },
+      {
+        "cpu_ms": 86.87199999999962,
+        "wall_ms": 87.4098448548466,
+        "in_process_ms": 51.0
+      },
+      {
+        "cpu_ms": 92.30200000000099,
+        "wall_ms": 92.87209203466773,
+        "in_process_ms": 52.0
+      },
+      {
+        "cpu_ms": 93.0620000000002,
+        "wall_ms": 93.65482814610004,
+        "in_process_ms": 53.0
+      },
+      {
+        "cpu_ms": 91.40499999999906,
+        "wall_ms": 91.93587116897106,
+        "in_process_ms": 54.0
+      },
+      {
+        "cpu_ms": 75.7260000000004,
+        "wall_ms": 76.69313112273812,
+        "in_process_ms": 45.0
+      },
+      {
+        "cpu_ms": 85.32599999999846,
+        "wall_ms": 85.80731088295579,
+        "in_process_ms": 47.0
+      },
+      {
+        "cpu_ms": 78.99599999999829,
+        "wall_ms": 79.53143585473299,
+        "in_process_ms": 47.0
+      },
+      {
+        "cpu_ms": 85.68799999999976,
+        "wall_ms": 86.16733807139099,
+        "in_process_ms": 49.0
+      },
+      {
+        "cpu_ms": 94.00099999999955,
+        "wall_ms": 94.5495218038559,
+        "in_process_ms": 53.0
+      }
+    ],
+    "median_cpu_ms": 89.81200000000022,
+    "median_wall_ms": 90.29591898433864,
+    "median_in_process_ms": 51.0
+  },
+  {
+    "name": "sort-arithmetic",
+    "n": 16000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp49-identity/long/sort-arithmetic.f",
+    "expected": "16000",
+    "samples": [
+      {
+        "cpu_ms": 95.60299999999967,
+        "wall_ms": 96.13686893135309,
+        "in_process_ms": 58.0
+      },
+      {
+        "cpu_ms": 98.33899999999952,
+        "wall_ms": 98.89878914691508,
+        "in_process_ms": 56.0
+      },
+      {
+        "cpu_ms": 98.93800000000064,
+        "wall_ms": 99.41950789652765,
+        "in_process_ms": 58.0
+      },
+      {
+        "cpu_ms": 96.15599999999947,
+        "wall_ms": 96.66747297160327,
+        "in_process_ms": 56.0
+      },
+      {
+        "cpu_ms": 99.07699999999974,
+        "wall_ms": 99.57617591135204,
+        "in_process_ms": 58.0
+      },
+      {
+        "cpu_ms": 94.33199999999987,
+        "wall_ms": 94.82046798802912,
+        "in_process_ms": 55.0
+      },
+      {
+        "cpu_ms": 97.73900000000069,
+        "wall_ms": 98.32822089083493,
+        "in_process_ms": 56.0
+      },
+      {
+        "cpu_ms": 96.67599999999953,
+        "wall_ms": 97.15897706337273,
+        "in_process_ms": 60.0
+      },
+      {
+        "cpu_ms": 95.05200000000124,
+        "wall_ms": 95.59535700827837,
+        "in_process_ms": 55.0
+      },
+      {
+        "cpu_ms": 92.33199999999874,
+        "wall_ms": 92.90926111862063,
+        "in_process_ms": 55.0
+      },
+      {
+        "cpu_ms": 88.30399999999949,
+        "wall_ms": 88.86043797247112,
+        "in_process_ms": 52.0
+      },
+      {
+        "cpu_ms": 88.05799999999996,
+        "wall_ms": 88.54737994261086,
+        "in_process_ms": 53.0
+      },
+      {
+        "cpu_ms": 90.722999999999,
+        "wall_ms": 91.29106299951673,
+        "in_process_ms": 51.0
+      },
+      {
+        "cpu_ms": 87.61299999999838,
+        "wall_ms": 88.10124499723315,
+        "in_process_ms": 50.0
+      },
+      {
+        "cpu_ms": 99.4540000000006,
+        "wall_ms": 99.97073607519269,
+        "in_process_ms": 58.0
+      }
+    ],
+    "median_cpu_ms": 95.60299999999967,
+    "median_wall_ms": 96.13686893135309,
+    "median_in_process_ms": 56.0
+  },
+  {
+    "name": "map-identity",
+    "n": 16000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp49-identity/long/map-identity.f",
+    "expected": "16000",
+    "samples": [
+      {
+        "cpu_ms": 25.85900000000002,
+        "wall_ms": 26.255869073793292,
+        "in_process_ms": 12.0
+      },
+      {
+        "cpu_ms": 24.380000000000347,
+        "wall_ms": 24.86155298538506,
+        "in_process_ms": 13.0
+      },
+      {
+        "cpu_ms": 22.930999999999703,
+        "wall_ms": 23.37996894493699,
+        "in_process_ms": 12.0
+      },
+      {
+        "cpu_ms": 25.374000000000784,
+        "wall_ms": 25.79805487766862,
+        "in_process_ms": 12.0
+      },
+      {
+        "cpu_ms": 27.17000000000047,
+        "wall_ms": 27.66141016036272,
+        "in_process_ms": 14.0
+      },
+      {
+        "cpu_ms": 23.3729999999992,
+        "wall_ms": 23.752563865855336,
+        "in_process_ms": 12.0
+      },
+      {
+        "cpu_ms": 23.504999999999,
+        "wall_ms": 23.94694392569363,
+        "in_process_ms": 13.0
+      },
+      {
+        "cpu_ms": 22.830999999999158,
+        "wall_ms": 23.178752046078444,
+        "in_process_ms": 12.0
+      },
+      {
+        "cpu_ms": 23.96200000000004,
+        "wall_ms": 24.394704960286617,
+        "in_process_ms": 12.0
+      },
+      {
+        "cpu_ms": 27.418000000002163,
+        "wall_ms": 27.881314046680927,
+        "in_process_ms": 14.0
+      },
+      {
+        "cpu_ms": 22.436999999999596,
+        "wall_ms": 22.84945989958942,
+        "in_process_ms": 12.0
+      },
+      {
+        "cpu_ms": 22.322000000002173,
+        "wall_ms": 22.779117105528712,
+        "in_process_ms": 12.0
+      },
+      {
+        "cpu_ms": 30.12399999999893,
+        "wall_ms": 30.466828029602766,
+        "in_process_ms": 17.0
+      },
+      {
+        "cpu_ms": 26.538999999999202,
+        "wall_ms": 26.986449025571346,
+        "in_process_ms": 14.0
+      },
+      {
+        "cpu_ms": 21.916000000000935,
+        "wall_ms": 22.457374026998878,
+        "in_process_ms": 11.0
+      }
+    ],
+    "median_cpu_ms": 23.96200000000004,
+    "median_wall_ms": 24.394704960286617,
+    "median_in_process_ms": 12.0
+  },
+  {
+    "name": "sort-aggregate",
+    "n": 16000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp49-identity/long/sort-aggregate.f",
+    "expected": "15999\n16000",
+    "samples": [
+      {
+        "cpu_ms": 149.72200000000012,
+        "wall_ms": 150.70693101733923,
+        "in_process_ms": 0.0
+      },
+      {
+        "cpu_ms": 156.51899999999975,
+        "wall_ms": 157.066771062091,
+        "in_process_ms": 0.0
+      },
+      {
+        "cpu_ms": 165.90400000000017,
+        "wall_ms": 166.4390149526298,
+        "in_process_ms": 0.0
+      },
+      {
+        "cpu_ms": 155.547999999999,
+        "wall_ms": 156.21726005338132,
+        "in_process_ms": 0.0
+      },
+      {
+        "cpu_ms": 152.78099999999927,
+        "wall_ms": 153.51578104309738,
+        "in_process_ms": 0.0
+      },
+      {
+        "cpu_ms": 149.68299999999945,
+        "wall_ms": 150.17568692564964,
+        "in_process_ms": 0.0
+      },
+      {
+        "cpu_ms": 148.94900000000112,
+        "wall_ms": 149.57580785267055,
+        "in_process_ms": 0.0
+      },
+      {
+        "cpu_ms": 143.92300000000046,
+        "wall_ms": 144.4077289197594,
+        "in_process_ms": 0.0
+      },
+      {
+        "cpu_ms": 170.25100000000083,
+        "wall_ms": 170.8660121075809,
+        "in_process_ms": 0.0
+      },
+      {
+        "cpu_ms": 157.47899999999905,
+        "wall_ms": 158.04349002428353,
+        "in_process_ms": 0.0
+      },
+      {
+        "cpu_ms": 149.75300000000001,
+        "wall_ms": 150.16888012178242,
+        "in_process_ms": 0.0
+      },
+      {
+        "cpu_ms": 153.7619999999984,
+        "wall_ms": 154.2927019763738,
+        "in_process_ms": 0.0
+      },
+      {
+        "cpu_ms": 149.49699999999933,
+        "wall_ms": 150.48174397088587,
+        "in_process_ms": 0.0
+      },
+      {
+        "cpu_ms": 147.05600000000186,
+        "wall_ms": 147.71875902079046,
+        "in_process_ms": 0.0
+      },
+      {
+        "cpu_ms": 153.71899999999928,
+        "wall_ms": 154.1665969416499,
+        "in_process_ms": 0.0
+      }
+    ],
+    "median_cpu_ms": 152.78099999999927,
+    "median_wall_ms": 153.51578104309738,
+    "median_in_process_ms": 0.0
+  },
+  {
+    "name": "sort-precreated",
+    "n": 16000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp49-identity/long/sort-precreated.f",
+    "expected": "16000",
+    "samples": [
+      {
+        "cpu_ms": 38.866000000000014,
+        "wall_ms": 39.33492489159107,
+        "in_process_ms": 25.0
+      },
+      {
+        "cpu_ms": 43.49400000000059,
+        "wall_ms": 44.09017786383629,
+        "in_process_ms": 26.0
+      },
+      {
+        "cpu_ms": 43.28099999999979,
+        "wall_ms": 43.772314907982945,
+        "in_process_ms": 26.0
+      },
+      {
+        "cpu_ms": 48.067000000000306,
+        "wall_ms": 48.48977504298091,
+        "in_process_ms": 29.0
+      },
+      {
+        "cpu_ms": 37.69700000000042,
+        "wall_ms": 38.08680991642177,
+        "in_process_ms": 24.0
+      },
+      {
+        "cpu_ms": 38.07199999999944,
+        "wall_ms": 38.559996988624334,
+        "in_process_ms": 24.0
+      },
+      {
+        "cpu_ms": 42.93700000000156,
+        "wall_ms": 43.37957105599344,
+        "in_process_ms": 26.0
+      },
+      {
+        "cpu_ms": 41.33299999999984,
+        "wall_ms": 41.86508595012128,
+        "in_process_ms": 24.0
+      },
+      {
+        "cpu_ms": 41.167999999999424,
+        "wall_ms": 41.64749593473971,
+        "in_process_ms": 25.0
+      },
+      {
+        "cpu_ms": 39.346999999999795,
+        "wall_ms": 39.81848596595228,
+        "in_process_ms": 24.0
+      },
+      {
+        "cpu_ms": 39.987000000000215,
+        "wall_ms": 40.397374890744686,
+        "in_process_ms": 26.0
+      },
+      {
+        "cpu_ms": 40.75099999999887,
+        "wall_ms": 41.13498399965465,
+        "in_process_ms": 24.0
+      },
+      {
+        "cpu_ms": 40.82299999999872,
+        "wall_ms": 41.20043199509382,
+        "in_process_ms": 24.0
+      },
+      {
+        "cpu_ms": 37.47899999999804,
+        "wall_ms": 37.95766201801598,
+        "in_process_ms": 24.0
+      },
+      {
+        "cpu_ms": 37.78400000000115,
+        "wall_ms": 38.22077508084476,
+        "in_process_ms": 25.0
+      }
+    ],
+    "median_cpu_ms": 40.75099999999887,
+    "median_wall_ms": 41.13498399965465,
+    "median_in_process_ms": 25.0
+  },
+  {
+    "name": "sort-captured",
+    "n": 16000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp49-identity/long/sort-captured.f",
+    "expected": "16000",
+    "samples": [
+      {
+        "cpu_ms": 110.18899999999981,
+        "wall_ms": 110.78903102315962,
+        "in_process_ms": 63.0
+      },
+      {
+        "cpu_ms": 105.94799999999994,
+        "wall_ms": 106.44116788171232,
+        "in_process_ms": 62.0
+      },
+      {
+        "cpu_ms": 114.02100000000016,
+        "wall_ms": 114.61020889692008,
+        "in_process_ms": 68.0
+      },
+      {
+        "cpu_ms": 111.27599999999993,
+        "wall_ms": 111.78310588002205,
+        "in_process_ms": 65.0
+      },
+      {
+        "cpu_ms": 90.04799999999923,
+        "wall_ms": 90.579051990062,
+        "in_process_ms": 55.0
+      },
+      {
+        "cpu_ms": 99.52699999999992,
+        "wall_ms": 100.1055920496583,
+        "in_process_ms": 59.0
+      },
+      {
+        "cpu_ms": 93.65099999999993,
+        "wall_ms": 94.19410000555217,
+        "in_process_ms": 55.0
+      },
+      {
+        "cpu_ms": 98.63400000000055,
+        "wall_ms": 99.2723791860044,
+        "in_process_ms": 59.0
+      },
+      {
+        "cpu_ms": 102.73000000000087,
+        "wall_ms": 103.21138193830848,
+        "in_process_ms": 62.0
+      },
+      {
+        "cpu_ms": 94.4360000000013,
+        "wall_ms": 94.8790111579001,
+        "in_process_ms": 54.0
+      },
+      {
+        "cpu_ms": 125.08600000000114,
+        "wall_ms": 125.6925049237907,
+        "in_process_ms": 66.0
+      },
+      {
+        "cpu_ms": 93.34899999999902,
+        "wall_ms": 93.90511503443122,
+        "in_process_ms": 55.0
+      },
+      {
+        "cpu_ms": 95.41400000000078,
+        "wall_ms": 95.8880118560046,
+        "in_process_ms": 56.0
+      },
+      {
+        "cpu_ms": 90.77399999999791,
+        "wall_ms": 91.26542811281979,
+        "in_process_ms": 56.0
+      },
+      {
+        "cpu_ms": 97.99000000000024,
+        "wall_ms": 98.48842187784612,
+        "in_process_ms": 60.0
+      }
+    ],
+    "median_cpu_ms": 98.63400000000055,
+    "median_wall_ms": 99.2723791860044,
+    "median_in_process_ms": 59.0
+  },
+  {
+    "name": "loops",
+    "n": 50000,
+    "path": "/home/nick/Repositories/nift/nift/.build/cp49-identity/long/loops.f",
+    "expected": "1249975000",
+    "samples": [
+      {
+        "cpu_ms": 25.848000000000205,
+        "wall_ms": 26.303644059225917,
+        "in_process_ms": 22.0
+      },
+      {
+        "cpu_ms": 24.518000000000374,
+        "wall_ms": 25.000157998874784,
+        "in_process_ms": 21.0
+      },
+      {
+        "cpu_ms": 22.630999999999514,
+        "wall_ms": 23.025203961879015,
+        "in_process_ms": 19.0
+      },
+      {
+        "cpu_ms": 25.771999999999906,
+        "wall_ms": 26.081104995682836,
+        "in_process_ms": 22.0
+      },
+      {
+        "cpu_ms": 22.8430000000005,
+        "wall_ms": 23.210758110508323,
+        "in_process_ms": 20.0
+      },
+      {
+        "cpu_ms": 21.72099999999899,
+        "wall_ms": 22.186024114489555,
+        "in_process_ms": 18.0
+      },
+      {
+        "cpu_ms": 22.606999999999378,
+        "wall_ms": 23.013288853690028,
+        "in_process_ms": 19.0
+      },
+      {
+        "cpu_ms": 20.21600000000001,
+        "wall_ms": 20.662094932049513,
+        "in_process_ms": 16.0
+      },
+      {
+        "cpu_ms": 22.762999999999202,
+        "wall_ms": 23.12099584378302,
+        "in_process_ms": 20.0
+      },
+      {
+        "cpu_ms": 18.915999999999045,
+        "wall_ms": 19.186670193448663,
+        "in_process_ms": 16.0
+      },
+      {
+        "cpu_ms": 26.547999999998908,
+        "wall_ms": 27.09557395428419,
+        "in_process_ms": 22.0
+      },
+      {
+        "cpu_ms": 21.12999999999765,
+        "wall_ms": 21.50229294784367,
+        "in_process_ms": 18.0
+      },
+      {
+        "cpu_ms": 19.487000000001142,
+        "wall_ms": 19.822752103209496,
+        "in_process_ms": 17.0
+      },
+      {
+        "cpu_ms": 20.468000000000597,
+        "wall_ms": 20.919264061376452,
+        "in_process_ms": 17.0
+      },
+      {
+        "cpu_ms": 21.086999999998746,
+        "wall_ms": 21.494691027328372,
+        "in_process_ms": 18.0
+      }
+    ],
+    "median_cpu_ms": 22.606999999999378,
+    "median_wall_ms": 23.013288853690028,
+    "median_in_process_ms": 19.0
+  }
+]

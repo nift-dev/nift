@@ -1,0 +1,902 @@
+[
+  {
+    "name": "call-scalar",
+    "counters": "lambda-cache syntax=0 numeric=0 instances=0 prepared=0 legacy=0\nphase factory calls=0 allocations=0 bytes=0\nphase instance calls=0 allocations=0 bytes=0\nphase metadata calls=0 allocations=0 bytes=0\nphase capture calls=0 allocations=0 bytes=0\nphase registration calls=0 allocations=0 bytes=0\nphase arguments calls=0 allocations=0 bytes=0\nphase frame calls=0 allocations=0 bytes=0\nphase body calls=0 allocations=0 bytes=0\nphase key calls=0 allocations=0 bytes=0\nphase decoration calls=0 allocations=0 bytes=0\nphase sorting calls=0 allocations=0 bytes=0\nphase result calls=0 allocations=0 bytes=0\nphase cleanup calls=0 allocations=0 bytes=0\nphase returned_key calls=0 allocations=0 bytes=0\nphase destruction calls=0 allocations=0 bytes=0\nevents instances=0 capture_entries=0 frame_capture_entries=0 comparisons=0\n",
+    "stages": {
+      "factory": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "instance": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "metadata": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "capture": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "registration": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "arguments": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "frame": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "body": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "decoration": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "sorting": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "result": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "cleanup": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "destruction": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      }
+    }
+  },
+  {
+    "name": "call-closure",
+    "counters": "capture-name cmd location=0\ncapture-name args location=0\ncapture-name offset location=0\nlambda-cache syntax=1 numeric=1 instances=1 prepared=2000 legacy=0\nphase factory calls=0 allocations=0 bytes=0\nphase instance calls=1 allocations=1 bytes=288\nphase metadata calls=1 allocations=4 bytes=613\nphase capture calls=1 allocations=7 bytes=608\nphase registration calls=1 allocations=4 bytes=236\nphase arguments calls=0 allocations=0 bytes=0\nphase frame calls=0 allocations=0 bytes=0\nphase body calls=2000 allocations=2007 bytes=129232\nphase key calls=0 allocations=0 bytes=0\nphase decoration calls=0 allocations=0 bytes=0\nphase sorting calls=0 allocations=0 bytes=0\nphase result calls=0 allocations=0 bytes=0\nphase cleanup calls=0 allocations=0 bytes=0\nphase returned_key calls=0 allocations=0 bytes=0\nphase destruction calls=0 allocations=0 bytes=0\nevents instances=1 capture_entries=3 frame_capture_entries=0 comparisons=0\n",
+    "stages": {
+      "factory": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "instance": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 288
+      },
+      "metadata": {
+        "calls": 1,
+        "allocations": 4,
+        "bytes": 613
+      },
+      "capture": {
+        "calls": 1,
+        "allocations": 7,
+        "bytes": 608
+      },
+      "registration": {
+        "calls": 1,
+        "allocations": 4,
+        "bytes": 236
+      },
+      "arguments": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "frame": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 2007,
+        "bytes": 129232
+      },
+      "key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "decoration": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "sorting": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "result": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "cleanup": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "destruction": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      }
+    }
+  },
+  {
+    "name": "call-callback",
+    "counters": "capture-name cmd location=0\ncapture-name args location=0\nlambda-cache syntax=1 numeric=1 instances=1 prepared=2000 legacy=0\nphase factory calls=0 allocations=0 bytes=0\nphase instance calls=1 allocations=1 bytes=288\nphase metadata calls=1 allocations=4 bytes=615\nphase capture calls=1 allocations=5 bytes=440\nphase registration calls=1 allocations=4 bytes=236\nphase arguments calls=0 allocations=0 bytes=0\nphase frame calls=0 allocations=0 bytes=0\nphase body calls=2000 allocations=2007 bytes=129232\nphase key calls=0 allocations=0 bytes=0\nphase decoration calls=0 allocations=0 bytes=0\nphase sorting calls=0 allocations=0 bytes=0\nphase result calls=0 allocations=0 bytes=0\nphase cleanup calls=0 allocations=0 bytes=0\nphase returned_key calls=0 allocations=0 bytes=0\nphase destruction calls=0 allocations=0 bytes=0\nevents instances=1 capture_entries=2 frame_capture_entries=0 comparisons=0\n",
+    "stages": {
+      "factory": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "instance": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 288
+      },
+      "metadata": {
+        "calls": 1,
+        "allocations": 4,
+        "bytes": 615
+      },
+      "capture": {
+        "calls": 1,
+        "allocations": 5,
+        "bytes": 440
+      },
+      "registration": {
+        "calls": 1,
+        "allocations": 4,
+        "bytes": 236
+      },
+      "arguments": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "frame": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 2007,
+        "bytes": 129232
+      },
+      "key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "decoration": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "sorting": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "result": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "cleanup": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "destruction": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0
+      }
+    }
+  },
+  {
+    "name": "sort-identity",
+    "counters": "capture-name cmd location=0\ncapture-name args location=0\ncapture-name a location=0\ncapture-name i location=0\ncapture-name probe_timer location=0\nlambda-cache syntax=1 numeric=0 instances=2000 prepared=2000 legacy=0\nphase factory calls=2000 allocations=38012 bytes=3994256\nphase instance calls=2000 allocations=2000 bytes=576000\nphase metadata calls=2000 allocations=8000 bytes=1230000\nphase capture calls=2000 allocations=22000 bytes=1888000\nphase registration calls=2000 allocations=6008 bytes=299936\nphase arguments calls=2000 allocations=2000 bytes=304000\nphase frame calls=2000 allocations=36001 bytes=3790240\nphase body calls=2000 allocations=0 bytes=0\nphase key calls=4000 allocations=2000 bytes=304000\nphase decoration calls=2000 allocations=0 bytes=0\nphase sorting calls=1 allocations=1 bytes=176000\nphase result calls=1 allocations=1 bytes=304000\nphase cleanup calls=2000 allocations=0 bytes=0\nphase returned_key calls=2000 allocations=0 bytes=0\nphase destruction calls=1 allocations=0 bytes=0\nevents instances=2000 capture_entries=10000 frame_capture_entries=10000 comparisons=18533\n",
+    "stages": {
+      "factory": {
+        "calls": 2000,
+        "allocations": 38012,
+        "bytes": 3994256,
+        "instructions": 18187846
+      },
+      "instance": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 576000,
+        "instructions": 761757
+      },
+      "metadata": {
+        "calls": 2000,
+        "allocations": 8000,
+        "bytes": 1230000,
+        "instructions": 3996402
+      },
+      "capture": {
+        "calls": 2000,
+        "allocations": 22000,
+        "bytes": 1888000,
+        "instructions": 7546952
+      },
+      "registration": {
+        "calls": 2000,
+        "allocations": 6008,
+        "bytes": 299936,
+        "instructions": 3392371
+      },
+      "arguments": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "instructions": 761895
+      },
+      "frame": {
+        "calls": 2000,
+        "allocations": 36001,
+        "bytes": 3790240,
+        "instructions": 15740660
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 724000
+      },
+      "key": {
+        "calls": 4000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "instructions": 638000
+      },
+      "decoration": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 454000
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 176000,
+        "instructions": 5769762
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 304000,
+        "instructions": 174652
+      },
+      "cleanup": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 2374000
+      },
+      "returned_key": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 152000
+      },
+      "destruction": {
+        "calls": 1,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 508248
+      }
+    }
+  },
+  {
+    "name": "sort-arithmetic",
+    "counters": "capture-name cmd location=0\ncapture-name args location=0\ncapture-name a location=0\ncapture-name i location=0\ncapture-name probe_timer location=0\nlambda-cache syntax=1 numeric=1 instances=2000 prepared=2000 legacy=0\nphase factory calls=2000 allocations=38012 bytes=4002256\nphase instance calls=2000 allocations=2000 bytes=576000\nphase metadata calls=2000 allocations=8000 bytes=1238000\nphase capture calls=2000 allocations=22000 bytes=1888000\nphase registration calls=2000 allocations=6008 bytes=299936\nphase arguments calls=2000 allocations=2000 bytes=304000\nphase frame calls=2000 allocations=36001 bytes=3798240\nphase body calls=2000 allocations=2007 bytes=129232\nphase key calls=4000 allocations=2000 bytes=304000\nphase decoration calls=2000 allocations=0 bytes=0\nphase sorting calls=1 allocations=1 bytes=176000\nphase result calls=1 allocations=1 bytes=304000\nphase cleanup calls=2000 allocations=0 bytes=0\nphase returned_key calls=0 allocations=0 bytes=0\nphase destruction calls=1 allocations=0 bytes=0\nevents instances=2000 capture_entries=10000 frame_capture_entries=10000 comparisons=18533\n",
+    "stages": {
+      "factory": {
+        "calls": 2000,
+        "allocations": 38012,
+        "bytes": 4002256,
+        "instructions": 17961603
+      },
+      "instance": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 576000,
+        "instructions": 763571
+      },
+      "metadata": {
+        "calls": 2000,
+        "allocations": 8000,
+        "bytes": 1238000,
+        "instructions": 4040402
+      },
+      "capture": {
+        "calls": 2000,
+        "allocations": 22000,
+        "bytes": 1888000,
+        "instructions": 7547088
+      },
+      "registration": {
+        "calls": 2000,
+        "allocations": 6008,
+        "bytes": 299936,
+        "instructions": 3120467
+      },
+      "arguments": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "instructions": 762965
+      },
+      "frame": {
+        "calls": 2000,
+        "allocations": 36001,
+        "bytes": 3798240,
+        "instructions": 15737346
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 2007,
+        "bytes": 129232,
+        "instructions": 6474917
+      },
+      "key": {
+        "calls": 4000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "instructions": 638000
+      },
+      "decoration": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 454000
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 176000,
+        "instructions": 5769762
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 304000,
+        "instructions": 174652
+      },
+      "cleanup": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 2374000
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 0
+      },
+      "destruction": {
+        "calls": 1,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 508248
+      }
+    }
+  },
+  {
+    "name": "map-identity",
+    "counters": "capture-name cmd location=0\ncapture-name args location=0\ncapture-name a location=0\ncapture-name i location=0\ncapture-name probe_timer location=0\nlambda-cache syntax=1 numeric=0 instances=1 prepared=2000 legacy=0\nphase factory calls=1 allocations=24 bytes=2401\nphase instance calls=1 allocations=1 bytes=288\nphase metadata calls=1 allocations=4 bytes=613\nphase capture calls=1 allocations=11 bytes=944\nphase registration calls=1 allocations=4 bytes=236\nphase arguments calls=2000 allocations=2000 bytes=304000\nphase frame calls=2000 allocations=36001 bytes=3786240\nphase body calls=2000 allocations=0 bytes=0\nphase key calls=0 allocations=0 bytes=0\nphase decoration calls=0 allocations=0 bytes=0\nphase sorting calls=0 allocations=0 bytes=0\nphase result calls=0 allocations=0 bytes=0\nphase cleanup calls=2000 allocations=0 bytes=0\nphase returned_key calls=2000 allocations=0 bytes=0\nphase destruction calls=0 allocations=0 bytes=0\nevents instances=1 capture_entries=5 frame_capture_entries=10000 comparisons=0\n",
+    "stages": {
+      "factory": {
+        "calls": 1,
+        "allocations": 24,
+        "bytes": 2401,
+        "instructions": 20455
+      },
+      "instance": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 288,
+        "instructions": 245
+      },
+      "metadata": {
+        "calls": 1,
+        "allocations": 4,
+        "bytes": 613,
+        "instructions": 2408
+      },
+      "capture": {
+        "calls": 1,
+        "allocations": 11,
+        "bytes": 944,
+        "instructions": 4725
+      },
+      "registration": {
+        "calls": 1,
+        "allocations": 4,
+        "bytes": 236,
+        "instructions": 1856
+      },
+      "arguments": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "instructions": 490000
+      },
+      "frame": {
+        "calls": 2000,
+        "allocations": 36001,
+        "bytes": 3786240,
+        "instructions": 13305953
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 724000
+      },
+      "key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 0
+      },
+      "decoration": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 0
+      },
+      "sorting": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 0
+      },
+      "result": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 0
+      },
+      "cleanup": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 2402000
+      },
+      "returned_key": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 152000
+      },
+      "destruction": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 0
+      }
+    }
+  },
+  {
+    "name": "sort-aggregate",
+    "counters": "capture-name cmd location=0\ncapture-name args location=0\ncapture-name a location=0\nlambda-cache syntax=1 numeric=1 instances=2000 prepared=2000 legacy=0\nphase factory calls=2000 allocations=30012 bytes=3338256\nphase instance calls=2000 allocations=2000 bytes=576000\nphase metadata calls=2000 allocations=8000 bytes=1246000\nphase capture calls=2000 allocations=14000 bytes=1216000\nphase registration calls=2000 allocations=6008 bytes=299936\nphase arguments calls=2000 allocations=8000 bytes=2320000\nphase frame calls=2000 allocations=34002 bytes=5150352\nphase body calls=2000 allocations=2006 bytes=128896\nphase key calls=4000 allocations=2000 bytes=304000\nphase decoration calls=2000 allocations=0 bytes=0\nphase sorting calls=1 allocations=1 bytes=176000\nphase result calls=1 allocations=1 bytes=304000\nphase cleanup calls=2000 allocations=0 bytes=0\nphase returned_key calls=0 allocations=0 bytes=0\nphase destruction calls=1 allocations=0 bytes=0\nevents instances=2000 capture_entries=6000 frame_capture_entries=6000 comparisons=9580\n",
+    "stages": {
+      "factory": {
+        "calls": 2000,
+        "allocations": 30012,
+        "bytes": 3338256,
+        "instructions": 15153458
+      },
+      "instance": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 576000,
+        "instructions": 762299
+      },
+      "metadata": {
+        "calls": 2000,
+        "allocations": 8000,
+        "bytes": 1246000,
+        "instructions": 4042239
+      },
+      "capture": {
+        "calls": 2000,
+        "allocations": 14000,
+        "bytes": 1216000,
+        "instructions": 4784834
+      },
+      "registration": {
+        "calls": 2000,
+        "allocations": 6008,
+        "bytes": 299936,
+        "instructions": 3120433
+      },
+      "arguments": {
+        "calls": 2000,
+        "allocations": 8000,
+        "bytes": 2320000,
+        "instructions": 2908573
+      },
+      "frame": {
+        "calls": 2000,
+        "allocations": 34002,
+        "bytes": 5150352,
+        "instructions": 14404137
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 2006,
+        "bytes": 128896,
+        "instructions": 1954998
+      },
+      "key": {
+        "calls": 4000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "instructions": 638136
+      },
+      "decoration": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 454000
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 176000,
+        "instructions": 5164417
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 304000,
+        "instructions": 174543
+      },
+      "cleanup": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 2762000
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 0
+      },
+      "destruction": {
+        "calls": 1,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 498345
+      }
+    }
+  },
+  {
+    "name": "sort-precreated",
+    "counters": "capture-name cmd location=0\ncapture-name args location=0\ncapture-name a location=0\ncapture-name i location=0\ncapture-name probe_timer location=0\nlambda-cache syntax=1 numeric=0 instances=1 prepared=2000 legacy=0\nphase factory calls=2000 allocations=2000 bytes=62000\nphase instance calls=1 allocations=1 bytes=288\nphase metadata calls=1 allocations=4 bytes=563\nphase capture calls=1 allocations=11 bytes=944\nphase registration calls=1 allocations=4 bytes=236\nphase arguments calls=2000 allocations=2000 bytes=304000\nphase frame calls=2000 allocations=36001 bytes=3686240\nphase body calls=2000 allocations=0 bytes=0\nphase key calls=4000 allocations=2000 bytes=304000\nphase decoration calls=2000 allocations=0 bytes=0\nphase sorting calls=1 allocations=1 bytes=176000\nphase result calls=1 allocations=1 bytes=304000\nphase cleanup calls=2000 allocations=0 bytes=0\nphase returned_key calls=2000 allocations=0 bytes=0\nphase destruction calls=1 allocations=0 bytes=0\nevents instances=1 capture_entries=5 frame_capture_entries=10000 comparisons=18533\n",
+    "stages": {
+      "factory": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 62000,
+        "instructions": 3088136
+      },
+      "instance": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 288,
+        "instructions": 242
+      },
+      "metadata": {
+        "calls": 1,
+        "allocations": 4,
+        "bytes": 563,
+        "instructions": 2287
+      },
+      "capture": {
+        "calls": 1,
+        "allocations": 11,
+        "bytes": 944,
+        "instructions": 4713
+      },
+      "registration": {
+        "calls": 1,
+        "allocations": 4,
+        "bytes": 236,
+        "instructions": 1708
+      },
+      "arguments": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "instructions": 762131
+      },
+      "frame": {
+        "calls": 2000,
+        "allocations": 36001,
+        "bytes": 3686240,
+        "instructions": 13142095
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 724000
+      },
+      "key": {
+        "calls": 4000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "instructions": 638000
+      },
+      "decoration": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 454000
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 176000,
+        "instructions": 5769762
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 304000,
+        "instructions": 174652
+      },
+      "cleanup": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 2366000
+      },
+      "returned_key": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 152000
+      },
+      "destruction": {
+        "calls": 1,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 544427
+      }
+    }
+  },
+  {
+    "name": "sort-captured",
+    "counters": "capture-name cmd location=0\ncapture-name args location=0\ncapture-name offset location=0\ncapture-name a location=0\ncapture-name i location=0\ncapture-name probe_timer location=0\nlambda-cache syntax=1 numeric=1 instances=2000 prepared=2000 legacy=0\nphase factory calls=2000 allocations=40012 bytes=4186256\nphase instance calls=2000 allocations=2000 bytes=576000\nphase metadata calls=2000 allocations=6000 bytes=1086000\nphase capture calls=2000 allocations=26000 bytes=2224000\nphase registration calls=2000 allocations=6008 bytes=299936\nphase arguments calls=2000 allocations=2000 bytes=304000\nphase frame calls=2000 allocations=38001 bytes=3982240\nphase body calls=2000 allocations=2007 bytes=129232\nphase key calls=4000 allocations=2000 bytes=304000\nphase decoration calls=2000 allocations=0 bytes=0\nphase sorting calls=1 allocations=1 bytes=176000\nphase result calls=1 allocations=1 bytes=304000\nphase cleanup calls=2000 allocations=0 bytes=0\nphase returned_key calls=0 allocations=0 bytes=0\nphase destruction calls=1 allocations=0 bytes=0\nevents instances=2000 capture_entries=12000 frame_capture_entries=12000 comparisons=18533\n",
+    "stages": {
+      "factory": {
+        "calls": 2000,
+        "allocations": 40012,
+        "bytes": 4186256,
+        "instructions": 18666288
+      },
+      "instance": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 576000,
+        "instructions": 762338
+      },
+      "metadata": {
+        "calls": 2000,
+        "allocations": 6000,
+        "bytes": 1086000,
+        "instructions": 3524408
+      },
+      "capture": {
+        "calls": 2000,
+        "allocations": 26000,
+        "bytes": 2224000,
+        "instructions": 8961224
+      },
+      "registration": {
+        "calls": 2000,
+        "allocations": 6008,
+        "bytes": 299936,
+        "instructions": 2849023
+      },
+      "arguments": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "instructions": 761891
+      },
+      "frame": {
+        "calls": 2000,
+        "allocations": 38001,
+        "bytes": 3982240,
+        "instructions": 16969996
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 2007,
+        "bytes": 129232,
+        "instructions": 9801712
+      },
+      "key": {
+        "calls": 4000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "instructions": 638000
+      },
+      "decoration": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 454000
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 176000,
+        "instructions": 5769762
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 304000,
+        "instructions": 174652
+      },
+      "cleanup": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 2436000
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 0
+      },
+      "destruction": {
+        "calls": 1,
+        "allocations": 0,
+        "bytes": 0,
+        "instructions": 508248
+      }
+    }
+  },
+  {
+    "name": "sort-unused-50",
+    "counters": "capture-name unused20 location=0\ncapture-name args location=0\ncapture-name unused19 location=0\ncapture-name unused18 location=0\ncapture-name unused30 location=0\ncapture-name unused17 location=0\ncapture-name unused10 location=0\ncapture-name unused35 location=0\ncapture-name unused16 location=0\ncapture-name unused27 location=0\ncapture-name unused15 location=0\ncapture-name unused14 location=0\ncapture-name unused7 location=0\ncapture-name unused13 location=0\ncapture-name unused12 location=0\ncapture-name cmd location=0\ncapture-name unused48 location=0\ncapture-name unused1 location=0\ncapture-name unused28 location=0\ncapture-name unused23 location=0\ncapture-name unused0 location=0\ncapture-name unused3 location=0\ncapture-name unused31 location=0\ncapture-name unused2 location=0\ncapture-name unused46 location=0\ncapture-name unused32 location=0\ncapture-name unused34 location=0\ncapture-name unused49 location=0\ncapture-name unused25 location=0\ncapture-name unused4 location=0\ncapture-name unused41 location=0\ncapture-name unused36 location=0\ncapture-name unused5 location=0\ncapture-name unused39 location=0\ncapture-name unused38 location=0\ncapture-name unused42 location=0\ncapture-name unused43 location=0\ncapture-name unused37 location=0\ncapture-name unused33 location=0\ncapture-name i location=0\ncapture-name unused11 location=0\ncapture-name unused44 location=0\ncapture-name unused40 location=0\ncapture-name probe_timer location=0\ncapture-name unused8 location=0\ncapture-name a location=0\ncapture-name unused45 location=0\ncapture-name unused22 location=0\ncapture-name unused9 location=0\ncapture-name unused24 location=0\ncapture-name unused26 location=0\ncapture-name unused29 location=0\ncapture-name unused47 location=0\ncapture-name unused6 location=0\ncapture-name unused21 location=0\nlambda-cache syntax=1 numeric=0 instances=2000 prepared=2000 legacy=0\nphase factory calls=2000 allocations=242012 bytes=22094256\nphase instance calls=2000 allocations=2000 bytes=576000\nphase metadata calls=2000 allocations=8000 bytes=1122000\nphase capture calls=2000 allocations=226000 bytes=20096000\nphase registration calls=2000 allocations=6008 bytes=299936\nphase arguments calls=2000 allocations=2000 bytes=304000\nphase frame calls=2000 allocations=240001 bytes=21890240\nphase body calls=2000 allocations=0 bytes=0\nphase key calls=4000 allocations=2000 bytes=304000\nphase decoration calls=2000 allocations=0 bytes=0\nphase sorting calls=1 allocations=1 bytes=176000\nphase result calls=1 allocations=1 bytes=304000\nphase cleanup calls=2000 allocations=0 bytes=0\nphase returned_key calls=2000 allocations=0 bytes=0\nphase destruction calls=1 allocations=0 bytes=0\nevents instances=2000 capture_entries=110000 frame_capture_entries=110000 comparisons=18533\n",
+    "stages": {
+      "factory": {
+        "calls": 2000,
+        "allocations": 242012,
+        "bytes": 22094256
+      },
+      "instance": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 576000
+      },
+      "metadata": {
+        "calls": 2000,
+        "allocations": 8000,
+        "bytes": 1122000
+      },
+      "capture": {
+        "calls": 2000,
+        "allocations": 226000,
+        "bytes": 20096000
+      },
+      "registration": {
+        "calls": 2000,
+        "allocations": 6008,
+        "bytes": 299936
+      },
+      "arguments": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 304000
+      },
+      "frame": {
+        "calls": 2000,
+        "allocations": 240001,
+        "bytes": 21890240
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "key": {
+        "calls": 4000,
+        "allocations": 2000,
+        "bytes": 304000
+      },
+      "decoration": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 176000
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 304000
+      },
+      "cleanup": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "returned_key": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "destruction": {
+        "calls": 1,
+        "allocations": 0,
+        "bytes": 0
+      }
+    }
+  }
+]

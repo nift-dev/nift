@@ -1,0 +1,175 @@
+[
+  {
+    "name": "factory-count",
+    "source": "n := 0\nfn(mk()) { n += 1; return x => x }\nprint([3,1,2].sort_by(mk()).stringify()); print(n)\nprint([3,1,2].map(mk()).stringify()); print(n)\nprint([].sort_by(mk()).stringify()); print(n)\nprint([].map(mk()).stringify()); print(n)",
+    "expected": "[1,2,3]\n3\n[3,1,2]\n4\n[]\n4\n[]\n5\n",
+    "exit": 0,
+    "stdout": "[1,2,3]\n3\n[3,1,2]\n4\n[]\n4\n[]\n5\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "factory-order",
+    "source": "n := 0\nfn(mk()) { n += 1; print(n); return x => x }\nprint([3,1,2].sort_by(mk(), \"asc\", mk(), \"desc\").stringify())",
+    "expected": "1\n2\n3\n4\n5\n6\n[1,2,3]\n",
+    "exit": 0,
+    "stdout": "1\n2\n3\n4\n5\n6\n[1,2,3]\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "fresh-identity",
+    "source": "f := x => x\ng := x => x\nprint(f == g); print(f == f)",
+    "expected": "false\ntrue\n",
+    "exit": 0,
+    "stdout": "false\ntrue\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "escape-identities",
+    "source": "saved := []\nfn(mk()) { f := x => x; saved.push(f); return f }\nprint([2,1].sort_by(mk()).stringify()); print(saved[0] == saved[1])",
+    "expected": "[1,2]\nfalse\n",
+    "exit": 0,
+    "stdout": "[1,2]\nfalse\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "capture-mutation",
+    "source": "n := 0\nf := x => n++\nprint([3,1,2].sort_by(f).stringify()); print(n)",
+    "expected": "[3,1,2]\n3\n",
+    "exit": 0,
+    "stdout": "[3,1,2]\n3\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "factory-capture-change",
+    "source": "n := 0\nfn(mk()) { n += 1; return x => n }\nprint([3,1,2].sort_by(mk()).stringify()); print(n)",
+    "expected": "[3,1,2]\n3\n",
+    "exit": 0,
+    "stdout": "[3,1,2]\n3\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "dynamic-capture-dependency",
+    "source": "fn(read_hidden()) { return hidden }\nfn(mk(hidden)) { return x => read_hidden() }\nf := mk(7)\nhidden := 100\nprint(f(0))",
+    "expected": "7\n",
+    "exit": 0,
+    "stdout": "7\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "changing-outer",
+    "source": "n := 1\nf := x => x + n\nprint(f(2)); n = 7; print(f(2))",
+    "expected": "3\n9\n",
+    "exit": 0,
+    "stdout": "3\n9\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "shadowing",
+    "source": "x := 99\nf := x => x\nprint(f(3)); print(x)",
+    "expected": "3\n99\n",
+    "exit": 0,
+    "stdout": "3\n99\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "named-precedence",
+    "source": "fn(x()) { return 8 }\nf := x => x\nprint(type(f(3)))",
+    "expected": "function\n",
+    "exit": 0,
+    "stdout": "function\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "escaped-local-captures",
+    "source": "fn(mk(v)) { return x => v }\na := mk(2); b := mk(8); print(a(0)); print(b(0))",
+    "expected": "2\n8\n",
+    "exit": 0,
+    "stdout": "2\n8\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "returned-callables",
+    "source": "a := [2,7].map(x => (y => x))\nf := a[0]; g := a[1]; print(f(0)); print(g(0)); print(f == g)",
+    "expected": "2\n7\nfalse\n",
+    "exit": 0,
+    "stdout": "2\n7\nfalse\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "root-path-growth",
+    "source": "a := [[1]]\nfor(row : a) { f := x => row[0]; a.push([9]); print(f(0)) }",
+    "expected": "1\n",
+    "exit": 0,
+    "stdout": "1\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "unused-timer-observable",
+    "source": "t := timer()\nf := async x => x\nr := f(3)\nprint(await r)",
+    "expected": {
+      "error": "async function capture contains a non-transferable timer"
+    },
+    "exit": 1,
+    "stdout": "",
+    "stderr": "error: /home/nick/Repositories/nift/nift/.build/cp49-identity/contracts/unused-timer-observable.f:3:6: async function capture contains a non-transferable timer\n",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "async-invoke",
+    "source": "f := async x => x + 1\nr := f(3); print(await r)",
+    "expected": "4\n",
+    "exit": 0,
+    "stdout": "4\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "async-callback-current",
+    "source": "f := async x => x + 1\nprint([3,1,2].sort_by(f).stringify())",
+    "expected": "[1,2,3]\n",
+    "exit": 0,
+    "stdout": "[1,2,3]\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "throwing-factory",
+    "source": "n := 0\nfn(mk()) { n += 1; if(n == 2) { throw error(\"stop\", \"user.selector\") }; return x => x }\ntry { [3,1,2].sort_by(mk()) } catch(e) { print(e.message) }\nprint(n)",
+    "expected": "stop\n2\n",
+    "exit": 0,
+    "stdout": "stop\n2\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "bad-key-cleanup",
+    "source": "try { [2,1].sort_by(x => [x]) } catch(e) { print(\"caught\") }\nprint([2,1].sort_by(x => x).stringify())",
+    "expected": null,
+    "exit": 1,
+    "stdout": "",
+    "stderr": "error: /home/nick/Repositories/nift/nift/.build/cp49-identity/contracts/bad-key-cleanup.f:1:1: sort_by: key must be scalar\n",
+    "exact_baseline_match": true
+  },
+  {
+    "name": "module-ownership",
+    "source": "import(\"./module.f\")\nv := 100\nf := mk(); print(f(1)); print([3,1,2].sort_by(f).stringify())",
+    "expected": "8\n[1,2,3]\n",
+    "exit": 0,
+    "stdout": "8\n[1,2,3]\n",
+    "stderr": "",
+    "exact_baseline_match": true
+  }
+]

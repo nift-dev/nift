@@ -1,0 +1,42 @@
+[
+  {
+    "name": "call-scalar",
+    "counters": "value-counts ctor=42050 copy_ctor=3 move_ctor=20002 copy_assign=16006 move_assign=12019 dtor=62055\n"
+  },
+  {
+    "name": "call-closure",
+    "counters": "value-counts ctor=48059 copy_ctor=5 move_ctor=14002 copy_assign=22006 move_assign=8024 dtor=62066\n"
+  },
+  {
+    "name": "call-callback",
+    "counters": "value-counts ctor=64057 copy_ctor=4 move_ctor=32002 copy_assign=26006 move_assign=14021 dtor=96063\n"
+  },
+  {
+    "name": "sort-identity",
+    "counters": "value-counts ctor=44068 copy_ctor=8004 move_ctor=18763 copy_assign=16006 move_assign=38074 dtor=70835\n"
+  },
+  {
+    "name": "sort-arithmetic",
+    "counters": "value-counts ctor=54072 copy_ctor=8004 move_ctor=18763 copy_assign=22006 move_assign=40075 dtor=80839\n"
+  },
+  {
+    "name": "map-identity",
+    "counters": "value-counts ctor=26059 copy_ctor=8004 move_ctor=14096 copy_assign=12006 move_assign=4020 dtor=48159\n"
+  },
+  {
+    "name": "sort-aggregate",
+    "counters": "value-counts ctor=28045 copy_ctor=70003 move_ctor=22716 copy_assign=2005 move_assign=36725 dtor=120764\n"
+  },
+  {
+    "name": "sort-precreated",
+    "counters": "value-counts ctor=42072 copy_ctor=8005 move_ctor=18763 copy_assign=18006 move_assign=36076 dtor=68840\n"
+  },
+  {
+    "name": "sort-captured",
+    "counters": "value-counts ctor=54077 copy_ctor=8005 move_ctor=18763 copy_assign=22006 move_assign=40078 dtor=80845\n"
+  },
+  {
+    "name": "sort-unused-50",
+    "counters": "value-counts ctor=44368 copy_ctor=8054 move_ctor=18763 copy_assign=16006 move_assign=38274 dtor=71185\n"
+  }
+]

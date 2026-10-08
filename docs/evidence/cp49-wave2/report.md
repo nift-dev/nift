@@ -321,3 +321,11 @@ preceding candidate → candidate, rather than total campaign savings.
 | sort-identity | 62084077 → 61993743 | 10.257 → 11.677 |
 | loops | 12915180 → 12950357 | 2.770 → 3.051 |
 
+
+## Hosted acceptance follow-up
+
+The accepted runtime and closeout were pushed normally to `02e3793`. All ten
+relevant non-release hosted workflows passed at that exact SHA, including Deep
+Guards, Test Integrity/bindings, NRS 93/93, PRS 12/12, performance and cross-platform
+checks. **CP49 WAVE 2: CLOSED.** See the [run identities and next design-only
+investigation](../cp49-identity/report.md). No official rerun or release run occurred.

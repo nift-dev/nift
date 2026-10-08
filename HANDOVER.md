@@ -496,4 +496,13 @@ call/aggregate/key/provenance improvements. Native/binding, strict GCC/Clang,
 ASan/UBSan/LSan, NRS 93/93 and PRS 12/12 pass; ABI 1.3 and all frozen hashes
 remain unchanged. See [the final report](docs/evidence/cp49-wave2/report.md).
 Stop before frame/storage/dispatch architecture decisions. Official reruns remain
-deferred until after v4.9 release; this closeout is local and unpublished.
+deferred until after v4.9 release; the accepted closeout is now pushed and hosted green.
+
+CP49 wave 2 is CLOSED: all ten relevant non-release hosted workflows are green
+at `02e3793ccc8d378ce63382b28cb12a69b5ce683d` (runtime `3c0a5b2`).
+[CP49-51–57 identity-sort investigation](docs/evidence/cp49-identity/report.md)
+is complete with no production changes. Per-element factory/capture/frame and
+retained-instance teardown dominate; the identity body is already prepared.
+Global hoisting and syntax-only selective capture violate tested contracts.
+Recommendation: a narrowly bounded insertion-cost follow-up, with key storage
+measured separately; stop for review before plan/capture/lifetime architecture.

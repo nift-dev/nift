@@ -1,0 +1,46 @@
+[
+  {
+    "name": "call-scalar",
+    "counters": "lambda-cache syntax=0 numeric=0 instances=0 prepared=0 legacy=0\ncp49 expressions=7 recursive_compat=15 prepared_calls=2000 scopes=4000 captures=0 source_contexts=2001 cached_paths=1 source_documents=1\n"
+  },
+  {
+    "name": "call-closure",
+    "counters": "lambda-cache syntax=1 numeric=1 instances=1 prepared=2000 legacy=0\ncp49 expressions=2009 recursive_compat=8019 prepared_calls=0 scopes=4000 captures=3 source_contexts=2001 cached_paths=0 source_documents=1\nlegacy-shape 2000 f(i)\n"
+  },
+  {
+    "name": "call-callback",
+    "counters": "lambda-cache syntax=1 numeric=1 instances=1 prepared=2000 legacy=0\ncp49 expressions=2008 recursive_compat=6017 prepared_calls=2000 scopes=6000 captures=2 source_contexts=4001 cached_paths=1 source_documents=1\nlegacy-shape 2000 f(x)\n"
+  },
+  {
+    "name": "sort-identity",
+    "counters": "lambda-cache syntax=1 numeric=0 instances=2000 prepared=2000 legacy=0\ncp49 expressions=8 recursive_compat=2018 prepared_calls=0 scopes=4000 captures=10000 source_contexts=2001 cached_paths=0 source_documents=1\n"
+  },
+  {
+    "name": "sort-arithmetic",
+    "counters": "lambda-cache syntax=1 numeric=1 instances=2000 prepared=2000 legacy=0\ncp49 expressions=8 recursive_compat=4018 prepared_calls=0 scopes=4000 captures=10000 source_contexts=2001 cached_paths=0 source_documents=1\n"
+  },
+  {
+    "name": "map-identity",
+    "counters": "lambda-cache syntax=1 numeric=0 instances=1 prepared=2000 legacy=0\ncp49 expressions=8 recursive_compat=19 prepared_calls=0 scopes=4000 captures=5 source_contexts=2001 cached_paths=0 source_documents=1\n"
+  },
+  {
+    "name": "sort-aggregate",
+    "counters": "lambda-cache syntax=1 numeric=1 instances=2000 prepared=2000 legacy=0\ncp49 expressions=8 recursive_compat=2018 prepared_calls=0 scopes=2000 captures=6000 source_contexts=2001 cached_paths=0 source_documents=1\n"
+  },
+  {
+    "name": "sort-precreated",
+    "counters": "lambda-cache syntax=1 numeric=0 instances=1 prepared=2000 legacy=0\ncp49 expressions=9 recursive_compat=2020 prepared_calls=0 scopes=4000 captures=5 source_contexts=2001 cached_paths=0 source_documents=1\n"
+  },
+  {
+    "name": "sort-captured",
+    "counters": "lambda-cache syntax=1 numeric=1 instances=2000 prepared=2000 legacy=0\ncp49 expressions=9 recursive_compat=6020 prepared_calls=0 scopes=4000 captures=12000 source_contexts=2001 cached_paths=0 source_documents=1\n"
+  },
+  {
+    "name": "sort-unused-50",
+    "counters": "lambda-cache syntax=1 numeric=0 instances=2000 prepared=2000 legacy=0\ncp49 expressions=58 recursive_compat=2118 prepared_calls=0 scopes=4000 captures=110000 source_contexts=2001 cached_paths=0 source_documents=1\n"
+  },
+  {
+    "name": "loops",
+    "counters": "lambda-cache syntax=0 numeric=0 instances=0 prepared=0 legacy=0\ncp49 expressions=7 recursive_compat=15 prepared_calls=0 scopes=2000 captures=0 source_contexts=1 cached_paths=0 source_documents=1\n"
+  }
+]

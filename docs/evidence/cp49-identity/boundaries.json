@@ -1,0 +1,13 @@
+{
+  "hosted_source": "02e3793ccc8d378ce63382b28cb12a69b5ce683d",
+  "runtime_source": "3c0a5b22c24da50f749e1f385d84d52ce1a4543d",
+  "binary_sha256": "790bbce6325b0eadce6d98fbb27527ccd4c43fa082b23d1ca3667e54022bc862",
+  "production_source_changes": [],
+  "version": "4.9.0",
+  "abi": "1.3",
+  "frozen_paths_checked": 2828,
+  "frozen_changes": [],
+  "official_runs": 0,
+  "labs_writes": 0,
+  "publication": "accepted wave-2 commits pushed; investigation is local evidence only"
+}

@@ -1,0 +1,66 @@
+[
+  {
+    "name": "call-scalar",
+    "instructions": 5975,
+    "allocation_annotation": []
+  },
+  {
+    "name": "call-closure",
+    "instructions": 5986,
+    "allocation_annotation": []
+  },
+  {
+    "name": "call-callback",
+    "instructions": 8453,
+    "allocation_annotation": []
+  },
+  {
+    "name": "sort-identity",
+    "instructions": 5841526,
+    "allocation_annotation": [
+      "         0                0           4,139,576 (36.67%)  24,035 (28.42%)  UnknownFile???:Parser::~Parser()"
+    ]
+  },
+  {
+    "name": "sort-arithmetic",
+    "instructions": 5845786,
+    "allocation_annotation": [
+      "         0                0           4,147,580 (36.27%)  24,035 (27.77%)  UnknownFile???:Parser::~Parser()"
+    ]
+  },
+  {
+    "name": "map-identity",
+    "instructions": 161652,
+    "allocation_annotation": [
+      "         0               0            621,511 ( 9.18%)     53 ( 0.12%)  UnknownFile???:Parser::~Parser()"
+    ]
+  },
+  {
+    "name": "sort-aggregate",
+    "instructions": 8051733,
+    "allocation_annotation": [
+      "         0                0           7,636,082 (29.41%)  32,034 (25.71%)  UnknownFile???:Parser::~Parser()"
+    ]
+  },
+  {
+    "name": "sort-precreated",
+    "instructions": 162123,
+    "allocation_annotation": [
+      "         0               0             621,803 ( 8.58%)     57 ( 0.12%)  UnknownFile???:Parser::~Parser()"
+    ]
+  },
+  {
+    "name": "sort-captured",
+    "instructions": 5915106,
+    "allocation_annotation": [
+      "         0                0           4,267,906 (36.17%)  24,038 (26.54%)  UnknownFile???:Parser::~Parser()"
+    ]
+  },
+  {
+    "name": "sort-unused-50",
+    "instructions": 29052422,
+    "allocation_annotation": [
+      "          0                  0          18,384,740 (38.65%) 124,185 (25.16%)  UnknownFile???:Parser::~Parser()"
+    ]
+  }
+]
