@@ -159,13 +159,14 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
     return parse(source, source_path, depth, provenance);
 }
 
-RenderResult Parser::parse(const std::string& source, const fs::path& source_path, int depth,
+RenderResult Parser::parse(const std::string& input, const fs::path& source_path, int depth,
                            SourceProvenance source_provenance, nift::detail::SourceView view) {
+    if (!view) view = nift::detail::SourceView::identity(source_path, input);
+    const nift::detail::SourceText source(input, view);
     if (depth > 64) {
         fail(source_path, source, 0, "maximum template parse depth exceeded (possible recursion)");
         return result_;
     }
-    if(!view)view=nift::detail::SourceView::identity(source_path,source);
     source_context_stack_.push_back(SourceContext{source_path,source_provenance,view});
     source_path_stack_.push_back(source_path);
     struct SourceContextGuard {
@@ -502,7 +503,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             }
 
             if (end < source.size()) {
-                const std::string key = source.substr(i + 2, end - i - 2);
+                const auto key = source.substr(i + 2, end - i - 2);
 
                 auto split_ternary = [&](const std::string& expression,
                                          std::string& condition,
@@ -687,7 +688,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
             if (!find_balanced(source, block_open, '{', '}', block_close)) { fail(source_path, source, block_open, "@item block has no matching '}'"); break; }
             const auto body = normalize_control_block_body(source.substr(block_open + 1, block_close - block_open - 1));
             push_json_scope();
-            const auto nested = parse(body.text, source_path, depth + 1, source_provenance);
+            const auto nested = parse(body.text, source_path, depth + 1, source_provenance, body.view);
             pop_json_scope();
             if (!nested.ok) break;
             result_.pagination_items.push_back(nested.output);
@@ -746,7 +747,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                 const auto body = normalize_control_block_body(
                     source.substr(block_open + 1, block_close - block_open - 1));
                 push_json_scope();
-                const auto nested = parse(body.text, source_path, depth + 1, source_provenance);
+                const auto nested = parse(body.text, source_path, depth + 1, source_provenance, body.view);
                 pop_json_scope();
                 if (!nested.ok) break;
                 append_indented(output, nested.output, control_indent, insertion_code_block_depth);
@@ -836,7 +837,7 @@ RenderResult Parser::parse(const std::string& source, const fs::path& source_pat
                         source.substr(cursor + 1, else_block_close - cursor - 1));
                     push_json_scope();
                     ++loop_depth_;
-                    const auto nested = parse(body.text, source_path, depth + 1, source_provenance);
+                    const auto nested = parse(body.text, source_path, depth + 1, source_provenance, body.view);
                     --loop_depth_;
                     pop_json_scope();
                     if (!nested.ok) { if(nested.diagnostic)active_diagnostic_=nested.diagnostic;fail(source_path,source,i,nested.error.message);break; }
@@ -1216,7 +1217,7 @@ e="unknown value or malformed expression: "+name;return false;};c.legacy=[&](con
             std::vector<std::unique_ptr<nift::ast::Stmt>> prepared_body; const bool prepared_body_ok=prepare_loop_body(body.text,prepared_body);
 
             while(result_.ok){bool yes=false;std::string e;if(prepared_condition.supported){auto& c=ast_context();nift::RuntimeValue cv;if(!nift::ast::evaluate(*prepared_condition.expr,c,cv,e)){fail(source_path,source,i,e);break;}yes=nift::ast::truthy(cv);last_expression_mutation_=false;}else if(!evaluate_condition(condition,yes,e)){fail(source_path,source,i,e);break;}if(!yes)break;
-                push_json_scope(); ++loop_depth_; RenderResult nested;if(prepared_body_ok){auto execution=execute_body_outcome(prepared_body);if(execution.kind()==nift::detail::ExecOutcome::Kind::Fatal){nested.ok=false;nested.diagnostic=execution.diagnostic();nested.error.message=nift::detail::project_diagnostic(execution.diagnostic());}else if(execution.kind()==nift::detail::ExecOutcome::Kind::Recoverable){active_recoverable_=execution.error();nested.ok=false;nested.error.message=execution.error().error?execution.error().error->message:"recoverable failure";}}else nested=parse(body.text,source_path,depth+1,source_provenance); --loop_depth_; pop_json_scope();if(!nested.ok){if(nested.diagnostic)active_diagnostic_=nested.diagnostic;fail(source_path,source,i,nested.error.message);break;}append_indented(output,nested.output,"",code_block_depth_);
+                push_json_scope(); ++loop_depth_; RenderResult nested;if(prepared_body_ok){auto execution=execute_body_outcome(prepared_body);if(execution.kind()==nift::detail::ExecOutcome::Kind::Fatal){nested.ok=false;nested.diagnostic=execution.diagnostic();nested.error.message=nift::detail::project_diagnostic(execution.diagnostic());}else if(execution.kind()==nift::detail::ExecOutcome::Kind::Recoverable){active_recoverable_=execution.error();nested.ok=false;nested.error.message=execution.error().error?execution.error().error->message:"recoverable failure";}}else nested=parse(body.text,source_path,depth+1,source_provenance,body.view); --loop_depth_; pop_json_scope();if(!nested.ok){if(nested.diagnostic)active_diagnostic_=nested.diagnostic;fail(source_path,source,i,nested.error.message);break;}append_indented(output,nested.output,"",code_block_depth_);
                 if (pending_control_.kind == ControlFlow::Continue) { pending_control_ = {}; continue; }
                 if (pending_control_.kind == ControlFlow::Break) { pending_control_ = {}; break; }
                 if(pending_control_.kind!=ControlFlow::None)break;
@@ -1398,7 +1399,7 @@ e="unknown value or malformed expression: "+name;return false;};c.legacy=[&](con
                         auto execution=execute_body_outcome(for_prepared_body);
                         if(execution.kind()==nift::detail::ExecOutcome::Kind::Fatal){nested.ok=false;nested.diagnostic=execution.diagnostic();nested.error.message=nift::detail::project_diagnostic(execution.diagnostic());}
                         else if(execution.kind()==nift::detail::ExecOutcome::Kind::Recoverable){active_recoverable_=execution.error();nested.ok=false;nested.error.message=execution.error().error?execution.error().error->message:"recoverable failure";}
-                    }else nested=parse(body.text,source_path,depth+1,source_provenance);
+                    }else nested=parse(body.text,source_path,depth+1,source_provenance,body.view);
                     --loop_depth_;
                     pop_json_scope();
                     if(!nested.ok)break;
@@ -1511,7 +1512,7 @@ e="unknown value or malformed expression: "+name;return false;};c.legacy=[&](con
                     if(for_prepared_ok){
                         std::string pe;
                         auto execution=execute_body_outcome(for_prepared_body);if(execution.kind()==nift::detail::ExecOutcome::Kind::Fatal){nested.ok=false;nested.diagnostic=execution.diagnostic();nested.error.message=nift::detail::project_diagnostic(execution.diagnostic());}else if(execution.kind()==nift::detail::ExecOutcome::Kind::Recoverable){active_recoverable_=execution.error();nested.ok=false;nested.error.message=execution.error().error?execution.error().error->message:"recoverable failure";}
-                    }else nested=parse(body.text, source_path, depth + 1, source_provenance);
+                    }else nested=parse(body.text, source_path, depth + 1, source_provenance, body.view);
                     --loop_depth_;
                     pop_json_scope();
                     if (!nested.ok) { if(nested.diagnostic)active_diagnostic_=nested.diagnostic;fail(source_path,source,i,nested.error.message);break; }
@@ -1650,7 +1651,7 @@ e="unknown value or malformed expression: "+name;return false;};c.legacy=[&](con
                     if(valid_binding_identifier(collection_expression)){VariableBinding* srcb=nullptr;for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(collection_expression);if(it!=sc->end()){srcb=&it->second;break;}}if(srcb){srcb->sync();if(srcb->value){vb.ref_root_slot=srcb->slot;std::vector<PathComponent> pc;pc.push_back(PathComponent::member(entry.first));vb.ref_path=std::move(pc);}}}
                     variable_scopes_.back().emplace(value_name, std::move(vb));
                     ++loop_depth_;
-                    const auto nested = parse(body.text, source_path, depth + 1, source_provenance);
+                    const auto nested = parse(body.text, source_path, depth + 1, source_provenance, body.view);
                     --loop_depth_;
                     pop_json_scope();
                     if (!nested.ok) break;
@@ -1693,7 +1694,7 @@ e="unknown value or malformed expression: "+name;return false;};c.legacy=[&](con
                 has_parameters = true;
                 std::size_t close = 0;
                 if (!find_balanced(source, call_start, '(', ')', close)) { fail(source_path, source, i, function + ": malformed parameters"); break; }
-                parameters = parse_parameters(source.substr(call_start + 1, close - call_start - 1), parameters_ok,
+                parameters = parse_parameters(static_cast<const std::string&>(source).substr(call_start + 1, close - call_start - 1), parameters_ok,
                                               function == "json" ? &parameter_quoted : nullptr);
                 if (!parameters_ok) { fail(source_path, source, i, function + ": malformed parameters"); break; }
                 end = close + 1;
@@ -2082,7 +2083,7 @@ e="unknown value or malformed expression: "+name;return false;};c.legacy=[&](con
                     }
                     const auto body = normalize_control_block_body(
                         source.substr(block_open + 1, block_close - block_open - 1));
-                    const auto templated = parse(body.text, source_path, depth + 1, source_provenance);
+                    const auto templated = parse(body.text, source_path, depth + 1, source_provenance, body.view);
                     if (!templated.ok) break;
                     markup_source = templated.output;
                     directive_end = block_close + 1;
@@ -2245,7 +2246,7 @@ e="unknown value or malformed expression: "+name;return false;};c.legacy=[&](con
                     }
                     const auto body = normalize_control_block_body(
                         source.substr(block_open + 1, block_close - block_open - 1));
-                    const auto templated = parse(body.text, source_path, depth + 1, source_provenance);
+                    const auto templated = parse(body.text, source_path, depth + 1, source_provenance, body.view);
                     if (!templated.ok) break;
                     nift::RuntimeValue parsed;
                     std::string parse_error;

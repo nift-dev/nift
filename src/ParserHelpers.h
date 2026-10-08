@@ -79,6 +79,9 @@ struct NIFT_PARSER_HELPER_HIDDEN ControlBlockBody {
 };
 
 NIFT_PARSER_HELPER_HIDDEN ControlBlockBody normalize_control_block_body(std::string body, SourceView view = {});
+inline ControlBlockBody normalize_control_block_body(const SourceText& body) {
+    return normalize_control_block_body(static_cast<const std::string&>(body), body.view);
+}
 NIFT_PARSER_HELPER_HIDDEN std::string insertion_indent(const std::string& output);
 NIFT_PARSER_HELPER_HIDDEN void append_indented(
     std::string& output, const std::string& text, const std::string& indent,
