@@ -22,7 +22,7 @@ if not compilers:
 for compiler in compilers:
     for source, include in [('bindings/node/native/nift_node.cc', node),
                             ('bindings/python/src/nift_module.cc', sysconfig.get_path('include'))]:
-        subprocess.run([compiler, '-std=c++17', '-Wall', '-Wextra', '-Wpedantic',
-                        '-Werror', '-fsyntax-only', '-I' + include, '-Iinclude', source],
-                       cwd=root, check=True)
+        command = [compiler, '-std=c++17', '-Wall', '-Wextra', '-Wpedantic',
+                        '-Werror', '-fsyntax-only', '-I' + include, '-Iinclude', source]
+        subprocess.run(command, cwd=root, check=True)
         print(f'PASS {compiler}: {source} warnings as errors')

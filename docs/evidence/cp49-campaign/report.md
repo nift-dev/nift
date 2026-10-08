@@ -289,3 +289,10 @@ bool rendered collisions, aggregate independence and callback effects. Existing
 470 numeric parity pairs/callback matrix/counters pass. Exact-current lifetime
 ASan/UBSan/LSan passes 37 cases, collections and callback module/capture/async
 matrix. Data in [9](9/).
+
+Tooling clarity: separate the binding-warning compiler argument vector from its
+`subprocess.run(..., check=True)`. The original already propagated errors, but
+the static scanner's bounded call window could not see the trailing check flag.
+No scanner suppression/rule weakening. Static integrity clean (290 files), all
+four GCC/Clang native-wrapper warning passes green, and an injected failing
+compiler proves a nonzero guard outcome. Nift runtime behavior is unaffected.
