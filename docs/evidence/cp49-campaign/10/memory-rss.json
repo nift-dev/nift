@@ -1,0 +1,26 @@
+[
+  {
+    "variant": "before",
+    "allocations": 25615,
+    "bytes": 11592124,
+    "maxrss_kib": [
+      40700,
+      41252,
+      40880,
+      40848,
+      41028
+    ]
+  },
+  {
+    "variant": "after",
+    "allocations": 25615,
+    "bytes": 11592117,
+    "maxrss_kib": [
+      41184,
+      41140,
+      40772,
+      40708,
+      40916
+    ]
+  }
+]

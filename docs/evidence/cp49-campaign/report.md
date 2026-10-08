@@ -209,3 +209,39 @@ matrix and deterministic counters pass. Exact current ASan/UBSan/LSan lifetime
 build passes 33 cases, location receiver, callback matrix and collection ops
 smoke. Data in [8](8/). Extra aggregate probes are independent generated records,
 not official benchmark inputs; generator retained in tools.
+
+## CP49-10: JSON timer preflight once per conversion
+
+**KEEP**. `runtime_to_json` recursively rescanned each subtree for timers before
+conversion. Retain its whole-value timer preflight at the public boundary and
+use a private recursive converter for the already-checked tree. Error priority,
+ordering, number spellings, output-on-failure, bytes/Error rejection and value
+semantics are unchanged; no vendored Jsonic++ code changed. Normal exported API
+and ABI are unchanged; counters exist only in a dedicated native guard binary.
+
+Independent wide objects, mixed nested arrays and 48-level chains at 2,000/
+16,000 leaves were isolated into raw parse, runtime conversion, serialization
+(runtime_to_json+dump) and deep copy; each stage includes destruction. Seven
+paired process-CPU batches, each 20 repetitions: deep serialization 0.60250 →
+0.23705 ms (-60.66%) at 2,000, 5.71430 → 2.01485 ms (-64.74%) at 16,000.
+Wide serialization 0.72060 → 0.67970 ms / 9.22620 → 8.93040 ms; mixed
+0.82115 → 0.76295 / 11.68900 → 11.52440 ms. Small shallow differences need
+caution; the repeatable deep gain is decisive. Whole native deep-2,000 helper
+instructions (all four stages, 20 repeats) 346,687,615 → 219,729,953 (-36.62%).
+Raw parser/conversion/copy timings vary with host load; their implementations
+are unchanged. No raw parser dominance or parser modification is inferred.
+
+Ordinary shallow JSON serialization instructions 28,106,729 → 28,076,284
+(-0.11%); parse/convert, traversal, mutation, aggregate map, BFS, loops, scalar
+call and filesystem control changes all below 0.02%. Allocation counts unchanged
+(25,615), bytes differ only by CLI path length; zero Memcheck errors/all freed.
+N=16,000 RSS distributions overlap (40,880 → 40,916 KiB median).
+
+Expanded native contracts first passed on the unmodified implementation, then
+on the candidate: wide/deep round-trip, timer-before-bytes/Error precedence,
+unchanged output on failure, cleared error on success. Exact current ASan/UBSan/
+LSan native unit and lifetime CLI timer/Error characterization pass. Deterministic
+guard proves one preflight and exactly N+49 conversions for depth-48 arrays at
+N=100/200/400. Native stage columns in paired-stages.json are parse, conversion,
+serialization and copy CPU milliseconds; these are local diagnostics, not an
+external language benchmark. Data in [10](10/), shape generator retained in tools.

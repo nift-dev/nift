@@ -8,3 +8,12 @@ for n in [2000,16000]:
  for name,body in [('map-aggregate','b := a.map(x => x); print(b.length())'),('filter-aggregate','b := a.filter(x => true); print(b.length())')]:
   p=b/f'{name}-{n}.f';p.write_text('a := inject('+json.dumps(str(file.resolve()))+')\nprobe_timer := timer(); probe_timer.start()\n'+body+'\nprobe_timer.stop(); print(probe_timer.elapsed())\n');rows.append(dict(name=name,n=n,path=str(p.resolve()),expected=str(n)))
 Path('.build/cp49-campaign/extra-probes.json').write_text(json.dumps(rows,indent=2)+'\n')
+# Wide objects, 48-level object chains, and heterogeneous nested arrays.
+shapes=Path('.build/cp49-campaign/10');shapes.mkdir(exist_ok=True,parents=True)
+for n in [2000,16000]:
+ wide={f'k{i}':{'v':i,'mixed':[None,True,'s']} for i in range(n)}
+ deep=[{'v':i} for i in range(n)]
+ for _ in range(48):deep={'next':deep}
+ mixed=[{'array':[1,{'x':i}],'s':'value'} for i in range(n)]
+ for label,value in [('wide',wide),('deep',deep),('mixed',mixed)]:
+  (shapes/f'{label}-{n}.json').write_text(json.dumps(value,separators=(',',':')))

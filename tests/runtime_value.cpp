@@ -288,4 +288,36 @@ int main() {
         threw = std::string(e.what()) == "bytes values are not JSON serializable";
     }
     assert(threw);
+    // Conversion rejects any nested timer before other unsupported values,
+    // preserves caller output on failure, and keeps wide/deep mixed structure.
+    auto timer_mixture = nift::RuntimeValue::make_array();
+    timer_mixture.array = {binary, runtime_error, nift::RuntimeValue::make_timer(3, 4)};
+    json::Document timer_unchanged(true);
+    std::string timer_error;
+    assert(!nift::runtime_to_json(timer_mixture, timer_unchanged, timer_error));
+    assert(timer_error == "timer values are not JSON serializable");
+    assert(timer_unchanged.is_bool() && timer_unchanged.boolean);
+    auto wide = nift::RuntimeValue::make_object();
+    for (int i = 0; i < 200; ++i) wide.object.emplace_back(std::to_string(i), value);
+    auto deep = wide;
+    for (int i = 0; i < 48; ++i) {
+        auto parent = nift::RuntimeValue::make_array();
+        parent.array.push_back(std::move(deep));
+        deep = std::move(parent);
+    }
+    json::Document deep_json;
+    std::string deep_error = "previous error";
+    assert(nift::runtime_to_json(deep, deep_json, deep_error));
+    assert(deep_error.empty());
+    assert(nift::runtime_equal(deep, nift::runtime_from_json(deep_json)));
+    auto nested_timer = timer_mixture;
+    for (int i = 0; i < 48; ++i) {
+        auto parent = nift::RuntimeValue::make_object();
+        parent.object.emplace_back("child", std::move(nested_timer));
+        nested_timer = std::move(parent);
+    }
+    assert(!nift::runtime_to_json(nested_timer, timer_unchanged, timer_error));
+    assert(timer_error == "timer values are not JSON serializable");
+    assert(timer_unchanged.is_bool() && timer_unchanged.boolean);
+
 }

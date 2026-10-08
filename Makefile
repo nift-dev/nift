@@ -730,7 +730,7 @@ test-all: test test-embed test-bindings test-build-boundary
 
 # Plain `make test` = the ordinary Nift/CLI regression surface (C++ toolchain
 # only). Embedding and binding suites are run through the focused targets.
-test: test-v49-glob-key-guard test-v49-glob-order test-v49-selector-parity test-parser-hardening test-content test-commands test-comments test-contracts test-json test-runtime-value test-cp15-numeric-repair test-cp17-bytes test-cp18-bytes test-cp19-bytes test-cp20-bytes test-cp21-bytes \
+test: test-v49-json-preflight-guard test-v49-glob-key-guard test-v49-glob-order test-v49-selector-parity test-parser-hardening test-content test-commands test-comments test-contracts test-json test-runtime-value test-cp15-numeric-repair test-cp17-bytes test-cp18-bytes test-cp19-bytes test-cp20-bytes test-cp21-bytes \
 	test-json-schema test-console test-diagnostics test-minify \
 	test-json-schema-integration test-markup-json-directives test-pagination test-pagination-ordering \
 	test-template-optional test-requirements test-path-alias test-path-safety test-metadata-safety \
@@ -1804,3 +1804,11 @@ $(GLOB_KEY_GUARD): $(filter-out src/ParserHelpers.o,$(CLI_OBJECTS)) $(TEST_DIR)/
 .PHONY: test-v49-glob-key-guard
 test-v49-glob-key-guard: $(GLOB_KEY_GUARD)
 	NIFT="$(CURDIR)/$(GLOB_KEY_GUARD)" python3 tests/v49_glob_key_guard.py
+
+JSON_PREFLIGHT_GUARD := $(TEST_DIR)/nift-json-preflight-guard$(EXEEXT)
+$(JSON_PREFLIGHT_GUARD): tests/v49_json_preflight_guard.cpp src/RuntimeValue.cpp src/RuntimeValue.h src/RuntimeJson.h
+	mkdir -p "$(TEST_DIR)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_TEST_JSON_PREFLIGHT_STATS tests/v49_json_preflight_guard.cpp src/RuntimeValue.cpp -o "$@"
+.PHONY: test-v49-json-preflight-guard
+test-v49-json-preflight-guard: $(JSON_PREFLIGHT_GUARD)
+	NIFT_JSON_GUARD="$(CURDIR)/$(JSON_PREFLIGHT_GUARD)" python3 tests/v49_json_preflight_guard.py

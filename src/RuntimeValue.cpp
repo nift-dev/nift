@@ -3,6 +3,11 @@
 #include "RuntimeJson.h"
 
 #include <algorithm>
+#ifdef NIFT_TEST_JSON_PREFLIGHT_STATS
+#include <atomic>
+#include <cstdio>
+#include <cstdlib>
+#endif
 #include <charconv>
 #include <cmath>
 #include <limits>
@@ -11,6 +16,16 @@
 namespace nift {
 
 namespace {
+#ifdef NIFT_TEST_JSON_PREFLIGHT_STATS
+struct JsonPreflightStats {
+    std::atomic<unsigned long long> preflights{0}, conversions{0};
+    ~JsonPreflightStats() {
+        if (std::getenv("NIFT_TEST_JSON_PREFLIGHT_STATS"))
+            std::fprintf(stderr, "json-conversion preflights=%llu conversions=%llu\n",
+                         preflights.load(), conversions.load());
+    }
+} json_preflight_stats;
+#endif
 json::Document runtime_error_to_json(const RuntimeErrorData& error, std::size_t depth,
                                      std::unordered_set<const RuntimeErrorData*>& seen) {
     if (depth >= 16 || !seen.insert(&error).second)
@@ -773,11 +788,11 @@ RuntimeValue runtime_from_json(const json::Document& document) {
     return value;
 }
 
-bool runtime_to_json(const RuntimeValue& value, json::Document& output, std::string& error) {
-    if (runtime_contains_timer(value)) {
-        error = "timer values are not JSON serializable";
-        return false;
-    }
+namespace {
+bool runtime_to_json_without_timer(const RuntimeValue& value, json::Document& output, std::string& error) {
+#ifdef NIFT_TEST_JSON_PREFLIGHT_STATS
+    ++json_preflight_stats.conversions;
+#endif
     json::Document document;
     switch (value.type) {
         case RuntimeType::Null: break;
@@ -794,7 +809,7 @@ bool runtime_to_json(const RuntimeValue& value, json::Document& output, std::str
             document.array.reserve(value.array.size());
             for (const auto& item : value.array) {
                 json::Document converted;
-                if (!runtime_to_json(item, converted, error)) return false;
+                if (!runtime_to_json_without_timer(item, converted, error)) return false;
                 document.array.push_back(std::move(converted));
             }
             break;
@@ -803,7 +818,7 @@ bool runtime_to_json(const RuntimeValue& value, json::Document& output, std::str
             document.object.reserve(value.object.size());
             for (const auto& entry : value.object) {
                 json::Document converted;
-                if (!runtime_to_json(entry.second, converted, error)) return false;
+                if (!runtime_to_json_without_timer(entry.second, converted, error)) return false;
                 document.object.emplace_back(entry.first, std::move(converted));
             }
             break;
@@ -820,6 +835,21 @@ bool runtime_to_json(const RuntimeValue& value, json::Document& output, std::str
     output = std::move(document);
     error.clear();
     return true;
+}
+
+} // namespace
+
+bool runtime_to_json(const RuntimeValue& value, json::Document& output, std::string& error) {
+#ifdef NIFT_TEST_JSON_PREFLIGHT_STATS
+    ++json_preflight_stats.preflights;
+#endif
+    // Preserve whole-value timer error priority, but do not rescan every
+    // subtree while recursively converting that already checked value.
+    if (runtime_contains_timer(value)) {
+        error = "timer values are not JSON serializable";
+        return false;
+    }
+    return runtime_to_json_without_timer(value, output, error);
 }
 
 json::Document runtime_to_json(const RuntimeValue& value) {
