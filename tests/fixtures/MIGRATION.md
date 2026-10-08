@@ -95,6 +95,32 @@ Publication/behaviour parity does **not** require different maintained-source
 architectures to preserve identical source semantics. An authored-source
 migration and an agent-primary rendered-source migration can both be valid.
 
+#### Interactive islands and client frameworks
+
+A Nift migration does not require static HTML only or removing React, Vue,
+Svelte, Solid, Web Components or other client-side framework code. Nift owns
+site generation and the build layer; generated pages may load and mount
+independently prepared browser-side islands or bundles. Nift does not itself
+compile those frameworks: preserve or configure the appropriate external
+bundle preparation as part of the production pipeline.
+
+Valid choices include React, Vue, Svelte and Solid islands, Web Components,
+vanilla JavaScript controllers, and other browser-side bundles required by the
+source application. The presence of framework islands does not make the site
+"not Nift".
+
+Use the smallest architecture that preserves required behaviour. Faithful
+human + agent migrations may retain existing islands where that is the safest
+and most maintainable parity path. Agent-primary migrations may prefer vanilla
+HTML/CSS/JS where practical, while framework islands remain available for
+complex/shared client state or interactions where they are the cleaner solution.
+
+Choose based on behavioural parity, maintainability, accessibility, runtime and
+bundle cost, shared client state, the selected source model, and compatibility
+risk. Record significant retained or introduced islands, their preparation and
+mounting paths, and the reasons for the choice in architecture evidence and
+`investigation/STATUS.md` before broad implementation.
+
 #### Complete production pipeline
 
 A successful upstream build does **not** necessarily mean the complete
@@ -148,7 +174,7 @@ fixtures:
 Maintain progress in `investigation/STATUS.md`, which is the resumable
 checkpoint ledger for the migration.
 
-### Phase 3 - Establish the initial Nift structure
+### Phase 3 - Establish the initial Nift structure and compatibility proof
 
 Set up:
 
@@ -160,8 +186,10 @@ Set up:
 - schemas/taxonomies where appropriate;
 - migration checkpoint structure.
 
-Do not prematurely redesign the source architecture. Treat the starter
-scaffold as placeholder and replace it here.
+Prove the chosen architecture with representative routes and interactions,
+including retained or introduced islands and compatibility stages, before broad
+content translation. Do not prematurely redesign the source architecture. Treat
+the starter scaffold as placeholder and replace it here.
 
 ### Phase 4 - Migrate shared shells/templates first
 
@@ -205,6 +233,7 @@ Require:
 - missing and extra route detection;
 - generated-file-set comparison where meaningful;
 - content/render parity checks;
+- browser, interactive behaviour and keyboard/accessibility checks where relevant;
 - explicit divergence classification in
   `investigation/KNOWN-DIVERGENCES.md`.
 
@@ -225,7 +254,53 @@ Verify, as appropriate for the project:
 
 A migration that only passes a full clean build is insufficient evidence.
 
-### Phase 9 - Benchmark
+### Phase 9 - Performance campaign
+
+A parity-complete migration is not automatically performance-final. Once the
+complete corpus, behavioural parity and incremental correctness are proved,
+perform a focused performance campaign before recording final benchmarks:
+
+    complete migration -> prove parity -> profile -> optimize general bottlenecks
+        -> re-prove parity -> benchmark the finished migration
+
+Profile before optimizing. Measure the complete production-equivalent workflow
+and locate actual time and memory/RSS hotspots. Depending on the project, inspect:
+
+- Nift build/evaluation overhead, templates and shared rendering paths;
+- compatibility adapters and Markdown/MDX or other transformation stages;
+- client-bundle preparation and generated indexes/search data;
+- repeated parsing, conversion or evaluation;
+- dependency discovery, filesystem work and external process/tool invocation;
+- large object/map/collection operations, avoidable repeated work and RSS hotspots.
+
+Prioritize general, semantics-preserving improvements supported by profiles,
+useful to production builds and maintainable after handover. Rerun relevant
+correctness/parity gates after every meaningful optimization. This phase does
+not authorize changes to Nift core without the existing stop-and-report review.
+
+Do not add benchmark-specific special cases, change the workload/content corpus,
+weaken parity, remove or hide required production stages, exclude compatibility
+costs still needed in production, or time a cheaper workflow than users run.
+
+Record profiles/hotspots, changes made, useful before/after measurements,
+deliberately deferred bottlenecks and any tradeoffs in migration evidence and
+`investigation/STATUS.md`. If remaining cost requires a disproportionate
+architectural rewrite, document and defer it rather than destabilizing the
+migration. A measured decision to defer can complete the campaign; an
+uninvestigated first parity pass cannot.
+
+### Phase 10 - Final parity revalidation
+
+Rerun the complete parity contract after the performance campaign, including
+browser/behaviour checks and incremental/full equivalence where applicable.
+Resolve or explicitly classify divergences. Record the tested revision and
+commands in `investigation/STATUS.md` before proceeding to final benchmarks.
+
+### Phase 11 - Final benchmark campaign
+
+Benchmark the optimized, parity-certified final migration, not the first
+implementation that happened to reach parity. Keep exploratory campaign
+measurements separate from final benchmark results.
 
 Measure the **complete production-equivalent pipeline**, not only `nift
 build`. Where practical, take five serialized samples and report median with
@@ -252,7 +327,7 @@ visible, and that a production build is not a dev-server hot reload. Do not
 cherry-pick. Do not hide compatibility-stage cost. If an external renderer
 exists, measure and report its cost separately where useful.
 
-### Phase 10 - Clean-checkout verification
+### Phase 12 - Clean-checkout verification
 
 Before completion verify on a fresh checkout:
 
@@ -263,7 +338,7 @@ Before completion verify on a fresh checkout:
 - no reliance on untracked local state;
 - no absolute developer-machine paths.
 
-### Phase 11 - Handover / final report
+### Phase 13 - Handover / final report
 
 Produce a final report containing at least:
 

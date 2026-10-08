@@ -75,6 +75,30 @@ grep -q 'Complete production pipeline' "$P/MIGRATION.md" || fail "MIGRATION.md l
 grep -qi 'byte deterministic' "$P/MIGRATION.md" || fail "MIGRATION.md lacks nondeterminism classification"
 grep -qi 'placeholder material' "$P/README.md" || fail "README.md lacks placeholder note"
 
+# Public methodology and resumable ordering, within the existing migration gate.
+python3 - "$P" <<'PY_CHECK'
+from pathlib import Path
+import sys
+root = Path(sys.argv[1])
+method = (root / "MIGRATION.md").read_text()
+status = (root / "investigation/STATUS.md").read_text()
+islands = method.index("#### Interactive islands and client frameworks")
+assert islands < method.index("### Phase 3"), "island guidance must inform architecture proof"
+for text in ("React", "Vue", "Svelte", "Solid", "Web Components", "vanilla JavaScript",
+             "independently prepared browser-side", "not Nift", "accessibility",
+             "benchmark-specific special cases", "complete parity contract"):
+    assert text in method, f"missing migration guidance: {text}"
+for text in ("Profiles/hotspots", "retained/introduced islands", "before/after measurements"):
+    assert text in status, f"missing resumable evidence field: {text}"
+for document, labels in ((method, ("### Phase 7", "### Phase 9 - Performance campaign",
+                                  "### Phase 10 - Final parity revalidation",
+                                  "### Phase 11 - Final benchmark campaign")),
+                         (status, ("| 7 Route/content", "| 9 Performance campaign",
+                                   "| 10 Final parity revalidation", "| 11 Final benchmark campaign"))):
+    positions = [document.index(label) for label in labels]
+    assert positions == sorted(positions), "parity/campaign/revalidation/benchmark order changed"
+PY_CHECK
+
 # Determinism: two fresh inits produce byte-identical guidance/state files.
 P2="$TMP/fresh2"; mkdir -p "$P2"
 (cd "$P2" && "$NIFT_BIN" init --migration >/dev/null 2>&1) || fail "second fresh init failed"
