@@ -1,6 +1,8 @@
 # NIFT v4.9 performance campaign
 
-**Final outcome: GO / accepted; READY FOR NEW OFFICIAL BENCHMARK SERIES.**
+**Final outcome: GO / accepted.** The historical official-series handoff was
+superseded; both waves are accepted and performance work is now frozen for v4.9
+release preparation. Official reruns remain deferred until after release.
 Six measured bounded changes are retained, the failed reserve experiment is
 reverted, and all required local/hosted certification is green. Stop here: no
 new official series, release, Labs change or provisioning was started.

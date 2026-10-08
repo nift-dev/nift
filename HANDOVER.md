@@ -20,11 +20,11 @@ whether it is a regression.
 ## Current identity
 
 - Product: **Nift**, a website generator and dependency-aware website build layer.
-- Current executable identity: `Nift v4.9.0` (development), following the public v4.8.0 release.
+- Current executable identity: `Nift v4.9.0` (release preparation; not yet published), following the public v4.8.0 release.
 - Language/toolchain: C++17 and Make.
 - Output convention for modern projects: `public/`.
 - Current branch: `main` in this checkout.
-- Current project phase: **post-v4.8 release; v4.9 development**.
+- Current project phase: **v4.9 release preparation — feature freeze ACTIVE; performance campaign CLOSED**.
   The immutable v4.8.0 tag targets `1bfc4a54b373da3477b497106fa4db59111e2770`.
   Release workflow #37746497666 and all public installer lanes passed.
   Chocolatey 4.8.0 was submitted via #37747611875 and remains pending moderation.
@@ -506,3 +506,23 @@ retained-instance teardown dominate; the identity body is already prepared.
 Global hoisting and syntax-only selective capture violate tested contracts.
 Recommendation: a narrowly bounded insertion-cost follow-up, with key storage
 measured separately; stop for review before plan/capture/lifetime architecture.
+
+## v4.9 release freeze — 2026-10-09
+
+The user accepted the CP49-51–57 investigation and explicitly declined a third
+bounded performance tranche. FEATURE FREEZE is ACTIVE; the PERFORMANCE CAMPAIGN
+is CLOSED. Capture insertion, owned sort keys, callable plan/instance or capture
+redesign, frames/arenas, persistent slots/indexes, RuntimeValue/root-path/storage
+redesign and VM/JIT are deferred until after v4.9. Only correctness/regression
+fixes, release blockers, release documentation and packaging/process fixes are
+authorized before release.
+
+Investigation evidence `cc60913` was verified documentation-only and pushed
+normally with a clean synchronized tree. Runtime remains `3c0a5b2`; the ten
+normal hosted walls passed at `02e3793`. Canonical reviewed notes are
+[release-notes-4.9.0.md](docs/evidence/release-4.9.0/release-notes-4.9.0.md).
+Repeat exact-candidate local/hosted release readiness, then run only the
+non-publishing Release artifacts workflow dispatch with version 4.9.0 and inspect
+the actual four archives/checksums. STOP before tag/publication/Chocolatey.
+Official post-v4.9 benchmarks remain deferred; frozen `20261008-v480` and Labs
+remain untouched.

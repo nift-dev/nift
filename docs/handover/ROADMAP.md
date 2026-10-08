@@ -1,33 +1,30 @@
 # Nift maintained roadmap
 
-## Current status — v4.9 bounded campaign
+## Current status — v4.9 release preparation
 
 Public v4.8.0 is released at immutable `1bfc4a54b373da3477b497106fa4db59111e2770`.
-Development is v4.9.0 after `9de5c3e3e62291c929702271b34f2c870ec2a442`.
+Version is v4.9.0; FEATURE FREEZE is ACTIVE and the PERFORMANCE CAMPAIGN is CLOSED.
+Runtime `3c0a5b2`, hosted-green identity `02e3793` and accepted documentation-only
+investigation `cc60913` are the release-preparation starting identities.
 The v4.8 feature/performance campaign and release are closed. Historical campaign
 records remain evidence; they do not authorize more implementation.
 
-## Near-term checkpoints
+## Release-preparation order
 
-1. **CP49-0:** reconcile living roadmap, decisions and handovers with release reality.
-2. **CP49-1:** reproduce and repair maintained binding warnings, validate builds/tests
-   and aggregate gate, clarify support. No public API/ABI or packaging redesign.
-3. **CP49-2:** investigate current performance: scaling, profiles, allocations,
-   isolated reproducers and shared root-cause ranking. Accepted by the user.
-4. **CP49-3+:** accepted bounded implementation checkpoints from profiler evidence,
-   with semantic, aliasing, ownership and cross-platform safety gates.
-5. **Later:** a new formal benchmark series, dedicated-node lab.nift.dev update and
-   post-benchmark prioritization. Series `20261008-v480` is complete and frozen;
-   never mutate or rerun it, alter workloads/presentation or provision nodes in this checkpoint.
+1. Accepted investigation evidence pushed; no production changes after wave 2.
+2. Review canonical v4.9 notes covering both waves and maintained bindings.
+3. Repeat local native/binding/sanitizer/NRS/PRS/performance and zero-warning gates.
+4. Run appropriate exact-SHA hosted non-release readiness walls.
+5. Run canonical non-publishing Release artifacts rehearsal for 4.9.0; inspect
+   actual four public archives and checksum manifest.
+6. STOP for explicit final tag/release authorization. No Chocolatey submission.
 
-Do not commit to bytecode/JIT, RuntimeValue/object redesign or a broad runtime rewrite.
-Rank shared causes by demonstrated cost, breadth, confidence and semantic/lifetime risk.
-Use BFS as a cross-check; separate raw Jsonic++ parse from Nift conversion/value work.
-Standalone Jsonic++ remains canonical for parser changes.
-
-Deferred architecture: explicit FFI resource-release API, further rewrite/redesign
-dogfooding, binding publication/support reassessment, and closure/capture/storage
-work only if profiles justify it. No package publication is authorized here.
+The optional third performance tranche is declined for v4.9. Capture insertion,
+owned keys, callable plans/instances, captures/frames/arenas, persistent slots or
+indexes, RuntimeValue/root-path/storage and VM/JIT remain post-release work.
+Only correctness/regression/release blockers and release documentation/process
+fixes are permitted during freeze. Official benchmarks remain post-release;
+frozen `20261008-v480`, Labs and official workloads stay unchanged. No nodes.
 
 ## Distribution validation direction
 
@@ -99,6 +96,7 @@ Version remains 4.9.0 and C ABI 1.3. Frozen `20261008-v480`, official workloads,
 release identities and vendored Jsonic++ remain unchanged. No official rerun,
 release, provisioning or architecture redesign is authorized by this campaign.
 The bounded campaign is complete: all required local and hosted certification
-is green. Recommendation: READY FOR NEW OFFICIAL BENCHMARK SERIES. Stop here;
-no new official series has been started. Full certificates and tradeoffs are
+is green. That historical benchmark recommendation was superseded: official measurements
+are deferred until after v4.9 release. Both bounded waves and the identity-sort
+investigation are accepted; performance implementation is now frozen. Full certificates and tradeoffs are
 recorded in the campaign evidence.

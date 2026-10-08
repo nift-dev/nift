@@ -1,6 +1,8 @@
 # NIFT v4.9 — identity sort / callable architecture investigation
 
-CP49-51–57 is complete as a local design/root-cause checkpoint. No production
+CP49-51–57 is accepted. Its optional third-tranche recommendation below is
+historical and was superseded on 2026-10-09: the user selected v4.9 release
+preparation and deferred all further tuning until after release. No production
 runtime optimization was added. Recommendation: **SAFE THIRD BOUNDED TRANCHE**,
 limited initially to capture-map insertion overhead; measure owned key storage
 separately. The large capture/identity/lifetime changes remain architecture decisions.

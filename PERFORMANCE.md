@@ -2,7 +2,8 @@
 
 The retained checkpoint measurements below are historical, machine-specific
 records; references to "current" within those records mean their checkpoint
-baseline. Current v4.9 investigation status and evidence appear at the end and in
+baseline. The v4.9 performance campaign is CLOSED under the release feature freeze.
+Campaign status and evidence appear at the end and in
 `docs/evidence/cp49/report.md`.
 
 
@@ -134,3 +135,14 @@ retained-instance teardown dominate; the identity body is already prepared.
 Global hoisting and syntax-only selective capture violate tested contracts.
 Recommendation: a narrowly bounded insertion-cost follow-up, with key storage
 measured separately; stop for review before plan/capture/lifetime architecture.
+
+## v4.9 performance freeze — ACTIVE
+
+On 2026-10-09 the user accepted the identity/callable investigation and selected
+release preparation. Its optional third-tranche recommendation is superseded:
+no capture insertion or owned-key tuning before v4.9. Plan/instance, capture/frame,
+root/path/storage and VM/JIT work remains post-release design work. Only real
+correctness/regression/release-blocking fixes may reopen runtime implementation.
+Both accepted performance waves remain retained and hosted green. Official
+post-v4.9 measurements are deferred until after release; no frozen-series/Labs
+change or benchmark provisioning is authorized during release preparation.
