@@ -39,3 +39,7 @@ jobs:
         run: make -j2
       - name: Guard tracking, full-build scaling and recovery epochs
         run: make test-performance-scaling
+      - name: Install deterministic instruction profiler
+        run: sudo apt-get update && sudo apt-get install -y valgrind
+      - name: Guard grouping construction instruction scaling
+        run: make test-v49-group-scaling

@@ -245,3 +245,47 @@ guard proves one preflight and exactly N+49 conversions for depth-48 arrays at
 N=100/200/400. Native stage columns in paired-stages.json are parse, conversion,
 serialization and copy CPU milliseconds; these are local diagnostics, not an
 external language benchmark. Data in [10](10/), shape generator retained in tools.
+
+## CP49-9: construction-only array grouping index
+
+**KEEP**. Array group_by repeatedly scanned the newly constructed ordered object
+for every rendered key. A local string→position map now indexes construction;
+the RuntimeValue representation remains unchanged, first occurrence controls
+object ordering, and existing rendered-key collisions are preserved. Two
+previously duplicated accumulation paths share this helper. The index is local
+to the operation and stores positions, not pointers into reallocating vectors.
+No persistent storage/index redesign or old scalar collection scan work revisited.
+
+Unique mixed-record grouping at N=2,000: 264,919,348 → 146,031,043 instructions
+(-44.88%); initial paired CPU 32.91 → 22.77 ms (-30.81%). Repeated 16-key
+shape instructions 337,329,532 → 335,825,577 (-0.45%). An initial repeated-key
+CPU batch regressed (49.01 → 64.32 ms), so acceptance was withheld and tested
+again with compiler work finished. Twenty-one interleaved recorded samples:
+unique 54.445 → 44.327 ms (-18.58%); repeated N=2,000 71.649 → 67.131 ms
+(-6.31%), N=16,000 391.695 → 394.175 ms (+0.63%, neutral/noise). The first
+regression did not reproduce; variable host CPU conditions are retained in data.
+Frequency/map-set/sliding-window/BFS/map/loops/call/JSON instruction controls
+remain within 0.02% (BFS CPU unchanged in the initial batch).
+
+Actual scalar unique-group instruction scaling N=1,000/2,000/4,000: baseline
+65.21M / 152.95M / 666.62M; candidate 18.39M / 33.77M / 64.54M. A mandatory
+Callgrind guard uses a broad <2.6 doubling ratio, fails on the saved preceding
+binary (second ratio 4.38), passes current (~1.83/1.91), and runs in the Linux
+performance workflow after installing Valgrind. It is a specialized explicit
+target, not a silent prerequisite skip on unsupported platforms; ordinary
+cross-platform correctness still runs the semantic contracts.
+
+Tradeoff: a bounded O(unique groups) temporary hash index. Unique aggregate
+allocations 130,573 → 132,581 (+1.54%), cumulative bytes 31,222,524 →
+31,370,509 (+0.47%); repeated allocations 156,726 → 156,744 (+18 blocks).
+Both zero Memcheck errors/all heap freed. N=16,000 RSS medians unique 86,440 →
+92,172 KiB (+5,732 KiB, +6.63%); repeated 84,000 → 84,000 KiB. The targeted
+unique-group memory increase is accepted for eliminating superlinear scans;
+unaffected/repeated controls remain neutral. No unsafe string_view/pointer key
+scheme was introduced to save index memory.
+
+37 original-baseline exact contracts now include group ordering, numeric/string/
+bool rendered collisions, aggregate independence and callback effects. Existing
+470 numeric parity pairs/callback matrix/counters pass. Exact-current lifetime
+ASan/UBSan/LSan passes 37 cases, collections and callback module/capture/async
+matrix. Data in [9](9/).

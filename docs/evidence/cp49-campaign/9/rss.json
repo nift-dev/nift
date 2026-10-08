@@ -1,0 +1,46 @@
+[
+  {
+    "name": "group-unique",
+    "variant": "before",
+    "maxrss_kib": [
+      86440,
+      86884,
+      86244,
+      86564,
+      86148
+    ]
+  },
+  {
+    "name": "group-unique",
+    "variant": "after",
+    "maxrss_kib": [
+      92456,
+      92148,
+      92484,
+      92092,
+      92172
+    ]
+  },
+  {
+    "name": "group-repeated",
+    "variant": "before",
+    "maxrss_kib": [
+      83760,
+      83976,
+      84048,
+      83692,
+      84000
+    ]
+  },
+  {
+    "name": "group-repeated",
+    "variant": "after",
+    "maxrss_kib": [
+      84052,
+      83828,
+      84000,
+      83548,
+      84232
+    ]
+  }
+]

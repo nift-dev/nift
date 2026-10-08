@@ -1812,3 +1812,7 @@ $(JSON_PREFLIGHT_GUARD): tests/v49_json_preflight_guard.cpp src/RuntimeValue.cpp
 .PHONY: test-v49-json-preflight-guard
 test-v49-json-preflight-guard: $(JSON_PREFLIGHT_GUARD)
 	NIFT_JSON_GUARD="$(CURDIR)/$(JSON_PREFLIGHT_GUARD)" python3 tests/v49_json_preflight_guard.py
+
+.PHONY: test-v49-group-scaling
+test-v49-group-scaling: $(TARGET)
+	NIFT="$(CURDIR)/$(TARGET)" python3 tests/v49_group_scaling.py

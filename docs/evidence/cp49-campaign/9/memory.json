@@ -1,0 +1,26 @@
+[
+  {
+    "name": "group-unique",
+    "variant": "before",
+    "allocations": 130573,
+    "bytes": 31222524
+  },
+  {
+    "name": "group-unique",
+    "variant": "after",
+    "allocations": 132581,
+    "bytes": 31370509
+  },
+  {
+    "name": "group-repeated",
+    "variant": "before",
+    "allocations": 156726,
+    "bytes": 31577420
+  },
+  {
+    "name": "group-repeated",
+    "variant": "after",
+    "allocations": 156744,
+    "bytes": 31578701
+  }
+]

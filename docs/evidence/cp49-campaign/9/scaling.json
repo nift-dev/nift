@@ -1,0 +1,32 @@
+[
+  {
+    "n": 1000,
+    "variant": "before",
+    "instructions": 65209029
+  },
+  {
+    "n": 1000,
+    "variant": "after",
+    "instructions": 18389948
+  },
+  {
+    "n": 2000,
+    "variant": "before",
+    "instructions": 152952232
+  },
+  {
+    "n": 2000,
+    "variant": "after",
+    "instructions": 33772944
+  },
+  {
+    "n": 4000,
+    "variant": "before",
+    "instructions": 666616278
+  },
+  {
+    "n": 4000,
+    "variant": "after",
+    "instructions": 64541617
+  }
+]
