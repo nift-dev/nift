@@ -9,7 +9,11 @@ with tempfile.TemporaryDirectory() as d:
  names=['z.txt','a space.txt','é.txt','中.txt','.hidden.txt','a/deep/end.txt','b/first.txt','.private/secret.txt']
  for name in names:
   p=root/'tree'/name;p.parent.mkdir(parents=True,exist_ok=True);p.touch()
- if os.name!='nt':
+ # MSYS Python reports POSIX but its link emulation is not a native POSIX
+ # filesystem link to the MinGW executable. Keep POSIX link fixtures on
+ # POSIX hosts; native Windows ordering is tested without emulated links.
+ posix_links = os.name!='nt' and not os.environ.get('MSYSTEM')
+ if posix_links:
   (root/'tree'/'link.txt').symlink_to(root/'tree'/'z.txt')
   (root/'tree'/'dirlink').symlink_to(root/'tree'/'a',target_is_directory=True)
  patterns=['tree/*.txt','tree/**/*.txt','tree/**/**/end.txt','tree/.*.txt','tree/**/.private/*.txt','tree/missing/*.txt','tree/?/*.txt',str(root/'tree'/'*.txt')]
@@ -30,4 +34,4 @@ with tempfile.TemporaryDirectory() as d:
  assert not any('/dirlink/' in p for p in results[1]),results[1]
  # ls resolves symlink targets after glob ordering; duplicate rendered paths
  # are existing behavior and must not be silently deduplicated here.
- print('PASS 8 glob ordering/dedup/Unicode/hidden/missing/symlink contracts'+(' with exact A/B' if baseline else ''))
+ print('PASS 8 glob ordering/dedup/Unicode/hidden/missing contracts'+(' plus POSIX symlinks' if posix_links else '')+(' with exact A/B' if baseline else ''))
