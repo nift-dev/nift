@@ -3,7 +3,9 @@
 ## v4.9.0 (unreleased development)
 
 Development has advanced to v4.9.0 after the completed v4.8.0 release. No
-v4.9.0 user-visible changes have been recorded yet.
+v4.9.0 runtime changes have been recorded yet. Binding maintenance removes native
+Node/Python compiler warnings without changing API or C ABI; the aggregate
+binding gate now includes strict native-wrapper warning checks.
 
 ## v4.8.0 (released 2026-10-08)
 

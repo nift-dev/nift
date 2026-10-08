@@ -92,7 +92,7 @@ thread_local ScratchGuard tls_scratch_guard;
 // Host callback dispatch (render/pagination worker thread side)
 // ---------------------------------------------------------------------------
 
-nift_status RunUserCallback(NiftEngineObject* self, PyObject* fn,
+nift_status RunUserCallback(NiftEngineObject* /*self*/, PyObject* fn,
                             const std::string& arg, nift_string* out) {
   PyGILState_STATE gil = PyGILState_Ensure();
   nift_status status = NIFT_ERROR_CALLBACK;
@@ -1041,8 +1041,17 @@ PyObject* EngineEvaluateResult(PyObject*, PyObject* args) {
 // Type objects
 // ---------------------------------------------------------------------------
 
-PyTypeObject NiftEngineType = { PyVarObject_HEAD_INIT(nullptr, 0) };
-PyTypeObject NiftContextType = { PyVarObject_HEAD_INIT(nullptr, 0) };
+// Preserve CPython's version-specific object header while zero-initializing
+// every type slot, including slots added by newer supported Python versions.
+static PyTypeObject EmptyType() {
+  PyTypeObject type{};
+  PyVarObject header = { PyObject_HEAD_INIT(nullptr) 0 };
+  type.ob_base = header;
+  return type;
+}
+
+PyTypeObject NiftEngineType = EmptyType();
+PyTypeObject NiftContextType = EmptyType();
 
 static void InitTypes() {
   NiftEngineType.tp_name = "nift._nift.NiftEngine";
@@ -1099,6 +1108,10 @@ PyModuleDef kModule = {
     "Nift Embed native extension over the frozen C ABI.",
     -1,
     kMethods,
+    nullptr,  // m_slots
+    nullptr,  // m_traverse
+    nullptr,  // m_clear
+    nullptr,  // m_free
 };
 
 }  // namespace

@@ -213,7 +213,7 @@ struct ContextWrap {
 // Host callback dispatch (render/pagination worker thread side)
 // ---------------------------------------------------------------------------
 
-nift_status DispatchHostCallback(EngineWrap* e, napi_threadsafe_function tsfn,
+nift_status DispatchHostCallback(EngineWrap* /*e*/, napi_threadsafe_function tsfn,
                                  CallbackScratch* s, const std::string& arg) {
   {
     std::lock_guard<std::mutex> lk(s->m);
@@ -379,7 +379,7 @@ void BuildSource(const std::string& data, bool is_path, nift_source* out) {
   out->logical_name_length = 0;
 }
 
-void RenderExecute(napi_env env, void* data) {
+void RenderExecute(napi_env /*env*/, void* data) {
   RenderReq* req = static_cast<RenderReq*>(data);
   // The wraps' native handles are guaranteed valid: BeginRender incremented
   // render_count, and native destruction is deferred until it reaches zero.
@@ -585,7 +585,7 @@ void DestroyEngine(EngineWrap* e) {
   e->env_tsfn = nullptr;
 }
 
-void FinalizeEngine(napi_env env, void* data, void* hint) {
+void FinalizeEngine(napi_env /*env*/, void* data, void* /*hint*/) {
   // The JS object became unreachable: no render is in flight (each render
   // holds a napi_ref to it), so render_count is zero and destroy is safe.
   EngineWrap* e = static_cast<EngineWrap*>(data);
@@ -712,7 +712,8 @@ napi_value EngineExecute(napi_env env, napi_callback_info info) {
   std::vector<std::string> av; if(argc>2){ bool is_array=false; napi_is_array(env,args[2],&is_array); if(!is_array)return ThrowJs(env,"execute args must be an array"); uint32_t n=0;napi_get_array_length(env,args[2],&n);for(uint32_t i=0;i<n;++i){napi_value x=nullptr;napi_get_element(env,args[2],i,&x);av.push_back(GetString(env,x));}}
   std::vector<const char*> ap; std::vector<size_t> al; for(auto& x:av){ap.push_back(x.data());al.push_back(x.size());}
   nift_script_result* r=nullptr; nift_status rc=nift_engine_execute(e->engine,script.data(),script.size(),cmd.data(),cmd.size(),ap.empty()?nullptr:ap.data(),al.empty()?nullptr:al.data(),av.size(),&r);
-  if(rc!=NIFT_OK)return ThrowJs(env,"nift_engine_execute failed"); return ScriptJsonOrThrow(env,r);
+  if (rc != NIFT_OK) return ThrowJs(env, "nift_engine_execute failed");
+  return ScriptJsonOrThrow(env, r);
 }
 
 napi_value EngineEvaluate(napi_env env, napi_callback_info info) {
@@ -727,7 +728,8 @@ napi_value EngineExecuteResult(napi_env env, napi_callback_info info) {
   std::vector<std::string> av; if(argc>2){ bool is_array=false; napi_is_array(env,args[2],&is_array); if(!is_array)return ThrowJs(env,"execute args must be an array"); uint32_t n=0;napi_get_array_length(env,args[2],&n);for(uint32_t i=0;i<n;++i){napi_value x=nullptr;napi_get_element(env,args[2],i,&x);av.push_back(GetString(env,x));}}
   std::vector<const char*> ap; std::vector<size_t> al; for(auto& x:av){ap.push_back(x.data());al.push_back(x.size());}
   nift_script_result* r=nullptr; nift_status rc=nift_engine_execute(e->engine,script.data(),script.size(),cmd.data(),cmd.size(),ap.empty()?nullptr:ap.data(),al.empty()?nullptr:al.data(),av.size(),&r);
-  if(rc!=NIFT_OK)return ThrowJs(env,"nift_engine_execute failed"); return ScriptResultValue(env,r);
+  if (rc != NIFT_OK) return ThrowJs(env, "nift_engine_execute failed");
+  return ScriptResultValue(env, r);
 }
 
 napi_value EngineEvaluateResult(napi_env env, napi_callback_info info) {
@@ -1031,7 +1033,7 @@ void DestroyContext(ContextWrap* c) {
   c->ctx = nullptr;
 }
 
-void FinalizeContext(napi_env env, void* data, void* hint) {
+void FinalizeContext(napi_env /*env*/, void* data, void* /*hint*/) {
   ContextWrap* c = static_cast<ContextWrap*>(data);
   DestroyContext(c);
   delete c;

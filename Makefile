@@ -718,7 +718,10 @@ test-node-binding: node-binding
 test-python-binding: python-binding
 	cd bindings/python && python3 -m unittest tests.test_nift
 
-test-bindings: test-go-binding test-csharp-binding test-node-binding test-python-binding
+test-binding-warnings:
+	python3 scripts/check_binding_warnings.py
+
+test-bindings: test-binding-warnings test-go-binding test-csharp-binding test-node-binding test-python-binding
 
 # The build-boundary gate is NON-DESTRUCTIVE (it runs in a temporary clean
 # source tree, never in the caller's checkout), so it is safe under parallel
@@ -1779,3 +1782,5 @@ test-source-map: $(TEST_DIR)/source-map-probe$(EXEEXT)
 	python3 tests/source_map_matrix.py $(TEST_DIR)/source-map-probe$(EXEEXT)
 
 test: test-source-map
+
+.PHONY: test-binding-warnings
