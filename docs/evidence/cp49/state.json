@@ -1,0 +1,29 @@
+{
+  "nift": {
+    "head": "2d837674c2b5aa6572790e4ee93fcfc56c66ff6b",
+    "branch": "main",
+    "status": "",
+    "ahead_behind": "2\t0"
+  },
+  "NRS": {
+    "head": "34b1c2ff4d1a3f591176f3ce79b74ad2958b6852",
+    "branch": "main",
+    "status": "",
+    "ahead_behind": "0\t0"
+  },
+  "PRS": {
+    "head": "1da43659da269c96af21aea7234799d2ad56b2df",
+    "branch": "main",
+    "status": "",
+    "ahead_behind": "0\t0"
+  },
+  "frozen_oracle": {
+    "head": "2ad0eb6b0760ec4adce46ef99dbdf29542758caa",
+    "branch": "stage",
+    "status": "",
+    "ahead_behind": "no configured upstream"
+  },
+  "cli_sha256": "f8da5147504226c0353559de11b9366820ba6064d07aced5e8ca366b49e7679e",
+  "abi": "1.3",
+  "release_target": "1bfc4a54b373da3477b497106fa4db59111e2770"
+}

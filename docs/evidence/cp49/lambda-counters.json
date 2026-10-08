@@ -1,0 +1,10 @@
+{
+  "map-index-counters.log": "lambda-cache syntax=1 numeric=1 instances=1 prepared=0 legacy=2000",
+  "call-callback-counters.log": "lambda-cache syntax=1 numeric=1 instances=1 prepared=2000 legacy=0",
+  "map-arithmetic-counters.log": "lambda-cache syntax=1 numeric=1 instances=1 prepared=2000 legacy=0",
+  "sort-index-counters.log": "lambda-cache syntax=1 numeric=1 instances=2000 prepared=0 legacy=2000",
+  "sort-arithmetic-counters.log": "lambda-cache syntax=1 numeric=1 instances=2000 prepared=2000 legacy=0",
+  "sort-identity-counters.log": "lambda-cache syntax=1 numeric=0 instances=2000 prepared=0 legacy=2000",
+  "map-identity-counters.log": "lambda-cache syntax=1 numeric=0 instances=1 prepared=0 legacy=2000",
+  "call-closure-counters.log": "lambda-cache syntax=1 numeric=1 instances=1 prepared=2000 legacy=0"
+}

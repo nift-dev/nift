@@ -1,0 +1,34 @@
+[
+  {
+    "n": 2000,
+    "raw_parse_destroy_cpu_ms": 0.9774,
+    "convert_destroy_cpu_ms": 0.5465,
+    "serialize_cpu_ms": 0.58205,
+    "value_copy_destroy_cpu_ms": 0.18,
+    "repeats": 20
+  },
+  {
+    "n": 4000,
+    "raw_parse_destroy_cpu_ms": 2.4254,
+    "convert_destroy_cpu_ms": 1.38,
+    "serialize_cpu_ms": 1.1876,
+    "value_copy_destroy_cpu_ms": 0.3389,
+    "repeats": 20
+  },
+  {
+    "n": 8000,
+    "raw_parse_destroy_cpu_ms": 4.79605,
+    "convert_destroy_cpu_ms": 3.6472,
+    "serialize_cpu_ms": 3.07235,
+    "value_copy_destroy_cpu_ms": 0.6693,
+    "repeats": 20
+  },
+  {
+    "n": 16000,
+    "raw_parse_destroy_cpu_ms": 9.95525,
+    "convert_destroy_cpu_ms": 9.90975,
+    "serialize_cpu_ms": 7.12785,
+    "value_copy_destroy_cpu_ms": 3.35205,
+    "repeats": 20
+  }
+]

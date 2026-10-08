@@ -1,0 +1,222 @@
+[
+  {
+    "name": "loops",
+    "n": 2000,
+    "instructions": 12930271
+  },
+  {
+    "name": "call-scalar",
+    "n": 2000,
+    "instructions": 33157688
+  },
+  {
+    "name": "call-closure",
+    "n": 2000,
+    "instructions": 152124396
+  },
+  {
+    "name": "sort-identity",
+    "n": 2000,
+    "instructions": 64101339
+  },
+  {
+    "name": "sort-index",
+    "n": 2000,
+    "instructions": 143397198
+  },
+  {
+    "name": "sort-arithmetic",
+    "n": 2000,
+    "instructions": 67470759
+  },
+  {
+    "name": "frequency",
+    "n": 2000,
+    "instructions": 58199081
+  },
+  {
+    "name": "json-parse-convert",
+    "n": 2000,
+    "instructions": 12850823
+  },
+  {
+    "name": "json-mutate",
+    "n": 2000,
+    "instructions": 40813378
+  },
+  {
+    "name": "bfs",
+    "n": 2000,
+    "instructions": 111872211
+  },
+  {
+    "name": "filesystem",
+    "n": 2000,
+    "instructions": 207809652
+  },
+  {
+    "name": "loops",
+    "n": 4000,
+    "instructions": 22762271
+  },
+  {
+    "name": "call-scalar",
+    "n": 4000,
+    "instructions": 63157688
+  },
+  {
+    "name": "call-closure",
+    "n": 4000,
+    "instructions": 300930396
+  },
+  {
+    "name": "sort-identity",
+    "n": 4000,
+    "instructions": 126047922
+  },
+  {
+    "name": "sort-index",
+    "n": 4000,
+    "instructions": 284835277
+  },
+  {
+    "name": "sort-arithmetic",
+    "n": 4000,
+    "instructions": 132764138
+  },
+  {
+    "name": "frequency",
+    "n": 4000,
+    "instructions": 111288765
+  },
+  {
+    "name": "json-parse-convert",
+    "n": 4000,
+    "instructions": 22650406
+  },
+  {
+    "name": "json-mutate",
+    "n": 4000,
+    "instructions": 78457584
+  },
+  {
+    "name": "bfs",
+    "n": 4000,
+    "instructions": 219610742
+  },
+  {
+    "name": "filesystem",
+    "n": 4000,
+    "instructions": 433735464
+  },
+  {
+    "name": "loops",
+    "n": 8000,
+    "instructions": 42426282
+  },
+  {
+    "name": "call-scalar",
+    "n": 8000,
+    "instructions": 123157701
+  },
+  {
+    "name": "call-closure",
+    "n": 8000,
+    "instructions": 598542407
+  },
+  {
+    "name": "sort-identity",
+    "n": 8000,
+    "instructions": 249198938
+  },
+  {
+    "name": "sort-index",
+    "n": 8000,
+    "instructions": 566969385
+  },
+  {
+    "name": "sort-arithmetic",
+    "n": 8000,
+    "instructions": 262605311
+  },
+  {
+    "name": "frequency",
+    "n": 8000,
+    "instructions": 217468343
+  },
+  {
+    "name": "json-parse-convert",
+    "n": 8000,
+    "instructions": 42251371
+  },
+  {
+    "name": "json-mutate",
+    "n": 8000,
+    "instructions": 153612767
+  },
+  {
+    "name": "bfs",
+    "n": 8000,
+    "instructions": 435125856
+  },
+  {
+    "name": "filesystem",
+    "n": 8000,
+    "instructions": 916203017
+  },
+  {
+    "name": "loops",
+    "n": 16000,
+    "instructions": 81755270
+  },
+  {
+    "name": "call-scalar",
+    "n": 16000,
+    "instructions": 243158222
+  },
+  {
+    "name": "call-closure",
+    "n": 16000,
+    "instructions": 1193767123
+  },
+  {
+    "name": "sort-identity",
+    "n": 16000,
+    "instructions": 500897256
+  },
+  {
+    "name": "sort-index",
+    "n": 16000,
+    "instructions": 1136153256
+  },
+  {
+    "name": "sort-arithmetic",
+    "n": 16000,
+    "instructions": 527752960
+  },
+  {
+    "name": "frequency",
+    "n": 16000,
+    "instructions": 429829811
+  },
+  {
+    "name": "json-parse-convert",
+    "n": 16000,
+    "instructions": 81307571
+  },
+  {
+    "name": "json-mutate",
+    "n": 16000,
+    "instructions": 308711359
+  },
+  {
+    "name": "bfs",
+    "n": 16000,
+    "instructions": 867599717
+  },
+  {
+    "name": "filesystem",
+    "n": 16000,
+    "instructions": 1878551712
+  }
+]

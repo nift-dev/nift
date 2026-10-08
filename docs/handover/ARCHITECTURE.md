@@ -10,7 +10,26 @@ JSON helpers must be reconciled with the live tree. Never alter source merely to
 match this document. A disagreement may mean the recollection is stale, the
 architecture evolved, this document needs correction, or the source has drifted.
 
-## Reconciled implementation snapshot (2026-08-16)
+## Current implementation orientation — post-v4.8
+
+Public v4.8.0 is released; development is v4.9.0 and C ABI remains 1.3.
+Parser is now split across Parser.cpp, ParserScript.cpp, ParserTemplate.cpp,
+ParserExpression.cpp and helper/concurrency files. Ast.cpp supports prepared
+statements/expressions with compatibility fallbacks; describing the whole modern
+runtime as a non-AST renderer is obsolete. ParserTemplate owns prepared statement
+execution/call adapters; ParserExpression owns compatibility expressions,
+collection callbacks and bounded numeric-lambda plans. RuntimeValue owns native
+values; RuntimeJson converts the canonical Jsonic++ documents. SourceText and
+SourceView preserve original-source diagnostic origins across prepared paths.
+
+Parameter interpolation has shipped: the separate DECISIONS entry and current
+source/tests own its one-pass, argument-boundary behavior. The August snapshot
+below predates native runtime, prepared execution and this interpolation work;
+it is retained as historical orientation, not a current implementation claim.
+CP49-2 measures current source before any architecture redesign; see
+`../evidence/cp49/report.md` for profiles, risks and proposed guards.
+
+## Historical implementation snapshot (2026-08-16)
 
 The inherited model has now been checked against the C++ implementation and the
 independent black-box suite. The principal ownership map is:
@@ -48,8 +67,8 @@ built-in metadata or scalar JSON paths and otherwise leaves an unrecognised form
 literal. Arrays/objects selected for direct rendering are diagnosed. Crucially,
 `parse_parameters` currently removes quote delimiters, performs its established
 backslash handling, splits source commas, and returns plain strings; it does not
-interpolate `$[...]`. Therefore parameter interpolation described later in this
-document is the agreed next design, not shipped behavior. It must reuse the same
+interpolate `$[...]`. At that snapshot, parameter interpolation described later in this
+document was the agreed next design, not yet shipped behavior. It must reuse the same
 value resolver after source argument boundaries are fixed and must not recursively
 parse the resolved data.
 

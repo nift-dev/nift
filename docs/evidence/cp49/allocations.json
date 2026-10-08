@@ -1,0 +1,191 @@
+[
+  {
+    "name": "loops",
+    "n": 2000,
+    "allocations": 4435,
+    "frees": 4435,
+    "allocated_bytes": 803412
+  },
+  {
+    "name": "array-build",
+    "n": 2000,
+    "allocations": 4472,
+    "frees": 4472,
+    "allocated_bytes": 1395829
+  },
+  {
+    "name": "call-noarg",
+    "n": 2000,
+    "allocations": 14479,
+    "frees": 14479,
+    "allocated_bytes": 2364137
+  },
+  {
+    "name": "call-scalar",
+    "n": 2000,
+    "allocations": 32489,
+    "frees": 32489,
+    "allocated_bytes": 4673497
+  },
+  {
+    "name": "call-multi",
+    "n": 2000,
+    "allocations": 60503,
+    "frees": 60503,
+    "allocated_bytes": 10079688
+  },
+  {
+    "name": "call-locals",
+    "n": 2000,
+    "allocations": 44516,
+    "frees": 44516,
+    "allocated_bytes": 6024538
+  },
+  {
+    "name": "call-recursion",
+    "n": 2000,
+    "allocations": 128530,
+    "frees": 128530,
+    "allocated_bytes": 20350073
+  },
+  {
+    "name": "call-closure",
+    "n": 2000,
+    "allocations": 92527,
+    "frees": 92527,
+    "allocated_bytes": 9881050
+  },
+  {
+    "name": "call-callback",
+    "n": 2000,
+    "allocations": 134539,
+    "frees": 134539,
+    "allocated_bytes": 15946735
+  },
+  {
+    "name": "array-index",
+    "n": 2000,
+    "allocations": 8541,
+    "frees": 8541,
+    "allocated_bytes": 2077213
+  },
+  {
+    "name": "sort-identity",
+    "n": 2000,
+    "allocations": 84567,
+    "frees": 84567,
+    "allocated_bytes": 11608079
+  },
+  {
+    "name": "sort-index",
+    "n": 2000,
+    "allocations": 98573,
+    "frees": 98573,
+    "allocated_bytes": 11971264
+  },
+  {
+    "name": "sort-arithmetic",
+    "n": 2000,
+    "allocations": 86574,
+    "frees": 86574,
+    "allocated_bytes": 11737453
+  },
+  {
+    "name": "map-identity",
+    "n": 2000,
+    "allocations": 44550,
+    "frees": 44550,
+    "allocated_bytes": 7075989
+  },
+  {
+    "name": "map-index",
+    "n": 2000,
+    "allocations": 58565,
+    "frees": 58565,
+    "allocated_bytes": 7451295
+  },
+  {
+    "name": "map-arithmetic",
+    "n": 2000,
+    "allocations": 46561,
+    "frees": 46561,
+    "allocated_bytes": 7197371
+  },
+  {
+    "name": "frequency",
+    "n": 2000,
+    "allocations": 46990,
+    "frees": 46990,
+    "allocated_bytes": 7014627
+  },
+  {
+    "name": "map-set",
+    "n": 2000,
+    "allocations": 14558,
+    "frees": 14558,
+    "allocated_bytes": 3974754
+  },
+  {
+    "name": "sliding-window",
+    "n": 2000,
+    "allocations": 8539,
+    "frees": 8539,
+    "allocated_bytes": 2076846
+  },
+  {
+    "name": "json-parse-convert",
+    "n": 2000,
+    "allocations": 14472,
+    "frees": 14472,
+    "allocated_bytes": 4041476
+  },
+  {
+    "name": "json-traverse",
+    "n": 2000,
+    "allocations": 42529,
+    "frees": 42529,
+    "allocated_bytes": 13037788
+  },
+  {
+    "name": "json-mutate",
+    "n": 2000,
+    "allocations": 44554,
+    "frees": 44554,
+    "allocated_bytes": 14514013
+  },
+  {
+    "name": "json-serialize",
+    "n": 2000,
+    "allocations": 25611,
+    "frees": 25611,
+    "allocated_bytes": 11589515
+  },
+  {
+    "name": "construct-destroy",
+    "n": 2000,
+    "allocations": 16456,
+    "frees": 16456,
+    "allocated_bytes": 3062030
+  },
+  {
+    "name": "bfs",
+    "n": 2000,
+    "allocations": 80752,
+    "frees": 80752,
+    "allocated_bytes": 13300200
+  },
+  {
+    "name": "filesystem",
+    "n": 2000,
+    "allocations": 175757,
+    "frees": 175757,
+    "allocated_bytes": 29848756
+  },
+  {
+    "name": "empty",
+    "n": 0,
+    "allocations": 323,
+    "frees": 323,
+    "allocated_bytes": 121028
+  }
+]

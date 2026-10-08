@@ -86,3 +86,10 @@ versus implementation details become visible.
 This remains a maintained risk assessment. Field findings, release incidents, new platform support, significant language features or architectural changes may add or reorder work. Production bugs should leave regressions where appropriate; new platforms expand evidence; performance and memory remain monitored; documentation and the website remain synchronized with current truth.
 
 “Production ready” and “battle tested” are maintained scoped claims, not permanent medals.
+
+## CP49 review checkpoint
+
+CP49-0 reconciliation and CP49-1 binding maintenance are complete locally.
+CP49-2 profiles/ranking are ready for review in `../evidence/cp49/report.md`.
+No runtime optimization is implemented. Review the proposed CP49-3 boundary
+before proceeding; frozen official measurements remain unchanged.

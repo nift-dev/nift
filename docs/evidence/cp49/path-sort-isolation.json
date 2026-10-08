@@ -1,0 +1,34 @@
+[
+  {
+    "n": 2000,
+    "original_sort_cpu_ms": 5.7974,
+    "cached_key_sort_cpu_ms": 1.6243,
+    "original_conversions": 51826,
+    "cached_conversions": 2000,
+    "order_identical": true
+  },
+  {
+    "n": 4000,
+    "original_sort_cpu_ms": 14.3741,
+    "cached_key_sort_cpu_ms": 4.5717,
+    "original_conversions": 113792,
+    "cached_conversions": 4000,
+    "order_identical": true
+  },
+  {
+    "n": 8000,
+    "original_sort_cpu_ms": 35.1114,
+    "cached_key_sort_cpu_ms": 9.0422,
+    "original_conversions": 270366,
+    "cached_conversions": 8000,
+    "order_identical": true
+  },
+  {
+    "n": 16000,
+    "original_sort_cpu_ms": 72.1349,
+    "cached_key_sort_cpu_ms": 21.1691,
+    "original_conversions": 552550,
+    "cached_conversions": 16000,
+    "order_identical": true
+  }
+]

@@ -1,5 +1,11 @@
 # Nift performance notes
 
+The retained checkpoint measurements below are historical, machine-specific
+records; references to "current" within those records mean their checkpoint
+baseline. Current v4.9 investigation status and evidence appear at the end and in
+`docs/evidence/cp49/report.md`.
+
+
 ## 10,000-page regression recovery
 
 The v1.0.39 checkpoint exposed a large-project regression in `ProjectInfo::load_tracking()`: duplicate-name and derived-path collision validation repeatedly scanned the already-loaded tracking vector. At 10,000 tracked pages that created roughly 50 million comparisons plus repeated path derivation, making project open approximately O(n²).

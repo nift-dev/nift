@@ -43,7 +43,8 @@ New runtime features still need a concrete Nift use case, deterministic semantic
 
 JSON, Schema validation, constrained loops, conditions, stable sorting, and
 lexical scope belong because they directly support deterministic rendering.
-They do not imply a general expression runtime.
+These template capabilities do not determine the scope of the separate native
+scripting runtime.
 
 ## Unknown web `@` syntax
 

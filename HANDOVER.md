@@ -476,3 +476,7 @@ Release workflows, tags and release artifacts remain outside this tranche.
 ## v4.9 orientation
 
 CP49-0 reconciles living status; CP49-1 resumes deferred binding warning maintenance; CP49-2 investigates/ranks current shared runtime costs and stops for review. Post-v4.8 work is evidence-driven. Frozen series `20261008-v480` remains unchanged; no official rerun, node provisioning, feature campaign or optimization is authorized by this checkpoint.
+
+CP49-0/1 are complete locally; CP49-2 investigation/ranking is ready for review in
+`docs/evidence/cp49/report.md`. Runtime source/public headers remain unchanged
+from the v4.9 version bump. No performance implementation or official rerun took place.
