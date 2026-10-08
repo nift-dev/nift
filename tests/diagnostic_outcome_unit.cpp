@@ -34,8 +34,12 @@ int main() {
         registry_fingerprint ^= static_cast<unsigned>(info.disposition);
         registry_fingerprint *= 1099511628211ULL;
     }
-    assert(static_cast<int>(DiagnosticCode::Count) == 61);
-    assert(registry_fingerprint == 12391608587057904430ULL);
+    // Filesystem metadata inspection added io.metadata_failed in e0390f4.
+    assert(static_cast<int>(DiagnosticCode::Count) == 62);
+    assert(registry_fingerprint == 12329584139511440984ULL);
+    assert(registered_codes.count("io.metadata_failed") == 1);
+    assert(nift::detail::diagnostic_code_info(DiagnosticCode::IoMetadataFailed).disposition ==
+           DiagnosticDisposition::Recoverable);
     assert(registered_codes.count("user.raised") == 1);
     assert(registered_codes.count("internal.host_exception") == 1);
     assert(registered_codes.count("host.callable_exception") == 0);
