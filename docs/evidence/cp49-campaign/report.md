@@ -137,3 +137,75 @@ strace confirms unchanged dominant syscall counts: 2,058 newfstatat and 84
 getdents64 (same baseline). Remaining traversal includes real filesystem work;
 no syscall-count reduction is claimed. strace instrumentation timing is not
 native wall time. Data in [5](5/).
+
+## CP49-3C / CP49-4: dispatch/construction investigation
+
+**NO CHANGE / DEFERRED**. Typed variable-call dispatch currently deliberately
+falls back to the canonical source-aware call path. That path binds argument
+locations, handles named-module/struct/lambda/async ownership, propagates return
+locations, performs argument/spread evaluation, and appends diagnostic frames.
+Copying it into AST Context.call would duplicate semantics; exposing a shared
+canonical typed call adapter requires a broader design/review than the bounded
+selector fix. No compatibility removal or async change attempted.
+
+Callback syntax/plans are already reused. Fresh sort instances remain observable
+through selector factory effects (existing multiple_selectors contract requires
+six factory calls for three values/two selectors), captures, identity and escaped
+closures. No global hoist attempted. Restricted instance reuse requires a
+separate eligibility proof and retained payoff after indexed dispatch; none was
+established strongly enough to justify production machinery in this campaign.
+
+## CP49-6 / CP49-7: frame isolation and rejected reservation
+
+Allocation deltas versus loops at N=2,000: noarg calls 14,479 vs 4,435; scalar
+32,489; three-arg 60,503; two-local 44,516; recursion 128,530; closure 92,527;
+callback 134,539. Debug-line Memcheck allocation-tree investigation retains
+raw evidence in `.build/cp49-campaign/frames/`; it separates parameter scope/
+shared RuntimeValue+slot allocation, argument AST work and SourceContext path
+copies. Recursive allocation-tree inclusive totals overlap and cannot be summed.
+Scalar prepared Context.call's source-path copying alone accounts for roughly
+1.16 MB/6,009 inclusive blocks, showing frame cost is not only unordered_map.
+Noarg vs scalar/multi isolates significant parameter/argument churn; locals also
+add costs beyond initial parameter binding. No reusable-frame/arena/alias design
+was introduced.
+
+Experiment: reserve exactly known parameter/variadic capacity in prepared named
+function scopes. Existing callable and location parity pass. **DROP, reverted
+YES**: instruction work increased (scalar +0.18%, multi +0.10%, locals +1.37%,
+recursion +0.19%); no reproducible execution improvement. Tiny CPU shifts with
+unchanged controls are host noise. Smaller bucket storage alone does not earn
+this tradeoff; locals can subsequently rehash the undersized map. Original
+scope implementation restored and rebuilt before subsequent work. Paired data
+in [7](7/). No failed production code retained; no sanitizer claim made for this
+dropped experiment.
+
+## CP49-8: move owned collection results
+
+**KEEP**. Three canonical array/collection callback paths copied each map result
+into its result vector, then deep-copied the complete owned map/filter result
+again into output. These temporaries have no subsequent use; move them instead.
+Copying source elements, argument binding, callback execution and external value/
+identity/location semantics are unchanged. No reserve/representation/alias change
+is bundled with this experiment.
+
+Independent mixed aggregate records at N=2,000: map 69,404,060 → 62,900,344
+instructions (-9.37%), CPU medians 16.10 → 12.93 ms (-19.69%); filter
+72,489,527 → 68,238,392 (-5.86%), CPU 17.97 → 16.15 ms (-10.13%).
+Scalar identity/index/arithmetic map instruction savings are only about 0.1%;
+BFS/loops/JSON mutate/scalar call instruction differences below 0.02%. The
+arithmetic-map CPU increase 6.81 → 8.42 ms is not matched by instructions or
+extra allocations; final paired cross-workload reprofile is required to assess
+such host-sensitive timings, not one sample batch.
+
+Memcheck: aggregate map allocations 118,554 → 106,553 (-10.12%), bytes
+30,677,606 → 26,341,599 (-14.13%); filter allocations 112,578 → 106,577
+(-5.33%), bytes 28,674,696 → 26,354,689 (-8.09%). Both zero errors/all freed.
+N=16,000 RSS medians map 81,360 → 62,768 KiB (-22.85%), filter 81,440 →
+62,720 KiB (-22.99%). This removes peak simultaneous ownership of deep copies.
+
+33 exact original-baseline contracts now include mapped/filtered aggregate
+independence and returned callable captures; 470 numeric parity pairs, callback
+matrix and deterministic counters pass. Exact current ASan/UBSan/LSan lifetime
+build passes 33 cases, location receiver, callback matrix and collection ops
+smoke. Data in [8](8/). Extra aggregate probes are independent generated records,
+not official benchmark inputs; generator retained in tools.

@@ -1,0 +1,54 @@
+[
+  {
+    "name": "map-aggregate",
+    "variant": "before",
+    "allocations": 118554,
+    "bytes": 30677606,
+    "maxrss_kib": [
+      81644,
+      81272,
+      81100,
+      81512,
+      81360
+    ]
+  },
+  {
+    "name": "map-aggregate",
+    "variant": "after",
+    "allocations": 106553,
+    "bytes": 26341599,
+    "maxrss_kib": [
+      62768,
+      62808,
+      62504,
+      62672,
+      62864
+    ]
+  },
+  {
+    "name": "filter-aggregate",
+    "variant": "before",
+    "allocations": 112578,
+    "bytes": 28674696,
+    "maxrss_kib": [
+      81424,
+      81572,
+      81376,
+      81776,
+      81440
+    ]
+  },
+  {
+    "name": "filter-aggregate",
+    "variant": "after",
+    "allocations": 106577,
+    "bytes": 26354689,
+    "maxrss_kib": [
+      62856,
+      62720,
+      62652,
+      62656,
+      62824
+    ]
+  }
+]

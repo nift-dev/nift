@@ -3,6 +3,8 @@ from pathlib import Path
 out=Path(sys.argv[1]);out.mkdir(exist_ok=True,parents=True)
 bins=[str(Path(x).resolve()) for x in sys.argv[2:4]]
 names=sys.argv[4:];rows=json.load(open('.build/cp49/probes.json'));result=[]
+extra=Path('.build/cp49-campaign/extra-probes.json')
+if extra.exists():rows += json.loads(extra.read_text())
 for name in names:
  r=next(x for x in rows if x['name']==name and x['n']==(0 if name=='empty' else 2000));item={'name':name,'n':r['n'],'variants':[]}
  for i,b in enumerate(bins):
