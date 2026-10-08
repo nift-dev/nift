@@ -427,7 +427,10 @@ std::vector<SourceText> parse_parameters(const SourceText& text, bool& ok,
     int parens = 0, brackets = 0, braces = 0;
     char quote = 0;
     auto append = [&](std::size_t end) {
-        auto raw = text.substr(start, end - start).trimmed();
+        auto begin = start, trimmed_end = end;
+        while (begin < trimmed_end && std::isspace(static_cast<unsigned char>(text[begin]))) ++begin;
+        while (trimmed_end > begin && std::isspace(static_cast<unsigned char>(text[trimmed_end-1]))) --trimmed_end;
+        auto raw = text.substr(begin, trimmed_end - begin);
         const auto index = result.size();
         if (flags[index] && raw.view) {
             SourceBuilder builder(raw.view);

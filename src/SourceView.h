@@ -72,8 +72,8 @@ public:
     std::pair<std::size_t, std::size_t> original_range(std::size_t offset,
                                                      std::size_t length = 1) const {
         offset = std::min(offset, size_);
-        if (!spans_) return {base_ + offset, std::min(length, size_ - offset)};
         if (offset == size_) return {eof_, 0};
+        if (!spans_) return {base_ + offset, std::min(length, size_ - offset)};
         auto it = std::upper_bound(spans_->begin(), spans_->end(), offset,
             [](std::size_t n, const SourceSpanMapping& span) { return n < span.begin; });
         if (it == spans_->begin()) return {eof_, 0};
@@ -90,11 +90,16 @@ public:
     SourceView slice(std::size_t start, std::size_t length = std::string::npos) const {
         start = std::min(start, size_);
         length = std::min(length, size_ - start);
-        if (!spans_) return SourceView(document_, {}, base_ + start, length, base_ + start + length);
-        std::vector<SourceSpanMapping> clipped;
+        if (!spans_) return SourceView(document_, {}, base_ + start, length, start + length == size_ ? eof_ : base_ + start + length);
         auto first = std::upper_bound(spans_->begin(), spans_->end(), start,
             [](std::size_t n, const SourceSpanMapping& span) { return n < span.begin; });
         if (first != spans_->begin()) --first;
+        const auto eof = original_range(start + length, 0).first;
+        if (!length) return SourceView(document_, {}, eof, 0, eof);
+        if (first != spans_->end() && !first->anchored && start >= first->begin &&
+            start + length <= first->begin + first->length)
+            return SourceView(document_, {}, first->original + start - first->begin, length, eof);
+        std::vector<SourceSpanMapping> clipped;
         for (auto it = first; it != spans_->end() && it->begin < start + length; ++it) {
             const auto& span = *it;
             const auto begin = std::max(start, span.begin);
@@ -104,7 +109,9 @@ public:
                 span.original + (span.anchored ? 0 : begin - span.begin),
                 span.anchored ? span.original_length : end - begin, span.anchored});
         }
-        return mapped(document_, std::move(clipped), length, original_range(start + length, 0).first);
+        if (clipped.size() == 1 && !clipped.front().anchored)
+            return SourceView(document_, {}, clipped.front().original, length, eof);
+        return mapped(document_, std::move(clipped), length, eof);
     }
     SourceView trim(std::string_view text) const {
         const auto first = text.find_first_not_of(" \t\r\n");

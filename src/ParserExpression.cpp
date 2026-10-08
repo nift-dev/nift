@@ -1217,8 +1217,8 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
         // Execute only pure numeric expression plans. The existing leaf evaluator
         // and numeric operator remain the semantic oracle. Non-numeric bindings,
         // calls, locations, blocks and other shapes retain compatibility dispatch.
-        auto eval_expression_lambda = [&](const nift::detail::SourceText& body, nift::RuntimeValue& result, int body_depth) {
-            auto legacy = [&] { NIFT_LAMBDA_COUNT(legacy); return eval(body, result, body_depth); };
+        auto eval_expression_lambda = [&](const std::string& body, nift::RuntimeValue& result, int body_depth, const nift::detail::SourceView& body_view) {
+            auto legacy = [&] { NIFT_LAMBDA_COUNT(legacy); return eval(nift::detail::SourceText(body,body_view), result, body_depth); };
             if (valid_binding_identifier(body)) return legacy();
             auto plan = numeric_lambda_plan(body);
             if (!plan || body_depth + static_cast<int>(plan->depth) + 1 > 96) return legacy();
@@ -1228,7 +1228,7 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
                 using K = nift::ast::Kind;
                 if (expr.kind == K::Literal) { value = expr.literal; return true; }
                 if (expr.kind == K::Binding) {
-                    if (!eval(nift::detail::SourceText(expr.name,body.view.slice(expr.span.begin,expr.span.end-expr.span.begin)), value, body_depth + 1)) return false;
+                    if (!eval(nift::detail::SourceText(expr.name,body_view.slice(expr.span.begin,expr.span.end-expr.span.begin)), value, body_depth + 1)) return false;
                     if (!value.is_number()) { unsupported = true; return false; }
                     return true;
                 }
@@ -1250,7 +1250,7 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
                 return numeric_binary(left, right, expr.op[0], value);
             };
             const bool ok = execute(*plan->expression, result);
-            if (!ok && !unsupported && !expression_failure_view_ && body.view) expression_failure_view_ = body.view;
+            if (!ok && !unsupported && !expression_failure_view_ && body_view) expression_failure_view_ = body_view;
             if (unsupported) return legacy();
             NIFT_LAMBDA_COUNT(prepared);
             return ok;
@@ -2251,7 +2251,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                                 bool okcall=true;
                                 source_context_stack_.push_back(SourceContext{fn->source_path,fn->source_provenance,fn->body_view});
                                 if(fn->block){std::string bt=trim_copy(fn->body);const bool rendered=!bt.empty()&&bt.front()=='<';if(rendered){auto nested=parse(fn->body,fn->source_path,1,fn->source_provenance,fn->body_view);if(!nested.ok){error=nested.error.message;if(nested.diagnostic)active_diagnostic_=nested.diagnostic;okcall=false;}else result=nift::RuntimeValue(nested.output);}else{okcall=eval(nift::detail::SourceText(fn->body,fn->body_view),result,depth+1);if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0)error="lambda body error: "+error;}}
-                                else{okcall=eval_expression_lambda(nift::detail::SourceText(fn->body,fn->body_view),result,depth+1);if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0)error="lambda body error: "+error;}
+                                else{okcall=eval_expression_lambda(fn->body,result,depth+1,fn->body_view);if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0)error="lambda body error: "+error;}
                                 source_context_stack_.pop_back();
                                 pop_variable_scope();leave_lexical_environment(std::move(lexical_env));--callable_call_depth_;if(!okcall)append_diagnostic_frame(nift::detail::DiagnosticFrameKind::Callback,"collection callback");return okcall;
                             }
@@ -2676,7 +2676,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                             bool okcall=true;
                             source_context_stack_.push_back(SourceContext{fn->source_path,fn->source_provenance,fn->body_view});
                             if(fn->block){std::string bt=trim_copy(fn->body);const bool rendered=!bt.empty()&&bt.front()=='<';if(rendered){auto nested=parse(fn->body,fn->source_path,1,fn->source_provenance,fn->body_view);if(!nested.ok){error=nested.error.message;if(nested.diagnostic)active_diagnostic_=nested.diagnostic;okcall=false;}else out=nift::RuntimeValue(nested.output);}else{++function_call_depth_;auto nested=execute_native_program(fn->body,fn->source_path,1,fn->source_provenance,true,fn->body_view);--function_call_depth_;if(!nested.ok){error=nested.error.message;if(nested.diagnostic)active_diagnostic_=nested.diagnostic;okcall=false;}else if(pending_control_.kind==ControlFlow::Return){consume_return(out);}else out=nift::RuntimeValue(nullptr);}}
-                            else { okcall=eval_expression_lambda(nift::detail::SourceText(fn->body,fn->body_view),out,1); if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0) error="lambda body error: "+error; VariableBinding lr; if(try_location_ref(fn->body,lr)&&lr.is_location_ref()&&lr.value){last_call_return_loc_root_=lr.ref_root_slot;last_call_return_loc_path_=lr.ref_path;} }
+                            else { okcall=eval_expression_lambda(fn->body,out,1,fn->body_view); if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0) error="lambda body error: "+error; VariableBinding lr; if(try_location_ref(fn->body,lr)&&lr.is_location_ref()&&lr.value){last_call_return_loc_root_=lr.ref_root_slot;last_call_return_loc_path_=lr.ref_path;} }
                             source_context_stack_.pop_back();pop_variable_scope();leave_lexical_environment(std::move(lexical_env));--callable_call_depth_;if(!okcall)append_diagnostic_frame(nift::detail::DiagnosticFrameKind::Lambda,"lambda");return okcall;
                         }
                     }

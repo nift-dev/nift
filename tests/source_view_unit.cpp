@@ -16,7 +16,10 @@ int main() {
     auto value=std::move(wrapped).finish();
     assert(value.text=="$[repeated]");
     assert(value.view.locate(0).column==5 && value.view.locate(2).column==5);
-    assert(value.view.slice(2,8).locate(3).column==8);
+    const auto linear_slice = value.view.slice(2,8);
+    assert(linear_slice.mapping_bytes()==0 && linear_slice.locate(3).column==8);
+    assert(linear_slice.locate(linear_slice.size()).column==value.view.locate(10).column);
+    assert(linear_slice.slice(0).locate(linear_slice.size()).column==value.view.locate(10).column);
     SourceBuilder dedent(root);
     dedent.copy(source,12,8);dedent.copy(source,20,1);dedent.copy(source,23,8);
     auto body=std::move(dedent).finish();
