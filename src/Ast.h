@@ -17,6 +17,8 @@ struct Expr {
     std::unique_ptr<Expr> left, right; std::vector<std::unique_ptr<Expr>> items;
 };
 struct Context {
+    std::function<void(SourceSpan)> failure_origin;
+    std::function<bool(const std::string&, SourceSpan, nift::RuntimeValue&, std::string&)> legacy_with_span;
     std::function<bool(const std::string&, nift::RuntimeValue&, std::string&)> resolve;
     std::function<bool(const std::string&, std::shared_ptr<const nift::RuntimeValue>&, std::string&)> resolve_ref;
     std::function<bool(const std::string&, nift::RuntimeValue&, std::string&)> legacy;
@@ -52,6 +54,9 @@ struct TemplateParseResult { std::vector<std::unique_ptr<TemplateNode>> nodes; s
 TemplateParseResult parse_template(const std::string& source);
 StatementParseResult parse_statement(const std::string& source);
 ParseResult parse_expression(const std::string& source);
+ParseResult parse_expression_at(const std::string& source, std::size_t start, std::size_t length = std::string::npos);
+void rebase(Expr& expression, std::size_t offset);
+void rebase(Stmt& statement, std::size_t offset);
 bool evaluate(const Expr& expr, Context& ctx, nift::RuntimeValue& out, std::string& error);
 bool truthy(const nift::RuntimeValue& value);
 void fold_constants(Expr& expr);

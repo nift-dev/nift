@@ -11,6 +11,15 @@ struct SourceTranslationTestAccess {
     }
 };
 int main() {
+    const std::string arguments = "  first, nested(1, missing), \"a\\n,b\"";
+    nift::detail::SourceText mapped_arguments(arguments,
+        nift::detail::SourceView::identity("arguments.n", arguments));
+    bool parameters_ok = false; std::vector<bool> quoted;
+    auto parameters = nift::detail::parse_parameters(mapped_arguments, parameters_ok, &quoted);
+    assert(parameters_ok && parameters.size() == 3 && quoted[2]);
+    assert(parameters[0] == "first" && parameters[0].view.locate(0).column == 3);
+    assert(parameters[1].substr(10, 7).view.locate(0).column == 20);
+    assert(parameters[2] == "a\n,b" && parameters[2].view.locate(2).column == 30);
     ScriptRenderHost host(std::filesystem::current_path());TrackedInfo tracked;Parser parser(host,tracked);
     const std::string input="first := 1\n\nfn(check()) {\n    for(i : [1]) {\n        missing_value\n    }\n}\n";
     std::string output;nift::detail::SourceView view;nift::detail::DiagnosticOrigin error;

@@ -416,6 +416,44 @@ std::vector<std::string> parse_parameters(const std::string& text, bool& ok,
     return result;
 }
 
+std::vector<SourceText> parse_parameters(const SourceText& text, bool& ok,
+                                         std::vector<bool>* quoted) {
+    std::vector<bool> flags;
+    auto values = parse_parameters(static_cast<const std::string&>(text), ok, &flags);
+    if (quoted) quoted->insert(quoted->end(), flags.begin(), flags.end());
+    if (!ok) return {};
+    std::vector<SourceText> result;
+    std::size_t start = 0;
+    int parens = 0, brackets = 0, braces = 0;
+    char quote = 0;
+    auto append = [&](std::size_t end) {
+        auto raw = text.substr(start, end - start).trimmed();
+        const auto index = result.size();
+        if (flags[index] && raw.view) {
+            SourceBuilder builder(raw.view);
+            builder.generated(values[index], 0, raw.size());
+            auto mapped = std::move(builder).finish();
+            result.emplace_back(std::move(mapped.text), std::move(mapped.view));
+        } else result.emplace_back(std::move(values[index]), std::move(raw.view));
+        start = end + 1;
+    };
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        const char c = text[i];
+        if (quote) {
+            if (c == '\\' && i + 1 < text.size()) ++i;
+            else if (c == quote) quote = 0;
+            continue;
+        }
+        if (c == '\'' || c == '"') { quote = c; continue; }
+        if (c == '(') ++parens; else if (c == ')') --parens;
+        else if (c == '[') ++brackets; else if (c == ']') --brackets;
+        else if (c == '{') ++braces; else if (c == '}') --braces;
+        else if (c == ',' && !parens && !brackets && !braces) append(i);
+    }
+    if (!values.empty()) append(text.size());
+    return result;
+}
+
 bool parse_callable_parameters(const std::string& text,
                                std::vector<std::string>& params,
                                std::string& variadic_param) {

@@ -1155,9 +1155,9 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
         return parens==0 && !quoted;
     };
 
-    std::function<bool(const std::string&, nift::RuntimeValue&, int)> eval;
-    eval = [&](const std::string& raw, nift::RuntimeValue& out, int depth) -> bool {
-        std::string text=trim_copy(raw);
+    std::function<bool(const nift::detail::SourceText&, nift::RuntimeValue&, int)> eval;
+    eval = [&](const nift::detail::SourceText& raw, nift::RuntimeValue& out, int depth) -> bool {
+        auto text=trim_copy(raw);
         if (text.empty()) { error="expression cannot be empty"; return false; }
         while (encloses(text)) text=trim_copy(text.substr(1,text.size()-2));
         // Generative recursion guard: flat binary chains are folded iteratively
@@ -1456,28 +1456,28 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
         // v4.3 native scripting filesystem, console and stream primitives.
         {
             std::vector<nift::RuntimeValue> spread_values;
-            auto call_args=[&](const std::string& name,std::vector<std::string>& args,std::vector<bool>& quoted)->bool{
+            auto call_args=[&](const std::string& name,std::vector<nift::detail::SourceText>& args,std::vector<bool>& quoted)->bool{
                 if(text.rfind(name+"(",0)!=0||text.back()!=')')return false;
                 std::size_t close=0;if(!find_balanced(text,name.size(),'(',')',close)||close!=text.size()-1)return false;
                 bool ok=false;args=parse_parameters(text.substr(name.size()+1,text.size()-name.size()-2),ok,&quoted);
                 if(!ok){error=name+": malformed arguments";return false;}
-                std::vector<std::string> expanded; std::vector<bool> expanded_q;
+                std::vector<nift::detail::SourceText> expanded; std::vector<bool> expanded_q;
                 for(std::size_t ai=0;ai<args.size();++ai){
                     if(!(ai<quoted.size()&&quoted[ai])&&trim_copy(args[ai]).rfind("...",0)==0){nift::RuntimeValue sv;if(!eval(trim_copy(args[ai]).substr(3),sv,depth+1))return false;if(!sv.is_array()){error=name+": spread value must be an array";return false;}for(const auto& item:sv.array){expanded.push_back("\x1fnift:spread:"+std::to_string(spread_values.size()));spread_values.push_back(item);expanded_q.push_back(false);}}
                     else {expanded.push_back(args[ai]);expanded_q.push_back(ai<quoted.size()&&quoted[ai]);}
                 }
                 args.swap(expanded);quoted.swap(expanded_q);return true;
             };
-            auto arg_value=[&](const std::vector<std::string>& args,const std::vector<bool>& q,size_t i,nift::RuntimeValue& v)->bool{
+            auto arg_value=[&](const std::vector<nift::detail::SourceText>& args,const std::vector<bool>& q,size_t i,nift::RuntimeValue& v)->bool{
                 if(i>=args.size())return false;
                 if(i<q.size()&&q[i]){v=nift::RuntimeValue(args[i]);return true;}
                 if(args[i].rfind("\x1fnift:spread:",0)==0){const auto index=static_cast<std::size_t>(std::stoull(args[i].substr(13)));if(index>=spread_values.size())return false;v=spread_values[index];return true;}
                 return eval(args[i],v,depth+1);
             };
-            auto string_arg=[&](const std::string& name,const std::vector<std::string>& args,const std::vector<bool>& q,size_t i,std::string& v)->bool{
+            auto string_arg=[&](const std::string& name,const std::vector<nift::detail::SourceText>& args,const std::vector<bool>& q,size_t i,std::string& v)->bool{
                 nift::RuntimeValue d;if(!arg_value(args,q,i,d)||!d.is_string()){error=name+": expected string path";return false;}v=d.string;return true;
             };
-            std::vector<std::string> error_args; std::vector<bool> error_quoted;
+            std::vector<nift::detail::SourceText> error_args; std::vector<bool> error_quoted;
             if (call_args("error", error_args, error_quoted)) {
                 bool shadowed = false;
                 if (auto* binding=find_binding("error");binding&&binding->value&&binding->value->is_string()&&binding->value->string.rfind("\x1fnift:callable:",0)==0) shadowed=true;
@@ -1510,8 +1510,8 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
 if(!home)home=std::getenv("USERPROFILE");
 #endif
 if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p.is_relative())p=(standalone_script_host_?fs::current_path():host_.root())/p;return fs::absolute(p).lexically_normal();};
-            auto checked_path=[&](const std::string& name,const std::vector<std::string>& aa,const std::vector<bool>& qq,size_t i,fs::path& p)->bool{std::string raw;if(!string_arg(name,aa,qq,i,raw))return false;p=resolve_path(raw);if(!standalone_script_host_&&!resource_path_authority_.project_root.empty()&&!filesystem::path_within(resource_path_authority_.project_root,p)){error=name+": path must stay inside the Nift project";return false;}if(!nift_fs_root_allowed(p,resource_path_authority_.enforce_filesystem_root?resource_path_authority_.filesystem_root:fs::path{},error)){error=name+": "+error;return false;}return true;};
-            std::vector<std::string> args;std::vector<bool> q;
+            auto checked_path=[&](const std::string& name,const std::vector<nift::detail::SourceText>& aa,const std::vector<bool>& qq,size_t i,fs::path& p)->bool{std::string raw;if(!string_arg(name,aa,qq,i,raw))return false;p=resolve_path(raw);if(!standalone_script_host_&&!resource_path_authority_.project_root.empty()&&!filesystem::path_within(resource_path_authority_.project_root,p)){error=name+": path must stay inside the Nift project";return false;}if(!nift_fs_root_allowed(p,resource_path_authority_.enforce_filesystem_root?resource_path_authority_.filesystem_root:fs::path{},error)){error=name+": "+error;return false;}return true;};
+            std::vector<nift::detail::SourceText> args;std::vector<bool> q;
             if(call_args("cmd",args,q)){
                 if(args.empty()){error="cmd: expected executable and optional arguments";return false;}std::vector<std::string> vals;
                 for(std::size_t ai=0;ai<args.size();++ai){nift::RuntimeValue v;if(!arg_value(args,q,ai,v))return false;if(v.is_array()){for(const auto&x:v.array){if(!(x.is_string()||x.is_number()||x.is_bool())){error="cmd: arguments must be scalar";return false;}vals.push_back(render_expression_value(x));}}else if(v.is_string()||v.is_number()||v.is_bool())vals.push_back(render_expression_value(v));else{error="cmd: arguments must be scalar";return false;}}
@@ -1710,7 +1710,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             if(call_args("stat",args,q)){fs::path p;if(args.size()!=1||!checked_path("stat",args,q,0,p))return false;FsInfo info=inspect_path(p);if(info.error)return fail_recoverable(nift::detail::DiagnosticCode::IoMetadataFailed,"stat: "+info.error_message,error);nift::RuntimeValue d=nift::RuntimeValue::make_object();d["exists"]=nift::RuntimeValue(info.exists);if(info.exists){d["type"]=nift::RuntimeValue(info.type);if(info.type=="file")d["size"]=nift::RuntimeValue(static_cast<double>(info.size));}out=std::move(d);return true;}
             if(call_args("make_dir",args,q)||call_args("mkdir",args,q)){fs::path p;if(args.size()!=1||!checked_path("make_dir",args,q,0,p))return false;std::error_code ec;fs::create_directories(p,ec);if(ec)return fail_recoverable(nift::detail::DiagnosticCode::IoCreateFailed,"make_dir: "+ec.message(),error);out=nift::RuntimeValue(nullptr);return true;}
             if(call_args("touch",args,q)){fs::path p;if(args.size()!=1||!checked_path("touch",args,q,0,p))return false;std::ofstream f(p,std::ios::app);if(!f)return fail_recoverable(nift::detail::DiagnosticCode::IoCreateFailed,"touch: cannot open path",error);out=nift::RuntimeValue(nullptr);return true;}
-            auto path_values=[&](const std::string& name,const std::vector<std::string>& aa,const std::vector<bool>& qq,std::size_t begin,std::size_t end,std::vector<fs::path>& paths)->bool{for(std::size_t ai=begin;ai<end;++ai){nift::RuntimeValue v;if(!arg_value(aa,qq,ai,v))return false;std::vector<std::string> raws;if(v.is_string())raws.push_back(v.string);else if(v.is_array()){for(const auto& x:v.array){if(!x.is_string()){error=name+": path arrays must contain strings";return false;}raws.push_back(x.string);}}else{error=name+": expected string path or array of paths";return false;}for(const auto& raw:raws){fs::path p=resolve_path(raw);if(!standalone_script_host_&&!resource_path_authority_.project_root.empty()&&!filesystem::path_within(resource_path_authority_.project_root,p)){error=name+": path must stay inside the Nift project";return false;}if(!nift_fs_root_allowed(p,resource_path_authority_.enforce_filesystem_root?resource_path_authority_.filesystem_root:fs::path{},error)){error=name+": "+error;return false;}if(glob_has_magic(raw)){auto matches=glob_expand(p);paths.insert(paths.end(),matches.begin(),matches.end());}else paths.push_back(std::move(p));}}return true;};
+            auto path_values=[&](const std::string& name,const std::vector<nift::detail::SourceText>& aa,const std::vector<bool>& qq,std::size_t begin,std::size_t end,std::vector<fs::path>& paths)->bool{for(std::size_t ai=begin;ai<end;++ai){nift::RuntimeValue v;if(!arg_value(aa,qq,ai,v))return false;std::vector<std::string> raws;if(v.is_string())raws.push_back(v.string);else if(v.is_array()){for(const auto& x:v.array){if(!x.is_string()){error=name+": path arrays must contain strings";return false;}raws.push_back(x.string);}}else{error=name+": expected string path or array of paths";return false;}for(const auto& raw:raws){fs::path p=resolve_path(raw);if(!standalone_script_host_&&!resource_path_authority_.project_root.empty()&&!filesystem::path_within(resource_path_authority_.project_root,p)){error=name+": path must stay inside the Nift project";return false;}if(!nift_fs_root_allowed(p,resource_path_authority_.enforce_filesystem_root?resource_path_authority_.filesystem_root:fs::path{},error)){error=name+": "+error;return false;}if(glob_has_magic(raw)){auto matches=glob_expand(p);paths.insert(paths.end(),matches.begin(),matches.end());}else paths.push_back(std::move(p));}}return true;};
             if(call_args("remove",args,q)||call_args("rm",args,q)){if(args.empty()){error="remove: expected at least one path";return false;}std::vector<fs::path> paths;if(!path_values("remove",args,q,0,args.size(),paths))return false;for(const auto& rp:paths){std::error_code ec;if(fs::is_directory(rp,ec)){error="remove: directories are not removed recursively";return false;}if(!fs::remove(rp,ec)&&ec)return fail_recoverable(nift::detail::DiagnosticCode::IoRemoveFailed,"remove: "+ec.message(),error);}out=nift::RuntimeValue(nullptr);return true;}
             if(call_args("copy",args,q)||call_args("cp",args,q)||call_args("move",args,q)||call_args("mv",args,q)){const bool mv=text.rfind("move(",0)==0||text.rfind("mv(",0)==0;const std::string name=mv?"move":"copy";if(text.rfind("copy(",0)==0&&args.size()<2){args.clear();q.clear();}else if(args.size()<2){error=name+": expected source(s) and destination";return false;}else{std::vector<fs::path> sources;if(!path_values(name,args,q,0,args.size()-1,sources))return false;if(sources.empty()){error=name+": glob matched no source files";return false;}std::vector<fs::path> dests;if(!path_values(name,args,q,args.size()-1,args.size(),dests)||dests.size()!=1){error=name+": destination must be one path";return false;}fs::path dest=dests.front();std::error_code dec;const bool dest_dir=fs::is_directory(dest,dec);if(sources.size()>1&&!dest_dir){error=name+": destination must be an existing directory for multiple sources";return false;}for(const auto& src:sources){fs::path target=dest_dir?dest/src.filename():dest;std::error_code ec;if(mv)fs::rename(src,target,ec);else fs::copy_file(src,target,fs::copy_options::overwrite_existing,ec);if(ec)return fail_recoverable(mv?nift::detail::DiagnosticCode::IoMoveFailed:nift::detail::DiagnosticCode::IoCopyFailed,name+": "+ec.message(),error);}out=nift::RuntimeValue(nullptr);return true;}}
             if(call_args("cat",args,q)){fs::path p;if(args.size()!=1||!checked_path("cat",args,q,0,p))return false;std::error_code ec;if(fs::is_directory(p,ec)){error="cat: path is a directory";return false;}std::ifstream f(p,std::ios::binary);if(!f)return fail_recoverable(nift::detail::DiagnosticCode::IoOpenFailed,"cat: cannot open path",error);std::ostringstream ss;ss<<f.rdbuf();execution_output_->write_stdout(ss.str());out=nift::RuntimeValue(nullptr);return true;}
@@ -2587,7 +2587,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),args_ok,&quoted);
                 if(!args_ok){error="malformed method arguments";return false;}
                 std::vector<nift::RuntimeValue> spread_values;
-                std::vector<std::string> expanded;std::vector<bool> expanded_quoted;
+                std::vector<nift::detail::SourceText> expanded;std::vector<bool> expanded_quoted;
                 for(std::size_t ai=0;ai<args.size();++ai){
                     if(!(ai<quoted.size()&&quoted[ai])&&trim_copy(args[ai]).rfind("...",0)==0){
                         nift::RuntimeValue spread;
@@ -2642,7 +2642,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     leave_lexical_environment(std::move(initializer_env));
                     if(!initializers_ok)return false;
                     const std::string id=std::to_string(next_struct_instance_id_++); struct_instances_[id]=instance;
-                    if(ctor!=si->second.methods.end()){std::vector<nift::RuntimeValue> av;for(std::size_t ai=0;ai<args.size();++ai){nift::RuntimeValue v;if(ai<q.size()&&q[ai])v=nift::RuntimeValue(args[ai]);else if(!eval(args[ai],v,depth+1))return false;av.push_back(std::move(v));}nift::RuntimeValue ignored;if(!invoke_struct_method(instance,ctor->second,av,args,ignored,error))return false;}
+                    if(ctor!=si->second.methods.end()){std::vector<nift::RuntimeValue> av;for(std::size_t ai=0;ai<args.size();++ai){nift::RuntimeValue v;if(ai<q.size()&&q[ai])v=nift::RuntimeValue(args[ai]);else if(!eval(args[ai],v,depth+1))return false;av.push_back(std::move(v));}nift::RuntimeValue ignored;if(!invoke_struct_method(instance,ctor->second,av,std::vector<std::string>(args.begin(),args.end()),ignored,error))return false;}
                     out=nift::RuntimeValue(std::string("\x1fnift:struct:")+id); return true;
                 }
                 auto ci = callables_.find(call_name);
@@ -2657,7 +2657,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                             auto li=lambda_instances_.find(tag.substr(22));if(li==lambda_instances_.end()){error="invalid lambda";return false;}auto fn=li->second;
                             if (callable_call_depth_ >= kMaxCallableDepth) { error = "callable recursion depth exceeded"; return false; }
                             ++callable_call_depth_;
-                            std::vector<nift::RuntimeValue> spread_args;bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(aok){std::vector<std::string> ex;std::vector<bool> eq;for(size_t ai=0;ai<ar.size();++ai){if(!(ai<aq.size()&&aq[ai])&&trim_copy(ar[ai]).rfind("...",0)==0){nift::RuntimeValue sv;if(!eval(trim_copy(ar[ai]).substr(3),sv,depth+1)){--callable_call_depth_;return false;}if(!sv.is_array()){error="spread value must be an array";--callable_call_depth_;return false;}for(const auto& item:sv.array){ex.push_back("\x1fnift:spread:"+std::to_string(spread_args.size()));spread_args.push_back(item);eq.push_back(false);}}else{ex.push_back(ar[ai]);eq.push_back(ai<aq.size()&&aq[ai]);}}ar.swap(ex);aq.swap(eq);}if(!aok||(!fn->variadic_param.empty()?ar.size()<fn->params.size():ar.size()!=fn->params.size())){error="lambda argument count mismatch";--callable_call_depth_;return false;}
+                            std::vector<nift::RuntimeValue> spread_args;bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(aok){std::vector<nift::detail::SourceText> ex;std::vector<bool> eq;for(size_t ai=0;ai<ar.size();++ai){if(!(ai<aq.size()&&aq[ai])&&trim_copy(ar[ai]).rfind("...",0)==0){nift::RuntimeValue sv;if(!eval(trim_copy(ar[ai]).substr(3),sv,depth+1)){--callable_call_depth_;return false;}if(!sv.is_array()){error="spread value must be an array";--callable_call_depth_;return false;}for(const auto& item:sv.array){ex.push_back("\x1fnift:spread:"+std::to_string(spread_args.size()));spread_args.push_back(item);eq.push_back(false);}}else{ex.push_back(ar[ai]);eq.push_back(ai<aq.size()&&aq[ai]);}}ar.swap(ex);aq.swap(eq);}if(!aok||(!fn->variadic_param.empty()?ar.size()<fn->params.size():ar.size()!=fn->params.size())){error="lambda argument count mismatch";--callable_call_depth_;return false;}
                             std::vector<nift::RuntimeValue> av;for(size_t ai=0;ai<ar.size();++ai){nift::RuntimeValue v;if(ai<aq.size()&&aq[ai])v=nift::RuntimeValue(ar[ai]);else if(ar[ai].rfind("\x1fnift:spread:",0)==0)v=spread_args[static_cast<std::size_t>(std::stoull(ar[ai].substr(13)))];else if(!eval(ar[ai],v,depth+1)){--callable_call_depth_;return false;}av.push_back(std::move(v));}
                             if(fn->async){for(std::size_t ai=0;ai<ar.size();++ai){const std::string an=trim_copy(ar[ai]);if(valid_binding_identifier(an)){if(auto* ab=find_binding(an)){ab->sync();if(ab->value&&ab->value->is_string()&&ab->value->string.rfind("\x1fnift:atomic:",0)==0)av[ai]=*ab->value;}}}--callable_call_depth_;return spawn_future(*cb->value,av,out);}
                             std::vector<VariableBinding> parameter_bindings;parameter_bindings.reserve(fn->params.size());for(size_t ai=0;ai<fn->params.size();++ai)parameter_bindings.push_back(bind_call_param(ar[ai],ai<aq.size()&&aq[ai],av[ai]));
@@ -2678,7 +2678,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 if (callee) {
                     const auto callee_env = module_callee ? module_callee_env : callee->module_env;
                     if (callable_call_depth_ >= kMaxCallableDepth) { error = "callable recursion depth exceeded: " + call_name; return false; }
-                    std::vector<nift::RuntimeValue> spread_args;bool args_ok=false; std::vector<bool> quoted_args; auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),args_ok,&quoted_args); if(args_ok){std::vector<std::string> ex;std::vector<bool> eq;for(size_t ai=0;ai<args.size();++ai){if(!(ai<quoted_args.size()&&quoted_args[ai])&&trim_copy(args[ai]).rfind("...",0)==0){nift::RuntimeValue sv;if(!eval(trim_copy(args[ai]).substr(3),sv,depth+1))return false;if(!sv.is_array()){error="spread value must be an array";return false;}for(const auto& item:sv.array){ex.push_back("\x1fnift:spread:"+std::to_string(spread_args.size()));spread_args.push_back(item);eq.push_back(false);}}else{ex.push_back(args[ai]);eq.push_back(ai<quoted_args.size()&&quoted_args[ai]);}}args.swap(ex);quoted_args.swap(eq);}if(!args_ok||(!callee->variadic_param.empty()?args.size()<callee->params.size():args.size()!=callee->params.size())){error="callable argument count mismatch: "+call_name;return false;}
+                    std::vector<nift::RuntimeValue> spread_args;bool args_ok=false; std::vector<bool> quoted_args; auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),args_ok,&quoted_args); if(args_ok){std::vector<nift::detail::SourceText> ex;std::vector<bool> eq;for(size_t ai=0;ai<args.size();++ai){if(!(ai<quoted_args.size()&&quoted_args[ai])&&trim_copy(args[ai]).rfind("...",0)==0){nift::RuntimeValue sv;if(!eval(trim_copy(args[ai]).substr(3),sv,depth+1))return false;if(!sv.is_array()){error="spread value must be an array";return false;}for(const auto& item:sv.array){ex.push_back("\x1fnift:spread:"+std::to_string(spread_args.size()));spread_args.push_back(item);eq.push_back(false);}}else{ex.push_back(args[ai]);eq.push_back(ai<quoted_args.size()&&quoted_args[ai]);}}args.swap(ex);quoted_args.swap(eq);}if(!args_ok||(!callee->variadic_param.empty()?args.size()<callee->params.size():args.size()!=callee->params.size())){error="callable argument count mismatch: "+call_name;return false;}
                     std::vector<nift::RuntimeValue> values; for(std::size_t ai=0;ai<args.size();++ai){nift::RuntimeValue v;if(ai<quoted_args.size()&&quoted_args[ai])v=nift::RuntimeValue(args[ai]);else if(args[ai].rfind("\x1fnift:spread:",0)==0)v=spread_args[static_cast<std::size_t>(std::stoull(args[ai].substr(13)))];else if(!eval(args[ai],v,depth+1))return false;values.push_back(std::move(v));}
                     if(callee->async){if(module_callee){error="module-private async callables are unsupported";return false;}for(std::size_t ai=0;ai<args.size();++ai){const std::string an=trim_copy(args[ai]);if(valid_binding_identifier(an)){if(auto* ab=find_binding(an)){ab->sync();if(ab->value&&ab->value->is_string()&&ab->value->string.rfind("\x1fnift:atomic:",0)==0)values[ai]=*ab->value;}}}nift::RuntimeValue cb(named_callable_tag(call_name,callee->module_env));return spawn_future(cb,values,out);}
                     ++callable_call_depth_;
@@ -3264,7 +3264,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 }
                 if (!rb) { error = "assignment to undefined binding: " + root; return false; }
                 if (!rb->mutable_binding) { error = "cannot assign to const binding: " + root; return false; }
-                std::vector<std::string> indexes;
+                std::vector<nift::detail::SourceText> indexes;
                 std::size_t pos = open;
                 while (pos < name.size()) {
                     const std::size_t close = name.find(']', pos);
@@ -3357,7 +3357,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
 
         // Split at every top-level occurrence of a binary operator string so a
         // flat chain folds iteratively rather than recursing per operator.
-        auto split_op=[&](const std::string& op,std::vector<std::string>& parts)->bool{
+        auto split_op=[&](const std::string& op,std::vector<nift::detail::SourceText>& parts)->bool{
             parts.clear();bool quoted=false;char quote=0;int parens=0,brackets=0,braces=0;std::size_t start=0;
             for(std::size_t i=0;i+op.size()<=text.size();++i){char c=text[i];if(quoted){if(c=='\\')++i;else if(c==quote)quoted=false;continue;}if(c=='\''||c=='"'){quoted=true;quote=c;continue;}if(c=='('){++parens;continue;}if(c==')'){if(parens)--parens;continue;}if(c=='['){++brackets;continue;}if(c==']'){if(brackets)--brackets;continue;}if(c=='{'){++braces;continue;}if(c=='}'){if(braces)--braces;continue;}if(parens||brackets||braces)continue;if(text.compare(i,op.size(),op)==0){parts.push_back(text.substr(start,i-start));i+=op.size()-1;start=i+1;}}
             if (parts.empty())
@@ -3365,10 +3365,10 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             parts.push_back(text.substr(start));
             return true;
         };
-        { std::vector<std::string> parts;
+        { std::vector<nift::detail::SourceText> parts;
           if (split_op("||",parts)) { nift::RuntimeValue v; for(const auto& pt:parts){if(!eval(pt,v,depth+1))return false;if(truthy_value(v)){out=nift::RuntimeValue(true);return true;}} out=nift::RuntimeValue(truthy_value(v)); return true; }
         }
-        { std::vector<std::string> parts;
+        { std::vector<nift::detail::SourceText> parts;
           if (split_op("&&",parts)) { nift::RuntimeValue v; for(const auto& pt:parts){if(!eval(pt,v,depth+1))return false;if(!truthy_value(v)){out=nift::RuntimeValue(false);return true;}} out=nift::RuntimeValue(truthy_value(v)); return true; }
         }
         // Stream insertion/extraction operators. Handled lazily inside the comparison
@@ -3471,7 +3471,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
         // Split at every top-level operator in `ops` (left to right) so a flat
         // left-associative chain can be folded iteratively; this removes the
         // O(chain length) C++ recursion that previously exhausted the stack.
-        auto split_arithmetic=[&](const std::string& ops,std::vector<std::string>& parts,std::vector<char>& opchars)->bool{
+        auto split_arithmetic=[&](const std::string& ops,std::vector<nift::detail::SourceText>& parts,std::vector<char>& opchars)->bool{
             parts.clear();opchars.clear();bool quoted=false;char quote=0;int parens=0,brackets=0,braces=0;std::size_t start=0;
             for(std::size_t i=0;i<text.size();++i){char c=text[i];if(quoted){if(c=='\\'&&i+1<text.size())++i;else if(c==quote)quoted=false;continue;}if(c=='\''||c=='"'){quoted=true;quote=c;continue;}if(c=='('){++parens;continue;}if(c==')'){if(parens)--parens;continue;}if(c=='['){++brackets;continue;}if(c==']'){if(brackets)--brackets;continue;}if(c=='{'){++braces;continue;}if(c=='}'){if(braces)--braces;continue;}if(parens||brackets||braces)continue;if(ops.find(c)==std::string::npos)continue;if(c=='+'||c=='-'){std::size_t j=i;while(j>0&&(text[j-1]==' '||text[j-1]=='\t'))--j;if(j==0||std::string("+-*/%(<>=!&|?:,").find(text[j-1])!=std::string::npos||numeric_exponent_sign(text,i))continue;}parts.push_back(text.substr(start,i-start));opchars.push_back(c);start=i+1;}
             if (opchars.empty())
@@ -3479,7 +3479,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             parts.push_back(text.substr(start));
             return true;
         };
-        { std::vector<std::string> parts;std::vector<char> opchars;
+        { std::vector<nift::detail::SourceText> parts;std::vector<char> opchars;
           if (split_arithmetic("+-",parts,opchars)||split_arithmetic("*/%",parts,opchars)) {
             nift::RuntimeValue acc;if(!eval(parts[0],acc,depth+1))return false;
             for(std::size_t k=0;k<opchars.size();++k){nift::RuntimeValue rhs;if(!eval(parts[k+1],rhs,depth+1))return false;nift::RuntimeValue next;if(!apply_arithmetic(opchars[k],std::move(acc),std::move(rhs),next))return false;acc=std::move(next);}

@@ -1748,3 +1748,13 @@ test-source-translation: $(TEST_DIR)/source-translation-unit$(EXEEXT)
 	$(TEST_DIR)/source-translation-unit$(EXEEXT)
 
 test: test-source-translation
+
+$(TEST_DIR)/ast-source-unit$(EXEEXT): tests/ast_source_unit.cpp src/Ast.cpp src/Ast.h src/RuntimeValue.cpp src/RuntimeValue.h
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/ast_source_unit.cpp src/Ast.cpp src/RuntimeValue.cpp -o $@
+
+.PHONY: test-ast-source
+test-ast-source: $(TEST_DIR)/ast-source-unit$(EXEEXT)
+	$(TEST_DIR)/ast-source-unit$(EXEEXT)
+
+test: test-ast-source

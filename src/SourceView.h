@@ -127,6 +127,23 @@ private:
         : document_(std::move(document)), spans_(std::move(spans)), base_(base), size_(size), eof_(eof) {}
 };
 
+// Internal text slices retain coordinates while remaining compatible with legacy helpers.
+class SourceText : public std::string {
+public:
+    SourceView view;
+    SourceText() = default;
+    SourceText(const char* text) : std::string(text) {}
+    SourceText(std::string text, SourceView source = {})
+        : std::string(std::move(text)), view(std::move(source)) {}
+    SourceText substr(std::size_t start = 0, std::size_t length = npos) const {
+        return SourceText(std::string::substr(start, length), view.slice(start, length));
+    }
+    SourceText trimmed() const {
+        const auto first = find_first_not_of(" \t\r\n");
+        return first == npos ? substr(size(), 0) : substr(first, find_last_not_of(" \t\r\n") - first + 1);
+    }
+};
+
 struct MappedSource { std::string text; SourceView view; };
 
 class SourceBuilder {

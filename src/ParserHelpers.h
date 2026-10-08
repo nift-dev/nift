@@ -55,6 +55,8 @@ NIFT_PARSER_HELPER_HIDDEN bool strip_presentation_chain(const std::string& text,
 NIFT_PARSER_HELPER_HIDDEN std::string unescape_parameter_string(const std::string& text);
 NIFT_PARSER_HELPER_HIDDEN std::vector<std::string> parse_parameters(
     const std::string& text, bool& ok, std::vector<bool>* quoted = nullptr);
+NIFT_PARSER_HELPER_HIDDEN std::vector<SourceText> parse_parameters(
+    const SourceText& text, bool& ok, std::vector<bool>* quoted = nullptr);
 NIFT_PARSER_HELPER_HIDDEN bool parse_callable_parameters(const std::string& text,
                                                          std::vector<std::string>& params,
                                                          std::string& variadic_param);

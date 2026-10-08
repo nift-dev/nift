@@ -460,6 +460,7 @@ private:
     std::string path_to_page(std::size_t page);
     bool scalar_literal(const std::string& text, nift::RuntimeValue& value, std::string& error) const;
     std::string trim_copy(const std::string& text) const;
+    nift::detail::SourceText trim_copy(const nift::detail::SourceText& text) const { return text.trimmed(); }
     void push_json_scope();
     void pop_json_scope();
     void push_variable_scope();
