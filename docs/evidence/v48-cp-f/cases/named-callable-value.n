@@ -1,0 +1,5 @@
+fn(bad(x)) {
+    return 1 / 0
+}
+f := bad
+f(1)

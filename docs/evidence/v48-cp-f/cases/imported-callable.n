@@ -1,0 +1,4 @@
+import("module_function.n")
+for(i : [1]) {
+    module_bad()
+}

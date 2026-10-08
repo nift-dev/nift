@@ -1,0 +1,8 @@
+fn(fail_loop()) {
+    i := 0
+    while(i < 1) {
+        missing_value
+        i += 1
+    }
+}
+fail_loop()

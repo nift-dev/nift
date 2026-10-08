@@ -1,0 +1,5 @@
+file original_bytes transformed_bytes spans logical_mapping_bytes line_index_bytes
+small-native.f 191 233 63 2520 176
+large-native.f 137793 157795 30003 1200120 80016
+native-loop.f 98 103 26 1040 24
+main.html 18021 16024 2003 80120 16008

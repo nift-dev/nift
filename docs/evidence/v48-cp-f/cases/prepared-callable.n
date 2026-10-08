@@ -1,0 +1,6 @@
+fn(bad()) {
+    return 1 / 0
+}
+for(i : [1]) {
+    bad()
+}

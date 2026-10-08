@@ -1,0 +1,4 @@
+fn(module_bad()) {
+    return 1 / 0
+}
+export(module_bad)

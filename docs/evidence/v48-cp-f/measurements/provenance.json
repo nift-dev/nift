@@ -1,0 +1,7 @@
+{
+  "source_commit": "7c81de3faee816231abe36c464c2d8327da305c7",
+  "baseline_commit": "ab687d07d4f987b09ac0277142e2aaf1c0602af6",
+  "compiler": "g++ (Ubuntu 15.2.0-16ubuntu1) 15.2.0",
+  "candidate_sha256": "19507bc20ebb24f32dc5a1f616a5b38f19422149f0509403495b5cf9d57e6ba9",
+  "baseline_sha256": "a77deda5ef4124886a6ad344cd0fe0a43a5fa02d793cdf7e7eef2ed19645d8c4"
+}

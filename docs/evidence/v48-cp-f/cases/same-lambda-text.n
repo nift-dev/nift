@@ -1,0 +1,5 @@
+a := (x) => missing_value + x
+
+
+b := (x) => missing_value + x
+b(1)

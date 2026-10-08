@@ -1,0 +1,4 @@
+small-native.f 191 14.3287
+large-native.f 137793 7305.8
+native-loop.f 98 6.02752
+main.html 18021 712.891

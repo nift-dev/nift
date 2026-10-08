@@ -1,0 +1,4 @@
+fn(bad(a,x)) {
+    return 1 / 0
+}
+[1].reduce(bad,0)

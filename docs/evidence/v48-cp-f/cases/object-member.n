@@ -1,0 +1,5 @@
+first := 1
+for(i : [1]) {
+    o := {"x": 1}
+    o.absent
+}

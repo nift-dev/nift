@@ -1,0 +1,6 @@
+first := 1
+try {
+    for(i : [1]) {
+        ffi_open("./missing-library-cpf.so")
+    }
+} catch(e) { print(e.code) }

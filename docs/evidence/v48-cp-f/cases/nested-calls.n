@@ -1,0 +1,4 @@
+fn(id(x)) { return x }
+x := id(
+    id(missing_value)
+)

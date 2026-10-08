@@ -1,0 +1,10 @@
+fn(fail_loop()) {
+    for(i : [1]) {
+        while(true) {
+            if(true) {
+                missing_value
+            }
+        }
+    }
+}
+fail_loop()
