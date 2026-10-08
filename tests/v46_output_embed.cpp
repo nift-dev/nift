@@ -64,23 +64,26 @@ int main() {
     assert(rendered.stdout_output() == "render-out\n");
     assert(rendered.stderr_output() == "render-err\n");
 
+    const std::string render_source = "@script { print(\"render-before\"); return 1 / 0 }";
     auto failed_render = engine.render(
-        nift::Source::text("@script { print(\"render-before\"); return 1 / 0 }",
-                           "cp1-render.nift"));
+        nift::Source::text(render_source, "cp1-render.nift"));
     assert(!failed_render.ok());
     assert(failed_render.error().message == "return: division by zero");
     assert(failed_render.error().source == "cp1-render.nift");
     assert(failed_render.error().line == 1);
-    assert(failed_render.error().column == 26);
+    // Return diagnostics anchor at the original return construct.
+    assert(failed_render.error().column == render_source.find("return") + 1);
     assert(failed_render.stdout_output() == "render-before\n");
 
+    const std::string fragment_source = "@fragment(bad()){$[1 / 0]}$[bad()]";
     auto failed_fragment = engine.render(
-        nift::Source::text("@fragment(bad()){$[1 / 0]}$[bad()]", "cp1-fragment.nift"));
+        nift::Source::text(fragment_source, "cp1-fragment.nift"));
     assert(!failed_fragment.ok());
     assert(failed_fragment.error().message == "division by zero");
     assert(failed_fragment.error().source == "cp1-fragment.nift");
     assert(failed_fragment.error().line == 1);
-    assert(failed_fragment.error().column == 27);
+    // Template expression diagnostics anchor at the defining directive.
+    assert(failed_fragment.error().column == fragment_source.find("$[") + 1);
 
     std::vector<std::thread> threads;
     std::vector<nift::RenderResult> results(8);
