@@ -16,7 +16,7 @@ printf 'import("./mid.f")\n' > top.f
 # one import boundary -> one "import: " frame at the importer (fatal projection pinned)
 [[ "$("$NIFT" top.f 2>&1)" == *'import: import: division by zero'* ]]
 # direct script failure projects the defining source
-[[ "$("$NIFT" bad.f 2>&1)" == *"$(pwd)/bad.f:1:1: division by zero"* ]]
+[[ "$("$NIFT" bad.f 2>&1)" == *"$(pwd)/bad.f:1:10: division by zero"* ]]
 
 # ---------------------------------------------------------------- recoverable crossing imports: defining origin
 printf 'throw error("deep", "user.deep")\n' > leaf.f
@@ -91,11 +91,12 @@ cat > tmpl_call.f <<'NIFT'
 import("./mod_helper.f")
 @script { helper() }
 NIFT
-# imported callable fatal projection keeps the call site (legacy compatibility surface)
+# Imported callable diagnostics retain the defining source; callers are frames.
 if "$NIFT" tmpl_call.f >"$TMP/t.out" 2>"$TMP/t.err"; then
     echo 'template imported callable failure unexpectedly succeeded' >&2; exit 1
 fi
 grep -q 'return: division by zero' "$TMP/t.err" || { echo 'template imported callable message mismatch' >&2; exit 1; }
+grep -Fq "$(pwd)/mod_helper.f:1:16:" "$TMP/t.err" || { echo 'template imported callable definition origin mismatch' >&2; exit 1; }
 
 # ---------------------------------------------------------------- worker/async from imported code
 printf 'fn(trow2()) { throw error("from-import", "user.fi") }\nexport(trow2)\n' > mod_wimp.f
@@ -106,7 +107,7 @@ printf 'import("./mod_async.f")\nh := af()\ntry { await h } catch(e) { print(e.c
 [[ "$("$NIFT" async_main.f 2>&1)" == $'user.f\nuser' ]]
 
 # ---------------------------------------------------------------- in-memory source label
-[[ "$("$NIFT" -e 'value := 1 / 0' 2>&1)" == 'error: <command-line>:1:1: division by zero' ]]
+[[ "$("$NIFT" -e 'value := 1 / 0' 2>&1)" == 'error: <command-line>:1:10: division by zero' ]]
 
 # ---------------------------------------------------------------- single import execution
 rm -f side.txt
