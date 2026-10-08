@@ -374,7 +374,7 @@ private:
     // Lazily opened project/build automation context for native script bindings.
     std::shared_ptr<class ProjectInfo> automation_project_;
     std::filesystem::path automation_root_;
-    struct StructField { std::string name; std::string initializer; bool private_member = false; };
+    struct StructField { std::string name; std::string initializer; bool private_member = false; nift::detail::SourceView initializer_view{}; };
     struct StructMethod { Callable callable; bool private_member = false; bool constructor = false; };
     struct StructDefinition { std::string name; std::vector<StructField> fields; std::unordered_map<std::string, StructMethod> methods; std::shared_ptr<ModuleEnv> module_env; };
     struct StructInstance {

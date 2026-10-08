@@ -14,6 +14,41 @@ struct SourceTranslationTestAccess {
         assert(parser.evaluate_expression("[1,2]", value, message = ""));
         assert(parser.expression_failure_view_.locate(0).column == 3);
     }
+    static void definition_boundaries(Parser& parser) {
+        const std::string field = "struct(origin_field_box) {\n    callback := () => missing_field\n}\norigin_box := origin_field_box()\norigin_box.callback()\n";
+        auto result = parser.run_script(field, "field-definition.n");
+        assert(!result.ok && result.diagnostic);
+        assert(result.diagnostic->origin.source == "field-definition.n");
+        assert(result.diagnostic->origin.line == 2 && result.diagnostic->origin.column == 23);
+        const std::string initializer = "struct(origin_value_box) {\n    value := missing_initializer\n}\norigin_value := origin_value_box()\n";
+        result = parser.run_script(initializer, "initializer-definition.n");
+        assert(!result.ok && result.diagnostic);
+        assert(result.diagnostic->origin.source == "initializer-definition.n");
+        assert(result.diagnostic->origin.line == 2 && result.diagnostic->origin.column == 14);
+        const std::string thread_definition = "origin_thread_lambda := () => missing_thread_origin";
+        assert(parser.run_statement(thread_definition, "<lambda-thread-definition>").ok);
+        assert(parser.run_statement("origin_thread := thread(origin_thread_lambda)", "<lambda-thread-create>").ok);
+        for (int observation = 0; observation < 2; ++observation) {
+            result = parser.run_statement("origin_thread.join()", "<lambda-thread-join>");
+            assert(!result.ok && result.diagnostic);
+            assert(result.error.source_file == "<lambda-thread-definition>");
+            assert(result.error.column == thread_definition.find("missing_thread_origin") + 1);
+            assert(result.error.source_line == thread_definition);
+            assert(result.diagnostic->origin.source_line == thread_definition);
+        }
+        const std::string future_definition = "origin_future_lambda := async () => missing_future_origin";
+        assert(parser.run_statement(future_definition, "<lambda-future-definition>").ok);
+        assert(parser.run_statement("origin_future := origin_future_lambda()", "<lambda-future-create>").ok);
+        for (int observation = 0; observation < 2; ++observation) {
+            result = parser.run_statement("await origin_future", "<lambda-future-await>");
+            assert(!result.ok && result.diagnostic);
+            assert(result.error.source_file == "<lambda-future-definition>");
+            assert(result.error.column == future_definition.find("missing_future_origin") + 1);
+            assert(result.error.source_line == future_definition);
+            assert(result.diagnostic->origin.source_line == future_definition);
+        }
+        parser.finalize_execution_workers();
+    }
     static bool translate(Parser& parser, const std::string& text, std::string& output,
                           nift::detail::SourceView& view, nift::detail::DiagnosticOrigin& error) {
         std::string message;
@@ -53,4 +88,5 @@ int main() {
     assert(error.source=="original.n" && error.line==2 && error.column==1);
     assert(SourceTranslationTestAccess::translate(parser,"\n",output,view,error));
     assert(output.empty() && view.locate(0).line==2);
+    SourceTranslationTestAccess::definition_boundaries(parser);
 }
