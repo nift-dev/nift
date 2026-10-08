@@ -197,10 +197,24 @@ private:
     };
     std::vector<std::unordered_map<std::string, VariableBinding>> variable_scopes_;
     enum class SourceProvenance { FileBacked, InMemory };
+    // Prepared calls retain an immutable defining path. Other contexts own their
+    // path directly; diagnostic origin and semantic authority remain distinct.
     struct SourceContext {
-        std::filesystem::path path;
+        std::filesystem::path owned_path;
+        std::shared_ptr<const std::filesystem::path> cached_path;
         SourceProvenance provenance = SourceProvenance::FileBacked;
         nift::detail::SourceView view{};
+        SourceContext() = default;
+        SourceContext(const std::filesystem::path& path, SourceProvenance origin,
+                      nift::detail::SourceView source_view = {})
+            : owned_path(path),
+              provenance(origin), view(std::move(source_view)) {}
+        SourceContext(std::shared_ptr<const std::filesystem::path> path, SourceProvenance origin,
+                      nift::detail::SourceView source_view)
+            : cached_path(std::move(path)), provenance(origin), view(std::move(source_view)) {}
+        const std::filesystem::path& path() const {
+            return cached_path ? *cached_path : owned_path;
+        }
     };
     struct ResourcePathAuthority {
         std::filesystem::path project_root;
@@ -235,7 +249,7 @@ private:
     std::vector<SavedLexicalScopes> saved_lexical_scopes_;
     std::unordered_map<std::string, Callable> callables_;
     // Prepared AST bodies for user callables, cached on first prepared call.
-    struct PreparedCallable { nift::detail::SourceView view; bool ready=false; std::vector<std::unique_ptr<nift::ast::Stmt>> stmts; };
+    struct PreparedCallable { std::shared_ptr<const std::filesystem::path> source_path; nift::detail::SourceView view; bool ready=false; std::vector<std::unique_ptr<nift::ast::Stmt>> stmts; };
     std::unordered_map<const Callable*, PreparedCallable> prepared_callables_;
     std::shared_ptr<ModuleEnv> active_module_env_;
     std::shared_ptr<ModuleEnv> loading_module_env_;

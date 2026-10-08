@@ -77,6 +77,24 @@ namespace {
 // results or callable identity. Bounded thread-local caches are safe across
 // parser instances and workers; invocation always resolves its live environment.
 constexpr std::size_t kLambdaCodeCacheLimit = 256;
+// initializer_list elements are const, so vector{value} makes a temporary
+// deep copy and then copies it again into the vector. Build the same owned
+// argument snapshot directly; callback parameter binding remains unchanged.
+std::vector<nift::RuntimeValue> callback_value_arguments(const nift::RuntimeValue& first) {
+    std::vector<nift::RuntimeValue> args;
+    args.reserve(1);
+    args.push_back(first);
+    return args;
+}
+std::vector<nift::RuntimeValue> callback_value_arguments(const nift::RuntimeValue& first,
+                                                        const nift::RuntimeValue& second) {
+    std::vector<nift::RuntimeValue> args;
+    args.reserve(2);
+    args.push_back(first);
+    args.push_back(second);
+    return args;
+}
+
 struct LambdaSyntax {
     std::vector<std::string> params;
     std::string variadic_param, body;
@@ -125,6 +143,8 @@ std::shared_ptr<const NumericLambdaPlan> numeric_lambda_plan(const std::string& 
         max_depth = std::max(max_depth, depth);
         using K = nift::ast::Kind;
         if (expr.kind == K::Binding) return true;
+        if (expr.kind == K::Member)
+            return expr.left && expr.left->kind == K::Binding && supported(*expr.left, depth + 1);
         if (expr.kind == K::Literal) return expr.literal.is_number() && std::isfinite(expr.literal.num);
         if (expr.kind == K::Unary)
             return (expr.op == "+" || expr.op == "-") && expr.right && supported(*expr.right, depth + 1);
@@ -139,7 +159,8 @@ std::shared_ptr<const NumericLambdaPlan> numeric_lambda_plan(const std::string& 
           parsed.expr->left->kind == nift::ast::Kind::Binding &&
           (parsed.expr->right->kind == nift::ast::Kind::Binding ||
            (parsed.expr->right->kind == nift::ast::Kind::Literal && parsed.expr->right->literal.is_number()))) ||
-         ((parsed.expr->kind == nift::ast::Kind::Binary || parsed.expr->kind == nift::ast::Kind::Unary) &&
+         ((parsed.expr->kind == nift::ast::Kind::Binary || parsed.expr->kind == nift::ast::Kind::Unary ||
+           parsed.expr->kind == nift::ast::Kind::Member) &&
         ((supported(*parsed.expr, 0)) ||
          (parsed.expr->kind == nift::ast::Kind::Binary &&
           (parsed.expr->op == "<" || parsed.expr->op == "<=" || parsed.expr->op == ">" || parsed.expr->op == ">=" ||
@@ -1264,22 +1285,22 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
             }
             auto plan = numeric_lambda_plan(body);
             if (!plan || body_depth + static_cast<int>(plan->depth) + 1 > 96) return legacy();
+            auto live_slot = [&](const std::string& name) -> VariableBinding* {
+                if (callables_.count(name) ||
+                    (active_module_env_ && active_module_env_->callables.count(name))) return nullptr;
+                for (auto scope = variable_scopes_.rbegin(); scope != variable_scopes_.rend(); ++scope) {
+                    auto found = scope->find(name);
+                    if (found == scope->end()) continue;
+                    found->second.sync();
+                    return found->second.value ? &found->second : nullptr;
+                }
+                return nullptr;
+            };
             if (plan->expression->kind == nift::ast::Kind::Index) {
                 // Syntax is cached, but both slots are synchronized on every
                 // invocation. There are no calls or mutations between resolving
                 // the root and copying the element. All other shapes, types and
                 // failures retain canonical compatibility diagnostics.
-                auto live_slot = [&](const std::string& name) -> VariableBinding* {
-                    if (callables_.count(name) ||
-                        (active_module_env_ && active_module_env_->callables.count(name))) return nullptr;
-                    for (auto scope = variable_scopes_.rbegin(); scope != variable_scopes_.rend(); ++scope) {
-                        auto found = scope->find(name);
-                        if (found == scope->end()) continue;
-                        found->second.sync();
-                        return found->second.value ? &found->second : nullptr;
-                    }
-                    return nullptr;
-                };
                 const auto& expr = *plan->expression;
                 auto* root = live_slot(expr.left->name);
                 if (!root || !root->value->is_array()) return legacy();
@@ -1304,6 +1325,19 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
                 if (expr.kind == K::Binding) {
                     if (!eval(nift::detail::SourceText(expr.name,body_view.slice(expr.span.begin,expr.span.end-expr.span.begin)), value, body_depth + 1)) return false;
                     if (!value.is_number()) { unsupported = true; return false; }
+                    return true;
+                }
+                if (expr.kind == K::Member) {
+                    // Immediate read from the synchronized live binding. The
+                    // numeric result is copied before any other evaluation;
+                    // no pointer or value survives into a future invocation.
+                    auto* root = live_slot(expr.left->name);
+                    if (!root || !root->value->is_object()) { unsupported = true; return false; }
+                    const auto& object = static_cast<const nift::RuntimeValue&>(*root->value);
+                    if (!object.has(expr.name)) { unsupported = true; return false; }
+                    const auto& member = object[expr.name];
+                    if (!member.is_number()) { unsupported = true; return false; }
+                    value = member;
                     return true;
                 }
                 if (expr.kind == K::Unary) {
@@ -1456,7 +1490,7 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
             if(callable_tag.rfind("\x1fnift:callable:lambda:",0)==0){auto it=lambdas.find(callable_tag.substr(22));if(it!=lambdas.end())it->second->async=false;}
             RenderHost* hp=&host_;TrackedInfo* tp=&tracked_info_;
             auto execution_output=execution_output_;
-            nift::detail::DiagnosticOrigin worker_origin;if(callable_tag.rfind("\x1fnift:callable:named:",0)==0){auto definition=funcs.find(callable_tag.substr(21));if(definition!=funcs.end())worker_origin.source=definition->second.source_path;}else if(callable_tag.rfind("\x1fnift:callable:lambda:",0)==0){auto definition=lambdas.find(callable_tag.substr(22));if(definition!=lambdas.end())worker_origin.source=definition->second->source_path;}if(worker_origin.source.empty())worker_origin.source=source_context_stack_.empty()?std::filesystem::path("<async-worker>"):source_context_stack_.back().path;worker_origin.line=1;worker_origin.column=1;
+            nift::detail::DiagnosticOrigin worker_origin;if(callable_tag.rfind("\x1fnift:callable:named:",0)==0){auto definition=funcs.find(callable_tag.substr(21));if(definition!=funcs.end())worker_origin.source=definition->second.source_path;}else if(callable_tag.rfind("\x1fnift:callable:lambda:",0)==0){auto definition=lambdas.find(callable_tag.substr(22));if(definition!=lambdas.end())worker_origin.source=definition->second->source_path;}if(worker_origin.source.empty())worker_origin.source=source_context_stack_.empty()?std::filesystem::path("<async-worker>"):source_context_stack_.back().path();worker_origin.line=1;worker_origin.column=1;
             nift::detail::NiftAsyncPool::instance().submit([state,hp,tp,execution_output=std::move(execution_output),vars=std::move(vars),funcs=std::move(funcs),modules=std::move(modules),next_module_identity,resource_authority,lambdas=std::move(lambdas),threads=std::move(threads),mutexes=std::move(mutexes),atomics=std::move(atomics),asyncs=std::move(asyncs),callable_tag,av,worker_origin=std::move(worker_origin)]() mutable {
                 nift::RuntimeValue result;std::string e;std::optional<nift::detail::Diagnostic> diagnostic;std::optional<nift::RuntimeValue> recoverable;std::optional<nift::detail::Diagnostic> recoverable_diagnostic;
                 try{Parser worker(*hp,*tp,std::move(execution_output));worker.standalone_script_host_=true;worker.resource_path_authority_=resource_authority;worker.strict_script_mode_=true;worker.callables_=std::move(funcs);worker.module_envs_=std::move(modules);worker.next_module_identity_=next_module_identity;worker.lambda_instances_=std::move(lambdas);worker.thread_instances_=std::move(threads);worker.mutex_instances_=std::move(mutexes);worker.atomic_instances_=std::move(atomics);worker.async_instances_=std::move(asyncs);worker.variable_scopes_.back()=std::move(vars);if(callable_tag.rfind("\x1fnift:callable:named:",0)==0&&!worker.set_named_callable_async(callable_tag,false))e="invalid async callable";auto csp=std::make_shared<nift::RuntimeValue>(callable_tag);worker.variable_scopes_.back()["__future_callable"]=VariableBinding{csp,nift_binding_type(*csp),false,false};std::string expr="__future_callable(";for(size_t i=0;e.empty()&&i<av.size();++i){auto sp=std::make_shared<nift::RuntimeValue>(av[i]);std::string n="__future_arg"+std::to_string(i);worker.variable_scopes_.back()[n]=VariableBinding{sp,nift_binding_type(*sp),false,false};if(i)expr+=",";expr+=n;}expr+=")";if(e.empty()&&!worker.evaluate_expression(expr,result,e)&&e.empty())e="async function failed";if(e.empty()&&worker.contains_timer_resource(result))e="async function result contains a non-transferable timer";if(!e.empty()&&worker.expression_failure_view_){const auto origin=worker.expression_failure_view_.locate(0,worker.expression_failure_view_.size());if(!worker.active_diagnostic_)worker.active_diagnostic_=nift::detail::make_diagnostic(nift::detail::DiagnosticCode::InternalLegacyFailure,e,origin);else if(!worker.active_diagnostic_->origin.line)worker.active_diagnostic_->origin=origin;}if(worker.active_recoverable_){recoverable=*worker.active_recoverable_;if(worker.active_diagnostic_)recoverable_diagnostic=*worker.active_diagnostic_;}if(!e.empty()&&worker.active_diagnostic_)diagnostic=*worker.active_diagnostic_;}catch(const std::exception& ex){e=ex.what();diagnostic=nift::detail::make_diagnostic(nift::detail::DiagnosticCode::InternalUnexpectedException,e,worker_origin);}catch(...){e="unknown async worker exception";diagnostic=nift::detail::make_diagnostic(nift::detail::DiagnosticCode::InternalUnexpectedException,e,worker_origin);}
@@ -1664,7 +1698,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 for(const auto&kv:lambda_instances_){auto li=std::make_shared<LambdaInstance>(*kv.second);li->captures.clear();for(const auto&cv:kv.second->captures)if(cv.second.value&&transferable(*cv.second.value))li->captures[cv.first]=clone_worker_binding(cv.second,clone_memo);if(li->module_env){auto owner=modules.find(li->module_env->identity);li->module_env=owner==modules.end()?std::shared_ptr<ModuleEnv>{}:owner->second;}lambdas[kv.first]=std::move(li);}
                 RenderHost* hp=&host_;TrackedInfo* tp=&tracked_info_;const std::string callable_tag=cb.string;
                 auto execution_output=execution_output_;
-                nift::detail::DiagnosticOrigin worker_origin;if(callable_tag.rfind("\x1fnift:callable:named:",0)==0){auto definition=funcs.find(callable_tag.substr(21));if(definition!=funcs.end())worker_origin.source=definition->second.source_path;}else if(callable_tag.rfind("\x1fnift:callable:lambda:",0)==0){auto definition=lambdas.find(callable_tag.substr(22));if(definition!=lambdas.end())worker_origin.source=definition->second->source_path;}if(worker_origin.source.empty())worker_origin.source=source_context_stack_.empty()?std::filesystem::path("<thread-worker>"):source_context_stack_.back().path;worker_origin.line=1;worker_origin.column=1;
+                nift::detail::DiagnosticOrigin worker_origin;if(callable_tag.rfind("\x1fnift:callable:named:",0)==0){auto definition=funcs.find(callable_tag.substr(21));if(definition!=funcs.end())worker_origin.source=definition->second.source_path;}else if(callable_tag.rfind("\x1fnift:callable:lambda:",0)==0){auto definition=lambdas.find(callable_tag.substr(22));if(definition!=lambdas.end())worker_origin.source=definition->second->source_path;}if(worker_origin.source.empty())worker_origin.source=source_context_stack_.empty()?std::filesystem::path("<thread-worker>"):source_context_stack_.back().path();worker_origin.line=1;worker_origin.column=1;
                 state->worker=std::thread([state,hp,tp,execution_output=std::move(execution_output),vars=std::move(vars),funcs=std::move(funcs),modules=std::move(modules),next_module_identity,resource_authority,lambdas=std::move(lambdas),threads=std::move(threads),mutexes=std::move(mutexes),atomics=std::move(atomics),asyncs=std::move(asyncs),callable_tag,av=std::move(av),worker_origin=std::move(worker_origin)]() mutable {
                     nift::RuntimeValue result;std::string e;
                     std::optional<nift::detail::Diagnostic> diagnostic;std::optional<nift::RuntimeValue> recoverable;std::optional<nift::detail::Diagnostic> recoverable_diagnostic;
@@ -2353,7 +2387,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                             nift::RuntimeValue result=nift::RuntimeValue::make_object();
                             std::unordered_map<std::string,std::size_t> seen_keys; result.object.reserve(a.size());
                             for(const auto& v:a){
-                                nift::RuntimeValue key;if(!invoke_value_callback(args[0],{v},key))return false;
+                                nift::RuntimeValue key;if(!invoke_value_callback(args[0],callback_value_arguments(v),key))return false;
                                 std::string rendered;if(!generated_object_key(key,rendered))return false;
                                 if(seen_keys.count(rendered)){error="index_by: duplicate generated key '"+rendered+"'";return false;}
                                 seen_keys[rendered]=result.object.size(); result.object.emplace_back(rendered,v);
@@ -2363,7 +2397,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         if(method=="partition"){
                             if(args.size()!=1){error="partition: expected one predicate";return false;}
                             nift::RuntimeValue result=nift::RuntimeValue::make_object(); result["matched"]=nift::RuntimeValue::make_array(); result["unmatched"]=nift::RuntimeValue::make_array();
-                            for(const auto& v:a){nift::RuntimeValue r;if(!invoke_value_callback(args[0],{v},r))return false;if(!r.is_bool()){error="partition: callback must return bool";return false;}(r.boolean?result["matched"]:result["unmatched"]).push_back(v);}out=std::move(result);return true;
+                            for(const auto& v:a){nift::RuntimeValue r;if(!invoke_value_callback(args[0],callback_value_arguments(v),r))return false;if(!r.is_bool()){error="partition: callback must return bool";return false;}(r.boolean?result["matched"]:result["unmatched"]).push_back(v);}out=std::move(result);return true;
                         }
                         if(method=="unique_by"){
                             if(args.size()!=1){error="unique_by: expected one selector";return false;} out=nift::RuntimeValue::make_array(); std::unordered_map<std::string,std::vector<nift::RuntimeValue>> seen;
@@ -2387,7 +2421,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                                 }
                                 out+='?';
                             };
-                            for(const auto& v:a){nift::RuntimeValue k;if(!invoke_value_callback(args[0],{v},k))return false;std::string ck;canonical_key(k,ck);auto& bucket=seen[ck];bool duplicate=false;for(const auto& prior:bucket)if(structural_equal(prior,k)){duplicate=true;break;}if(!duplicate){bucket.push_back(std::move(k));out.array.push_back(v);}}return true;
+                            for(const auto& v:a){nift::RuntimeValue k;if(!invoke_value_callback(args[0],callback_value_arguments(v),k))return false;std::string ck;canonical_key(k,ck);auto& bucket=seen[ck];bool duplicate=false;for(const auto& prior:bucket)if(structural_equal(prior,k)){duplicate=true;break;}if(!duplicate){bucket.push_back(std::move(k));out.array.push_back(v);}}return true;
                         }
                         if(method=="min_by"||method=="max_by"){
                             if(args.size()!=1){error=method+": expected one selector";return false;}if(a.empty()){error=method+": cannot select from an empty array";return false;}nift::RuntimeValue best_key;if(!invoke_value_callback(args[0],{a.front()},best_key))return false;if(!(best_key.is_number()||best_key.is_string()||best_key.is_bool())){error=method+": key must be scalar";return false;}out=a.front();
@@ -2396,7 +2430,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         if(method=="count_by"){
                             if(args.size()!=1){error="count_by: expected one selector";return false;}nift::RuntimeValue result=nift::RuntimeValue::make_object();
                             std::unordered_map<std::string,std::size_t> pos; result.object.reserve(a.size());
-                            for(const auto& v:a){nift::RuntimeValue k;if(!invoke_value_callback(args[0],{v},k))return false;std::string rendered;if(!generated_object_key(k,rendered))return false;auto it=pos.find(rendered);if(it==pos.end()){pos[rendered]=result.object.size();result.object.emplace_back(rendered,nift::RuntimeValue(0.0));result.object.back().second.num+=1;}else result.object[it->second].second.num+=1;}
+                            for(const auto& v:a){nift::RuntimeValue k;if(!invoke_value_callback(args[0],callback_value_arguments(v),k))return false;std::string rendered;if(!generated_object_key(k,rendered))return false;auto it=pos.find(rendered);if(it==pos.end()){pos[rendered]=result.object.size();result.object.emplace_back(rendered,nift::RuntimeValue(0.0));result.object.back().second.num+=1;}else result.object[it->second].second.num+=1;}
                             out=std::move(result);return true;
                         }
                         if(method=="take"||method=="drop"||method=="chunk"){
@@ -2405,7 +2439,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         if(method=="group_by_each"){
                             if(args.size()!=1){error="group_by_each: expected one selector";return false;}nift::RuntimeValue result=nift::RuntimeValue::make_object();
                             std::unordered_map<std::string,std::size_t> pos;
-                            for(const auto& v:a){nift::RuntimeValue ks;if(!invoke_value_callback(args[0],{v},ks))return false;if(!ks.is_array()){error="group_by_each: selector must return an array";return false;}std::vector<std::string> item_keys;for(const auto& k:ks.array){std::string rendered;if(!generated_object_key(k,rendered))return false;if(std::find(item_keys.begin(),item_keys.end(),rendered)!=item_keys.end())continue;item_keys.push_back(rendered);auto it=pos.find(rendered);if(it==pos.end()){pos[rendered]=result.object.size();result.object.emplace_back(rendered,nift::RuntimeValue::make_array());result.object.back().second.array.push_back(v);}else result.object[it->second].second.array.push_back(v);}}
+                            for(const auto& v:a){nift::RuntimeValue ks;if(!invoke_value_callback(args[0],callback_value_arguments(v),ks))return false;if(!ks.is_array()){error="group_by_each: selector must return an array";return false;}std::vector<std::string> item_keys;for(const auto& k:ks.array){std::string rendered;if(!generated_object_key(k,rendered))return false;if(std::find(item_keys.begin(),item_keys.end(),rendered)!=item_keys.end())continue;item_keys.push_back(rendered);auto it=pos.find(rendered);if(it==pos.end()){pos[rendered]=result.object.size();result.object.emplace_back(rendered,nift::RuntimeValue::make_array());result.object.back().second.array.push_back(v);}else result.object[it->second].second.array.push_back(v);}}
                             out=std::move(result);return true;
                         }
                         if(method=="sort_by"){
@@ -2415,14 +2449,14 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                                 for(size_t si=0;si<args.size();si+=2){if(si+1>=args.size()||si+1>=aq.size()||!aq[si+1]){error="sort_by: direction must be quoted 'asc' or 'desc'";return false;}std::string d=args[si+1];if(d!="asc"&&d!="desc"){error="sort_by: direction must be 'asc' or 'desc'";return false;}specs.push_back({args[si],d=="desc"});}
                             }
                             struct Decorated { std::vector<nift::RuntimeValue> keys; nift::RuntimeValue value; }; std::vector<Decorated> decorated; decorated.reserve(a.size());
-                            for(const auto& v:a){Decorated d;d.value=v;for(const auto& sp:specs){nift::RuntimeValue k;if(!invoke_value_callback(sp.selector,{v},k))return false;if(!(k.is_string()||k.is_number()||k.is_bool())){error="sort_by: key must be scalar";return false;}d.keys.push_back(std::move(k));}decorated.push_back(std::move(d));}
+                            for(auto& v:base.array){Decorated d;d.keys.reserve(specs.size());for(const auto& sp:specs){nift::RuntimeValue k;if(!invoke_value_callback(sp.selector,callback_value_arguments(v),k))return false;if(!(k.is_string()||k.is_number()||k.is_bool())){error="sort_by: key must be scalar";return false;}d.keys.push_back(std::move(k));}d.value=std::move(v);decorated.push_back(std::move(d));}
                             auto cmp_key=[&](const nift::RuntimeValue& x,const nift::RuntimeValue& y,int& c)->bool{if(x.is_number()&&y.is_number())c=nift::runtime_compare_numbers(x,y);else if(x.is_string()&&y.is_string())c=x.string<y.string?-1:x.string>y.string?1:0;else if(x.is_bool()&&y.is_bool())c=x.boolean<y.boolean?-1:x.boolean>y.boolean?1:0;else{error="sort_by: keys must be comparable and homogeneous";return false;}return true;};
-                            bool compare_error=false;std::stable_sort(decorated.begin(),decorated.end(),[&](const Decorated& x,const Decorated& y){for(size_t si=0;si<specs.size();++si){int c=0;if(!cmp_key(x.keys[si],y.keys[si],c)){compare_error=true;return false;}if(c)return specs[si].desc?c>0:c<0;}return false;});if(compare_error)return false;out=nift::RuntimeValue::make_array();for(auto& d:decorated)out.array.push_back(std::move(d.value));return true;
+                            bool compare_error=false;std::stable_sort(decorated.begin(),decorated.end(),[&](const Decorated& x,const Decorated& y){for(size_t si=0;si<specs.size();++si){int c=0;if(!cmp_key(x.keys[si],y.keys[si],c)){compare_error=true;return false;}if(c)return specs[si].desc?c>0:c<0;}return false;});if(compare_error)return false;out=nift::RuntimeValue::make_array();out.array.reserve(decorated.size());for(auto& d:decorated)out.array.push_back(std::move(d.value));return true;
                         }
                         if(method=="map"||method=="filter"||method=="reduce"||method=="any"||method=="all"||method=="find"||method=="find_index"||method=="count"||method=="group_by"){
                             if((method=="reduce"&&args.size()!=2)||(method!="reduce"&&args.size()!=1)){error=method+": invalid arguments";return false;}nift::RuntimeValue arr=nift::RuntimeValue::make_array(),acc;if(method=="reduce"&&!eval_arg(1,acc))return false;double cnt=0;std::vector<std::pair<nift::RuntimeValue,nift::RuntimeValue>> keyed;
                             nift::RuntimeValue cbv;if(!eval(args[0],cbv,depth+1))return false;if(!cbv.is_string()||cbv.string.rfind("\x1fnift:callable:",0)!=0){error="transformation: callback must be callable";return false;}
-                            for(size_t vi=0;vi<a.size();++vi){const auto&v=a[vi];nift::RuntimeValue r;if(!invoke_value_cb(cbv,method=="reduce"?std::vector<nift::RuntimeValue>{acc,v}:std::vector<nift::RuntimeValue>{v},r))return false;if(method=="map")arr.array.push_back(std::move(r));else if(method=="filter"){if(!r.is_bool()){error="filter: callback must return bool";return false;}if(r.boolean)arr.array.push_back(v);}else if(method=="reduce")acc=r;else if(method=="group_by"){if(!(r.is_string()||r.is_number()||r.is_bool())){error=method+": key must be scalar";return false;}keyed.push_back({r,v});}else{if(!r.is_bool()){error=method+": callback must return bool";return false;}if(method=="any"&&r.boolean){out=nift::RuntimeValue(true);return true;}if(method=="all"&&!r.boolean){out=nift::RuntimeValue(false);return true;}if(method=="find"&&r.boolean){out=v;return true;}if(method=="find_index"&&r.boolean){out=nift::RuntimeValue((double)vi);return true;}if(method=="count"&&r.boolean)cnt+=1;}}
+                            for(size_t vi=0;vi<a.size();++vi){const auto&v=a[vi];nift::RuntimeValue r;if(!invoke_value_cb(cbv,method=="reduce"?callback_value_arguments(acc,v):callback_value_arguments(v),r))return false;if(method=="map")arr.array.push_back(std::move(r));else if(method=="filter"){if(!r.is_bool()){error="filter: callback must return bool";return false;}if(r.boolean)arr.array.push_back(v);}else if(method=="reduce")acc=r;else if(method=="group_by"){if(!(r.is_string()||r.is_number()||r.is_bool())){error=method+": key must be scalar";return false;}keyed.push_back({r,v});}else{if(!r.is_bool()){error=method+": callback must return bool";return false;}if(method=="any"&&r.boolean){out=nift::RuntimeValue(true);return true;}if(method=="all"&&!r.boolean){out=nift::RuntimeValue(false);return true;}if(method=="find"&&r.boolean){out=v;return true;}if(method=="find_index"&&r.boolean){out=nift::RuntimeValue((double)vi);return true;}if(method=="count"&&r.boolean)cnt+=1;}}
                             if(method=="group_by")return group_keyed(keyed,out);
                             if(method=="map"||method=="filter")out=std::move(arr);else if(method=="reduce")out=acc;else if(method=="any")out=nift::RuntimeValue(false);else if(method=="all")out=nift::RuntimeValue(true);else if(method=="find"||method=="find_index")out=nift::RuntimeValue(method=="find"?nift::RuntimeValue(nullptr):nift::RuntimeValue(-1.0));else out=nift::RuntimeValue(cnt);return true;}
                         if(method=="unique"||method=="flatten"||method=="sum"||method=="min"||method=="max"){if(!args.empty()){error=method+": expected no arguments";return false;}if(method=="unique"){out=nift::RuntimeValue::make_array();for(const auto&v:a){bool seen=false;for(const auto&w:out.array)if(structural_equal(v,w)){seen=true;break;}if(!seen)out.array.push_back(v);}return true;}if(method=="flatten"){out=nift::RuntimeValue::make_array();for(const auto&v:a){if(v.is_array())out.array.insert(out.array.end(),v.array.begin(),v.array.end());else out.array.push_back(v);}return true;}if(a.empty()){if(method=="sum"){out=nift::RuntimeValue(0.0);return true;}error=method+": cannot aggregate an empty array";return false;}if(method=="sum"){double total=0;for(const auto&v:a){if(!v.is_number()){error="sum: values must be numeric";return false;}total+=v.num;}out=nift::RuntimeValue(total);return true;}out=a.front();for(size_t ai=1;ai<a.size();++ai){const auto&v=a[ai];bool take=false;if(out.is_number()&&v.is_number()){const int cmp=nift::runtime_compare_numbers(v,out);take=method=="min"?cmp<0:cmp>0;}else if(out.is_string()&&v.is_string())take=method=="min"?v.string<out.string:v.string>out.string;else{error=method+": values must be comparable and homogeneous";return false;}if(take)out=v;}return true;}
@@ -2595,8 +2629,8 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         for(size_t i=0;i<av.size();++i){if(i)call+=",";std::string n="__nift_arg"+std::to_string(i);auto sp=std::make_shared<nift::RuntimeValue>(av[i]);sc[n]=VariableBinding{sp,nift_binding_type(*sp),false,false};call+=n;}call+=")";bool r=eval(call,result,depth+1);pop_variable_scope();return r;};
                     if(method=="map"||method=="filter"||method=="reduce"||method=="any"||method=="all"||method=="find"||method=="find_index"||method=="count"||method=="sort_by"||method=="group_by"){
                         if((method=="reduce"&&args.size()!=2)||(method!="reduce"&&args.size()!=1)){error=method+": invalid arguments";return false;}nift::RuntimeValue arr=nift::RuntimeValue::make_array(),acc;if(method=="reduce"&&!eval(args[1],acc,depth+1))return false;double cnt=0;std::vector<std::pair<nift::RuntimeValue,nift::RuntimeValue>> keyed;
-                        for(size_t vi=0;vi<a.size();++vi){const auto&v=a[vi];nift::RuntimeValue r;if(!invoke_callback(args[0],method=="reduce"?std::vector<nift::RuntimeValue>{acc,v}:std::vector<nift::RuntimeValue>{v},r))return false;if(method=="map")arr.array.push_back(std::move(r));else if(method=="filter"){if(!r.is_bool()){error="filter: callback must return bool";return false;}if(r.boolean)arr.array.push_back(v);}else if(method=="reduce")acc=r;else if(method=="group_by"){if(!(r.is_string()||r.is_number()||r.is_bool())){error=method+": key must be scalar";return false;}keyed.push_back({r,v});}else{if(!r.is_bool()){error=method+": callback must return bool";return false;}if(method=="any"&&r.boolean){out=nift::RuntimeValue(true);return true;}if(method=="all"&&!r.boolean){out=nift::RuntimeValue(false);return true;}if(method=="find"&&r.boolean){out=v;return true;}if(method=="find_index"&&r.boolean){out=nift::RuntimeValue((double)vi);return true;}if(method=="count"&&r.boolean)cnt+=1;}}
-                        if(method=="sort_by"){std::stable_sort(keyed.begin(),keyed.end(),[&](const auto&x,const auto&y){if(x.first.is_number()&&y.first.is_number())return nift::runtime_compare_numbers(x.first,y.first)<0;if(x.first.is_string()&&y.first.is_string())return x.first.string<y.first.string;if(x.first.is_bool()&&y.first.is_bool())return x.first.boolean<y.first.boolean;return (int)x.first.type<(int)y.first.type;});out=nift::RuntimeValue::make_array();for(auto&kv:keyed)out.array.push_back(kv.second);return true;}
+                        for(size_t vi=0;vi<a.size();++vi){const auto&v=a[vi];nift::RuntimeValue r;if(!invoke_callback(args[0],method=="reduce"?callback_value_arguments(acc,v):callback_value_arguments(v),r))return false;if(method=="map")arr.array.push_back(std::move(r));else if(method=="filter"){if(!r.is_bool()){error="filter: callback must return bool";return false;}if(r.boolean)arr.array.push_back(v);}else if(method=="reduce")acc=r;else if(method=="group_by"){if(!(r.is_string()||r.is_number()||r.is_bool())){error=method+": key must be scalar";return false;}keyed.push_back({r,v});}else{if(!r.is_bool()){error=method+": callback must return bool";return false;}if(method=="any"&&r.boolean){out=nift::RuntimeValue(true);return true;}if(method=="all"&&!r.boolean){out=nift::RuntimeValue(false);return true;}if(method=="find"&&r.boolean){out=v;return true;}if(method=="find_index"&&r.boolean){out=nift::RuntimeValue((double)vi);return true;}if(method=="count"&&r.boolean)cnt+=1;}}
+                        if(method=="sort_by"){std::stable_sort(keyed.begin(),keyed.end(),[&](const auto&x,const auto&y){if(x.first.is_number()&&y.first.is_number())return nift::runtime_compare_numbers(x.first,y.first)<0;if(x.first.is_string()&&y.first.is_string())return x.first.string<y.first.string;if(x.first.is_bool()&&y.first.is_bool())return x.first.boolean<y.first.boolean;return (int)x.first.type<(int)y.first.type;});out=nift::RuntimeValue::make_array();out.array.reserve(keyed.size());for(auto&kv:keyed)out.array.push_back(std::move(kv.second));return true;}
                         if(method=="group_by")return group_keyed(keyed,out);
                         if(method=="map"||method=="filter")out=std::move(arr);else if(method=="reduce")out=acc;else if(method=="any")out=nift::RuntimeValue(false);else if(method=="all")out=nift::RuntimeValue(true);else if(method=="find"||method=="find_index")out=nift::RuntimeValue(method=="find"?nift::RuntimeValue(nullptr):nift::RuntimeValue(-1.0));else out=nift::RuntimeValue(cnt);return true;}
                     if(method=="unique"||method=="flatten"||method=="sum"||method=="min"||method=="max"){

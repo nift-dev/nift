@@ -1816,3 +1816,13 @@ test-v49-json-preflight-guard: $(JSON_PREFLIGHT_GUARD)
 .PHONY: test-v49-group-scaling
 test-v49-group-scaling: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" python3 tests/v49_group_scaling.py
+
+$(TEST_DIR)/v49-call-outcome-unit$(EXEEXT): tests/v49_call_outcome_unit.cpp src/Ast.cpp src/Ast.h src/RuntimeValue.cpp src/RuntimeValue.h
+	mkdir -p $(TEST_DIR)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/v49_call_outcome_unit.cpp src/Ast.cpp src/RuntimeValue.cpp -o $@
+
+.PHONY: test-v49-call-outcome
+test-v49-call-outcome: $(TEST_DIR)/v49-call-outcome-unit$(EXEEXT)
+	$(TEST_DIR)/v49-call-outcome-unit$(EXEEXT)
+
+test: test-v49-call-outcome

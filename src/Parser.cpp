@@ -481,7 +481,7 @@ bool Parser::resolve_owned_resource_path(const std::string& name,
         const SourceContext source_context = owner
             ? SourceContext{owner->source_path, owner->source_provenance}
             : (source_context_stack_.empty() ? SourceContext{} : source_context_stack_.back());
-        fs::path source = source_context.path;
+        fs::path source = source_context.path();
         if (source.empty() || source_context.provenance != SourceProvenance::FileBacked) {
             error = "module_path: current execution has no file-backed source";
             return false;
@@ -976,7 +976,7 @@ void Parser::append_diagnostic_frame(nift::detail::DiagnosticFrameKind kind,
                                      std::string compatibility_prefix) {
     if (!active_diagnostic_) return;
     nift::detail::DiagnosticOrigin site;
-    if (!source_context_stack_.empty()) site.source = source_context_stack_.back().path;
+    if (!source_context_stack_.empty()) site.source = source_context_stack_.back().path();
     active_diagnostic_->frames.push_back(
         {kind, std::move(label), std::move(site), std::move(compatibility_prefix)});
     result_.diagnostic = active_diagnostic_;
