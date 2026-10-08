@@ -135,16 +135,20 @@ std::shared_ptr<const NumericLambdaPlan> numeric_lambda_plan(const std::string& 
     };
     std::shared_ptr<const NumericLambdaPlan> result;
     if (parsed.supported && parsed.expr &&
-        (parsed.expr->kind == nift::ast::Kind::Binary || parsed.expr->kind == nift::ast::Kind::Unary) &&
+        ((parsed.expr->kind == nift::ast::Kind::Index && parsed.expr->left && parsed.expr->right &&
+          parsed.expr->left->kind == nift::ast::Kind::Binding &&
+          (parsed.expr->right->kind == nift::ast::Kind::Binding ||
+           (parsed.expr->right->kind == nift::ast::Kind::Literal && parsed.expr->right->literal.is_number()))) ||
+         ((parsed.expr->kind == nift::ast::Kind::Binary || parsed.expr->kind == nift::ast::Kind::Unary) &&
         ((supported(*parsed.expr, 0)) ||
          (parsed.expr->kind == nift::ast::Kind::Binary &&
           (parsed.expr->op == "<" || parsed.expr->op == "<=" || parsed.expr->op == ">" || parsed.expr->op == ">=" ||
            parsed.expr->op == "==" || parsed.expr->op == "!=") &&
           parsed.expr->left && parsed.expr->right &&
-          supported(*parsed.expr->left, 1) && supported(*parsed.expr->right, 1)))) {
+          supported(*parsed.expr->left, 1) && supported(*parsed.expr->right, 1)))))) {
         auto plan = std::make_shared<NumericLambdaPlan>();
         plan->expression = std::move(parsed.expr);
-        plan->depth = max_depth;
+        plan->depth = plan->expression->kind == nift::ast::Kind::Index ? 1 : max_depth;
         result = std::move(plan);
     }
     // Negative entries avoid repeatedly preparing unsupported syntax. Parse
@@ -1239,6 +1243,38 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
             }
             auto plan = numeric_lambda_plan(body);
             if (!plan || body_depth + static_cast<int>(plan->depth) + 1 > 96) return legacy();
+            if (plan->expression->kind == nift::ast::Kind::Index) {
+                // Syntax is cached, but both slots are synchronized on every
+                // invocation. There are no calls or mutations between resolving
+                // the root and copying the element. All other shapes, types and
+                // failures retain canonical compatibility diagnostics.
+                auto live_slot = [&](const std::string& name) -> VariableBinding* {
+                    if (callables_.count(name) ||
+                        (active_module_env_ && active_module_env_->callables.count(name))) return nullptr;
+                    for (auto scope = variable_scopes_.rbegin(); scope != variable_scopes_.rend(); ++scope) {
+                        auto found = scope->find(name);
+                        if (found == scope->end()) continue;
+                        found->second.sync();
+                        return found->second.value ? &found->second : nullptr;
+                    }
+                    return nullptr;
+                };
+                const auto& expr = *plan->expression;
+                auto* root = live_slot(expr.left->name);
+                if (!root || !root->value->is_array()) return legacy();
+                const nift::RuntimeValue* index = &expr.right->literal;
+                if (expr.right->kind == nift::ast::Kind::Binding) {
+                    auto* slot = live_slot(expr.right->name);
+                    if (!slot) return legacy();
+                    index = slot->value.get();
+                }
+                std::size_t offset = 0;
+                if (!index->is_number() || !nift::runtime_number_to_size(*index, offset) ||
+                    offset >= root->value->array.size()) return legacy();
+                result = root->value->array[offset];
+                NIFT_LAMBDA_COUNT(prepared);
+                return true;
+            }
             bool unsupported = false;
             std::function<bool(const nift::ast::Expr&, nift::RuntimeValue&)> execute;
             execute = [&](const nift::ast::Expr& expr, nift::RuntimeValue& value) {

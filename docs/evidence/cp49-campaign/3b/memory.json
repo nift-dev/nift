@@ -1,0 +1,50 @@
+[
+  {
+    "name": "map-index",
+    "variant": "before",
+    "allocations": 58569,
+    "bytes": 7453904
+  },
+  {
+    "name": "map-index",
+    "variant": "after",
+    "allocations": 44570,
+    "bytes": 7067929
+  },
+  {
+    "name": "sort-index",
+    "variant": "before",
+    "allocations": 98577,
+    "bytes": 11973873
+  },
+  {
+    "name": "sort-index",
+    "variant": "after",
+    "allocations": 84578,
+    "bytes": 11587898
+  },
+  {
+    "name": "map-identity",
+    "variant": "before",
+    "allocations": 44554,
+    "bytes": 7078598
+  },
+  {
+    "name": "map-identity",
+    "variant": "after",
+    "allocations": 44554,
+    "bytes": 7078591
+  },
+  {
+    "name": "bfs",
+    "variant": "before",
+    "allocations": 80756,
+    "bytes": 13302812
+  },
+  {
+    "name": "bfs",
+    "variant": "after",
+    "allocations": 80756,
+    "bytes": 13302805
+  }
+]

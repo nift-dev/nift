@@ -1,0 +1,90 @@
+[
+  {
+    "name": "map-index",
+    "variant": "before",
+    "maxrss_kib": [
+      16700,
+      16444,
+      16520,
+      16280,
+      16428
+    ]
+  },
+  {
+    "name": "map-index",
+    "variant": "after",
+    "maxrss_kib": [
+      16508,
+      16472,
+      16360,
+      16328,
+      16772
+    ]
+  },
+  {
+    "name": "sort-index",
+    "variant": "before",
+    "maxrss_kib": [
+      51252,
+      51108,
+      51320,
+      51204,
+      51036
+    ]
+  },
+  {
+    "name": "sort-index",
+    "variant": "after",
+    "maxrss_kib": [
+      51400,
+      51212,
+      51296,
+      51044,
+      51280
+    ]
+  },
+  {
+    "name": "map-identity",
+    "variant": "before",
+    "maxrss_kib": [
+      16832,
+      16684,
+      16728,
+      16740,
+      16596
+    ]
+  },
+  {
+    "name": "map-identity",
+    "variant": "after",
+    "maxrss_kib": [
+      16760,
+      16380,
+      16648,
+      16564,
+      16664
+    ]
+  },
+  {
+    "name": "bfs",
+    "variant": "before",
+    "maxrss_kib": [
+      20720,
+      21256,
+      20512,
+      21172,
+      20648
+    ]
+  },
+  {
+    "name": "bfs",
+    "variant": "after",
+    "maxrss_kib": [
+      20872,
+      21024,
+      21220,
+      20784,
+      21156
+    ]
+  }
+]
