@@ -730,7 +730,7 @@ test-all: test test-embed test-bindings test-build-boundary
 
 # Plain `make test` = the ordinary Nift/CLI regression surface (C++ toolchain
 # only). Embedding and binding suites are run through the focused targets.
-test: test-parser-hardening test-content test-commands test-comments test-contracts test-json test-runtime-value test-cp15-numeric-repair test-cp17-bytes test-cp18-bytes test-cp19-bytes test-cp20-bytes test-cp21-bytes \
+test: test-v49-selector-parity test-parser-hardening test-content test-commands test-comments test-contracts test-json test-runtime-value test-cp15-numeric-repair test-cp17-bytes test-cp18-bytes test-cp19-bytes test-cp20-bytes test-cp21-bytes \
 	test-json-schema test-console test-diagnostics test-minify \
 	test-json-schema-integration test-markup-json-directives test-pagination test-pagination-ordering \
 	test-template-optional test-requirements test-path-alias test-path-safety test-metadata-safety \
@@ -1784,3 +1784,7 @@ test-source-map: $(TEST_DIR)/source-map-probe$(EXEEXT)
 test: test-source-map
 
 .PHONY: test-binding-warnings
+
+.PHONY: test-v49-selector-parity
+test-v49-selector-parity: $(TARGET)
+	NIFT="$(CURDIR)/$(TARGET)" python3 tests/v49_selector_parity.py

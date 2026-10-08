@@ -9,6 +9,12 @@ import tempfile
 binary = str(Path(os.environ.get("NIFT", "./nift")).resolve())
 build = "a := []\ni := 1\nwhile(i <= 100000) { a.push(i); i += 1 }\n"
 cases = [
+    ("identity map", build + "print(a.map(x => x).length())\n",
+     "100000\n", {"syntax": 1, "numeric": 0, "instances": 1, "prepared": 100000, "legacy": 0}),
+    ("identity sort", build + "a = a.sort_by(x => x)\nprint(a[0])\n",
+     "1\n", {"syntax": 1, "numeric": 0, "instances": 100000, "prepared": 100000, "legacy": 0}),
+    ("identity typed fallback", 'f := x => x\nprint(f(2))\nprint(f("a"))\n',
+     "2\na\n", {"syntax": 1, "numeric": 0, "instances": 1, "prepared": 1, "legacy": 1}),
     ("sort", build + "a = a.sort_by(x => x + 1)\nprint(a[0])\n",
      "1\n", {"syntax": 1, "numeric": 1, "instances": 100000, "prepared": 100000, "legacy": 0}),
     ("reduce", build + "print(a.reduce((acc,x) => acc + x, 0))\n",

@@ -1,0 +1,50 @@
+[
+  {
+    "name": "map-identity",
+    "variant": "before",
+    "allocations": 44550,
+    "bytes": 7075982
+  },
+  {
+    "name": "map-identity",
+    "variant": "after",
+    "allocations": 44550,
+    "bytes": 7075979
+  },
+  {
+    "name": "sort-identity",
+    "variant": "before",
+    "allocations": 84567,
+    "bytes": 11608072
+  },
+  {
+    "name": "sort-identity",
+    "variant": "after",
+    "allocations": 84567,
+    "bytes": 11608069
+  },
+  {
+    "name": "call-scalar",
+    "variant": "before",
+    "allocations": 32489,
+    "bytes": 4673490
+  },
+  {
+    "name": "call-scalar",
+    "variant": "after",
+    "allocations": 32489,
+    "bytes": 4673487
+  },
+  {
+    "name": "bfs",
+    "variant": "before",
+    "allocations": 80752,
+    "bytes": 13300193
+  },
+  {
+    "name": "bfs",
+    "variant": "after",
+    "allocations": 80752,
+    "bytes": 13300190
+  }
+]

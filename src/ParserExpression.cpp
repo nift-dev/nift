@@ -1219,7 +1219,24 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
         // calls, locations, blocks and other shapes retain compatibility dispatch.
         auto eval_expression_lambda = [&](const std::string& body, nift::RuntimeValue& result, int body_depth, const nift::detail::SourceView& body_view) {
             auto legacy = [&] { NIFT_LAMBDA_COUNT(legacy); return eval(nift::detail::SourceText(body,body_view), result, body_depth); };
-            if (valid_binding_identifier(body)) return legacy();
+            if (valid_binding_identifier(body) && body_depth <= 96) {
+                // A pure numeric binding uses the same live scope slot as the
+                // compatibility resolver. Keep named-callable precedence and
+                // every nonnumeric/unresolved shape on that resolver.
+                if (callables_.count(body) ||
+                    (active_module_env_ && active_module_env_->callables.count(body)))
+                    return legacy();
+                for (auto scope = variable_scopes_.rbegin(); scope != variable_scopes_.rend(); ++scope) {
+                    auto found = scope->find(body);
+                    if (found == scope->end()) continue;
+                    found->second.sync();
+                    if (!found->second.value || !found->second.value->is_number()) return legacy();
+                    result = *found->second.value;
+                    NIFT_LAMBDA_COUNT(prepared);
+                    return true;
+                }
+                return legacy();
+            }
             auto plan = numeric_lambda_plan(body);
             if (!plan || body_depth + static_cast<int>(plan->depth) + 1 > 96) return legacy();
             bool unsupported = false;
