@@ -20,20 +20,20 @@ whether it is a regression.
 ## Current identity
 
 - Product: **Nift**, a website generator and dependency-aware website build layer.
-- Current executable identity: `Nift v4.10.0` (development), following the verified public v4.9.0 release.
+- Current executable identity: `Nift v4.11.0` (development), following the verified public v4.10.0 release.
 - Language/toolchain: C++17 and Make.
 - Output convention for modern projects: `public/`.
 - Current branch: `main` in this checkout.
-- Current project phase: **post-v4.9 release; v4.10 development**.
-  The immutable v4.9.0 tag targets `aaadeb31219251b7cc02a62fbf75360ac3e11aaf`.
-  Release workflow #37809541710 and all public installer lanes passed.
+- Current project phase: **post-v4.10 release; v4.11 development**.
+  The immutable v4.10.0 tag targets `76dbe2661fe7d221827db63959bf4a392bae2ba6`.
+  Release workflow #37987877884 and all public installer lanes passed.
   Exactly five public assets and deployed website bytes were independently verified.
-  Chocolatey 4.9.0 was submitted via #37812050345; its feed reports Submitted/Pending,
+  Chocolatey 4.10.0 was submitted via #37989307795; its feed reports Submitted/Pending,
   not approved. Release verification is recorded in
-  `docs/evidence/release-4.9.0/release-verification.md`.
-  External contracts remain NRS `34b1c2ff4d1a3f591176f3ce79b74ad2958b6852`
-  (93 modules) and PRS `1da43659da269c96af21aea7234799d2ad56b2df` (12 modules).
-  The v4.9 performance campaign is CLOSED. The user separately authorized the
+  `docs/evidence/release-4.10.0/release-verification.md`.
+  External contracts remain NRS `a50c8dafbca81daf881a17d76dc195a84b9f3ca2`
+  (94 modules) and PRS `1da43659da269c96af21aea7234799d2ad56b2df` (12 modules).
+  The v4.10 performance campaign is CLOSED. The user separately authorized the
   bounded v4.10 scripting competitiveness investigation; its accepted candidate
   and review boundaries are in `docs/evidence/cp410-competitiveness/report.md`.
   Frozen `20261009-v490` results and official workloads remain unchanged.

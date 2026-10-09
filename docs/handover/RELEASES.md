@@ -7,20 +7,20 @@ approved release is packaged and published.
 
 ## Authority and current state
 
-The executable and Snap recipe declare `4.10.0` for development after the completed
-v4.9.0 GitHub release. The immutable annotated `v4.9.0` tag targets
-`aaadeb31219251b7cc02a62fbf75360ac3e11aaf`; tag object
-`1314a4b169ea2588df8bf63a3f342639ea7b5aa7`. Release workflow #37809541710 passed,
+The executable and Snap recipe declare `4.11.0` for development after the completed
+v4.10.0 GitHub release. The immutable annotated `v4.10.0` tag targets
+`76dbe2661fe7d221827db63959bf4a392bae2ba6`; tag object
+`00acc981185ab3946a5a4f88e583ea17b5c5834f`. Release workflow #37987877884 passed,
 including all three public installer lanes. Exactly five public assets and the
-live website were independently verified. Chocolatey 4.9.0 was submitted through
-#37812050345; its feed reports Submitted/Pending, not approved. Snap remains
+live website were independently verified. Chocolatey 4.10.0 was submitted through
+#37989307795; its feed reports Submitted/Pending, not approved. Snap remains
 maintainer-managed; Homebrew downstream propagation was not checked in this task.
 
-See `docs/evidence/release-4.9.0/release-verification.md` for final checksums and
+See `docs/evidence/release-4.10.0/release-verification.md` for final checksums and
 evidence. Canonical reviewed notes remain unchanged at
-`docs/evidence/release-4.9.0/release-notes-4.9.0.md`. External suites remain NRS
-`34b1c2ff4d1a3f591176f3ce79b74ad2958b6852` (93 modules) and PRS
-`1da43659da269c96af21aea7234799d2ad56b2df` (12 modules). The v4.9 performance
+`docs/evidence/release-4.10.0/release-notes-4.10.0.md`. External suites remain NRS
+`a50c8dafbca81daf881a17d76dc195a84b9f3ca2` (94 modules) and PRS
+`1da43659da269c96af21aea7234799d2ad56b2df` (12 modules). The v4.10 performance
 campaign is closed. No new feature, optimization, official benchmark campaign,
 Labs change or provisioning is authorized by this development transition.
 Future tags and package publication require explicit authorization.

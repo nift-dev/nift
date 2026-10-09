@@ -1,6 +1,11 @@
 # Nift release notes
 
-## v4.10.0 (unreleased development)
+## v4.11.0 (unreleased development)
+
+Development has advanced to v4.11.0 after the verified v4.10.0 release. No
+v4.11.0 user-visible changes have been recorded yet.
+
+## v4.10.0 (released 2026-10-10)
 
 The accepted bounded performance campaign improves capture-heavy sort, traversal,
 filesystem wrappers, large strings and FileValue ownership. Ordinary sort and tiny

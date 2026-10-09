@@ -8,7 +8,7 @@ For documentation, examples and downloads, visit **[nift.dev](https://nift.dev)*
 
 ## Project status
 
-Nift has completed its planned Checkpoints 0–10 deliberate hardening campaign and the v4.2–v4.8 language, runtime, shell, packaging and embedding campaigns. The current development identity is `Nift v4.10.0`, following the verified public v4.9.0 performance and hardening release. The v4.9 performance campaign is closed; no new feature or performance implementation is authorized by this version transition. Existing regression, sanitizer, filesystem, parser, incremental, cross-platform, performance and packaging gates remain maintained; new hardening work should be driven by concrete findings or newly justified guarantees rather than arbitrary checkpoint numbers.
+Nift has completed its planned Checkpoints 0–10 deliberate hardening campaign and the v4.2–v4.8 language, runtime, shell, packaging and embedding campaigns. The current development identity is `Nift v4.11.0`, following the verified public v4.10.0 build-workflow and performance release. The v4.10 performance campaign is closed; no new feature or performance implementation is authorized by this version transition. Existing regression, sanitizer, filesystem, parser, incremental, cross-platform, performance and packaging gates remain maintained; new hardening work should be driven by concrete findings or newly justified guarantees rather than arbitrary checkpoint numbers.
 
 ## Features
 
