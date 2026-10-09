@@ -1,0 +1,17 @@
+CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-linux-gnu-cc"
+mkdir -p ".build/lambda-cache/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_TEST_LAMBDA_CACHE_STATS -MMD -MP -c src/ParserExpression.cpp -o .build/lambda-cache/ParserExpression.o
+g++ -std=c++17 -O2 -Wall -Wextra -pedantic -pthread  src/nift.o src/ProjectOwnership.o src/PackageTransaction.o src/CLI.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserHelpers.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o .build/lambda-cache/ParserExpression.o -ldl .build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a -o .build/nift-lambda-cache-guard
+NIFT="/home/nick/Repositories/nift/nift/.build/nift-lambda-cache-guard" python3 tests/v48_callback_guard.py
+PASS indexed map: {'syntax': 1, 'numeric': 1, 'instances': 1, 'prepared': 100000, 'legacy': 0}
+PASS indexed sort: {'syntax': 1, 'numeric': 1, 'instances': 100000, 'prepared': 100000, 'legacy': 0}
+PASS identity map: {'syntax': 1, 'numeric': 0, 'instances': 1, 'prepared': 100000, 'legacy': 0}
+PASS identity sort: {'syntax': 1, 'numeric': 0, 'instances': 100000, 'prepared': 100000, 'legacy': 0}
+PASS identity typed fallback: {'syntax': 1, 'numeric': 0, 'instances': 1, 'prepared': 1, 'legacy': 1}
+PASS sort: {'syntax': 1, 'numeric': 1, 'instances': 100000, 'prepared': 100000, 'legacy': 0}
+PASS reduce: {'syntax': 1, 'numeric': 1, 'instances': 1, 'prepared': 100000, 'legacy': 0}
+PASS numeric filter: {'syntax': 1, 'numeric': 1, 'instances': 1, 'prepared': 100000, 'legacy': 0}
+PASS numeric equality filter: {'syntax': 1, 'numeric': 1, 'instances': 1, 'prepared': 100000, 'legacy': 0}
+PASS bounded cache: {'syntax': 300, 'numeric': 256, 'instances': 300, 'prepared': 256, 'legacy': 44}
+PASS oversized body: {'syntax': 1, 'numeric': 0, 'instances': 1, 'prepared': 0, 'legacy': 1}
+PASS typed fallback: {'syntax': 1, 'numeric': 1, 'instances': 1, 'prepared': 1, 'legacy': 1}

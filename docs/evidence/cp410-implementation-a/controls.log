@@ -1,0 +1,8 @@
+loops [{'name': 'loops', 'n': 8000, 'label': 'baseline', 'instructions': 41900425}, {'name': 'loops', 'n': 8000, 'label': 'snapshot', 'instructions': 41796884}]
+call-scalar [{'name': 'call-scalar', 'n': 8000, 'label': 'baseline', 'instructions': 87655922}, {'name': 'call-scalar', 'n': 8000, 'label': 'snapshot', 'instructions': 87552325}]
+call-noarg [{'name': 'call-noarg', 'n': 8000, 'label': 'baseline', 'instructions': 63378813}, {'name': 'call-noarg', 'n': 8000, 'label': 'snapshot', 'instructions': 63275061}]
+call-closure [{'name': 'call-closure', 'n': 8000, 'label': 'baseline', 'instructions': 370179193}, {'name': 'call-closure', 'n': 8000, 'label': 'snapshot', 'instructions': 371580215}]
+call-callback [{'name': 'call-callback', 'n': 8000, 'label': 'baseline', 'instructions': 415999847}, {'name': 'call-callback', 'n': 8000, 'label': 'snapshot', 'instructions': 416792641}]
+bfs [{'name': 'bfs', 'n': 8000, 'label': 'baseline', 'instructions': 362743165}, {'name': 'bfs', 'n': 8000, 'label': 'snapshot', 'instructions': 362472821}]
+json-traverse [{'name': 'json-traverse', 'n': 8000, 'label': 'baseline', 'instructions': 123396014}, {'name': 'json-traverse', 'n': 8000, 'label': 'snapshot', 'instructions': 123291974}]
+map-set [{'name': 'map-set', 'n': 8000, 'label': 'baseline', 'instructions': 127562771}, {'name': 'map-set', 'n': 8000, 'label': 'snapshot', 'instructions': 127530905}]

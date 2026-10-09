@@ -1,0 +1,4 @@
+{'width': 0, 'label': 'baseline', 'allocations': 512480, 'allocated_bytes': 86496994}
+{'width': 0, 'label': 'snapshot', 'allocations': 352486, 'allocated_bytes': 66273677}
+{'width': 100, 'label': 'baseline', 'allocations': 3809294, 'allocated_bytes': 576873957}
+{'width': 100, 'label': 'snapshot', 'allocations': 353403, 'allocated_bytes': 66425960}
