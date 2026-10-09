@@ -5,7 +5,7 @@ The bounded implementation campaign retains callback capture/frame overlays, ope
 Starting SHA: `b1267a5b1a2224ec3a230d2640d2e0ad9314992c`.
 Starting binary SHA256: `7dd0fe8b34d13486e10b180b5ddf8c51ba76658c5c5ed5cc64cb3a8b16821b89`.
 Final native binary SHA256: `f3f999b247fe5375902306f983311402225ca279947dd1b16a6073830db62dd0`.
-The source/evidence commit introducing this report is the final repository head; its exact SHA and hosted receipt are provided in the completion response. Main and the final complete certification stage have identical native binaries.
+The final repository head includes the test-fixture portability correction; its exact SHA and hosted receipt are provided in the completion response. Main and the final complete certification stage have identical native binaries.
 
 These are private controlled measurements. The frozen official v4.9 and expanded-shell series are unchanged. Paired CPU measurements compare binaries within each trial batch; timings from different batches are not mixed to invent speedups.
 
@@ -93,3 +93,5 @@ All 81 frozen official/expanded hashes remain unchanged. No Linode, official rer
 3. **Broader collection/JSON/BFS runtime/value costs.** Narrow objects and repeated copies, frames and generic source/value work remain. The evidence does not justify optimizing an already competitive dependency or adding a wide-object index.
 
 Recommendation: **architecture decision required**. This bounded campaign is complete after the final hosted walls pass; v4.10's general competitiveness goals are not declared achieved.
+
+Hosted correction: the initial D macOS guard failed because its absolute temporary path used the `/var` alias while project policy resolves the physical `/private/var` root. The fixture now canonicalizes its root. Native and symlinked-temp guard runs pass; no runtime policy or expectations changed. The failed job log is retained. All ten workflows are required on the corrected head.

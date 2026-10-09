@@ -29,4 +29,4 @@ struct SourceTranslationTestAccess {
         std::cout<<"PASS saved-state alias, lazy snapshots, no-op writes, revert, retained shell/IDs; cache="<<peak_entries<<" entries/"<<peak_charge<<" conservative bytes\n";
     }
 };
-int main(){auto root=std::filesystem::temp_directory_path()/("nift-file-guard-"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));std::filesystem::create_directory(root);{ScriptRenderHost host(root);TrackedInfo tracked;Parser parser(host,tracked);SourceTranslationTestAccess::guard(parser,root/"data");}std::filesystem::remove_all(root);}
+int main(){auto root=std::filesystem::temp_directory_path()/("nift-file-guard-"+std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));std::filesystem::create_directory(root);root=std::filesystem::canonical(root);{ScriptRenderHost host(root);TrackedInfo tracked;Parser parser(host,tracked);SourceTranslationTestAccess::guard(parser,root/"data");}std::filesystem::remove_all(root);}

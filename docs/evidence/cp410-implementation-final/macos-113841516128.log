@@ -1,0 +1,315 @@
+﻿2026-10-09T13:28:01.7122750Z Current runner version: '2.337.0'
+2026-10-09T13:28:01.7136620Z ##[group]Runner Image Provisioner
+2026-10-09T13:28:01.7137120Z Hosted Compute Agent
+2026-10-09T13:28:01.7137520Z Version: 20260828.587
+2026-10-09T13:28:01.7137930Z Commit: abac92662cab4cc7352de4f9f9d2e2419aad9c29
+2026-10-09T13:28:01.7138430Z Build Date: 2026-08-28T16:44:25Z
+2026-10-09T13:28:01.7138900Z Worker ID: {ae63098a-2c4a-4c7a-9afe-593eba4865da}
+2026-10-09T13:28:01.7139390Z Azure Region: westus
+2026-10-09T13:28:01.7139770Z ##[endgroup]
+2026-10-09T13:28:01.7140570Z ##[group]Operating System
+2026-10-09T13:28:01.7140960Z macOS
+2026-10-09T13:28:01.7141290Z 26.6.2
+2026-10-09T13:28:01.7141620Z 25G83
+2026-10-09T13:28:01.7141950Z ##[endgroup]
+2026-10-09T13:28:01.7142310Z ##[group]Runner Image
+2026-10-09T13:28:01.7142700Z Image: macos-26-arm64
+2026-10-09T13:28:01.7143070Z Version: 20260907.0351.1
+2026-10-09T13:28:01.7143880Z Included Software: https://github.com/actions/runner-images/blob/macos-26-arm64/20260907.0351/images/macos/macos-26-arm64-Readme.md
+2026-10-09T13:28:01.7144930Z Image Release: https://github.com/actions/runner-images/releases/tag/macos-26-arm64%2F20260907.0351
+2026-10-09T13:28:01.7145610Z ##[endgroup]
+2026-10-09T13:28:01.7146320Z ##[group]GITHUB_TOKEN Permissions
+2026-10-09T13:28:01.7147270Z Contents: read
+2026-10-09T13:28:01.7147630Z Metadata: read
+2026-10-09T13:28:01.7148060Z ##[endgroup]
+2026-10-09T13:28:01.7149640Z Secret source: Actions
+2026-10-09T13:28:01.7150230Z Cache mode: write
+2026-10-09T13:28:01.7150690Z Prepare workflow directory
+2026-10-09T13:28:01.7362620Z Prepare all required actions
+2026-10-09T13:28:01.7395700Z Getting action download info
+2026-10-09T13:28:02.1664250Z Download action repository 'actions/checkout@v5' (SHA:fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09)
+2026-10-09T13:28:02.3865880Z Download action repository 'actions/setup-python@v6' (SHA:ece7cb06caefa5fff74198d8649806c4678c61a1)
+2026-10-09T13:28:02.4729780Z Download action repository 'msys2/setup-msys2@v2' (SHA:ec48f7c5447b3140e2b088413ae3a55687bccb6e)
+2026-10-09T13:28:02.8365790Z Download action repository 'actions/upload-artifact@v7' (SHA:cf430e030ddbb5b0abf93d22962f4752f3646cd9)
+2026-10-09T13:28:03.3229930Z Complete job name: macos behavioural corpus
+2026-10-09T13:28:03.3676220Z ##[group]Run actions/checkout@v5
+2026-10-09T13:28:03.3676850Z with:
+2026-10-09T13:28:03.3677200Z   repository: nift-dev/nift
+2026-10-09T13:28:03.3679930Z   token: ***
+2026-10-09T13:28:03.3680240Z   ssh-strict: true
+2026-10-09T13:28:03.3680560Z   ssh-user: git
+2026-10-09T13:28:03.3680880Z   persist-credentials: true
+2026-10-09T13:28:03.3681240Z   clean: true
+2026-10-09T13:28:03.3681560Z   sparse-checkout-cone-mode: true
+2026-10-09T13:28:03.3681940Z   fetch-depth: 1
+2026-10-09T13:28:03.3682260Z   fetch-tags: false
+2026-10-09T13:28:03.3682580Z   show-progress: true
+2026-10-09T13:28:03.3682920Z   lfs: false
+2026-10-09T13:28:03.3683230Z   submodules: false
+2026-10-09T13:28:03.3683570Z   set-safe-directory: true
+2026-10-09T13:28:03.3683940Z   allow-unsafe-pr-checkout: false
+2026-10-09T13:28:03.3684540Z ##[endgroup]
+2026-10-09T13:28:03.6800920Z Syncing repository: nift-dev/nift
+2026-10-09T13:28:03.6802460Z ##[group]Getting Git version info
+2026-10-09T13:28:03.6803100Z Working directory is '/Users/runner/work/nift/nift'
+2026-10-09T13:28:03.6803850Z [command]/opt/homebrew/bin/git version
+2026-10-09T13:28:03.7309030Z git version 2.55.0
+2026-10-09T13:28:03.7326140Z ##[endgroup]
+2026-10-09T13:28:03.7330190Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/991db322-a7c7-4996-bd60-29ea9c740590/.gitconfig'
+2026-10-09T13:28:03.7331700Z Temporarily overriding HOME='/Users/runner/work/_temp/991db322-a7c7-4996-bd60-29ea9c740590' before making global git config changes
+2026-10-09T13:28:03.7332760Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-09T13:28:03.7333620Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/nift/nift
+2026-10-09T13:28:03.7435810Z Deleting the contents of '/Users/runner/work/nift/nift'
+2026-10-09T13:28:03.7438800Z ##[group]Initializing the repository
+2026-10-09T13:28:03.7443020Z [command]/opt/homebrew/bin/git init /Users/runner/work/nift/nift
+2026-10-09T13:28:03.7650870Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-10-09T13:28:03.7651980Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-10-09T13:28:03.7652830Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-10-09T13:28:03.7653400Z hint: call:
+2026-10-09T13:28:03.7653720Z hint:
+2026-10-09T13:28:03.7654210Z hint: 	git config --global init.defaultBranch <name>
+2026-10-09T13:28:03.7654690Z hint:
+2026-10-09T13:28:03.7655130Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-10-09T13:28:03.7656000Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-10-09T13:28:03.7657480Z hint:
+2026-10-09T13:28:03.7657920Z hint: 	git branch -m <name>
+2026-10-09T13:28:03.7658290Z hint:
+2026-10-09T13:28:03.7658780Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-10-09T13:28:03.7659470Z Initialized empty Git repository in /Users/runner/work/nift/nift/.git/
+2026-10-09T13:28:03.7661130Z [command]/opt/homebrew/bin/git remote add origin https://github.com/nift-dev/nift
+2026-10-09T13:28:03.7739980Z ##[endgroup]
+2026-10-09T13:28:03.7740620Z ##[group]Disabling automatic garbage collection
+2026-10-09T13:28:03.7742860Z [command]/opt/homebrew/bin/git config --local gc.auto 0
+2026-10-09T13:28:03.7808120Z ##[endgroup]
+2026-10-09T13:28:03.7808730Z ##[group]Setting up auth
+2026-10-09T13:28:03.7812830Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-09T13:28:03.7874930Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-09T13:28:03.8763630Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-09T13:28:03.8821050Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-09T13:28:03.9621640Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-09T13:28:03.9686670Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-09T13:28:04.0479200Z [command]/opt/homebrew/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-10-09T13:28:04.0556490Z ##[endgroup]
+2026-10-09T13:28:04.0557590Z ##[group]Fetching the repository
+2026-10-09T13:28:04.0562510Z [command]/opt/homebrew/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +8ad663237a56158a733d76234a131a7ab7edfb7a:refs/remotes/origin/main
+2026-10-09T13:28:05.6927220Z From https://github.com/nift-dev/nift
+2026-10-09T13:28:05.6929600Z  * [new ref]         8ad663237a56158a733d76234a131a7ab7edfb7a -> origin/main
+2026-10-09T13:28:05.6932660Z ##[endgroup]
+2026-10-09T13:28:05.6933450Z ##[group]Determining the checkout info
+2026-10-09T13:28:05.6934400Z ##[endgroup]
+2026-10-09T13:28:05.6935080Z [command]/opt/homebrew/bin/git sparse-checkout disable
+2026-10-09T13:28:05.7015110Z [command]/opt/homebrew/bin/git config --local --unset-all extensions.worktreeConfig
+2026-10-09T13:28:05.7079300Z ##[group]Checking out the ref
+2026-10-09T13:28:05.7082150Z [command]/opt/homebrew/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-10-09T13:28:06.2871470Z Switched to a new branch 'main'
+2026-10-09T13:28:06.2878590Z branch 'main' set up to track 'origin/main'.
+2026-10-09T13:28:06.2908160Z ##[endgroup]
+2026-10-09T13:28:06.3025950Z [command]/opt/homebrew/bin/git log -1 --format=%H
+2026-10-09T13:28:06.3105750Z 8ad663237a56158a733d76234a131a7ab7edfb7a
+2026-10-09T13:28:06.3315830Z ##[group]Run actions/setup-python@v6
+2026-10-09T13:28:06.3316070Z with:
+2026-10-09T13:28:06.3316210Z   python-version: 3.13
+2026-10-09T13:28:06.3316370Z   check-latest: false
+2026-10-09T13:28:06.3318360Z   token: ***
+2026-10-09T13:28:06.3318510Z   update-environment: true
+2026-10-09T13:28:06.3318700Z   allow-prereleases: false
+2026-10-09T13:28:06.3318870Z   freethreaded: false
+2026-10-09T13:28:06.3319030Z ##[endgroup]
+2026-10-09T13:28:06.4811350Z ##[group]Installed versions
+2026-10-09T13:28:06.4890970Z Successfully set up CPython (3.13.15)
+2026-10-09T13:28:06.4891600Z ##[endgroup]
+2026-10-09T13:28:06.4998510Z ##[group]Run make -j2
+2026-10-09T13:28:06.4998840Z [36;1mmake -j2[0m
+2026-10-09T13:28:06.5064020Z shell: /bin/bash -e {0}
+2026-10-09T13:28:06.5064310Z env:
+2026-10-09T13:28:06.5064620Z   pythonLocation: /Users/runner/hostedtoolcache/Python/3.13.15/arm64
+2026-10-09T13:28:06.5065070Z   PKG_CONFIG_PATH: /Users/runner/hostedtoolcache/Python/3.13.15/arm64/lib/pkgconfig
+2026-10-09T13:28:06.5065560Z   Python_ROOT_DIR: /Users/runner/hostedtoolcache/Python/3.13.15/arm64
+2026-10-09T13:28:06.5065930Z   Python2_ROOT_DIR: /Users/runner/hostedtoolcache/Python/3.13.15/arm64
+2026-10-09T13:28:06.5066320Z   Python3_ROOT_DIR: /Users/runner/hostedtoolcache/Python/3.13.15/arm64
+2026-10-09T13:28:06.5066610Z ##[endgroup]
+2026-10-09T13:28:08.3526040Z c++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/arm64-apple-darwin25.6.0-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/nift.cpp -o src/nift.o
+2026-10-09T13:28:08.3550330Z c++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/arm64-apple-darwin25.6.0-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ProjectOwnership.cpp -o src/ProjectOwnership.o
+2026-10-09T13:28:09.1291290Z c++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/arm64-apple-darwin25.6.0-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/PackageTransaction.cpp -o src/PackageTransaction.o
+2026-10-09T13:28:10.8371830Z c++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/arm64-apple-darwin25.6.0-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/CLI.cpp -o src/CLI.o
+2026-10-09T13:28:13.4105680Z c++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/arm64-apple-darwin25.6.0-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/Process.cpp -o src/Process.o
+2026-10-09T13:28:14.1944310Z c++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/arm64-apple-darwin25.6.0-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/JobControl.cpp -o src/JobControl.o
+2026-10-09T13:28:15.0523160Z c++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/arm64-apple-darwin25.6.0-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/RuntimeValue.cpp -o src/RuntimeValue.o
+2026-10-09T13:28:16.4976500Z c++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/arm64-apple-darwin25.6.0-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/Value.cpp -o src/Value.o
+2026-10-09T13:28:16.9897390Z c++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/arm64-apple-darwin25.6.0-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/FileSystem.cpp -o src/FileSystem.o
+2026-10-09T13:28:17.9547420Z c++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/arm64-apple-darwin25.6.0-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/JsonFile.cpp -o src/JsonFile.o
+2026-10-09T13:28:18.7734870Z c++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/arm64-apple-darwin25.6.0-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/JsonSchema.cpp -o src/JsonSchema.o
+2026-10-09T13:28:19.3555500Z c++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/arm64-apple-darwin25.6.0-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c minifypp/src/Minify.cpp -o minifypp/src/Minify.o
+2026-10-09T13:28:20.4689330Z c++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/arm64-apple-darwin25.6.0-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c markuppp/src/Markup.cpp -o markuppp/src/Markup.o
+2026-10-09T13:28:21.4734520Z c++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/arm64-apple-darwin25.6.0-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c markuppp/src/AsciiDoc.cpp -o markuppp/src/AsciiDoc.o
+2026-10-09T13:28:23.3655810Z c++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/arm64-apple-darwin25.6.0-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c markuppp/src/ReStructuredText.cpp -o markuppp/src/ReStructuredText.o
+2026-10-09T13:28:24.3118360Z c++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/arm64-apple-darwin25.6.0-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ProjectInfo.cpp -o src/ProjectInfo.o
+2026-10-09T13:28:25.0909800Z c++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/arm64-apple-darwin25.6.0-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ProjectRead.cpp -o src/ProjectRead.o
+2026-10-09T13:28:26.7908680Z c++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/arm64-apple-darwin25.6.0-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ProjectState.cpp -o src/ProjectState.o
+2026-10-09T13:28:29.6182830Z c++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/arm64-apple-darwin25.6.0-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/WatchList.cpp -o src/WatchList.o
+2026-10-09T13:28:29.6934060Z c++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/arm64-apple-darwin25.6.0-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/BuildProgress.cpp -o src/BuildProgress.o
+2026-10-09T13:28:30.3100440Z c++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/arm64-apple-darwin25.6.0-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/Automation.cpp -o src/Automation.o
+2026-10-09T13:28:31.0594250Z c++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/arm64-apple-darwin25.6.0-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/Hooks.cpp -o src/Hooks.o
+2026-10-09T13:28:31.2649140Z c++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/arm64-apple-darwin25.6.0-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/Ast.cpp -o src/Ast.o
+2026-10-09T13:28:33.5748700Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/blocks.c -o markuppp/vendor/cmark/blocks.o
+2026-10-09T13:28:33.8360590Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/buffer.c -o markuppp/vendor/cmark/buffer.o
+2026-10-09T13:28:33.9045680Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/cmark.c -o markuppp/vendor/cmark/cmark.o
+2026-10-09T13:28:33.9465570Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/cmark_ctype.c -o markuppp/vendor/cmark/cmark_ctype.o
+2026-10-09T13:28:33.9800210Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/houdini_href_e.c -o markuppp/vendor/cmark/houdini_href_e.o
+2026-10-09T13:28:34.0191250Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/houdini_html_e.c -o markuppp/vendor/cmark/houdini_html_e.o
+2026-10-09T13:28:34.0601380Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/houdini_html_u.c -o markuppp/vendor/cmark/houdini_html_u.o
+2026-10-09T13:28:34.1248600Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/html.c -o markuppp/vendor/cmark/html.o
+2026-10-09T13:28:34.1952010Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/inlines.c -o markuppp/vendor/cmark/inlines.o
+2026-10-09T13:28:34.4575470Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/iterator.c -o markuppp/vendor/cmark/iterator.o
+2026-10-09T13:28:34.5207750Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/node.c -o markuppp/vendor/cmark/node.o
+2026-10-09T13:28:34.6321250Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/references.c -o markuppp/vendor/cmark/references.o
+2026-10-09T13:28:34.7043960Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/render.c -o markuppp/vendor/cmark/render.o
+2026-10-09T13:28:34.7469040Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/scanners.c -o markuppp/vendor/cmark/scanners.o
+2026-10-09T13:28:34.7838810Z cc -Imarkuppp/vendor/cmark -std=c99 -O2 -Wall -Wextra -pedantic -MMD -MP -c markuppp/vendor/cmark/utf8.c -o markuppp/vendor/cmark/utf8.o
+2026-10-09T13:28:34.9136820Z CC="cc" CXX="c++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/arm64-apple-darwin25.6.0-cc"
+2026-10-09T13:28:35.4156430Z BUILD vendored libffi (arm64-apple-darwin25.6.0-cc)
+2026-10-09T13:28:48.6896450Z BUILD vendored libffi: done (13s)
+2026-10-09T13:28:48.6899100Z c++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/arm64-apple-darwin25.6.0-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/Parser.cpp -o src/Parser.o
+2026-10-09T13:28:48.6910470Z c++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/arm64-apple-darwin25.6.0-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ParserAsyncPool.cpp -o src/ParserAsyncPool.o
+2026-10-09T13:28:49.3017080Z c++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/arm64-apple-darwin25.6.0-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ParserExpression.cpp -o src/ParserExpression.o
+2026-10-09T13:28:54.5874490Z c++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/arm64-apple-darwin25.6.0-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ParserHelpers.cpp -o src/ParserHelpers.o
+2026-10-09T13:28:57.5683360Z c++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/arm64-apple-darwin25.6.0-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ParserScript.cpp -o src/ParserScript.o
+2026-10-09T13:29:02.2978170Z c++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/arm64-apple-darwin25.6.0-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ParserTemplate.cpp -o src/ParserTemplate.o
+2026-10-09T13:29:11.0661790Z c++ -std=c++17 -O2 -Wall -Wextra -pedantic -pthread  src/nift.o src/ProjectOwnership.o src/PackageTransaction.o src/CLI.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserExpression.o src/ParserHelpers.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o  .build/libffi/arm64-apple-darwin25.6.0-cc/install/lib/libffi.a -o nift
+2026-10-09T13:29:11.2033970Z ##[group]Run make test-v410-file-buffer-parity test-v410-file-buffer-guard test-v410-large-string-parity test-v410-large-string-guard test-v410-filesystem-recipe-parity test-v410-filesystem-recipe-guard test-v410-string-replace-parity test-v410-native-dispatch-parity test-v410-glob-parity test-v410-glob-relative-guard test-v410-glob-prefix-parity test-v410-glob-prefix-guard test-v49-selector-parity test-v49-glob-order test-v49-glob-key-guard test-v49-json-preflight-guard test-runtime-value test-v48-callback-parity test-v48-callback-guard test-v410-sort-factory-parity test-v410-callback-overlay-parity test-v410-callback-overlay-guard test-v410-object-member-parity test-v410-object-member-unit test-v410-object-member-guard
+2026-10-09T13:29:11.2040070Z [36;1mmake test-v410-file-buffer-parity test-v410-file-buffer-guard test-v410-large-string-parity test-v410-large-string-guard test-v410-filesystem-recipe-parity test-v410-filesystem-recipe-guard test-v410-string-replace-parity test-v410-native-dispatch-parity test-v410-glob-parity test-v410-glob-relative-guard test-v410-glob-prefix-parity test-v410-glob-prefix-guard test-v49-selector-parity test-v49-glob-order test-v49-glob-key-guard test-v49-json-preflight-guard test-runtime-value test-v48-callback-parity test-v48-callback-guard test-v410-sort-factory-parity test-v410-callback-overlay-parity test-v410-callback-overlay-guard test-v410-object-member-parity test-v410-object-member-unit test-v410-object-member-guard[0m
+2026-10-09T13:29:11.2299230Z shell: /bin/bash -e {0}
+2026-10-09T13:29:11.2299570Z env:
+2026-10-09T13:29:11.2299990Z   pythonLocation: /Users/runner/hostedtoolcache/Python/3.13.15/arm64
+2026-10-09T13:29:11.2300620Z   PKG_CONFIG_PATH: /Users/runner/hostedtoolcache/Python/3.13.15/arm64/lib/pkgconfig
+2026-10-09T13:29:11.2301260Z   Python_ROOT_DIR: /Users/runner/hostedtoolcache/Python/3.13.15/arm64
+2026-10-09T13:29:11.2301690Z   Python2_ROOT_DIR: /Users/runner/hostedtoolcache/Python/3.13.15/arm64
+2026-10-09T13:29:11.2302650Z   Python3_ROOT_DIR: /Users/runner/hostedtoolcache/Python/3.13.15/arm64
+2026-10-09T13:29:11.2303040Z ##[endgroup]
+2026-10-09T13:29:11.4494230Z CC="cc" CXX="c++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/arm64-apple-darwin25.6.0-cc"
+2026-10-09T13:29:11.7745580Z NIFT=/Users/runner/work/nift/nift/nift /Users/runner/hostedtoolcache/Python/3.13.15/arm64/bin/python3 tests/v410_file_buffer_parity.py
+2026-10-09T13:29:11.8601630Z PASS open-r
+2026-10-09T13:29:11.8667090Z PASS open-rw
+2026-10-09T13:29:11.8721640Z PASS open-w
+2026-10-09T13:29:11.8771390Z PASS open-a
+2026-10-09T13:29:11.8822110Z PASS mutate-write("xy")
+2026-10-09T13:29:11.8878290Z PASS mutate-write("")
+2026-10-09T13:29:11.8931660Z PASS mutate-write_line("xy")
+2026-10-09T13:29:11.8980810Z PASS mutate-write_bytes(bytes([0,255,65]))
+2026-10-09T13:29:11.9031140Z PASS mutate-write(bytes([0,255,65]))
+2026-10-09T13:29:11.9085220Z PASS mutate-write_val(42)
+2026-10-09T13:29:11.9140380Z PASS mutate-append("xy")
+2026-10-09T13:29:11.9260700Z PASS mutate-append("")
+2026-10-09T13:29:11.9512770Z PASS mutate-prepend("xy")
+2026-10-09T13:29:11.9564340Z PASS mutate-insert(2,"xy")
+2026-10-09T13:29:11.9620280Z PASS mutate-insert_before("CD","xy")
+2026-10-09T13:29:11.9673130Z PASS mutate-insert_after("CD","xy")
+2026-10-09T13:29:11.9724350Z PASS mutate-replace("CD","xy")
+2026-10-09T13:29:11.9779730Z PASS mutate-replace("CD","CD")
+2026-10-09T13:29:11.9832680Z PASS mutate-replace("missing","xy")
+2026-10-09T13:29:11.9882650Z PASS mutate-replace_once("CD","xy")
+2026-10-09T13:29:11.9937220Z PASS save-then-revert
+2026-10-09T13:29:11.9987290Z PASS overwrite-initial-revert
+2026-10-09T13:29:12.0042820Z PASS new-empty-write
+2026-10-09T13:29:12.0095970Z PASS append-new-empty-write
+2026-10-09T13:29:12.0157350Z PASS reopen-external-edit
+2026-10-09T13:29:12.0215160Z PASS opaque-closed-reopen
+2026-10-09T13:29:12.0274930Z PASS write-argument-saves
+2026-10-09T13:29:12.0336730Z PASS write-argument-reverts
+2026-10-09T13:29:12.0398700Z PASS write-argument-closes
+2026-10-09T13:29:12.0451840Z PASS closed-write-factory-count
+2026-10-09T13:29:12.0506210Z PASS readonly-write-factory-count
+2026-10-09T13:29:12.0586540Z PASS failed-save-revert
+2026-10-09T13:29:12.0678060Z PASS duplicate-replace-once-error
+2026-10-09T13:29:12.0755640Z PASS receiver-factory-count
+2026-10-09T13:29:12.0831070Z PASS factory-path-counter
+2026-10-09T13:29:12.0907210Z PASS factory-changing-cwd
+2026-10-09T13:29:12.0987880Z PASS open-mode-factory-cwd
+2026-10-09T13:29:12.1062310Z PASS closed-file-copy
+2026-10-09T13:29:12.1141840Z PASS closed-file-move
+2026-10-09T13:29:12.1202930Z PASS closed-file-remove
+2026-10-09T13:29:12.1256470Z PASS open-copy-precondition-counter
+2026-10-09T13:29:12.1308230Z PASS copy-invalid-argument
+2026-10-09T13:29:12.1362150Z PASS unknown-file-tag
+2026-10-09T13:29:12.1414810Z PASS nonfile-receiver-counter
+2026-10-09T13:29:12.1471170Z PASS read-val-token-contract
+2026-10-09T13:29:12.1524140Z PASS invalid-mode-arity
+2026-10-09T13:29:12.1582500Z PASS save-argument-arity
+2026-10-09T13:29:12.1648170Z PASS empty-write-return-to-clean
+2026-10-09T13:29:12.1705630Z PASS nested-method-depth-20
+2026-10-09T13:29:12.1774140Z PASS nested-method-depth-40
+2026-10-09T13:29:12.1852360Z PASS nested-method-depth-48
+2026-10-09T13:29:12.1930610Z PASS nested-method-depth-50
+2026-10-09T13:29:12.2029990Z PASS nested-method-depth-60
+2026-10-09T13:29:12.2092310Z PASS stack-named-20
+2026-10-09T13:29:12.2166730Z PASS stack-named-40
+2026-10-09T13:29:12.2241570Z PASS stack-named-48
+2026-10-09T13:29:12.2320380Z PASS stack-named-50
+2026-10-09T13:29:12.2412510Z PASS stack-named-60
+2026-10-09T13:29:12.2551830Z PASS stack-named-80
+2026-10-09T13:29:12.2617190Z PASS stack-named-96
+2026-10-09T13:29:12.2682710Z PASS stack-named-110
+2026-10-09T13:29:12.2733850Z PASS stack-html_escape-20
+2026-10-09T13:29:12.2790060Z PASS stack-html_escape-40
+2026-10-09T13:29:12.2852320Z PASS stack-html_escape-48
+2026-10-09T13:29:12.2911310Z PASS stack-html_escape-50
+2026-10-09T13:29:12.2967220Z PASS stack-html_escape-60
+2026-10-09T13:29:12.3026560Z PASS stack-html_escape-80
+2026-10-09T13:29:12.3093130Z PASS stack-html_escape-96
+2026-10-09T13:29:12.3169390Z PASS stack-html_escape-110
+2026-10-09T13:29:12.3222460Z PASS stack-type-20
+2026-10-09T13:29:12.3273910Z PASS stack-type-40
+2026-10-09T13:29:12.3326690Z PASS stack-type-48
+2026-10-09T13:29:12.3381800Z PASS stack-type-50
+2026-10-09T13:29:12.3436400Z PASS stack-type-60
+2026-10-09T13:29:12.3491290Z PASS stack-type-80
+2026-10-09T13:29:12.3549440Z PASS stack-type-96
+2026-10-09T13:29:12.3614410Z PASS stack-type-110
+2026-10-09T13:29:12.3674480Z PASS stack-min-20
+2026-10-09T13:29:12.3729090Z PASS stack-min-40
+2026-10-09T13:29:12.3786320Z PASS stack-min-48
+2026-10-09T13:29:12.3842910Z PASS stack-min-50
+2026-10-09T13:29:12.3905610Z PASS stack-min-60
+2026-10-09T13:29:12.3968630Z PASS stack-min-80
+2026-10-09T13:29:12.4030520Z PASS stack-min-96
+2026-10-09T13:29:12.4103800Z PASS stack-min-110
+2026-10-09T13:29:12.4199250Z PASS stack-method-20
+2026-10-09T13:29:12.4242010Z PASS stack-method-40
+2026-10-09T13:29:12.4296340Z PASS stack-method-48
+2026-10-09T13:29:12.4350000Z PASS stack-method-50
+2026-10-09T13:29:12.4403990Z PASS stack-method-60
+2026-10-09T13:29:12.4473830Z PASS stack-method-80
+2026-10-09T13:29:12.4541520Z PASS stack-method-96
+2026-10-09T13:29:12.4658330Z PASS stack-method-110
+2026-10-09T13:29:12.4705850Z PASS stack-method-argument-20
+2026-10-09T13:29:12.4753580Z PASS stack-method-argument-40
+2026-10-09T13:29:12.4806210Z PASS stack-method-argument-48
+2026-10-09T13:29:12.4863140Z PASS stack-method-argument-50
+2026-10-09T13:29:12.4917820Z PASS stack-method-argument-60
+2026-10-09T13:29:12.4975890Z PASS stack-method-argument-80
+2026-10-09T13:29:12.5041990Z PASS stack-method-argument-96
+2026-10-09T13:29:12.5105620Z PASS stack-method-argument-110
+2026-10-09T13:29:12.5163330Z PASS write-preserves-string-slots
+2026-10-09T13:29:12.5166700Z PASS 102 exact buffer/factory/cwd/reentry/file-effect contracts
+2026-10-09T13:29:12.5244140Z c++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/arm64-apple-darwin25.6.0-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread tests/v410_file_buffer_guard.cpp src/ProjectOwnership.o src/PackageTransaction.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserExpression.o src/ParserHelpers.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o   .build/libffi/arm64-apple-darwin25.6.0-cc/install/lib/libffi.a -o .build/file-buffer-guard
+2026-10-09T13:29:17.0120040Z .build/file-buffer-guard
+2026-10-09T13:29:17.0158040Z file("/var/folders/36/tjdph2t965j8snz9_vkdnw0r0000gn/T/nift-file-guard-162549059875/data"): file: path must stay inside the Nift project
+2026-10-09T13:29:17.0158830Z Assertion failed: (ok), function operator(), file v410_file_buffer_guard.cpp, line 8.
+2026-10-09T13:29:17.0159710Z make: *** [test-v410-file-buffer-guard] Abort trap: 6
+2026-10-09T13:29:17.0184660Z ##[error]Process completed with exit code 2.
+2026-10-09T13:29:17.0381170Z Post job cleanup.
+2026-10-09T13:29:17.7734180Z [command]/opt/homebrew/bin/git version
+2026-10-09T13:29:17.7989640Z git version 2.55.0
+2026-10-09T13:29:17.8021140Z Copying '/Users/runner/.gitconfig' to '/Users/runner/work/_temp/30d2fa25-d10d-4d40-a29c-d8898472b622/.gitconfig'
+2026-10-09T13:29:17.8031110Z Temporarily overriding HOME='/Users/runner/work/_temp/30d2fa25-d10d-4d40-a29c-d8898472b622' before making global git config changes
+2026-10-09T13:29:17.8032700Z Adding repository directory to the temporary git global config as a safe directory
+2026-10-09T13:29:17.8041810Z [command]/opt/homebrew/bin/git config --global --add safe.directory /Users/runner/work/nift/nift
+2026-10-09T13:29:17.8211740Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-10-09T13:29:17.8312870Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-10-09T13:29:17.9816730Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-10-09T13:29:17.9884790Z http.https://github.com/.extraheader
+2026-10-09T13:29:17.9902480Z [command]/opt/homebrew/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-10-09T13:29:18.0098960Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-10-09T13:29:18.1623570Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-10-09T13:29:18.1720080Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-10-09T13:29:18.3138730Z Cleaning up orphan processes
