@@ -1,0 +1,4 @@
+ascii-no-match PASS pure outputs
+ascii-many PASS pure outputs
+utf8-short PASS pure outputs
+utf8-large PASS pure outputs

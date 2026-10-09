@@ -1,0 +1,6 @@
+{'mode': 'direct', 'n': 1000, 'instructions': 3168885, 'scope': 'fresh-file successful write floor; atomic includes write/close/rename but omits Nift registry/revert/permission/failure contracts'}
+{'mode': 'atomic', 'n': 1000, 'instructions': 5380205, 'scope': 'fresh-file successful write floor; atomic includes write/close/rename but omits Nift registry/revert/permission/failure contracts'}
+concat current PASS
+concat native-floor PASS
+string current PASS
+string native-floor PASS

@@ -1,0 +1,3 @@
+CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-linux-gnu-cc"
+NIFT="/home/nick/Repositories/nift/nift/.build/nift-glob-relative-guard" python3 tests/v410_glob_relative_guard.py
+PASS relative-base scaling: 32/128/512; absolute and empty globs bypass canonicalization

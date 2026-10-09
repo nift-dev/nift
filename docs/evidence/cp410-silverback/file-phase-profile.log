@@ -1,0 +1,21 @@
+1 PASS logical/allocator phases
+1000 PASS logical/allocator phases
+10000 PASS logical/allocator phases
+100000 PASS logical/allocator phases
+FileConstruction 1514885
+Registry 550342
+CheckedPath 22739925
+PathResolution 20450190
+Cwd 2872999
+Open 1312764
+Write 2146118
+Save 10730926
+Comparison 26000
+ParentCheck 2614000
+Permissions 129000
+TempName 3392868
+Stream 2855196
+AtomicReplace 93862
+SavedState 298000
+Close 270000
+FileTeardown 1769809
