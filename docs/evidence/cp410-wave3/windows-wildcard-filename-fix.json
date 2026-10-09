@@ -1,0 +1,8 @@
+{
+  "failed_commit": "624d967efd30038336b19ff969ed813d46c8217c",
+  "run": 37885238766,
+  "cause": "MSYS maps a literal asterisk in a fixture filename to U+F02A; native Windows prohibits that filename",
+  "fix": "Use legal fullwidth-asterisk Unicode filename on Windows; preserve literal-asterisk fixture and explicit escaped-component matching on POSIX. Feed all pattern source via UTF-8 stdin. Exact ordering, hidden, recursion, dedup and Unicode output remain asserted.",
+  "local_cases": 12,
+  "runtime_change": false
+}
