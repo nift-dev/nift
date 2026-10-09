@@ -1,0 +1,10 @@
+CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-linux-gnu-cc"
+  g++: src/FileSystem.cpp
+  g++: src/ProjectInfo.cpp
+PASS: zero first-party compiler warnings (g++)
+CC="cc" CXX="clang++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-linux-gnu-cc"
+BUILD vendored libffi (x86_64-linux-gnu-cc)
+BUILD vendored libffi: done (7s)
+  clang++: src/FileSystem.cpp
+  clang++: src/ProjectInfo.cpp
+PASS: zero first-party compiler warnings (clang++)

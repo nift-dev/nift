@@ -29,9 +29,8 @@ namespace {
 // preserving the ordinary no-dependency path and retaining lexical fallback.
 std::string build_cache_key(const fs::path& path, bool canonical) {
     if (canonical) {
-        std::error_code error;
-        const auto resolved = fs::weakly_canonical(path, error);
-        if (!error) return resolved.generic_string();
+        const auto resolved = filesystem::resolved_path(path);
+        if (resolved) return resolved->generic_string();
     }
     return path.lexically_normal().generic_string();
 }

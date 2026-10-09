@@ -30,5 +30,10 @@
   "profile-final.log": "79f2ca7a149cce6a80ea1525fa2fe82ac22a6f64bfa968e65e035ad1f5d4b561",
   "hosted-windows-fixture-failure.log": "ade432abdb6a73c842852f7fad533cfec2233d876b365d86c6d38ef105ab7297",
   "contracts-native-symlink.log": "3186e51d96bf1eb97580ee5abd6510e14ef3f770caa8b5da94d6224326089ba9",
-  "integrity-symlink.json": "28f7f7cb8180b6ef226d611caff803a8ee546e640e596ea22fa013419b96f147"
+  "integrity-symlink.json": "28f7f7cb8180b6ef226d611caff803a8ee546e640e596ea22fa013419b96f147",
+  "report.md": "93d80283b9f96f39b38dc52594e49fb24c06b98a2f1f0d1fe8bb2b39da42d537",
+  "hosted-windows-native-alias-failure.log": "47bffc149ae073f49db1f2f932d94282337e66cc98c1bdf054ab1fabae9dd2f0",
+  "windows-alias-checks.log": "c3ac4279cd3c975c166c39618e5d056e753963fd09cc45bafe4171b2984636f0",
+  "windows-alias-sanitizer.log": "b91bbfd3a94ea6dae7b3d4950ac3aeb0b37b0664c0c0e2eddf0c6299f0c8fc02",
+  "windows-alias-warnings.log": "0ee2aabfbfc104858d4a397d1755bf3f451e52647ff304df1fe40a5c063f4321"
 }

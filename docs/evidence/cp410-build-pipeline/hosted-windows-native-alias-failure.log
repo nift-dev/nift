@@ -1,0 +1,43 @@
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	﻿2026-10-09T16:09:18.7222265Z ##[group]Run make test-v410-build-pipeline test-v410-file-buffer-parity test-v410-file-buffer-guard test-v410-large-string-parity test-v410-large-string-guard test-v410-filesystem-recipe-parity test-v410-filesystem-recipe-guard test-v410-string-replace-parity test-v410-native-dispatch-parity test-v410-glob-parity test-v410-glob-relative-guard test-v410-glob-prefix-parity test-v410-glob-prefix-guard test-v49-selector-parity test-v49-glob-order test-v49-glob-key-guard test-v49-json-preflight-guard test-runtime-value test-v48-callback-parity test-v48-callback-guard test-v410-sort-factory-parity test-v410-callback-overlay-parity test-v410-callback-overlay-guard test-v410-object-member-parity test-v410-object-member-unit test-v410-object-member-guard
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:18.7228131Z [36;1mmake test-v410-build-pipeline test-v410-file-buffer-parity test-v410-file-buffer-guard test-v410-large-string-parity test-v410-large-string-guard test-v410-filesystem-recipe-parity test-v410-filesystem-recipe-guard test-v410-string-replace-parity test-v410-native-dispatch-parity test-v410-glob-parity test-v410-glob-relative-guard test-v410-glob-prefix-parity test-v410-glob-prefix-guard test-v49-selector-parity test-v49-glob-order test-v49-glob-key-guard test-v49-json-preflight-guard test-runtime-value test-v48-callback-parity test-v48-callback-guard test-v410-sort-factory-parity test-v410-callback-overlay-parity test-v410-callback-overlay-guard test-v410-object-member-parity test-v410-object-member-unit test-v410-object-member-guard[0m
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:18.7233871Z shell: D:\a\_temp\setup-msys2\msys2.CMD {0}
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:18.7234219Z env:
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:18.7234590Z   pythonLocation: C:\hostedtoolcache\windows\Python\3.13.15\x64
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:18.7235111Z   PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.13.15\x64/lib/pkgconfig
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:18.7235621Z   Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.13.15\x64
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:18.7236086Z   Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.13.15\x64
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:18.7236585Z   Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.13.15\x64
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:18.7236961Z   MSYSTEM: UCRT64
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:18.7237224Z ##[endgroup]
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:20.0782121Z CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-w64-mingw32-cc"
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:20.8988786Z python3 tests/v410_build_pipeline.py --nift "/d/a/nift/nift/nift.exe"
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:21.3306281Z PASS custom replaces render; pre/main/post; dependency recording; incremental
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:21.6624962Z PASS all scripts and content invalidate
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:21.7576421Z PASS pre-build generates missing content before render
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:21.8845045Z PASS script-relevant tracked metadata invalidates
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:21.9322455Z PASS failure pre-build
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:22.0106234Z PASS repair pre-build
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:22.0583535Z PASS failure build
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:22.1532117Z PASS repair build
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:22.2486381Z PASS failure post-build
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:22.3749359Z PASS repair post-build
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:22.4386239Z PASS failure missing-output
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:22.5337099Z PASS repair missing-output
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:22.9773413Z PASS sidecars; removal invalidation; conflict; explicit precedence
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:23.4841845Z PASS chain ordering, targeted closure, clean prerequisites and no invalidation
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:23.7220054Z PASS diamond ordering, targeted closure, clean prerequisites and no invalidation
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:23.8169162Z PASS transitive failure propagation; independent branch; recovery
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:24.0711596Z PASS missing/self/duplicate/cycle/type validation before mutation
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:24.1183968Z PASS parallel independent branches with deterministic barrier
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:24.1663221Z PASS normal/custom composition
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:28.0817007Z PASS 10k iterative cycle diagnostic
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:28.1773937Z PASS transitive closure across a clean intermediate
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:28.5264063Z PASS same-pass ordinary file invalidation, multiple consumers hash
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:28.7960148Z PASS same-pass ordinary file invalidation, multiple consumers modified
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:32.0628955Z Traceback (most recent call last):
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:32.0638149Z   File "/d/a/nift/nift/tests/v410_build_pipeline.py", line 112, in <module>
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:32.0638858Z     assert (q/'public/b.html').read_text()=='seedX'
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:32.0639265Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:32.0639612Z AssertionError
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:32.0898466Z make: *** [Makefile:1968: test-v410-build-pipeline] Error 1
+windows behavioural corpus	v4.9/v4.10 contracts on Windows	2026-10-09T16:09:32.0970813Z ##[error]Process completed with exit code 2.

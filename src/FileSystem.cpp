@@ -605,6 +605,21 @@ static bool windows_resolved_path(const fs::path& path, fs::path& resolved) {
 }
 #endif
 
+std::optional<fs::path> resolved_path(const fs::path& path) {
+    std::error_code error;
+    const fs::path absolute = fs::absolute(path, error).lexically_normal();
+    if (error) return std::nullopt;
+#ifdef _WIN32
+    fs::path resolved;
+    if (!windows_resolved_path(absolute, resolved)) return std::nullopt;
+    return resolved;
+#else
+    const fs::path resolved = fs::weakly_canonical(absolute, error);
+    if (error) return std::nullopt;
+    return resolved;
+#endif
+}
+
 bool path_within(const fs::path& base, const fs::path& candidate) {
     const fs::path normalized_base = fs::absolute(base).lexically_normal();
     const fs::path normalized_candidate = fs::absolute(candidate).lexically_normal();

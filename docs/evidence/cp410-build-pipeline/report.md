@@ -68,6 +68,23 @@ on native Windows as well. The failed log is retained; an unchanged workflow
 is not rerun to conceal the failure. Native and sanitized local contracts pass,
 with the corrected Windows fixture requiring a new exact-head hosted cohort.
 
+## Native Windows alias cache correction
+
+The verified native-symbolic-link fixture subsequently exposed a production
+failure in Checkpoint 10 run `37956192665`: the dependent read cached `seed`
+instead of the producer's replacement `seedX`. The failed log is retained.
+MinGW `std::filesystem::weakly_canonical` does not reliably follow native
+Windows reparse points, as already accounted for by the filesystem containment
+implementation. Build-cache identity now reuses that native handle-based
+resolver on Windows. Both the alias read and completed-output invalidation
+resolve to the same target. POSIX keeps weak canonical resolution; ordinary
+no-dependency projects still bypass canonical cache keys.
+
+The assertion is retained without skipping Windows. Local native pipeline,
+filesystem-boundary, integrity and changed-source GCC/Clang warning checks
+pass; lifetime certification is recorded alongside the correction. Final
+acceptance still requires the new exact-head Windows and full hosted cohort.
+
 ## Hosted publication wall and stopping rule
 
 Publish Nift main, the pinned NRS revision, and website generated main/source stage commits. Dispatch only the ordinary non-release walls: Hosted certification diagnostic; v4.4/v4.5 cross-platform; Test integrity; Init targets; Gate 6B bytes; Gate 6A-R libffi; build-only packaging; Performance regression; Checkpoint 10 cross-platform; Deep guards. Deep includes the exact 94-module NRS pin. No release or package submission is dispatched.
