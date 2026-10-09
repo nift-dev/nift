@@ -1831,3 +1831,27 @@ test: test-v49-call-outcome
 .PHONY: test-v410-allocation-guard
 test-v410-allocation-guard: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" python3 tests/v410_allocation_guard.py
+
+.PHONY: test-v410-object-member-parity test-v410-object-member-unit
+test-v410-object-member-parity: $(TARGET)
+	python3 tests/v410_object_member_parity.py --nift ./$(TARGET)
+
+test-v410-object-member-unit:
+	mkdir -p .build
+	$(CXX) -std=c++17 -O2 -Wall -Wextra -pedantic -Isrc -Ijsonic/include tests/v410_object_member_unit.cpp src/RuntimeValue.cpp -o .build/v410-object-member-unit
+	.build/v410-object-member-unit
+
+$(TEST_DIR)/object-lookup/RuntimeValue.o: src/RuntimeValue.cpp
+	mkdir -p "$(dir $@)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_TEST_OBJECT_LOOKUP_STATS -MMD -MP -c $< -o $@
+
+-include $(TEST_DIR)/object-lookup/RuntimeValue.d
+OBJECT_LOOKUP_GUARD := $(TEST_DIR)/nift-object-lookup-guard$(EXEEXT)
+$(OBJECT_LOOKUP_GUARD): $(filter-out src/RuntimeValue.o,$(CLI_OBJECTS)) $(TEST_DIR)/object-lookup/RuntimeValue.o $(LIBFFI_A)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/RuntimeValue.o,$(CLI_OBJECTS)) $(TEST_DIR)/object-lookup/RuntimeValue.o $(LDLIBS) -o $@
+
+.PHONY: test-v410-object-member-guard
+test-v410-object-member-guard: $(OBJECT_LOOKUP_GUARD)
+	python3 tests/v410_object_member_guard.py --nift ./$(OBJECT_LOOKUP_GUARD)
+
+test: test-v410-object-member-parity test-v410-object-member-unit test-v410-object-member-guard

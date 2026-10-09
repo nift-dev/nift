@@ -131,6 +131,9 @@ public:
     bool is_error() const { return type == RuntimeType::Error; }
 
     bool has(const std::string& key) const;
+    // Immediate lookup only: returned members are invalidated by mutation.
+    RuntimeValue* find_member(const std::string& key) noexcept;
+    const RuntimeValue* find_member(const std::string& key) const noexcept;
     RuntimeValue& operator[](const std::string& key);
     const RuntimeValue& operator[](const std::string& key) const;
     RuntimeValue& operator[](std::size_t index);

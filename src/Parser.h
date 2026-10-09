@@ -181,8 +181,8 @@ private:
                     if(!cur->is_array() || p.index>=cur->array.size()) return nullptr;
                     cur=&cur->array[p.index];
                 } else {
-                    if(!cur->is_object() || !cur->has(p.key)) return nullptr;
-                    cur=&(*cur)[p.key];
+                    cur=cur->find_member(p.key);
+                    if(!cur) return nullptr;
                 }
             }
             return cur;

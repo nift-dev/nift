@@ -3,7 +3,7 @@
 #include "RuntimeJson.h"
 
 #include <algorithm>
-#ifdef NIFT_TEST_JSON_PREFLIGHT_STATS
+#if defined(NIFT_TEST_JSON_PREFLIGHT_STATS) || defined(NIFT_TEST_OBJECT_LOOKUP_STATS)
 #include <atomic>
 #include <cstdio>
 #include <cstdlib>
@@ -16,6 +16,16 @@
 namespace nift {
 
 namespace {
+#ifdef NIFT_TEST_OBJECT_LOOKUP_STATS
+struct ObjectLookupStats {
+    std::atomic<unsigned long long> scans{0}, comparisons{0};
+    ~ObjectLookupStats() {
+        std::fprintf(stderr, "object-lookups scans=%llu comparisons=%llu\n",
+                     scans.load(), comparisons.load());
+    }
+};
+ObjectLookupStats object_lookup_stats;
+#endif
 #ifdef NIFT_TEST_JSON_PREFLIGHT_STATS
 struct JsonPreflightStats {
     std::atomic<unsigned long long> preflights{0}, conversions{0};
@@ -157,23 +167,38 @@ RuntimeValue runtime_error_with_origin(const RuntimeValue& value, std::string so
 }
 
 bool RuntimeValue::has(const std::string& key) const {
-    if (!is_object()) return false;
-    return std::find_if(object.begin(), object.end(), [&](const auto& entry) {
+    return find_member(key) != nullptr;
+}
+
+const RuntimeValue* RuntimeValue::find_member(const std::string& key) const noexcept {
+    if (!is_object()) return nullptr;
+#ifdef NIFT_TEST_OBJECT_LOOKUP_STATS
+    object_lookup_stats.scans.fetch_add(1, std::memory_order_relaxed);
+#endif
+    const auto found = std::find_if(object.begin(), object.end(), [&](const auto& entry) {
+#ifdef NIFT_TEST_OBJECT_LOOKUP_STATS
+        object_lookup_stats.comparisons.fetch_add(1, std::memory_order_relaxed);
+#endif
         return entry.first == key;
-    }) != object.end();
+    });
+    return found == object.end() ? nullptr : &found->second;
+}
+
+RuntimeValue* RuntimeValue::find_member(const std::string& key) noexcept {
+    return const_cast<RuntimeValue*>(static_cast<const RuntimeValue&>(*this).find_member(key));
 }
 
 RuntimeValue& RuntimeValue::operator[](const std::string& key) {
     if (is_null()) type = RuntimeType::Object;
     if (!is_object()) throw std::runtime_error("JSON value is not an object");
-    for (auto& entry : object) if (entry.first == key) return entry.second;
+    if (auto* member = find_member(key)) return *member;
     object.emplace_back(key, RuntimeValue{});
     return object.back().second;
 }
 
 const RuntimeValue& RuntimeValue::operator[](const std::string& key) const {
     if (!is_object()) throw std::runtime_error("JSON value is not an object");
-    for (const auto& entry : object) if (entry.first == key) return entry.second;
+    if (const auto* member = find_member(key)) return *member;
     throw std::out_of_range("JSON object has no key '" + key + "'");
 }
 

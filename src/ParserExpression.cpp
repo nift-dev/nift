@@ -972,8 +972,10 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
                         if(!host_.resolve_page_member(current.string.substr(11),member,resolved,perr)){error=perr.empty()?("page has no member: "+member):perr;return false;}
                         current=std::move(resolved);
                     } else if(current.is_object()){
-                        if(!current.has(member)){error="page value '"+text+"' has no member '"+member+"'";return false;}
-                        current=current[member];
+                        const auto* value=current.find_member(member);
+                        if(!value){error="page value '"+text+"' has no member '"+member+"'";return false;}
+                        nift::RuntimeValue next=*value;
+                        current=std::move(next);
                     } else if(current.is_array()){
                         error="cannot access member '"+member+"' on a page collection; select an element first";return false;
                     } else if(current.is_null()){
@@ -1020,15 +1022,17 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
                     const std::string member = text.substr(member_start, pos - member_start);
                     if (cur->is_error() && nift::runtime_error_member(*cur, member, error_member_value)) {
                         cur = &error_member_value;
-                    } else if (!cur->is_object() || !cur->has(member)) {
-                        // Defer compound expressions to the operator/postfix
-                        // machinery, which will resolve this member operand and
-                        // produce the normal missing-member diagnostic.
-                        if (path_only) error = "value has no member: " + member;
-                        walk_ok = false;
-                        break;
                     } else {
-                        cur = &(*cur)[member];
+                        const auto* value = cur->find_member(member);
+                        if (!value) {
+                            // Defer compound expressions to the operator/postfix
+                            // machinery, which will resolve this member operand and
+                            // produce the normal missing-member diagnostic.
+                            if (path_only) error = "value has no member: " + member;
+                            walk_ok = false;
+                            break;
+                        }
+                        cur = value;
                     }
                 } else if (text[pos] == '[') {
                     if (!cur->is_array() && !cur->is_object() && !cur->is_bytes()) {
@@ -1109,9 +1113,11 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
                             ++pos; const std::size_t member_start = pos;
                             while (pos < text.size() &&
                                    (std::isalnum(static_cast<unsigned char>(text[pos])) || text[pos] == '_')) ++pos;
-                            if (member_start == pos || !current.is_object() ||
-                                !current.has(text.substr(member_start, pos - member_start))) { walk_ok = false; break; }
-                            current = current[text.substr(member_start, pos - member_start)];
+                            if (member_start == pos) { walk_ok = false; break; }
+                            const auto* value = current.find_member(text.substr(member_start, pos - member_start));
+                            if (!value) { walk_ok = false; break; }
+                            nift::RuntimeValue next = *value;
+                            current = std::move(next);
                         } else if (text[pos] == '[') {
                             ++pos; const std::size_t index_start = pos;
                             while (pos < text.size() && std::isdigit(static_cast<unsigned char>(text[pos]))) ++pos;
@@ -1335,10 +1341,9 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
                     auto* root = live_slot(expr.left->name);
                     if (!root || !root->value->is_object()) { unsupported = true; return false; }
                     const auto& object = static_cast<const nift::RuntimeValue&>(*root->value);
-                    if (!object.has(expr.name)) { unsupported = true; return false; }
-                    const auto& member = object[expr.name];
-                    if (!member.is_number()) { unsupported = true; return false; }
-                    value = member;
+                    const auto* member = object.find_member(expr.name);
+                    if (!member || !member->is_number()) { unsupported = true; return false; }
+                    value = *member;
                     return true;
                 }
                 if (expr.kind == K::Unary) {
@@ -3098,11 +3103,12 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         error = "cannot access member '" + operand + "' because the current JSON value is not an object";
                         return false;
                     }
-                    if (!base.has(operand)) {
+                    const auto* member = base.find_member(operand);
+                    if (!member) {
                         error = "JSON value '" + receiver + "' has no member '" + operand + "'";
                         return false;
                     }
-                    out = base[operand];
+                    out = *member;
                     return true;
                 } else if (kind == 2) {
                     std::string token = trim_copy(operand.substr(1, operand.size() - 2));
@@ -3155,8 +3161,9 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                                 key = computed.string;
                             }
                         }
-                        if (!base.has(key)) { error = "JSON object has no key '" + key + "'"; return false; }
-                        out = base[key];
+                        const auto* member = base.find_member(key);
+                        if (!member) { error = "JSON object has no key '" + key + "'"; return false; }
+                        out = *member;
                         return true;
                     }
                     error = "cannot index JSON value in '" + text + "'";
@@ -3409,8 +3416,9 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         if (i >= node->array.size()) { error = "index out of range: " + indexes[k]; return false; }
                         node = &(*node)[i];
                     } else if (idx.is_string() && node->is_object()) {
-                        if (!node->has(idx.string)) { error = "object has no member: " + idx.string; return false; }
-                        node = &(*node)[idx.string];
+                        auto* member = node->find_member(idx.string);
+                        if (!member) { error = "object has no member: " + idx.string; return false; }
+                        node = member;
                     } else {
                         error = "assignment index does not address an array or object: " + indexes[k];
                         return false;
