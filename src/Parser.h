@@ -199,6 +199,10 @@ private:
         std::unordered_map<std::string, VariableBinding>& destination,
         const std::unordered_map<std::string, VariableBinding>& source);
     std::vector<std::unordered_map<std::string, VariableBinding>> variable_scopes_;
+    // Bounded syntax-only cache. No values, binding descriptors or source views.
+    std::unordered_map<std::string,std::shared_ptr<const nift::ast::Expr>> large_string_plans_;
+    std::size_t large_string_plan_bytes_=0;
+
     enum class SourceProvenance { FileBacked, InMemory };
     // Prepared calls retain an immutable defining path. Other contexts own their
     // path directly; diagnostic origin and semantic authority remain distinct.
@@ -334,7 +338,7 @@ private:
         bool quoted=false;
         std::shared_ptr<const nift::ast::Expr> pure_plan;
     };
-    static std::shared_ptr<const nift::ast::Expr> prepare_pure_string_plan(const std::string& source);
+    static std::shared_ptr<const nift::ast::Expr> prepare_pure_string_plan(const std::string& source, bool large=false);
     bool evaluate_pure_string_plan(const nift::ast::Expr& expression, nift::RuntimeValue& out);
     struct PreparedFilesystemOperation {
         enum class Kind { Stat, Copy, Move };

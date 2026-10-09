@@ -1,0 +1,18 @@
+Traceback (most recent call last):
+  File "/home/nick/Repositories/nift/nift/scripts/checkpoint3_core_memory.py", line 45, in <module>
+    run([nift,"init"],root)
+    ~~~^^^^^^^^^^^^^^^^^^^^
+  File "/home/nick/Repositories/nift/nift/scripts/checkpoint3_core_memory.py", line 41, in run
+    raise RuntimeError(json.dumps(rec,indent=2))
+RuntimeError: {
+  "command": [
+    "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/.build/nift-sanitize-lifetime",
+    "init"
+  ],
+  "cwd": "/tmp/nift-cp3-k94ymjlo",
+  "exit_status": 1,
+  "expected": 0,
+  "elapsed_seconds": 0.118283,
+  "stdout_tail": "",
+  "stderr_tail": "==4==LeakSanitizer has encountered a fatal error.\n==4==HINT: For debugging, try setting environment variable LSAN_OPTIONS=verbosity=1:log_threads=1\n==4==HINT: LeakSanitizer does not work under ptrace (strace, gdb, etc)"
+}

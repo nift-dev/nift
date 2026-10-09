@@ -1,0 +1,20 @@
+[
+  {
+    "label": "accepted",
+    "allocations": 59279,
+    "frees": 59279,
+    "allocated_bytes": 553512174
+  },
+  {
+    "label": "canonical-assignment",
+    "allocations": 20332,
+    "frees": 20332,
+    "allocated_bytes": 235586141
+  },
+  {
+    "label": "native-floor",
+    "allocations": 3004,
+    "frees": 3004,
+    "allocated_bytes": 57453498
+  }
+]

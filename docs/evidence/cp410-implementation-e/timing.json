@@ -1,0 +1,200 @@
+[
+  {
+    "label": "accepted",
+    "repeat": 0,
+    "wall": 0.3425980252213776,
+    "cpu": 0.34179299999999996,
+    "rss_kib": 7456,
+    "affinity": 0,
+    "binary_sha256": "9d1e0ed43856b02bd834857137c647b4445cad89fabf59cc3ad67341af3e8314",
+    "source_sha256": "6f96dede41b63f265759ed4f2b7d83dfd825e06b74d6f38fb18e28b0593c7e28",
+    "scope": "whole process; same UTF-8 bytes and 1000 repetitions; no concurrent campaign compilation/profile"
+  },
+  {
+    "label": "canonical-assignment",
+    "repeat": 0,
+    "wall": 0.13603942189365625,
+    "cpu": 0.13541299999999998,
+    "rss_kib": 7664,
+    "affinity": 0,
+    "binary_sha256": "bf9771454572e1d866a38ffa7b864d8c7ce33e2455ad0b0af55c22ae9b04c30d",
+    "source_sha256": "6f96dede41b63f265759ed4f2b7d83dfd825e06b74d6f38fb18e28b0593c7e28",
+    "scope": "whole process; same UTF-8 bytes and 1000 repetitions; no concurrent campaign compilation/profile"
+  },
+  {
+    "label": "native-floor",
+    "repeat": 0,
+    "wall": 0.0701529891230166,
+    "cpu": 0.06961500000000001,
+    "rss_kib": 4012,
+    "affinity": 0,
+    "binary_sha256": "6d4ca5edee3b865f4473d10548d2f089098c67b79900732ae19dbabffe491cac",
+    "source_sha256": "6f96dede41b63f265759ed4f2b7d83dfd825e06b74d6f38fb18e28b0593c7e28",
+    "scope": "whole process; same UTF-8 bytes and 1000 repetitions; no concurrent campaign compilation/profile"
+  },
+  {
+    "label": "native-floor",
+    "repeat": 1,
+    "wall": 0.07050217012874782,
+    "cpu": 0.06990499999999998,
+    "rss_kib": 4176,
+    "affinity": 0,
+    "binary_sha256": "6d4ca5edee3b865f4473d10548d2f089098c67b79900732ae19dbabffe491cac",
+    "source_sha256": "6f96dede41b63f265759ed4f2b7d83dfd825e06b74d6f38fb18e28b0593c7e28",
+    "scope": "whole process; same UTF-8 bytes and 1000 repetitions; no concurrent campaign compilation/profile"
+  },
+  {
+    "label": "canonical-assignment",
+    "repeat": 1,
+    "wall": 0.1355534999165684,
+    "cpu": 0.134976,
+    "rss_kib": 7884,
+    "affinity": 0,
+    "binary_sha256": "bf9771454572e1d866a38ffa7b864d8c7ce33e2455ad0b0af55c22ae9b04c30d",
+    "source_sha256": "6f96dede41b63f265759ed4f2b7d83dfd825e06b74d6f38fb18e28b0593c7e28",
+    "scope": "whole process; same UTF-8 bytes and 1000 repetitions; no concurrent campaign compilation/profile"
+  },
+  {
+    "label": "accepted",
+    "repeat": 1,
+    "wall": 0.34784128912724555,
+    "cpu": 0.34672099999999995,
+    "rss_kib": 7496,
+    "affinity": 0,
+    "binary_sha256": "9d1e0ed43856b02bd834857137c647b4445cad89fabf59cc3ad67341af3e8314",
+    "source_sha256": "6f96dede41b63f265759ed4f2b7d83dfd825e06b74d6f38fb18e28b0593c7e28",
+    "scope": "whole process; same UTF-8 bytes and 1000 repetitions; no concurrent campaign compilation/profile"
+  },
+  {
+    "label": "accepted",
+    "repeat": 2,
+    "wall": 0.34498775703832507,
+    "cpu": 0.34316800000000014,
+    "rss_kib": 7740,
+    "affinity": 0,
+    "binary_sha256": "9d1e0ed43856b02bd834857137c647b4445cad89fabf59cc3ad67341af3e8314",
+    "source_sha256": "6f96dede41b63f265759ed4f2b7d83dfd825e06b74d6f38fb18e28b0593c7e28",
+    "scope": "whole process; same UTF-8 bytes and 1000 repetitions; no concurrent campaign compilation/profile"
+  },
+  {
+    "label": "canonical-assignment",
+    "repeat": 2,
+    "wall": 0.13797450601123273,
+    "cpu": 0.135244,
+    "rss_kib": 7624,
+    "affinity": 0,
+    "binary_sha256": "bf9771454572e1d866a38ffa7b864d8c7ce33e2455ad0b0af55c22ae9b04c30d",
+    "source_sha256": "6f96dede41b63f265759ed4f2b7d83dfd825e06b74d6f38fb18e28b0593c7e28",
+    "scope": "whole process; same UTF-8 bytes and 1000 repetitions; no concurrent campaign compilation/profile"
+  },
+  {
+    "label": "native-floor",
+    "repeat": 2,
+    "wall": 0.07206035382114351,
+    "cpu": 0.06997899999999993,
+    "rss_kib": 4080,
+    "affinity": 0,
+    "binary_sha256": "6d4ca5edee3b865f4473d10548d2f089098c67b79900732ae19dbabffe491cac",
+    "source_sha256": "6f96dede41b63f265759ed4f2b7d83dfd825e06b74d6f38fb18e28b0593c7e28",
+    "scope": "whole process; same UTF-8 bytes and 1000 repetitions; no concurrent campaign compilation/profile"
+  },
+  {
+    "label": "native-floor",
+    "repeat": 3,
+    "wall": 0.07053894293494523,
+    "cpu": 0.06997399999999995,
+    "rss_kib": 3996,
+    "affinity": 0,
+    "binary_sha256": "6d4ca5edee3b865f4473d10548d2f089098c67b79900732ae19dbabffe491cac",
+    "source_sha256": "6f96dede41b63f265759ed4f2b7d83dfd825e06b74d6f38fb18e28b0593c7e28",
+    "scope": "whole process; same UTF-8 bytes and 1000 repetitions; no concurrent campaign compilation/profile"
+  },
+  {
+    "label": "canonical-assignment",
+    "repeat": 3,
+    "wall": 0.13634537812322378,
+    "cpu": 0.13568799999999995,
+    "rss_kib": 7844,
+    "affinity": 0,
+    "binary_sha256": "bf9771454572e1d866a38ffa7b864d8c7ce33e2455ad0b0af55c22ae9b04c30d",
+    "source_sha256": "6f96dede41b63f265759ed4f2b7d83dfd825e06b74d6f38fb18e28b0593c7e28",
+    "scope": "whole process; same UTF-8 bytes and 1000 repetitions; no concurrent campaign compilation/profile"
+  },
+  {
+    "label": "accepted",
+    "repeat": 3,
+    "wall": 0.36673531704582274,
+    "cpu": 0.36499800000000027,
+    "rss_kib": 7512,
+    "affinity": 0,
+    "binary_sha256": "9d1e0ed43856b02bd834857137c647b4445cad89fabf59cc3ad67341af3e8314",
+    "source_sha256": "6f96dede41b63f265759ed4f2b7d83dfd825e06b74d6f38fb18e28b0593c7e28",
+    "scope": "whole process; same UTF-8 bytes and 1000 repetitions; no concurrent campaign compilation/profile"
+  },
+  {
+    "label": "accepted",
+    "repeat": 4,
+    "wall": 0.34699842310510576,
+    "cpu": 0.3450140000000001,
+    "rss_kib": 7456,
+    "affinity": 0,
+    "binary_sha256": "9d1e0ed43856b02bd834857137c647b4445cad89fabf59cc3ad67341af3e8314",
+    "source_sha256": "6f96dede41b63f265759ed4f2b7d83dfd825e06b74d6f38fb18e28b0593c7e28",
+    "scope": "whole process; same UTF-8 bytes and 1000 repetitions; no concurrent campaign compilation/profile"
+  },
+  {
+    "label": "canonical-assignment",
+    "repeat": 4,
+    "wall": 0.14163184189237654,
+    "cpu": 0.13909299999999947,
+    "rss_kib": 7820,
+    "affinity": 0,
+    "binary_sha256": "bf9771454572e1d866a38ffa7b864d8c7ce33e2455ad0b0af55c22ae9b04c30d",
+    "source_sha256": "6f96dede41b63f265759ed4f2b7d83dfd825e06b74d6f38fb18e28b0593c7e28",
+    "scope": "whole process; same UTF-8 bytes and 1000 repetitions; no concurrent campaign compilation/profile"
+  },
+  {
+    "label": "native-floor",
+    "repeat": 4,
+    "wall": 0.07160996203310788,
+    "cpu": 0.07011900000000032,
+    "rss_kib": 4012,
+    "affinity": 0,
+    "binary_sha256": "6d4ca5edee3b865f4473d10548d2f089098c67b79900732ae19dbabffe491cac",
+    "source_sha256": "6f96dede41b63f265759ed4f2b7d83dfd825e06b74d6f38fb18e28b0593c7e28",
+    "scope": "whole process; same UTF-8 bytes and 1000 repetitions; no concurrent campaign compilation/profile"
+  },
+  {
+    "label": "native-floor",
+    "repeat": 5,
+    "wall": 0.070622893050313,
+    "cpu": 0.07016099999999972,
+    "rss_kib": 4012,
+    "affinity": 0,
+    "binary_sha256": "6d4ca5edee3b865f4473d10548d2f089098c67b79900732ae19dbabffe491cac",
+    "source_sha256": "6f96dede41b63f265759ed4f2b7d83dfd825e06b74d6f38fb18e28b0593c7e28",
+    "scope": "whole process; same UTF-8 bytes and 1000 repetitions; no concurrent campaign compilation/profile"
+  },
+  {
+    "label": "canonical-assignment",
+    "repeat": 5,
+    "wall": 0.13878481998108327,
+    "cpu": 0.13774500000000015,
+    "rss_kib": 7512,
+    "affinity": 0,
+    "binary_sha256": "bf9771454572e1d866a38ffa7b864d8c7ce33e2455ad0b0af55c22ae9b04c30d",
+    "source_sha256": "6f96dede41b63f265759ed4f2b7d83dfd825e06b74d6f38fb18e28b0593c7e28",
+    "scope": "whole process; same UTF-8 bytes and 1000 repetitions; no concurrent campaign compilation/profile"
+  },
+  {
+    "label": "accepted",
+    "repeat": 5,
+    "wall": 0.35320320702157915,
+    "cpu": 0.3508789999999999,
+    "rss_kib": 7512,
+    "affinity": 0,
+    "binary_sha256": "9d1e0ed43856b02bd834857137c647b4445cad89fabf59cc3ad67341af3e8314",
+    "source_sha256": "6f96dede41b63f265759ed4f2b7d83dfd825e06b74d6f38fb18e28b0593c7e28",
+    "scope": "whole process; same UTF-8 bytes and 1000 repetitions; no concurrent campaign compilation/profile"
+  }
+]

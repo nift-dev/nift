@@ -54,6 +54,8 @@ struct TemplateParseResult { std::vector<std::unique_ptr<TemplateNode>> nodes; s
 TemplateParseResult parse_template(const std::string& source);
 StatementParseResult parse_statement(const std::string& source);
 ParseResult parse_expression(const std::string& source);
+// Separate canonical pure-plan entry; ordinary preparation limits stay fixed.
+ParseResult parse_literal_payload_expression(const std::string& source);
 ParseResult parse_expression_at(const std::string& source, std::size_t start, std::size_t length = std::string::npos);
 void rebase(Expr& expression, std::size_t offset);
 void rebase(Stmt& statement, std::size_t offset);

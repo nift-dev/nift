@@ -1,0 +1,14 @@
+{
+  "accepted_head": "6b1023b711afec23a6347f0b52ef40270d6107d7",
+  "accepted_binary_sha256": "9d1e0ed43856b02bd834857137c647b4445cad89fabf59cc3ad67341af3e8314",
+  "candidate_sha256": "bf9771454572e1d866a38ffa7b864d8c7ce33e2455ad0b0af55c22ae9b04c30d",
+  "certification_sha256": "bf9771454572e1d866a38ffa7b864d8c7ce33e2455ad0b0af55c22ae9b04c30d",
+  "source_sha256": {
+    "Ast.cpp": "809fc067fca8aa5313d8dc08a8856841abce983ba5b58e9f94584d16d59d5941",
+    "Ast.h": "ea6390e6ef72d1d4da9daf7a67f9d4adcf9eb00298b9584b3c19df9df0e405bb",
+    "Parser.h": "08c82b7fc52141ec6922d1fcea3cb82def8ab686831f135bed676148b3c24f18",
+    "ParserExpression.cpp": "ec951daec50d980184c6711feede3078358581b0d100b4bbb02eefa96f6f0ef2",
+    "ParserHelpers.h": "b2e5d1b7e4ab63cda3c31b136dc9ac21a16d815c7d2744bbee07fcdab93f1cc8",
+    "ParserTemplate.cpp": "873f36b63341de7ab0ed9785c71a1d6d3147e2047bd981f33a3130bdd5d81632"
+  }
+}

@@ -1,0 +1,743 @@
+{
+  "schema_version": 1,
+  "checkpoint": "3",
+  "commit": "6b1023b711afec23a6347f0b52ef40270d6107d7",
+  "platform": "Linux-7.0.0-29-generic-x86_64-with-glibc2.43",
+  "rounds": 4,
+  "commands": 57,
+  "pass": true,
+  "runs": [
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "init"
+      ],
+      "cwd": "/tmp/nift-cp3-qoitivwr",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.005248,
+      "stdout_tail": "\ud83d\udce6 1 file built successfully",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "track",
+        "a",
+        "A0"
+      ],
+      "cwd": "/tmp/nift-cp3-qoitivwr",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.003313,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "cp",
+        "a",
+        "b"
+      ],
+      "cwd": "/tmp/nift-cp3-qoitivwr",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.002886,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "mv",
+        "b",
+        "c"
+      ],
+      "cwd": "/tmp/nift-cp3-qoitivwr",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.002798,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "build",
+        "--all"
+      ],
+      "cwd": "/tmp/nift-cp3-qoitivwr",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.003442,
+      "stdout_tail": "\ud83d\udce6 3 files built successfully\ntime taken: 0.001217 seconds",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "build"
+      ],
+      "cwd": "/tmp/nift-cp3-qoitivwr",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.003324,
+      "stdout_tail": "\u2713 3 tracked files are up to date\ntime taken: 0.000906 seconds",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "status"
+      ],
+      "cwd": "/tmp/nift-cp3-qoitivwr",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.003766,
+      "stdout_tail": "Nift status\n\u2713 all 3 tracked files are up to date",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "build",
+        "--all"
+      ],
+      "cwd": "/tmp/nift-cp3-qoitivwr",
+      "exit_status": 1,
+      "expected": 1,
+      "elapsed_seconds": 0.004751,
+      "stdout_tail": "0 of 3 files built successfully\ntime taken: 0.001318 seconds",
+      "stderr_tail": "    @input('missing-partial.html')\n    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nerror: while building a\n  templates/template.html:1:1\n  @input path does not exist: missing-partial.html\n    @input('missing-partial.html')\n    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nerror: while building c\n  templates/template.html:1:1\n  @input path does not exist: missing-partial.html\n    @input('missing-partial.html')\n    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "build",
+        "--repair"
+      ],
+      "cwd": "/tmp/nift-cp3-qoitivwr",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.004695,
+      "stdout_tail": "\ud83d\udce6 3 files built successfully\ntime taken: 0.001786 seconds",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "untrack",
+        "c"
+      ],
+      "cwd": "/tmp/nift-cp3-qoitivwr",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.003198,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "rm",
+        "a"
+      ],
+      "cwd": "/tmp/nift-cp3-qoitivwr",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.003134,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "info",
+        "--all"
+      ],
+      "cwd": "/tmp/nift-cp3-qoitivwr",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.002817,
+      "stdout_tail": "      \"output-path\": \"public/index.html\",\n      \"template-path\": \"templates/template.html\",\n      \"content-ext\": \".html\",\n      \"output-ext\": \".html\",\n      \"minify\": false\n    }\n  ]\n}",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "init"
+      ],
+      "cwd": "/tmp/nift-cp3-ph_u1p6r",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.004356,
+      "stdout_tail": "\ud83d\udce6 1 file built successfully",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "track",
+        "a",
+        "A1"
+      ],
+      "cwd": "/tmp/nift-cp3-ph_u1p6r",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.003109,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "cp",
+        "a",
+        "b"
+      ],
+      "cwd": "/tmp/nift-cp3-ph_u1p6r",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.002807,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "mv",
+        "b",
+        "c"
+      ],
+      "cwd": "/tmp/nift-cp3-ph_u1p6r",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.003124,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "build",
+        "--all"
+      ],
+      "cwd": "/tmp/nift-cp3-ph_u1p6r",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.003997,
+      "stdout_tail": "\ud83d\udce6 3 files built successfully\ntime taken: 0.001372 seconds",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "build"
+      ],
+      "cwd": "/tmp/nift-cp3-ph_u1p6r",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.003951,
+      "stdout_tail": "\u2713 3 tracked files are up to date\ntime taken: 0.001004 seconds",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "status"
+      ],
+      "cwd": "/tmp/nift-cp3-ph_u1p6r",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.003639,
+      "stdout_tail": "Nift status\n\u2713 all 3 tracked files are up to date",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "build",
+        "--all"
+      ],
+      "cwd": "/tmp/nift-cp3-ph_u1p6r",
+      "exit_status": 1,
+      "expected": 1,
+      "elapsed_seconds": 0.004096,
+      "stdout_tail": "0 of 3 files built successfully\ntime taken: 0.001194 seconds",
+      "stderr_tail": "    @input('missing-partial.html')\n    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nerror: while building a\n  templates/template.html:1:1\n  @input path does not exist: missing-partial.html\n    @input('missing-partial.html')\n    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nerror: while building c\n  templates/template.html:1:1\n  @input path does not exist: missing-partial.html\n    @input('missing-partial.html')\n    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "build",
+        "--repair"
+      ],
+      "cwd": "/tmp/nift-cp3-ph_u1p6r",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.004774,
+      "stdout_tail": "\ud83d\udce6 3 files built successfully\ntime taken: 0.00171 seconds",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "untrack",
+        "c"
+      ],
+      "cwd": "/tmp/nift-cp3-ph_u1p6r",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.003415,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "rm",
+        "a"
+      ],
+      "cwd": "/tmp/nift-cp3-ph_u1p6r",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.002401,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "info",
+        "--all"
+      ],
+      "cwd": "/tmp/nift-cp3-ph_u1p6r",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.00268,
+      "stdout_tail": "      \"output-path\": \"public/index.html\",\n      \"template-path\": \"templates/template.html\",\n      \"content-ext\": \".html\",\n      \"output-ext\": \".html\",\n      \"minify\": false\n    }\n  ]\n}",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "init"
+      ],
+      "cwd": "/tmp/nift-cp3-hv12xqvj",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.004189,
+      "stdout_tail": "\ud83d\udce6 1 file built successfully",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "track",
+        "a",
+        "A2"
+      ],
+      "cwd": "/tmp/nift-cp3-hv12xqvj",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.003241,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "cp",
+        "a",
+        "b"
+      ],
+      "cwd": "/tmp/nift-cp3-hv12xqvj",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.002599,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "mv",
+        "b",
+        "c"
+      ],
+      "cwd": "/tmp/nift-cp3-hv12xqvj",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.0029,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "build",
+        "--all"
+      ],
+      "cwd": "/tmp/nift-cp3-hv12xqvj",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.003595,
+      "stdout_tail": "\ud83d\udce6 3 files built successfully\ntime taken: 0.001243 seconds",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "build"
+      ],
+      "cwd": "/tmp/nift-cp3-hv12xqvj",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.003413,
+      "stdout_tail": "\u2713 3 tracked files are up to date\ntime taken: 0.00093 seconds",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "status"
+      ],
+      "cwd": "/tmp/nift-cp3-hv12xqvj",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.003548,
+      "stdout_tail": "Nift status\n\u2713 all 3 tracked files are up to date",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "build",
+        "--all"
+      ],
+      "cwd": "/tmp/nift-cp3-hv12xqvj",
+      "exit_status": 1,
+      "expected": 1,
+      "elapsed_seconds": 0.00399,
+      "stdout_tail": "0 of 3 files built successfully\ntime taken: 0.001142 seconds",
+      "stderr_tail": "    @input('missing-partial.html')\n    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nerror: while building a\n  templates/template.html:1:1\n  @input path does not exist: missing-partial.html\n    @input('missing-partial.html')\n    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nerror: while building c\n  templates/template.html:1:1\n  @input path does not exist: missing-partial.html\n    @input('missing-partial.html')\n    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "build",
+        "--repair"
+      ],
+      "cwd": "/tmp/nift-cp3-hv12xqvj",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.004392,
+      "stdout_tail": "\ud83d\udce6 3 files built successfully\ntime taken: 0.001549 seconds",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "untrack",
+        "c"
+      ],
+      "cwd": "/tmp/nift-cp3-hv12xqvj",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.002728,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "rm",
+        "a"
+      ],
+      "cwd": "/tmp/nift-cp3-hv12xqvj",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.002887,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "info",
+        "--all"
+      ],
+      "cwd": "/tmp/nift-cp3-hv12xqvj",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.002948,
+      "stdout_tail": "      \"output-path\": \"public/index.html\",\n      \"template-path\": \"templates/template.html\",\n      \"content-ext\": \".html\",\n      \"output-ext\": \".html\",\n      \"minify\": false\n    }\n  ]\n}",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "init"
+      ],
+      "cwd": "/tmp/nift-cp3-i8vuvky8",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.00421,
+      "stdout_tail": "\ud83d\udce6 1 file built successfully",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "track",
+        "a",
+        "A3"
+      ],
+      "cwd": "/tmp/nift-cp3-i8vuvky8",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.002903,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "cp",
+        "a",
+        "b"
+      ],
+      "cwd": "/tmp/nift-cp3-i8vuvky8",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.002701,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "mv",
+        "b",
+        "c"
+      ],
+      "cwd": "/tmp/nift-cp3-i8vuvky8",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.002272,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "build",
+        "--all"
+      ],
+      "cwd": "/tmp/nift-cp3-i8vuvky8",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.003409,
+      "stdout_tail": "\ud83d\udce6 3 files built successfully\ntime taken: 0.001089 seconds",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "build"
+      ],
+      "cwd": "/tmp/nift-cp3-i8vuvky8",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.003259,
+      "stdout_tail": "\u2713 3 tracked files are up to date\ntime taken: 0.000916 seconds",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "status"
+      ],
+      "cwd": "/tmp/nift-cp3-i8vuvky8",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.003051,
+      "stdout_tail": "Nift status\n\u2713 all 3 tracked files are up to date",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "build",
+        "--all"
+      ],
+      "cwd": "/tmp/nift-cp3-i8vuvky8",
+      "exit_status": 1,
+      "expected": 1,
+      "elapsed_seconds": 0.003135,
+      "stdout_tail": "0 of 3 files built successfully\ntime taken: 0.000943 seconds",
+      "stderr_tail": "    @input('missing-partial.html')\n    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nerror: while building a\n  templates/template.html:1:1\n  @input path does not exist: missing-partial.html\n    @input('missing-partial.html')\n    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\nerror: while building c\n  templates/template.html:1:1\n  @input path does not exist: missing-partial.html\n    @input('missing-partial.html')\n    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "build",
+        "--repair"
+      ],
+      "cwd": "/tmp/nift-cp3-i8vuvky8",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.003893,
+      "stdout_tail": "\ud83d\udce6 3 files built successfully\ntime taken: 0.001483 seconds",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "untrack",
+        "c"
+      ],
+      "cwd": "/tmp/nift-cp3-i8vuvky8",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.00285,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "rm",
+        "a"
+      ],
+      "cwd": "/tmp/nift-cp3-i8vuvky8",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.002392,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/nift",
+        "info",
+        "--all"
+      ],
+      "cwd": "/tmp/nift-cp3-i8vuvky8",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.002347,
+      "stdout_tail": "      \"output-path\": \"public/index.html\",\n      \"template-path\": \"templates/template.html\",\n      \"content-ext\": \".html\",\n      \"output-ext\": \".html\",\n      \"minify\": false\n    }\n  ]\n}",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "bash",
+        "tests/persistence_concurrency_failure_smoke.sh"
+      ],
+      "cwd": "/home/nick/Repositories/nift/nift",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.352161,
+      "stdout_tail": "Persistence/concurrency/failed-build-state smoke test passed",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "bash",
+        "tests/incremental_new_features_smoke.sh"
+      ],
+      "cwd": "/home/nick/Repositories/nift/nift",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 9.345326,
+      "stdout_tail": "New-feature incremental modes smoke test passed",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "bash",
+        "tests/contracts_smoke.sh"
+      ],
+      "cwd": "/home/nick/Repositories/nift/nift",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.411669,
+      "stdout_tail": "Project contracts smoke test passed",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "bash",
+        "tests/json_schema_integration_smoke.sh"
+      ],
+      "cwd": "/home/nick/Repositories/nift/nift",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.17841,
+      "stdout_tail": "JSON Schema integration smoke test passed",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "bash",
+        "tests/minify_integration_smoke.sh"
+      ],
+      "cwd": "/home/nick/Repositories/nift/nift",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.543327,
+      "stdout_tail": "Minifier integration smoke test passed",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "bash",
+        "tests/requirements_smoke.sh"
+      ],
+      "cwd": "/home/nick/Repositories/nift/nift",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.29614,
+      "stdout_tail": "Requirements smoke test passed",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "bash",
+        "tests/path_safety_smoke.sh"
+      ],
+      "cwd": "/home/nick/Repositories/nift/nift",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.087612,
+      "stdout_tail": "Path safety smoke test passed",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "bash",
+        "tests/template_optional_smoke.sh"
+      ],
+      "cwd": "/home/nick/Repositories/nift/nift",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.185056,
+      "stdout_tail": "Optional tracked template smoke test passed",
+      "stderr_tail": ""
+    },
+    {
+      "command": [
+        "bash",
+        "tests/cross_feature_smoke.sh"
+      ],
+      "cwd": "/home/nick/Repositories/nift/nift",
+      "exit_status": 0,
+      "expected": 0,
+      "elapsed_seconds": 0.249462,
+      "stdout_tail": "Cross-feature smoke test passed",
+      "stderr_tail": ""
+    }
+  ]
+}

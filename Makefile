@@ -1937,3 +1937,14 @@ test-v410-filesystem-recipe-parity: $(TARGET)
 test-v410-filesystem-recipe-guard: $(FS_RECIPE_GUARD)
 	NIFT_FS_STATS=$(abspath $(FS_RECIPE_GUARD)) $(PYTHON) tests/v410_filesystem_recipe_guard.py
 test: test-v410-filesystem-recipe-parity test-v410-filesystem-recipe-guard
+
+LARGE_STRING_GUARD := $(TEST_DIR)/large-string-guard$(EXEEXT)
+$(LARGE_STRING_GUARD): tests/v410_large_string_guard.cpp $(filter-out src/nift.o src/CLI.o,$(CLI_OBJECTS)) $(LIBFFI_A)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/v410_large_string_guard.cpp $(filter-out src/nift.o src/CLI.o,$(CLI_OBJECTS)) $(LDFLAGS) $(LDLIBS) -o $@
+.PHONY: test-v410-large-string-parity test-v410-large-string-guard
+test-v410-large-string-parity: $(TARGET)
+	NIFT=$(abspath $(TARGET)) $(PYTHON) tests/v410_large_string_parity.py
+test-v410-large-string-guard: $(LARGE_STRING_GUARD)
+	$(LARGE_STRING_GUARD)
+test: test-v410-large-string-parity test-v410-large-string-guard

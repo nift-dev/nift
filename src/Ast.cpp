@@ -116,16 +116,33 @@ void fold_constants(Expr& e){
  e.kind=Kind::Literal; e.literal=std::move(v); e.text.clear(); e.op.clear(); e.name.clear(); e.params.clear(); e.left.reset(); e.right.reset(); e.items.clear();
 }
 
-ParseResult parse_expression(const std::string& source){
+static ParseResult parse_bounded_expression(const std::string& source,bool literal_payload){
+    if(literal_payload){
+        // Bound nodes before the AST can duplicate a large literal into every
+        // chained call's source text or recursively fold/destruct that chain.
+        std::size_t tokens=0,nesting=0;
+        for(std::size_t i=0;i<source.size();){
+            const unsigned char c=(unsigned char)source[i];
+            if(std::isspace(c)){++i;continue;}
+            if(++tokens>64)return{{},"literal-payload expression exceeds structural limits",false};
+            if(c=='\''||c=='"'){const char quote=source[i++];while(i<source.size()&&source[i]!=quote){if(source[i]=='\\'&&i+1<source.size())i+=2;else ++i;}if(i==source.size())return{{},"literal-payload expression exceeds structural limits",false};++i;continue;}
+            if(std::isalpha(c)||c=='_'){++i;while(i<source.size()&&(std::isalnum((unsigned char)source[i])||source[i]=='_'))++i;continue;}
+            if(c=='('||c=='['||c=='{'){if(++nesting>16)return{{},"literal-payload expression exceeds structural limits",false};}
+            else if((c==')'||c==']'||c=='}')&&nesting)--nesting;
+            ++i;
+        }
+    }
  // The prepared AST is recursive (fold/evaluate/destruct) so it must not build
  // a pathologically large or deeply nested tree. Beyond these bounds the
  // expression is reported unsupported and the robust legacy evaluator (which
  // handles flat chains iteratively) evaluates it instead, so behaviour is
  // preserved and the parser never exhausts the C++ stack.
- {std::size_t depth=0,maxdepth=0;bool q=false;char qc=0;for(std::size_t i=0;i<source.size();++i){char c=source[i];if(q){if(c=='\\')++i;else if(c==qc)q=false;continue;}if(c=='\''||c=='"'){q=true;qc=c;continue;}if(c=='('||c=='['||c=='{'){if(++depth>maxdepth)maxdepth=depth;}else if(c==')'||c==']'||c=='}'){if(depth)--depth;}}
-  if(source.size()>8192||maxdepth>256)return{{},std::string("expression is too large for the prepared parser"),false};}
+ {std::size_t depth=0,maxdepth=0,structural=0;bool q=false;char qc=0;for(std::size_t i=0;i<source.size();++i){char c=source[i];if(q){if(c=='\\')++i;else if(c==qc)q=false;continue;}++structural;if(c=='\''||c=='"'){q=true;qc=c;continue;}if(c=='('||c=='['||c=='{'){if(++depth>maxdepth)maxdepth=depth;}else if(c==')'||c==']'||c=='}'){if(depth)--depth;}}
+  if((literal_payload?(source.size()>131072||structural>8192):source.size()>8192)||maxdepth>256)return{{},std::string("expression is too large for the prepared parser"),false};}
  {auto arrow=source.find("=>");if(arrow!=std::string::npos){auto lhs=source.substr(0,arrow);auto trim=[](std::string x){auto b=x.find_first_not_of(" \t\r\n");if(b==std::string::npos)return std::string();auto e=x.find_last_not_of(" \t\r\n");return x.substr(b,e-b+1);};lhs=trim(lhs);if(lhs.size()>=2&&lhs.front()=='('&&lhs.back()==')'){auto n=std::make_unique<Expr>();n->kind=Kind::Lambda;n->span={0,source.size()};n->text=source;std::string ps=lhs.substr(1,lhs.size()-2);std::size_t p=0;while(p<=ps.size()){auto c=ps.find(',',p);auto v=trim(ps.substr(p,c==std::string::npos?std::string::npos:c-p));if(!v.empty()){if(v.rfind("...",0)==0){n->op="variadic:"+trim(v.substr(3));n->params.push_back(trim(v.substr(3)));}else n->params.push_back(v);}if(c==std::string::npos)break;p=c+1;}return{std::move(n),{},true};}}}
  P p{source,0,{}};auto e=p.coalesce();p.ws();if(!e||p.p!=source.size())return{{},p.error.empty()?"unsupported expression":p.error,false};fold_constants(*e);return{std::move(e),{},true};}
+ParseResult parse_expression(const std::string& source){return parse_bounded_expression(source,false);}
+ParseResult parse_literal_payload_expression(const std::string& source){return parse_bounded_expression(source,true);}
 TemplateParseResult parse_template(const std::string& source){
  TemplateParseResult r; std::size_t pos=0,lit=0;
  auto literal=[&](std::size_t b,std::size_t e){if(e<=b)return;auto n=std::make_unique<TemplateNode>();n->kind=TemplateKind::Literal;n->span={b,e};n->text=source.substr(b,e-b);r.nodes.push_back(std::move(n));};

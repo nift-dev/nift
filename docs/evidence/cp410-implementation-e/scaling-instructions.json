@@ -1,0 +1,82 @@
+[
+  {
+    "expression_bytes": 8192,
+    "iterations": 128,
+    "label": "accepted",
+    "instructions": 521352128,
+    "output_bytes": 16319,
+    "source_sha256": "7e28b209c0b2cdac931f37aa92e0fe4432bcc643f0e7752cbbbeed2a58754719"
+  },
+  {
+    "expression_bytes": 8192,
+    "iterations": 128,
+    "label": "canonical-assignment",
+    "instructions": 518254886,
+    "output_bytes": 16319,
+    "source_sha256": "7e28b209c0b2cdac931f37aa92e0fe4432bcc643f0e7752cbbbeed2a58754719"
+  },
+  {
+    "expression_bytes": 16384,
+    "iterations": 128,
+    "label": "accepted",
+    "instructions": 1497755650,
+    "output_bytes": 32703,
+    "source_sha256": "ca3bfd271e6afa527e2319df4cc4506d87744bbd083361a33651267d83ac676d"
+  },
+  {
+    "expression_bytes": 16384,
+    "iterations": 128,
+    "label": "canonical-assignment",
+    "instructions": 709327391,
+    "output_bytes": 32703,
+    "source_sha256": "ca3bfd271e6afa527e2319df4cc4506d87744bbd083361a33651267d83ac676d"
+  },
+  {
+    "expression_bytes": 32768,
+    "iterations": 128,
+    "label": "accepted",
+    "instructions": 2977902327,
+    "output_bytes": 65471,
+    "source_sha256": "f703b4fb56586f1d8b2e593ab4e9db4586d8cbc52795bf4aa5beb69b8e5520af"
+  },
+  {
+    "expression_bytes": 32768,
+    "iterations": 128,
+    "label": "canonical-assignment",
+    "instructions": 1415319617,
+    "output_bytes": 65471,
+    "source_sha256": "f703b4fb56586f1d8b2e593ab4e9db4586d8cbc52795bf4aa5beb69b8e5520af"
+  },
+  {
+    "expression_bytes": 65536,
+    "iterations": 128,
+    "label": "accepted",
+    "instructions": 5937872338,
+    "output_bytes": 131007,
+    "source_sha256": "70e64764604f4fb49f6b0f01f2f85f2c6f9d6036673e35a7b142d7226af21195"
+  },
+  {
+    "expression_bytes": 65536,
+    "iterations": 128,
+    "label": "canonical-assignment",
+    "instructions": 2822998157,
+    "output_bytes": 131007,
+    "source_sha256": "70e64764604f4fb49f6b0f01f2f85f2c6f9d6036673e35a7b142d7226af21195"
+  },
+  {
+    "expression_bytes": 131072,
+    "iterations": 128,
+    "label": "accepted",
+    "instructions": 11857877852,
+    "output_bytes": 262079,
+    "source_sha256": "5f99e97136dffd440c7f51200335ded1a9a735f81a0cafe70a1a283228a74f58"
+  },
+  {
+    "expression_bytes": 131072,
+    "iterations": 128,
+    "label": "canonical-assignment",
+    "instructions": 5638379166,
+    "output_bytes": 262079,
+    "source_sha256": "5f99e97136dffd440c7f51200335ded1a9a735f81a0cafe70a1a283228a74f58"
+  }
+]

@@ -1,0 +1,24 @@
+[
+  {
+    "name": "official",
+    "root": "/home/nick/Repositories/nift/scripting-benchmark/evidence/campaign-20261009-v490",
+    "checked": 30,
+    "unchanged": true
+  },
+  {
+    "name": "expanded",
+    "root": "/home/nick/Repositories/nift/nift-experiments/lab-evidence/benchmarks/shell/20261009-v4100-shell-expanded",
+    "checked": 51,
+    "unchanged": true
+  },
+  {
+    "dependency": "/home/nick/Repositories/nift/jsonic/jsonic",
+    "clean": true,
+    "head": "a956c50a4ba0092080902c19aa14132e7a885eb0"
+  },
+  {
+    "dependency": "/home/nick/Repositories/nift/minify/minify",
+    "clean": true,
+    "head": "ea089d8f1550a02f8a9e7926d58156527b8d36e9"
+  }
+]

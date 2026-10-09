@@ -1,0 +1,11 @@
+Traceback (most recent call last):
+  File "/home/nick/Repositories/nift/nift/scripts/checkpoint9_parser_fuzz.py", line 126, in <module>
+    root=pathlib.Path(td); setup(root)
+                           ~~~~~^^^^^^
+  File "/home/nick/Repositories/nift/nift/scripts/checkpoint9_parser_fuzz.py", line 85, in setup
+    subprocess.run([NIFT,'init'],cwd=root,check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,env=SAN_ENV)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/.build/nift-sanitize', 'init']' died with <Signals.SIGABRT: 6>.

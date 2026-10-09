@@ -1,0 +1,49 @@
+--------------------------------------------------------------------------------
+Profile data file '.build/cp410-implementation/strings/canonical-plan.callgrind' (creator: callgrind-3.26.0)
+--------------------------------------------------------------------------------
+I1 cache: 
+D1 cache: 
+LL cache: 
+Timerange: Basic block 0 - 1639386613
+Trigger: Program termination
+Profiled target:  /home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/prototype/nift - (PID 6, part 1)
+Events recorded:  Ir
+Events shown:     Ir
+Event sort order: Ir
+Thresholds:       95
+Include dirs:     
+User annotated:   
+Auto-annotation:  on
+
+--------------------------------------------------------------------------------
+Ir                     
+--------------------------------------------------------------------------------
+5,589,989,606 (100.0%)  PROGRAM TOTALS
+
+--------------------------------------------------------------------------------
+Ir                      file:function
+--------------------------------------------------------------------------------
+2,309,616,432 (41.32%)  ???:Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView, Parser::PreparedFilesystemOperation const*)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const::{lambda()#1}::operator()() const::{lambda(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&)#2}::operator()(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) const [/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/prototype/nift]
+  470,696,566 ( 8.42%)  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S:__memcpy_avx_unaligned_erms [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  368,860,067 ( 6.60%)  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S:__memcmp_avx2_movbe [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  358,728,762 ( 6.42%)  ???:bool std::operator==<char, std::char_traits<char>, std::allocator<char> >(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, char const*) [/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/prototype/nift]
+  264,415,562 ( 4.73%)  ???:std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_append(char const*, unsigned long) [/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.35]
+  230,717,993 ( 4.13%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)'2 [/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/prototype/nift]
+  213,222,776 ( 3.81%)  ???:std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::find(char const*, unsigned long, unsigned long) const [/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.35]
+  203,698,842 ( 3.64%)  ./string/../sysdeps/x86_64/multiarch/strlen-avx2.S:__strlen_avx2 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  191,206,286 ( 3.42%)  ???:Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView, Parser::PreparedFilesystemOperation const*)::{lambda(nift::detail::SourceText const&, nift::RuntimeValue&, int)#1}::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const::{lambda()#1}::operator()() const [/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/prototype/nift]
+  172,994,604 ( 3.09%)  ???:Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView)::{lambda(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, bool&)#1}::operator()(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, bool&) const [/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/prototype/nift]
+  157,796,000 ( 2.82%)  ???:Parser::evaluate_pure_string_plan(nift::ast::Expr const&, nift::RuntimeValue&)::{lambda(nift::ast::Expr const&)#2}::operator()(nift::ast::Expr const&) const'2 [/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/prototype/nift]
+  157,696,000 ( 2.82%)  ./ctype/./ctype/ctype.c:toupper [/usr/lib/x86_64-linux-gnu/libc.so.6]
+  147,507,000 ( 2.64%)  ???:nift::detail::replace_string_linear(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&) [/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/prototype/nift]
+   89,977,807 ( 1.61%)  ./string/../sysdeps/x86_64/multiarch/memchr-avx2.S:__memchr_avx2 [/usr/lib/x86_64-linux-gnu/libc.so.6]
+
+--------------------------------------------------------------------------------
+The following files chosen for auto-annotation could not be found:
+--------------------------------------------------------------------------------
+  ./ctype/./ctype/ctype.c
+  ./string/../sysdeps/x86_64/multiarch/memchr-avx2.S
+  ./string/../sysdeps/x86_64/multiarch/memcmp-avx2-movbe.S
+  ./string/../sysdeps/x86_64/multiarch/memmove-vec-unaligned-erms.S
+  ./string/../sysdeps/x86_64/multiarch/strlen-avx2.S
+

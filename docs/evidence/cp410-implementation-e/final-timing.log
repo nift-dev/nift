@@ -1,0 +1,7 @@
+PASS balanced triple 0
+PASS balanced triple 1
+PASS balanced triple 2
+PASS balanced triple 3
+PASS balanced triple 4
+PASS balanced triple 5
+{'accepted': {'wall': 0.34741985611617565, 'cpu': 0.3458675, 'rss_kib': 7504.0}, 'canonical-assignment': {'wall': 0.13715994206722826, 'cpu': 0.13555049999999996, 'rss_kib': 7742.0}, 'native-floor': {'wall': 0.07058091799262911, 'cpu': 0.06997649999999994, 'rss_kib': 4012.0}}

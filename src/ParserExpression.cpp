@@ -915,6 +915,21 @@ void record_filesystem_plan_event(FilesystemPlanEvent event){
 }
 #endif
 
+namespace nift { namespace detail {
+static std::string replace_string_linear(const std::string& source,const std::string& pattern,const std::string& replacement){
+std::string r;
+                            r.reserve(source.size());
+                            std::size_t begin=0, pos=source.find(pattern);
+                            while(pos!=std::string::npos){
+                                r.append(source,begin,pos-begin);
+                                r.append(replacement);
+                                begin=pos+pattern.size();
+                                pos=source.find(pattern,begin);
+                            }
+                            r.append(source,begin,std::string::npos);
+                            return r;
+}
+}}
 bool Parser::execute_filesystem_operation(PreparedFilesystemOperation::Kind kind,std::size_t operand_count,
     const std::function<bool(std::size_t,nift::RuntimeValue&)>& operand,nift::RuntimeValue& out,std::string& error) {
     nift::detail::record_filesystem_plan_event(nift::detail::FilesystemPlanEvent::Backend);
@@ -952,11 +967,11 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path path(expanded);i
             out=nift::RuntimeValue(nullptr);return true;
 }
 
-std::shared_ptr<const nift::ast::Expr> Parser::prepare_pure_string_plan(const std::string& source) {
+std::shared_ptr<const nift::ast::Expr> Parser::prepare_pure_string_plan(const std::string& source,bool large) {
     // Conservative canonical string-only grammar, with bounded structure.
     // Escapes and effectful/unknown nodes retain the full legacy evaluator.
-    if(source.size()>4096||source.find('\\')!=std::string::npos)return {};
-    auto parsed=nift::ast::parse_expression(source);if(!parsed.supported||!parsed.expr)return {};
+    if(source.size()>(large?131072:4096)||source.find('\\')!=std::string::npos)return {};
+    auto parsed=large?nift::ast::parse_literal_payload_expression(source):nift::ast::parse_expression(source);if(!parsed.supported||!parsed.expr)return {};
     std::size_t nodes=0;
     std::function<int(const nift::ast::Expr&,unsigned)> type;
     type=[&](const nift::ast::Expr& e,unsigned depth)->int{
@@ -968,10 +983,21 @@ std::shared_ptr<const nift::ast::Expr> Parser::prepare_pure_string_plan(const st
             return type(*e.left,depth+1)==1&&type(*e.right,depth+1)==1?1:0;
         if(e.kind!=Kind::Call||!e.left||e.left->kind!=Kind::Member||!e.left->left)return 0;
         const auto& method=e.left->name;
+        // AST argument construction omits empty comma segments; canonical
+        // parsing retains them. Validate exact canonical argument shape.
+        const auto open=e.left->span.end-e.span.begin;
+        auto at=open;while(at<e.text.size()&&std::isspace((unsigned char)e.text[at]))++at;
+        if(at>=e.text.size()||e.text[at]!='('||e.text.back()!=')')return 0;
+        bool args_ok=false;std::vector<bool> quotes;
+        auto args=parse_parameters(nift::detail::SourceText(e.text,nift::detail::SourceView::identity({},e.text)).substr(at+1,e.text.size()-at-2),args_ok,&quotes);
+        if(!args_ok||args.size()!=e.items.size())return 0;
         if(e.text.find("."+method+"(")==std::string::npos)return 0;
         if(method=="split"&&e.items.size()==1&&e.items[0]->kind==Kind::Literal&&e.items[0]->literal.is_string()&&!e.items[0]->literal.string.empty())
             return type(*e.left->left,depth+1)==1?2:0;
         if((method=="first"||method=="last")&&e.items.empty())return type(*e.left->left,depth+1)==2?1:0;
+        if(large&&(method=="to_upper"||method=="to_lower"||method=="trim"||method=="trim_start"||method=="trim_end")&&e.items.empty())return type(*e.left->left,depth+1)==1?1:0;
+        if(large&&method=="replace"&&e.items.size()==2&&e.items[0]->kind==Kind::Literal&&e.items[1]->kind==Kind::Literal&&e.items[0]->literal.is_string()&&e.items[1]->literal.is_string()&&!e.items[0]->literal.string.empty()&&e.items[0]->literal.string.find('\x1f')==std::string::npos&&e.items[1]->literal.string.find('\x1f')==std::string::npos)return type(*e.left->left,depth+1)==1?1:0;
+
         return 0;
     };
     if(type(*parsed.expr,0)==0)return {};
@@ -1014,6 +1040,10 @@ bool Parser::evaluate_pure_string_plan(const nift::ast::Expr& expression,nift::R
             nift::RuntimeValue result=nift::RuntimeValue::make_array();const auto& delimiter=e.items[0]->literal.string;
             std::size_t pos=0;while(true){const auto at=value.string.find(delimiter,pos);if(at==std::string::npos){result.array.emplace_back(value.string.substr(pos));break;}result.array.emplace_back(value.string.substr(pos,at-pos));pos=at+delimiter.size();}return result;
         }
+        const auto& method=e.left->name;
+        if(method=="replace")return nift::RuntimeValue(nift::detail::replace_string_linear(value.string,e.items[0]->literal.string,e.items[1]->literal.string));
+        if(method=="to_upper"||method=="to_lower"){for(char& c:value.string)c=(char)(method=="to_lower"?std::tolower((unsigned char)c):std::toupper((unsigned char)c));return value;}
+        if(method=="trim"||method=="trim_start"||method=="trim_end"){std::size_t a=0,b=value.string.size();if(method!="trim_end")while(a<b&&std::isspace((unsigned char)value.string[a]))++a;if(method!="trim_start")while(b>a&&std::isspace((unsigned char)value.string[b-1]))--b;return nift::RuntimeValue(value.string.substr(a,b-a));}
         return e.left->name=="first"?value.array.front():value.array.back();
     };
     out=execute(expression);return true;
@@ -1373,6 +1403,19 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
         return true;
     };
 
+    auto large_plan=[&](const std::string& source)->std::shared_ptr<const nift::ast::Expr>{
+        if(source.size()<=8192||source.size()>131072||source.find(".replace(")==std::string::npos)return {};
+        auto found=large_string_plans_.find(source);
+        if(found==large_string_plans_.end()){
+            auto plan=prepare_pure_string_plan(source,true);
+            std::size_t bytes=source.capacity()+sizeof(decltype(large_string_plans_)::value_type)+4*sizeof(void*);
+            std::function<void(const nift::ast::Expr&)> account=[&](const nift::ast::Expr& e){bytes+=sizeof(e)+e.text.capacity()+e.name.capacity()+e.op.capacity()+e.literal.string.capacity()+e.params.capacity()*sizeof(std::string)+e.items.capacity()*sizeof(std::unique_ptr<nift::ast::Expr>);for(const auto& x:e.params)bytes+=x.capacity();if(e.left)account(*e.left);if(e.right)account(*e.right);for(const auto& x:e.items)account(*x);};
+            if(plan)account(*plan);
+            if(large_string_plans_.size()>=16||large_string_plan_bytes_+bytes>4*1024*1024){large_string_plans_.clear();large_string_plan_bytes_=0;found=large_string_plans_.end();}
+            if(bytes<=4*1024*1024){large_string_plan_bytes_+=bytes;found=large_string_plans_.emplace(source,std::move(plan)).first;}
+        }
+        return found==large_string_plans_.end()?nullptr:found->second;
+    };
     std::function<bool(const nift::detail::SourceText&, nift::RuntimeValue&, int)> eval;
     eval = [&](const nift::detail::SourceText& raw, nift::RuntimeValue& out, int depth) -> bool {
         const auto previous_failure = expression_failure_view_;
@@ -1385,6 +1428,7 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
         // above, so this depth only grows with genuine syntactic nesting. Fail
         // deterministically instead of exhausting the C++ stack.
         if(depth>96){error="expression nesting exceeds parser limit";return false;}
+        if(auto plan=large_plan(text);plan&&evaluate_pure_string_plan(*plan,out))return true;
 
         if (recipe && depth==0) {
             auto operand=[&](std::size_t i,nift::RuntimeValue& value) {
@@ -1655,6 +1699,60 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
         auto exact_i64 = [](const nift::RuntimeValue& d, std::int64_t& v)->bool {
             return nift::runtime_number_to_i64(d, v);
         };
+        auto assign_plain_canonical=[&](const std::string& name,std::size_t p)->bool {
+            if (!valid_binding_identifier(name)) { error = "assignment requires an identifier before '='"; return false; }
+            VariableBinding* binding = nullptr;
+            for (auto scope = variable_scopes_.rbegin(); scope != variable_scopes_.rend(); ++scope) {
+                const auto it = scope->find(name);
+                if (it != scope->end()) { binding = &it->second; break; }
+            }
+            if (!binding && !receiver_stack_.empty()) {
+                auto rec = receiver_stack_.back()->fields.find(name);
+                if (rec != receiver_stack_.back()->fields.end()) {
+                    nift::RuntimeValue assigned;
+                    if (!eval(text.substr(p + 1), assigned, depth + 1)) return false;
+                    const int assigned_type = nift_binding_type_from_text(text.substr(p + 1), assigned);
+                    if (!nift_type_assignable(assigned_type, rec->second.type)) {
+                        error = "cannot assign " + std::string(nift_binding_type_name(assigned_type)) +
+                                " to " + nift_binding_type_name(rec->second.type) + " struct field '" + name + "'";
+                        return false;
+                    }
+                    if (assigned.is_string()&&(assigned.string.rfind("\x1fnift:struct:",0)==0||assigned.string.rfind("\x1fnift:collection:",0)==0)){std::string recv_id;for(const auto& e:struct_instances_)if(e.second==receiver_stack_.back()){recv_id=e.first;break;}if(reference_would_cycle(assigned.string,std::string("\x1fnift:struct:")+recv_id)){error="assignment would create a cyclic reference: "+name;return false;}}
+                    auto rebound = std::make_shared<nift::RuntimeValue>(std::move(assigned));
+                    rec->second.value = rebound;
+                    if (depth == 0) last_expression_mutation_ = true;
+                    out = *rebound;
+                    return true;
+                }
+            }
+            if (!binding) { error = "assignment to undefined binding: " + name; return false; }
+            if (!binding->mutable_binding) { error = "cannot assign to const binding: " + name; return false; }
+            nift::RuntimeValue assigned;
+            if (!eval(text.substr(p + 1), assigned, depth + 1)) return false;
+            if(binding->value&&binding->value->is_string()&&binding->value->string.rfind("\x1fnift:atomic:",0)==0&&!(assigned.is_string()&&assigned.string.rfind("\x1fnift:atomic:",0)==0)){auto ai=atomic_instances_.find(binding->value->string.substr(13));if(ai==atomic_instances_.end()){error="atomic: invalid handle";return false;}if(ai->second->kind==AtomicInstance::Kind::Int){std::int64_t v=0;if(!exact_i64(assigned,v)){error="assignment to atomic<int> requires signed 64-bit integer";return false;}ai->second->int_value.store(v);}else{if(!assigned.is_bool()){error="assignment to atomic<bool> requires bool";return false;}ai->second->bool_value.store(assigned.boolean);}out=assigned;if(depth==0)last_expression_mutation_=true;return true;}
+            const int assigned_type = nift_binding_type_from_text(text.substr(p + 1), assigned);
+            if (!nift_type_assignable(assigned_type, binding->type)) {
+                error = "cannot assign " + std::string(nift_binding_type_name(assigned_type)) +
+                        " to " + nift_binding_type_name(binding->type) + " binding '" + name + "'";
+                return false;
+            }
+            auto rebound = std::make_shared<nift::RuntimeValue>(std::move(assigned));
+            binding->rebind(rebound);
+            if (depth == 0) last_expression_mutation_ = true;
+            out = *rebound;
+            return true;
+        };
+        // Only a canonical plain assignment with a certified pure string RHS
+        // skips dispatch scans. Binding validation/evaluation/mutation use the
+        // very same body as the compatibility branch below.
+        if(text.size()>8192&&text.size()<=131072){
+            std::size_t end=0;while(end<text.size()&&(std::isalnum((unsigned char)text[end])||text[end]=='_'))++end;
+            auto at=end;while(at<text.size()&&std::isspace((unsigned char)text[at]))++at;
+            if(end&&at+1<text.size()&&text[at]=='='&&text[at+1]!='='&&text[at+1]!='>'){
+                const std::string name=text.substr(0,end);
+                if(valid_binding_identifier(name)&&large_plan(text.substr(at+1)))return assign_plain_canonical(name,at);
+            }
+        }
         auto structural_equal = [&](const nift::RuntimeValue& a, const nift::RuntimeValue& b) -> bool {
             std::function<bool(const nift::RuntimeValue&,const nift::RuntimeValue&)> eq;
             eq = [&](const nift::RuntimeValue& x,const nift::RuntimeValue& y)->bool {
@@ -2534,17 +2632,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                             std::string r=str;for(char& c:r)c=(char)(method=="to_lower"?std::tolower((unsigned char)c):std::toupper((unsigned char)c));out=nift::RuntimeValue(r);return true;
                         }
                         if(method=="replace"){
-                            if(args.size()!=2){error="replace: expected old and replacement strings";return false;}nift::RuntimeValue a,b;if(!eval_arg(0,a)||!eval_arg(1,b)||!a.is_string()||!b.is_string()){error="replace: arguments must be strings";return false;}if(a.string.empty()){error="replace: old string must not be empty";return false;}std::string r;
-                            r.reserve(str.size());
-                            std::size_t begin=0, pos=str.find(a.string);
-                            while(pos!=std::string::npos){
-                                r.append(str,begin,pos-begin);
-                                r.append(b.string);
-                                begin=pos+a.string.size();
-                                pos=str.find(a.string,begin);
-                            }
-                            r.append(str,begin,std::string::npos);
-                            out=nift::RuntimeValue(std::move(r));return true;
+                            if(args.size()!=2){error="replace: expected old and replacement strings";return false;}nift::RuntimeValue a,b;if(!eval_arg(0,a)||!eval_arg(1,b)||!a.is_string()||!b.is_string()){error="replace: arguments must be strings";return false;}if(a.string.empty()){error="replace: old string must not be empty";return false;}out=nift::RuntimeValue(nift::detail::replace_string_linear(str,a.string,b.string));return true;
                         }
                         if(method=="to_int"){
                             if(!no_args())return false;
@@ -3730,47 +3818,8 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 if (depth == 0) last_expression_mutation_ = true;
                 return true;
             }
-            if (!valid_binding_identifier(name)) { error = "assignment requires an identifier before '='"; return false; }
-            VariableBinding* binding = nullptr;
-            for (auto scope = variable_scopes_.rbegin(); scope != variable_scopes_.rend(); ++scope) {
-                const auto it = scope->find(name);
-                if (it != scope->end()) { binding = &it->second; break; }
-            }
-            if (!binding && !receiver_stack_.empty()) {
-                auto rec = receiver_stack_.back()->fields.find(name);
-                if (rec != receiver_stack_.back()->fields.end()) {
-                    nift::RuntimeValue assigned;
-                    if (!eval(text.substr(p + 1), assigned, depth + 1)) return false;
-                    const int assigned_type = nift_binding_type_from_text(text.substr(p + 1), assigned);
-                    if (!nift_type_assignable(assigned_type, rec->second.type)) {
-                        error = "cannot assign " + std::string(nift_binding_type_name(assigned_type)) +
-                                " to " + nift_binding_type_name(rec->second.type) + " struct field '" + name + "'";
-                        return false;
-                    }
-                    if (assigned.is_string()&&(assigned.string.rfind("\x1fnift:struct:",0)==0||assigned.string.rfind("\x1fnift:collection:",0)==0)){std::string recv_id;for(const auto& e:struct_instances_)if(e.second==receiver_stack_.back()){recv_id=e.first;break;}if(reference_would_cycle(assigned.string,std::string("\x1fnift:struct:")+recv_id)){error="assignment would create a cyclic reference: "+name;return false;}}
-                    auto rebound = std::make_shared<nift::RuntimeValue>(std::move(assigned));
-                    rec->second.value = rebound;
-                    if (depth == 0) last_expression_mutation_ = true;
-                    out = *rebound;
-                    return true;
-                }
-            }
-            if (!binding) { error = "assignment to undefined binding: " + name; return false; }
-            if (!binding->mutable_binding) { error = "cannot assign to const binding: " + name; return false; }
-            nift::RuntimeValue assigned;
-            if (!eval(text.substr(p + 1), assigned, depth + 1)) return false;
-            if(binding->value&&binding->value->is_string()&&binding->value->string.rfind("\x1fnift:atomic:",0)==0&&!(assigned.is_string()&&assigned.string.rfind("\x1fnift:atomic:",0)==0)){auto ai=atomic_instances_.find(binding->value->string.substr(13));if(ai==atomic_instances_.end()){error="atomic: invalid handle";return false;}if(ai->second->kind==AtomicInstance::Kind::Int){std::int64_t v=0;if(!exact_i64(assigned,v)){error="assignment to atomic<int> requires signed 64-bit integer";return false;}ai->second->int_value.store(v);}else{if(!assigned.is_bool()){error="assignment to atomic<bool> requires bool";return false;}ai->second->bool_value.store(assigned.boolean);}out=assigned;if(depth==0)last_expression_mutation_=true;return true;}
-            const int assigned_type = nift_binding_type_from_text(text.substr(p + 1), assigned);
-            if (!nift_type_assignable(assigned_type, binding->type)) {
-                error = "cannot assign " + std::string(nift_binding_type_name(assigned_type)) +
-                        " to " + nift_binding_type_name(binding->type) + " binding '" + name + "'";
-                return false;
-            }
-            auto rebound = std::make_shared<nift::RuntimeValue>(std::move(assigned));
-            binding->rebind(rebound);
-            if (depth == 0) last_expression_mutation_ = true;
-            out = *rebound;
-            return true;
+            return assign_plain_canonical(name,p);
+
         }
 
         // Split at every top-level occurrence of a binary operator string so a

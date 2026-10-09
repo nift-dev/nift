@@ -1,0 +1,12 @@
+==9== Callgrind, a call-graph generating cache profiler
+==9== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==9== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==9== Command: /home/nick/Repositories/nift/nift/.build/cp410-implementation/filesystem/nift -
+==9== Parent PID: 4
+==9== 
+==9== For interactive control, run 'callgrind_control -h'.
+==9== 
+==9== Events    : Ir
+==9== Collected : 2977902327
+==9== 
+==9== I   refs:      2,977,902,327
