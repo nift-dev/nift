@@ -23,7 +23,7 @@ with tempfile.TemporaryDirectory() as d:
  for pattern,expected in cases:
   code='print(ls('+json.dumps(pattern,ensure_ascii=False)+').stringify())'
   p=subprocess.run([binary,'-'],input=code,cwd=root,text=True,encoding='utf-8',capture_output=True)
-  assert p.returncode==0,p.stderr
+  assert p.returncode==0,(pattern,code,p.returncode,p.stderr)
   assert json.loads(p.stdout)==expected,(pattern,p.stdout,expected)
   if baseline:
    q=subprocess.run([str(Path(baseline).resolve()),'-'],input=code,cwd=root,text=True,encoding='utf-8',capture_output=True)
