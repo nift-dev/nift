@@ -1,0 +1,9 @@
+{
+  "failed_commit": "391dac5daf0eb488242ba06b8182b59bc0db8c0d",
+  "run": 37883963014,
+  "cause": "MSYS subprocess Unicode argv converted to Windows native code page before Nift -e parsing; output contained byte e9 instead of UTF-8",
+  "fix": "Transport exact UTF-8 source through stdin, retain exact exit/stdout/error text/line/column checks; normalize only deliberate stdin origin to existing command-line fixture origin",
+  "local_cases": 15,
+  "skips": 0,
+  "runtime_change": false
+}

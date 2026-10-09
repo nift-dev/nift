@@ -1,0 +1,32 @@
+windows behavioural corpus	v4.9 contracts on Windows	﻿2026-10-09T04:34:24.8233139Z ##[group]Run make test-v410-native-dispatch-parity test-v410-glob-parity test-v410-glob-relative-guard test-v49-selector-parity test-v49-glob-order test-v49-glob-key-guard test-v49-json-preflight-guard test-runtime-value test-v48-callback-parity test-v48-callback-guard test-v410-sort-factory-parity test-v410-object-member-parity test-v410-object-member-unit test-v410-object-member-guard
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:24.8235494Z [36;1mmake test-v410-native-dispatch-parity test-v410-glob-parity test-v410-glob-relative-guard test-v49-selector-parity test-v49-glob-order test-v49-glob-key-guard test-v49-json-preflight-guard test-runtime-value test-v48-callback-parity test-v48-callback-guard test-v410-sort-factory-parity test-v410-object-member-parity test-v410-object-member-unit test-v410-object-member-guard[0m
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:24.8238999Z shell: D:\a\_temp\setup-msys2\msys2.CMD {0}
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:24.8239288Z env:
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:24.8239563Z   pythonLocation: C:\hostedtoolcache\windows\Python\3.13.15\x64
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:24.8240084Z   PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.13.15\x64/lib/pkgconfig
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:24.8240489Z   Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.13.15\x64
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:24.8240888Z   Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.13.15\x64
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:24.8241249Z   Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.13.15\x64
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:24.8241560Z   MSYSTEM: UCRT64
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:24.8241777Z ##[endgroup]
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:25.8353232Z CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-w64-mingw32-cc"
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:26.5093469Z NIFT="/d/a/nift/nift/nift.exe" python3 tests/v410_native_dispatch_parity.py
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:26.8025897Z Traceback (most recent call last):
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:26.8031682Z   File "/d/a/nift/nift/tests/v410_native_dispatch_parity.py", line 9, in <module>
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:26.8032307Z     p=subprocess.run([binary,'-e',case['source']],cwd=d,text=True,encoding='utf-8',capture_output=True)
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:26.8032808Z       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:26.8033228Z   File "/usr/lib/python3.12/subprocess.py", line 550, in run
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:26.8034118Z     stdout, stderr = process.communicate(input, timeout=timeout)
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:26.8034849Z                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:26.8035305Z   File "/usr/lib/python3.12/subprocess.py", line 1209, in communicate
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:26.8041389Z     stdout, stderr = self._communicate(input, endtime, timeout)
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:26.8042327Z                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:26.8042829Z   File "/usr/lib/python3.12/subprocess.py", line 2153, in _communicate
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:26.8050706Z     stdout = self._translate_newlines(stdout,
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:26.8051092Z              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:26.8051472Z   File "/usr/lib/python3.12/subprocess.py", line 1086, in _translate_newlines
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:26.8056794Z     data = data.decode(encoding, errors)
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:26.8057357Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:26.8058069Z UnicodeDecodeError: 'utf-8' codec can't decode byte 0xe9 in position 0: invalid continuation byte
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:26.8185524Z make: *** [Makefile:1885: test-v410-native-dispatch-parity] Error 1
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T04:34:26.8243420Z ##[error]Process completed with exit code 2.
