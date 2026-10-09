@@ -125,10 +125,13 @@ thread_local std::unordered_map<std::string, std::shared_ptr<const NumericLambda
 #ifdef NIFT_TEST_LAMBDA_CACHE_STATS
 struct LambdaCacheStats {
     std::atomic<unsigned long long> syntax{0}, numeric{0}, instances{0}, prepared{0}, legacy{0};
+    std::atomic<unsigned long long> overlay_hits{0}, capture_hits{0}, hydrations{0}, misses{0}, fallbacks{0};
     ~LambdaCacheStats() {
         if (std::getenv("NIFT_TEST_LAMBDA_CACHE_STATS"))
             std::fprintf(stderr, "lambda-cache syntax=%llu numeric=%llu instances=%llu prepared=%llu legacy=%llu\n",
                          syntax.load(), numeric.load(), instances.load(), prepared.load(), legacy.load());
+        if (std::getenv("NIFT_TEST_LAMBDA_CACHE_STATS"))
+            std::fprintf(stderr, "callback-overlay overlay_hits=%llu capture_hits=%llu hydrations=%llu misses=%llu fallbacks=%llu\n", overlay_hits.load(), capture_hits.load(), hydrations.load(), misses.load(), fallbacks.load());
     }
 } lambda_cache_stats;
 #define NIFT_LAMBDA_COUNT(field) (++lambda_cache_stats.field)
@@ -1283,8 +1286,44 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
         // Execute only pure numeric expression plans. The existing leaf evaluator
         // and numeric operator remain the semantic oracle. Non-numeric bindings,
         // calls, locations, blocks and other shapes retain compatibility dispatch.
-        auto eval_expression_lambda = [&](const std::string& body, nift::RuntimeValue& result, int body_depth, const nift::detail::SourceView& body_view) {
-            auto legacy = [&] { NIFT_LAMBDA_COUNT(legacy); return eval(nift::detail::SourceText(body,body_view), result, body_depth); };
+        auto eval_expression_lambda = [&](const std::string& body, nift::RuntimeValue& result, int body_depth, const nift::detail::SourceView& body_view,
+                                          const std::unordered_map<std::string, VariableBinding>* captures = nullptr) {
+            // Collection callbacks alone use a descriptor environment. Ordinary
+            // calls retain their existing map frames. The registered instance
+            // owns captures throughout this synchronous invocation.
+            const std::size_t frame = variable_scopes_.size() - 1;
+            auto materialize = [&] {
+                if (!captures) return;
+                for (const auto& binding : *captures)
+                    variable_scopes_[frame].try_emplace(binding.first, binding.second);
+                captures = nullptr;
+            };
+            auto legacy = [&] { materialize(); NIFT_LAMBDA_COUNT(legacy); return eval(nift::detail::SourceText(body,body_view), result, body_depth); };
+            auto lookup = [&](const std::string& name) -> VariableBinding* {
+                if (captures) {
+                    auto& overlay = variable_scopes_[frame];
+                    auto local = overlay.find(name);
+                    if (local != overlay.end()) {
+                        NIFT_LAMBDA_COUNT(overlay_hits);
+                        return &local->second;
+                    }
+                    auto captured = captures->find(name);
+                    if (captured != captures->end()) {
+                        NIFT_LAMBDA_COUNT(capture_hits);
+                        NIFT_LAMBDA_COUNT(hydrations);
+                        // sync/rebind must operate on a private descriptor, never
+                        // on the registered immutable capture environment.
+                        return &overlay.emplace(name, captured->second).first->second;
+                    }
+                    NIFT_LAMBDA_COUNT(misses);
+                    NIFT_LAMBDA_COUNT(fallbacks);
+                }
+                for (auto scope = variable_scopes_.rbegin(); scope != variable_scopes_.rend(); ++scope) {
+                    auto found = scope->find(name);
+                    if (found != scope->end()) return &found->second;
+                }
+                return nullptr;
+            };
             if (valid_binding_identifier(body) && body_depth <= 96) {
                 // A pure numeric binding uses the same live scope slot as the
                 // compatibility resolver. Keep named-callable precedence and
@@ -1292,12 +1331,10 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
                 if (callables_.count(body) ||
                     (active_module_env_ && active_module_env_->callables.count(body)))
                     return legacy();
-                for (auto scope = variable_scopes_.rbegin(); scope != variable_scopes_.rend(); ++scope) {
-                    auto found = scope->find(body);
-                    if (found == scope->end()) continue;
-                    found->second.sync();
-                    if (!found->second.value || !found->second.value->is_number()) return legacy();
-                    result = *found->second.value;
+                if (auto* found = lookup(body)) {
+                    found->sync();
+                    if (!found->value || !found->value->is_number()) return legacy();
+                    result = *found->value;
                     NIFT_LAMBDA_COUNT(prepared);
                     return true;
                 }
@@ -1308,13 +1345,10 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
             auto live_slot = [&](const std::string& name) -> VariableBinding* {
                 if (callables_.count(name) ||
                     (active_module_env_ && active_module_env_->callables.count(name))) return nullptr;
-                for (auto scope = variable_scopes_.rbegin(); scope != variable_scopes_.rend(); ++scope) {
-                    auto found = scope->find(name);
-                    if (found == scope->end()) continue;
-                    found->second.sync();
-                    return found->second.value ? &found->second : nullptr;
-                }
-                return nullptr;
+                auto* found = lookup(name);
+                if (!found) return nullptr;
+                found->sync();
+                return found->value ? found : nullptr;
             };
             if (plan->expression->kind == nift::ast::Kind::Index) {
                 // Syntax is cached, but both slots are synchronized on every
@@ -1343,7 +1377,12 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
                 using K = nift::ast::Kind;
                 if (expr.kind == K::Literal) { value = expr.literal; return true; }
                 if (expr.kind == K::Binding) {
-                    if (!eval(nift::detail::SourceText(expr.name,body_view.slice(expr.span.begin,expr.span.end-expr.span.begin)), value, body_depth + 1)) return false;
+                    auto* binding = captures ? live_slot(expr.name) : nullptr;
+                    if (binding && binding->value->is_number()) value = *binding->value;
+                    else {
+                        materialize();
+                        if (!eval(nift::detail::SourceText(expr.name,body_view.slice(expr.span.begin,expr.span.end-expr.span.begin)), value, body_depth + 1)) return false;
+                    }
                     if (!value.is_number()) { unsupported = true; return false; }
                     return true;
                 }
@@ -1504,7 +1543,7 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
             auto inherited_asyncs=async_instances_;auto state=std::make_shared<AsyncInstance>();static std::atomic<std::uint64_t> async_ids{1};const std::string id=std::to_string(async_ids.fetch_add(1));async_instances_[id]=state;owned_async_instances_.push_back(state);
             WorkerCloneMemo clone_memo;std::unordered_map<std::string,VariableBinding> vars;for(const auto& scope:variable_scopes_)for(const auto&kv:scope)if(kv.second.value&&transferable(*kv.second.value))vars[kv.first]=clone_worker_binding(kv.second,clone_memo);
                 std::unordered_map<std::string,Callable> funcs;std::unordered_map<std::uint64_t,std::shared_ptr<ModuleEnv>> modules;clone_worker_module_graph(funcs,modules,clone_memo);const auto next_module_identity=next_module_identity_;const auto resource_authority=resource_path_authority_;auto threads=thread_instances_;auto mutexes=mutex_instances_;auto atomics=atomic_instances_;auto asyncs=std::move(inherited_asyncs);
-            std::unordered_map<std::string,std::shared_ptr<LambdaInstance>> lambdas;for(const auto&kv:lambda_instances_){auto li=std::make_shared<LambdaInstance>(*kv.second);li->captures.clear();for(const auto&cv:kv.second->captures)if(cv.second.value&&transferable(*cv.second.value))li->captures[cv.first]=clone_worker_binding(cv.second,clone_memo);if(li->module_env){auto owner=modules.find(li->module_env->identity);li->module_env=owner==modules.end()?std::shared_ptr<ModuleEnv>{}:owner->second;}lambdas[kv.first]=std::move(li);}
+            std::unordered_map<std::string,std::shared_ptr<LambdaInstance>> lambdas;for(const auto&kv:lambda_instances_){auto li=std::make_shared<LambdaInstance>(*kv.second);std::unordered_map<std::string,VariableBinding> captures;for(const auto&cv:*kv.second->captures)if(cv.second.value&&transferable(*cv.second.value))captures[cv.first]=clone_worker_binding(cv.second,clone_memo);li->captures=std::make_shared<const std::unordered_map<std::string,VariableBinding>>(std::move(captures));if(li->module_env){auto owner=modules.find(li->module_env->identity);li->module_env=owner==modules.end()?std::shared_ptr<ModuleEnv>{}:owner->second;}lambdas[kv.first]=std::move(li);}
             const std::string callable_tag=cb.string;
             if(callable_tag.rfind("\x1fnift:callable:lambda:",0)==0){auto it=lambdas.find(callable_tag.substr(22));if(it!=lambdas.end())it->second->async=false;}
             RenderHost* hp=&host_;TrackedInfo* tp=&tracked_info_;
@@ -1559,9 +1598,10 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
                 li->source_provenance=(active_module_env_?active_module_env_->source_provenance:(loading_module_env_?loading_module_env_->source_provenance:(source_context_stack_.empty()?SourceProvenance::InMemory:source_context_stack_.back().provenance)));
                 // Copy the canonical binding/slot directly; indexed assignment would
                 // allocate a default slot only to discard it immediately.
-                for(const auto& scope:variable_scopes_) copy_capture_bindings(li->captures,scope);
+                li->captures = snapshot_callback_captures();
                 li->module_env=active_module_env_ ? active_module_env_ : loading_module_env_;
                 const std::string id=std::to_string(next_lambda_instance_id_++); lambda_instances_[id]=li;
+                last_capture_snapshot_ = li->captures;
                 out=nift::RuntimeValue(std::string("\x1fnift:callable:lambda:")+id);
                 return true;
             };
@@ -1716,7 +1756,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 for(const auto& scope:variable_scopes_)for(const auto&kv:scope)if(kv.second.value&&transferable(*kv.second.value))vars[kv.first]=clone_worker_binding(kv.second,clone_memo);
                 std::unordered_map<std::string,Callable> funcs;std::unordered_map<std::uint64_t,std::shared_ptr<ModuleEnv>> modules;clone_worker_module_graph(funcs,modules,clone_memo);const auto next_module_identity=next_module_identity_;const auto resource_authority=resource_path_authority_;auto threads=thread_instances_;auto mutexes=mutex_instances_;auto atomics=atomic_instances_;auto asyncs=async_instances_;
                 std::unordered_map<std::string,std::shared_ptr<LambdaInstance>> lambdas;
-                for(const auto&kv:lambda_instances_){auto li=std::make_shared<LambdaInstance>(*kv.second);li->captures.clear();for(const auto&cv:kv.second->captures)if(cv.second.value&&transferable(*cv.second.value))li->captures[cv.first]=clone_worker_binding(cv.second,clone_memo);if(li->module_env){auto owner=modules.find(li->module_env->identity);li->module_env=owner==modules.end()?std::shared_ptr<ModuleEnv>{}:owner->second;}lambdas[kv.first]=std::move(li);}
+                for(const auto&kv:lambda_instances_){auto li=std::make_shared<LambdaInstance>(*kv.second);std::unordered_map<std::string,VariableBinding> captures;for(const auto&cv:*kv.second->captures)if(cv.second.value&&transferable(*cv.second.value))captures[cv.first]=clone_worker_binding(cv.second,clone_memo);li->captures=std::make_shared<const std::unordered_map<std::string,VariableBinding>>(std::move(captures));if(li->module_env){auto owner=modules.find(li->module_env->identity);li->module_env=owner==modules.end()?std::shared_ptr<ModuleEnv>{}:owner->second;}lambdas[kv.first]=std::move(li);}
                 RenderHost* hp=&host_;TrackedInfo* tp=&tracked_info_;const std::string callable_tag=cb.string;
                 auto execution_output=execution_output_;
                 nift::detail::DiagnosticOrigin worker_origin;if(callable_tag.rfind("\x1fnift:callable:named:",0)==0){auto definition=funcs.find(callable_tag.substr(21));if(definition!=funcs.end())worker_origin.source=definition->second.source_path;}else if(callable_tag.rfind("\x1fnift:callable:lambda:",0)==0){auto definition=lambdas.find(callable_tag.substr(22));if(definition!=lambdas.end())worker_origin.source=definition->second->source_path;}if(worker_origin.source.empty())worker_origin.source=source_context_stack_.empty()?std::filesystem::path("<thread-worker>"):source_context_stack_.back().path();worker_origin.line=1;worker_origin.column=1;
@@ -2413,13 +2453,13 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                                 if(callable_call_depth_>=kMaxCallableDepth){error="callable recursion depth exceeded";return false;}++callable_call_depth_;
                                 if(fn->variadic_param.empty()?av.size()!=fn->params.size():av.size()<fn->params.size()){--callable_call_depth_;error="callback argument count mismatch";return false;}
                                 auto lexical_env=enter_lexical_environment(fn->module_env);
-                                push_variable_scope();auto& sc=variable_scopes_.back();copy_capture_bindings(sc,fn->captures);
-                                for(std::size_t ai=0;ai<fn->params.size();++ai){auto sp=std::make_shared<nift::RuntimeValue>(av[ai]);sc[fn->params[ai]]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
-                                if(!fn->variadic_param.empty()){nift::RuntimeValue rest=nift::RuntimeValue::make_array();for(std::size_t ai=fn->params.size();ai<av.size();++ai)rest.array.push_back(av[ai]);auto sp=std::make_shared<nift::RuntimeValue>(std::move(rest));sc[fn->variadic_param]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
+                                push_variable_scope();auto& sc=variable_scopes_.back();if(fn->block)copy_capture_bindings(sc,*fn->captures);
+                                for(std::size_t ai=0;ai<fn->params.size();++ai){auto sp=std::make_shared<nift::RuntimeValue>(av[ai]);sc.insert_or_assign(fn->params[ai],VariableBinding{sp,nift_binding_type(*sp),true,false});}
+                                if(!fn->variadic_param.empty()){nift::RuntimeValue rest=nift::RuntimeValue::make_array();for(std::size_t ai=fn->params.size();ai<av.size();++ai)rest.array.push_back(av[ai]);auto sp=std::make_shared<nift::RuntimeValue>(std::move(rest));sc.insert_or_assign(fn->variadic_param,VariableBinding{sp,nift_binding_type(*sp),true,false});}
                                 bool okcall=true;
                                 source_context_stack_.push_back(SourceContext{fn->source_path,fn->source_provenance,fn->body_view});
                                 if(fn->block){std::string bt=trim_copy(fn->body);const bool rendered=!bt.empty()&&bt.front()=='<';if(rendered){auto nested=parse(fn->body,fn->source_path,1,fn->source_provenance,fn->body_view);if(!nested.ok){error=nested.error.message;if(nested.diagnostic)active_diagnostic_=nested.diagnostic;okcall=false;}else result=nift::RuntimeValue(nested.output);}else{okcall=eval(nift::detail::SourceText(fn->body,fn->body_view),result,depth+1);if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0)error="lambda body error: "+error;}}
-                                else{okcall=eval_expression_lambda(fn->body,result,depth+1,fn->body_view);if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0)error="lambda body error: "+error;}
+                                else{okcall=eval_expression_lambda(fn->body,result,depth+1,fn->body_view,fn->captures.get());if(!okcall&&error.rfind("callable recursion depth exceeded",0)!=0)error="lambda body error: "+error;}
                                 source_context_stack_.pop_back();
                                 pop_variable_scope();leave_lexical_environment(std::move(lexical_env));--callable_call_depth_;if(!okcall)append_diagnostic_frame(nift::detail::DiagnosticFrameKind::Callback,"collection callback");return okcall;
                             }
@@ -2840,7 +2880,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                             if(fn->async){for(std::size_t ai=0;ai<ar.size();++ai){const std::string an=trim_copy(ar[ai]);if(valid_binding_identifier(an)){if(auto* ab=find_binding(an)){ab->sync();if(ab->value&&ab->value->is_string()&&ab->value->string.rfind("\x1fnift:atomic:",0)==0)av[ai]=*ab->value;}}}--callable_call_depth_;return spawn_future(*cb->value,av,out);}
                             std::vector<VariableBinding> parameter_bindings;parameter_bindings.reserve(fn->params.size());for(size_t ai=0;ai<fn->params.size();++ai)parameter_bindings.push_back(bind_call_param(ar[ai],ai<aq.size()&&aq[ai],av[ai]));
                             auto lexical_env=enter_lexical_environment(fn->module_env);
-                            push_variable_scope();auto& sc=variable_scopes_.back();copy_capture_bindings(sc,fn->captures);for(size_t ai=0;ai<fn->params.size();++ai)sc[fn->params[ai]]=std::move(parameter_bindings[ai]);if(!fn->variadic_param.empty()){nift::RuntimeValue rest=nift::RuntimeValue::make_array();for(size_t ai=fn->params.size();ai<av.size();++ai)rest.array.push_back(std::move(av[ai]));auto sp=std::make_shared<nift::RuntimeValue>(std::move(rest));sc[fn->variadic_param]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
+                            push_variable_scope();auto& sc=variable_scopes_.back();copy_capture_bindings(sc,*fn->captures);for(size_t ai=0;ai<fn->params.size();++ai)sc[fn->params[ai]]=std::move(parameter_bindings[ai]);if(!fn->variadic_param.empty()){nift::RuntimeValue rest=nift::RuntimeValue::make_array();for(size_t ai=fn->params.size();ai<av.size();++ai)rest.array.push_back(std::move(av[ai]));auto sp=std::make_shared<nift::RuntimeValue>(std::move(rest));sc[fn->variadic_param]=VariableBinding{sp,nift_binding_type(*sp),true,false};}
                             bool okcall=true;
                             source_context_stack_.push_back(SourceContext{fn->source_path,fn->source_provenance,fn->body_view});
                             if(fn->block){std::string bt=trim_copy(fn->body);const bool rendered=!bt.empty()&&bt.front()=='<';if(rendered){auto nested=parse(fn->body,fn->source_path,1,fn->source_provenance,fn->body_view);if(!nested.ok){error=nested.error.message;if(nested.diagnostic)active_diagnostic_=nested.diagnostic;okcall=false;}else out=nift::RuntimeValue(nested.output);}else{++function_call_depth_;auto nested=execute_native_program(fn->body,fn->source_path,1,fn->source_provenance,true,fn->body_view);--function_call_depth_;if(!nested.ok){error=nested.error.message;if(nested.diagnostic)active_diagnostic_=nested.diagnostic;okcall=false;}else if(pending_control_.kind==ControlFlow::Return){consume_return(out);}else out=nift::RuntimeValue(nullptr);}}

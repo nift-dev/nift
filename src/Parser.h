@@ -269,11 +269,14 @@ private:
         bool async = false;
         std::filesystem::path source_path;
         SourceProvenance source_provenance = SourceProvenance::FileBacked;
-        std::unordered_map<std::string, VariableBinding> captures;
+        // Published descriptors are immutable; invocation frames hydrate copies.
+        std::shared_ptr<const std::unordered_map<std::string, VariableBinding>> captures;
         std::shared_ptr<ModuleEnv> module_env;
         nift::detail::SourceView body_view{};
     };
     std::unordered_map<std::string, std::shared_ptr<LambdaInstance>> lambda_instances_;
+    std::weak_ptr<const std::unordered_map<std::string, VariableBinding>> last_capture_snapshot_;
+    std::shared_ptr<const std::unordered_map<std::string, VariableBinding>> snapshot_callback_captures();
     std::uint64_t next_lambda_instance_id_ = 1;
     std::uint64_t next_runtime_temporary_id_ = 1;
     struct ThreadInstance {

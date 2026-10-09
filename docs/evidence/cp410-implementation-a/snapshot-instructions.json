@@ -1,0 +1,22 @@
+[
+  {
+    "width": 0,
+    "kind": "identity",
+    "instructions": 369259842
+  },
+  {
+    "width": 0,
+    "kind": "captured",
+    "instructions": 411081872
+  },
+  {
+    "width": 100,
+    "kind": "identity",
+    "instructions": 717796746
+  },
+  {
+    "width": 100,
+    "kind": "captured",
+    "instructions": 762760998
+  }
+]

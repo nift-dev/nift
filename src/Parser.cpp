@@ -277,7 +277,7 @@ bool Parser::contains_timer_resource(const nift::RuntimeValue& root) const {
             if (!seen_lambdas.insert(id).second) return false;
             auto found = lambda_instances_.find(id);
             if (found == lambda_instances_.end()) return false;
-            for (const auto& capture : found->second->captures)
+            for (const auto& capture : *found->second->captures)
                 if (binding_contains(capture.second)) return true;
             return module_contains(found->second->module_env);
         } else if (value.string.rfind("\x1fnift:callable:named:", 0) == 0) {
@@ -659,7 +659,7 @@ void Parser::finish_timer_operation(std::uint64_t checkpoint) {
             if (!seen_lambdas.insert(id).second) return;
             auto found = lambda_instances_.find(id);
             if (found == lambda_instances_.end()) return;
-            for (const auto& capture : found->second->captures) mark_binding(capture.second);
+            for (const auto& capture : *found->second->captures) mark_binding(capture.second);
             mark_module(found->second->module_env);
         }
     };
@@ -724,6 +724,45 @@ void Parser::copy_capture_bindings(
     // Keep this insertion machinery outside the expression dispatch body.
     for (const auto& binding : source)
         destination.insert_or_assign(binding.first, binding.second);
+}
+
+std::shared_ptr<const std::unordered_map<std::string, Parser::VariableBinding>>
+Parser::snapshot_callback_captures() {
+    using Map = std::unordered_map<std::string, VariableBinding>;
+    auto previous = last_capture_snapshot_.lock();
+    if (previous) {
+        auto same_owner = [](const auto& a, const auto& b) {
+            return a.get() == b.get() && !a.owner_before(b) && !b.owner_before(a);
+        };
+        auto same_binding = [&](const VariableBinding& a, const VariableBinding& b) {
+            return same_owner(a.value, b.value) && same_owner(a.slot, b.slot) &&
+                   same_owner(a.ref_root_slot, b.ref_root_slot) &&
+                   a.type == b.type && a.mutable_binding == b.mutable_binding &&
+                   a.deep_readonly == b.deep_readonly &&
+                   a.is_script_invocation == b.is_script_invocation &&
+                   a.ref_valid == b.ref_valid && a.ref_path == b.ref_path;
+        };
+        std::size_t resolved = 0;
+        bool equal = true;
+        for (std::size_t i = 0; equal && i < variable_scopes_.size(); ++i) {
+            for (const auto& binding : variable_scopes_[i]) {
+                bool shadowed = false;
+                for (std::size_t j = i + 1; j < variable_scopes_.size(); ++j)
+                    if (variable_scopes_[j].count(binding.first)) { shadowed = true; break; }
+                if (shadowed) continue;
+                ++resolved;
+                auto found = previous->find(binding.first);
+                if (found == previous->end() || !same_binding(binding.second, found->second)) {
+                    equal = false;
+                    break;
+                }
+            }
+        }
+        if (equal && resolved == previous->size()) return previous;
+    }
+    Map descriptors;
+    for (const auto& scope : variable_scopes_) copy_capture_bindings(descriptors, scope);
+    return std::make_shared<const Map>(std::move(descriptors));
 }
 
 void Parser::finalize_execution_workers() {

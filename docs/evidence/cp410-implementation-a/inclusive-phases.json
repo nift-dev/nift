@@ -1,0 +1,62 @@
+[
+  {
+    "label": "baseline",
+    "width": 0,
+    "instructions": 56969592,
+    "function": "Parser::copy_capture_bindings(std::unordered_map<std::__cxx11::basic_string<char, std::char_traits<c"
+  },
+  {
+    "label": "baseline",
+    "width": 0,
+    "instructions": 45890962,
+    "function": "Parser::~Parser() [/home/nick/Repositories/nift/nift/.build/cp410-implementation/baseline-nift]"
+  },
+  {
+    "label": "baseline",
+    "width": 100,
+    "instructions": 1875532607,
+    "function": "Parser::copy_capture_bindings(std::unordered_map<std::__cxx11::basic_string<char, std::char_traits<c"
+  },
+  {
+    "label": "baseline",
+    "width": 100,
+    "instructions": 418974639,
+    "function": "Parser::~Parser() [/home/nick/Repositories/nift/nift/.build/cp410-implementation/baseline-nift]"
+  },
+  {
+    "label": "snapshot",
+    "width": 0,
+    "instructions": 27862095,
+    "function": "Parser::~Parser() [/home/nick/Repositories/nift/nift/nift]"
+  },
+  {
+    "label": "snapshot",
+    "width": 0,
+    "instructions": 9153816,
+    "function": "Parser::snapshot_callback_captures[abi:cxx11]() [/home/nick/Repositories/nift/nift/nift]"
+  },
+  {
+    "label": "snapshot",
+    "width": 0,
+    "instructions": 2088,
+    "function": "Parser::copy_capture_bindings(std::unordered_map<std::__cxx11::basic_string<char, std::char_traits<c"
+  },
+  {
+    "label": "snapshot",
+    "width": 100,
+    "instructions": 345974852,
+    "function": "Parser::snapshot_callback_captures[abi:cxx11]() [/home/nick/Repositories/nift/nift/nift]"
+  },
+  {
+    "label": "snapshot",
+    "width": 100,
+    "instructions": 27950361,
+    "function": "Parser::~Parser() [/home/nick/Repositories/nift/nift/nift]"
+  },
+  {
+    "label": "snapshot",
+    "width": 100,
+    "instructions": 60173,
+    "function": "Parser::copy_capture_bindings(std::unordered_map<std::__cxx11::basic_string<char, std::char_traits<c"
+  }
+]

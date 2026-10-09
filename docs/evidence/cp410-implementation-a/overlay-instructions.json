@@ -1,0 +1,50 @@
+[
+  {
+    "width": 0,
+    "kind": "identity",
+    "label": "baseline",
+    "instructions": 442821117
+  },
+  {
+    "width": 0,
+    "kind": "identity",
+    "label": "overlay",
+    "instructions": 413420197
+  },
+  {
+    "width": 0,
+    "kind": "captured",
+    "label": "baseline",
+    "instructions": 532355510
+  },
+  {
+    "width": 0,
+    "kind": "captured",
+    "label": "overlay",
+    "instructions": 464708832
+  },
+  {
+    "width": 100,
+    "kind": "identity",
+    "label": "baseline",
+    "instructions": 3008310286
+  },
+  {
+    "width": 100,
+    "kind": "identity",
+    "label": "overlay",
+    "instructions": 1724385372
+  },
+  {
+    "width": 100,
+    "kind": "captured",
+    "label": "baseline",
+    "instructions": 3096076914
+  },
+  {
+    "width": 100,
+    "kind": "captured",
+    "label": "overlay",
+    "instructions": 1766535530
+  }
+]

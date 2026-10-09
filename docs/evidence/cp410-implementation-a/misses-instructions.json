@@ -1,0 +1,104 @@
+[
+  {
+    "repetitions": 1,
+    "label": "baseline",
+    "instructions": 13109126
+  },
+  {
+    "repetitions": 1,
+    "label": "snapshot",
+    "instructions": 12255429,
+    "counters": {
+      "overlay_hits": 0,
+      "capture_hits": 0,
+      "hydrations": 0,
+      "misses": 1000,
+      "fallbacks": 1000
+    }
+  },
+  {
+    "repetitions": 8,
+    "label": "baseline",
+    "instructions": 34139381
+  },
+  {
+    "repetitions": 8,
+    "label": "snapshot",
+    "instructions": 25023991,
+    "counters": {
+      "overlay_hits": 0,
+      "capture_hits": 0,
+      "hydrations": 0,
+      "misses": 8000,
+      "fallbacks": 8000
+    }
+  },
+  {
+    "repetitions": 32,
+    "label": "baseline",
+    "instructions": 101042895
+  },
+  {
+    "repetitions": 32,
+    "label": "snapshot",
+    "instructions": 67697356,
+    "counters": {
+      "overlay_hits": 0,
+      "capture_hits": 0,
+      "hydrations": 0,
+      "misses": 32000,
+      "fallbacks": 32000
+    }
+  },
+  {
+    "repetitions": 128,
+    "label": "baseline",
+    "instructions": 5718778351
+  },
+  {
+    "repetitions": 128,
+    "label": "snapshot",
+    "instructions": 5709981522,
+    "counters": {
+      "overlay_hits": 0,
+      "capture_hits": 0,
+      "hydrations": 0,
+      "misses": 0,
+      "fallbacks": 0
+    }
+  },
+  {
+    "repetitions": 256,
+    "label": "baseline",
+    "instructions": 12331513305
+  },
+  {
+    "repetitions": 256,
+    "label": "snapshot",
+    "instructions": 12326052253,
+    "counters": {
+      "overlay_hits": 0,
+      "capture_hits": 0,
+      "hydrations": 0,
+      "misses": 0,
+      "fallbacks": 0
+    }
+  },
+  {
+    "repetitions": 1024,
+    "label": "baseline",
+    "instructions": 56547946392
+  },
+  {
+    "repetitions": 1024,
+    "label": "snapshot",
+    "instructions": 56530137132,
+    "counters": {
+      "overlay_hits": 0,
+      "capture_hits": 0,
+      "hydrations": 0,
+      "misses": 0,
+      "fallbacks": 0
+    }
+  }
+]

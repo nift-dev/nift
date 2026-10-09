@@ -1,0 +1,1682 @@
+[
+  {
+    "n": 2000,
+    "width": 0,
+    "kind": "identity",
+    "label": "baseline",
+    "instructions": 59668588
+  },
+  {
+    "n": 2000,
+    "width": 0,
+    "kind": "identity",
+    "label": "snapshot",
+    "instructions": 48416467
+  },
+  {
+    "n": 2000,
+    "width": 0,
+    "kind": "captured",
+    "label": "baseline",
+    "instructions": 67860284
+  },
+  {
+    "n": 2000,
+    "width": 0,
+    "kind": "captured",
+    "label": "snapshot",
+    "instructions": 53120372
+  },
+  {
+    "n": 2000,
+    "width": 0,
+    "kind": "map",
+    "label": "baseline",
+    "instructions": 40002156
+  },
+  {
+    "n": 2000,
+    "width": 0,
+    "kind": "map",
+    "label": "snapshot",
+    "instructions": 31776419
+  },
+  {
+    "n": 2000,
+    "width": 0,
+    "kind": "filter",
+    "label": "baseline",
+    "instructions": 39164075
+  },
+  {
+    "n": 2000,
+    "width": 0,
+    "kind": "filter",
+    "label": "snapshot",
+    "instructions": 30990331
+  },
+  {
+    "n": 2000,
+    "width": 0,
+    "kind": "group",
+    "label": "baseline",
+    "instructions": 42548644
+  },
+  {
+    "n": 2000,
+    "width": 0,
+    "kind": "group",
+    "label": "snapshot",
+    "instructions": 34322256
+  },
+  {
+    "n": 2000,
+    "width": 0,
+    "kind": "closure",
+    "label": "baseline",
+    "instructions": 39966760
+  },
+  {
+    "n": 2000,
+    "width": 0,
+    "kind": "closure",
+    "label": "snapshot",
+    "instructions": 31900713
+  },
+  {
+    "n": 2000,
+    "width": 5,
+    "kind": "identity",
+    "label": "baseline",
+    "instructions": 73031428
+  },
+  {
+    "n": 2000,
+    "width": 5,
+    "kind": "identity",
+    "label": "snapshot",
+    "instructions": 50895925
+  },
+  {
+    "n": 2000,
+    "width": 5,
+    "kind": "captured",
+    "label": "baseline",
+    "instructions": 81329405
+  },
+  {
+    "n": 2000,
+    "width": 5,
+    "kind": "captured",
+    "label": "snapshot",
+    "instructions": 55635170
+  },
+  {
+    "n": 2000,
+    "width": 5,
+    "kind": "map",
+    "label": "baseline",
+    "instructions": 45529365
+  },
+  {
+    "n": 2000,
+    "width": 5,
+    "kind": "map",
+    "label": "snapshot",
+    "instructions": 32020440
+  },
+  {
+    "n": 2000,
+    "width": 5,
+    "kind": "filter",
+    "label": "baseline",
+    "instructions": 44691791
+  },
+  {
+    "n": 2000,
+    "width": 5,
+    "kind": "filter",
+    "label": "snapshot",
+    "instructions": 31174667
+  },
+  {
+    "n": 2000,
+    "width": 5,
+    "kind": "group",
+    "label": "baseline",
+    "instructions": 48053350
+  },
+  {
+    "n": 2000,
+    "width": 5,
+    "kind": "group",
+    "label": "snapshot",
+    "instructions": 34584447
+  },
+  {
+    "n": 2000,
+    "width": 5,
+    "kind": "closure",
+    "label": "baseline",
+    "instructions": 45533765
+  },
+  {
+    "n": 2000,
+    "width": 5,
+    "kind": "closure",
+    "label": "snapshot",
+    "instructions": 32151722
+  },
+  {
+    "n": 2000,
+    "width": 16,
+    "kind": "identity",
+    "label": "baseline",
+    "instructions": 116580922
+  },
+  {
+    "n": 2000,
+    "width": 16,
+    "kind": "identity",
+    "label": "snapshot",
+    "instructions": 56860222
+  },
+  {
+    "n": 2000,
+    "width": 16,
+    "kind": "captured",
+    "label": "baseline",
+    "instructions": 124804980
+  },
+  {
+    "n": 2000,
+    "width": 16,
+    "kind": "captured",
+    "label": "snapshot",
+    "instructions": 61762702
+  },
+  {
+    "n": 2000,
+    "width": 16,
+    "kind": "map",
+    "label": "baseline",
+    "instructions": 66094090
+  },
+  {
+    "n": 2000,
+    "width": 16,
+    "kind": "map",
+    "label": "snapshot",
+    "instructions": 33548357
+  },
+  {
+    "n": 2000,
+    "width": 16,
+    "kind": "filter",
+    "label": "baseline",
+    "instructions": 65254525
+  },
+  {
+    "n": 2000,
+    "width": 16,
+    "kind": "filter",
+    "label": "snapshot",
+    "instructions": 32702253
+  },
+  {
+    "n": 2000,
+    "width": 16,
+    "kind": "group",
+    "label": "baseline",
+    "instructions": 68815011
+  },
+  {
+    "n": 2000,
+    "width": 16,
+    "kind": "group",
+    "label": "snapshot",
+    "instructions": 36093425
+  },
+  {
+    "n": 2000,
+    "width": 16,
+    "kind": "closure",
+    "label": "baseline",
+    "instructions": 66614370
+  },
+  {
+    "n": 2000,
+    "width": 16,
+    "kind": "closure",
+    "label": "snapshot",
+    "instructions": 33707138
+  },
+  {
+    "n": 2000,
+    "width": 50,
+    "kind": "identity",
+    "label": "baseline",
+    "instructions": 225855289
+  },
+  {
+    "n": 2000,
+    "width": 50,
+    "kind": "identity",
+    "label": "snapshot",
+    "instructions": 72471425
+  },
+  {
+    "n": 2000,
+    "width": 50,
+    "kind": "captured",
+    "label": "baseline",
+    "instructions": 235640012
+  },
+  {
+    "n": 2000,
+    "width": 50,
+    "kind": "captured",
+    "label": "snapshot",
+    "instructions": 77435123
+  },
+  {
+    "n": 2000,
+    "width": 50,
+    "kind": "map",
+    "label": "baseline",
+    "instructions": 123376649
+  },
+  {
+    "n": 2000,
+    "width": 50,
+    "kind": "map",
+    "label": "snapshot",
+    "instructions": 35358894
+  },
+  {
+    "n": 2000,
+    "width": 50,
+    "kind": "filter",
+    "label": "baseline",
+    "instructions": 122538431
+  },
+  {
+    "n": 2000,
+    "width": 50,
+    "kind": "filter",
+    "label": "snapshot",
+    "instructions": 34512684
+  },
+  {
+    "n": 2000,
+    "width": 50,
+    "kind": "group",
+    "label": "baseline",
+    "instructions": 125018943
+  },
+  {
+    "n": 2000,
+    "width": 50,
+    "kind": "group",
+    "label": "snapshot",
+    "instructions": 37904044
+  },
+  {
+    "n": 2000,
+    "width": 50,
+    "kind": "closure",
+    "label": "baseline",
+    "instructions": 122906890
+  },
+  {
+    "n": 2000,
+    "width": 50,
+    "kind": "closure",
+    "label": "snapshot",
+    "instructions": 35422769
+  },
+  {
+    "n": 2000,
+    "width": 100,
+    "kind": "identity",
+    "label": "baseline",
+    "instructions": 382190673
+  },
+  {
+    "n": 2000,
+    "width": 100,
+    "kind": "identity",
+    "label": "snapshot",
+    "instructions": 95675037
+  },
+  {
+    "n": 2000,
+    "width": 100,
+    "kind": "captured",
+    "label": "baseline",
+    "instructions": 390421774
+  },
+  {
+    "n": 2000,
+    "width": 100,
+    "kind": "captured",
+    "label": "snapshot",
+    "instructions": 100525592
+  },
+  {
+    "n": 2000,
+    "width": 100,
+    "kind": "map",
+    "label": "baseline",
+    "instructions": 203557161
+  },
+  {
+    "n": 2000,
+    "width": 100,
+    "kind": "map",
+    "label": "snapshot",
+    "instructions": 37949205
+  },
+  {
+    "n": 2000,
+    "width": 100,
+    "kind": "filter",
+    "label": "baseline",
+    "instructions": 202611288
+  },
+  {
+    "n": 2000,
+    "width": 100,
+    "kind": "filter",
+    "label": "snapshot",
+    "instructions": 37094644
+  },
+  {
+    "n": 2000,
+    "width": 100,
+    "kind": "group",
+    "label": "baseline",
+    "instructions": 205074364
+  },
+  {
+    "n": 2000,
+    "width": 100,
+    "kind": "group",
+    "label": "snapshot",
+    "instructions": 40505849
+  },
+  {
+    "n": 2000,
+    "width": 100,
+    "kind": "closure",
+    "label": "baseline",
+    "instructions": 203624893
+  },
+  {
+    "n": 2000,
+    "width": 100,
+    "kind": "closure",
+    "label": "snapshot",
+    "instructions": 38098875
+  },
+  {
+    "n": 4000,
+    "width": 0,
+    "kind": "identity",
+    "label": "baseline",
+    "instructions": 117569824
+  },
+  {
+    "n": 4000,
+    "width": 0,
+    "kind": "identity",
+    "label": "snapshot",
+    "instructions": 95330037
+  },
+  {
+    "n": 4000,
+    "width": 0,
+    "kind": "captured",
+    "label": "baseline",
+    "instructions": 133954530
+  },
+  {
+    "n": 4000,
+    "width": 0,
+    "kind": "captured",
+    "label": "snapshot",
+    "instructions": 104727498
+  },
+  {
+    "n": 4000,
+    "width": 0,
+    "kind": "map",
+    "label": "baseline",
+    "instructions": 77127995
+  },
+  {
+    "n": 4000,
+    "width": 0,
+    "kind": "map",
+    "label": "snapshot",
+    "instructions": 60678322
+  },
+  {
+    "n": 4000,
+    "width": 0,
+    "kind": "filter",
+    "label": "baseline",
+    "instructions": 75449275
+  },
+  {
+    "n": 4000,
+    "width": 0,
+    "kind": "filter",
+    "label": "snapshot",
+    "instructions": 59103595
+  },
+  {
+    "n": 4000,
+    "width": 0,
+    "kind": "group",
+    "label": "baseline",
+    "instructions": 82206304
+  },
+  {
+    "n": 4000,
+    "width": 0,
+    "kind": "group",
+    "label": "snapshot",
+    "instructions": 65754008
+  },
+  {
+    "n": 4000,
+    "width": 0,
+    "kind": "closure",
+    "label": "baseline",
+    "instructions": 76922647
+  },
+  {
+    "n": 4000,
+    "width": 0,
+    "kind": "closure",
+    "label": "snapshot",
+    "instructions": 60792568
+  },
+  {
+    "n": 4000,
+    "width": 5,
+    "kind": "identity",
+    "label": "baseline",
+    "instructions": 143937005
+  },
+  {
+    "n": 4000,
+    "width": 5,
+    "kind": "identity",
+    "label": "snapshot",
+    "instructions": 100039621
+  },
+  {
+    "n": 4000,
+    "width": 5,
+    "kind": "captured",
+    "label": "baseline",
+    "instructions": 160521188
+  },
+  {
+    "n": 4000,
+    "width": 5,
+    "kind": "captured",
+    "label": "snapshot",
+    "instructions": 109506621
+  },
+  {
+    "n": 4000,
+    "width": 5,
+    "kind": "map",
+    "label": "baseline",
+    "instructions": 87931300
+  },
+  {
+    "n": 4000,
+    "width": 5,
+    "kind": "map",
+    "label": "snapshot",
+    "instructions": 60914295
+  },
+  {
+    "n": 4000,
+    "width": 5,
+    "kind": "filter",
+    "label": "baseline",
+    "instructions": 86253039
+  },
+  {
+    "n": 4000,
+    "width": 5,
+    "kind": "filter",
+    "label": "snapshot",
+    "instructions": 59219900
+  },
+  {
+    "n": 4000,
+    "width": 5,
+    "kind": "group",
+    "label": "baseline",
+    "instructions": 92962978
+  },
+  {
+    "n": 4000,
+    "width": 5,
+    "kind": "group",
+    "label": "snapshot",
+    "instructions": 66028151
+  },
+  {
+    "n": 4000,
+    "width": 5,
+    "kind": "closure",
+    "label": "baseline",
+    "instructions": 87803700
+  },
+  {
+    "n": 4000,
+    "width": 5,
+    "kind": "closure",
+    "label": "snapshot",
+    "instructions": 61043610
+  },
+  {
+    "n": 4000,
+    "width": 16,
+    "kind": "identity",
+    "label": "baseline",
+    "instructions": 230719941
+  },
+  {
+    "n": 4000,
+    "width": 16,
+    "kind": "identity",
+    "label": "snapshot",
+    "instructions": 111389772
+  },
+  {
+    "n": 4000,
+    "width": 16,
+    "kind": "captured",
+    "label": "baseline",
+    "instructions": 247244086
+  },
+  {
+    "n": 4000,
+    "width": 16,
+    "kind": "captured",
+    "label": "snapshot",
+    "instructions": 121183958
+  },
+  {
+    "n": 4000,
+    "width": 16,
+    "kind": "map",
+    "label": "baseline",
+    "instructions": 128352618
+  },
+  {
+    "n": 4000,
+    "width": 16,
+    "kind": "map",
+    "label": "snapshot",
+    "instructions": 63390267
+  },
+  {
+    "n": 4000,
+    "width": 16,
+    "kind": "filter",
+    "label": "baseline",
+    "instructions": 126670586
+  },
+  {
+    "n": 4000,
+    "width": 16,
+    "kind": "filter",
+    "label": "snapshot",
+    "instructions": 61695453
+  },
+  {
+    "n": 4000,
+    "width": 16,
+    "kind": "group",
+    "label": "baseline",
+    "instructions": 133898293
+  },
+  {
+    "n": 4000,
+    "width": 16,
+    "kind": "group",
+    "label": "snapshot",
+    "instructions": 68465220
+  },
+  {
+    "n": 4000,
+    "width": 16,
+    "kind": "closure",
+    "label": "baseline",
+    "instructions": 129379837
+  },
+  {
+    "n": 4000,
+    "width": 16,
+    "kind": "closure",
+    "label": "snapshot",
+    "instructions": 63572956
+  },
+  {
+    "n": 4000,
+    "width": 50,
+    "kind": "identity",
+    "label": "baseline",
+    "instructions": 447163587
+  },
+  {
+    "n": 4000,
+    "width": 50,
+    "kind": "identity",
+    "label": "snapshot",
+    "instructions": 140799099
+  },
+  {
+    "n": 4000,
+    "width": 50,
+    "kind": "captured",
+    "label": "baseline",
+    "instructions": 466827495
+  },
+  {
+    "n": 4000,
+    "width": 50,
+    "kind": "captured",
+    "label": "snapshot",
+    "instructions": 150715172
+  },
+  {
+    "n": 4000,
+    "width": 50,
+    "kind": "map",
+    "label": "baseline",
+    "instructions": 241242443
+  },
+  {
+    "n": 4000,
+    "width": 50,
+    "kind": "map",
+    "label": "snapshot",
+    "instructions": 65190740
+  },
+  {
+    "n": 4000,
+    "width": 50,
+    "kind": "filter",
+    "label": "baseline",
+    "instructions": 239563572
+  },
+  {
+    "n": 4000,
+    "width": 50,
+    "kind": "filter",
+    "label": "snapshot",
+    "instructions": 63495932
+  },
+  {
+    "n": 4000,
+    "width": 50,
+    "kind": "group",
+    "label": "baseline",
+    "instructions": 244474716
+  },
+  {
+    "n": 4000,
+    "width": 50,
+    "kind": "group",
+    "label": "snapshot",
+    "instructions": 70265636
+  },
+  {
+    "n": 4000,
+    "width": 50,
+    "kind": "closure",
+    "label": "baseline",
+    "instructions": 240132824
+  },
+  {
+    "n": 4000,
+    "width": 50,
+    "kind": "closure",
+    "label": "snapshot",
+    "instructions": 65184656
+  },
+  {
+    "n": 4000,
+    "width": 100,
+    "kind": "identity",
+    "label": "baseline",
+    "instructions": 757156588
+  },
+  {
+    "n": 4000,
+    "width": 100,
+    "kind": "identity",
+    "label": "snapshot",
+    "instructions": 184540046
+  },
+  {
+    "n": 4000,
+    "width": 100,
+    "kind": "captured",
+    "label": "baseline",
+    "instructions": 773508488
+  },
+  {
+    "n": 4000,
+    "width": 100,
+    "kind": "captured",
+    "label": "snapshot",
+    "instructions": 194231099
+  },
+  {
+    "n": 4000,
+    "width": 100,
+    "kind": "map",
+    "label": "baseline",
+    "instructions": 398903723
+  },
+  {
+    "n": 4000,
+    "width": 100,
+    "kind": "map",
+    "label": "snapshot",
+    "instructions": 67695026
+  },
+  {
+    "n": 4000,
+    "width": 100,
+    "kind": "filter",
+    "label": "baseline",
+    "instructions": 397009128
+  },
+  {
+    "n": 4000,
+    "width": 100,
+    "kind": "filter",
+    "label": "snapshot",
+    "instructions": 65983875
+  },
+  {
+    "n": 4000,
+    "width": 100,
+    "kind": "group",
+    "label": "baseline",
+    "instructions": 401903941
+  },
+  {
+    "n": 4000,
+    "width": 100,
+    "kind": "group",
+    "label": "snapshot",
+    "instructions": 72793614
+  },
+  {
+    "n": 4000,
+    "width": 100,
+    "kind": "closure",
+    "label": "baseline",
+    "instructions": 398905947
+  },
+  {
+    "n": 4000,
+    "width": 100,
+    "kind": "closure",
+    "label": "snapshot",
+    "instructions": 67860792
+  },
+  {
+    "n": 8000,
+    "width": 0,
+    "kind": "identity",
+    "label": "baseline",
+    "instructions": 232598364
+  },
+  {
+    "n": 8000,
+    "width": 0,
+    "kind": "identity",
+    "label": "snapshot",
+    "instructions": 187834408
+  },
+  {
+    "n": 8000,
+    "width": 0,
+    "kind": "captured",
+    "label": "baseline",
+    "instructions": 265332936
+  },
+  {
+    "n": 8000,
+    "width": 0,
+    "kind": "captured",
+    "label": "snapshot",
+    "instructions": 206619527
+  },
+  {
+    "n": 8000,
+    "width": 0,
+    "kind": "map",
+    "label": "baseline",
+    "instructions": 151377826
+  },
+  {
+    "n": 8000,
+    "width": 0,
+    "kind": "map",
+    "label": "snapshot",
+    "instructions": 118480089
+  },
+  {
+    "n": 8000,
+    "width": 0,
+    "kind": "filter",
+    "label": "baseline",
+    "instructions": 148017799
+  },
+  {
+    "n": 8000,
+    "width": 0,
+    "kind": "filter",
+    "label": "snapshot",
+    "instructions": 115328055
+  },
+  {
+    "n": 8000,
+    "width": 0,
+    "kind": "group",
+    "label": "baseline",
+    "instructions": 161521662
+  },
+  {
+    "n": 8000,
+    "width": 0,
+    "kind": "group",
+    "label": "snapshot",
+    "instructions": 128617198
+  },
+  {
+    "n": 8000,
+    "width": 0,
+    "kind": "closure",
+    "label": "baseline",
+    "instructions": 150832398
+  },
+  {
+    "n": 8000,
+    "width": 0,
+    "kind": "closure",
+    "label": "snapshot",
+    "instructions": 118574415
+  },
+  {
+    "n": 8000,
+    "width": 5,
+    "kind": "identity",
+    "label": "baseline",
+    "instructions": 285115704
+  },
+  {
+    "n": 8000,
+    "width": 5,
+    "kind": "identity",
+    "label": "snapshot",
+    "instructions": 197004140
+  },
+  {
+    "n": 8000,
+    "width": 5,
+    "kind": "captured",
+    "label": "baseline",
+    "instructions": 318272785
+  },
+  {
+    "n": 8000,
+    "width": 5,
+    "kind": "captured",
+    "label": "snapshot",
+    "instructions": 215926809
+  },
+  {
+    "n": 8000,
+    "width": 5,
+    "kind": "map",
+    "label": "baseline",
+    "instructions": 172733035
+  },
+  {
+    "n": 8000,
+    "width": 5,
+    "kind": "map",
+    "label": "snapshot",
+    "instructions": 118700142
+  },
+  {
+    "n": 8000,
+    "width": 5,
+    "kind": "filter",
+    "label": "baseline",
+    "instructions": 169373483
+  },
+  {
+    "n": 8000,
+    "width": 5,
+    "kind": "filter",
+    "label": "snapshot",
+    "instructions": 115308392
+  },
+  {
+    "n": 8000,
+    "width": 5,
+    "kind": "group",
+    "label": "baseline",
+    "instructions": 182782272
+  },
+  {
+    "n": 8000,
+    "width": 5,
+    "kind": "group",
+    "label": "snapshot",
+    "instructions": 128915501
+  },
+  {
+    "n": 8000,
+    "width": 5,
+    "kind": "closure",
+    "label": "baseline",
+    "instructions": 172341435
+  },
+  {
+    "n": 8000,
+    "width": 5,
+    "kind": "closure",
+    "label": "snapshot",
+    "instructions": 118825361
+  },
+  {
+    "n": 8000,
+    "width": 16,
+    "kind": "identity",
+    "label": "baseline",
+    "instructions": 458099273
+  },
+  {
+    "n": 8000,
+    "width": 16,
+    "kind": "identity",
+    "label": "snapshot",
+    "instructions": 219126610
+  },
+  {
+    "n": 8000,
+    "width": 16,
+    "kind": "captured",
+    "label": "baseline",
+    "instructions": 491180340
+  },
+  {
+    "n": 8000,
+    "width": 16,
+    "kind": "captured",
+    "label": "snapshot",
+    "instructions": 238703292
+  },
+  {
+    "n": 8000,
+    "width": 16,
+    "kind": "map",
+    "label": "baseline",
+    "instructions": 253108186
+  },
+  {
+    "n": 8000,
+    "width": 16,
+    "kind": "map",
+    "label": "snapshot",
+    "instructions": 123072123
+  },
+  {
+    "n": 8000,
+    "width": 16,
+    "kind": "filter",
+    "label": "baseline",
+    "instructions": 249741267
+  },
+  {
+    "n": 8000,
+    "width": 16,
+    "kind": "filter",
+    "label": "snapshot",
+    "instructions": 119679977
+  },
+  {
+    "n": 8000,
+    "width": 16,
+    "kind": "group",
+    "label": "baseline",
+    "instructions": 264064928
+  },
+  {
+    "n": 8000,
+    "width": 16,
+    "kind": "group",
+    "label": "snapshot",
+    "instructions": 133208481
+  },
+  {
+    "n": 8000,
+    "width": 16,
+    "kind": "closure",
+    "label": "baseline",
+    "instructions": 254908578
+  },
+  {
+    "n": 8000,
+    "width": 16,
+    "kind": "closure",
+    "label": "snapshot",
+    "instructions": 123302803
+  },
+  {
+    "n": 8000,
+    "width": 50,
+    "kind": "identity",
+    "label": "baseline",
+    "instructions": 892234066
+  },
+  {
+    "n": 8000,
+    "width": 50,
+    "kind": "identity",
+    "label": "snapshot",
+    "instructions": 276130729
+  },
+  {
+    "n": 8000,
+    "width": 50,
+    "kind": "captured",
+    "label": "baseline",
+    "instructions": 928337260
+  },
+  {
+    "n": 8000,
+    "width": 50,
+    "kind": "captured",
+    "label": "snapshot",
+    "instructions": 295951533
+  },
+  {
+    "n": 8000,
+    "width": 50,
+    "kind": "map",
+    "label": "baseline",
+    "instructions": 476982319
+  },
+  {
+    "n": 8000,
+    "width": 50,
+    "kind": "map",
+    "label": "snapshot",
+    "instructions": 124852571
+  },
+  {
+    "n": 8000,
+    "width": 50,
+    "kind": "filter",
+    "label": "baseline",
+    "instructions": 473622173
+  },
+  {
+    "n": 8000,
+    "width": 50,
+    "kind": "filter",
+    "label": "snapshot",
+    "instructions": 121460376
+  },
+  {
+    "n": 8000,
+    "width": 50,
+    "kind": "group",
+    "label": "baseline",
+    "instructions": 483385808
+  },
+  {
+    "n": 8000,
+    "width": 50,
+    "kind": "group",
+    "label": "snapshot",
+    "instructions": 134989082
+  },
+  {
+    "n": 8000,
+    "width": 50,
+    "kind": "closure",
+    "label": "baseline",
+    "instructions": 474582578
+  },
+  {
+    "n": 8000,
+    "width": 50,
+    "kind": "closure",
+    "label": "snapshot",
+    "instructions": 124706407
+  },
+  {
+    "n": 8000,
+    "width": 100,
+    "kind": "identity",
+    "label": "baseline",
+    "instructions": 1506374410
+  },
+  {
+    "n": 8000,
+    "width": 100,
+    "kind": "identity",
+    "label": "snapshot",
+    "instructions": 360943620
+  },
+  {
+    "n": 8000,
+    "width": 100,
+    "kind": "captured",
+    "label": "baseline",
+    "instructions": 1539048858
+  },
+  {
+    "n": 8000,
+    "width": 100,
+    "kind": "captured",
+    "label": "snapshot",
+    "instructions": 380316038
+  },
+  {
+    "n": 8000,
+    "width": 100,
+    "kind": "map",
+    "label": "baseline",
+    "instructions": 789599988
+  },
+  {
+    "n": 8000,
+    "width": 100,
+    "kind": "map",
+    "label": "snapshot",
+    "instructions": 127184810
+  },
+  {
+    "n": 8000,
+    "width": 100,
+    "kind": "filter",
+    "label": "baseline",
+    "instructions": 785808117
+  },
+  {
+    "n": 8000,
+    "width": 100,
+    "kind": "filter",
+    "label": "snapshot",
+    "instructions": 123760287
+  },
+  {
+    "n": 8000,
+    "width": 100,
+    "kind": "group",
+    "label": "baseline",
+    "instructions": 795565187
+  },
+  {
+    "n": 8000,
+    "width": 100,
+    "kind": "group",
+    "label": "snapshot",
+    "instructions": 137368807
+  },
+  {
+    "n": 8000,
+    "width": 100,
+    "kind": "closure",
+    "label": "baseline",
+    "instructions": 789471106
+  },
+  {
+    "n": 8000,
+    "width": 100,
+    "kind": "closure",
+    "label": "snapshot",
+    "instructions": 127382641
+  },
+  {
+    "n": 16000,
+    "width": 0,
+    "kind": "identity",
+    "label": "baseline",
+    "instructions": 467968634
+  },
+  {
+    "n": 16000,
+    "width": 0,
+    "kind": "identity",
+    "label": "snapshot",
+    "instructions": 377990572
+  },
+  {
+    "n": 16000,
+    "width": 0,
+    "kind": "captured",
+    "label": "baseline",
+    "instructions": 533460094
+  },
+  {
+    "n": 16000,
+    "width": 0,
+    "kind": "captured",
+    "label": "snapshot",
+    "instructions": 416029848
+  },
+  {
+    "n": 16000,
+    "width": 0,
+    "kind": "map",
+    "label": "baseline",
+    "instructions": 300010019
+  },
+  {
+    "n": 16000,
+    "width": 0,
+    "kind": "map",
+    "label": "snapshot",
+    "instructions": 234216298
+  },
+  {
+    "n": 16000,
+    "width": 0,
+    "kind": "filter",
+    "label": "baseline",
+    "instructions": 293286685
+  },
+  {
+    "n": 16000,
+    "width": 0,
+    "kind": "filter",
+    "label": "snapshot",
+    "instructions": 227429754
+  },
+  {
+    "n": 16000,
+    "width": 0,
+    "kind": "group",
+    "label": "baseline",
+    "instructions": 320290924
+  },
+  {
+    "n": 16000,
+    "width": 0,
+    "kind": "group",
+    "label": "snapshot",
+    "instructions": 254482551
+  },
+  {
+    "n": 16000,
+    "width": 0,
+    "kind": "closure",
+    "label": "baseline",
+    "instructions": 298847638
+  },
+  {
+    "n": 16000,
+    "width": 0,
+    "kind": "closure",
+    "label": "snapshot",
+    "instructions": 234414267
+  },
+  {
+    "n": 16000,
+    "width": 5,
+    "kind": "identity",
+    "label": "baseline",
+    "instructions": 573044508
+  },
+  {
+    "n": 16000,
+    "width": 5,
+    "kind": "identity",
+    "label": "snapshot",
+    "instructions": 396368120
+  },
+  {
+    "n": 16000,
+    "width": 5,
+    "kind": "captured",
+    "label": "baseline",
+    "instructions": 639087966
+  },
+  {
+    "n": 16000,
+    "width": 5,
+    "kind": "captured",
+    "label": "snapshot",
+    "instructions": 434394721
+  },
+  {
+    "n": 16000,
+    "width": 5,
+    "kind": "map",
+    "label": "baseline",
+    "instructions": 342565780
+  },
+  {
+    "n": 16000,
+    "width": 5,
+    "kind": "map",
+    "label": "snapshot",
+    "instructions": 234404773
+  },
+  {
+    "n": 16000,
+    "width": 5,
+    "kind": "filter",
+    "label": "baseline",
+    "instructions": 335555170
+  },
+  {
+    "n": 16000,
+    "width": 5,
+    "kind": "filter",
+    "label": "snapshot",
+    "instructions": 227680254
+  },
+  {
+    "n": 16000,
+    "width": 5,
+    "kind": "group",
+    "label": "baseline",
+    "instructions": 362559665
+  },
+  {
+    "n": 16000,
+    "width": 5,
+    "kind": "group",
+    "label": "snapshot",
+    "instructions": 254828824
+  },
+  {
+    "n": 16000,
+    "width": 5,
+    "kind": "closure",
+    "label": "baseline",
+    "instructions": 341244489
+  },
+  {
+    "n": 16000,
+    "width": 5,
+    "kind": "closure",
+    "label": "snapshot",
+    "instructions": 234616368
+  },
+  {
+    "n": 16000,
+    "width": 16,
+    "kind": "identity",
+    "label": "baseline",
+    "instructions": 921260747
+  },
+  {
+    "n": 16000,
+    "width": 16,
+    "kind": "identity",
+    "label": "snapshot",
+    "instructions": 440077952
+  },
+  {
+    "n": 16000,
+    "width": 16,
+    "kind": "captured",
+    "label": "baseline",
+    "instructions": 989936305
+  },
+  {
+    "n": 16000,
+    "width": 16,
+    "kind": "captured",
+    "label": "snapshot",
+    "instructions": 479393545
+  },
+  {
+    "n": 16000,
+    "width": 16,
+    "kind": "map",
+    "label": "baseline",
+    "instructions": 502380858
+  },
+  {
+    "n": 16000,
+    "width": 16,
+    "kind": "map",
+    "label": "snapshot",
+    "instructions": 242568270
+  },
+  {
+    "n": 16000,
+    "width": 16,
+    "kind": "filter",
+    "label": "baseline",
+    "instructions": 495996450
+  },
+  {
+    "n": 16000,
+    "width": 16,
+    "kind": "filter",
+    "label": "snapshot",
+    "instructions": 234949369
+  },
+  {
+    "n": 16000,
+    "width": 16,
+    "kind": "group",
+    "label": "baseline",
+    "instructions": 525383021
+  },
+  {
+    "n": 16000,
+    "width": 16,
+    "kind": "group",
+    "label": "snapshot",
+    "instructions": 262065967
+  },
+  {
+    "n": 16000,
+    "width": 16,
+    "kind": "closure",
+    "label": "baseline",
+    "instructions": 506098899
+  },
+  {
+    "n": 16000,
+    "width": 16,
+    "kind": "closure",
+    "label": "snapshot",
+    "instructions": 242894998
+  },
+  {
+    "n": 16000,
+    "width": 50,
+    "kind": "identity",
+    "label": "baseline",
+    "instructions": 1775699207
+  },
+  {
+    "n": 16000,
+    "width": 50,
+    "kind": "identity",
+    "label": "snapshot",
+    "instructions": 551986466
+  },
+  {
+    "n": 16000,
+    "width": 50,
+    "kind": "captured",
+    "label": "baseline",
+    "instructions": 1841361464
+  },
+  {
+    "n": 16000,
+    "width": 50,
+    "kind": "captured",
+    "label": "snapshot",
+    "instructions": 591716757
+  },
+  {
+    "n": 16000,
+    "width": 50,
+    "kind": "map",
+    "label": "baseline",
+    "instructions": 948594844
+  },
+  {
+    "n": 16000,
+    "width": 50,
+    "kind": "map",
+    "label": "snapshot",
+    "instructions": 244308759
+  },
+  {
+    "n": 16000,
+    "width": 50,
+    "kind": "filter",
+    "label": "baseline",
+    "instructions": 941264128
+  },
+  {
+    "n": 16000,
+    "width": 50,
+    "kind": "filter",
+    "label": "snapshot",
+    "instructions": 237265455
+  },
+  {
+    "n": 16000,
+    "width": 50,
+    "kind": "group",
+    "label": "baseline",
+    "instructions": 961347339
+  },
+  {
+    "n": 16000,
+    "width": 50,
+    "kind": "group",
+    "label": "snapshot",
+    "instructions": 264574516
+  },
+  {
+    "n": 16000,
+    "width": 50,
+    "kind": "closure",
+    "label": "baseline",
+    "instructions": 943614814
+  },
+  {
+    "n": 16000,
+    "width": 50,
+    "kind": "closure",
+    "label": "snapshot",
+    "instructions": 243882657
+  },
+  {
+    "n": 16000,
+    "width": 100,
+    "kind": "identity",
+    "label": "baseline",
+    "instructions": 3010085198
+  },
+  {
+    "n": 16000,
+    "width": 100,
+    "kind": "identity",
+    "label": "snapshot",
+    "instructions": 719387550
+  },
+  {
+    "n": 16000,
+    "width": 100,
+    "kind": "captured",
+    "label": "baseline",
+    "instructions": 3075490058
+  },
+  {
+    "n": 16000,
+    "width": 100,
+    "kind": "captured",
+    "label": "snapshot",
+    "instructions": 758121609
+  },
+  {
+    "n": 16000,
+    "width": 100,
+    "kind": "map",
+    "label": "baseline",
+    "instructions": 1571125163
+  },
+  {
+    "n": 16000,
+    "width": 100,
+    "kind": "map",
+    "label": "snapshot",
+    "instructions": 246297050
+  },
+  {
+    "n": 16000,
+    "width": 100,
+    "kind": "filter",
+    "label": "baseline",
+    "instructions": 1563538537
+  },
+  {
+    "n": 16000,
+    "width": 100,
+    "kind": "filter",
+    "label": "snapshot",
+    "instructions": 239445756
+  },
+  {
+    "n": 16000,
+    "width": 100,
+    "kind": "group",
+    "label": "baseline",
+    "instructions": 1588082205
+  },
+  {
+    "n": 16000,
+    "width": 100,
+    "kind": "group",
+    "label": "snapshot",
+    "instructions": 266498698
+  },
+  {
+    "n": 16000,
+    "width": 100,
+    "kind": "closure",
+    "label": "baseline",
+    "instructions": 1569056574
+  },
+  {
+    "n": 16000,
+    "width": 100,
+    "kind": "closure",
+    "label": "snapshot",
+    "instructions": 246415003
+  }
+]

@@ -1,0 +1,962 @@
+[
+  {
+    "n": 2000,
+    "width": 0,
+    "kind": "identity",
+    "before": 59668588,
+    "after": 48416467,
+    "reduction_percent": 18.85769611307041
+  },
+  {
+    "n": 2000,
+    "width": 0,
+    "kind": "captured",
+    "before": 67860284,
+    "after": 53120372,
+    "reduction_percent": 21.72097010380918
+  },
+  {
+    "n": 2000,
+    "width": 0,
+    "kind": "map",
+    "before": 40002156,
+    "after": 31776419,
+    "reduction_percent": 20.563234141679764
+  },
+  {
+    "n": 2000,
+    "width": 0,
+    "kind": "filter",
+    "before": 39164075,
+    "after": 30990331,
+    "reduction_percent": 20.870514623414437
+  },
+  {
+    "n": 2000,
+    "width": 0,
+    "kind": "group",
+    "before": 42548644,
+    "after": 34322256,
+    "reduction_percent": 19.334077955574802
+  },
+  {
+    "n": 2000,
+    "width": 0,
+    "kind": "closure",
+    "before": 39966760,
+    "after": 31900713,
+    "reduction_percent": 20.181888649467705
+  },
+  {
+    "n": 2000,
+    "width": 5,
+    "kind": "identity",
+    "before": 73031428,
+    "after": 50895925,
+    "reduction_percent": 30.309557961813372
+  },
+  {
+    "n": 2000,
+    "width": 5,
+    "kind": "captured",
+    "before": 81329405,
+    "after": 55635170,
+    "reduction_percent": 31.592798447252868
+  },
+  {
+    "n": 2000,
+    "width": 5,
+    "kind": "map",
+    "before": 45529365,
+    "after": 32020440,
+    "reduction_percent": 29.670795979693544
+  },
+  {
+    "n": 2000,
+    "width": 5,
+    "kind": "filter",
+    "before": 44691791,
+    "after": 31174667,
+    "reduction_percent": 30.245205433812217
+  },
+  {
+    "n": 2000,
+    "width": 5,
+    "kind": "group",
+    "before": 48053350,
+    "after": 34584447,
+    "reduction_percent": 28.029061449409877
+  },
+  {
+    "n": 2000,
+    "width": 5,
+    "kind": "closure",
+    "before": 45533765,
+    "after": 32151722,
+    "reduction_percent": 29.389274091435226
+  },
+  {
+    "n": 2000,
+    "width": 16,
+    "kind": "identity",
+    "before": 116580922,
+    "after": 56860222,
+    "reduction_percent": 51.22682080006196
+  },
+  {
+    "n": 2000,
+    "width": 16,
+    "kind": "captured",
+    "before": 124804980,
+    "after": 61762702,
+    "reduction_percent": 50.51263018510961
+  },
+  {
+    "n": 2000,
+    "width": 16,
+    "kind": "map",
+    "before": 66094090,
+    "after": 33548357,
+    "reduction_percent": 49.2415176606562
+  },
+  {
+    "n": 2000,
+    "width": 16,
+    "kind": "filter",
+    "before": 65254525,
+    "after": 32702253,
+    "reduction_percent": 49.885080000199224
+  },
+  {
+    "n": 2000,
+    "width": 16,
+    "kind": "group",
+    "before": 68815011,
+    "after": 36093425,
+    "reduction_percent": 47.55007014385277
+  },
+  {
+    "n": 2000,
+    "width": 16,
+    "kind": "closure",
+    "before": 66614370,
+    "after": 33707138,
+    "reduction_percent": 49.3995995158402
+  },
+  {
+    "n": 2000,
+    "width": 50,
+    "kind": "identity",
+    "before": 225855289,
+    "after": 72471425,
+    "reduction_percent": 67.91245167608184
+  },
+  {
+    "n": 2000,
+    "width": 50,
+    "kind": "captured",
+    "before": 235640012,
+    "after": 77435123,
+    "reduction_percent": 67.13838098090065
+  },
+  {
+    "n": 2000,
+    "width": 50,
+    "kind": "map",
+    "before": 123376649,
+    "after": 35358894,
+    "reduction_percent": 71.34069186787526
+  },
+  {
+    "n": 2000,
+    "width": 50,
+    "kind": "filter",
+    "before": 122538431,
+    "after": 34512684,
+    "reduction_percent": 71.83521633307024
+  },
+  {
+    "n": 2000,
+    "width": 50,
+    "kind": "group",
+    "before": 125018943,
+    "after": 37904044,
+    "reduction_percent": 69.68135940806987
+  },
+  {
+    "n": 2000,
+    "width": 50,
+    "kind": "closure",
+    "before": 122906890,
+    "after": 35422769,
+    "reduction_percent": 71.17918368937657
+  },
+  {
+    "n": 2000,
+    "width": 100,
+    "kind": "identity",
+    "before": 382190673,
+    "after": 95675037,
+    "reduction_percent": 74.96667402974535
+  },
+  {
+    "n": 2000,
+    "width": 100,
+    "kind": "captured",
+    "before": 390421774,
+    "after": 100525592,
+    "reduction_percent": 74.25205285809699
+  },
+  {
+    "n": 2000,
+    "width": 100,
+    "kind": "map",
+    "before": 203557161,
+    "after": 37949205,
+    "reduction_percent": 81.35697864247577
+  },
+  {
+    "n": 2000,
+    "width": 100,
+    "kind": "filter",
+    "before": 202611288,
+    "after": 37094644,
+    "reduction_percent": 81.69171897273561
+  },
+  {
+    "n": 2000,
+    "width": 100,
+    "kind": "group",
+    "before": 205074364,
+    "after": 40505849,
+    "reduction_percent": 80.24821425266008
+  },
+  {
+    "n": 2000,
+    "width": 100,
+    "kind": "closure",
+    "before": 203624893,
+    "after": 38098875,
+    "reduction_percent": 81.28967709267255
+  },
+  {
+    "n": 4000,
+    "width": 0,
+    "kind": "identity",
+    "before": 117569824,
+    "after": 95330037,
+    "reduction_percent": 18.91623738417776
+  },
+  {
+    "n": 4000,
+    "width": 0,
+    "kind": "captured",
+    "before": 133954530,
+    "after": 104727498,
+    "reduction_percent": 21.818621587489428
+  },
+  {
+    "n": 4000,
+    "width": 0,
+    "kind": "map",
+    "before": 77127995,
+    "after": 60678322,
+    "reduction_percent": 21.32775913596613
+  },
+  {
+    "n": 4000,
+    "width": 0,
+    "kind": "filter",
+    "before": 75449275,
+    "after": 59103595,
+    "reduction_percent": 21.66446264725539
+  },
+  {
+    "n": 4000,
+    "width": 0,
+    "kind": "group",
+    "before": 82206304,
+    "after": 65754008,
+    "reduction_percent": 20.013423788034558
+  },
+  {
+    "n": 4000,
+    "width": 0,
+    "kind": "closure",
+    "before": 76922647,
+    "after": 60792568,
+    "reduction_percent": 20.969219896970003
+  },
+  {
+    "n": 4000,
+    "width": 5,
+    "kind": "identity",
+    "before": 143937005,
+    "after": 100039621,
+    "reduction_percent": 30.497636101293057
+  },
+  {
+    "n": 4000,
+    "width": 5,
+    "kind": "captured",
+    "before": 160521188,
+    "after": 109506621,
+    "reduction_percent": 31.78058151426091
+  },
+  {
+    "n": 4000,
+    "width": 5,
+    "kind": "map",
+    "before": 87931300,
+    "after": 60914295,
+    "reduction_percent": 30.725128594709737
+  },
+  {
+    "n": 4000,
+    "width": 5,
+    "kind": "filter",
+    "before": 86253039,
+    "after": 59219900,
+    "reduction_percent": 31.341665538300624
+  },
+  {
+    "n": 4000,
+    "width": 5,
+    "kind": "group",
+    "before": 92962978,
+    "after": 66028151,
+    "reduction_percent": 28.973713600267835
+  },
+  {
+    "n": 4000,
+    "width": 5,
+    "kind": "closure",
+    "before": 87803700,
+    "after": 61043610,
+    "reduction_percent": 30.477178068805756
+  },
+  {
+    "n": 4000,
+    "width": 16,
+    "kind": "identity",
+    "before": 230719941,
+    "after": 111389772,
+    "reduction_percent": 51.72078689115129
+  },
+  {
+    "n": 4000,
+    "width": 16,
+    "kind": "captured",
+    "before": 247244086,
+    "after": 121183958,
+    "reduction_percent": 50.98610447652931
+  },
+  {
+    "n": 4000,
+    "width": 16,
+    "kind": "map",
+    "before": 128352618,
+    "after": 63390267,
+    "reduction_percent": 50.612408233075534
+  },
+  {
+    "n": 4000,
+    "width": 16,
+    "kind": "filter",
+    "before": 126670586,
+    "after": 61695453,
+    "reduction_percent": 51.294570469580044
+  },
+  {
+    "n": 4000,
+    "width": 16,
+    "kind": "group",
+    "before": 133898293,
+    "after": 68465220,
+    "reduction_percent": 48.86774247375955
+  },
+  {
+    "n": 4000,
+    "width": 16,
+    "kind": "closure",
+    "before": 129379837,
+    "after": 63572956,
+    "reduction_percent": 50.86332037966628
+  },
+  {
+    "n": 4000,
+    "width": 50,
+    "kind": "identity",
+    "before": 447163587,
+    "after": 140799099,
+    "reduction_percent": 68.51284337693625
+  },
+  {
+    "n": 4000,
+    "width": 50,
+    "kind": "captured",
+    "before": 466827495,
+    "after": 150715172,
+    "reduction_percent": 67.71501815676045
+  },
+  {
+    "n": 4000,
+    "width": 50,
+    "kind": "map",
+    "before": 241242443,
+    "after": 65190740,
+    "reduction_percent": 72.97708513091123
+  },
+  {
+    "n": 4000,
+    "width": 50,
+    "kind": "filter",
+    "before": 239563572,
+    "after": 63495932,
+    "reduction_percent": 73.49516394754708
+  },
+  {
+    "n": 4000,
+    "width": 50,
+    "kind": "group",
+    "before": 244474716,
+    "after": 70265636,
+    "reduction_percent": 71.25852638274462
+  },
+  {
+    "n": 4000,
+    "width": 50,
+    "kind": "closure",
+    "before": 240132824,
+    "after": 65184656,
+    "reduction_percent": 72.85474975299505
+  },
+  {
+    "n": 4000,
+    "width": 100,
+    "kind": "identity",
+    "before": 757156588,
+    "after": 184540046,
+    "reduction_percent": 75.62722837987114
+  },
+  {
+    "n": 4000,
+    "width": 100,
+    "kind": "captured",
+    "before": 773508488,
+    "after": 194231099,
+    "reduction_percent": 74.88959694518569
+  },
+  {
+    "n": 4000,
+    "width": 100,
+    "kind": "map",
+    "before": 398903723,
+    "after": 67695026,
+    "reduction_percent": 83.02973321710512
+  },
+  {
+    "n": 4000,
+    "width": 100,
+    "kind": "filter",
+    "before": 397009128,
+    "after": 65983875,
+    "reduction_percent": 83.3797587142631
+  },
+  {
+    "n": 4000,
+    "width": 100,
+    "kind": "group",
+    "before": 401903941,
+    "after": 72793614,
+    "reduction_percent": 81.88780786302367
+  },
+  {
+    "n": 4000,
+    "width": 100,
+    "kind": "closure",
+    "before": 398905947,
+    "after": 67860792,
+    "reduction_percent": 82.98827267170323
+  },
+  {
+    "n": 8000,
+    "width": 0,
+    "kind": "identity",
+    "before": 232598364,
+    "after": 187834408,
+    "reduction_percent": 19.24517233491806
+  },
+  {
+    "n": 8000,
+    "width": 0,
+    "kind": "captured",
+    "before": 265332936,
+    "after": 206619527,
+    "reduction_percent": 22.128202357810565
+  },
+  {
+    "n": 8000,
+    "width": 0,
+    "kind": "map",
+    "before": 151377826,
+    "after": 118480089,
+    "reduction_percent": 21.732203367750834
+  },
+  {
+    "n": 8000,
+    "width": 0,
+    "kind": "filter",
+    "before": 148017799,
+    "after": 115328055,
+    "reduction_percent": 22.085008844105293
+  },
+  {
+    "n": 8000,
+    "width": 0,
+    "kind": "group",
+    "before": 161521662,
+    "after": 128617198,
+    "reduction_percent": 20.371548678096197
+  },
+  {
+    "n": 8000,
+    "width": 0,
+    "kind": "closure",
+    "before": 150832398,
+    "after": 118574415,
+    "reduction_percent": 21.386640687102254
+  },
+  {
+    "n": 8000,
+    "width": 5,
+    "kind": "identity",
+    "before": 285115704,
+    "after": 197004140,
+    "reduction_percent": 30.903791956685765
+  },
+  {
+    "n": 8000,
+    "width": 5,
+    "kind": "captured",
+    "before": 318272785,
+    "after": 215926809,
+    "reduction_percent": 32.156684713083465
+  },
+  {
+    "n": 8000,
+    "width": 5,
+    "kind": "map",
+    "before": 172733035,
+    "after": 118700142,
+    "reduction_percent": 31.281157654643188
+  },
+  {
+    "n": 8000,
+    "width": 5,
+    "kind": "filter",
+    "before": 169373483,
+    "after": 115308392,
+    "reduction_percent": 31.920634825700546
+  },
+  {
+    "n": 8000,
+    "width": 5,
+    "kind": "group",
+    "before": 182782272,
+    "after": 128915501,
+    "reduction_percent": 29.470457069272015
+  },
+  {
+    "n": 8000,
+    "width": 5,
+    "kind": "closure",
+    "before": 172341435,
+    "after": 118825361,
+    "reduction_percent": 31.052354879138612
+  },
+  {
+    "n": 8000,
+    "width": 16,
+    "kind": "identity",
+    "before": 458099273,
+    "after": 219126610,
+    "reduction_percent": 52.16613015668331
+  },
+  {
+    "n": 8000,
+    "width": 16,
+    "kind": "captured",
+    "before": 491180340,
+    "after": 238703292,
+    "reduction_percent": 51.40210782866432
+  },
+  {
+    "n": 8000,
+    "width": 16,
+    "kind": "map",
+    "before": 253108186,
+    "after": 123072123,
+    "reduction_percent": 51.375684467194596
+  },
+  {
+    "n": 8000,
+    "width": 16,
+    "kind": "filter",
+    "before": 249741267,
+    "after": 119679977,
+    "reduction_percent": 52.078413616761225
+  },
+  {
+    "n": 8000,
+    "width": 16,
+    "kind": "group",
+    "before": 264064928,
+    "after": 133208481,
+    "reduction_percent": 49.55464854461854
+  },
+  {
+    "n": 8000,
+    "width": 16,
+    "kind": "closure",
+    "before": 254908578,
+    "after": 123302803,
+    "reduction_percent": 51.628617613645
+  },
+  {
+    "n": 8000,
+    "width": 50,
+    "kind": "identity",
+    "before": 892234066,
+    "after": 276130729,
+    "reduction_percent": 69.05176124490184
+  },
+  {
+    "n": 8000,
+    "width": 50,
+    "kind": "captured",
+    "before": 928337260,
+    "after": 295951533,
+    "reduction_percent": 68.12025696350914
+  },
+  {
+    "n": 8000,
+    "width": 50,
+    "kind": "map",
+    "before": 476982319,
+    "after": 124852571,
+    "reduction_percent": 73.82448656341076
+  },
+  {
+    "n": 8000,
+    "width": 50,
+    "kind": "filter",
+    "before": 473622173,
+    "after": 121460376,
+    "reduction_percent": 74.35500639029415
+  },
+  {
+    "n": 8000,
+    "width": 50,
+    "kind": "group",
+    "before": 483385808,
+    "after": 134989082,
+    "reduction_percent": 72.07425626364272
+  },
+  {
+    "n": 8000,
+    "width": 50,
+    "kind": "closure",
+    "before": 474582578,
+    "after": 124706407,
+    "reduction_percent": 73.72292773039806
+  },
+  {
+    "n": 8000,
+    "width": 100,
+    "kind": "identity",
+    "before": 1506374410,
+    "after": 360943620,
+    "reduction_percent": 76.03891717730387
+  },
+  {
+    "n": 8000,
+    "width": 100,
+    "kind": "captured",
+    "before": 1539048858,
+    "after": 380316038,
+    "reduction_percent": 75.28889118606526
+  },
+  {
+    "n": 8000,
+    "width": 100,
+    "kind": "map",
+    "before": 789599988,
+    "after": 127184810,
+    "reduction_percent": 83.89250102166922
+  },
+  {
+    "n": 8000,
+    "width": 100,
+    "kind": "filter",
+    "before": 785808117,
+    "after": 123760287,
+    "reduction_percent": 84.25057156796969
+  },
+  {
+    "n": 8000,
+    "width": 100,
+    "kind": "group",
+    "before": 795565187,
+    "after": 137368807,
+    "reduction_percent": 82.73318022901371
+  },
+  {
+    "n": 8000,
+    "width": 100,
+    "kind": "closure",
+    "before": 789471106,
+    "after": 127382641,
+    "reduction_percent": 83.86481278011459
+  },
+  {
+    "n": 16000,
+    "width": 0,
+    "kind": "identity",
+    "before": 467968634,
+    "after": 377990572,
+    "reduction_percent": 19.227370268580867
+  },
+  {
+    "n": 16000,
+    "width": 0,
+    "kind": "captured",
+    "before": 533460094,
+    "after": 416029848,
+    "reduction_percent": 22.012939172166078
+  },
+  {
+    "n": 16000,
+    "width": 0,
+    "kind": "map",
+    "before": 300010019,
+    "after": 234216298,
+    "reduction_percent": 21.930507927470245
+  },
+  {
+    "n": 16000,
+    "width": 0,
+    "kind": "filter",
+    "before": 293286685,
+    "after": 227429754,
+    "reduction_percent": 22.454797427984165
+  },
+  {
+    "n": 16000,
+    "width": 0,
+    "kind": "group",
+    "before": 320290924,
+    "after": 254482551,
+    "reduction_percent": 20.546437026108176
+  },
+  {
+    "n": 16000,
+    "width": 0,
+    "kind": "closure",
+    "before": 298847638,
+    "after": 234414267,
+    "reduction_percent": 21.560609088702254
+  },
+  {
+    "n": 16000,
+    "width": 5,
+    "kind": "identity",
+    "before": 573044508,
+    "after": 396368120,
+    "reduction_percent": 30.831180743119525
+  },
+  {
+    "n": 16000,
+    "width": 5,
+    "kind": "captured",
+    "before": 639087966,
+    "after": 434394721,
+    "reduction_percent": 32.02896250435734
+  },
+  {
+    "n": 16000,
+    "width": 5,
+    "kind": "map",
+    "before": 342565780,
+    "after": 234404773,
+    "reduction_percent": 31.57379204659613
+  },
+  {
+    "n": 16000,
+    "width": 5,
+    "kind": "filter",
+    "before": 335555170,
+    "after": 227680254,
+    "reduction_percent": 32.14819071331847
+  },
+  {
+    "n": 16000,
+    "width": 5,
+    "kind": "group",
+    "before": 362559665,
+    "after": 254828824,
+    "reduction_percent": 29.71396197643773
+  },
+  {
+    "n": 16000,
+    "width": 5,
+    "kind": "closure",
+    "before": 341244489,
+    "after": 234616368,
+    "reduction_percent": 31.246840443480394
+  },
+  {
+    "n": 16000,
+    "width": 16,
+    "kind": "identity",
+    "before": 921260747,
+    "after": 440077952,
+    "reduction_percent": 52.230901681953455
+  },
+  {
+    "n": 16000,
+    "width": 16,
+    "kind": "captured",
+    "before": 989936305,
+    "after": 479393545,
+    "reduction_percent": 51.57329389995451
+  },
+  {
+    "n": 16000,
+    "width": 16,
+    "kind": "map",
+    "before": 502380858,
+    "after": 242568270,
+    "reduction_percent": 51.71625945986978
+  },
+  {
+    "n": 16000,
+    "width": 16,
+    "kind": "filter",
+    "before": 495996450,
+    "after": 234949369,
+    "reduction_percent": 52.63083657151175
+  },
+  {
+    "n": 16000,
+    "width": 16,
+    "kind": "group",
+    "before": 525383021,
+    "after": 262065967,
+    "reduction_percent": 50.11906427786901
+  },
+  {
+    "n": 16000,
+    "width": 16,
+    "kind": "closure",
+    "before": 506098899,
+    "after": 242894998,
+    "reduction_percent": 52.00641643759039
+  },
+  {
+    "n": 16000,
+    "width": 50,
+    "kind": "identity",
+    "before": 1775699207,
+    "after": 551986466,
+    "reduction_percent": 68.91441614525652
+  },
+  {
+    "n": 16000,
+    "width": 50,
+    "kind": "captured",
+    "before": 1841361464,
+    "after": 591716757,
+    "reduction_percent": 67.86525793177998
+  },
+  {
+    "n": 16000,
+    "width": 50,
+    "kind": "map",
+    "before": 948594844,
+    "after": 244308759,
+    "reduction_percent": 74.24519429498396
+  },
+  {
+    "n": 16000,
+    "width": 50,
+    "kind": "filter",
+    "before": 941264128,
+    "after": 237265455,
+    "reduction_percent": 74.79289309535866
+  },
+  {
+    "n": 16000,
+    "width": 50,
+    "kind": "group",
+    "before": 961347339,
+    "after": 264574516,
+    "reduction_percent": 72.47878001355762
+  },
+  {
+    "n": 16000,
+    "width": 50,
+    "kind": "closure",
+    "before": 943614814,
+    "after": 243882657,
+    "reduction_percent": 74.15442685070013
+  },
+  {
+    "n": 16000,
+    "width": 100,
+    "kind": "identity",
+    "before": 3010085198,
+    "after": 719387550,
+    "reduction_percent": 76.10075786300052
+  },
+  {
+    "n": 16000,
+    "width": 100,
+    "kind": "captured",
+    "before": 3075490058,
+    "after": 758121609,
+    "reduction_percent": 75.34956723309946
+  },
+  {
+    "n": 16000,
+    "width": 100,
+    "kind": "map",
+    "before": 1571125163,
+    "after": 246297050,
+    "reduction_percent": 84.32352457969003
+  },
+  {
+    "n": 16000,
+    "width": 100,
+    "kind": "filter",
+    "before": 1563538537,
+    "after": 239445756,
+    "reduction_percent": 84.68565050789023
+  },
+  {
+    "n": 16000,
+    "width": 100,
+    "kind": "group",
+    "before": 1588082205,
+    "after": 266498698,
+    "reduction_percent": 83.21883482095942
+  },
+  {
+    "n": 16000,
+    "width": 100,
+    "kind": "closure",
+    "before": 1569056574,
+    "after": 246415003,
+    "reduction_percent": 84.29533981863932
+  }
+]

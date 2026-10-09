@@ -1889,3 +1889,15 @@ test: test-v410-native-dispatch-parity
 test-v410-string-replace-parity: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" python3 tests/v410_string_replace_parity.py
 test: test-v410-string-replace-parity
+
+.PHONY: test-v410-callback-overlay-parity
+test-v410-callback-overlay-parity: $(TARGET)
+	python3 tests/v410_callback_overlay_parity.py --nift "$(CURDIR)/$(TARGET)"
+
+test: test-v410-callback-overlay-parity
+
+.PHONY: test-v410-callback-overlay-guard
+test-v410-callback-overlay-guard: $(LAMBDA_CACHE_GUARD)
+	NIFT="$(CURDIR)/$(LAMBDA_CACHE_GUARD)" python3 tests/v410_callback_overlay_guard.py
+
+test: test-v410-callback-overlay-guard
