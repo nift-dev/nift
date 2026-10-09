@@ -1,0 +1,184 @@
+mkdir -p ".build"
+mkdir -p ".build/glob-keys/"
+mkdir -p ".build"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_TEST_JSON_PREFLIGHT_STATS tests/v49_json_preflight_guard.cpp src/RuntimeValue.cpp -o ".build/nift-json-preflight-guard"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread tests/json_smoke.cpp -o ".build/nift-json-smoke"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_TEST_GLOB_KEY_STATS -MMD -MP -c src/ParserHelpers.cpp -o .build/glob-keys/ParserHelpers.o
+mkdir -p ".build"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread tests/runtime_value.cpp src/RuntimeValue.cpp -o ".build/nift-runtime-value"
+".build/nift-json-smoke"
+JSON smoke test passed
+mkdir -p ".build"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread tests/cp17_bytes.cpp src/RuntimeValue.cpp -o ".build/nift-cp17-bytes"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/embed/Engine.cpp -o src/embed/Engine.o
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/embed/Context.cpp -o src/embed/Context.o
+mkdir -p ".build"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread tests/json_schema_smoke.cpp src/JsonSchema.cpp -o ".build/nift-json-schema-smoke"
+".build/nift-console-smoke"
+console diagnostics smoke passed
+make -C minifypp test-smoke
+make[1]: Entering directory '/home/nick/Repositories/nift/nift/minifypp'
+mkdir -p .build
+g++ -Iinclude -Isrc -std=c++17 -O2 -Wall -Wextra -pedantic tests/minify_smoke.cpp src/Minify.cpp -o .build/minifypp-smoke
+python3 tests/macos_runner_policy_test.py
+macOS runner-policy guard passed (10 official macOS matrix entries)
+mkdir -p ".build/lambda-cache/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_TEST_LAMBDA_CACHE_STATS -MMD -MP -c src/ParserExpression.cpp -o .build/lambda-cache/ParserExpression.o
+".build/progress-render"
+progress renderer smoke passed
+python3 tests/snap_release_contract.py
+python3 tests/distribution_summary_test.py
+test_edge_success_is_not_stable_success (__main__.DistributionSummaryTest.test_edge_success_is_not_stable_success) ... ok
+test_install_runtime_failure_classified (__main__.DistributionSummaryTest.test_install_runtime_failure_classified) ... ok
+test_maintained_channels_recorded_from_env (__main__.DistributionSummaryTest.test_maintained_channels_recorded_from_env) ... ok
+test_not_selected (__main__.DistributionSummaryTest.test_not_selected) ... ok
+test_stable_correct (__main__.DistributionSummaryTest.test_stable_correct) ... ok
+test_validate_version_failure_recorded (__main__.DistributionSummaryTest.test_validate_version_failure_recorded) ... ok
+test_version_mismatch_classified (__main__.DistributionSummaryTest.test_version_mismatch_classified) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.225s
+
+OK
+python3 tests/version_consistency_test.py
+test_exact_412_413_failure_rejected (__main__.VersionConsistencyTest.test_exact_412_413_failure_rejected) ... FAIL: version disagreement: executable=4.0.13 Snap-metadata=4.0.12
+FAIL: Snap metadata 4.0.12 != expected 4.0.13
+FAIL: version disagreement: executable=4.0.13 Snap-metadata=4.0.12
+FAIL: executable 4.0.13 != expected 4.0.12
+FAIL: version disagreement: executable=4.0.13 Snap-metadata=4.0.12
+ok
+test_expected_accepts_leading_v_prefix (__main__.VersionConsistencyTest.test_expected_accepts_leading_v_prefix) ... ok
+test_expected_prefix_does_not_mask_repo_mismatch (__main__.VersionConsistencyTest.test_expected_prefix_does_not_mask_repo_mismatch) ... FAIL: version disagreement: executable=4.0.14 Snap-metadata=4.1.0
+FAIL: executable 4.0.14 != expected 4.1.0
+FAIL: version disagreement: executable=4.0.14 Snap-metadata=4.1.0
+FAIL: Snap metadata 4.1.0 != expected 4.0.14
+ok
+test_expected_rejects_malformed_prefixes (__main__.VersionConsistencyTest.test_expected_rejects_malformed_prefixes) ... FAIL: expected/release version is malformed: 'vv4.0.13'
+FAIL: expected/release version is malformed: 'v4.0'
+FAIL: expected/release version is malformed: '4.0.13.1'
+ok
+test_malformed_version_rejected (__main__.VersionConsistencyTest.test_malformed_version_rejected) ... FAIL: executable (src/CLI.cpp) version is missing
+FAIL: Snap metadata (snap/snapcraft.yaml) version is malformed: 'four.zero.thirteen'
+ok
+test_matching_release_versions_agree (__main__.VersionConsistencyTest.test_matching_release_versions_agree) ... ok
+test_missing_version_rejected (__main__.VersionConsistencyTest.test_missing_version_rejected) ... FAIL: executable (src/CLI.cpp) version is missing
+FAIL: Snap metadata (snap/snapcraft.yaml) version is missing
+ok
+test_real_repo_development_versions_match (__main__.VersionConsistencyTest.test_real_repo_development_versions_match) ... ok
+test_tag_version_mismatch_rejected (__main__.VersionConsistencyTest.test_tag_version_mismatch_rejected) ... FAIL: version disagreement: executable=4.0.13 Snap-metadata=4.1.0
+FAIL: executable 4.0.13 != tag version 4.0.12
+FAIL: Snap metadata 4.1.0 != tag version 4.0.12
+ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.007s
+
+OK
+PASS: version consistency (executable=4.10.0, Snap-metadata=4.10.0, expected=4.10.0)
+PASS: version consistency (executable=4.10.0, Snap-metadata=4.10.0, expected=v4.10.0)
+PASS: version consistency (executable=4.10.0, Snap-metadata=4.10.0, expected=v4.10.0, tag=v4.10.0)
+PASS: version consistency (executable=4.10.0, Snap-metadata=4.10.0, expected=v4.10.0, tag=v4.10.0)
+PASS: version consistency (executable=4.1.0, Snap-metadata=4.1.0, expected=4.1.0, tag=v4.1.0)
+PASS: version consistency (executable=4.10.0, Snap-metadata=4.10.0, expected=4.10.0, tag=v4.10.0)
+python3 scripts/check_version_consistency.py
+PASS: version consistency (executable=4.10.0, Snap-metadata=4.10.0)
+.build/source-view-unit
+mkdir -p .build
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread tests/ast_source_unit.cpp src/Ast.cpp src/RuntimeValue.cpp -o .build/ast-source-unit
+".build/nift-json-schema-smoke"
+JSON Schema smoke test passed
+mkdir -p .build
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread tests/v49_call_outcome_unit.cpp src/Ast.cpp src/RuntimeValue.cpp -o .build/v49-call-outcome-unit
+mkdir -p .build
+g++ -std=c++17 -O2 -Wall -Wextra -pedantic -Isrc -Ijsonic/include tests/v410_object_member_unit.cpp src/RuntimeValue.cpp -o .build/v410-object-member-unit
+.build/minifypp-smoke
+Standalone minifier smoke test passed
+make[1]: Leaving directory '/home/nick/Repositories/nift/nift/minifypp'
+mkdir -p .build/pic/src/
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/RuntimeValue.cpp -o .build/pic/src/RuntimeValue.o
+mkdir -p .build/pic/src/
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/Value.cpp -o .build/pic/src/Value.o
+mkdir -p .build/pic/src/
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/ProjectInfo.cpp -o .build/pic/src/ProjectInfo.o
+.build/v410-object-member-unit
+mkdir -p .build/pic/src/
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/ProjectState.cpp -o .build/pic/src/ProjectState.o
+mkdir -p .build/pic/src/
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/Hooks.cpp -o .build/pic/src/Hooks.o
+mkdir -p .build/pic/src/
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/Ast.cpp -o .build/pic/src/Ast.o
+mkdir -p .build/pic/src/embed/
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/embed/Engine.cpp -o .build/pic/src/embed/Engine.o
+mkdir -p .build/pic/src/embed/
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/embed/Context.cpp -o .build/pic/src/embed/Context.o
+python3 scripts/check_binding_warnings.py
+cd bindings/node && bash build.sh
+using node headers: /usr/include/node
+BUILD vendored libffi (libffi)
+cd bindings/python && bash build.sh
+using python headers: /usr/include/python3.14
+PASS g++: bindings/node/native/nift_node.cc warnings as errors
+PASS g++: bindings/python/src/nift_module.cc warnings as errors
+PASS clang++: bindings/node/native/nift_node.cc warnings as errors
+PASS clang++: bindings/python/src/nift_module.cc warnings as errors
+NIFT_JSON_GUARD="/home/nick/Repositories/nift/nift/.build/nift-json-preflight-guard" python3 tests/v49_json_preflight_guard.py
+PASS 100 leaves, depth 48: one preflight, 149 converted nodes
+PASS 200 leaves, depth 48: one preflight, 249 converted nodes
+PASS 400 leaves, depth 48: one preflight, 449 converted nodes
+CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-linux-gnu-cc"
+BUILD vendored libffi (libffi)
+".build/nift-runtime-value"
+.build/ast-source-unit
+.build/v49-call-outcome-unit
+mkdir -p .build/pic/src/
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/Parser.cpp -o .build/pic/src/Parser.o
+BUILD vendored libffi: done (5s)
+BUILD vendored libffi: done (5s)
+mkdir -p .build/pic/src/
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/ParserExpression.cpp -o .build/pic/src/ParserExpression.o
+mkdir -p .build/pic/src/
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/ParserHelpers.cpp -o .build/pic/src/ParserHelpers.o
+mkdir -p .build/pic/src/
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/ParserScript.cpp -o .build/pic/src/ParserScript.o
+mkdir -p .build/pic/src/
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/ParserTemplate.cpp -o .build/pic/src/ParserTemplate.o
+g++ -std=c++17 -O2 -Wall -Wextra -pedantic -pthread  src/nift.o src/ProjectOwnership.o src/PackageTransaction.o src/CLI.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserExpression.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o .build/glob-keys/ParserHelpers.o -ldl .build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a -o .build/nift-glob-key-guard
+NIFT="/home/nick/Repositories/nift/nift/nift" python3 tests/v49_glob_order.py
+PASS 8 glob ordering/dedup/Unicode/hidden/missing contracts plus POSIX symlinks
+NIFT="/home/nick/Repositories/nift/nift/nift" python3 tests/v49_selector_parity.py
+PASS 58 selector/capture/location/error contracts
+NIFT="/home/nick/Repositories/nift/nift/nift" bash tests/v47_deep_expression_smoke.sh
+PASS v4.7 deep expression
+NIFT_BIN="/home/nick/Repositories/nift/nift/nift" tests/parser_content_smoke.sh
+Tracked content/input parser smoke test passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/nift" tests/commands_smoke.sh
+CLI grammar smoke test passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/nift" tests/comments_smoke.sh
+Comments smoke test passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/nift" tests/contracts_smoke.sh
+Project contracts smoke test passed
+NIFT="/home/nick/Repositories/nift/nift/nift" tests/cp15_numeric_repair.sh
+CP15 numeric repair smoke: PASS
+".build/nift-cp17-bytes"
+NIFT="/home/nick/Repositories/nift/nift/nift" tests/cp17_bytes.sh
+CP17 bytes language semantics: PASS
+mkdir -p .build
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread tests/cp18_bytes.cpp src/ProjectOwnership.o src/PackageTransaction.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserExpression.o src/ParserHelpers.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o src/embed/Engine.o src/embed/Context.o src/embed/c_abi.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o -ldl .build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a -o .build/nift-cp18-bytes
+NIFT="/home/nick/Repositories/nift/nift/nift" tests/cp19_bytes_io.sh
+CP19 bytes I/O: PASS
+NIFT="/home/nick/Repositories/nift/nift/nift" tests/cp20_bytes_ffi.sh
+CP20 bytes/FFI copying bridges: PASS
+cp .build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a libnift_c.a
+ar rcs libnift_c.a src/ProjectOwnership.o src/PackageTransaction.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserExpression.o src/ParserHelpers.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o src/embed/Engine.o src/embed/Context.o src/embed/c_abi.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o
+NIFT_BIN="/home/nick/Repositories/nift/nift/nift" tests/diagnostics_smoke.sh
+diagnostics smoke passed
+diagnostics smoke passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/nift" tests/json_schema_integration_smoke.sh
+JSON Schema integration smoke test passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/nift" tests/markup_json_directives_smoke.sh
+@json and @markup directive smoke test passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/nift" tests/pagination_smoke.sh
+Pagination smoke test passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/nift" tests/pagination_ordering_smoke.sh
+make: *** [Makefile:1012: test-pagination-ordering] Error 1
+make: *** Waiting for unfinished jobs....

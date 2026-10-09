@@ -25,7 +25,7 @@ generic-call allocation slopes with N/2N/4N and verified negative controls.
 STOP FOR REVIEW before callable plan/instance ownership, retention/reclamation,
 persistent member indexing, RuntimeValue layout, canonical Jsonic++ changes,
 frames/arenas or VM/JIT work. Commit/push and non-release hosted certification
-are authorized; hosted green must precede the next runtime checkpoint. Sort is
+completed at `4d80ca47` with all ten hosted checks green. Sort is
 the primary target; bounded one-fetch access and Jsonic++ investigation are
 secondary. No new official series is authorized.
 
@@ -169,3 +169,17 @@ correctness/regression/release-blocking fixes may reopen runtime implementation.
 Both accepted performance waves remain retained and hosted green. Official
 post-v4.9 measurements are deferred until after release; no frozen-series/Labs
 change or benchmark provisioning is authorized during release preparation.
+
+## v4.10 sort-first follow-up
+
+The [follow-up report](docs/evidence/cp410-sort-first/report.md) retains fixed-path
+identity sort and capture/map/precreated controls at 2k/4k/8k/16k. Metadata sharing
+has only a roughly 8% measured instruction ceiling; fresh capture/frame/lifetime
+costs remain the primary architecture problem. The secondary one-fetch object
+experiment and canonical Jsonic++ duplicate-check proposal are separately
+measured. No new peer ratio or official benchmark result is claimed.
+
+The user accepted the one-fetch follow-up and authorized its separate commit,
+normal push and exact-SHA certification. The next architectural budget targets
+capture/frame ownership; immutable metadata alone has only an ~8% ceiling.
+See [the next review boundary](docs/evidence/cp410-capture-frame/README.md).

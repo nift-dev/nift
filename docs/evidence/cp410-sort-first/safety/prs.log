@@ -1,0 +1,14 @@
+PASS  contract/curl_facade_smoke.sh
+PASS  contract/sqlite_module_smoke.sh
+PASS  contract/database_packages_smoke.sh
+PASS  contract/parameter_binding_smoke.sh
+PASS  contract/transaction_atomicity_smoke.sh
+PASS  contract/imagemagick_package_smoke.sh
+PASS  contract/vips_magick_combined_smoke.sh
+PASS  integration/coexistence_smoke.sh
+PASS  integration/privacy_smoke.sh
+PASS  integration/no_process_smoke.sh
+PASS  integration/source_install_smoke.sh
+PASS  integration/combined_consumer_smoke.sh
+
+PASS: 12 package regression modules

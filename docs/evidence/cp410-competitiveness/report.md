@@ -1,6 +1,11 @@
 # NIFT v4.10 — SCRIPTING COMPETITIVENESS INVESTIGATION
 
-Status: **ACCEPTED bounded candidate — commit/push authorized; hosted certification pending.**
+Status: **ACCEPTED, committed, pushed and hosted-green at `4d80ca47e94beb68544904e736a9f3415b303157`.**
+
+All ten exact-SHA non-release certification workflows passed. The initial Deep
+version-expectation failure was fixed without weakening the contracts; its log
+is retained in `publication/initial-deep-failure.log`. The subsequent sort-first
+checkpoint is recorded in [the follow-up report](../cp410-sort-first/report.md).
 
 The largest sort penalty is callback factory/frame ownership, rather than selector
 parsing or comparisons. General closure calls have a separate native-dispatch
@@ -15,11 +20,11 @@ Current development baseline is `629b1f23afbb5b3be97dac66b6cea1a9d5b3d1fc`, vers
 ahead and zero behind origin/main `aaadeb31219251b7cc02a62fbf75360ac3e11aaf`.
 The saved exact baseline binary SHA256 is
 `86d9dfb2e169aa09d30b890b09edf7dda4105b5e2946c661c23460364fdb09e2`.
-The release closeout and development-version commits remain local.
+The release closeout and development-version commits were included in the authorized normal push.
 
 External oracle unchanged: **YES**. `20261009-v490` is COMPLETE and IMMUTABLE, measured from released
 `aaadeb31219251b7cc02a62fbf75360ac3e11aaf`. No official run, workload edit, Labs
-edit, node provisioning, public release or push is part of this checkpoint.
+edit, node provisioning or public release is part of this checkpoint; the accepted source was subsequently pushed normally.
 The final audit checks 8,292 scripting-repository files, 102 shell files, all
 30 frozen campaign evidence files, and 166 source/201 public Labs oracle-related
 files. The benchmark repositories and frozen series hashes match. The original

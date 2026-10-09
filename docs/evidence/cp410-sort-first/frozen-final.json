@@ -1,0 +1,30 @@
+{
+  "scripting-benchmark": {
+    "unchanged": true,
+    "files": 8292,
+    "issues": []
+  },
+  "shell-benchmark": {
+    "unchanged": true,
+    "files": 102,
+    "issues": []
+  },
+  "official_campaign": {
+    "unchanged": true,
+    "files": 30,
+    "issues": []
+  },
+  "canonical_relocation": {
+    "pinned_files_verified": 323,
+    "byte_identical_copies": 322,
+    "documented_superseded_replacements": [
+      {
+        "original": "public/benchmarks/evidence/diagnostics.tar.gz",
+        "original_sha256": "1c362c68fc251cd29aa8547c0ef9ee202d10c2c3419e6bba919279884951aa37",
+        "canonical_path": "benchmarks/diagnostics/README.md",
+        "canonical_sha256": "e6d1404a0cf2e061210f7252aa29b7bcc64ed8afac6ac55093fbad411276e0c5",
+        "origin_and_current_verified": true
+      }
+    ]
+  }
+}

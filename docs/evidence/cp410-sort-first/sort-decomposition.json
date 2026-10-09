@@ -1,0 +1,2429 @@
+[
+  {
+    "name": "identity",
+    "n": 2000,
+    "expected": "1\n2000\n1000\n",
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410-followup/sort-probes/n00002000/identity____/official-equivalent.f",
+    "phases": {
+      "factory": {
+        "calls": 2000,
+        "allocations": 26012,
+        "bytes": 3674256,
+        "frees": 2007,
+        "instructions": 15195703
+      },
+      "instance": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 576000,
+        "frees": 0,
+        "instructions": 762427
+      },
+      "metadata": {
+        "calls": 2000,
+        "allocations": 8000,
+        "bytes": 1502000,
+        "frees": 0,
+        "instructions": 4288579
+      },
+      "capture": {
+        "calls": 2000,
+        "allocations": 10000,
+        "bytes": 1296000,
+        "frees": 0,
+        "instructions": 4082620
+      },
+      "registration": {
+        "calls": 2000,
+        "allocations": 6008,
+        "bytes": 299936,
+        "frees": 2007,
+        "instructions": 3581222
+      },
+      "arguments": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "frees": 0,
+        "instructions": 762163
+      },
+      "frame": {
+        "calls": 2000,
+        "allocations": 24001,
+        "bytes": 3470240,
+        "frees": 2001,
+        "instructions": 12287346
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0,
+        "instructions": 724000
+      },
+      "key": {
+        "calls": 4000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "frees": 0,
+        "instructions": 638000
+      },
+      "decoration": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0,
+        "instructions": 454000
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 176000,
+        "frees": 1,
+        "instructions": 5114983
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 304000,
+        "frees": 0,
+        "instructions": 174652
+      },
+      "cleanup": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 22000,
+        "instructions": 4376000
+      },
+      "returned_key": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0,
+        "instructions": 152000
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 2000
+      }
+    },
+    "events": {
+      "instances": 2000,
+      "capture_entries": 8000,
+      "frame_capture_entries": 8000,
+      "comparisons": 9580
+    },
+    "production_instructions": 55276480,
+    "production_heap": {
+      "allocations": 60457,
+      "frees": 60457,
+      "bytes": 10651414
+    },
+    "parser_destructor_frees_lines": [
+      "22,025 (36.43%)  UnknownFile???:Parser::~Parser()"
+    ],
+    "production_destructor_instruction_lines": [
+      " 5,434,309 ( 9.83%)  ???:Parser::~Parser() [/home/nick/Repositories/nift/nift/.build/cp410-followup/accepted-nift]"
+    ]
+  },
+  {
+    "name": "captured",
+    "n": 2000,
+    "expected": "1\n2000\n1000\n",
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410-followup/sort-probes/n00002000/captured____/official-equivalent.f",
+    "phases": {
+      "factory": {
+        "calls": 2000,
+        "allocations": 28012,
+        "bytes": 3946256,
+        "frees": 2007,
+        "instructions": 15909742
+      },
+      "instance": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 576000,
+        "frees": 0,
+        "instructions": 762722
+      },
+      "metadata": {
+        "calls": 2000,
+        "allocations": 8000,
+        "bytes": 1502000,
+        "frees": 0,
+        "instructions": 4328919
+      },
+      "capture": {
+        "calls": 2000,
+        "allocations": 12000,
+        "bytes": 1568000,
+        "frees": 0,
+        "instructions": 4994680
+      },
+      "registration": {
+        "calls": 2000,
+        "allocations": 6008,
+        "bytes": 299936,
+        "frees": 2007,
+        "instructions": 3309361
+      },
+      "arguments": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "frees": 0,
+        "instructions": 762161
+      },
+      "frame": {
+        "calls": 2000,
+        "allocations": 26001,
+        "bytes": 3742240,
+        "frees": 2001,
+        "instructions": 13464827
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 2007,
+        "bytes": 129232,
+        "frees": 2001,
+        "instructions": 9983382
+      },
+      "key": {
+        "calls": 4000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "frees": 0,
+        "instructions": 638000
+      },
+      "decoration": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0,
+        "instructions": 454000
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 176000,
+        "frees": 1,
+        "instructions": 5114983
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 304000,
+        "frees": 0,
+        "instructions": 174652
+      },
+      "cleanup": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 24000,
+        "instructions": 4750000
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 2000
+      }
+    },
+    "events": {
+      "instances": 2000,
+      "capture_entries": 10000,
+      "frame_capture_entries": 10000,
+      "comparisons": 9580
+    },
+    "production_instructions": 66547897,
+    "production_heap": {
+      "allocations": 66472,
+      "frees": 66472,
+      "bytes": 11325665
+    },
+    "parser_destructor_frees_lines": [
+      "24,028 (36.15%)  UnknownFile???:Parser::~Parser()"
+    ],
+    "production_destructor_instruction_lines": [
+      " 5,918,445 ( 8.89%)  ???:Parser::~Parser() [/home/nick/Repositories/nift/nift/.build/cp410-followup/accepted-nift]"
+    ]
+  },
+  {
+    "name": "unused16",
+    "n": 2000,
+    "expected": "1\n2000\n1000\n",
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410-followup/sort-probes/n00002000/unused16____/official-equivalent.f",
+    "phases": {
+      "factory": {
+        "calls": 2000,
+        "allocations": 60012,
+        "bytes": 8490256,
+        "frees": 4007,
+        "instructions": 38389497
+      },
+      "instance": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 576000,
+        "frees": 0,
+        "instructions": 1027201
+      },
+      "metadata": {
+        "calls": 2000,
+        "allocations": 8000,
+        "bytes": 1502000,
+        "frees": 0,
+        "instructions": 4300116
+      },
+      "capture": {
+        "calls": 2000,
+        "allocations": 44000,
+        "bytes": 6112000,
+        "frees": 2000,
+        "instructions": 26782358
+      },
+      "registration": {
+        "calls": 2000,
+        "allocations": 6008,
+        "bytes": 299936,
+        "frees": 2007,
+        "instructions": 3782595
+      },
+      "arguments": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "frees": 0,
+        "instructions": 871516
+      },
+      "frame": {
+        "calls": 2000,
+        "allocations": 58001,
+        "bytes": 8286240,
+        "frees": 4001,
+        "instructions": 38129827
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0,
+        "instructions": 876000
+      },
+      "key": {
+        "calls": 4000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "frees": 0,
+        "instructions": 638000
+      },
+      "decoration": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0,
+        "instructions": 454000
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 176000,
+        "frees": 1,
+        "instructions": 5114963
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 304000,
+        "frees": 0,
+        "instructions": 174543
+      },
+      "cleanup": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 54000,
+        "instructions": 11723877
+      },
+      "returned_key": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0,
+        "instructions": 152000
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 2000
+      }
+    },
+    "events": {
+      "instances": 2000,
+      "capture_entries": 40000,
+      "frame_capture_entries": 40000,
+      "comparisons": 9580
+    },
+    "production_instructions": 110587677,
+    "production_heap": {
+      "allocations": 128591,
+      "frees": 128591,
+      "bytes": 20306703
+    },
+    "parser_destructor_frees_lines": [
+      " 54,073 (42.05%)  UnknownFile???:Parser::~Parser()"
+    ],
+    "production_destructor_instruction_lines": [
+      " 12,933,565 (11.70%)  ???:Parser::~Parser() [/home/nick/Repositories/nift/nift/.build/cp410-followup/accepted-nift]"
+    ]
+  },
+  {
+    "name": "map",
+    "n": 2000,
+    "expected": "2000\n1\n1001\n",
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410-followup/sort-probes/n00002000/map_________/official-equivalent.f",
+    "phases": {
+      "factory": {
+        "calls": 1,
+        "allocations": 18,
+        "bytes": 2243,
+        "frees": 1,
+        "instructions": 17726
+      },
+      "instance": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 288,
+        "frees": 0,
+        "instructions": 245
+      },
+      "metadata": {
+        "calls": 1,
+        "allocations": 4,
+        "bytes": 751,
+        "frees": 0,
+        "instructions": 2731
+      },
+      "capture": {
+        "calls": 1,
+        "allocations": 5,
+        "bytes": 648,
+        "frees": 0,
+        "instructions": 2661
+      },
+      "registration": {
+        "calls": 1,
+        "allocations": 4,
+        "bytes": 236,
+        "frees": 1,
+        "instructions": 1947
+      },
+      "arguments": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "frees": 0,
+        "instructions": 490000
+      },
+      "frame": {
+        "calls": 2000,
+        "allocations": 24001,
+        "bytes": 3470240,
+        "frees": 2001,
+        "instructions": 10125641
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0,
+        "instructions": 724000
+      },
+      "key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 22000,
+        "instructions": 4404000
+      },
+      "returned_key": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0,
+        "instructions": 152000
+      },
+      "destruction": {
+        "calls": 1,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      }
+    },
+    "events": {
+      "instances": 1,
+      "capture_entries": 4,
+      "frame_capture_entries": 8000,
+      "comparisons": 0
+    },
+    "production_instructions": 29015277,
+    "production_heap": {
+      "allocations": 32465,
+      "frees": 32465,
+      "bytes": 6460753
+    },
+    "parser_destructor_frees_lines": [
+      "    42 ( 0.13%)  UnknownFile???:Parser::~Parser()"
+    ],
+    "production_destructor_instruction_lines": [
+      "   160,667 ( 0.55%)  ???:Parser::~Parser() [/home/nick/Repositories/nift/nift/.build/cp410-followup/accepted-nift]"
+    ]
+  },
+  {
+    "name": "precreated",
+    "n": 2000,
+    "expected": "1\n2000\n1000\n",
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410-followup/sort-probes/n00002000/precreated__/official-equivalent.f",
+    "phases": {
+      "factory": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 62000,
+        "frees": 0,
+        "instructions": 3074162
+      },
+      "instance": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 288,
+        "frees": 0,
+        "instructions": 242
+      },
+      "metadata": {
+        "calls": 1,
+        "allocations": 4,
+        "bytes": 751,
+        "frees": 0,
+        "instructions": 2719
+      },
+      "capture": {
+        "calls": 1,
+        "allocations": 5,
+        "bytes": 648,
+        "frees": 0,
+        "instructions": 2646
+      },
+      "registration": {
+        "calls": 1,
+        "allocations": 4,
+        "bytes": 236,
+        "frees": 1,
+        "instructions": 1934
+      },
+      "arguments": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "frees": 0,
+        "instructions": 762131
+      },
+      "frame": {
+        "calls": 2000,
+        "allocations": 24001,
+        "bytes": 3470240,
+        "frees": 2001,
+        "instructions": 10126049
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0,
+        "instructions": 724000
+      },
+      "key": {
+        "calls": 4000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "frees": 0,
+        "instructions": 638000
+      },
+      "decoration": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0,
+        "instructions": 454000
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 176000,
+        "frees": 1,
+        "instructions": 5114983
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 304000,
+        "frees": 0,
+        "instructions": 174652
+      },
+      "cleanup": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 22000,
+        "instructions": 4404000
+      },
+      "returned_key": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0,
+        "instructions": 152000
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 2000
+      }
+    },
+    "events": {
+      "instances": 1,
+      "capture_entries": 4,
+      "frame_capture_entries": 8000,
+      "comparisons": 9580
+    },
+    "production_instructions": 38807516,
+    "production_heap": {
+      "allocations": 36465,
+      "frees": 36465,
+      "bytes": 7037224
+    },
+    "parser_destructor_frees_lines": [
+      "    46 ( 0.13%)  UnknownFile???:Parser::~Parser()"
+    ],
+    "production_destructor_instruction_lines": [
+      "   161,078 ( 0.42%)  ???:Parser::~Parser() [/home/nick/Repositories/nift/nift/.build/cp410-followup/accepted-nift]"
+    ]
+  },
+  {
+    "name": "identity",
+    "n": 4000,
+    "expected": "1\n4000\n2000\n",
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410-followup/sort-probes/n00004000/identity____/official-equivalent.f",
+    "phases": {
+      "factory": {
+        "calls": 4000,
+        "allocations": 52013,
+        "bytes": 7352952,
+        "frees": 4008,
+        "instructions": 30399647
+      },
+      "instance": {
+        "calls": 4000,
+        "allocations": 4000,
+        "bytes": 1152000,
+        "frees": 0,
+        "instructions": 1525140
+      },
+      "metadata": {
+        "calls": 4000,
+        "allocations": 16000,
+        "bytes": 3004000,
+        "frees": 0,
+        "instructions": 8576579
+      },
+      "capture": {
+        "calls": 4000,
+        "allocations": 20000,
+        "bytes": 2592000,
+        "frees": 0,
+        "instructions": 8164620
+      },
+      "registration": {
+        "calls": 4000,
+        "allocations": 12009,
+        "bytes": 604632,
+        "frees": 4008,
+        "instructions": 7180453
+      },
+      "arguments": {
+        "calls": 4000,
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 0,
+        "instructions": 1524474
+      },
+      "frame": {
+        "calls": 4000,
+        "allocations": 48001,
+        "bytes": 6940240,
+        "frees": 4001,
+        "instructions": 24572718
+      },
+      "body": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0,
+        "instructions": 1448000
+      },
+      "key": {
+        "calls": 8000,
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 0,
+        "instructions": 1276000
+      },
+      "decoration": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0,
+        "instructions": 908000
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 352000,
+        "frees": 1,
+        "instructions": 11554597
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 608000,
+        "frees": 0,
+        "instructions": 348652
+      },
+      "cleanup": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 44000,
+        "instructions": 8752000
+      },
+      "returned_key": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0,
+        "instructions": 304000
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 4000
+      }
+    },
+    "events": {
+      "instances": 4000,
+      "capture_entries": 16000,
+      "frame_capture_entries": 16000,
+      "comparisons": 21158
+    },
+    "production_instructions": 108636617,
+    "production_heap": {
+      "allocations": 120459,
+      "frees": 120459,
+      "bytes": 21164702
+    },
+    "parser_destructor_frees_lines": [
+      " 44,025 (36.55%)  UnknownFile???:Parser::~Parser()"
+    ],
+    "production_destructor_instruction_lines": [
+      " 10,661,537 ( 9.81%)  ???:Parser::~Parser() [/home/nick/Repositories/nift/nift/.build/cp410-followup/accepted-nift]"
+    ]
+  },
+  {
+    "name": "captured",
+    "n": 4000,
+    "expected": "1\n4000\n2000\n",
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410-followup/sort-probes/n00004000/captured____/official-equivalent.f",
+    "phases": {
+      "factory": {
+        "calls": 4000,
+        "allocations": 56013,
+        "bytes": 7896952,
+        "frees": 4008
+      },
+      "instance": {
+        "calls": 4000,
+        "allocations": 4000,
+        "bytes": 1152000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 4000,
+        "allocations": 16000,
+        "bytes": 3004000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 4000,
+        "allocations": 24000,
+        "bytes": 3136000,
+        "frees": 0
+      },
+      "registration": {
+        "calls": 4000,
+        "allocations": 12009,
+        "bytes": 604632,
+        "frees": 4008
+      },
+      "arguments": {
+        "calls": 4000,
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 4000,
+        "allocations": 52001,
+        "bytes": 7484240,
+        "frees": 4001
+      },
+      "body": {
+        "calls": 4000,
+        "allocations": 4007,
+        "bytes": 257232,
+        "frees": 4001
+      },
+      "key": {
+        "calls": 8000,
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 352000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 48000
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 4000
+      }
+    },
+    "events": {
+      "instances": 4000,
+      "capture_entries": 20000,
+      "frame_capture_entries": 20000,
+      "comparisons": 21158
+    },
+    "production_instructions": 131061777,
+    "production_heap": {
+      "allocations": 132474,
+      "frees": 132474,
+      "bytes": 22510953
+    },
+    "parser_destructor_frees_lines": [
+      " 48,028 (36.25%)  UnknownFile???:Parser::~Parser()"
+    ],
+    "production_destructor_instruction_lines": [
+      " 11,608,200 ( 8.86%)  ???:Parser::~Parser() [/home/nick/Repositories/nift/nift/.build/cp410-followup/accepted-nift]"
+    ]
+  },
+  {
+    "name": "unused16",
+    "n": 4000,
+    "expected": "1\n4000\n2000\n",
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410-followup/sort-probes/n00004000/unused16____/official-equivalent.f",
+    "phases": {
+      "factory": {
+        "calls": 4000,
+        "allocations": 120013,
+        "bytes": 16984952,
+        "frees": 8008
+      },
+      "instance": {
+        "calls": 4000,
+        "allocations": 4000,
+        "bytes": 1152000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 4000,
+        "allocations": 16000,
+        "bytes": 3004000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 4000,
+        "allocations": 88000,
+        "bytes": 12224000,
+        "frees": 4000
+      },
+      "registration": {
+        "calls": 4000,
+        "allocations": 12009,
+        "bytes": 604632,
+        "frees": 4008
+      },
+      "arguments": {
+        "calls": 4000,
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 4000,
+        "allocations": 116001,
+        "bytes": 16572240,
+        "frees": 8001
+      },
+      "body": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "calls": 8000,
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 352000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 108000
+      },
+      "returned_key": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 4000
+      }
+    },
+    "events": {
+      "instances": 4000,
+      "capture_entries": 80000,
+      "frame_capture_entries": 80000,
+      "comparisons": 21158
+    },
+    "production_instructions": 218358471,
+    "production_heap": {
+      "allocations": 256593,
+      "frees": 256593,
+      "bytes": 40451991
+    },
+    "parser_destructor_frees_lines": [
+      "108,073 (42.12%)  UnknownFile???:Parser::~Parser()"
+    ],
+    "production_destructor_instruction_lines": [
+      " 25,721,373 (11.78%)  ???:Parser::~Parser() [/home/nick/Repositories/nift/nift/.build/cp410-followup/accepted-nift]"
+    ]
+  },
+  {
+    "name": "map",
+    "n": 4000,
+    "expected": "4000\n1\n2001\n",
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410-followup/sort-probes/n00004000/map_________/official-equivalent.f",
+    "phases": {
+      "factory": {
+        "calls": 1,
+        "allocations": 18,
+        "bytes": 2243,
+        "frees": 1
+      },
+      "instance": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 288,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 1,
+        "allocations": 4,
+        "bytes": 751,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 1,
+        "allocations": 5,
+        "bytes": 648,
+        "frees": 0
+      },
+      "registration": {
+        "calls": 1,
+        "allocations": 4,
+        "bytes": 236,
+        "frees": 1
+      },
+      "arguments": {
+        "calls": 4000,
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 4000,
+        "allocations": 48001,
+        "bytes": 6940240,
+        "frees": 4001
+      },
+      "body": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 44000
+      },
+      "returned_key": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 1,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      }
+    },
+    "events": {
+      "instances": 1,
+      "capture_entries": 4,
+      "frame_capture_entries": 16000,
+      "comparisons": 0
+    },
+    "production_instructions": 54967107,
+    "production_heap": {
+      "allocations": 64467,
+      "frees": 64467,
+      "bytes": 12775937
+    },
+    "parser_destructor_frees_lines": [
+      "     42 ( 0.07%)  UnknownFile???:Parser::~Parser()"
+    ],
+    "production_destructor_instruction_lines": [
+      "   316,667 ( 0.58%)  ???:Parser::~Parser() [/home/nick/Repositories/nift/nift/.build/cp410-followup/accepted-nift]"
+    ]
+  },
+  {
+    "name": "precreated",
+    "n": 4000,
+    "expected": "1\n4000\n2000\n",
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410-followup/sort-probes/n00004000/precreated__/official-equivalent.f",
+    "phases": {
+      "factory": {
+        "calls": 4000,
+        "allocations": 4000,
+        "bytes": 124000,
+        "frees": 0
+      },
+      "instance": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 288,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 1,
+        "allocations": 4,
+        "bytes": 751,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 1,
+        "allocations": 5,
+        "bytes": 648,
+        "frees": 0
+      },
+      "registration": {
+        "calls": 1,
+        "allocations": 4,
+        "bytes": 236,
+        "frees": 1
+      },
+      "arguments": {
+        "calls": 4000,
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 4000,
+        "allocations": 48001,
+        "bytes": 6940240,
+        "frees": 4001
+      },
+      "body": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "calls": 8000,
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 352000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 44000
+      },
+      "returned_key": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 4000
+      }
+    },
+    "events": {
+      "instances": 1,
+      "capture_entries": 4,
+      "frame_capture_entries": 16000,
+      "comparisons": 21158
+    },
+    "production_instructions": 75845373,
+    "production_heap": {
+      "allocations": 72466,
+      "frees": 72466,
+      "bytes": 13927816
+    },
+    "parser_destructor_frees_lines": [
+      "     46 ( 0.06%)  UnknownFile???:Parser::~Parser()"
+    ],
+    "production_destructor_instruction_lines": [
+      "   317,078 ( 0.42%)  ???:Parser::~Parser() [/home/nick/Repositories/nift/nift/.build/cp410-followup/accepted-nift]"
+    ]
+  },
+  {
+    "name": "identity",
+    "n": 8000,
+    "expected": "1\n8000\n4000\n",
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410-followup/sort-probes/n00008000/identity____/official-equivalent.f",
+    "phases": {
+      "factory": {
+        "calls": 8000,
+        "allocations": 104014,
+        "bytes": 14711136,
+        "frees": 8009,
+        "instructions": 60816786
+      },
+      "instance": {
+        "calls": 8000,
+        "allocations": 8000,
+        "bytes": 2304000,
+        "frees": 0,
+        "instructions": 3051028
+      },
+      "metadata": {
+        "calls": 8000,
+        "allocations": 32000,
+        "bytes": 6008000,
+        "frees": 0,
+        "instructions": 17152579
+      },
+      "capture": {
+        "calls": 8000,
+        "allocations": 40000,
+        "bytes": 5184000,
+        "frees": 0,
+        "instructions": 16328620
+      },
+      "registration": {
+        "calls": 8000,
+        "allocations": 24010,
+        "bytes": 1214816,
+        "frees": 8009,
+        "instructions": 14387704
+      },
+      "arguments": {
+        "calls": 8000,
+        "allocations": 8000,
+        "bytes": 1216000,
+        "frees": 0,
+        "instructions": 3048572
+      },
+      "frame": {
+        "calls": 8000,
+        "allocations": 96001,
+        "bytes": 13880240,
+        "frees": 8001,
+        "instructions": 49139980
+      },
+      "body": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0,
+        "instructions": 2896000
+      },
+      "key": {
+        "calls": 16000,
+        "allocations": 8000,
+        "bytes": 1216000,
+        "frees": 0,
+        "instructions": 2552000
+      },
+      "decoration": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0,
+        "instructions": 1816000
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 704000,
+        "frees": 1,
+        "instructions": 23432177
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 1216000,
+        "frees": 0,
+        "instructions": 696652
+      },
+      "cleanup": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 88000,
+        "instructions": 17504000
+      },
+      "returned_key": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0,
+        "instructions": 608000
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 8000
+      }
+    },
+    "events": {
+      "instances": 8000,
+      "capture_entries": 32000,
+      "frame_capture_entries": 32000,
+      "comparisons": 46312
+    },
+    "production_instructions": 214527593,
+    "production_heap": {
+      "allocations": 240461,
+      "frees": 240461,
+      "bytes": 42192070
+    },
+    "parser_destructor_frees_lines": [
+      " 88,025 (36.61%)  UnknownFile???:Parser::~Parser()"
+    ],
+    "production_destructor_instruction_lines": [
+      " 21,331,565 ( 9.94%)  ???:Parser::~Parser() [/home/nick/Repositories/nift/nift/.build/cp410-followup/accepted-nift]"
+    ]
+  },
+  {
+    "name": "captured",
+    "n": 8000,
+    "expected": "1\n8000\n4000\n",
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410-followup/sort-probes/n00008000/captured____/official-equivalent.f",
+    "phases": {
+      "factory": {
+        "calls": 8000,
+        "allocations": 112014,
+        "bytes": 15799136,
+        "frees": 8009
+      },
+      "instance": {
+        "calls": 8000,
+        "allocations": 8000,
+        "bytes": 2304000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 8000,
+        "allocations": 32000,
+        "bytes": 6008000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 8000,
+        "allocations": 48000,
+        "bytes": 6272000,
+        "frees": 0
+      },
+      "registration": {
+        "calls": 8000,
+        "allocations": 24010,
+        "bytes": 1214816,
+        "frees": 8009
+      },
+      "arguments": {
+        "calls": 8000,
+        "allocations": 8000,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 8000,
+        "allocations": 104001,
+        "bytes": 14968240,
+        "frees": 8001
+      },
+      "body": {
+        "calls": 8000,
+        "allocations": 8007,
+        "bytes": 513232,
+        "frees": 8001
+      },
+      "key": {
+        "calls": 16000,
+        "allocations": 8000,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 704000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 96000
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 8000
+      }
+    },
+    "events": {
+      "instances": 8000,
+      "capture_entries": 40000,
+      "frame_capture_entries": 40000,
+      "comparisons": 46312
+    },
+    "production_instructions": 259335211,
+    "production_heap": {
+      "allocations": 264476,
+      "frees": 264476,
+      "bytes": 44882321
+    },
+    "parser_destructor_frees_lines": [
+      " 96,028 (36.31%)  UnknownFile???:Parser::~Parser()"
+    ],
+    "production_destructor_instruction_lines": [
+      " 23,223,942 ( 8.96%)  ???:Parser::~Parser() [/home/nick/Repositories/nift/nift/.build/cp410-followup/accepted-nift]"
+    ]
+  },
+  {
+    "name": "unused16",
+    "n": 8000,
+    "expected": "1\n8000\n4000\n",
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410-followup/sort-probes/n00008000/unused16____/official-equivalent.f",
+    "phases": {
+      "factory": {
+        "calls": 8000,
+        "allocations": 240014,
+        "bytes": 33975136,
+        "frees": 16009
+      },
+      "instance": {
+        "calls": 8000,
+        "allocations": 8000,
+        "bytes": 2304000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 8000,
+        "allocations": 32000,
+        "bytes": 6008000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 8000,
+        "allocations": 176000,
+        "bytes": 24448000,
+        "frees": 8000
+      },
+      "registration": {
+        "calls": 8000,
+        "allocations": 24010,
+        "bytes": 1214816,
+        "frees": 8009
+      },
+      "arguments": {
+        "calls": 8000,
+        "allocations": 8000,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 8000,
+        "allocations": 232001,
+        "bytes": 33144240,
+        "frees": 16001
+      },
+      "body": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "calls": 16000,
+        "allocations": 8000,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 704000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 216000
+      },
+      "returned_key": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 8000
+      }
+    },
+    "events": {
+      "instances": 8000,
+      "capture_entries": 160000,
+      "frame_capture_entries": 160000,
+      "comparisons": 46312
+    },
+    "production_instructions": 433035183,
+    "production_heap": {
+      "allocations": 512595,
+      "frees": 512595,
+      "bytes": 80743359
+    },
+    "parser_destructor_frees_lines": [
+      "216,073 (42.15%)  UnknownFile???:Parser::~Parser()"
+    ],
+    "production_destructor_instruction_lines": [
+      " 51,440,272 (11.88%)  ???:Parser::~Parser() [/home/nick/Repositories/nift/nift/.build/cp410-followup/accepted-nift]"
+    ]
+  },
+  {
+    "name": "map",
+    "n": 8000,
+    "expected": "8000\n1\n4001\n",
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410-followup/sort-probes/n00008000/map_________/official-equivalent.f",
+    "phases": {
+      "factory": {
+        "calls": 1,
+        "allocations": 18,
+        "bytes": 2243,
+        "frees": 1
+      },
+      "instance": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 288,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 1,
+        "allocations": 4,
+        "bytes": 751,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 1,
+        "allocations": 5,
+        "bytes": 648,
+        "frees": 0
+      },
+      "registration": {
+        "calls": 1,
+        "allocations": 4,
+        "bytes": 236,
+        "frees": 1
+      },
+      "arguments": {
+        "calls": 8000,
+        "allocations": 8000,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 8000,
+        "allocations": 96001,
+        "bytes": 13880240,
+        "frees": 8001
+      },
+      "body": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 88000
+      },
+      "returned_key": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 1,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      }
+    },
+    "events": {
+      "instances": 1,
+      "capture_entries": 4,
+      "frame_capture_entries": 32000,
+      "comparisons": 0
+    },
+    "production_instructions": 106869670,
+    "production_heap": {
+      "allocations": 128469,
+      "frees": 128469,
+      "bytes": 25406305
+    },
+    "parser_destructor_frees_lines": [
+      "     42 ( 0.03%)  UnknownFile???:Parser::~Parser()"
+    ],
+    "production_destructor_instruction_lines": [
+      "    628,667 ( 0.59%)  ???:Parser::~Parser() [/home/nick/Repositories/nift/nift/.build/cp410-followup/accepted-nift]"
+    ]
+  },
+  {
+    "name": "precreated",
+    "n": 8000,
+    "expected": "1\n8000\n4000\n",
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410-followup/sort-probes/n00008000/precreated__/official-equivalent.f",
+    "phases": {
+      "factory": {
+        "calls": 8000,
+        "allocations": 8000,
+        "bytes": 248000,
+        "frees": 0
+      },
+      "instance": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 288,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 1,
+        "allocations": 4,
+        "bytes": 751,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 1,
+        "allocations": 5,
+        "bytes": 648,
+        "frees": 0
+      },
+      "registration": {
+        "calls": 1,
+        "allocations": 4,
+        "bytes": 236,
+        "frees": 1
+      },
+      "arguments": {
+        "calls": 8000,
+        "allocations": 8000,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 8000,
+        "allocations": 96001,
+        "bytes": 13880240,
+        "frees": 8001
+      },
+      "body": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "calls": 16000,
+        "allocations": 8000,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 704000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 88000
+      },
+      "returned_key": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 8000
+      }
+    },
+    "events": {
+      "instances": 1,
+      "capture_entries": 4,
+      "frame_capture_entries": 32000,
+      "comparisons": 46312
+    },
+    "production_instructions": 148911316,
+    "production_heap": {
+      "allocations": 144467,
+      "frees": 144467,
+      "bytes": 27709000
+    },
+    "parser_destructor_frees_lines": [
+      "     46 ( 0.03%)  UnknownFile???:Parser::~Parser()"
+    ],
+    "production_destructor_instruction_lines": [
+      "    629,078 ( 0.42%)  ???:Parser::~Parser() [/home/nick/Repositories/nift/nift/.build/cp410-followup/accepted-nift]"
+    ]
+  },
+  {
+    "name": "identity",
+    "n": 16000,
+    "expected": "1\n16000\n8000\n",
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410-followup/sort-probes/n00016000/identity____/official-equivalent.f",
+    "phases": {
+      "factory": {
+        "calls": 16000,
+        "allocations": 208015,
+        "bytes": 29429160,
+        "frees": 16010,
+        "instructions": 121808420
+      },
+      "instance": {
+        "calls": 16000,
+        "allocations": 16000,
+        "bytes": 4608000,
+        "frees": 0,
+        "instructions": 6101505
+      },
+      "metadata": {
+        "calls": 16000,
+        "allocations": 64000,
+        "bytes": 12016000,
+        "frees": 0,
+        "instructions": 34304731
+      },
+      "capture": {
+        "calls": 16000,
+        "allocations": 80000,
+        "bytes": 10368000,
+        "frees": 0,
+        "instructions": 32656756
+      },
+      "registration": {
+        "calls": 16000,
+        "allocations": 48011,
+        "bytes": 2436840,
+        "frees": 16010,
+        "instructions": 28960573
+      },
+      "arguments": {
+        "calls": 16000,
+        "allocations": 16000,
+        "bytes": 2432000,
+        "frees": 0,
+        "instructions": 6098366
+      },
+      "frame": {
+        "calls": 16000,
+        "allocations": 192001,
+        "bytes": 27760240,
+        "frees": 16001,
+        "instructions": 98274357
+      },
+      "body": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0,
+        "instructions": 5792000
+      },
+      "key": {
+        "calls": 32000,
+        "allocations": 16000,
+        "bytes": 2432000,
+        "frees": 0,
+        "instructions": 5104000
+      },
+      "decoration": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0,
+        "instructions": 3632000
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 1408000,
+        "frees": 1,
+        "instructions": 52169543
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 2432000,
+        "frees": 0,
+        "instructions": 1392652
+      },
+      "cleanup": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 176000,
+        "instructions": 35008000
+      },
+      "returned_key": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0,
+        "instructions": 1216000
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 16000
+      }
+    },
+    "events": {
+      "instances": 16000,
+      "capture_entries": 64000,
+      "frame_capture_entries": 64000,
+      "comparisons": 100620
+    },
+    "production_instructions": 431538781,
+    "production_heap": {
+      "allocations": 480463,
+      "frees": 480463,
+      "bytes": 84254494
+    },
+    "parser_destructor_frees_lines": [
+      "176,025 (36.64%)  UnknownFile???:Parser::~Parser()"
+    ],
+    "production_destructor_instruction_lines": [
+      " 42,673,741 ( 9.89%)  ???:Parser::~Parser() [/home/nick/Repositories/nift/nift/.build/cp410-followup/accepted-nift]"
+    ]
+  },
+  {
+    "name": "captured",
+    "n": 16000,
+    "expected": "1\n16000\n8000\n",
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410-followup/sort-probes/n00016000/captured____/official-equivalent.f",
+    "phases": {
+      "factory": {
+        "calls": 16000,
+        "allocations": 224015,
+        "bytes": 31605160,
+        "frees": 16010
+      },
+      "instance": {
+        "calls": 16000,
+        "allocations": 16000,
+        "bytes": 4608000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 16000,
+        "allocations": 64000,
+        "bytes": 12016000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 16000,
+        "allocations": 96000,
+        "bytes": 12544000,
+        "frees": 0
+      },
+      "registration": {
+        "calls": 16000,
+        "allocations": 48011,
+        "bytes": 2436840,
+        "frees": 16010
+      },
+      "arguments": {
+        "calls": 16000,
+        "allocations": 16000,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 16000,
+        "allocations": 208001,
+        "bytes": 29936240,
+        "frees": 16001
+      },
+      "body": {
+        "calls": 16000,
+        "allocations": 16007,
+        "bytes": 1025232,
+        "frees": 16001
+      },
+      "key": {
+        "calls": 32000,
+        "allocations": 16000,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 1408000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 192000
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 16000
+      }
+    },
+    "events": {
+      "instances": 16000,
+      "capture_entries": 80000,
+      "frame_capture_entries": 80000,
+      "comparisons": 100620
+    },
+    "production_instructions": 521131278,
+    "production_heap": {
+      "allocations": 528478,
+      "frees": 528478,
+      "bytes": 89632745
+    },
+    "parser_destructor_frees_lines": [
+      "192,028 (36.34%)  UnknownFile???:Parser::~Parser()"
+    ],
+    "production_destructor_instruction_lines": [
+      " 46,457,007 ( 8.91%)  ???:Parser::~Parser() [/home/nick/Repositories/nift/nift/.build/cp410-followup/accepted-nift]"
+    ]
+  },
+  {
+    "name": "unused16",
+    "n": 16000,
+    "expected": "1\n16000\n8000\n",
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410-followup/sort-probes/n00016000/unused16____/official-equivalent.f",
+    "phases": {
+      "factory": {
+        "calls": 16000,
+        "allocations": 480015,
+        "bytes": 67957160,
+        "frees": 32010
+      },
+      "instance": {
+        "calls": 16000,
+        "allocations": 16000,
+        "bytes": 4608000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 16000,
+        "allocations": 64000,
+        "bytes": 12016000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 16000,
+        "allocations": 352000,
+        "bytes": 48896000,
+        "frees": 16000
+      },
+      "registration": {
+        "calls": 16000,
+        "allocations": 48011,
+        "bytes": 2436840,
+        "frees": 16010
+      },
+      "arguments": {
+        "calls": 16000,
+        "allocations": 16000,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 16000,
+        "allocations": 464001,
+        "bytes": 66288240,
+        "frees": 32001
+      },
+      "body": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "calls": 32000,
+        "allocations": 16000,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 1408000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 432000
+      },
+      "returned_key": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 16000
+      }
+    },
+    "events": {
+      "instances": 16000,
+      "capture_entries": 320000,
+      "frame_capture_entries": 320000,
+      "comparisons": 100620
+    },
+    "production_instructions": 867592200,
+    "production_heap": {
+      "allocations": 1024597,
+      "frees": 1024597,
+      "bytes": 161333783
+    },
+    "parser_destructor_frees_lines": [
+      "  432,073 (42.17%)  UnknownFile???:Parser::~Parser()"
+    ],
+    "production_destructor_instruction_lines": [
+      "102,892,215 (11.86%)  ???:Parser::~Parser() [/home/nick/Repositories/nift/nift/.build/cp410-followup/accepted-nift]"
+    ]
+  },
+  {
+    "name": "map",
+    "n": 16000,
+    "expected": "16000\n1\n8001\n",
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410-followup/sort-probes/n00016000/map_________/official-equivalent.f",
+    "phases": {
+      "factory": {
+        "calls": 1,
+        "allocations": 18,
+        "bytes": 2243,
+        "frees": 1
+      },
+      "instance": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 288,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 1,
+        "allocations": 4,
+        "bytes": 751,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 1,
+        "allocations": 5,
+        "bytes": 648,
+        "frees": 0
+      },
+      "registration": {
+        "calls": 1,
+        "allocations": 4,
+        "bytes": 236,
+        "frees": 1
+      },
+      "arguments": {
+        "calls": 16000,
+        "allocations": 16000,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 16000,
+        "allocations": 192001,
+        "bytes": 27760240,
+        "frees": 16001
+      },
+      "body": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 176000
+      },
+      "returned_key": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 1,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      }
+    },
+    "events": {
+      "instances": 1,
+      "capture_entries": 4,
+      "frame_capture_entries": 64000,
+      "comparisons": 0
+    },
+    "production_instructions": 210680713,
+    "production_heap": {
+      "allocations": 256471,
+      "frees": 256471,
+      "bytes": 50667072
+    },
+    "parser_destructor_frees_lines": [
+      "     42 ( 0.02%)  UnknownFile???:Parser::~Parser()"
+    ],
+    "production_destructor_instruction_lines": [
+      "  1,252,667 ( 0.59%)  ???:Parser::~Parser() [/home/nick/Repositories/nift/nift/.build/cp410-followup/accepted-nift]"
+    ]
+  },
+  {
+    "name": "precreated",
+    "n": 16000,
+    "expected": "1\n16000\n8000\n",
+    "path": "/home/nick/Repositories/nift/nift/.build/cp410-followup/sort-probes/n00016000/precreated__/official-equivalent.f",
+    "phases": {
+      "factory": {
+        "calls": 16000,
+        "allocations": 16000,
+        "bytes": 496000,
+        "frees": 0
+      },
+      "instance": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 288,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 1,
+        "allocations": 4,
+        "bytes": 751,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 1,
+        "allocations": 5,
+        "bytes": 648,
+        "frees": 0
+      },
+      "registration": {
+        "calls": 1,
+        "allocations": 4,
+        "bytes": 236,
+        "frees": 1
+      },
+      "arguments": {
+        "calls": 16000,
+        "allocations": 16000,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 16000,
+        "allocations": 192001,
+        "bytes": 27760240,
+        "frees": 16001
+      },
+      "body": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "calls": 32000,
+        "allocations": 16000,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 1408000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 176000
+      },
+      "returned_key": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 16000
+      }
+    },
+    "events": {
+      "instances": 1,
+      "capture_entries": 4,
+      "frame_capture_entries": 64000,
+      "comparisons": 100620
+    },
+    "production_instructions": 300291502,
+    "production_heap": {
+      "allocations": 288468,
+      "frees": 288468,
+      "bytes": 55271399
+    },
+    "parser_destructor_frees_lines": [
+      "     46 ( 0.02%)  UnknownFile???:Parser::~Parser()"
+    ],
+    "production_destructor_instruction_lines": [
+      "  1,253,078 ( 0.42%)  ???:Parser::~Parser() [/home/nick/Repositories/nift/nift/.build/cp410-followup/accepted-nift]"
+    ]
+  }
+]

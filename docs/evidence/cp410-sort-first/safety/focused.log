@@ -1,0 +1,36 @@
+CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-linux-gnu-cc"
+NIFT_BIN="/home/nick/Repositories/nift/nift/nift" tests/diagnostics_smoke.sh
+diagnostics smoke passed
+diagnostics smoke passed
+python3 tests/v410_sort_factory_parity.py --nift ./nift
+PASS 31 exact sort/factory/capture/origin contracts
+python3 tests/v410_object_member_parity.py --nift ./nift
+PASS 86 exact object/member/location/origin contracts
+mkdir -p .build
+g++ -std=c++17 -O2 -Wall -Wextra -pedantic -Isrc -Ijsonic/include tests/v410_object_member_unit.cpp src/RuntimeValue.cpp -o .build/v410-object-member-unit
+.build/v410-object-member-unit
+python3 tests/v410_object_member_guard.py --nift ./.build/nift-object-lookup-guard
+PASS one traversal per object lookup, exact comparison positions and missing checks
+NIFT="/home/nick/Repositories/nift/nift/nift" bash tests/v48_callable_parity.sh
+PASS v4.8 callable parity
+NIFT="/home/nick/Repositories/nift/nift/nift" bash tests/v48_callback_parity.sh
+PASS v4.8 identifier and callback compatibility parity
+PASS v4.8 callback compatibility matrix
+NIFT="/home/nick/Repositories/nift/nift/nift" python3 tests/v48_callback_numeric_parity.py
+PASS 470 ordinary/callback numeric and fallback parity pairs
+NIFT="/home/nick/Repositories/nift/nift/nift" python3 tests/v410_allocation_guard.py
+[
+  {
+    "low": 100,
+    "high": 200,
+    "capture_slope": 2.25,
+    "dispatch_slope": 33.0
+  },
+  {
+    "low": 200,
+    "high": 400,
+    "capture_slope": 2.25,
+    "dispatch_slope": 33.0
+  }
+]
+PASS capture and native-dispatch allocation slopes (N/2N/4N)

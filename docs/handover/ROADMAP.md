@@ -18,8 +18,8 @@ benchmark rerun, node provisioning or new release are authorized.
 
 ## Next review boundary
 
-1. Commit the accepted runtime and guards/evidence coherently, repeat focused
-   checks, push normally, and require all relevant hosted certification green.
+1. DONE: accepted source was committed and normally pushed at `4d80ca47`;
+   all ten exact-SHA hosted certifications passed.
 2. Prioritize sort/selector factory, capture, frame, instance and retention costs.
    Extend exact semantic contracts and quantify the post-acceptance decomposition.
    Design immutable plans plus fresh instances; return ownership, diagnostics,
@@ -108,3 +108,19 @@ is green. That historical benchmark recommendation was superseded: official meas
 are deferred until after v4.9 release. Both bounded waves and the identity-sort
 investigation are accepted; performance implementation is now frozen. Full certificates and tradeoffs are
 recorded in the campaign evidence.
+
+The [sort-first review](../evidence/cp410-sort-first/report.md) records the
+post-acceptance decomposition, ownership proposal and separate local object
+experiment. Callable architecture and canonical Jsonic++ implementation remain
+review boundaries. No release or official benchmark run is authorized.
+
+## Accepted sort-first follow-up and next boundary
+
+The one-fetch object win is accepted and committed separately. Publish and
+certify it first; then investigate capture/frame/instance ownership for sort.
+Metadata plan sharing is subordinate to the selected environment ownership
+model and must not be implemented as an isolated architecture. Compare current,
+shared-environment/overlay, persistent-parent/overlay and COW prototypes outside
+production, with exact lookup/escape semantics and measured payoff. Canonical
+Jsonic++ threshold work is secondary. Stop before production representation or
+ownership changes. Current [checkpoint](../evidence/cp410-capture-frame/README.md).

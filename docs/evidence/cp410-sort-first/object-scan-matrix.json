@@ -1,0 +1,194 @@
+[
+  {
+    "width": 8,
+    "position": "first",
+    "before_scans": 200,
+    "before_comparisons": 200,
+    "after_scans": 100,
+    "after_comparisons": 100
+  },
+  {
+    "width": 8,
+    "position": "middle",
+    "before_scans": 200,
+    "before_comparisons": 1000,
+    "after_scans": 100,
+    "after_comparisons": 500
+  },
+  {
+    "width": 8,
+    "position": "last",
+    "before_scans": 200,
+    "before_comparisons": 1600,
+    "after_scans": 100,
+    "after_comparisons": 800
+  },
+  {
+    "width": 8,
+    "position": "missing",
+    "before_scans": 1,
+    "before_comparisons": 8,
+    "after_scans": 1,
+    "after_comparisons": 8
+  },
+  {
+    "width": 32,
+    "position": "first",
+    "before_scans": 200,
+    "before_comparisons": 200,
+    "after_scans": 100,
+    "after_comparisons": 100
+  },
+  {
+    "width": 32,
+    "position": "middle",
+    "before_scans": 200,
+    "before_comparisons": 3400,
+    "after_scans": 100,
+    "after_comparisons": 1700
+  },
+  {
+    "width": 32,
+    "position": "last",
+    "before_scans": 200,
+    "before_comparisons": 6400,
+    "after_scans": 100,
+    "after_comparisons": 3200
+  },
+  {
+    "width": 32,
+    "position": "missing",
+    "before_scans": 1,
+    "before_comparisons": 32,
+    "after_scans": 1,
+    "after_comparisons": 32
+  },
+  {
+    "width": 128,
+    "position": "first",
+    "before_scans": 200,
+    "before_comparisons": 200,
+    "after_scans": 100,
+    "after_comparisons": 100
+  },
+  {
+    "width": 128,
+    "position": "middle",
+    "before_scans": 200,
+    "before_comparisons": 13000,
+    "after_scans": 100,
+    "after_comparisons": 6500
+  },
+  {
+    "width": 128,
+    "position": "last",
+    "before_scans": 200,
+    "before_comparisons": 25600,
+    "after_scans": 100,
+    "after_comparisons": 12800
+  },
+  {
+    "width": 128,
+    "position": "missing",
+    "before_scans": 1,
+    "before_comparisons": 128,
+    "after_scans": 1,
+    "after_comparisons": 128
+  },
+  {
+    "width": 512,
+    "position": "first",
+    "before_scans": 200,
+    "before_comparisons": 200,
+    "after_scans": 100,
+    "after_comparisons": 100
+  },
+  {
+    "width": 512,
+    "position": "middle",
+    "before_scans": 200,
+    "before_comparisons": 51400,
+    "after_scans": 100,
+    "after_comparisons": 25700
+  },
+  {
+    "width": 512,
+    "position": "last",
+    "before_scans": 200,
+    "before_comparisons": 102400,
+    "after_scans": 100,
+    "after_comparisons": 51200
+  },
+  {
+    "width": 512,
+    "position": "missing",
+    "before_scans": 1,
+    "before_comparisons": 512,
+    "after_scans": 1,
+    "after_comparisons": 512
+  },
+  {
+    "width": 2000,
+    "position": "first",
+    "before_scans": 200,
+    "before_comparisons": 200,
+    "after_scans": 100,
+    "after_comparisons": 100
+  },
+  {
+    "width": 2000,
+    "position": "middle",
+    "before_scans": 200,
+    "before_comparisons": 200200,
+    "after_scans": 100,
+    "after_comparisons": 100100
+  },
+  {
+    "width": 2000,
+    "position": "last",
+    "before_scans": 200,
+    "before_comparisons": 400000,
+    "after_scans": 100,
+    "after_comparisons": 200000
+  },
+  {
+    "width": 2000,
+    "position": "missing",
+    "before_scans": 1,
+    "before_comparisons": 2000,
+    "after_scans": 1,
+    "after_comparisons": 2000
+  },
+  {
+    "width": 8000,
+    "position": "first",
+    "before_scans": 200,
+    "before_comparisons": 200,
+    "after_scans": 100,
+    "after_comparisons": 100
+  },
+  {
+    "width": 8000,
+    "position": "middle",
+    "before_scans": 200,
+    "before_comparisons": 800200,
+    "after_scans": 100,
+    "after_comparisons": 400100
+  },
+  {
+    "width": 8000,
+    "position": "last",
+    "before_scans": 200,
+    "before_comparisons": 1600000,
+    "after_scans": 100,
+    "after_comparisons": 800000
+  },
+  {
+    "width": 8000,
+    "position": "missing",
+    "before_scans": 1,
+    "before_comparisons": 8000,
+    "after_scans": 1,
+    "after_comparisons": 8000
+  }
+]

@@ -1,0 +1,9 @@
+{
+  "runtime_commit": "7dfd2ebdcc8db898797a9ac8141acb7eb32381c4",
+  "object_one_fetch": "KEEP/accepted",
+  "hosted": "PENDING",
+  "production_architecture": "NOT STARTED",
+  "plan_instance_split": "NOT STARTED",
+  "next_priority": "capture/frame/instance ownership",
+  "official_benchmark": "20261009-v490 unchanged"
+}

@@ -1832,7 +1832,10 @@ test: test-v49-call-outcome
 test-v410-allocation-guard: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" python3 tests/v410_allocation_guard.py
 
-.PHONY: test-v410-object-member-parity test-v410-object-member-unit
+.PHONY: test-v410-sort-factory-parity test-v410-object-member-parity test-v410-object-member-unit
+test-v410-sort-factory-parity: $(TARGET)
+	python3 tests/v410_sort_factory_parity.py --nift ./$(TARGET)
+
 test-v410-object-member-parity: $(TARGET)
 	python3 tests/v410_object_member_parity.py --nift ./$(TARGET)
 
@@ -1854,4 +1857,4 @@ $(OBJECT_LOOKUP_GUARD): $(filter-out src/RuntimeValue.o,$(CLI_OBJECTS)) $(TEST_D
 test-v410-object-member-guard: $(OBJECT_LOOKUP_GUARD)
 	python3 tests/v410_object_member_guard.py --nift ./$(OBJECT_LOOKUP_GUARD)
 
-test: test-v410-object-member-parity test-v410-object-member-unit test-v410-object-member-guard
+test: test-v410-sort-factory-parity test-v410-object-member-parity test-v410-object-member-unit test-v410-object-member-guard

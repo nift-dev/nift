@@ -1,0 +1,1 @@
+FAIL scans 8/first/dot: (200, 200) != (100, 100)

@@ -1,0 +1,22 @@
+[
+  {
+    "name": "escaped-equivalent",
+    "source": "{\"a\":1,\"\\u0061\":2}",
+    "stdout": "ERROR\t15\tduplicate object key 'a'\n"
+  },
+  {
+    "name": "duplicate-before-bad-colon",
+    "source": "{\"a\":1,\"a\" garbage}",
+    "stdout": "ERROR\t10\tduplicate object key 'a'\n"
+  },
+  {
+    "name": "duplicate-before-bad-value",
+    "source": "{\"a\":1,\"a\":broken}",
+    "stdout": "ERROR\t10\tduplicate object key 'a'\n"
+  },
+  {
+    "name": "malformed-before-duplicate",
+    "source": "{\"a\":broken,\"a\":2}",
+    "stdout": "ERROR\t5\tunexpected character while parsing JSON\n"
+  }
+]

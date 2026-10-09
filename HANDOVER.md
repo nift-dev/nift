@@ -38,9 +38,15 @@ whether it is a regression.
   and review boundaries are in `docs/evidence/cp410-competitiveness/report.md`.
   Frozen `20261009-v490` results and official workloads remain unchanged.
   Concurrent external Labs presentation edits are preserved and recorded in the audit. Normal commit/push and exact-SHA non-release hosted certification are authorized.
-  Hosted green is required before the next runtime checkpoint. Sort/selector
-  architecture is the primary target: design the plan/instance split for review;
-  bounded one-fetch object access and canonical Jsonic++ investigation are secondary.
+  Accepted source `4d80ca47` passed all ten exact-SHA hosted workflows.
+  The one-fetch checkpoint is accepted; runtime commit `7dfd2ebd` is separate
+  from design/evidence. Current publication and next review boundary are in
+  `docs/evidence/cp410-capture-frame/README.md`.
+  Sort capture/frame/instance ownership is the primary architectural target.
+  Do not implement the metadata plan split in isolation for its ~8% ceiling.
+  After exact-SHA hosted green, investigate and prototype environment ownership;
+  stop before production architecture implementation. Canonical Jsonic++ threshold
+  investigation is secondary; persistent RuntimeValue object indexing is deferred.
   No official rerun, release or provisioning is authorized.
 - Public documentation: the separate `nift-dev.github.io` repository.
 - External contract: the separate `nift-regression-suite` repository.

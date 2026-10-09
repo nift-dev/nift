@@ -1,0 +1,1 @@
+["g++", "-std=c++17", "-O2", "-I/home/nick/Repositories/nift/jsonic/jsonic/include", ".build/cp410-followup/jsonic/probe.cpp", ".build/cp410-followup/jsonic/Alloc.cpp", "-o", "/home/nick/Repositories/nift/nift/.build/cp410-followup/jsonic/probe"]

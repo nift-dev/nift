@@ -1,0 +1,226 @@
+{
+  "baseline": "4d80ca47e94beb68544904e736a9f3415b303157",
+  "fixtures": {
+    "module.f": "v := 7\nfn(mk()) { return x => x + v }\nexport(mk)\n",
+    "error-module.f": "fn(mk_error()) { return x => x.missing }\nexport(mk_error)\n"
+  },
+  "cases": [
+    {
+      "name": "factory-count",
+      "source": "n := 0\nfn(mk()) { n += 1; return x => x }\nprint([3,1,2].sort_by(mk()).stringify()); print(n)\nprint([3,1,2].map(mk()).stringify()); print(n)\nprint([].sort_by(mk()).stringify()); print(n)\nprint([].map(mk()).stringify()); print(n)",
+      "exit": 0,
+      "stdout": "[1,2,3]\n3\n[3,1,2]\n4\n[]\n4\n[]\n5\n",
+      "stderr": ""
+    },
+    {
+      "name": "factory-order",
+      "source": "n := 0\nfn(mk()) { n += 1; print(n); return x => x }\nprint([3,1,2].sort_by(mk(), \"asc\", mk(), \"desc\").stringify())",
+      "exit": 0,
+      "stdout": "1\n2\n3\n4\n5\n6\n[1,2,3]\n",
+      "stderr": ""
+    },
+    {
+      "name": "fresh-identity",
+      "source": "f := x => x\ng := x => x\nprint(f == g); print(f == f)",
+      "exit": 0,
+      "stdout": "false\ntrue\n",
+      "stderr": ""
+    },
+    {
+      "name": "escape-identities",
+      "source": "saved := []\nfn(mk()) { f := x => x; saved.push(f); return f }\nprint([2,1].sort_by(mk()).stringify()); print(saved[0] == saved[1])",
+      "exit": 0,
+      "stdout": "[1,2]\nfalse\n",
+      "stderr": ""
+    },
+    {
+      "name": "capture-mutation",
+      "source": "n := 0\nf := x => n++\nprint([3,1,2].sort_by(f).stringify()); print(n)",
+      "exit": 0,
+      "stdout": "[3,1,2]\n3\n",
+      "stderr": ""
+    },
+    {
+      "name": "factory-capture-change",
+      "source": "n := 0\nfn(mk()) { n += 1; return x => n }\nprint([3,1,2].sort_by(mk()).stringify()); print(n)",
+      "exit": 0,
+      "stdout": "[3,1,2]\n3\n",
+      "stderr": ""
+    },
+    {
+      "name": "dynamic-capture-dependency",
+      "source": "fn(read_hidden()) { return hidden }\nfn(mk(hidden)) { return x => read_hidden() }\nf := mk(7)\nhidden := 100\nprint(f(0))",
+      "exit": 0,
+      "stdout": "7\n",
+      "stderr": ""
+    },
+    {
+      "name": "changing-outer",
+      "source": "n := 1\nf := x => x + n\nprint(f(2)); n = 7; print(f(2))",
+      "exit": 0,
+      "stdout": "3\n9\n",
+      "stderr": ""
+    },
+    {
+      "name": "shadowing",
+      "source": "x := 99\nf := x => x\nprint(f(3)); print(x)",
+      "exit": 0,
+      "stdout": "3\n99\n",
+      "stderr": ""
+    },
+    {
+      "name": "named-precedence",
+      "source": "fn(x()) { return 8 }\nf := x => x\nprint(type(f(3)))",
+      "exit": 0,
+      "stdout": "function\n",
+      "stderr": ""
+    },
+    {
+      "name": "escaped-local-captures",
+      "source": "fn(mk(v)) { return x => v }\na := mk(2); b := mk(8); print(a(0)); print(b(0))",
+      "exit": 0,
+      "stdout": "2\n8\n",
+      "stderr": ""
+    },
+    {
+      "name": "returned-callables",
+      "source": "a := [2,7].map(x => (y => x))\nf := a[0]; g := a[1]; print(f(0)); print(g(0)); print(f == g)",
+      "exit": 0,
+      "stdout": "2\n7\nfalse\n",
+      "stderr": ""
+    },
+    {
+      "name": "root-path-growth",
+      "source": "a := [[1]]\nfor(row : a) { f := x => row[0]; a.push([9]); print(f(0)) }",
+      "exit": 0,
+      "stdout": "1\n",
+      "stderr": ""
+    },
+    {
+      "name": "unused-timer-observable",
+      "source": "t := timer()\nf := async x => x\nr := f(3)\nprint(await r)",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: <ORACLE_ROOT>/unused-timer-observable.f:3:6: async function capture contains a non-transferable timer\n"
+    },
+    {
+      "name": "async-invoke",
+      "source": "f := async x => x + 1\nr := f(3); print(await r)",
+      "exit": 0,
+      "stdout": "4\n",
+      "stderr": ""
+    },
+    {
+      "name": "async-callback-current",
+      "source": "f := async x => x + 1\nprint([3,1,2].sort_by(f).stringify())",
+      "exit": 0,
+      "stdout": "[1,2,3]\n",
+      "stderr": ""
+    },
+    {
+      "name": "throwing-factory",
+      "source": "n := 0\nfn(mk()) { n += 1; if(n == 2) { throw error(\"stop\", \"user.selector\") }; return x => x }\ntry { [3,1,2].sort_by(mk()) } catch(e) { print(e.message) }\nprint(n)",
+      "exit": 0,
+      "stdout": "stop\n2\n",
+      "stderr": ""
+    },
+    {
+      "name": "bad-key-cleanup",
+      "source": "try { [2,1].sort_by(x => [x]) } catch(e) { print(\"caught\") }\nprint([2,1].sort_by(x => x).stringify())",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: <ORACLE_ROOT>/bad-key-cleanup.f:1:1: sort_by: key must be scalar\n"
+    },
+    {
+      "name": "module-ownership",
+      "source": "import(\"./module.f\")\nv := 100\nf := mk(); print(f(1)); print([3,1,2].sort_by(f).stringify())",
+      "exit": 0,
+      "stdout": "8\n[1,2,3]\n",
+      "stderr": ""
+    },
+    {
+      "name": "compound-stable-ties",
+      "source": "a := [{\"n\":\"a\",\"f\":false,\"v\":2},{\"n\":\"b\",\"f\":true,\"v\":1},{\"n\":\"c\",\"f\":true,\"v\":3},{\"n\":\"d\",\"f\":true,\"v\":3}]\nprint(a.sort_by(x => x.f, \"desc\", x => x.v, \"desc\").map(x => x.n).join(\",\"))",
+      "exit": 0,
+      "stdout": "c,d,b,a\n",
+      "stderr": ""
+    },
+    {
+      "name": "escaped-invoke-after-sort",
+      "source": "saved := []\nfn(mk()) { f := x => x; saved.push(f); return f }\nprint([3,1,2].sort_by(mk()).stringify()); f := saved[0]; g := saved[1]; print(f(8)); print(g(9)); print(f == g)",
+      "exit": 0,
+      "stdout": "[1,2,3]\n8\n9\nfalse\n",
+      "stderr": ""
+    },
+    {
+      "name": "nested-returned-factory",
+      "source": "fn(mk(v)) { return y => (x => x + v + y) }\nouter := mk(7); selector := outer(2); print([3,1,2].sort_by(selector).stringify()); print(selector(4))",
+      "exit": 0,
+      "stdout": "[1,2,3]\n13\n",
+      "stderr": ""
+    },
+    {
+      "name": "capture-rebinding-sort",
+      "source": "v := {\"k\":1}\nf := x => x * v.k\nprint([3,1,2].sort_by(f).stringify()); v = {\"k\":-1}; print([3,1,2].sort_by(f).stringify())",
+      "exit": 0,
+      "stdout": "[1,2,3]\n[3,2,1]\n",
+      "stderr": ""
+    },
+    {
+      "name": "location-parent-growth-sort",
+      "source": "a := [{\"k\":1}]\nfor(row : a) { f := x => x * row.k; a.push({\"k\":-1}); print([3,1,2].sort_by(f).stringify()) }",
+      "exit": 0,
+      "stdout": "[1,2,3]\n",
+      "stderr": ""
+    },
+    {
+      "name": "key-error-origin",
+      "source": "fn(mk()) { return x => x.missing }\nprint([{\"a\":1}].sort_by(mk()).stringify())",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: <ORACLE_ROOT>/key-error-origin.f:2:7: lambda body error: value has no member: missing\n"
+    },
+    {
+      "name": "compound-factory-trace",
+      "source": "fn(mk(n)) { print(n); return x => x }\nprint([2,1].sort_by(mk(1), \"asc\", mk(2), \"desc\").stringify())",
+      "exit": 0,
+      "stdout": "1\n2\n1\n2\n[1,2]\n",
+      "stderr": ""
+    },
+    {
+      "name": "empty-factory-trace",
+      "source": "fn(mk()) { print(\"factory\"); return x => x }\nprint([].sort_by(mk()).stringify())",
+      "exit": 0,
+      "stdout": "[]\n",
+      "stderr": ""
+    },
+    {
+      "name": "bad-direction-origin",
+      "source": "print([3,1].sort_by(x => x, \"sideways\").stringify())",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: <ORACLE_ROOT>/bad-direction-origin.f:1:7: sort_by: direction must be 'asc' or 'desc'\n"
+    },
+    {
+      "name": "compound-missing-direction",
+      "source": "print([3,1].sort_by(x => x, \"asc\", x => x).stringify())",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: <ORACLE_ROOT>/compound-missing-direction.f:1:7: sort_by: expected selector or selector/direction pairs\n"
+    },
+    {
+      "name": "module-definition-error",
+      "source": "import(\"./error-module.f\")\nf := mk_error(); print([1].sort_by(f).stringify())",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "error: <ORACLE_ROOT>/module-definition-error.f:2:24: lambda body error: value has no member: missing\n"
+    },
+    {
+      "name": "async-factory-sort",
+      "source": "fn(mk()) { return async x => x + 1 }\nprint([3,1,2].sort_by(mk()).stringify())",
+      "exit": 0,
+      "stdout": "[1,2,3]\n",
+      "stderr": ""
+    }
+  ]
+}

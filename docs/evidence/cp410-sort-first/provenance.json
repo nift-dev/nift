@@ -1,0 +1,10 @@
+{
+  "accepted_sha": "4d80ca47e94beb68544904e736a9f3415b303157",
+  "accepted_binary_sha256": "15dfefb789b5c2f58a8d8d5b1bd4ecb108c0e65970310829ee484074cd5ca103",
+  "candidate_binary_sha256": "1b70a37a77cea5328a960de3145fbdef5f5b95d1a6f0e7fa85af4e69109962a8",
+  "version": "4.10.0",
+  "abi": "1.3",
+  "architecture_implemented": false,
+  "jsonic_implemented": false,
+  "official_benchmark_rerun": false
+}
