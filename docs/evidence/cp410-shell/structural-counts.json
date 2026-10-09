@@ -1,0 +1,464 @@
+{
+  "measurement": "baseline-only logical counters; sort_entries counts inputs submitted including size-one calls that return without key conversion; growths covers directory entry vectors, not result/output vectors",
+  "rows": [
+    {
+      "shape": "official-traverse",
+      "n": 1000,
+      "pattern": "files/**/*.dat",
+      "results": 1200,
+      "counts": {
+        "walks": 1211,
+        "scans": 2,
+        "entries": 2400,
+        "matches": 1200,
+        "terminals": 1200,
+        "normalizations": 1200,
+        "sorts": 3,
+        "sort_entries": 3600,
+        "growths": 24
+      }
+    },
+    {
+      "shape": "official-traverse",
+      "n": 1000,
+      "pattern": "files/**/*.missing",
+      "results": 0,
+      "counts": {
+        "walks": 11,
+        "scans": 2,
+        "entries": 2400,
+        "matches": 1200,
+        "terminals": 0,
+        "normalizations": 0,
+        "sorts": 3,
+        "sort_entries": 2400,
+        "growths": 24
+      }
+    },
+    {
+      "shape": "official-traverse",
+      "n": 1000,
+      "pattern": "files/**/obj-*000*.dat",
+      "results": 1001,
+      "counts": {
+        "walks": 1012,
+        "scans": 2,
+        "entries": 2400,
+        "matches": 1200,
+        "terminals": 1001,
+        "normalizations": 1001,
+        "sorts": 3,
+        "sort_entries": 3401,
+        "growths": 24
+      }
+    },
+    {
+      "shape": "official-traverse",
+      "n": 10000,
+      "pattern": "files/**/*.dat",
+      "results": 12000,
+      "counts": {
+        "walks": 12011,
+        "scans": 2,
+        "entries": 24000,
+        "matches": 12000,
+        "terminals": 12000,
+        "normalizations": 12000,
+        "sorts": 3,
+        "sort_entries": 36000,
+        "growths": 30
+      }
+    },
+    {
+      "shape": "official-traverse",
+      "n": 10000,
+      "pattern": "files/**/*.missing",
+      "results": 0,
+      "counts": {
+        "walks": 11,
+        "scans": 2,
+        "entries": 24000,
+        "matches": 12000,
+        "terminals": 0,
+        "normalizations": 0,
+        "sorts": 3,
+        "sort_entries": 24000,
+        "growths": 30
+      }
+    },
+    {
+      "shape": "official-traverse",
+      "n": 10000,
+      "pattern": "files/**/obj-*000*.dat",
+      "results": 1020,
+      "counts": {
+        "walks": 1031,
+        "scans": 2,
+        "entries": 24000,
+        "matches": 12000,
+        "terminals": 1020,
+        "normalizations": 1020,
+        "sorts": 3,
+        "sort_entries": 25020,
+        "growths": 30
+      }
+    },
+    {
+      "shape": "official-traverse",
+      "n": 100000,
+      "pattern": "files/**/*.dat",
+      "results": 120000,
+      "counts": {
+        "walks": 120011,
+        "scans": 2,
+        "entries": 240000,
+        "matches": 120000,
+        "terminals": 120000,
+        "normalizations": 120000,
+        "sorts": 3,
+        "sort_entries": 360000,
+        "growths": 36
+      }
+    },
+    {
+      "shape": "official-traverse",
+      "n": 100000,
+      "pattern": "files/**/*.missing",
+      "results": 0,
+      "counts": {
+        "walks": 11,
+        "scans": 2,
+        "entries": 240000,
+        "matches": 120000,
+        "terminals": 0,
+        "normalizations": 0,
+        "sorts": 3,
+        "sort_entries": 240000,
+        "growths": 36
+      }
+    },
+    {
+      "shape": "official-traverse",
+      "n": 100000,
+      "pattern": "files/**/obj-*000*.dat",
+      "results": 1308,
+      "counts": {
+        "walks": 1319,
+        "scans": 2,
+        "entries": 240000,
+        "matches": 120000,
+        "terminals": 1308,
+        "normalizations": 1308,
+        "sorts": 3,
+        "sort_entries": 241308,
+        "growths": 36
+      }
+    },
+    {
+      "shape": "deep",
+      "n": 1000,
+      "pattern": "files/**/*.dat",
+      "results": 1000,
+      "counts": {
+        "walks": 1035,
+        "scans": 26,
+        "entries": 2024,
+        "matches": 1012,
+        "terminals": 1000,
+        "normalizations": 1000,
+        "sorts": 27,
+        "sort_entries": 3024,
+        "growths": 46
+      }
+    },
+    {
+      "shape": "deep",
+      "n": 1000,
+      "pattern": "files/**/*.missing",
+      "results": 0,
+      "counts": {
+        "walks": 35,
+        "scans": 26,
+        "entries": 2024,
+        "matches": 1012,
+        "terminals": 0,
+        "normalizations": 0,
+        "sorts": 27,
+        "sort_entries": 2024,
+        "growths": 46
+      }
+    },
+    {
+      "shape": "deep",
+      "n": 1000,
+      "pattern": "files/**/obj-*000*.dat",
+      "results": 1000,
+      "counts": {
+        "walks": 1035,
+        "scans": 26,
+        "entries": 2024,
+        "matches": 1012,
+        "terminals": 1000,
+        "normalizations": 1000,
+        "sorts": 27,
+        "sort_entries": 3024,
+        "growths": 46
+      }
+    },
+    {
+      "shape": "deep",
+      "n": 10000,
+      "pattern": "files/**/*.dat",
+      "results": 10000,
+      "counts": {
+        "walks": 10035,
+        "scans": 26,
+        "entries": 20024,
+        "matches": 10012,
+        "terminals": 10000,
+        "normalizations": 10000,
+        "sorts": 27,
+        "sort_entries": 30024,
+        "growths": 54
+      }
+    },
+    {
+      "shape": "deep",
+      "n": 10000,
+      "pattern": "files/**/*.missing",
+      "results": 0,
+      "counts": {
+        "walks": 35,
+        "scans": 26,
+        "entries": 20024,
+        "matches": 10012,
+        "terminals": 0,
+        "normalizations": 0,
+        "sorts": 27,
+        "sort_entries": 20024,
+        "growths": 54
+      }
+    },
+    {
+      "shape": "deep",
+      "n": 10000,
+      "pattern": "files/**/obj-*000*.dat",
+      "results": 1009,
+      "counts": {
+        "walks": 1044,
+        "scans": 26,
+        "entries": 20024,
+        "matches": 10012,
+        "terminals": 1009,
+        "normalizations": 1009,
+        "sorts": 27,
+        "sort_entries": 21033,
+        "growths": 54
+      }
+    },
+    {
+      "shape": "deep",
+      "n": 100000,
+      "pattern": "files/**/*.dat",
+      "results": 100000,
+      "counts": {
+        "walks": 100035,
+        "scans": 26,
+        "entries": 200024,
+        "matches": 100012,
+        "terminals": 100000,
+        "normalizations": 100000,
+        "sorts": 27,
+        "sort_entries": 300024,
+        "growths": 60
+      }
+    },
+    {
+      "shape": "deep",
+      "n": 100000,
+      "pattern": "files/**/*.missing",
+      "results": 0,
+      "counts": {
+        "walks": 35,
+        "scans": 26,
+        "entries": 200024,
+        "matches": 100012,
+        "terminals": 0,
+        "normalizations": 0,
+        "sorts": 27,
+        "sort_entries": 200024,
+        "growths": 60
+      }
+    },
+    {
+      "shape": "deep",
+      "n": 100000,
+      "pattern": "files/**/obj-*000*.dat",
+      "results": 1180,
+      "counts": {
+        "walks": 1215,
+        "scans": 26,
+        "entries": 200024,
+        "matches": 100012,
+        "terminals": 1180,
+        "normalizations": 1180,
+        "sorts": 27,
+        "sort_entries": 201204,
+        "growths": 60
+      }
+    },
+    {
+      "shape": "mixed",
+      "n": 1000,
+      "pattern": "files/**/*.dat",
+      "results": 1000,
+      "counts": {
+        "walks": 1611,
+        "scans": 602,
+        "entries": 2600,
+        "matches": 1300,
+        "terminals": 1000,
+        "normalizations": 1000,
+        "sorts": 603,
+        "sort_entries": 3600,
+        "growths": 1416
+      }
+    },
+    {
+      "shape": "mixed",
+      "n": 1000,
+      "pattern": "files/**/*.missing",
+      "results": 0,
+      "counts": {
+        "walks": 611,
+        "scans": 602,
+        "entries": 2600,
+        "matches": 1300,
+        "terminals": 0,
+        "normalizations": 0,
+        "sorts": 603,
+        "sort_entries": 2600,
+        "growths": 1416
+      }
+    },
+    {
+      "shape": "mixed",
+      "n": 1000,
+      "pattern": "files/**/obj-*000*.dat",
+      "results": 1000,
+      "counts": {
+        "walks": 1611,
+        "scans": 602,
+        "entries": 2600,
+        "matches": 1300,
+        "terminals": 1000,
+        "normalizations": 1000,
+        "sorts": 603,
+        "sort_entries": 3600,
+        "growths": 1416
+      }
+    },
+    {
+      "shape": "mixed",
+      "n": 10000,
+      "pattern": "files/**/*.dat",
+      "results": 10000,
+      "counts": {
+        "walks": 10611,
+        "scans": 602,
+        "entries": 20600,
+        "matches": 10300,
+        "terminals": 10000,
+        "normalizations": 10000,
+        "sorts": 603,
+        "sort_entries": 30600,
+        "growths": 2016
+      }
+    },
+    {
+      "shape": "mixed",
+      "n": 10000,
+      "pattern": "files/**/*.missing",
+      "results": 0,
+      "counts": {
+        "walks": 611,
+        "scans": 602,
+        "entries": 20600,
+        "matches": 10300,
+        "terminals": 0,
+        "normalizations": 0,
+        "sorts": 603,
+        "sort_entries": 20600,
+        "growths": 2016
+      }
+    },
+    {
+      "shape": "mixed",
+      "n": 10000,
+      "pattern": "files/**/obj-*000*.dat",
+      "results": 1009,
+      "counts": {
+        "walks": 1620,
+        "scans": 602,
+        "entries": 20600,
+        "matches": 10300,
+        "terminals": 1009,
+        "normalizations": 1009,
+        "sorts": 603,
+        "sort_entries": 21609,
+        "growths": 2016
+      }
+    },
+    {
+      "shape": "mixed",
+      "n": 100000,
+      "pattern": "files/**/*.dat",
+      "results": 100000,
+      "counts": {
+        "walks": 100611,
+        "scans": 602,
+        "entries": 200600,
+        "matches": 100300,
+        "terminals": 100000,
+        "normalizations": 100000,
+        "sorts": 603,
+        "sort_entries": 300600,
+        "growths": 2616
+      }
+    },
+    {
+      "shape": "mixed",
+      "n": 100000,
+      "pattern": "files/**/*.missing",
+      "results": 0,
+      "counts": {
+        "walks": 611,
+        "scans": 602,
+        "entries": 200600,
+        "matches": 100300,
+        "terminals": 0,
+        "normalizations": 0,
+        "sorts": 603,
+        "sort_entries": 200600,
+        "growths": 2616
+      }
+    },
+    {
+      "shape": "mixed",
+      "n": 100000,
+      "pattern": "files/**/obj-*000*.dat",
+      "results": 1180,
+      "counts": {
+        "walks": 1791,
+        "scans": 602,
+        "entries": 200600,
+        "matches": 100300,
+        "terminals": 1180,
+        "normalizations": 1180,
+        "sorts": 603,
+        "sort_entries": 201780,
+        "growths": 2616
+      }
+    }
+  ]
+}

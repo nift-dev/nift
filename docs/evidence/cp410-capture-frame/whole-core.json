@@ -1,0 +1,266 @@
+[
+  {
+    "n": 2000,
+    "unused": 0,
+    "kind": "identity",
+    "instructions": 56621010,
+    "allocations": 64474,
+    "bytes": 10933905,
+    "memcheck_errors": 0
+  },
+  {
+    "n": 2000,
+    "unused": 0,
+    "kind": "captured",
+    "instructions": 67893997,
+    "allocations": 70489,
+    "bytes": 11608156,
+    "memcheck_errors": 0
+  },
+  {
+    "n": 2000,
+    "unused": 5,
+    "kind": "identity",
+    "instructions": 69968163
+  },
+  {
+    "n": 2000,
+    "unused": 5,
+    "kind": "captured",
+    "instructions": 81331186
+  },
+  {
+    "n": 2000,
+    "unused": 16,
+    "kind": "identity",
+    "instructions": 118848354
+  },
+  {
+    "n": 2000,
+    "unused": 16,
+    "kind": "captured",
+    "instructions": 131965719
+  },
+  {
+    "n": 2000,
+    "unused": 50,
+    "kind": "identity",
+    "instructions": 228860485
+  },
+  {
+    "n": 2000,
+    "unused": 50,
+    "kind": "captured",
+    "instructions": 241006537
+  },
+  {
+    "n": 2000,
+    "unused": 100,
+    "kind": "identity",
+    "instructions": 382736530,
+    "allocations": 477288,
+    "bytes": 72350868,
+    "memcheck_errors": 0
+  },
+  {
+    "n": 2000,
+    "unused": 100,
+    "kind": "captured",
+    "instructions": 393544011,
+    "allocations": 483304,
+    "bytes": 73028960,
+    "memcheck_errors": 0
+  },
+  {
+    "n": 4000,
+    "unused": 0,
+    "kind": "identity",
+    "instructions": 111375829
+  },
+  {
+    "n": 4000,
+    "unused": 0,
+    "kind": "captured",
+    "instructions": 133816999
+  },
+  {
+    "n": 4000,
+    "unused": 5,
+    "kind": "identity",
+    "instructions": 137664177
+  },
+  {
+    "n": 4000,
+    "unused": 5,
+    "kind": "captured",
+    "instructions": 160290890
+  },
+  {
+    "n": 4000,
+    "unused": 16,
+    "kind": "identity",
+    "instructions": 234978918
+  },
+  {
+    "n": 4000,
+    "unused": 16,
+    "kind": "captured",
+    "instructions": 261216632
+  },
+  {
+    "n": 4000,
+    "unused": 50,
+    "kind": "identity",
+    "instructions": 452652072
+  },
+  {
+    "n": 4000,
+    "unused": 50,
+    "kind": "captured",
+    "instructions": 476960971
+  },
+  {
+    "n": 4000,
+    "unused": 100,
+    "kind": "identity",
+    "instructions": 757183961
+  },
+  {
+    "n": 4000,
+    "unused": 100,
+    "kind": "captured",
+    "instructions": 778821648
+  },
+  {
+    "n": 8000,
+    "unused": 0,
+    "kind": "identity",
+    "instructions": 220123835
+  },
+  {
+    "n": 8000,
+    "unused": 0,
+    "kind": "captured",
+    "instructions": 264933189
+  },
+  {
+    "n": 8000,
+    "unused": 5,
+    "kind": "identity",
+    "instructions": 272406934
+  },
+  {
+    "n": 8000,
+    "unused": 5,
+    "kind": "captured",
+    "instructions": 317582214
+  },
+  {
+    "n": 8000,
+    "unused": 16,
+    "kind": "identity",
+    "instructions": 466311747
+  },
+  {
+    "n": 8000,
+    "unused": 16,
+    "kind": "captured",
+    "instructions": 518707014
+  },
+  {
+    "n": 8000,
+    "unused": 50,
+    "kind": "identity",
+    "instructions": 899582881
+  },
+  {
+    "n": 8000,
+    "unused": 50,
+    "kind": "captured",
+    "instructions": 948053194
+  },
+  {
+    "n": 8000,
+    "unused": 100,
+    "kind": "identity",
+    "instructions": 1505429920
+  },
+  {
+    "n": 8000,
+    "unused": 100,
+    "kind": "captured",
+    "instructions": 1549183608
+  },
+  {
+    "n": 16000,
+    "unused": 0,
+    "kind": "identity",
+    "instructions": 442817357,
+    "allocations": 512480,
+    "bytes": 86496985,
+    "memcheck_errors": 0
+  },
+  {
+    "n": 16000,
+    "unused": 0,
+    "kind": "captured",
+    "instructions": 532354743,
+    "allocations": 560495,
+    "bytes": 91875236,
+    "memcheck_errors": 0
+  },
+  {
+    "n": 16000,
+    "unused": 5,
+    "kind": "identity",
+    "instructions": 547081375
+  },
+  {
+    "n": 16000,
+    "unused": 5,
+    "kind": "captured",
+    "instructions": 637344382
+  },
+  {
+    "n": 16000,
+    "unused": 16,
+    "kind": "identity",
+    "instructions": 934385074
+  },
+  {
+    "n": 16000,
+    "unused": 16,
+    "kind": "captured",
+    "instructions": 1038875399
+  },
+  {
+    "n": 16000,
+    "unused": 50,
+    "kind": "identity",
+    "instructions": 1803240558
+  },
+  {
+    "n": 16000,
+    "unused": 50,
+    "kind": "captured",
+    "instructions": 1898885807
+  },
+  {
+    "n": 16000,
+    "unused": 100,
+    "kind": "identity",
+    "instructions": 3009727608,
+    "allocations": 3809294,
+    "bytes": 576873948,
+    "memcheck_errors": 0
+  },
+  {
+    "n": 16000,
+    "unused": 100,
+    "kind": "captured",
+    "instructions": 3095505785,
+    "allocations": 3857310,
+    "bytes": 582256040,
+    "memcheck_errors": 0
+  }
+]

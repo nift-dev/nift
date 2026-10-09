@@ -1,0 +1,13 @@
+CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-linux-gnu-cc"
+python3 tests/v410_oracle_paths_test.py
+...
+----------------------------------------------------------------------
+Ran 3 tests in 0.000s
+
+OK
+python3 tests/v410_sort_factory_parity.py --nift ./nift
+PASS 31 exact sort/factory/capture/origin contracts
+python3 tests/v410_object_member_parity.py --nift ./nift
+PASS 86 exact object/member/location/origin contracts
+python3 tests/v410_object_member_guard.py --nift ./.build/nift-object-lookup-guard
+PASS one traversal per object lookup, exact comparison positions and missing checks

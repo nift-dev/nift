@@ -1,0 +1,67 @@
+[
+  {
+    "model": "current",
+    "returncode": 0,
+    "stdout": "200\n",
+    "assertions": [
+      "injected cmd redeclaration exception",
+      "nested caller snapshot",
+      "live/root slots",
+      "capture declaration membership",
+      "parameter shadow",
+      "later caller fallback"
+    ]
+  },
+  {
+    "model": "shared",
+    "returncode": 0,
+    "stdout": "200\n",
+    "assertions": [
+      "injected cmd redeclaration exception",
+      "nested caller snapshot",
+      "live/root slots",
+      "capture declaration membership",
+      "parameter shadow",
+      "later caller fallback"
+    ]
+  },
+  {
+    "model": "parent",
+    "returncode": 0,
+    "stdout": "200\n",
+    "assertions": [
+      "injected cmd redeclaration exception",
+      "nested caller snapshot",
+      "live/root slots",
+      "capture declaration membership",
+      "parameter shadow",
+      "later caller fallback"
+    ]
+  },
+  {
+    "model": "cow",
+    "returncode": 0,
+    "stdout": "200\n",
+    "assertions": [
+      "injected cmd redeclaration exception",
+      "nested caller snapshot",
+      "live/root slots",
+      "capture declaration membership",
+      "parameter shadow",
+      "later caller fallback"
+    ]
+  },
+  {
+    "model": "memo",
+    "returncode": 0,
+    "stdout": "200\n",
+    "assertions": [
+      "injected cmd redeclaration exception",
+      "nested caller snapshot",
+      "live/root slots",
+      "capture declaration membership",
+      "parameter shadow",
+      "later caller fallback"
+    ]
+  }
+]

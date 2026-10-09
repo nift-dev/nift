@@ -1,0 +1,69 @@
+[
+  {
+    "name": "sort-identity",
+    "n": 128000,
+    "pairs": 12,
+    "median_paired_cpu_pct": 0.9727420398303432,
+    "min_pct": -1.793341814275795,
+    "max_pct": 2.71959067412193
+  },
+  {
+    "name": "map-set",
+    "n": 128000,
+    "pairs": 12,
+    "median_paired_cpu_pct": 3.3905728358652576,
+    "min_pct": -10.18580118881436,
+    "max_pct": 8.532238672177495
+  },
+  {
+    "name": "json-parse-convert",
+    "n": 128000,
+    "pairs": 12,
+    "median_paired_cpu_pct": -0.1680654743012655,
+    "min_pct": -3.839810719300618,
+    "max_pct": 6.428141721811453
+  },
+  {
+    "name": "json-mutate",
+    "n": 128000,
+    "pairs": 12,
+    "median_paired_cpu_pct": -1.2094775280203085,
+    "min_pct": -5.6516058042780815,
+    "max_pct": 1.6593417463905746
+  },
+  {
+    "name": "json-serialize",
+    "n": 128000,
+    "pairs": 12,
+    "median_paired_cpu_pct": -0.5457926665663915,
+    "min_pct": -6.948105062254728,
+    "max_pct": 4.50987299427501
+  },
+  {
+    "name": "call-scalar",
+    "n": 128000,
+    "pairs": 12,
+    "median_paired_cpu_pct": -0.6023290693491834,
+    "min_pct": -3.7735696497238846,
+    "max_pct": 0.9022251507857515
+  },
+  {
+    "name": "bfs",
+    "n": 128000,
+    "pairs": 12,
+    "median_paired_cpu_pct": -0.602644307100425,
+    "min_pct": -4.2638322905449,
+    "max_pct": 10.353956870683323
+  },
+  {
+    "name": "map-set-larger-confirmation",
+    "n": 256000,
+    "pairs": 32,
+    "median_paired_cpu_pct": 0.773469841413843,
+    "bootstrap_95pct_median_interval": [
+      0.11581977060826087,
+      1.315155816615421
+    ],
+    "note": "sampling interval only; does not include machine/frequency/build-layout systematic uncertainty"
+  }
+]

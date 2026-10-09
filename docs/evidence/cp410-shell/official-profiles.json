@@ -1,0 +1,65 @@
+[
+  {
+    "n": 1000,
+    "label": "baseline",
+    "instructions": 69771020,
+    "heap": "85,597 allocs, 85,597 frees, 15,945,440 bytes allocated",
+    "errors": "0 errors from 0 contexts (suppressed: 0 from 0)"
+  },
+  {
+    "n": 1000,
+    "label": "candidate",
+    "instructions": 55465500,
+    "heap": "74,791 allocs, 74,791 frees, 13,680,955 bytes allocated",
+    "errors": "0 errors from 0 contexts (suppressed: 0 from 0)"
+  },
+  {
+    "n": 1000,
+    "label": "native",
+    "instructions": 45608642,
+    "heap": "57,634 allocs, 57,634 frees, 13,538,703 bytes allocated",
+    "errors": "0 errors from 0 contexts (suppressed: 0 from 0)"
+  },
+  {
+    "n": 10000,
+    "label": "baseline",
+    "instructions": 684077615,
+    "heap": "852,409 allocs, 852,409 frees, 155,713,426 bytes allocated",
+    "errors": "0 errors from 0 contexts (suppressed: 0 from 0)"
+  },
+  {
+    "n": 10000,
+    "label": "candidate",
+    "instructions": 533644531,
+    "heap": "744,400 allocs, 744,400 frees, 134,218,002 bytes allocated",
+    "errors": "0 errors from 0 contexts (suppressed: 0 from 0)"
+  },
+  {
+    "n": 10000,
+    "label": "native",
+    "instructions": 440824811,
+    "heap": "576,040 allocs, 576,040 frees, 133,962,690 bytes allocated",
+    "errors": "0 errors from 0 contexts (suppressed: 0 from 0)"
+  },
+  {
+    "n": 100000,
+    "label": "baseline",
+    "instructions": 6936903556,
+    "heap": "8,520,421 allocs, 8,520,421 frees, 1,540,333,764 bytes allocated",
+    "errors": "0 errors from 0 contexts (suppressed: 0 from 0)"
+  },
+  {
+    "n": 100000,
+    "label": "candidate",
+    "instructions": 5356232167,
+    "heap": "7,440,409 allocs, 7,440,409 frees, 1,334,489,193 bytes allocated",
+    "errors": "0 errors from 0 contexts (suppressed: 0 from 0)"
+  },
+  {
+    "n": 100000,
+    "label": "native",
+    "instructions": 4480458774,
+    "heap": "5,760,046 allocs, 5,760,046 frees, 1,335,909,765 bytes allocated",
+    "errors": "0 errors from 0 contexts (suppressed: 0 from 0)"
+  }
+]

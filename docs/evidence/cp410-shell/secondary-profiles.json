@@ -1,0 +1,72 @@
+[
+  {
+    "operation": "metadata",
+    "label": "baseline",
+    "instructions": 50816383,
+    "heap": "66,383 allocs, 66,383 frees, 16,501,336 bytes allocated",
+    "errors": "0 errors from 0 contexts (suppressed: 0 from 0)"
+  },
+  {
+    "operation": "metadata",
+    "label": "native",
+    "instructions": 4847730,
+    "heap": "7,016 allocs, 7,016 frees, 488,023 bytes allocated",
+    "errors": "0 errors from 0 contexts (suppressed: 0 from 0)"
+  },
+  {
+    "operation": "move",
+    "label": "baseline",
+    "instructions": 244787741,
+    "heap": "185,400 allocs, 185,400 frees, 32,937,352 bytes allocated",
+    "errors": "0 errors from 0 contexts (suppressed: 0 from 0)"
+  },
+  {
+    "operation": "move",
+    "label": "native",
+    "instructions": 6240310,
+    "heap": "11,016 allocs, 11,016 frees, 667,023 bytes allocated",
+    "errors": "0 errors from 0 contexts (suppressed: 0 from 0)"
+  },
+  {
+    "operation": "copy",
+    "label": "baseline",
+    "instructions": 246007484,
+    "heap": "186,402 allocs, 186,402 frees, 33,027,457 bytes allocated",
+    "errors": "0 errors from 0 contexts (suppressed: 0 from 0)"
+  },
+  {
+    "operation": "copy",
+    "label": "native",
+    "instructions": 6695603,
+    "heap": "11,016 allocs, 11,016 frees, 667,023 bytes allocated",
+    "errors": "0 errors from 0 contexts (suppressed: 0 from 0)"
+  },
+  {
+    "operation": "concat",
+    "label": "baseline",
+    "instructions": 53385764,
+    "heap": "67,471 allocs, 67,471 frees, 24,858,237 bytes allocated",
+    "errors": "0 errors from 0 contexts (suppressed: 0 from 0)"
+  },
+  {
+    "operation": "concat",
+    "label": "native",
+    "instructions": 5282732,
+    "heap": "3,018 allocs, 3,018 frees, 8,852,687 bytes allocated",
+    "errors": "0 errors from 0 contexts (suppressed: 0 from 0)"
+  },
+  {
+    "operation": "string",
+    "label": "baseline",
+    "instructions": 70795269,
+    "heap": "26,301 allocs, 26,301 frees, 2,710,977 bytes allocated",
+    "errors": "0 errors from 0 contexts (suppressed: 0 from 0)"
+  },
+  {
+    "operation": "string",
+    "label": "native",
+    "instructions": 3236116,
+    "heap": "1,016 allocs, 1,016 frees, 180,023 bytes allocated",
+    "errors": "0 errors from 0 contexts (suppressed: 0 from 0)"
+  }
+]

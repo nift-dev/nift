@@ -1,0 +1,79 @@
+[
+  {
+    "name": "injected-command-redeclaration",
+    "source": "f := x => { cmd := 7; return cmd }; print(f(0))",
+    "returncode": 0,
+    "stdout": "7\n",
+    "stderr": ""
+  },
+  {
+    "name": "future-global-name",
+    "source": "f := x => late; late := 7; print(f(0))",
+    "returncode": 0,
+    "stdout": "7\n",
+    "stderr": ""
+  },
+  {
+    "name": "nested-caller-name-snapshot",
+    "source": "f := x => (y => late); fn(mk()) { late := 11; return f(0) }; g := mk(); late := 22; print(g(0))",
+    "returncode": 0,
+    "stdout": "11\n",
+    "stderr": ""
+  },
+  {
+    "name": "future-caller-name",
+    "source": "f := x => late; fn(call()) { late := 11; return f(0) }; print(call())",
+    "returncode": 0,
+    "stdout": "11\n",
+    "stderr": ""
+  },
+  {
+    "name": "captured-name-over-caller-shadow",
+    "source": "v := 1; f := x => v; if(true) { v := 2; print(f(0)) }",
+    "returncode": 0,
+    "stdout": "1\n",
+    "stderr": ""
+  },
+  {
+    "name": "live-captured-slot",
+    "source": "fn(mk()) { v := 1; f := x => v; v = 9; return f }; f := mk(); v := 100; print(f(0))",
+    "returncode": 0,
+    "stdout": "9\n",
+    "stderr": ""
+  },
+  {
+    "name": "capture-declaration-membership",
+    "source": "v := 1; f := x => { v := 2; return v }; print(f(0))",
+    "returncode": 1,
+    "stdout": "",
+    "stderr": "error: <command-line>:1:21: binding already declared in this scope: v\n"
+  },
+  {
+    "name": "parameter-replaces-capture",
+    "source": "x := 99; f := x => x; print(f(3)); print(x)",
+    "returncode": 0,
+    "stdout": "3\n99\n",
+    "stderr": ""
+  },
+  {
+    "name": "named-bare-precedence",
+    "source": "fn(v()) { return 8 }; v := 2; f := x => v; print(type(f(0)))",
+    "returncode": 0,
+    "stdout": "function\n",
+    "stderr": ""
+  },
+  {
+    "name": "callable-binding-invocation-precedence",
+    "source": "fn(f()) { return 8 }; f := x => x+1; print(f(2))",
+    "returncode": 0,
+    "stdout": "3\n",
+    "stderr": ""
+  },
+  {
+    "name": "unused-capture-transferability",
+    "source": "t := timer(); f := async x => x; r := f(3); print(await r)",
+    "returncode": 1,
+    "stdout": "",
+    "stderr": "error: <command-line>:1:39: async function capture contains a non-transferable timer\n"
+  }
+]

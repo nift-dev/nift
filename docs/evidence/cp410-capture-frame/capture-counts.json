@@ -1,0 +1,5042 @@
+[
+  {
+    "n": 2000,
+    "unused": 0,
+    "kind": "identity",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n002000/u000/identity____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 8000,
+        "inserts": 8000,
+        "overwrites": 0,
+        "value_refs": 8000,
+        "slot_refs": 8000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 8000,
+        "inserts": 8000,
+        "overwrites": 0,
+        "value_refs": 8000,
+        "slot_refs": 8000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 2000,
+        "explicit_slots": 2000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 2000,
+        "allocations": 28012,
+        "bytes": 3814256,
+        "frees": 2007
+      },
+      "instance": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 576000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 2000,
+        "allocations": 10000,
+        "bytes": 1642000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 2000,
+        "allocations": 10000,
+        "bytes": 1296000,
+        "frees": 0
+      },
+      "registration": {
+        "calls": 2000,
+        "allocations": 6008,
+        "bytes": 299936,
+        "frees": 2007
+      },
+      "arguments": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 2000,
+        "allocations": 26001,
+        "bytes": 3610240,
+        "frees": 2001
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "calls": 4000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 176000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 304000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 24000
+      },
+      "returned_key": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 2000
+      }
+    }
+  },
+  {
+    "n": 2000,
+    "unused": 0,
+    "kind": "captured",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n002000/u000/captured____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 10000,
+        "inserts": 10000,
+        "overwrites": 0,
+        "value_refs": 10000,
+        "slot_refs": 10000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 10000,
+        "inserts": 10000,
+        "overwrites": 0,
+        "value_refs": 10000,
+        "slot_refs": 10000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 2000,
+        "explicit_slots": 2000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 2000,
+        "allocations": 30012,
+        "bytes": 4086256,
+        "frees": 2007
+      },
+      "instance": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 576000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 2000,
+        "allocations": 10000,
+        "bytes": 1642000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 2000,
+        "allocations": 12000,
+        "bytes": 1568000,
+        "frees": 0
+      },
+      "registration": {
+        "calls": 2000,
+        "allocations": 6008,
+        "bytes": 299936,
+        "frees": 2007
+      },
+      "arguments": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 2000,
+        "allocations": 28001,
+        "bytes": 3882240,
+        "frees": 2001
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 2007,
+        "bytes": 129232,
+        "frees": 2001
+      },
+      "key": {
+        "calls": 4000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 176000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 304000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 26000
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 2000
+      }
+    }
+  },
+  {
+    "n": 2000,
+    "unused": 5,
+    "kind": "identity",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n002000/u005/identity____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 18000,
+        "inserts": 18000,
+        "overwrites": 0,
+        "value_refs": 18000,
+        "slot_refs": 18000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 18000,
+        "inserts": 18000,
+        "overwrites": 0,
+        "value_refs": 18000,
+        "slot_refs": 18000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 2000,
+        "explicit_slots": 2000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 2000,
+        "allocations": 38012,
+        "bytes": 5174256,
+        "frees": 2007
+      },
+      "instance": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 576000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 2000,
+        "allocations": 10000,
+        "bytes": 1642000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 2000,
+        "allocations": 20000,
+        "bytes": 2656000,
+        "frees": 0
+      },
+      "registration": {
+        "calls": 2000,
+        "allocations": 6008,
+        "bytes": 299936,
+        "frees": 2007
+      },
+      "arguments": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 2000,
+        "allocations": 36001,
+        "bytes": 4970240,
+        "frees": 2001
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "calls": 4000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 176000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 304000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 34000
+      },
+      "returned_key": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 2000
+      }
+    }
+  },
+  {
+    "n": 2000,
+    "unused": 5,
+    "kind": "captured",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n002000/u005/captured____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 20000,
+        "inserts": 20000,
+        "overwrites": 0,
+        "value_refs": 20000,
+        "slot_refs": 20000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 20000,
+        "inserts": 20000,
+        "overwrites": 0,
+        "value_refs": 20000,
+        "slot_refs": 20000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 2000,
+        "explicit_slots": 2000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 2000,
+        "allocations": 40012,
+        "bytes": 5446256,
+        "frees": 2007
+      },
+      "instance": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 576000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 2000,
+        "allocations": 10000,
+        "bytes": 1642000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 2000,
+        "allocations": 22000,
+        "bytes": 2928000,
+        "frees": 0
+      },
+      "registration": {
+        "calls": 2000,
+        "allocations": 6008,
+        "bytes": 299936,
+        "frees": 2007
+      },
+      "arguments": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 2000,
+        "allocations": 38001,
+        "bytes": 5242240,
+        "frees": 2001
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 2007,
+        "bytes": 129232,
+        "frees": 2001
+      },
+      "key": {
+        "calls": 4000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 176000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 304000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 36000
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 2000
+      }
+    }
+  },
+  {
+    "n": 2000,
+    "unused": 16,
+    "kind": "identity",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n002000/u016/identity____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 40000,
+        "inserts": 40000,
+        "overwrites": 0,
+        "value_refs": 40000,
+        "slot_refs": 40000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 40000,
+        "inserts": 40000,
+        "overwrites": 0,
+        "value_refs": 40000,
+        "slot_refs": 40000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 2000,
+        "explicit_slots": 2000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 2000,
+        "allocations": 62012,
+        "bytes": 8630256,
+        "frees": 4007
+      },
+      "instance": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 576000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 2000,
+        "allocations": 10000,
+        "bytes": 1642000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 2000,
+        "allocations": 44000,
+        "bytes": 6112000,
+        "frees": 2000
+      },
+      "registration": {
+        "calls": 2000,
+        "allocations": 6008,
+        "bytes": 299936,
+        "frees": 2007
+      },
+      "arguments": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 2000,
+        "allocations": 60001,
+        "bytes": 8426240,
+        "frees": 4001
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "calls": 4000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 176000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 304000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 56000
+      },
+      "returned_key": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 2000
+      }
+    }
+  },
+  {
+    "n": 2000,
+    "unused": 16,
+    "kind": "captured",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n002000/u016/captured____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 42000,
+        "inserts": 42000,
+        "overwrites": 0,
+        "value_refs": 42000,
+        "slot_refs": 42000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 42000,
+        "inserts": 42000,
+        "overwrites": 0,
+        "value_refs": 42000,
+        "slot_refs": 42000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 2000,
+        "explicit_slots": 2000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 2000,
+        "allocations": 64012,
+        "bytes": 8902256,
+        "frees": 4007
+      },
+      "instance": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 576000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 2000,
+        "allocations": 10000,
+        "bytes": 1642000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 2000,
+        "allocations": 46000,
+        "bytes": 6384000,
+        "frees": 2000
+      },
+      "registration": {
+        "calls": 2000,
+        "allocations": 6008,
+        "bytes": 299936,
+        "frees": 2007
+      },
+      "arguments": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 2000,
+        "allocations": 62001,
+        "bytes": 8698240,
+        "frees": 4001
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 2007,
+        "bytes": 129232,
+        "frees": 2001
+      },
+      "key": {
+        "calls": 4000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 176000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 304000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 58000
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 2000
+      }
+    }
+  },
+  {
+    "n": 2000,
+    "unused": 50,
+    "kind": "identity",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n002000/u050/identity____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 108000,
+        "inserts": 108000,
+        "overwrites": 0,
+        "value_refs": 108000,
+        "slot_refs": 108000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 108000,
+        "inserts": 108000,
+        "overwrites": 0,
+        "value_refs": 108000,
+        "slot_refs": 108000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 2000,
+        "explicit_slots": 2000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 2000,
+        "allocations": 132012,
+        "bytes": 18822256,
+        "frees": 6007
+      },
+      "instance": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 576000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 2000,
+        "allocations": 10000,
+        "bytes": 1642000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 2000,
+        "allocations": 114000,
+        "bytes": 16304000,
+        "frees": 4000
+      },
+      "registration": {
+        "calls": 2000,
+        "allocations": 6008,
+        "bytes": 299936,
+        "frees": 2007
+      },
+      "arguments": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 2000,
+        "allocations": 130001,
+        "bytes": 18618240,
+        "frees": 6001
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "calls": 4000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 176000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 304000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 124000
+      },
+      "returned_key": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 2000
+      }
+    }
+  },
+  {
+    "n": 2000,
+    "unused": 50,
+    "kind": "captured",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n002000/u050/captured____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 110000,
+        "inserts": 110000,
+        "overwrites": 0,
+        "value_refs": 110000,
+        "slot_refs": 110000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 110000,
+        "inserts": 110000,
+        "overwrites": 0,
+        "value_refs": 110000,
+        "slot_refs": 110000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 2000,
+        "explicit_slots": 2000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 2000,
+        "allocations": 134012,
+        "bytes": 19094256,
+        "frees": 6007
+      },
+      "instance": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 576000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 2000,
+        "allocations": 10000,
+        "bytes": 1642000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 2000,
+        "allocations": 116000,
+        "bytes": 16576000,
+        "frees": 4000
+      },
+      "registration": {
+        "calls": 2000,
+        "allocations": 6008,
+        "bytes": 299936,
+        "frees": 2007
+      },
+      "arguments": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 2000,
+        "allocations": 132001,
+        "bytes": 18890240,
+        "frees": 6001
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 2007,
+        "bytes": 129232,
+        "frees": 2001
+      },
+      "key": {
+        "calls": 4000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 176000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 304000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 126000
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 2000
+      }
+    }
+  },
+  {
+    "n": 2000,
+    "unused": 100,
+    "kind": "identity",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n002000/u100/identity____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 208000,
+        "inserts": 208000,
+        "overwrites": 0,
+        "value_refs": 208000,
+        "slot_refs": 208000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 208000,
+        "inserts": 208000,
+        "overwrites": 0,
+        "value_refs": 208000,
+        "slot_refs": 208000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 2000,
+        "explicit_slots": 2000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 2000,
+        "allocations": 234012,
+        "bytes": 34454256,
+        "frees": 8007
+      },
+      "instance": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 576000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 2000,
+        "allocations": 10000,
+        "bytes": 1642000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 2000,
+        "allocations": 216000,
+        "bytes": 31936000,
+        "frees": 6000
+      },
+      "registration": {
+        "calls": 2000,
+        "allocations": 6008,
+        "bytes": 299936,
+        "frees": 2007
+      },
+      "arguments": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 2000,
+        "allocations": 232001,
+        "bytes": 34250240,
+        "frees": 8001
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "calls": 4000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 176000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 304000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 224000
+      },
+      "returned_key": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 2000
+      }
+    }
+  },
+  {
+    "n": 2000,
+    "unused": 100,
+    "kind": "captured",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n002000/u100/captured____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 210000,
+        "inserts": 210000,
+        "overwrites": 0,
+        "value_refs": 210000,
+        "slot_refs": 210000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 210000,
+        "inserts": 210000,
+        "overwrites": 0,
+        "value_refs": 210000,
+        "slot_refs": 210000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 2000,
+        "explicit_slots": 2000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 2000,
+        "allocations": 236012,
+        "bytes": 34726256,
+        "frees": 8007
+      },
+      "instance": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 576000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 2000,
+        "allocations": 10000,
+        "bytes": 1642000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 2000,
+        "allocations": 218000,
+        "bytes": 32208000,
+        "frees": 6000
+      },
+      "registration": {
+        "calls": 2000,
+        "allocations": 6008,
+        "bytes": 299936,
+        "frees": 2007
+      },
+      "arguments": {
+        "calls": 2000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 2000,
+        "allocations": 234001,
+        "bytes": 34522240,
+        "frees": 8001
+      },
+      "body": {
+        "calls": 2000,
+        "allocations": 2007,
+        "bytes": 129232,
+        "frees": 2001
+      },
+      "key": {
+        "calls": 4000,
+        "allocations": 2000,
+        "bytes": 304000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 176000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 304000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 2000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 226000
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 2000
+      }
+    }
+  },
+  {
+    "n": 4000,
+    "unused": 0,
+    "kind": "identity",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n004000/u000/identity____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 16000,
+        "inserts": 16000,
+        "overwrites": 0,
+        "value_refs": 16000,
+        "slot_refs": 16000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 16000,
+        "inserts": 16000,
+        "overwrites": 0,
+        "value_refs": 16000,
+        "slot_refs": 16000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 4000,
+        "explicit_slots": 4000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 4000,
+        "allocations": 56013,
+        "bytes": 7632952,
+        "frees": 4008
+      },
+      "instance": {
+        "calls": 4000,
+        "allocations": 4000,
+        "bytes": 1152000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 4000,
+        "allocations": 20000,
+        "bytes": 3284000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 4000,
+        "allocations": 20000,
+        "bytes": 2592000,
+        "frees": 0
+      },
+      "registration": {
+        "calls": 4000,
+        "allocations": 12009,
+        "bytes": 604632,
+        "frees": 4008
+      },
+      "arguments": {
+        "calls": 4000,
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 4000,
+        "allocations": 52001,
+        "bytes": 7220240,
+        "frees": 4001
+      },
+      "body": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "calls": 8000,
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 352000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 48000
+      },
+      "returned_key": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 4000
+      }
+    }
+  },
+  {
+    "n": 4000,
+    "unused": 0,
+    "kind": "captured",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n004000/u000/captured____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 20000,
+        "inserts": 20000,
+        "overwrites": 0,
+        "value_refs": 20000,
+        "slot_refs": 20000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 20000,
+        "inserts": 20000,
+        "overwrites": 0,
+        "value_refs": 20000,
+        "slot_refs": 20000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 4000,
+        "explicit_slots": 4000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 4000,
+        "allocations": 60013,
+        "bytes": 8176952,
+        "frees": 4008
+      },
+      "instance": {
+        "calls": 4000,
+        "allocations": 4000,
+        "bytes": 1152000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 4000,
+        "allocations": 20000,
+        "bytes": 3284000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 4000,
+        "allocations": 24000,
+        "bytes": 3136000,
+        "frees": 0
+      },
+      "registration": {
+        "calls": 4000,
+        "allocations": 12009,
+        "bytes": 604632,
+        "frees": 4008
+      },
+      "arguments": {
+        "calls": 4000,
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 4000,
+        "allocations": 56001,
+        "bytes": 7764240,
+        "frees": 4001
+      },
+      "body": {
+        "calls": 4000,
+        "allocations": 4007,
+        "bytes": 257232,
+        "frees": 4001
+      },
+      "key": {
+        "calls": 8000,
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 352000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 52000
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 4000
+      }
+    }
+  },
+  {
+    "n": 4000,
+    "unused": 5,
+    "kind": "identity",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n004000/u005/identity____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 36000,
+        "inserts": 36000,
+        "overwrites": 0,
+        "value_refs": 36000,
+        "slot_refs": 36000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 36000,
+        "inserts": 36000,
+        "overwrites": 0,
+        "value_refs": 36000,
+        "slot_refs": 36000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 4000,
+        "explicit_slots": 4000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 4000,
+        "allocations": 76013,
+        "bytes": 10352952,
+        "frees": 4008
+      },
+      "instance": {
+        "calls": 4000,
+        "allocations": 4000,
+        "bytes": 1152000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 4000,
+        "allocations": 20000,
+        "bytes": 3284000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 4000,
+        "allocations": 40000,
+        "bytes": 5312000,
+        "frees": 0
+      },
+      "registration": {
+        "calls": 4000,
+        "allocations": 12009,
+        "bytes": 604632,
+        "frees": 4008
+      },
+      "arguments": {
+        "calls": 4000,
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 4000,
+        "allocations": 72001,
+        "bytes": 9940240,
+        "frees": 4001
+      },
+      "body": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "calls": 8000,
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 352000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 68000
+      },
+      "returned_key": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 4000
+      }
+    }
+  },
+  {
+    "n": 4000,
+    "unused": 5,
+    "kind": "captured",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n004000/u005/captured____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 40000,
+        "inserts": 40000,
+        "overwrites": 0,
+        "value_refs": 40000,
+        "slot_refs": 40000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 40000,
+        "inserts": 40000,
+        "overwrites": 0,
+        "value_refs": 40000,
+        "slot_refs": 40000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 4000,
+        "explicit_slots": 4000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 4000,
+        "allocations": 80013,
+        "bytes": 10896952,
+        "frees": 4008
+      },
+      "instance": {
+        "calls": 4000,
+        "allocations": 4000,
+        "bytes": 1152000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 4000,
+        "allocations": 20000,
+        "bytes": 3284000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 4000,
+        "allocations": 44000,
+        "bytes": 5856000,
+        "frees": 0
+      },
+      "registration": {
+        "calls": 4000,
+        "allocations": 12009,
+        "bytes": 604632,
+        "frees": 4008
+      },
+      "arguments": {
+        "calls": 4000,
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 4000,
+        "allocations": 76001,
+        "bytes": 10484240,
+        "frees": 4001
+      },
+      "body": {
+        "calls": 4000,
+        "allocations": 4007,
+        "bytes": 257232,
+        "frees": 4001
+      },
+      "key": {
+        "calls": 8000,
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 352000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 72000
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 4000
+      }
+    }
+  },
+  {
+    "n": 4000,
+    "unused": 16,
+    "kind": "identity",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n004000/u016/identity____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 80000,
+        "inserts": 80000,
+        "overwrites": 0,
+        "value_refs": 80000,
+        "slot_refs": 80000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 80000,
+        "inserts": 80000,
+        "overwrites": 0,
+        "value_refs": 80000,
+        "slot_refs": 80000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 4000,
+        "explicit_slots": 4000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 4000,
+        "allocations": 124013,
+        "bytes": 17264952,
+        "frees": 8008
+      },
+      "instance": {
+        "calls": 4000,
+        "allocations": 4000,
+        "bytes": 1152000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 4000,
+        "allocations": 20000,
+        "bytes": 3284000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 4000,
+        "allocations": 88000,
+        "bytes": 12224000,
+        "frees": 4000
+      },
+      "registration": {
+        "calls": 4000,
+        "allocations": 12009,
+        "bytes": 604632,
+        "frees": 4008
+      },
+      "arguments": {
+        "calls": 4000,
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 4000,
+        "allocations": 120001,
+        "bytes": 16852240,
+        "frees": 8001
+      },
+      "body": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "calls": 8000,
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 352000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 112000
+      },
+      "returned_key": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 4000
+      }
+    }
+  },
+  {
+    "n": 4000,
+    "unused": 16,
+    "kind": "captured",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n004000/u016/captured____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 84000,
+        "inserts": 84000,
+        "overwrites": 0,
+        "value_refs": 84000,
+        "slot_refs": 84000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 84000,
+        "inserts": 84000,
+        "overwrites": 0,
+        "value_refs": 84000,
+        "slot_refs": 84000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 4000,
+        "explicit_slots": 4000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 4000,
+        "allocations": 128013,
+        "bytes": 17808952,
+        "frees": 8008
+      },
+      "instance": {
+        "calls": 4000,
+        "allocations": 4000,
+        "bytes": 1152000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 4000,
+        "allocations": 20000,
+        "bytes": 3284000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 4000,
+        "allocations": 92000,
+        "bytes": 12768000,
+        "frees": 4000
+      },
+      "registration": {
+        "calls": 4000,
+        "allocations": 12009,
+        "bytes": 604632,
+        "frees": 4008
+      },
+      "arguments": {
+        "calls": 4000,
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 4000,
+        "allocations": 124001,
+        "bytes": 17396240,
+        "frees": 8001
+      },
+      "body": {
+        "calls": 4000,
+        "allocations": 4007,
+        "bytes": 257232,
+        "frees": 4001
+      },
+      "key": {
+        "calls": 8000,
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 352000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 116000
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 4000
+      }
+    }
+  },
+  {
+    "n": 4000,
+    "unused": 50,
+    "kind": "identity",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n004000/u050/identity____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 216000,
+        "inserts": 216000,
+        "overwrites": 0,
+        "value_refs": 216000,
+        "slot_refs": 216000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 216000,
+        "inserts": 216000,
+        "overwrites": 0,
+        "value_refs": 216000,
+        "slot_refs": 216000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 4000,
+        "explicit_slots": 4000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 4000,
+        "allocations": 264013,
+        "bytes": 37648952,
+        "frees": 12008
+      },
+      "instance": {
+        "calls": 4000,
+        "allocations": 4000,
+        "bytes": 1152000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 4000,
+        "allocations": 20000,
+        "bytes": 3284000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 4000,
+        "allocations": 228000,
+        "bytes": 32608000,
+        "frees": 8000
+      },
+      "registration": {
+        "calls": 4000,
+        "allocations": 12009,
+        "bytes": 604632,
+        "frees": 4008
+      },
+      "arguments": {
+        "calls": 4000,
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 4000,
+        "allocations": 260001,
+        "bytes": 37236240,
+        "frees": 12001
+      },
+      "body": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "calls": 8000,
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 352000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 248000
+      },
+      "returned_key": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 4000
+      }
+    }
+  },
+  {
+    "n": 4000,
+    "unused": 50,
+    "kind": "captured",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n004000/u050/captured____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 220000,
+        "inserts": 220000,
+        "overwrites": 0,
+        "value_refs": 220000,
+        "slot_refs": 220000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 220000,
+        "inserts": 220000,
+        "overwrites": 0,
+        "value_refs": 220000,
+        "slot_refs": 220000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 4000,
+        "explicit_slots": 4000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 4000,
+        "allocations": 268013,
+        "bytes": 38192952,
+        "frees": 12008
+      },
+      "instance": {
+        "calls": 4000,
+        "allocations": 4000,
+        "bytes": 1152000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 4000,
+        "allocations": 20000,
+        "bytes": 3284000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 4000,
+        "allocations": 232000,
+        "bytes": 33152000,
+        "frees": 8000
+      },
+      "registration": {
+        "calls": 4000,
+        "allocations": 12009,
+        "bytes": 604632,
+        "frees": 4008
+      },
+      "arguments": {
+        "calls": 4000,
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 4000,
+        "allocations": 264001,
+        "bytes": 37780240,
+        "frees": 12001
+      },
+      "body": {
+        "calls": 4000,
+        "allocations": 4007,
+        "bytes": 257232,
+        "frees": 4001
+      },
+      "key": {
+        "calls": 8000,
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 352000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 252000
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 4000
+      }
+    }
+  },
+  {
+    "n": 4000,
+    "unused": 100,
+    "kind": "identity",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n004000/u100/identity____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 416000,
+        "inserts": 416000,
+        "overwrites": 0,
+        "value_refs": 416000,
+        "slot_refs": 416000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 416000,
+        "inserts": 416000,
+        "overwrites": 0,
+        "value_refs": 416000,
+        "slot_refs": 416000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 4000,
+        "explicit_slots": 4000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 4000,
+        "allocations": 468013,
+        "bytes": 68912952,
+        "frees": 16008
+      },
+      "instance": {
+        "calls": 4000,
+        "allocations": 4000,
+        "bytes": 1152000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 4000,
+        "allocations": 20000,
+        "bytes": 3284000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 4000,
+        "allocations": 432000,
+        "bytes": 63872000,
+        "frees": 12000
+      },
+      "registration": {
+        "calls": 4000,
+        "allocations": 12009,
+        "bytes": 604632,
+        "frees": 4008
+      },
+      "arguments": {
+        "calls": 4000,
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 4000,
+        "allocations": 464001,
+        "bytes": 68500240,
+        "frees": 16001
+      },
+      "body": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "calls": 8000,
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 352000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 448000
+      },
+      "returned_key": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 4000
+      }
+    }
+  },
+  {
+    "n": 4000,
+    "unused": 100,
+    "kind": "captured",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n004000/u100/captured____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 420000,
+        "inserts": 420000,
+        "overwrites": 0,
+        "value_refs": 420000,
+        "slot_refs": 420000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 420000,
+        "inserts": 420000,
+        "overwrites": 0,
+        "value_refs": 420000,
+        "slot_refs": 420000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 4000,
+        "explicit_slots": 4000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 4000,
+        "allocations": 472013,
+        "bytes": 69456952,
+        "frees": 16008
+      },
+      "instance": {
+        "calls": 4000,
+        "allocations": 4000,
+        "bytes": 1152000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 4000,
+        "allocations": 20000,
+        "bytes": 3284000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 4000,
+        "allocations": 436000,
+        "bytes": 64416000,
+        "frees": 12000
+      },
+      "registration": {
+        "calls": 4000,
+        "allocations": 12009,
+        "bytes": 604632,
+        "frees": 4008
+      },
+      "arguments": {
+        "calls": 4000,
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 4000,
+        "allocations": 468001,
+        "bytes": 69044240,
+        "frees": 16001
+      },
+      "body": {
+        "calls": 4000,
+        "allocations": 4007,
+        "bytes": 257232,
+        "frees": 4001
+      },
+      "key": {
+        "calls": 8000,
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 352000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 608000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 4000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 452000
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 4000
+      }
+    }
+  },
+  {
+    "n": 8000,
+    "unused": 0,
+    "kind": "identity",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n008000/u000/identity____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 32000,
+        "inserts": 32000,
+        "overwrites": 0,
+        "value_refs": 32000,
+        "slot_refs": 32000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 32000,
+        "inserts": 32000,
+        "overwrites": 0,
+        "value_refs": 32000,
+        "slot_refs": 32000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 8000,
+        "explicit_slots": 8000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 8000,
+        "allocations": 112014,
+        "bytes": 15271136,
+        "frees": 8009
+      },
+      "instance": {
+        "calls": 8000,
+        "allocations": 8000,
+        "bytes": 2304000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 8000,
+        "allocations": 40000,
+        "bytes": 6568000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 8000,
+        "allocations": 40000,
+        "bytes": 5184000,
+        "frees": 0
+      },
+      "registration": {
+        "calls": 8000,
+        "allocations": 24010,
+        "bytes": 1214816,
+        "frees": 8009
+      },
+      "arguments": {
+        "calls": 8000,
+        "allocations": 8000,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 8000,
+        "allocations": 104001,
+        "bytes": 14440240,
+        "frees": 8001
+      },
+      "body": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "calls": 16000,
+        "allocations": 8000,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 704000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 96000
+      },
+      "returned_key": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 8000
+      }
+    }
+  },
+  {
+    "n": 8000,
+    "unused": 0,
+    "kind": "captured",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n008000/u000/captured____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 40000,
+        "inserts": 40000,
+        "overwrites": 0,
+        "value_refs": 40000,
+        "slot_refs": 40000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 40000,
+        "inserts": 40000,
+        "overwrites": 0,
+        "value_refs": 40000,
+        "slot_refs": 40000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 8000,
+        "explicit_slots": 8000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 8000,
+        "allocations": 120014,
+        "bytes": 16359136,
+        "frees": 8009
+      },
+      "instance": {
+        "calls": 8000,
+        "allocations": 8000,
+        "bytes": 2304000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 8000,
+        "allocations": 40000,
+        "bytes": 6568000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 8000,
+        "allocations": 48000,
+        "bytes": 6272000,
+        "frees": 0
+      },
+      "registration": {
+        "calls": 8000,
+        "allocations": 24010,
+        "bytes": 1214816,
+        "frees": 8009
+      },
+      "arguments": {
+        "calls": 8000,
+        "allocations": 8000,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 8000,
+        "allocations": 112001,
+        "bytes": 15528240,
+        "frees": 8001
+      },
+      "body": {
+        "calls": 8000,
+        "allocations": 8007,
+        "bytes": 513232,
+        "frees": 8001
+      },
+      "key": {
+        "calls": 16000,
+        "allocations": 8000,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 704000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 104000
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 8000
+      }
+    }
+  },
+  {
+    "n": 8000,
+    "unused": 5,
+    "kind": "identity",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n008000/u005/identity____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 72000,
+        "inserts": 72000,
+        "overwrites": 0,
+        "value_refs": 72000,
+        "slot_refs": 72000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 72000,
+        "inserts": 72000,
+        "overwrites": 0,
+        "value_refs": 72000,
+        "slot_refs": 72000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 8000,
+        "explicit_slots": 8000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 8000,
+        "allocations": 152014,
+        "bytes": 20711136,
+        "frees": 8009
+      },
+      "instance": {
+        "calls": 8000,
+        "allocations": 8000,
+        "bytes": 2304000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 8000,
+        "allocations": 40000,
+        "bytes": 6568000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 8000,
+        "allocations": 80000,
+        "bytes": 10624000,
+        "frees": 0
+      },
+      "registration": {
+        "calls": 8000,
+        "allocations": 24010,
+        "bytes": 1214816,
+        "frees": 8009
+      },
+      "arguments": {
+        "calls": 8000,
+        "allocations": 8000,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 8000,
+        "allocations": 144001,
+        "bytes": 19880240,
+        "frees": 8001
+      },
+      "body": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "calls": 16000,
+        "allocations": 8000,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 704000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 136000
+      },
+      "returned_key": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 8000
+      }
+    }
+  },
+  {
+    "n": 8000,
+    "unused": 5,
+    "kind": "captured",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n008000/u005/captured____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 80000,
+        "inserts": 80000,
+        "overwrites": 0,
+        "value_refs": 80000,
+        "slot_refs": 80000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 80000,
+        "inserts": 80000,
+        "overwrites": 0,
+        "value_refs": 80000,
+        "slot_refs": 80000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 8000,
+        "explicit_slots": 8000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 8000,
+        "allocations": 160014,
+        "bytes": 21799136,
+        "frees": 8009
+      },
+      "instance": {
+        "calls": 8000,
+        "allocations": 8000,
+        "bytes": 2304000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 8000,
+        "allocations": 40000,
+        "bytes": 6568000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 8000,
+        "allocations": 88000,
+        "bytes": 11712000,
+        "frees": 0
+      },
+      "registration": {
+        "calls": 8000,
+        "allocations": 24010,
+        "bytes": 1214816,
+        "frees": 8009
+      },
+      "arguments": {
+        "calls": 8000,
+        "allocations": 8000,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 8000,
+        "allocations": 152001,
+        "bytes": 20968240,
+        "frees": 8001
+      },
+      "body": {
+        "calls": 8000,
+        "allocations": 8007,
+        "bytes": 513232,
+        "frees": 8001
+      },
+      "key": {
+        "calls": 16000,
+        "allocations": 8000,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 704000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 144000
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 8000
+      }
+    }
+  },
+  {
+    "n": 8000,
+    "unused": 16,
+    "kind": "identity",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n008000/u016/identity____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 160000,
+        "inserts": 160000,
+        "overwrites": 0,
+        "value_refs": 160000,
+        "slot_refs": 160000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 160000,
+        "inserts": 160000,
+        "overwrites": 0,
+        "value_refs": 160000,
+        "slot_refs": 160000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 8000,
+        "explicit_slots": 8000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 8000,
+        "allocations": 248014,
+        "bytes": 34535136,
+        "frees": 16009
+      },
+      "instance": {
+        "calls": 8000,
+        "allocations": 8000,
+        "bytes": 2304000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 8000,
+        "allocations": 40000,
+        "bytes": 6568000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 8000,
+        "allocations": 176000,
+        "bytes": 24448000,
+        "frees": 8000
+      },
+      "registration": {
+        "calls": 8000,
+        "allocations": 24010,
+        "bytes": 1214816,
+        "frees": 8009
+      },
+      "arguments": {
+        "calls": 8000,
+        "allocations": 8000,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 8000,
+        "allocations": 240001,
+        "bytes": 33704240,
+        "frees": 16001
+      },
+      "body": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "calls": 16000,
+        "allocations": 8000,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 704000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 224000
+      },
+      "returned_key": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 8000
+      }
+    }
+  },
+  {
+    "n": 8000,
+    "unused": 16,
+    "kind": "captured",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n008000/u016/captured____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 168000,
+        "inserts": 168000,
+        "overwrites": 0,
+        "value_refs": 168000,
+        "slot_refs": 168000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 168000,
+        "inserts": 168000,
+        "overwrites": 0,
+        "value_refs": 168000,
+        "slot_refs": 168000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 8000,
+        "explicit_slots": 8000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 8000,
+        "allocations": 256014,
+        "bytes": 35623136,
+        "frees": 16009
+      },
+      "instance": {
+        "calls": 8000,
+        "allocations": 8000,
+        "bytes": 2304000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 8000,
+        "allocations": 40000,
+        "bytes": 6568000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 8000,
+        "allocations": 184000,
+        "bytes": 25536000,
+        "frees": 8000
+      },
+      "registration": {
+        "calls": 8000,
+        "allocations": 24010,
+        "bytes": 1214816,
+        "frees": 8009
+      },
+      "arguments": {
+        "calls": 8000,
+        "allocations": 8000,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 8000,
+        "allocations": 248001,
+        "bytes": 34792240,
+        "frees": 16001
+      },
+      "body": {
+        "calls": 8000,
+        "allocations": 8007,
+        "bytes": 513232,
+        "frees": 8001
+      },
+      "key": {
+        "calls": 16000,
+        "allocations": 8000,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 704000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 232000
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 8000
+      }
+    }
+  },
+  {
+    "n": 8000,
+    "unused": 50,
+    "kind": "identity",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n008000/u050/identity____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 432000,
+        "inserts": 432000,
+        "overwrites": 0,
+        "value_refs": 432000,
+        "slot_refs": 432000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 432000,
+        "inserts": 432000,
+        "overwrites": 0,
+        "value_refs": 432000,
+        "slot_refs": 432000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 8000,
+        "explicit_slots": 8000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 8000,
+        "allocations": 528014,
+        "bytes": 75303136,
+        "frees": 24009
+      },
+      "instance": {
+        "calls": 8000,
+        "allocations": 8000,
+        "bytes": 2304000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 8000,
+        "allocations": 40000,
+        "bytes": 6568000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 8000,
+        "allocations": 456000,
+        "bytes": 65216000,
+        "frees": 16000
+      },
+      "registration": {
+        "calls": 8000,
+        "allocations": 24010,
+        "bytes": 1214816,
+        "frees": 8009
+      },
+      "arguments": {
+        "calls": 8000,
+        "allocations": 8000,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 8000,
+        "allocations": 520001,
+        "bytes": 74472240,
+        "frees": 24001
+      },
+      "body": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "calls": 16000,
+        "allocations": 8000,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 704000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 496000
+      },
+      "returned_key": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 8000
+      }
+    }
+  },
+  {
+    "n": 8000,
+    "unused": 50,
+    "kind": "captured",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n008000/u050/captured____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 440000,
+        "inserts": 440000,
+        "overwrites": 0,
+        "value_refs": 440000,
+        "slot_refs": 440000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 440000,
+        "inserts": 440000,
+        "overwrites": 0,
+        "value_refs": 440000,
+        "slot_refs": 440000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 8000,
+        "explicit_slots": 8000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 8000,
+        "allocations": 536014,
+        "bytes": 76391136,
+        "frees": 24009
+      },
+      "instance": {
+        "calls": 8000,
+        "allocations": 8000,
+        "bytes": 2304000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 8000,
+        "allocations": 40000,
+        "bytes": 6568000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 8000,
+        "allocations": 464000,
+        "bytes": 66304000,
+        "frees": 16000
+      },
+      "registration": {
+        "calls": 8000,
+        "allocations": 24010,
+        "bytes": 1214816,
+        "frees": 8009
+      },
+      "arguments": {
+        "calls": 8000,
+        "allocations": 8000,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 8000,
+        "allocations": 528001,
+        "bytes": 75560240,
+        "frees": 24001
+      },
+      "body": {
+        "calls": 8000,
+        "allocations": 8007,
+        "bytes": 513232,
+        "frees": 8001
+      },
+      "key": {
+        "calls": 16000,
+        "allocations": 8000,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 704000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 504000
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 8000
+      }
+    }
+  },
+  {
+    "n": 8000,
+    "unused": 100,
+    "kind": "identity",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n008000/u100/identity____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 832000,
+        "inserts": 832000,
+        "overwrites": 0,
+        "value_refs": 832000,
+        "slot_refs": 832000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 832000,
+        "inserts": 832000,
+        "overwrites": 0,
+        "value_refs": 832000,
+        "slot_refs": 832000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 8000,
+        "explicit_slots": 8000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 8000,
+        "allocations": 936014,
+        "bytes": 137831136,
+        "frees": 32009
+      },
+      "instance": {
+        "calls": 8000,
+        "allocations": 8000,
+        "bytes": 2304000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 8000,
+        "allocations": 40000,
+        "bytes": 6568000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 8000,
+        "allocations": 864000,
+        "bytes": 127744000,
+        "frees": 24000
+      },
+      "registration": {
+        "calls": 8000,
+        "allocations": 24010,
+        "bytes": 1214816,
+        "frees": 8009
+      },
+      "arguments": {
+        "calls": 8000,
+        "allocations": 8000,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 8000,
+        "allocations": 928001,
+        "bytes": 137000240,
+        "frees": 32001
+      },
+      "body": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "calls": 16000,
+        "allocations": 8000,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 704000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 896000
+      },
+      "returned_key": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 8000
+      }
+    }
+  },
+  {
+    "n": 8000,
+    "unused": 100,
+    "kind": "captured",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n008000/u100/captured____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 840000,
+        "inserts": 840000,
+        "overwrites": 0,
+        "value_refs": 840000,
+        "slot_refs": 840000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 840000,
+        "inserts": 840000,
+        "overwrites": 0,
+        "value_refs": 840000,
+        "slot_refs": 840000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 8000,
+        "explicit_slots": 8000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 8000,
+        "allocations": 944014,
+        "bytes": 138919136,
+        "frees": 32009
+      },
+      "instance": {
+        "calls": 8000,
+        "allocations": 8000,
+        "bytes": 2304000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 8000,
+        "allocations": 40000,
+        "bytes": 6568000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 8000,
+        "allocations": 872000,
+        "bytes": 128832000,
+        "frees": 24000
+      },
+      "registration": {
+        "calls": 8000,
+        "allocations": 24010,
+        "bytes": 1214816,
+        "frees": 8009
+      },
+      "arguments": {
+        "calls": 8000,
+        "allocations": 8000,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 8000,
+        "allocations": 936001,
+        "bytes": 138088240,
+        "frees": 32001
+      },
+      "body": {
+        "calls": 8000,
+        "allocations": 8007,
+        "bytes": 513232,
+        "frees": 8001
+      },
+      "key": {
+        "calls": 16000,
+        "allocations": 8000,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 704000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 1216000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 8000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 904000
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 8000
+      }
+    }
+  },
+  {
+    "n": 16000,
+    "unused": 0,
+    "kind": "identity",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n016000/u000/identity____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 64000,
+        "inserts": 64000,
+        "overwrites": 0,
+        "value_refs": 64000,
+        "slot_refs": 64000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 64000,
+        "inserts": 64000,
+        "overwrites": 0,
+        "value_refs": 64000,
+        "slot_refs": 64000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 16000,
+        "explicit_slots": 16000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 16000,
+        "allocations": 224015,
+        "bytes": 30549160,
+        "frees": 16010
+      },
+      "instance": {
+        "calls": 16000,
+        "allocations": 16000,
+        "bytes": 4608000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 16000,
+        "allocations": 80000,
+        "bytes": 13136000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 16000,
+        "allocations": 80000,
+        "bytes": 10368000,
+        "frees": 0
+      },
+      "registration": {
+        "calls": 16000,
+        "allocations": 48011,
+        "bytes": 2436840,
+        "frees": 16010
+      },
+      "arguments": {
+        "calls": 16000,
+        "allocations": 16000,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 16000,
+        "allocations": 208001,
+        "bytes": 28880240,
+        "frees": 16001
+      },
+      "body": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "calls": 32000,
+        "allocations": 16000,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 1408000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 192000
+      },
+      "returned_key": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 16000
+      }
+    }
+  },
+  {
+    "n": 16000,
+    "unused": 0,
+    "kind": "captured",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n016000/u000/captured____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 80000,
+        "inserts": 80000,
+        "overwrites": 0,
+        "value_refs": 80000,
+        "slot_refs": 80000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 80000,
+        "inserts": 80000,
+        "overwrites": 0,
+        "value_refs": 80000,
+        "slot_refs": 80000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 16000,
+        "explicit_slots": 16000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 16000,
+        "allocations": 240015,
+        "bytes": 32725160,
+        "frees": 16010
+      },
+      "instance": {
+        "calls": 16000,
+        "allocations": 16000,
+        "bytes": 4608000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 16000,
+        "allocations": 80000,
+        "bytes": 13136000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 16000,
+        "allocations": 96000,
+        "bytes": 12544000,
+        "frees": 0
+      },
+      "registration": {
+        "calls": 16000,
+        "allocations": 48011,
+        "bytes": 2436840,
+        "frees": 16010
+      },
+      "arguments": {
+        "calls": 16000,
+        "allocations": 16000,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 16000,
+        "allocations": 224001,
+        "bytes": 31056240,
+        "frees": 16001
+      },
+      "body": {
+        "calls": 16000,
+        "allocations": 16007,
+        "bytes": 1025232,
+        "frees": 16001
+      },
+      "key": {
+        "calls": 32000,
+        "allocations": 16000,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 1408000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 208000
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 16000
+      }
+    }
+  },
+  {
+    "n": 16000,
+    "unused": 5,
+    "kind": "identity",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n016000/u005/identity____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 144000,
+        "inserts": 144000,
+        "overwrites": 0,
+        "value_refs": 144000,
+        "slot_refs": 144000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 144000,
+        "inserts": 144000,
+        "overwrites": 0,
+        "value_refs": 144000,
+        "slot_refs": 144000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 16000,
+        "explicit_slots": 16000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 16000,
+        "allocations": 304015,
+        "bytes": 41429160,
+        "frees": 16010
+      },
+      "instance": {
+        "calls": 16000,
+        "allocations": 16000,
+        "bytes": 4608000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 16000,
+        "allocations": 80000,
+        "bytes": 13136000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 16000,
+        "allocations": 160000,
+        "bytes": 21248000,
+        "frees": 0
+      },
+      "registration": {
+        "calls": 16000,
+        "allocations": 48011,
+        "bytes": 2436840,
+        "frees": 16010
+      },
+      "arguments": {
+        "calls": 16000,
+        "allocations": 16000,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 16000,
+        "allocations": 288001,
+        "bytes": 39760240,
+        "frees": 16001
+      },
+      "body": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "calls": 32000,
+        "allocations": 16000,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 1408000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 272000
+      },
+      "returned_key": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 16000
+      }
+    }
+  },
+  {
+    "n": 16000,
+    "unused": 5,
+    "kind": "captured",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n016000/u005/captured____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 160000,
+        "inserts": 160000,
+        "overwrites": 0,
+        "value_refs": 160000,
+        "slot_refs": 160000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 160000,
+        "inserts": 160000,
+        "overwrites": 0,
+        "value_refs": 160000,
+        "slot_refs": 160000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 16000,
+        "explicit_slots": 16000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 16000,
+        "allocations": 320015,
+        "bytes": 43605160,
+        "frees": 16010
+      },
+      "instance": {
+        "calls": 16000,
+        "allocations": 16000,
+        "bytes": 4608000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 16000,
+        "allocations": 80000,
+        "bytes": 13136000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 16000,
+        "allocations": 176000,
+        "bytes": 23424000,
+        "frees": 0
+      },
+      "registration": {
+        "calls": 16000,
+        "allocations": 48011,
+        "bytes": 2436840,
+        "frees": 16010
+      },
+      "arguments": {
+        "calls": 16000,
+        "allocations": 16000,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 16000,
+        "allocations": 304001,
+        "bytes": 41936240,
+        "frees": 16001
+      },
+      "body": {
+        "calls": 16000,
+        "allocations": 16007,
+        "bytes": 1025232,
+        "frees": 16001
+      },
+      "key": {
+        "calls": 32000,
+        "allocations": 16000,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 1408000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 288000
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 16000
+      }
+    }
+  },
+  {
+    "n": 16000,
+    "unused": 16,
+    "kind": "identity",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n016000/u016/identity____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 320000,
+        "inserts": 320000,
+        "overwrites": 0,
+        "value_refs": 320000,
+        "slot_refs": 320000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 320000,
+        "inserts": 320000,
+        "overwrites": 0,
+        "value_refs": 320000,
+        "slot_refs": 320000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 16000,
+        "explicit_slots": 16000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 16000,
+        "allocations": 496015,
+        "bytes": 69077160,
+        "frees": 32010
+      },
+      "instance": {
+        "calls": 16000,
+        "allocations": 16000,
+        "bytes": 4608000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 16000,
+        "allocations": 80000,
+        "bytes": 13136000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 16000,
+        "allocations": 352000,
+        "bytes": 48896000,
+        "frees": 16000
+      },
+      "registration": {
+        "calls": 16000,
+        "allocations": 48011,
+        "bytes": 2436840,
+        "frees": 16010
+      },
+      "arguments": {
+        "calls": 16000,
+        "allocations": 16000,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 16000,
+        "allocations": 480001,
+        "bytes": 67408240,
+        "frees": 32001
+      },
+      "body": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "calls": 32000,
+        "allocations": 16000,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 1408000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 448000
+      },
+      "returned_key": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 16000
+      }
+    }
+  },
+  {
+    "n": 16000,
+    "unused": 16,
+    "kind": "captured",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n016000/u016/captured____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 336000,
+        "inserts": 336000,
+        "overwrites": 0,
+        "value_refs": 336000,
+        "slot_refs": 336000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 336000,
+        "inserts": 336000,
+        "overwrites": 0,
+        "value_refs": 336000,
+        "slot_refs": 336000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 16000,
+        "explicit_slots": 16000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 16000,
+        "allocations": 512015,
+        "bytes": 71253160,
+        "frees": 32010
+      },
+      "instance": {
+        "calls": 16000,
+        "allocations": 16000,
+        "bytes": 4608000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 16000,
+        "allocations": 80000,
+        "bytes": 13136000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 16000,
+        "allocations": 368000,
+        "bytes": 51072000,
+        "frees": 16000
+      },
+      "registration": {
+        "calls": 16000,
+        "allocations": 48011,
+        "bytes": 2436840,
+        "frees": 16010
+      },
+      "arguments": {
+        "calls": 16000,
+        "allocations": 16000,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 16000,
+        "allocations": 496001,
+        "bytes": 69584240,
+        "frees": 32001
+      },
+      "body": {
+        "calls": 16000,
+        "allocations": 16007,
+        "bytes": 1025232,
+        "frees": 16001
+      },
+      "key": {
+        "calls": 32000,
+        "allocations": 16000,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 1408000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 464000
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 16000
+      }
+    }
+  },
+  {
+    "n": 16000,
+    "unused": 50,
+    "kind": "identity",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n016000/u050/identity____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 864000,
+        "inserts": 864000,
+        "overwrites": 0,
+        "value_refs": 864000,
+        "slot_refs": 864000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 864000,
+        "inserts": 864000,
+        "overwrites": 0,
+        "value_refs": 864000,
+        "slot_refs": 864000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 16000,
+        "explicit_slots": 16000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 16000,
+        "allocations": 1056015,
+        "bytes": 150613160,
+        "frees": 48010
+      },
+      "instance": {
+        "calls": 16000,
+        "allocations": 16000,
+        "bytes": 4608000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 16000,
+        "allocations": 80000,
+        "bytes": 13136000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 16000,
+        "allocations": 912000,
+        "bytes": 130432000,
+        "frees": 32000
+      },
+      "registration": {
+        "calls": 16000,
+        "allocations": 48011,
+        "bytes": 2436840,
+        "frees": 16010
+      },
+      "arguments": {
+        "calls": 16000,
+        "allocations": 16000,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 16000,
+        "allocations": 1040001,
+        "bytes": 148944240,
+        "frees": 48001
+      },
+      "body": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "calls": 32000,
+        "allocations": 16000,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 1408000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 992000
+      },
+      "returned_key": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 16000
+      }
+    }
+  },
+  {
+    "n": 16000,
+    "unused": 50,
+    "kind": "captured",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n016000/u050/captured____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 880000,
+        "inserts": 880000,
+        "overwrites": 0,
+        "value_refs": 880000,
+        "slot_refs": 880000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 880000,
+        "inserts": 880000,
+        "overwrites": 0,
+        "value_refs": 880000,
+        "slot_refs": 880000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 16000,
+        "explicit_slots": 16000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 16000,
+        "allocations": 1072015,
+        "bytes": 152789160,
+        "frees": 48010
+      },
+      "instance": {
+        "calls": 16000,
+        "allocations": 16000,
+        "bytes": 4608000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 16000,
+        "allocations": 80000,
+        "bytes": 13136000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 16000,
+        "allocations": 928000,
+        "bytes": 132608000,
+        "frees": 32000
+      },
+      "registration": {
+        "calls": 16000,
+        "allocations": 48011,
+        "bytes": 2436840,
+        "frees": 16010
+      },
+      "arguments": {
+        "calls": 16000,
+        "allocations": 16000,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 16000,
+        "allocations": 1056001,
+        "bytes": 151120240,
+        "frees": 48001
+      },
+      "body": {
+        "calls": 16000,
+        "allocations": 16007,
+        "bytes": 1025232,
+        "frees": 16001
+      },
+      "key": {
+        "calls": 32000,
+        "allocations": 16000,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 1408000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 1008000
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 16000
+      }
+    }
+  },
+  {
+    "n": 16000,
+    "unused": 100,
+    "kind": "identity",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n016000/u100/identity____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 1664000,
+        "inserts": 1664000,
+        "overwrites": 0,
+        "value_refs": 1664000,
+        "slot_refs": 1664000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 1664000,
+        "inserts": 1664000,
+        "overwrites": 0,
+        "value_refs": 1664000,
+        "slot_refs": 1664000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 16000,
+        "explicit_slots": 16000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 16000,
+        "allocations": 1872015,
+        "bytes": 275669160,
+        "frees": 64010
+      },
+      "instance": {
+        "calls": 16000,
+        "allocations": 16000,
+        "bytes": 4608000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 16000,
+        "allocations": 80000,
+        "bytes": 13136000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 16000,
+        "allocations": 1728000,
+        "bytes": 255488000,
+        "frees": 48000
+      },
+      "registration": {
+        "calls": 16000,
+        "allocations": 48011,
+        "bytes": 2436840,
+        "frees": 16010
+      },
+      "arguments": {
+        "calls": 16000,
+        "allocations": 16000,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 16000,
+        "allocations": 1856001,
+        "bytes": 274000240,
+        "frees": 64001
+      },
+      "body": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "calls": 32000,
+        "allocations": 16000,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 1408000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 1792000
+      },
+      "returned_key": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 16000
+      }
+    }
+  },
+  {
+    "n": 16000,
+    "unused": 100,
+    "kind": "captured",
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n016000/u100/captured____/official-equivalent.f",
+    "bindings": {
+      "capture": {
+        "entries": 1680000,
+        "inserts": 1680000,
+        "overwrites": 0,
+        "value_refs": 1680000,
+        "slot_refs": 1680000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 1680000,
+        "inserts": 1680000,
+        "overwrites": 0,
+        "value_refs": 1680000,
+        "slot_refs": 1680000,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 16000,
+        "explicit_slots": 16000
+      }
+    },
+    "phases": {
+      "factory": {
+        "calls": 16000,
+        "allocations": 1888015,
+        "bytes": 277845160,
+        "frees": 64010
+      },
+      "instance": {
+        "calls": 16000,
+        "allocations": 16000,
+        "bytes": 4608000,
+        "frees": 0
+      },
+      "metadata": {
+        "calls": 16000,
+        "allocations": 80000,
+        "bytes": 13136000,
+        "frees": 0
+      },
+      "capture": {
+        "calls": 16000,
+        "allocations": 1744000,
+        "bytes": 257664000,
+        "frees": 48000
+      },
+      "registration": {
+        "calls": 16000,
+        "allocations": 48011,
+        "bytes": 2436840,
+        "frees": 16010
+      },
+      "arguments": {
+        "calls": 16000,
+        "allocations": 16000,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "frame": {
+        "calls": 16000,
+        "allocations": 1872001,
+        "bytes": 276176240,
+        "frees": 64001
+      },
+      "body": {
+        "calls": 16000,
+        "allocations": 16007,
+        "bytes": 1025232,
+        "frees": 16001
+      },
+      "key": {
+        "calls": 32000,
+        "allocations": 16000,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "decoration": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 1408000,
+        "frees": 1
+      },
+      "result": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 2432000,
+        "frees": 0
+      },
+      "cleanup": {
+        "calls": 16000,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 1808000
+      },
+      "returned_key": {
+        "calls": 0,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "calls": 2,
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 16000
+      }
+    }
+  }
+]

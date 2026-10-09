@@ -1,0 +1,1622 @@
+[
+  {
+    "shape": "flat",
+    "n": 1000,
+    "pattern": "files/**/*.dat",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.03267679596319795,
+    "user_system_rss": "0.00 0.02 9280",
+    "stdout": "1200"
+  },
+  {
+    "shape": "flat",
+    "n": 1000,
+    "pattern": "files/**/*.dat",
+    "repeat": 0,
+    "label": "prototype",
+    "wall": 0.019919808954000473,
+    "user_system_rss": "0.00 0.01 9256",
+    "stdout": "1200"
+  },
+  {
+    "shape": "flat",
+    "n": 1000,
+    "pattern": "files/**/*.dat",
+    "repeat": 1,
+    "label": "prototype",
+    "wall": 0.020043871132656932,
+    "user_system_rss": "0.00 0.01 8988",
+    "stdout": "1200"
+  },
+  {
+    "shape": "flat",
+    "n": 1000,
+    "pattern": "files/**/*.dat",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.026246214052662253,
+    "user_system_rss": "0.00 0.01 9444",
+    "stdout": "1200"
+  },
+  {
+    "shape": "flat",
+    "n": 1000,
+    "pattern": "files/**/*.dat",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.03142673894762993,
+    "user_system_rss": "0.00 0.01 9304",
+    "stdout": "1200"
+  },
+  {
+    "shape": "flat",
+    "n": 1000,
+    "pattern": "files/**/*.dat",
+    "repeat": 2,
+    "label": "prototype",
+    "wall": 0.018898467998951674,
+    "user_system_rss": "0.00 0.01 9032",
+    "stdout": "1200"
+  },
+  {
+    "shape": "flat",
+    "n": 1000,
+    "pattern": "files/**/*.missing",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.006069087889045477,
+    "user_system_rss": "0.00 0.00 8280",
+    "stdout": "0"
+  },
+  {
+    "shape": "flat",
+    "n": 1000,
+    "pattern": "files/**/*.missing",
+    "repeat": 0,
+    "label": "prototype",
+    "wall": 0.006033612880855799,
+    "user_system_rss": "0.00 0.00 8360",
+    "stdout": "0"
+  },
+  {
+    "shape": "flat",
+    "n": 1000,
+    "pattern": "files/**/*.missing",
+    "repeat": 1,
+    "label": "prototype",
+    "wall": 0.008538736961781979,
+    "user_system_rss": "0.00 0.00 8204",
+    "stdout": "0"
+  },
+  {
+    "shape": "flat",
+    "n": 1000,
+    "pattern": "files/**/*.missing",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.009347349870949984,
+    "user_system_rss": "0.00 0.00 8284",
+    "stdout": "0"
+  },
+  {
+    "shape": "flat",
+    "n": 1000,
+    "pattern": "files/**/*.missing",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.010047151008620858,
+    "user_system_rss": "0.00 0.00 8224",
+    "stdout": "0"
+  },
+  {
+    "shape": "flat",
+    "n": 1000,
+    "pattern": "files/**/*.missing",
+    "repeat": 2,
+    "label": "prototype",
+    "wall": 0.011642269091680646,
+    "user_system_rss": "0.00 0.00 8024",
+    "stdout": "0"
+  },
+  {
+    "shape": "flat",
+    "n": 1000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.007419588044285774,
+    "user_system_rss": "0.00 0.00 8260",
+    "stdout": "2"
+  },
+  {
+    "shape": "flat",
+    "n": 1000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 0,
+    "label": "prototype",
+    "wall": 0.007956922985613346,
+    "user_system_rss": "0.00 0.00 8428",
+    "stdout": "2"
+  },
+  {
+    "shape": "flat",
+    "n": 1000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 1,
+    "label": "prototype",
+    "wall": 0.00874914089217782,
+    "user_system_rss": "0.00 0.00 8352",
+    "stdout": "2"
+  },
+  {
+    "shape": "flat",
+    "n": 1000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.00883853086270392,
+    "user_system_rss": "0.00 0.00 8212",
+    "stdout": "2"
+  },
+  {
+    "shape": "flat",
+    "n": 1000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.006714971968904138,
+    "user_system_rss": "0.00 0.00 8176",
+    "stdout": "2"
+  },
+  {
+    "shape": "flat",
+    "n": 1000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 2,
+    "label": "prototype",
+    "wall": 0.007467529969289899,
+    "user_system_rss": "0.00 0.00 8452",
+    "stdout": "2"
+  },
+  {
+    "shape": "flat",
+    "n": 10000,
+    "pattern": "files/**/*.dat",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.21942050498910248,
+    "user_system_rss": "0.08 0.13 28532",
+    "stdout": "12000"
+  },
+  {
+    "shape": "flat",
+    "n": 10000,
+    "pattern": "files/**/*.dat",
+    "repeat": 0,
+    "label": "prototype",
+    "wall": 0.17731900792568922,
+    "user_system_rss": "0.06 0.10 28408",
+    "stdout": "12000"
+  },
+  {
+    "shape": "flat",
+    "n": 10000,
+    "pattern": "files/**/*.dat",
+    "repeat": 1,
+    "label": "prototype",
+    "wall": 0.17923331912606955,
+    "user_system_rss": "0.07 0.10 28072",
+    "stdout": "12000"
+  },
+  {
+    "shape": "flat",
+    "n": 10000,
+    "pattern": "files/**/*.dat",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.22438681707717478,
+    "user_system_rss": "0.07 0.14 28452",
+    "stdout": "12000"
+  },
+  {
+    "shape": "flat",
+    "n": 10000,
+    "pattern": "files/**/*.dat",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.2178707669954747,
+    "user_system_rss": "0.07 0.13 28596",
+    "stdout": "12000"
+  },
+  {
+    "shape": "flat",
+    "n": 10000,
+    "pattern": "files/**/*.dat",
+    "repeat": 2,
+    "label": "prototype",
+    "wall": 0.1705472960602492,
+    "user_system_rss": "0.05 0.10 28308",
+    "stdout": "12000"
+  },
+  {
+    "shape": "flat",
+    "n": 10000,
+    "pattern": "files/**/*.missing",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.04801537888124585,
+    "user_system_rss": "0.02 0.01 17192",
+    "stdout": "0"
+  },
+  {
+    "shape": "flat",
+    "n": 10000,
+    "pattern": "files/**/*.missing",
+    "repeat": 0,
+    "label": "prototype",
+    "wall": 0.04124632803723216,
+    "user_system_rss": "0.02 0.01 17488",
+    "stdout": "0"
+  },
+  {
+    "shape": "flat",
+    "n": 10000,
+    "pattern": "files/**/*.missing",
+    "repeat": 1,
+    "label": "prototype",
+    "wall": 0.044627551920711994,
+    "user_system_rss": "0.02 0.01 17252",
+    "stdout": "0"
+  },
+  {
+    "shape": "flat",
+    "n": 10000,
+    "pattern": "files/**/*.missing",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.04253155994229019,
+    "user_system_rss": "0.02 0.01 17248",
+    "stdout": "0"
+  },
+  {
+    "shape": "flat",
+    "n": 10000,
+    "pattern": "files/**/*.missing",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.04072162811644375,
+    "user_system_rss": "0.02 0.01 17400",
+    "stdout": "0"
+  },
+  {
+    "shape": "flat",
+    "n": 10000,
+    "pattern": "files/**/*.missing",
+    "repeat": 2,
+    "label": "prototype",
+    "wall": 0.045372304040938616,
+    "user_system_rss": "0.03 0.01 17496",
+    "stdout": "0"
+  },
+  {
+    "shape": "flat",
+    "n": 10000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.04538568085990846,
+    "user_system_rss": "0.02 0.01 17324",
+    "stdout": "12"
+  },
+  {
+    "shape": "flat",
+    "n": 10000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 0,
+    "label": "prototype",
+    "wall": 0.04407625203020871,
+    "user_system_rss": "0.03 0.00 17528",
+    "stdout": "12"
+  },
+  {
+    "shape": "flat",
+    "n": 10000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 1,
+    "label": "prototype",
+    "wall": 0.04265137598849833,
+    "user_system_rss": "0.03 0.00 17512",
+    "stdout": "12"
+  },
+  {
+    "shape": "flat",
+    "n": 10000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.05248039006255567,
+    "user_system_rss": "0.03 0.01 17592",
+    "stdout": "12"
+  },
+  {
+    "shape": "flat",
+    "n": 10000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.046238034032285213,
+    "user_system_rss": "0.03 0.01 17524",
+    "stdout": "12"
+  },
+  {
+    "shape": "flat",
+    "n": 10000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 2,
+    "label": "prototype",
+    "wall": 0.045571322087198496,
+    "user_system_rss": "0.03 0.01 17412",
+    "stdout": "12"
+  },
+  {
+    "shape": "flat",
+    "n": 100000,
+    "pattern": "files/**/*.dat",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 2.285665044095367,
+    "user_system_rss": "0.88 1.39 222520",
+    "stdout": "120000"
+  },
+  {
+    "shape": "flat",
+    "n": 100000,
+    "pattern": "files/**/*.dat",
+    "repeat": 0,
+    "label": "prototype",
+    "wall": 1.863506186986342,
+    "user_system_rss": "0.85 0.99 222312",
+    "stdout": "120000"
+  },
+  {
+    "shape": "flat",
+    "n": 100000,
+    "pattern": "files/**/*.dat",
+    "repeat": 1,
+    "label": "prototype",
+    "wall": 1.804273797897622,
+    "user_system_rss": "0.87 0.93 222320",
+    "stdout": "120000"
+  },
+  {
+    "shape": "flat",
+    "n": 100000,
+    "pattern": "files/**/*.dat",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 2.323402521200478,
+    "user_system_rss": "0.95 1.36 222860",
+    "stdout": "120000"
+  },
+  {
+    "shape": "flat",
+    "n": 100000,
+    "pattern": "files/**/*.dat",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 2.306233316892758,
+    "user_system_rss": "0.89 1.40 222488",
+    "stdout": "120000"
+  },
+  {
+    "shape": "flat",
+    "n": 100000,
+    "pattern": "files/**/*.dat",
+    "repeat": 2,
+    "label": "prototype",
+    "wall": 1.8370605260133743,
+    "user_system_rss": "0.86 0.96 221848",
+    "stdout": "120000"
+  },
+  {
+    "shape": "flat",
+    "n": 100000,
+    "pattern": "files/**/*.missing",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.5953097899910063,
+    "user_system_rss": "0.50 0.08 108776",
+    "stdout": "0"
+  },
+  {
+    "shape": "flat",
+    "n": 100000,
+    "pattern": "files/**/*.missing",
+    "repeat": 0,
+    "label": "prototype",
+    "wall": 0.540765045909211,
+    "user_system_rss": "0.44 0.08 109096",
+    "stdout": "0"
+  },
+  {
+    "shape": "flat",
+    "n": 100000,
+    "pattern": "files/**/*.missing",
+    "repeat": 1,
+    "label": "prototype",
+    "wall": 0.5496393931098282,
+    "user_system_rss": "0.45 0.09 108948",
+    "stdout": "0"
+  },
+  {
+    "shape": "flat",
+    "n": 100000,
+    "pattern": "files/**/*.missing",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.5423525080550462,
+    "user_system_rss": "0.46 0.07 108784",
+    "stdout": "0"
+  },
+  {
+    "shape": "flat",
+    "n": 100000,
+    "pattern": "files/**/*.missing",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.5688255289569497,
+    "user_system_rss": "0.46 0.09 108868",
+    "stdout": "0"
+  },
+  {
+    "shape": "flat",
+    "n": 100000,
+    "pattern": "files/**/*.missing",
+    "repeat": 2,
+    "label": "prototype",
+    "wall": 0.5890815129969269,
+    "user_system_rss": "0.48 0.09 108872",
+    "stdout": "0"
+  },
+  {
+    "shape": "flat",
+    "n": 100000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.5757720877882093,
+    "user_system_rss": "0.49 0.08 108992",
+    "stdout": "120"
+  },
+  {
+    "shape": "flat",
+    "n": 100000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 0,
+    "label": "prototype",
+    "wall": 0.7412418599706143,
+    "user_system_rss": "0.63 0.10 108648",
+    "stdout": "120"
+  },
+  {
+    "shape": "flat",
+    "n": 100000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 1,
+    "label": "prototype",
+    "wall": 0.6990949278697371,
+    "user_system_rss": "0.57 0.11 108672",
+    "stdout": "120"
+  },
+  {
+    "shape": "flat",
+    "n": 100000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.6852893349714577,
+    "user_system_rss": "0.57 0.10 108552",
+    "stdout": "120"
+  },
+  {
+    "shape": "flat",
+    "n": 100000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.7301791328936815,
+    "user_system_rss": "0.61 0.11 108692",
+    "stdout": "120"
+  },
+  {
+    "shape": "flat",
+    "n": 100000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 2,
+    "label": "prototype",
+    "wall": 0.5947448110673577,
+    "user_system_rss": "0.50 0.08 109160",
+    "stdout": "120"
+  },
+  {
+    "shape": "deep",
+    "n": 1000,
+    "pattern": "files/**/*.dat",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.04224015213549137,
+    "user_system_rss": "0.00 0.02 10220",
+    "stdout": "1000"
+  },
+  {
+    "shape": "deep",
+    "n": 1000,
+    "pattern": "files/**/*.dat",
+    "repeat": 0,
+    "label": "prototype",
+    "wall": 0.03434698493219912,
+    "user_system_rss": "0.01 0.02 10504",
+    "stdout": "1000"
+  },
+  {
+    "shape": "deep",
+    "n": 1000,
+    "pattern": "files/**/*.dat",
+    "repeat": 1,
+    "label": "prototype",
+    "wall": 0.030675939051434398,
+    "user_system_rss": "0.01 0.01 10444",
+    "stdout": "1000"
+  },
+  {
+    "shape": "deep",
+    "n": 1000,
+    "pattern": "files/**/*.dat",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.03322717105038464,
+    "user_system_rss": "0.01 0.02 10084",
+    "stdout": "1000"
+  },
+  {
+    "shape": "deep",
+    "n": 1000,
+    "pattern": "files/**/*.dat",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.034392864909023046,
+    "user_system_rss": "0.01 0.02 10364",
+    "stdout": "1000"
+  },
+  {
+    "shape": "deep",
+    "n": 1000,
+    "pattern": "files/**/*.dat",
+    "repeat": 2,
+    "label": "prototype",
+    "wall": 0.030595070915296674,
+    "user_system_rss": "0.00 0.01 10260",
+    "stdout": "1000"
+  },
+  {
+    "shape": "deep",
+    "n": 1000,
+    "pattern": "files/**/*.missing",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.009099688846617937,
+    "user_system_rss": "0.00 0.00 8776",
+    "stdout": "0"
+  },
+  {
+    "shape": "deep",
+    "n": 1000,
+    "pattern": "files/**/*.missing",
+    "repeat": 0,
+    "label": "prototype",
+    "wall": 0.007162740221247077,
+    "user_system_rss": "0.00 0.00 8456",
+    "stdout": "0"
+  },
+  {
+    "shape": "deep",
+    "n": 1000,
+    "pattern": "files/**/*.missing",
+    "repeat": 1,
+    "label": "prototype",
+    "wall": 0.008097823010757565,
+    "user_system_rss": "0.00 0.00 8672",
+    "stdout": "0"
+  },
+  {
+    "shape": "deep",
+    "n": 1000,
+    "pattern": "files/**/*.missing",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.008297603111714125,
+    "user_system_rss": "0.00 0.00 8896",
+    "stdout": "0"
+  },
+  {
+    "shape": "deep",
+    "n": 1000,
+    "pattern": "files/**/*.missing",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.009836849058046937,
+    "user_system_rss": "0.00 0.00 8708",
+    "stdout": "0"
+  },
+  {
+    "shape": "deep",
+    "n": 1000,
+    "pattern": "files/**/*.missing",
+    "repeat": 2,
+    "label": "prototype",
+    "wall": 0.00858926703222096,
+    "user_system_rss": "0.00 0.00 8896",
+    "stdout": "0"
+  },
+  {
+    "shape": "deep",
+    "n": 1000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.0072619610000401735,
+    "user_system_rss": "0.00 0.00 8724",
+    "stdout": "1"
+  },
+  {
+    "shape": "deep",
+    "n": 1000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 0,
+    "label": "prototype",
+    "wall": 0.009085173020139337,
+    "user_system_rss": "0.00 0.00 8712",
+    "stdout": "1"
+  },
+  {
+    "shape": "deep",
+    "n": 1000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 1,
+    "label": "prototype",
+    "wall": 0.009631722932681441,
+    "user_system_rss": "0.00 0.00 8548",
+    "stdout": "1"
+  },
+  {
+    "shape": "deep",
+    "n": 1000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.013548673829063773,
+    "user_system_rss": "0.00 0.00 8656",
+    "stdout": "1"
+  },
+  {
+    "shape": "deep",
+    "n": 1000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.011054489994421601,
+    "user_system_rss": "0.00 0.00 8800",
+    "stdout": "1"
+  },
+  {
+    "shape": "deep",
+    "n": 1000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 2,
+    "label": "prototype",
+    "wall": 0.006459064083173871,
+    "user_system_rss": "0.00 0.00 8880",
+    "stdout": "1"
+  },
+  {
+    "shape": "deep",
+    "n": 10000,
+    "pattern": "files/**/*.dat",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.30199645506218076,
+    "user_system_rss": "0.10 0.19 38664",
+    "stdout": "10000"
+  },
+  {
+    "shape": "deep",
+    "n": 10000,
+    "pattern": "files/**/*.dat",
+    "repeat": 0,
+    "label": "prototype",
+    "wall": 0.27402211003936827,
+    "user_system_rss": "0.09 0.16 38796",
+    "stdout": "10000"
+  },
+  {
+    "shape": "deep",
+    "n": 10000,
+    "pattern": "files/**/*.dat",
+    "repeat": 1,
+    "label": "prototype",
+    "wall": 0.27893735095858574,
+    "user_system_rss": "0.11 0.15 38544",
+    "stdout": "10000"
+  },
+  {
+    "shape": "deep",
+    "n": 10000,
+    "pattern": "files/**/*.dat",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.3154008479323238,
+    "user_system_rss": "0.10 0.20 38632",
+    "stdout": "10000"
+  },
+  {
+    "shape": "deep",
+    "n": 10000,
+    "pattern": "files/**/*.dat",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.31124859279952943,
+    "user_system_rss": "0.10 0.20 38568",
+    "stdout": "10000"
+  },
+  {
+    "shape": "deep",
+    "n": 10000,
+    "pattern": "files/**/*.dat",
+    "repeat": 2,
+    "label": "prototype",
+    "wall": 0.2638980941846967,
+    "user_system_rss": "0.09 0.16 38636",
+    "stdout": "10000"
+  },
+  {
+    "shape": "deep",
+    "n": 10000,
+    "pattern": "files/**/*.missing",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.05899308901280165,
+    "user_system_rss": "0.03 0.01 22448",
+    "stdout": "0"
+  },
+  {
+    "shape": "deep",
+    "n": 10000,
+    "pattern": "files/**/*.missing",
+    "repeat": 0,
+    "label": "prototype",
+    "wall": 0.05270563601516187,
+    "user_system_rss": "0.04 0.00 22304",
+    "stdout": "0"
+  },
+  {
+    "shape": "deep",
+    "n": 10000,
+    "pattern": "files/**/*.missing",
+    "repeat": 1,
+    "label": "prototype",
+    "wall": 0.05266779102385044,
+    "user_system_rss": "0.04 0.00 22676",
+    "stdout": "0"
+  },
+  {
+    "shape": "deep",
+    "n": 10000,
+    "pattern": "files/**/*.missing",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.05251523316837847,
+    "user_system_rss": "0.04 0.00 22056",
+    "stdout": "0"
+  },
+  {
+    "shape": "deep",
+    "n": 10000,
+    "pattern": "files/**/*.missing",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.05453655100427568,
+    "user_system_rss": "0.04 0.01 22256",
+    "stdout": "0"
+  },
+  {
+    "shape": "deep",
+    "n": 10000,
+    "pattern": "files/**/*.missing",
+    "repeat": 2,
+    "label": "prototype",
+    "wall": 0.05540216597728431,
+    "user_system_rss": "0.03 0.01 22376",
+    "stdout": "0"
+  },
+  {
+    "shape": "deep",
+    "n": 10000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.051251237047836185,
+    "user_system_rss": "0.03 0.00 22700",
+    "stdout": "10"
+  },
+  {
+    "shape": "deep",
+    "n": 10000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 0,
+    "label": "prototype",
+    "wall": 0.05578099889680743,
+    "user_system_rss": "0.04 0.01 22056",
+    "stdout": "10"
+  },
+  {
+    "shape": "deep",
+    "n": 10000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 1,
+    "label": "prototype",
+    "wall": 0.059665959095582366,
+    "user_system_rss": "0.04 0.01 22620",
+    "stdout": "10"
+  },
+  {
+    "shape": "deep",
+    "n": 10000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.0617569989990443,
+    "user_system_rss": "0.04 0.01 22404",
+    "stdout": "10"
+  },
+  {
+    "shape": "deep",
+    "n": 10000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.06532817496918142,
+    "user_system_rss": "0.04 0.01 22320",
+    "stdout": "10"
+  },
+  {
+    "shape": "deep",
+    "n": 10000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 2,
+    "label": "prototype",
+    "wall": 0.06420898484066129,
+    "user_system_rss": "0.04 0.01 22600",
+    "stdout": "10"
+  },
+  {
+    "shape": "deep",
+    "n": 100000,
+    "pattern": "files/**/*.dat",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 3.2678518251050264,
+    "user_system_rss": "1.23 2.02 320140",
+    "stdout": "100000"
+  },
+  {
+    "shape": "deep",
+    "n": 100000,
+    "pattern": "files/**/*.dat",
+    "repeat": 0,
+    "label": "prototype",
+    "wall": 3.0225958980154246,
+    "user_system_rss": "1.34 1.67 320292",
+    "stdout": "100000"
+  },
+  {
+    "shape": "deep",
+    "n": 100000,
+    "pattern": "files/**/*.dat",
+    "repeat": 1,
+    "label": "prototype",
+    "wall": 2.9663693220354617,
+    "user_system_rss": "1.29 1.66 319604",
+    "stdout": "100000"
+  },
+  {
+    "shape": "deep",
+    "n": 100000,
+    "pattern": "files/**/*.dat",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 3.2612789270933717,
+    "user_system_rss": "1.22 2.02 320196",
+    "stdout": "100000"
+  },
+  {
+    "shape": "deep",
+    "n": 100000,
+    "pattern": "files/**/*.dat",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 3.3518487848341465,
+    "user_system_rss": "1.27 2.06 320208",
+    "stdout": "100000"
+  },
+  {
+    "shape": "deep",
+    "n": 100000,
+    "pattern": "files/**/*.dat",
+    "repeat": 2,
+    "label": "prototype",
+    "wall": 3.026823871070519,
+    "user_system_rss": "1.33 1.67 319380",
+    "stdout": "100000"
+  },
+  {
+    "shape": "deep",
+    "n": 100000,
+    "pattern": "files/**/*.missing",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.6899552100803703,
+    "user_system_rss": "0.57 0.10 158428",
+    "stdout": "0"
+  },
+  {
+    "shape": "deep",
+    "n": 100000,
+    "pattern": "files/**/*.missing",
+    "repeat": 0,
+    "label": "prototype",
+    "wall": 0.7055930548813194,
+    "user_system_rss": "0.59 0.10 158396",
+    "stdout": "0"
+  },
+  {
+    "shape": "deep",
+    "n": 100000,
+    "pattern": "files/**/*.missing",
+    "repeat": 1,
+    "label": "prototype",
+    "wall": 0.7877653350587934,
+    "user_system_rss": "0.65 0.12 158244",
+    "stdout": "0"
+  },
+  {
+    "shape": "deep",
+    "n": 100000,
+    "pattern": "files/**/*.missing",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.7873588078655303,
+    "user_system_rss": "0.66 0.11 158460",
+    "stdout": "0"
+  },
+  {
+    "shape": "deep",
+    "n": 100000,
+    "pattern": "files/**/*.missing",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.7130324391182512,
+    "user_system_rss": "0.60 0.10 158952",
+    "stdout": "0"
+  },
+  {
+    "shape": "deep",
+    "n": 100000,
+    "pattern": "files/**/*.missing",
+    "repeat": 2,
+    "label": "prototype",
+    "wall": 0.682401972124353,
+    "user_system_rss": "0.57 0.09 158572",
+    "stdout": "0"
+  },
+  {
+    "shape": "deep",
+    "n": 100000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.7233239379711449,
+    "user_system_rss": "0.59 0.12 158708",
+    "stdout": "100"
+  },
+  {
+    "shape": "deep",
+    "n": 100000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 0,
+    "label": "prototype",
+    "wall": 0.7778762448579073,
+    "user_system_rss": "0.67 0.10 158628",
+    "stdout": "100"
+  },
+  {
+    "shape": "deep",
+    "n": 100000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 1,
+    "label": "prototype",
+    "wall": 0.7121143171098083,
+    "user_system_rss": "0.59 0.11 158488",
+    "stdout": "100"
+  },
+  {
+    "shape": "deep",
+    "n": 100000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.6943724821321666,
+    "user_system_rss": "0.57 0.10 158724",
+    "stdout": "100"
+  },
+  {
+    "shape": "deep",
+    "n": 100000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.7272665950004011,
+    "user_system_rss": "0.61 0.10 158692",
+    "stdout": "100"
+  },
+  {
+    "shape": "deep",
+    "n": 100000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 2,
+    "label": "prototype",
+    "wall": 0.7430125451646745,
+    "user_system_rss": "0.63 0.10 158636",
+    "stdout": "100"
+  },
+  {
+    "shape": "mixed",
+    "n": 1000,
+    "pattern": "files/**/*.dat",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.038827511947602034,
+    "user_system_rss": "0.01 0.01 8200",
+    "stdout": "1000"
+  },
+  {
+    "shape": "mixed",
+    "n": 1000,
+    "pattern": "files/**/*.dat",
+    "repeat": 0,
+    "label": "prototype",
+    "wall": 0.024950323859229684,
+    "user_system_rss": "0.00 0.01 8508",
+    "stdout": "1000"
+  },
+  {
+    "shape": "mixed",
+    "n": 1000,
+    "pattern": "files/**/*.dat",
+    "repeat": 1,
+    "label": "prototype",
+    "wall": 0.025461395038291812,
+    "user_system_rss": "0.00 0.01 8568",
+    "stdout": "1000"
+  },
+  {
+    "shape": "mixed",
+    "n": 1000,
+    "pattern": "files/**/*.dat",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.0363630170468241,
+    "user_system_rss": "0.01 0.02 8668",
+    "stdout": "1000"
+  },
+  {
+    "shape": "mixed",
+    "n": 1000,
+    "pattern": "files/**/*.dat",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.029506138991564512,
+    "user_system_rss": "0.00 0.01 8372",
+    "stdout": "1000"
+  },
+  {
+    "shape": "mixed",
+    "n": 1000,
+    "pattern": "files/**/*.dat",
+    "repeat": 2,
+    "label": "prototype",
+    "wall": 0.032173021929338574,
+    "user_system_rss": "0.01 0.02 8764",
+    "stdout": "1000"
+  },
+  {
+    "shape": "mixed",
+    "n": 1000,
+    "pattern": "files/**/*.missing",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.010651214979588985,
+    "user_system_rss": "0.00 0.00 7424",
+    "stdout": "0"
+  },
+  {
+    "shape": "mixed",
+    "n": 1000,
+    "pattern": "files/**/*.missing",
+    "repeat": 0,
+    "label": "prototype",
+    "wall": 0.015365117928013206,
+    "user_system_rss": "0.00 0.00 7480",
+    "stdout": "0"
+  },
+  {
+    "shape": "mixed",
+    "n": 1000,
+    "pattern": "files/**/*.missing",
+    "repeat": 1,
+    "label": "prototype",
+    "wall": 0.013836303958669305,
+    "user_system_rss": "0.00 0.00 7480",
+    "stdout": "0"
+  },
+  {
+    "shape": "mixed",
+    "n": 1000,
+    "pattern": "files/**/*.missing",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.013192930957302451,
+    "user_system_rss": "0.00 0.00 7372",
+    "stdout": "0"
+  },
+  {
+    "shape": "mixed",
+    "n": 1000,
+    "pattern": "files/**/*.missing",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.012002642033621669,
+    "user_system_rss": "0.00 0.00 7364",
+    "stdout": "0"
+  },
+  {
+    "shape": "mixed",
+    "n": 1000,
+    "pattern": "files/**/*.missing",
+    "repeat": 2,
+    "label": "prototype",
+    "wall": 0.009997300105169415,
+    "user_system_rss": "0.00 0.00 7172",
+    "stdout": "0"
+  },
+  {
+    "shape": "mixed",
+    "n": 1000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.009348297957330942,
+    "user_system_rss": "0.00 0.00 7084",
+    "stdout": "1"
+  },
+  {
+    "shape": "mixed",
+    "n": 1000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 0,
+    "label": "prototype",
+    "wall": 0.013541768072173,
+    "user_system_rss": "0.00 0.00 7188",
+    "stdout": "1"
+  },
+  {
+    "shape": "mixed",
+    "n": 1000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 1,
+    "label": "prototype",
+    "wall": 0.014399135019630194,
+    "user_system_rss": "0.00 0.00 7180",
+    "stdout": "1"
+  },
+  {
+    "shape": "mixed",
+    "n": 1000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.011168695986270905,
+    "user_system_rss": "0.00 0.00 7344",
+    "stdout": "1"
+  },
+  {
+    "shape": "mixed",
+    "n": 1000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.01553652691654861,
+    "user_system_rss": "0.00 0.00 7444",
+    "stdout": "1"
+  },
+  {
+    "shape": "mixed",
+    "n": 1000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 2,
+    "label": "prototype",
+    "wall": 0.014129474991932511,
+    "user_system_rss": "0.00 0.00 7232",
+    "stdout": "1"
+  },
+  {
+    "shape": "mixed",
+    "n": 10000,
+    "pattern": "files/**/*.dat",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.2146981421392411,
+    "user_system_rss": "0.07 0.14 20572",
+    "stdout": "10000"
+  },
+  {
+    "shape": "mixed",
+    "n": 10000,
+    "pattern": "files/**/*.dat",
+    "repeat": 0,
+    "label": "prototype",
+    "wall": 0.18147918302565813,
+    "user_system_rss": "0.06 0.11 20596",
+    "stdout": "10000"
+  },
+  {
+    "shape": "mixed",
+    "n": 10000,
+    "pattern": "files/**/*.dat",
+    "repeat": 1,
+    "label": "prototype",
+    "wall": 0.18073137407191098,
+    "user_system_rss": "0.05 0.11 20712",
+    "stdout": "10000"
+  },
+  {
+    "shape": "mixed",
+    "n": 10000,
+    "pattern": "files/**/*.dat",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.21788897993974388,
+    "user_system_rss": "0.05 0.15 20556",
+    "stdout": "10000"
+  },
+  {
+    "shape": "mixed",
+    "n": 10000,
+    "pattern": "files/**/*.dat",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.21451836987398565,
+    "user_system_rss": "0.06 0.14 20748",
+    "stdout": "10000"
+  },
+  {
+    "shape": "mixed",
+    "n": 10000,
+    "pattern": "files/**/*.dat",
+    "repeat": 2,
+    "label": "prototype",
+    "wall": 0.17732784198597074,
+    "user_system_rss": "0.06 0.10 20524",
+    "stdout": "10000"
+  },
+  {
+    "shape": "mixed",
+    "n": 10000,
+    "pattern": "files/**/*.missing",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.03601384302601218,
+    "user_system_rss": "0.01 0.01 7184",
+    "stdout": "0"
+  },
+  {
+    "shape": "mixed",
+    "n": 10000,
+    "pattern": "files/**/*.missing",
+    "repeat": 0,
+    "label": "prototype",
+    "wall": 0.03145418711937964,
+    "user_system_rss": "0.02 0.00 7572",
+    "stdout": "0"
+  },
+  {
+    "shape": "mixed",
+    "n": 10000,
+    "pattern": "files/**/*.missing",
+    "repeat": 1,
+    "label": "prototype",
+    "wall": 0.028607174986973405,
+    "user_system_rss": "0.02 0.00 7376",
+    "stdout": "0"
+  },
+  {
+    "shape": "mixed",
+    "n": 10000,
+    "pattern": "files/**/*.missing",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.03214043704792857,
+    "user_system_rss": "0.02 0.00 7504",
+    "stdout": "0"
+  },
+  {
+    "shape": "mixed",
+    "n": 10000,
+    "pattern": "files/**/*.missing",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.03077774401754141,
+    "user_system_rss": "0.01 0.00 7008",
+    "stdout": "0"
+  },
+  {
+    "shape": "mixed",
+    "n": 10000,
+    "pattern": "files/**/*.missing",
+    "repeat": 2,
+    "label": "prototype",
+    "wall": 0.03180993185378611,
+    "user_system_rss": "0.02 0.00 7520",
+    "stdout": "0"
+  },
+  {
+    "shape": "mixed",
+    "n": 10000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.03142072702758014,
+    "user_system_rss": "0.02 0.00 7280",
+    "stdout": "10"
+  },
+  {
+    "shape": "mixed",
+    "n": 10000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 0,
+    "label": "prototype",
+    "wall": 0.030824190005660057,
+    "user_system_rss": "0.01 0.00 7436",
+    "stdout": "10"
+  },
+  {
+    "shape": "mixed",
+    "n": 10000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 1,
+    "label": "prototype",
+    "wall": 0.032219099113717675,
+    "user_system_rss": "0.02 0.00 7352",
+    "stdout": "10"
+  },
+  {
+    "shape": "mixed",
+    "n": 10000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.029777545016258955,
+    "user_system_rss": "0.02 0.00 7636",
+    "stdout": "10"
+  },
+  {
+    "shape": "mixed",
+    "n": 10000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.03353357198648155,
+    "user_system_rss": "0.01 0.01 7456",
+    "stdout": "10"
+  },
+  {
+    "shape": "mixed",
+    "n": 10000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 2,
+    "label": "prototype",
+    "wall": 0.031389627838507295,
+    "user_system_rss": "0.02 0.00 7316",
+    "stdout": "10"
+  },
+  {
+    "shape": "mixed",
+    "n": 100000,
+    "pattern": "files/**/*.dat",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 2.1369517878629267,
+    "user_system_rss": "0.71 1.42 140984",
+    "stdout": "100000"
+  },
+  {
+    "shape": "mixed",
+    "n": 100000,
+    "pattern": "files/**/*.dat",
+    "repeat": 0,
+    "label": "prototype",
+    "wall": 1.6366765981074423,
+    "user_system_rss": "0.59 1.03 140976",
+    "stdout": "100000"
+  },
+  {
+    "shape": "mixed",
+    "n": 100000,
+    "pattern": "files/**/*.dat",
+    "repeat": 1,
+    "label": "prototype",
+    "wall": 1.8261574059724808,
+    "user_system_rss": "0.65 1.15 140436",
+    "stdout": "100000"
+  },
+  {
+    "shape": "mixed",
+    "n": 100000,
+    "pattern": "files/**/*.dat",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 2.248085595900193,
+    "user_system_rss": "0.71 1.52 140584",
+    "stdout": "100000"
+  },
+  {
+    "shape": "mixed",
+    "n": 100000,
+    "pattern": "files/**/*.dat",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 2.2589284910354763,
+    "user_system_rss": "0.69 1.55 140780",
+    "stdout": "100000"
+  },
+  {
+    "shape": "mixed",
+    "n": 100000,
+    "pattern": "files/**/*.dat",
+    "repeat": 2,
+    "label": "prototype",
+    "wall": 1.7790369091089815,
+    "user_system_rss": "0.65 1.11 140876",
+    "stdout": "100000"
+  },
+  {
+    "shape": "mixed",
+    "n": 100000,
+    "pattern": "files/**/*.missing",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.2584843609947711,
+    "user_system_rss": "0.21 0.03 8580",
+    "stdout": "0"
+  },
+  {
+    "shape": "mixed",
+    "n": 100000,
+    "pattern": "files/**/*.missing",
+    "repeat": 0,
+    "label": "prototype",
+    "wall": 0.2466575661674142,
+    "user_system_rss": "0.20 0.03 8720",
+    "stdout": "0"
+  },
+  {
+    "shape": "mixed",
+    "n": 100000,
+    "pattern": "files/**/*.missing",
+    "repeat": 1,
+    "label": "prototype",
+    "wall": 0.24997837096452713,
+    "user_system_rss": "0.20 0.03 8400",
+    "stdout": "0"
+  },
+  {
+    "shape": "mixed",
+    "n": 100000,
+    "pattern": "files/**/*.missing",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.24850057205185294,
+    "user_system_rss": "0.20 0.03 8464",
+    "stdout": "0"
+  },
+  {
+    "shape": "mixed",
+    "n": 100000,
+    "pattern": "files/**/*.missing",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.25334070692770183,
+    "user_system_rss": "0.21 0.03 8468",
+    "stdout": "0"
+  },
+  {
+    "shape": "mixed",
+    "n": 100000,
+    "pattern": "files/**/*.missing",
+    "repeat": 2,
+    "label": "prototype",
+    "wall": 0.24893723614513874,
+    "user_system_rss": "0.20 0.03 8264",
+    "stdout": "0"
+  },
+  {
+    "shape": "mixed",
+    "n": 100000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.24607680505141616,
+    "user_system_rss": "0.20 0.03 8744",
+    "stdout": "100"
+  },
+  {
+    "shape": "mixed",
+    "n": 100000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 0,
+    "label": "prototype",
+    "wall": 0.2776327121537179,
+    "user_system_rss": "0.22 0.03 8696",
+    "stdout": "100"
+  },
+  {
+    "shape": "mixed",
+    "n": 100000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 1,
+    "label": "prototype",
+    "wall": 0.2675426790956408,
+    "user_system_rss": "0.21 0.04 8668",
+    "stdout": "100"
+  },
+  {
+    "shape": "mixed",
+    "n": 100000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.256481644930318,
+    "user_system_rss": "0.21 0.03 8676",
+    "stdout": "100"
+  },
+  {
+    "shape": "mixed",
+    "n": 100000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.2505481611005962,
+    "user_system_rss": "0.21 0.03 8824",
+    "stdout": "100"
+  },
+  {
+    "shape": "mixed",
+    "n": 100000,
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 2,
+    "label": "prototype",
+    "wall": 0.24579379591159523,
+    "user_system_rss": "0.20 0.03 8440",
+    "stdout": "100"
+  }
+]

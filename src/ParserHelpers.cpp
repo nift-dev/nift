@@ -279,13 +279,13 @@ void glob_walk(const fs::path& base,const std::vector<std::string>& parts,std::s
         glob_walk(base,parts,i+1,out);
         std::error_code ec; if(!fs::is_directory(base,ec)||ec)return;
         std::vector<fs::directory_entry> entries; for(fs::directory_iterator it(base,fs::directory_options::skip_permission_denied,ec),end;!ec&&it!=end;it.increment(ec))entries.push_back(*it);
-        sort_glob_paths(entries, [](const auto& entry) -> const fs::path& { return entry.path(); });
+        /* Final glob ordering covers entries from every directory. */
         for(const auto& e:entries){auto name=e.path().filename().string();if(!name.empty()&&name[0]=='.')continue;std::error_code sec;if(e.is_directory(sec)&&!e.is_symlink(sec))glob_walk(e.path(),parts,i,out);}
         return;
     }
     if(!glob_has_magic(part)){std::string literal;literal.reserve(part.size());for(std::size_t k=0;k<part.size();++k){if(part[k]=='\\'&&k+1<part.size())literal+=part[++k];else literal+=part[k];}glob_walk(base/literal,parts,i+1,out);return;}
     std::error_code ec;if(!fs::is_directory(base,ec)||ec)return;std::vector<fs::directory_entry> entries;for(fs::directory_iterator it(base,fs::directory_options::skip_permission_denied,ec),end;!ec&&it!=end;it.increment(ec))entries.push_back(*it);
-    sort_glob_paths(entries, [](const auto& entry) -> const fs::path& { return entry.path(); });for(const auto&e:entries)if(glob_component_match(part,e.path().filename().string()))glob_walk(e.path(),parts,i+1,out);
+    /* Final glob ordering covers entries from every directory. */for(const auto&e:entries)if(glob_component_match(part,e.path().filename().string()))glob_walk(e.path(),parts,i+1,out);
 }
 
 bool is_single_quoted_parameter(const std::string& text) {

@@ -1,0 +1,218 @@
+[
+  {
+    "shape": "flat",
+    "n": 1000,
+    "pattern": "files/**/*.dat",
+    "baseline": 0.03142673894762993,
+    "prototype": 0.019919808954000473,
+    "change_pct": -36.615093958061664
+  },
+  {
+    "shape": "flat",
+    "n": 1000,
+    "pattern": "files/**/*.missing",
+    "baseline": 0.009347349870949984,
+    "prototype": 0.008538736961781979,
+    "change_pct": -8.650718335482876
+  },
+  {
+    "shape": "flat",
+    "n": 1000,
+    "pattern": "files/**/obj-*000.dat",
+    "baseline": 0.007419588044285774,
+    "prototype": 0.007956922985613346,
+    "change_pct": 7.242112879048612
+  },
+  {
+    "shape": "flat",
+    "n": 10000,
+    "pattern": "files/**/*.dat",
+    "baseline": 0.21942050498910248,
+    "prototype": 0.17731900792568922,
+    "change_pct": -19.187585529212157
+  },
+  {
+    "shape": "flat",
+    "n": 10000,
+    "pattern": "files/**/*.missing",
+    "baseline": 0.04253155994229019,
+    "prototype": 0.044627551920711994,
+    "change_pct": 4.928086299364032
+  },
+  {
+    "shape": "flat",
+    "n": 10000,
+    "pattern": "files/**/obj-*000.dat",
+    "baseline": 0.046238034032285213,
+    "prototype": 0.04407625203020871,
+    "change_pct": -4.675332866806281
+  },
+  {
+    "shape": "flat",
+    "n": 100000,
+    "pattern": "files/**/*.dat",
+    "baseline": 2.306233316892758,
+    "prototype": 1.8370605260133743,
+    "change_pct": -20.343682811395304
+  },
+  {
+    "shape": "flat",
+    "n": 100000,
+    "pattern": "files/**/*.missing",
+    "baseline": 0.5688255289569497,
+    "prototype": 0.5496393931098282,
+    "change_pct": -3.372938602510145
+  },
+  {
+    "shape": "flat",
+    "n": 100000,
+    "pattern": "files/**/obj-*000.dat",
+    "baseline": 0.6852893349714577,
+    "prototype": 0.6990949278697371,
+    "change_pct": 2.014564096325011
+  },
+  {
+    "shape": "deep",
+    "n": 1000,
+    "pattern": "files/**/*.dat",
+    "baseline": 0.034392864909023046,
+    "prototype": 0.030675939051434398,
+    "change_pct": -10.807258620125904
+  },
+  {
+    "shape": "deep",
+    "n": 1000,
+    "pattern": "files/**/*.missing",
+    "baseline": 0.009099688846617937,
+    "prototype": 0.008097823010757565,
+    "change_pct": -11.009891137461613
+  },
+  {
+    "shape": "deep",
+    "n": 1000,
+    "pattern": "files/**/obj-*000.dat",
+    "baseline": 0.011054489994421601,
+    "prototype": 0.009085173020139337,
+    "change_pct": -17.8146343727846
+  },
+  {
+    "shape": "deep",
+    "n": 10000,
+    "pattern": "files/**/*.dat",
+    "baseline": 0.31124859279952943,
+    "prototype": 0.27402211003936827,
+    "change_pct": -11.9603698205756
+  },
+  {
+    "shape": "deep",
+    "n": 10000,
+    "pattern": "files/**/*.missing",
+    "baseline": 0.05453655100427568,
+    "prototype": 0.05270563601516187,
+    "change_pct": -3.3572254852901606
+  },
+  {
+    "shape": "deep",
+    "n": 10000,
+    "pattern": "files/**/obj-*000.dat",
+    "baseline": 0.0617569989990443,
+    "prototype": 0.059665959095582366,
+    "change_pct": -3.3859156651933398
+  },
+  {
+    "shape": "deep",
+    "n": 100000,
+    "pattern": "files/**/*.dat",
+    "baseline": 3.2678518251050264,
+    "prototype": 3.0225958980154246,
+    "change_pct": -7.505111621201477
+  },
+  {
+    "shape": "deep",
+    "n": 100000,
+    "pattern": "files/**/*.missing",
+    "baseline": 0.7130324391182512,
+    "prototype": 0.7055930548813194,
+    "change_pct": -1.0433444299016048
+  },
+  {
+    "shape": "deep",
+    "n": 100000,
+    "pattern": "files/**/obj-*000.dat",
+    "baseline": 0.7233239379711449,
+    "prototype": 0.7430125451646745,
+    "change_pct": 2.7219626172962474
+  },
+  {
+    "shape": "mixed",
+    "n": 1000,
+    "pattern": "files/**/*.dat",
+    "baseline": 0.0363630170468241,
+    "prototype": 0.025461395038291812,
+    "change_pct": -29.979971118717774
+  },
+  {
+    "shape": "mixed",
+    "n": 1000,
+    "pattern": "files/**/*.missing",
+    "baseline": 0.012002642033621669,
+    "prototype": 0.013836303958669305,
+    "change_pct": 15.277152479522439
+  },
+  {
+    "shape": "mixed",
+    "n": 1000,
+    "pattern": "files/**/obj-*000.dat",
+    "baseline": 0.011168695986270905,
+    "prototype": 0.014129474991932511,
+    "change_pct": 26.50962126018237
+  },
+  {
+    "shape": "mixed",
+    "n": 10000,
+    "pattern": "files/**/*.dat",
+    "baseline": 0.2146981421392411,
+    "prototype": 0.18073137407191098,
+    "change_pct": -15.820708893373281
+  },
+  {
+    "shape": "mixed",
+    "n": 10000,
+    "pattern": "files/**/*.missing",
+    "baseline": 0.03214043704792857,
+    "prototype": 0.03145418711937964,
+    "change_pct": -2.1351605378781224
+  },
+  {
+    "shape": "mixed",
+    "n": 10000,
+    "pattern": "files/**/obj-*000.dat",
+    "baseline": 0.03142072702758014,
+    "prototype": 0.031389627838507295,
+    "change_pct": -0.09897666927168869
+  },
+  {
+    "shape": "mixed",
+    "n": 100000,
+    "pattern": "files/**/*.dat",
+    "baseline": 2.248085595900193,
+    "prototype": 1.7790369091089815,
+    "change_pct": -20.864360665208203
+  },
+  {
+    "shape": "mixed",
+    "n": 100000,
+    "pattern": "files/**/*.missing",
+    "baseline": 0.25334070692770183,
+    "prototype": 0.24893723614513874,
+    "change_pct": -1.7381615595711386
+  },
+  {
+    "shape": "mixed",
+    "n": 100000,
+    "pattern": "files/**/obj-*000.dat",
+    "baseline": 0.2505481611005962,
+    "prototype": 0.2675426790956408,
+    "change_pct": 6.7829346343600605
+  }
+]

@@ -1,0 +1,98 @@
+[
+  {
+    "label": "direct",
+    "n": 1,
+    "wall": 0.0035707619972527027,
+    "user_system_rss": "0.00 0.00 4020"
+  },
+  {
+    "label": "atomic",
+    "n": 1,
+    "wall": 0.002700359094887972,
+    "user_system_rss": "0.00 0.00 4228"
+  },
+  {
+    "label": "fsync",
+    "n": 1,
+    "wall": 0.011483847862109542,
+    "user_system_rss": "0.00 0.00 4176"
+  },
+  {
+    "label": "nift",
+    "n": 1,
+    "wall": 0.004027558024972677,
+    "user_system_rss": "0.00 0.00 7392"
+  },
+  {
+    "label": "direct",
+    "n": 1000,
+    "wall": 0.02077242615632713,
+    "user_system_rss": "0.00 0.01 4064"
+  },
+  {
+    "label": "atomic",
+    "n": 1000,
+    "wall": 0.038491417188197374,
+    "user_system_rss": "0.00 0.03 4068"
+  },
+  {
+    "label": "fsync",
+    "n": 1000,
+    "wall": 0.590781036997214,
+    "user_system_rss": "0.00 0.08 4072"
+  },
+  {
+    "label": "nift",
+    "n": 1000,
+    "wall": 0.06859870790503919,
+    "user_system_rss": "0.02 0.04 8604"
+  },
+  {
+    "label": "direct",
+    "n": 10000,
+    "wall": 0.1557890430558473,
+    "user_system_rss": "0.00 0.14 4096"
+  },
+  {
+    "label": "atomic",
+    "n": 10000,
+    "wall": 0.3394780501257628,
+    "user_system_rss": "0.01 0.32 4040"
+  },
+  {
+    "label": "fsync",
+    "n": 10000,
+    "wall": 6.21551594696939,
+    "user_system_rss": "0.06 0.95 4024"
+  },
+  {
+    "label": "nift",
+    "n": 10000,
+    "wall": 0.6193326851353049,
+    "user_system_rss": "0.22 0.38 24356"
+  },
+  {
+    "label": "direct",
+    "n": 100000,
+    "wall": 1.645605867030099,
+    "user_system_rss": "0.04 1.48 4060"
+  },
+  {
+    "label": "atomic",
+    "n": 100000,
+    "wall": 3.1055498321074992,
+    "user_system_rss": "0.08 2.96 4052"
+  },
+  {
+    "label": "fsync",
+    "n": 100000,
+    "wall": 384.61614607507363,
+    "user_system_rss": "1.71 27.04 4032"
+  },
+  {
+    "label": "nift",
+    "n": 100000,
+    "wall": 5.571481649996713,
+    "user_system_rss": "2.21 3.27 181592"
+  }
+]

@@ -1,0 +1,58 @@
+[
+  {
+    "operation": "traverse",
+    "n": 1000,
+    "keepers": 200,
+    "code": "paths := ls(\"files/**/*.dat\"); print(paths.size())",
+    "target_name_length": 21,
+    "keeper_name_length": 19
+  },
+  {
+    "operation": "traverse",
+    "n": 10000,
+    "keepers": 2000,
+    "code": "paths := ls(\"files/**/*.dat\"); print(paths.size())",
+    "target_name_length": 21,
+    "keeper_name_length": 19
+  },
+  {
+    "operation": "traverse",
+    "n": 100000,
+    "keepers": 20000,
+    "code": "paths := ls(\"files/**/*.dat\"); print(paths.size())",
+    "target_name_length": 21,
+    "keeper_name_length": 19
+  },
+  {
+    "operation": "create-small",
+    "n": 1,
+    "keepers": 1,
+    "code": "paths := open(\"targets.txt\").trim().split(\"\\n\"); for(p : paths) { f := file(p); f.open(\"w\"); f.write(\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcde\\n\"); f.save(); f.close() }; print(\"OK\")",
+    "target_name_length": 21,
+    "keeper_name_length": 19
+  },
+  {
+    "operation": "create-small",
+    "n": 1000,
+    "keepers": 200,
+    "code": "paths := open(\"targets.txt\").trim().split(\"\\n\"); for(p : paths) { f := file(p); f.open(\"w\"); f.write(\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcde\\n\"); f.save(); f.close() }; print(\"OK\")",
+    "target_name_length": 21,
+    "keeper_name_length": 19
+  },
+  {
+    "operation": "create-small",
+    "n": 10000,
+    "keepers": 2000,
+    "code": "paths := open(\"targets.txt\").trim().split(\"\\n\"); for(p : paths) { f := file(p); f.open(\"w\"); f.write(\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcde\\n\"); f.save(); f.close() }; print(\"OK\")",
+    "target_name_length": 21,
+    "keeper_name_length": 19
+  },
+  {
+    "operation": "create-small",
+    "n": 100000,
+    "keepers": 20000,
+    "code": "paths := open(\"targets.txt\").trim().split(\"\\n\"); for(p : paths) { f := file(p); f.open(\"w\"); f.write(\"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcde\\n\"); f.save(); f.close() }; print(\"OK\")",
+    "target_name_length": 21,
+    "keeper_name_length": 19
+  }
+]

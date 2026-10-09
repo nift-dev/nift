@@ -1,0 +1,7742 @@
+[
+  {
+    "model": "current",
+    "scenario": "identity",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 20496558,
+    "phases": {
+      "factory": {
+        "allocations": 30000,
+        "bytes": 3536000,
+        "frees": 30000
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 12000,
+        "bytes": 1504000,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 18000,
+        "bytes": 2032000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 12000
+      }
+    },
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "identity",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 15261362,
+    "phases": {
+      "factory": {
+        "allocations": 22000,
+        "bytes": 2448000,
+        "frees": 22000
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 12000,
+        "bytes": 1504000,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 12000
+      }
+    },
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "identity",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 7421136,
+    "phases": {
+      "factory": {
+        "allocations": 12006,
+        "bytes": 1152720,
+        "frees": 12006
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 2006,
+        "bytes": 208720,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 2006
+      }
+    },
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "current",
+    "scenario": "identity",
+    "unused": 5,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 38561841,
+    "phases": {
+      "factory": {
+        "allocations": 50000,
+        "bytes": 6256000,
+        "frees": 50000
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 22000,
+        "bytes": 2864000,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 28000,
+        "bytes": 3392000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 22000
+      }
+    },
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "identity",
+    "unused": 5,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 25678371,
+    "phases": {
+      "factory": {
+        "allocations": 32000,
+        "bytes": 3808000,
+        "frees": 32000
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 22000,
+        "bytes": 2864000,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 22000
+      }
+    },
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "identity",
+    "unused": 5,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 9615796,
+    "phases": {
+      "factory": {
+        "allocations": 12011,
+        "bytes": 1153400,
+        "frees": 12011
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 2011,
+        "bytes": 209400,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 2011
+      }
+    },
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "current",
+    "scenario": "identity",
+    "unused": 16,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 90564810,
+    "phases": {
+      "factory": {
+        "allocations": 98000,
+        "bytes": 13168000,
+        "frees": 98000
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 46000,
+        "bytes": 6320000,
+        "frees": 2000
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 52000,
+        "bytes": 6848000,
+        "frees": 4000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 44000
+      }
+    },
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "identity",
+    "unused": 16,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 52826415,
+    "phases": {
+      "factory": {
+        "allocations": 56000,
+        "bytes": 7264000,
+        "frees": 56000
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 46000,
+        "bytes": 6320000,
+        "frees": 2000
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 44000
+      }
+    },
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "identity",
+    "unused": 16,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 17062459,
+    "phases": {
+      "factory": {
+        "allocations": 12023,
+        "bytes": 1155128,
+        "frees": 12023
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 2023,
+        "bytes": 211128,
+        "frees": 1
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 2022
+      }
+    },
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "current",
+    "scenario": "identity",
+    "unused": 50,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 228918540,
+    "phases": {
+      "factory": {
+        "allocations": 238000,
+        "bytes": 33552000,
+        "frees": 238000
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 116000,
+        "bytes": 16512000,
+        "frees": 4000
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 122000,
+        "bytes": 17040000,
+        "frees": 6000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 112000
+      }
+    },
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "identity",
+    "unused": 50,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 122319299,
+    "phases": {
+      "factory": {
+        "allocations": 126000,
+        "bytes": 17456000,
+        "frees": 126000
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 116000,
+        "bytes": 16512000,
+        "frees": 4000
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 112000
+      }
+    },
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "identity",
+    "unused": 50,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 26788003,
+    "phases": {
+      "factory": {
+        "allocations": 12058,
+        "bytes": 1160224,
+        "frees": 12058
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 2058,
+        "bytes": 216224,
+        "frees": 2
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 2056
+      }
+    },
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "current",
+    "scenario": "identity",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 427161130,
+    "phases": {
+      "factory": {
+        "allocations": 442000,
+        "bytes": 64816000,
+        "frees": 442000
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 218000,
+        "bytes": 32144000,
+        "frees": 6000
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 224000,
+        "bytes": 32672000,
+        "frees": 8000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 212000
+      }
+    },
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "identity",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 221401358,
+    "phases": {
+      "factory": {
+        "allocations": 228000,
+        "bytes": 33088000,
+        "frees": 228000
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 218000,
+        "bytes": 32144000,
+        "frees": 6000
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 212000
+      }
+    },
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "identity",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 44914786,
+    "phases": {
+      "factory": {
+        "allocations": 12109,
+        "bytes": 1168040,
+        "frees": 12109
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 2109,
+        "bytes": 224040,
+        "frees": 3
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 2106
+      }
+    },
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "current",
+    "scenario": "captured",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 23881165,
+    "phases": {
+      "factory": {
+        "allocations": 34000,
+        "bytes": 4080000,
+        "frees": 34000
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 14000,
+        "bytes": 1776000,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 20000,
+        "bytes": 2304000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 14000
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "captured",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 18892078,
+    "phases": {
+      "factory": {
+        "allocations": 26000,
+        "bytes": 2992000,
+        "frees": 26000
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 14000,
+        "bytes": 1776000,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 2000,
+        "bytes": 272000,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 14000
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "captured",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 9381211,
+    "phases": {
+      "factory": {
+        "allocations": 14007,
+        "bytes": 1424856,
+        "frees": 14007
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 2007,
+        "bytes": 208856,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 2000,
+        "bytes": 272000,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 2007
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "current",
+    "scenario": "captured",
+    "unused": 5,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 42074264,
+    "phases": {
+      "factory": {
+        "allocations": 54000,
+        "bytes": 6800000,
+        "frees": 54000
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 24000,
+        "bytes": 3136000,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 30000,
+        "bytes": 3664000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 24000
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "captured",
+    "unused": 5,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 29396519,
+    "phases": {
+      "factory": {
+        "allocations": 36000,
+        "bytes": 4352000,
+        "frees": 36000
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 24000,
+        "bytes": 3136000,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 2000,
+        "bytes": 272000,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 24000
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "captured",
+    "unused": 5,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 11658730,
+    "phases": {
+      "factory": {
+        "allocations": 14012,
+        "bytes": 1425536,
+        "frees": 14012
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 2012,
+        "bytes": 209536,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 2000,
+        "bytes": 272000,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 2012
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "current",
+    "scenario": "captured",
+    "unused": 16,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 94935940,
+    "phases": {
+      "factory": {
+        "allocations": 102000,
+        "bytes": 13712000,
+        "frees": 102000
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 48000,
+        "bytes": 6592000,
+        "frees": 2000
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 54000,
+        "bytes": 7120000,
+        "frees": 4000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 46000
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "captured",
+    "unused": 16,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 56817914,
+    "phases": {
+      "factory": {
+        "allocations": 60000,
+        "bytes": 7808000,
+        "frees": 60000
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 48000,
+        "bytes": 6592000,
+        "frees": 2000
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 2000,
+        "bytes": 272000,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 46000
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "captured",
+    "unused": 16,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 16668835,
+    "phases": {
+      "factory": {
+        "allocations": 14024,
+        "bytes": 1427264,
+        "frees": 14024
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 2024,
+        "bytes": 211264,
+        "frees": 1
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 2000,
+        "bytes": 272000,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 2023
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "current",
+    "scenario": "captured",
+    "unused": 50,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 232046486,
+    "phases": {
+      "factory": {
+        "allocations": 242000,
+        "bytes": 34096000,
+        "frees": 242000
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 118000,
+        "bytes": 16784000,
+        "frees": 4000
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 124000,
+        "bytes": 17312000,
+        "frees": 6000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 114000
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "captured",
+    "unused": 50,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 126113307,
+    "phases": {
+      "factory": {
+        "allocations": 130000,
+        "bytes": 18000000,
+        "frees": 130000
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 118000,
+        "bytes": 16784000,
+        "frees": 4000
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 2000,
+        "bytes": 272000,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 114000
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "captured",
+    "unused": 50,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 29137001,
+    "phases": {
+      "factory": {
+        "allocations": 14059,
+        "bytes": 1432360,
+        "frees": 14059
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 2059,
+        "bytes": 216360,
+        "frees": 2
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 2000,
+        "bytes": 272000,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 2057
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "current",
+    "scenario": "captured",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 431089588,
+    "phases": {
+      "factory": {
+        "allocations": 446000,
+        "bytes": 65360000,
+        "frees": 446000
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 220000,
+        "bytes": 32416000,
+        "frees": 6000
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 226000,
+        "bytes": 32944000,
+        "frees": 8000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 214000
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "captured",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 225281379,
+    "phases": {
+      "factory": {
+        "allocations": 232000,
+        "bytes": 33632000,
+        "frees": 232000
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 220000,
+        "bytes": 32416000,
+        "frees": 6000
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 2000,
+        "bytes": 272000,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 214000
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "captured",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 47237778,
+    "phases": {
+      "factory": {
+        "allocations": 14110,
+        "bytes": 1440176,
+        "frees": 14110
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 2110,
+        "bytes": 224176,
+        "frees": 3
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 2000,
+        "bytes": 272000,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 2107
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "current",
+    "scenario": "reused-identity",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 10095235,
+    "phases": {
+      "factory": {
+        "allocations": 18006,
+        "bytes": 2032752,
+        "frees": 18006
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 18000,
+        "bytes": 2032000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 6
+      }
+    },
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "reused-identity",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 4855673,
+    "phases": {
+      "factory": {
+        "allocations": 10006,
+        "bytes": 944752,
+        "frees": 10006
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 6
+      }
+    },
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "reused-identity",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 4856070,
+    "phases": {
+      "factory": {
+        "allocations": 10007,
+        "bytes": 944824,
+        "frees": 10007
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 7
+      }
+    },
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "current",
+    "scenario": "reused-identity",
+    "unused": 5,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 17750553,
+    "phases": {
+      "factory": {
+        "allocations": 28011,
+        "bytes": 3393432,
+        "frees": 28011
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 28000,
+        "bytes": 3392000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 11
+      }
+    },
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "reused-identity",
+    "unused": 5,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 4859485,
+    "phases": {
+      "factory": {
+        "allocations": 10011,
+        "bytes": 945432,
+        "frees": 10011
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 11
+      }
+    },
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "reused-identity",
+    "unused": 5,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 4861101,
+    "phases": {
+      "factory": {
+        "allocations": 10012,
+        "bytes": 945504,
+        "frees": 10012
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 12
+      }
+    },
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "current",
+    "scenario": "reused-identity",
+    "unused": 16,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 40798847,
+    "phases": {
+      "factory": {
+        "allocations": 52023,
+        "bytes": 6851160,
+        "frees": 52023
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 52000,
+        "bytes": 6848000,
+        "frees": 4000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 22
+      }
+    },
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "reused-identity",
+    "unused": 16,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 4874274,
+    "phases": {
+      "factory": {
+        "allocations": 10023,
+        "bytes": 947160,
+        "frees": 10023
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 22
+      }
+    },
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "reused-identity",
+    "unused": 16,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 4874981,
+    "phases": {
+      "factory": {
+        "allocations": 10024,
+        "bytes": 947232,
+        "frees": 10024
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 23
+      }
+    },
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "current",
+    "scenario": "reused-identity",
+    "unused": 50,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 111086365,
+    "phases": {
+      "factory": {
+        "allocations": 122058,
+        "bytes": 17048256,
+        "frees": 122058
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 122000,
+        "bytes": 17040000,
+        "frees": 6000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 56
+      }
+    },
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "reused-identity",
+    "unused": 50,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 4908965,
+    "phases": {
+      "factory": {
+        "allocations": 10058,
+        "bytes": 952256,
+        "frees": 10058
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 56
+      }
+    },
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "reused-identity",
+    "unused": 50,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 4909377,
+    "phases": {
+      "factory": {
+        "allocations": 10059,
+        "bytes": 952328,
+        "frees": 10059
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 57
+      }
+    },
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "current",
+    "scenario": "reused-identity",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 210270144,
+    "phases": {
+      "factory": {
+        "allocations": 224109,
+        "bytes": 32688072,
+        "frees": 224109
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 224000,
+        "bytes": 32672000,
+        "frees": 8000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 106
+      }
+    },
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "reused-identity",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 4958776,
+    "phases": {
+      "factory": {
+        "allocations": 10109,
+        "bytes": 960072,
+        "frees": 10109
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 106
+      }
+    },
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "reused-identity",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 4959183,
+    "phases": {
+      "factory": {
+        "allocations": 10110,
+        "bytes": 960144,
+        "frees": 10110
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 107
+      }
+    },
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "current",
+    "scenario": "reused",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 11559595,
+    "phases": {
+      "factory": {
+        "allocations": 20007,
+        "bytes": 2304888,
+        "frees": 20007
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 20000,
+        "bytes": 2304000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 7
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "reused",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 6553510,
+    "phases": {
+      "factory": {
+        "allocations": 12007,
+        "bytes": 1216888,
+        "frees": 12007
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 2000,
+        "bytes": 272000,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 7
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "reused",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 6546950,
+    "phases": {
+      "factory": {
+        "allocations": 12008,
+        "bytes": 1216960,
+        "frees": 12008
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 2000,
+        "bytes": 272000,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 8
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "current",
+    "scenario": "reused",
+    "unused": 5,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 19296619,
+    "phases": {
+      "factory": {
+        "allocations": 30012,
+        "bytes": 3665568,
+        "frees": 30012
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 30000,
+        "bytes": 3664000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 12
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "reused",
+    "unused": 5,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 6584156,
+    "phases": {
+      "factory": {
+        "allocations": 12012,
+        "bytes": 1217568,
+        "frees": 12012
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 2000,
+        "bytes": 272000,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 12
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "reused",
+    "unused": 5,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 6580411,
+    "phases": {
+      "factory": {
+        "allocations": 12013,
+        "bytes": 1217640,
+        "frees": 12013
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 2000,
+        "bytes": 272000,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 13
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "current",
+    "scenario": "reused",
+    "unused": 16,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 43118628,
+    "phases": {
+      "factory": {
+        "allocations": 54024,
+        "bytes": 7123296,
+        "frees": 54024
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 54000,
+        "bytes": 7120000,
+        "frees": 4000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 23
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "reused",
+    "unused": 16,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 6735575,
+    "phases": {
+      "factory": {
+        "allocations": 12024,
+        "bytes": 1219296,
+        "frees": 12024
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 2000,
+        "bytes": 272000,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 23
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "reused",
+    "unused": 16,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 6714202,
+    "phases": {
+      "factory": {
+        "allocations": 12025,
+        "bytes": 1219368,
+        "frees": 12025
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 2000,
+        "bytes": 272000,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 24
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "current",
+    "scenario": "reused",
+    "unused": 50,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 112277278,
+    "phases": {
+      "factory": {
+        "allocations": 124059,
+        "bytes": 17320392,
+        "frees": 124059
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 124000,
+        "bytes": 17312000,
+        "frees": 6000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 57
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "reused",
+    "unused": 50,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 6780157,
+    "phases": {
+      "factory": {
+        "allocations": 12059,
+        "bytes": 1224392,
+        "frees": 12059
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 2000,
+        "bytes": 272000,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 57
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "reused",
+    "unused": 50,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 6774579,
+    "phases": {
+      "factory": {
+        "allocations": 12060,
+        "bytes": 1224464,
+        "frees": 12060
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 2000,
+        "bytes": 272000,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 58
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "current",
+    "scenario": "reused",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 212290063,
+    "phases": {
+      "factory": {
+        "allocations": 226110,
+        "bytes": 32960208,
+        "frees": 226110
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 226000,
+        "bytes": 32944000,
+        "frees": 8000
+      },
+      "body": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 107
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "reused",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 6829971,
+    "phases": {
+      "factory": {
+        "allocations": 12110,
+        "bytes": 1232208,
+        "frees": 12110
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 2000,
+        "bytes": 272000,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 107
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "reused",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 6824366,
+    "phases": {
+      "factory": {
+        "allocations": 12111,
+        "bytes": 1232280,
+        "frees": 12111
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 2000,
+        "bytes": 272000,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 108
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "current",
+    "scenario": "mutation",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 25143973,
+    "phases": {
+      "factory": {
+        "allocations": 36000,
+        "bytes": 4416000,
+        "frees": 35999
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 14000,
+        "bytes": 1776000,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 20000,
+        "bytes": 2304000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 2000,
+        "bytes": 336000,
+        "frees": 1999
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 14000
+      }
+    },
+    "stdout": "1.997e+06\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "mutation",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 20140878,
+    "phases": {
+      "factory": {
+        "allocations": 28000,
+        "bytes": 3328000,
+        "frees": 27999
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 14000,
+        "bytes": 1776000,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 1999
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 14000
+      }
+    },
+    "stdout": "1.997e+06\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "mutation",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 10629019,
+    "phases": {
+      "factory": {
+        "allocations": 16007,
+        "bytes": 1760856,
+        "frees": 16006
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 2007,
+        "bytes": 208856,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 1999
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 2007
+      }
+    },
+    "stdout": "1.997e+06\n"
+  },
+  {
+    "model": "current",
+    "scenario": "mutation",
+    "unused": 5,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 43380080,
+    "phases": {
+      "factory": {
+        "allocations": 56000,
+        "bytes": 7136000,
+        "frees": 55999
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 24000,
+        "bytes": 3136000,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 30000,
+        "bytes": 3664000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 2000,
+        "bytes": 336000,
+        "frees": 1999
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 24000
+      }
+    },
+    "stdout": "1.997e+06\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "mutation",
+    "unused": 5,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 30646327,
+    "phases": {
+      "factory": {
+        "allocations": 38000,
+        "bytes": 4688000,
+        "frees": 37999
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 24000,
+        "bytes": 3136000,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 1999
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 24000
+      }
+    },
+    "stdout": "1.997e+06\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "mutation",
+    "unused": 5,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 12906538,
+    "phases": {
+      "factory": {
+        "allocations": 16012,
+        "bytes": 1761536,
+        "frees": 16011
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 2012,
+        "bytes": 209536,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 1999
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 2012
+      }
+    },
+    "stdout": "1.997e+06\n"
+  },
+  {
+    "model": "current",
+    "scenario": "mutation",
+    "unused": 16,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 96422841,
+    "phases": {
+      "factory": {
+        "allocations": 104000,
+        "bytes": 14048000,
+        "frees": 103999
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 48000,
+        "bytes": 6592000,
+        "frees": 2000
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 54000,
+        "bytes": 7120000,
+        "frees": 4000
+      },
+      "body": {
+        "allocations": 2000,
+        "bytes": 336000,
+        "frees": 1999
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 46000
+      }
+    },
+    "stdout": "1.997e+06\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "mutation",
+    "unused": 16,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 58066855,
+    "phases": {
+      "factory": {
+        "allocations": 62000,
+        "bytes": 8144000,
+        "frees": 61999
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 48000,
+        "bytes": 6592000,
+        "frees": 2000
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 1999
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 46000
+      }
+    },
+    "stdout": "1.997e+06\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "mutation",
+    "unused": 16,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 17916915,
+    "phases": {
+      "factory": {
+        "allocations": 16024,
+        "bytes": 1763264,
+        "frees": 16023
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 2024,
+        "bytes": 211264,
+        "frees": 1
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 1999
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 2023
+      }
+    },
+    "stdout": "1.997e+06\n"
+  },
+  {
+    "model": "current",
+    "scenario": "mutation",
+    "unused": 50,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 233533299,
+    "phases": {
+      "factory": {
+        "allocations": 244000,
+        "bytes": 34432000,
+        "frees": 243999
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 118000,
+        "bytes": 16784000,
+        "frees": 4000
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 124000,
+        "bytes": 17312000,
+        "frees": 6000
+      },
+      "body": {
+        "allocations": 2000,
+        "bytes": 336000,
+        "frees": 1999
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 114000
+      }
+    },
+    "stdout": "1.997e+06\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "mutation",
+    "unused": 50,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 127365264,
+    "phases": {
+      "factory": {
+        "allocations": 132000,
+        "bytes": 18336000,
+        "frees": 131999
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 118000,
+        "bytes": 16784000,
+        "frees": 4000
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 1999
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 114000
+      }
+    },
+    "stdout": "1.997e+06\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "mutation",
+    "unused": 50,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 30385081,
+    "phases": {
+      "factory": {
+        "allocations": 16059,
+        "bytes": 1768360,
+        "frees": 16058
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 2059,
+        "bytes": 216360,
+        "frees": 2
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 1999
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 2057
+      }
+    },
+    "stdout": "1.997e+06\n"
+  },
+  {
+    "model": "current",
+    "scenario": "mutation",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 432575251,
+    "phases": {
+      "factory": {
+        "allocations": 448000,
+        "bytes": 65696000,
+        "frees": 447999
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 220000,
+        "bytes": 32416000,
+        "frees": 6000
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 226000,
+        "bytes": 32944000,
+        "frees": 8000
+      },
+      "body": {
+        "allocations": 2000,
+        "bytes": 336000,
+        "frees": 1999
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 214000
+      }
+    },
+    "stdout": "1.997e+06\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "mutation",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 226532079,
+    "phases": {
+      "factory": {
+        "allocations": 234000,
+        "bytes": 33968000,
+        "frees": 233999
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 220000,
+        "bytes": 32416000,
+        "frees": 6000
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 1999
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 214000
+      }
+    },
+    "stdout": "1.997e+06\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "mutation",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 48485858,
+    "phases": {
+      "factory": {
+        "allocations": 16110,
+        "bytes": 1776176,
+        "frees": 16109
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 2110,
+        "bytes": 224176,
+        "frees": 3
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 4000,
+        "bytes": 608000,
+        "frees": 1999
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 2107
+      }
+    },
+    "stdout": "1.997e+06\n"
+  },
+  {
+    "model": "current",
+    "scenario": "nested",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 40670932,
+    "phases": {
+      "factory": {
+        "allocations": 50000,
+        "bytes": 6128000,
+        "frees": 50000
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 14000,
+        "bytes": 1776000,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 20000,
+        "bytes": 2304000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 16000,
+        "bytes": 2048000,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 34000
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "nested",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 34379325,
+    "phases": {
+      "factory": {
+        "allocations": 42000,
+        "bytes": 5040000,
+        "frees": 42000
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 14000,
+        "bytes": 1776000,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 18000,
+        "bytes": 2320000,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 34000
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "nested",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 24882271,
+    "phases": {
+      "factory": {
+        "allocations": 30007,
+        "bytes": 3472856,
+        "frees": 30007
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 2007,
+        "bytes": 208856,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 18000,
+        "bytes": 2320000,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 22007
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "current",
+    "scenario": "nested",
+    "unused": 5,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 71847031,
+    "phases": {
+      "factory": {
+        "allocations": 80000,
+        "bytes": 10208000,
+        "frees": 80000
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 24000,
+        "bytes": 3136000,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 30000,
+        "bytes": 3664000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 26000,
+        "bytes": 3408000,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 54000
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "nested",
+    "unused": 5,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 55448103,
+    "phases": {
+      "factory": {
+        "allocations": 62000,
+        "bytes": 7760000,
+        "frees": 62000
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 24000,
+        "bytes": 3136000,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 28000,
+        "bytes": 3680000,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 54000
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "nested",
+    "unused": 5,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 37727542,
+    "phases": {
+      "factory": {
+        "allocations": 40012,
+        "bytes": 4833536,
+        "frees": 40012
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 2012,
+        "bytes": 209536,
+        "frees": 0
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 28000,
+        "bytes": 3680000,
+        "frees": 0
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 32012
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "current",
+    "scenario": "nested",
+    "unused": 16,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 157307767,
+    "phases": {
+      "factory": {
+        "allocations": 152000,
+        "bytes": 20576000,
+        "frees": 152000
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 48000,
+        "bytes": 6592000,
+        "frees": 2000
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 54000,
+        "bytes": 7120000,
+        "frees": 4000
+      },
+      "body": {
+        "allocations": 50000,
+        "bytes": 6864000,
+        "frees": 2000
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 98000
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "nested",
+    "unused": 16,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 109925569,
+    "phases": {
+      "factory": {
+        "allocations": 110000,
+        "bytes": 14672000,
+        "frees": 110000
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 48000,
+        "bytes": 6592000,
+        "frees": 2000
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 52000,
+        "bytes": 7136000,
+        "frees": 2000
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 98000
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "nested",
+    "unused": 16,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 70096116,
+    "phases": {
+      "factory": {
+        "allocations": 64024,
+        "bytes": 8291264,
+        "frees": 64024
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 2024,
+        "bytes": 211264,
+        "frees": 1
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 52000,
+        "bytes": 7136000,
+        "frees": 2000
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 54023
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "current",
+    "scenario": "nested",
+    "unused": 50,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 375072197,
+    "phases": {
+      "factory": {
+        "allocations": 362000,
+        "bytes": 51152000,
+        "frees": 362000
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 118000,
+        "bytes": 16784000,
+        "frees": 4000
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 124000,
+        "bytes": 17312000,
+        "frees": 6000
+      },
+      "body": {
+        "allocations": 120000,
+        "bytes": 17056000,
+        "frees": 4000
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 234000
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "nested",
+    "unused": 50,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 245614357,
+    "phases": {
+      "factory": {
+        "allocations": 250000,
+        "bytes": 35056000,
+        "frees": 250000
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 118000,
+        "bytes": 16784000,
+        "frees": 4000
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 122000,
+        "bytes": 17328000,
+        "frees": 4000
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 234000
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "nested",
+    "unused": 50,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 148735873,
+    "phases": {
+      "factory": {
+        "allocations": 134059,
+        "bytes": 18488360,
+        "frees": 134059
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 2059,
+        "bytes": 216360,
+        "frees": 2
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 122000,
+        "bytes": 17328000,
+        "frees": 4000
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 122057
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "current",
+    "scenario": "nested",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 695141231,
+    "phases": {
+      "factory": {
+        "allocations": 668000,
+        "bytes": 98048000,
+        "frees": 668000
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 220000,
+        "bytes": 32416000,
+        "frees": 6000
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 226000,
+        "bytes": 32944000,
+        "frees": 8000
+      },
+      "body": {
+        "allocations": 222000,
+        "bytes": 32688000,
+        "frees": 6000
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 434000
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "nested",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 443902648,
+    "phases": {
+      "factory": {
+        "allocations": 454000,
+        "bytes": 66320000,
+        "frees": 454000
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 220000,
+        "bytes": 32416000,
+        "frees": 6000
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 224000,
+        "bytes": 32960000,
+        "frees": 6000
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 434000
+      }
+    },
+    "stdout": "4000\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "nested",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 266196305,
+    "phases": {
+      "factory": {
+        "allocations": 236110,
+        "bytes": 34128176,
+        "frees": 236110
+      },
+      "instance": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "metadata": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "capture": {
+        "allocations": 2110,
+        "bytes": 224176,
+        "frees": 3
+      },
+      "registration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "arguments": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "frame": {
+        "allocations": 10000,
+        "bytes": 944000,
+        "frees": 2000
+      },
+      "body": {
+        "allocations": 224000,
+        "bytes": 32960000,
+        "frees": 6000
+      },
+      "key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "decoration": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "sorting": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "result": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "cleanup": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "returned_key": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 0
+      },
+      "destruction": {
+        "allocations": 0,
+        "bytes": 0,
+        "frees": 222107
+      }
+    },
+    "stdout": "4000\n"
+  }
+]

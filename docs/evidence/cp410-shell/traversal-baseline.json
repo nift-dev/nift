@@ -1,0 +1,128 @@
+[
+  {
+    "label": "baseline",
+    "n": 1000,
+    "repeat": 0,
+    "wall": 0.03471652395091951,
+    "user_system_rss": "0.01 0.02 9404"
+  },
+  {
+    "label": "baseline",
+    "n": 1000,
+    "repeat": 1,
+    "wall": 0.030770589131861925,
+    "user_system_rss": "0.01 0.01 9320"
+  },
+  {
+    "label": "baseline",
+    "n": 1000,
+    "repeat": 2,
+    "wall": 0.02571745286695659,
+    "user_system_rss": "0.00 0.01 9552"
+  },
+  {
+    "label": "native",
+    "n": 1000,
+    "repeat": 0,
+    "wall": 0.020083514042198658,
+    "user_system_rss": "0.00 0.01 4372"
+  },
+  {
+    "label": "native",
+    "n": 1000,
+    "repeat": 1,
+    "wall": 0.021677070995792747,
+    "user_system_rss": "0.00 0.01 4220"
+  },
+  {
+    "label": "native",
+    "n": 1000,
+    "repeat": 2,
+    "wall": 0.0308681670576334,
+    "user_system_rss": "0.01 0.01 4384"
+  },
+  {
+    "label": "baseline",
+    "n": 10000,
+    "repeat": 0,
+    "wall": 0.24183641490526497,
+    "user_system_rss": "0.08 0.15 28352"
+  },
+  {
+    "label": "baseline",
+    "n": 10000,
+    "repeat": 1,
+    "wall": 0.23761384887620807,
+    "user_system_rss": "0.08 0.15 28152"
+  },
+  {
+    "label": "baseline",
+    "n": 10000,
+    "repeat": 2,
+    "wall": 0.24980551307089627,
+    "user_system_rss": "0.09 0.15 28684"
+  },
+  {
+    "label": "native",
+    "n": 10000,
+    "repeat": 0,
+    "wall": 0.17455431818962097,
+    "user_system_rss": "0.04 0.12 4604"
+  },
+  {
+    "label": "native",
+    "n": 10000,
+    "repeat": 1,
+    "wall": 0.17681481805630028,
+    "user_system_rss": "0.04 0.12 4852"
+  },
+  {
+    "label": "native",
+    "n": 10000,
+    "repeat": 2,
+    "wall": 0.1654520279262215,
+    "user_system_rss": "0.03 0.12 4852"
+  },
+  {
+    "label": "baseline",
+    "n": 100000,
+    "repeat": 0,
+    "wall": 2.4452936451416463,
+    "user_system_rss": "1.04 1.40 222924"
+  },
+  {
+    "label": "baseline",
+    "n": 100000,
+    "repeat": 1,
+    "wall": 2.606107478030026,
+    "user_system_rss": "1.15 1.44 222440"
+  },
+  {
+    "label": "baseline",
+    "n": 100000,
+    "repeat": 2,
+    "wall": 2.2962310679722577,
+    "user_system_rss": "0.93 1.36 222888"
+  },
+  {
+    "label": "native",
+    "n": 100000,
+    "repeat": 0,
+    "wall": 1.6377951260656118,
+    "user_system_rss": "0.35 1.27 13760"
+  },
+  {
+    "label": "native",
+    "n": 100000,
+    "repeat": 1,
+    "wall": 1.7167260171845555,
+    "user_system_rss": "0.42 1.29 13344"
+  },
+  {
+    "label": "native",
+    "n": 100000,
+    "repeat": 2,
+    "wall": 1.710928075015545,
+    "user_system_rss": "0.39 1.31 13300"
+  }
+]

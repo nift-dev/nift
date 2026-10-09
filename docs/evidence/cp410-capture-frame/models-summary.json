@@ -1,0 +1,1402 @@
+[
+  {
+    "scenario": "identity",
+    "unused": 0,
+    "current_instructions": 20436142,
+    "models": {
+      "current": {
+        "instructions": 20436142,
+        "change_pct": 0.0,
+        "allocations": 30000,
+        "frame_allocations": 18000,
+        "teardown_frees": 12000
+      },
+      "shared": {
+        "instructions": 15221744,
+        "change_pct": -25.51556942597091,
+        "allocations": 22000,
+        "frame_allocations": 10000,
+        "teardown_frees": 12000
+      },
+      "parent": {
+        "instructions": 6401111,
+        "change_pct": -68.67749793478633,
+        "allocations": 12000,
+        "frame_allocations": 10000,
+        "teardown_frees": 2000
+      },
+      "cow": {
+        "instructions": 20432142,
+        "change_pct": -0.019573166011466192,
+        "allocations": 30000,
+        "frame_allocations": 18000,
+        "teardown_frees": 12000
+      }
+    }
+  },
+  {
+    "scenario": "identity",
+    "unused": 5,
+    "current_instructions": 38505171,
+    "models": {
+      "current": {
+        "instructions": 38505171,
+        "change_pct": 0.0,
+        "allocations": 50000,
+        "frame_allocations": 28000,
+        "teardown_frees": 22000
+      },
+      "shared": {
+        "instructions": 25651865,
+        "change_pct": -33.38072696781427,
+        "allocations": 32000,
+        "frame_allocations": 10000,
+        "teardown_frees": 22000
+      },
+      "parent": {
+        "instructions": 6399775,
+        "change_pct": -83.37944012766492,
+        "allocations": 12000,
+        "frame_allocations": 10000,
+        "teardown_frees": 2000
+      },
+      "cow": {
+        "instructions": 38501171,
+        "change_pct": -0.010388215130896494,
+        "allocations": 50000,
+        "frame_allocations": 28000,
+        "teardown_frees": 22000
+      }
+    }
+  },
+  {
+    "scenario": "identity",
+    "unused": 16,
+    "current_instructions": 90291624,
+    "models": {
+      "current": {
+        "instructions": 90291624,
+        "change_pct": 0.0,
+        "allocations": 98000,
+        "frame_allocations": 52000,
+        "teardown_frees": 44000
+      },
+      "shared": {
+        "instructions": 52792745,
+        "change_pct": -41.53085008195223,
+        "allocations": 56000,
+        "frame_allocations": 10000,
+        "teardown_frees": 44000
+      },
+      "parent": {
+        "instructions": 6422922,
+        "change_pct": -92.886469735,
+        "allocations": 12000,
+        "frame_allocations": 10000,
+        "teardown_frees": 2000
+      },
+      "cow": {
+        "instructions": 90287624,
+        "change_pct": -0.004430089772222701,
+        "allocations": 98000,
+        "frame_allocations": 52000,
+        "teardown_frees": 44000
+      }
+    }
+  },
+  {
+    "scenario": "identity",
+    "unused": 50,
+    "current_instructions": 229055813,
+    "models": {
+      "current": {
+        "instructions": 229055813,
+        "change_pct": 0.0,
+        "allocations": 238000,
+        "frame_allocations": 122000,
+        "teardown_frees": 112000
+      },
+      "shared": {
+        "instructions": 122382385,
+        "change_pct": -46.57093247399925,
+        "allocations": 126000,
+        "frame_allocations": 10000,
+        "teardown_frees": 112000
+      },
+      "parent": {
+        "instructions": 6399496,
+        "change_pct": -97.20614119494098,
+        "allocations": 12000,
+        "frame_allocations": 10000,
+        "teardown_frees": 2000
+      },
+      "cow": {
+        "instructions": 229051813,
+        "change_pct": -0.0017462992742300898,
+        "allocations": 238000,
+        "frame_allocations": 122000,
+        "teardown_frees": 112000
+      }
+    }
+  },
+  {
+    "scenario": "identity",
+    "unused": 100,
+    "current_instructions": 428391280,
+    "models": {
+      "current": {
+        "instructions": 428391280,
+        "change_pct": 0.0,
+        "allocations": 442000,
+        "frame_allocations": 224000,
+        "teardown_frees": 212000
+      },
+      "shared": {
+        "instructions": 221378665,
+        "change_pct": -48.32325601959031,
+        "allocations": 228000,
+        "frame_allocations": 10000,
+        "teardown_frees": 212000
+      },
+      "parent": {
+        "instructions": 6399496,
+        "change_pct": -98.50615633446134,
+        "allocations": 12000,
+        "frame_allocations": 10000,
+        "teardown_frees": 2000
+      },
+      "cow": {
+        "instructions": 428387280,
+        "change_pct": -0.0009337258218722333,
+        "allocations": 442000,
+        "frame_allocations": 224000,
+        "teardown_frees": 212000
+      }
+    }
+  },
+  {
+    "scenario": "captured",
+    "unused": 0,
+    "current_instructions": 23820672,
+    "models": {
+      "current": {
+        "instructions": 23820672,
+        "change_pct": 0.0,
+        "allocations": 34000,
+        "frame_allocations": 20000,
+        "teardown_frees": 14000
+      },
+      "shared": {
+        "instructions": 18842080,
+        "change_pct": -20.90030037775592,
+        "allocations": 26000,
+        "frame_allocations": 10000,
+        "teardown_frees": 14000
+      },
+      "parent": {
+        "instructions": 8125111,
+        "change_pct": -65.89050468433469,
+        "allocations": 14000,
+        "frame_allocations": 10000,
+        "teardown_frees": 2000
+      },
+      "cow": {
+        "instructions": 23816672,
+        "change_pct": -0.01679213751820674,
+        "allocations": 34000,
+        "frame_allocations": 20000,
+        "teardown_frees": 14000
+      }
+    }
+  },
+  {
+    "scenario": "captured",
+    "unused": 5,
+    "current_instructions": 42027266,
+    "models": {
+      "current": {
+        "instructions": 42027266,
+        "change_pct": 0.0,
+        "allocations": 54000,
+        "frame_allocations": 30000,
+        "teardown_frees": 24000
+      },
+      "shared": {
+        "instructions": 29353600,
+        "change_pct": -30.155818368009,
+        "allocations": 36000,
+        "frame_allocations": 10000,
+        "teardown_frees": 24000
+      },
+      "parent": {
+        "instructions": 8167775,
+        "change_pct": -80.56553333733392,
+        "allocations": 14000,
+        "frame_allocations": 10000,
+        "teardown_frees": 2000
+      },
+      "cow": {
+        "instructions": 42023266,
+        "change_pct": -0.009517630768562935,
+        "allocations": 54000,
+        "frame_allocations": 30000,
+        "teardown_frees": 24000
+      }
+    }
+  },
+  {
+    "scenario": "captured",
+    "unused": 16,
+    "current_instructions": 94696815,
+    "models": {
+      "current": {
+        "instructions": 94696815,
+        "change_pct": 0.0,
+        "allocations": 102000,
+        "frame_allocations": 54000,
+        "teardown_frees": 46000
+      },
+      "shared": {
+        "instructions": 56804101,
+        "change_pct": -40.01477135213049,
+        "allocations": 60000,
+        "frame_allocations": 10000,
+        "teardown_frees": 46000
+      },
+      "parent": {
+        "instructions": 8301102,
+        "change_pct": -91.23402196789829,
+        "allocations": 14000,
+        "frame_allocations": 10000,
+        "teardown_frees": 2000
+      },
+      "cow": {
+        "instructions": 94693311,
+        "change_pct": -0.0037002300447008807,
+        "allocations": 102000,
+        "frame_allocations": 54000,
+        "teardown_frees": 46000
+      }
+    }
+  },
+  {
+    "scenario": "captured",
+    "unused": 50,
+    "current_instructions": 232182997,
+    "models": {
+      "current": {
+        "instructions": 232182997,
+        "change_pct": 0.0,
+        "allocations": 242000,
+        "frame_allocations": 124000,
+        "teardown_frees": 114000
+      },
+      "shared": {
+        "instructions": 126304991,
+        "change_pct": -45.60110230638465,
+        "allocations": 130000,
+        "frame_allocations": 10000,
+        "teardown_frees": 114000
+      },
+      "parent": {
+        "instructions": 8305632,
+        "change_pct": -96.42280782515698,
+        "allocations": 14000,
+        "frame_allocations": 10000,
+        "teardown_frees": 2000
+      },
+      "cow": {
+        "instructions": 232179501,
+        "change_pct": -0.00150570887841317,
+        "allocations": 242000,
+        "frame_allocations": 124000,
+        "teardown_frees": 114000
+      }
+    }
+  },
+  {
+    "scenario": "captured",
+    "unused": 100,
+    "current_instructions": 432434727,
+    "models": {
+      "current": {
+        "instructions": 432434727,
+        "change_pct": 0.0,
+        "allocations": 446000,
+        "frame_allocations": 226000,
+        "teardown_frees": 214000
+      },
+      "shared": {
+        "instructions": 225496089,
+        "change_pct": -47.854306113579085,
+        "allocations": 232000,
+        "frame_allocations": 10000,
+        "teardown_frees": 214000
+      },
+      "parent": {
+        "instructions": 8331632,
+        "change_pct": -98.07332032332361,
+        "allocations": 14000,
+        "frame_allocations": 10000,
+        "teardown_frees": 2000
+      },
+      "cow": {
+        "instructions": 432431207,
+        "change_pct": -0.0008139956807817761,
+        "allocations": 446000,
+        "frame_allocations": 226000,
+        "teardown_frees": 214000
+      }
+    }
+  },
+  {
+    "scenario": "reused-identity",
+    "unused": 0,
+    "current_instructions": 10095181,
+    "models": {
+      "current": {
+        "instructions": 10095181,
+        "change_pct": 0.0,
+        "allocations": 18006,
+        "frame_allocations": 18000,
+        "teardown_frees": 6
+      },
+      "shared": {
+        "instructions": 4855619,
+        "change_pct": -51.90161523602201,
+        "allocations": 10006,
+        "frame_allocations": 10000,
+        "teardown_frees": 6
+      },
+      "parent": {
+        "instructions": 4852634,
+        "change_pct": -51.931183799478184,
+        "allocations": 10001,
+        "frame_allocations": 10000,
+        "teardown_frees": 1
+      },
+      "cow": {
+        "instructions": 10091181,
+        "change_pct": -0.03962286560290629,
+        "allocations": 18006,
+        "frame_allocations": 18000,
+        "teardown_frees": 6
+      }
+    }
+  },
+  {
+    "scenario": "reused-identity",
+    "unused": 5,
+    "current_instructions": 17750506,
+    "models": {
+      "current": {
+        "instructions": 17750506,
+        "change_pct": 0.0,
+        "allocations": 28011,
+        "frame_allocations": 28000,
+        "teardown_frees": 11
+      },
+      "shared": {
+        "instructions": 4859431,
+        "change_pct": -72.6237043608785,
+        "allocations": 10011,
+        "frame_allocations": 10000,
+        "teardown_frees": 11
+      },
+      "parent": {
+        "instructions": 4852634,
+        "change_pct": -72.66199622703712,
+        "allocations": 10001,
+        "frame_allocations": 10000,
+        "teardown_frees": 1
+      },
+      "cow": {
+        "instructions": 17746506,
+        "change_pct": -0.02253456887369998,
+        "allocations": 28011,
+        "frame_allocations": 28000,
+        "teardown_frees": 11
+      }
+    }
+  },
+  {
+    "scenario": "reused-identity",
+    "unused": 16,
+    "current_instructions": 40787112,
+    "models": {
+      "current": {
+        "instructions": 40787112,
+        "change_pct": 0.0,
+        "allocations": 52023,
+        "frame_allocations": 52000,
+        "teardown_frees": 22
+      },
+      "shared": {
+        "instructions": 4874355,
+        "change_pct": -88.04927644791324,
+        "allocations": 10023,
+        "frame_allocations": 10000,
+        "teardown_frees": 22
+      },
+      "parent": {
+        "instructions": 4853186,
+        "change_pct": -88.10117764650755,
+        "allocations": 10001,
+        "frame_allocations": 10000,
+        "teardown_frees": 1
+      },
+      "cow": {
+        "instructions": 40783112,
+        "change_pct": -0.00980701943300577,
+        "allocations": 52023,
+        "frame_allocations": 52000,
+        "teardown_frees": 22
+      }
+    }
+  },
+  {
+    "scenario": "reused-identity",
+    "unused": 50,
+    "current_instructions": 111073307,
+    "models": {
+      "current": {
+        "instructions": 111073307,
+        "change_pct": 0.0,
+        "allocations": 122058,
+        "frame_allocations": 122000,
+        "teardown_frees": 56
+      },
+      "shared": {
+        "instructions": 4908901,
+        "change_pct": -95.58048541761704,
+        "allocations": 10058,
+        "frame_allocations": 10000,
+        "teardown_frees": 56
+      },
+      "parent": {
+        "instructions": 4853178,
+        "change_pct": -95.63065318654823,
+        "allocations": 10001,
+        "frame_allocations": 10000,
+        "teardown_frees": 1
+      },
+      "cow": {
+        "instructions": 111069307,
+        "change_pct": -0.00360122527007789,
+        "allocations": 122058,
+        "frame_allocations": 122000,
+        "teardown_frees": 56
+      }
+    }
+  },
+  {
+    "scenario": "reused-identity",
+    "unused": 100,
+    "current_instructions": 210308076,
+    "models": {
+      "current": {
+        "instructions": 210308076,
+        "change_pct": 0.0,
+        "allocations": 224109,
+        "frame_allocations": 224000,
+        "teardown_frees": 106
+      },
+      "shared": {
+        "instructions": 4958748,
+        "change_pct": -97.64215046121197,
+        "allocations": 10109,
+        "frame_allocations": 10000,
+        "teardown_frees": 106
+      },
+      "parent": {
+        "instructions": 4853178,
+        "change_pct": -97.69234824819566,
+        "allocations": 10001,
+        "frame_allocations": 10000,
+        "teardown_frees": 1
+      },
+      "cow": {
+        "instructions": 210304076,
+        "change_pct": -0.0019019716580026547,
+        "allocations": 224109,
+        "frame_allocations": 224000,
+        "teardown_frees": 106
+      }
+    }
+  },
+  {
+    "scenario": "reused",
+    "unused": 0,
+    "current_instructions": 11559541,
+    "models": {
+      "current": {
+        "instructions": 11559541,
+        "change_pct": 0.0,
+        "allocations": 20007,
+        "frame_allocations": 20000,
+        "teardown_frees": 7
+      },
+      "shared": {
+        "instructions": 6555456,
+        "change_pct": -43.28965137975634,
+        "allocations": 12007,
+        "frame_allocations": 10000,
+        "teardown_frees": 7
+      },
+      "parent": {
+        "instructions": 6580597,
+        "change_pct": -43.07216004510905,
+        "allocations": 12001,
+        "frame_allocations": 10000,
+        "teardown_frees": 1
+      },
+      "cow": {
+        "instructions": 11555541,
+        "change_pct": -0.034603450085080034,
+        "allocations": 20007,
+        "frame_allocations": 20000,
+        "teardown_frees": 7
+      }
+    }
+  },
+  {
+    "scenario": "reused",
+    "unused": 5,
+    "current_instructions": 19296572,
+    "models": {
+      "current": {
+        "instructions": 19296572,
+        "change_pct": 0.0,
+        "allocations": 30012,
+        "frame_allocations": 30000,
+        "teardown_frees": 12
+      },
+      "shared": {
+        "instructions": 6586109,
+        "change_pct": -65.86902067372381,
+        "allocations": 12012,
+        "frame_allocations": 10000,
+        "teardown_frees": 12
+      },
+      "parent": {
+        "instructions": 6624597,
+        "change_pct": -65.66956555806907,
+        "allocations": 12001,
+        "frame_allocations": 10000,
+        "teardown_frees": 1
+      },
+      "cow": {
+        "instructions": 19292572,
+        "change_pct": -0.020729070427638607,
+        "allocations": 30012,
+        "frame_allocations": 30000,
+        "teardown_frees": 12
+      }
+    }
+  },
+  {
+    "scenario": "reused",
+    "unused": 16,
+    "current_instructions": 43158229,
+    "models": {
+      "current": {
+        "instructions": 43158229,
+        "change_pct": 0.0,
+        "allocations": 54024,
+        "frame_allocations": 54000,
+        "teardown_frees": 23
+      },
+      "shared": {
+        "instructions": 6735695,
+        "change_pct": -84.39302270721072,
+        "allocations": 12024,
+        "frame_allocations": 10000,
+        "teardown_frees": 23
+      },
+      "parent": {
+        "instructions": 6735329,
+        "change_pct": -84.39387074942302,
+        "allocations": 12001,
+        "frame_allocations": 10000,
+        "teardown_frees": 1
+      },
+      "cow": {
+        "instructions": 43154229,
+        "change_pct": -0.009268220899427693,
+        "allocations": 54024,
+        "frame_allocations": 54000,
+        "teardown_frees": 23
+      }
+    }
+  },
+  {
+    "scenario": "reused",
+    "unused": 50,
+    "current_instructions": 112300199,
+    "models": {
+      "current": {
+        "instructions": 112300199,
+        "change_pct": 0.0,
+        "allocations": 124059,
+        "frame_allocations": 124000,
+        "teardown_frees": 57
+      },
+      "shared": {
+        "instructions": 6780102,
+        "change_pct": -93.9625200486065,
+        "allocations": 12059,
+        "frame_allocations": 10000,
+        "teardown_frees": 57
+      },
+      "parent": {
+        "instructions": 6763277,
+        "change_pct": -93.97750221261852,
+        "allocations": 12001,
+        "frame_allocations": 10000,
+        "teardown_frees": 1
+      },
+      "cow": {
+        "instructions": 112296199,
+        "change_pct": -0.0035618814887450334,
+        "allocations": 124059,
+        "frame_allocations": 124000,
+        "teardown_frees": 57
+      }
+    }
+  },
+  {
+    "scenario": "reused",
+    "unused": 100,
+    "current_instructions": 212284027,
+    "models": {
+      "current": {
+        "instructions": 212284027,
+        "change_pct": 0.0,
+        "allocations": 226110,
+        "frame_allocations": 226000,
+        "teardown_frees": 107
+      },
+      "shared": {
+        "instructions": 6829923,
+        "change_pct": -96.78264865401296,
+        "allocations": 12110,
+        "frame_allocations": 10000,
+        "teardown_frees": 107
+      },
+      "parent": {
+        "instructions": 6789277,
+        "change_pct": -96.80179564334344,
+        "allocations": 12001,
+        "frame_allocations": 10000,
+        "teardown_frees": 1
+      },
+      "cow": {
+        "instructions": 212280027,
+        "change_pct": -0.001884268004770373,
+        "allocations": 226110,
+        "frame_allocations": 226000,
+        "teardown_frees": 107
+      }
+    }
+  },
+  {
+    "scenario": "mutation",
+    "unused": 0,
+    "current_instructions": 25083472,
+    "models": {
+      "current": {
+        "instructions": 25083472,
+        "change_pct": 0.0,
+        "allocations": 36000,
+        "frame_allocations": 20000,
+        "teardown_frees": 14000
+      },
+      "shared": {
+        "instructions": 20090888,
+        "change_pct": -19.90387933536474,
+        "allocations": 28000,
+        "frame_allocations": 10000,
+        "teardown_frees": 14000
+      },
+      "parent": {
+        "instructions": 9372919,
+        "change_pct": -62.633087636352734,
+        "allocations": 16000,
+        "frame_allocations": 10000,
+        "teardown_frees": 2000
+      },
+      "cow": {
+        "instructions": 25079472,
+        "change_pct": -0.015946755696338855,
+        "allocations": 36000,
+        "frame_allocations": 20000,
+        "teardown_frees": 14000
+      }
+    }
+  },
+  {
+    "scenario": "mutation",
+    "unused": 5,
+    "current_instructions": 43332082,
+    "models": {
+      "current": {
+        "instructions": 43332082,
+        "change_pct": 0.0,
+        "allocations": 56000,
+        "frame_allocations": 30000,
+        "teardown_frees": 24000
+      },
+      "shared": {
+        "instructions": 30602424,
+        "change_pct": -29.376982163008,
+        "allocations": 38000,
+        "frame_allocations": 10000,
+        "teardown_frees": 24000
+      },
+      "parent": {
+        "instructions": 9415583,
+        "change_pct": -78.27110407480535,
+        "allocations": 16000,
+        "frame_allocations": 10000,
+        "teardown_frees": 2000
+      },
+      "cow": {
+        "instructions": 43328082,
+        "change_pct": -0.009231035794676767,
+        "allocations": 56000,
+        "frame_allocations": 30000,
+        "teardown_frees": 24000
+      }
+    }
+  },
+  {
+    "scenario": "mutation",
+    "unused": 16,
+    "current_instructions": 96183701,
+    "models": {
+      "current": {
+        "instructions": 96183701,
+        "change_pct": 0.0,
+        "allocations": 104000,
+        "frame_allocations": 54000,
+        "teardown_frees": 46000
+      },
+      "shared": {
+        "instructions": 58053164,
+        "change_pct": -39.64344956948579,
+        "allocations": 62000,
+        "frame_allocations": 10000,
+        "teardown_frees": 46000
+      },
+      "parent": {
+        "instructions": 9549182,
+        "change_pct": -90.0719332894042,
+        "allocations": 16000,
+        "frame_allocations": 10000,
+        "teardown_frees": 2000
+      },
+      "cow": {
+        "instructions": 96180693,
+        "change_pct": -0.0031273489881633587,
+        "allocations": 104000,
+        "frame_allocations": 54000,
+        "teardown_frees": 46000
+      }
+    }
+  },
+  {
+    "scenario": "mutation",
+    "unused": 50,
+    "current_instructions": 233670163,
+    "models": {
+      "current": {
+        "instructions": 233670163,
+        "change_pct": 0.0,
+        "allocations": 244000,
+        "frame_allocations": 124000,
+        "teardown_frees": 114000
+      },
+      "shared": {
+        "instructions": 127553818,
+        "change_pct": -45.41287755253545,
+        "allocations": 132000,
+        "frame_allocations": 10000,
+        "teardown_frees": 114000
+      },
+      "parent": {
+        "instructions": 9553712,
+        "change_pct": -95.91145404387808,
+        "allocations": 16000,
+        "frame_allocations": 10000,
+        "teardown_frees": 2000
+      },
+      "cow": {
+        "instructions": 233667155,
+        "change_pct": -0.001287284590112403,
+        "allocations": 244000,
+        "frame_allocations": 124000,
+        "teardown_frees": 114000
+      }
+    }
+  },
+  {
+    "scenario": "mutation",
+    "unused": 100,
+    "current_instructions": 433919278,
+    "models": {
+      "current": {
+        "instructions": 433919278,
+        "change_pct": 0.0,
+        "allocations": 448000,
+        "frame_allocations": 226000,
+        "teardown_frees": 214000
+      },
+      "shared": {
+        "instructions": 226744591,
+        "change_pct": -47.744983342270395,
+        "allocations": 234000,
+        "frame_allocations": 10000,
+        "teardown_frees": 214000
+      },
+      "parent": {
+        "instructions": 9579712,
+        "change_pct": -97.7922824622694,
+        "allocations": 16000,
+        "frame_allocations": 10000,
+        "teardown_frees": 2000
+      },
+      "cow": {
+        "instructions": 433916222,
+        "change_pct": -0.0007042784579858186,
+        "allocations": 448000,
+        "frame_allocations": 226000,
+        "teardown_frees": 214000
+      }
+    }
+  },
+  {
+    "scenario": "nested",
+    "unused": 0,
+    "current_instructions": 40567708,
+    "models": {
+      "current": {
+        "instructions": 40567708,
+        "change_pct": 0.0,
+        "allocations": 50000,
+        "frame_allocations": 20000,
+        "teardown_frees": 34000
+      },
+      "shared": {
+        "instructions": 34279191,
+        "change_pct": -15.501287378621441,
+        "allocations": 42000,
+        "frame_allocations": 10000,
+        "teardown_frees": 34000
+      },
+      "parent": {
+        "instructions": 17156218,
+        "change_pct": -57.70966898105261,
+        "allocations": 24000,
+        "frame_allocations": 10000,
+        "teardown_frees": 16000
+      },
+      "cow": {
+        "instructions": 40563708,
+        "change_pct": -0.00986005913866661,
+        "allocations": 50000,
+        "frame_allocations": 20000,
+        "teardown_frees": 34000
+      }
+    }
+  },
+  {
+    "scenario": "nested",
+    "unused": 5,
+    "current_instructions": 71756943,
+    "models": {
+      "current": {
+        "instructions": 71756943,
+        "change_pct": 0.0,
+        "allocations": 80000,
+        "frame_allocations": 30000,
+        "teardown_frees": 54000
+      },
+      "shared": {
+        "instructions": 55350856,
+        "change_pct": -22.863414067123788,
+        "allocations": 62000,
+        "frame_allocations": 10000,
+        "teardown_frees": 54000
+      },
+      "parent": {
+        "instructions": 17132983,
+        "change_pct": -76.12358848676149,
+        "allocations": 24000,
+        "frame_allocations": 10000,
+        "teardown_frees": 16000
+      },
+      "cow": {
+        "instructions": 71752943,
+        "change_pct": -0.005574373479089179,
+        "allocations": 80000,
+        "frame_allocations": 30000,
+        "teardown_frees": 54000
+      }
+    }
+  },
+  {
+    "scenario": "nested",
+    "unused": 16,
+    "current_instructions": 156679208,
+    "models": {
+      "current": {
+        "instructions": 156679208,
+        "change_pct": 0.0,
+        "allocations": 152000,
+        "frame_allocations": 54000,
+        "teardown_frees": 98000
+      },
+      "shared": {
+        "instructions": 110010366,
+        "change_pct": -29.786238133141442,
+        "allocations": 110000,
+        "frame_allocations": 10000,
+        "teardown_frees": 98000
+      },
+      "parent": {
+        "instructions": 17244178,
+        "change_pct": -88.99395891763763,
+        "allocations": 24000,
+        "frame_allocations": 10000,
+        "teardown_frees": 16000
+      },
+      "cow": {
+        "instructions": 156675208,
+        "change_pct": -0.00255298712003027,
+        "allocations": 152000,
+        "frame_allocations": 54000,
+        "teardown_frees": 98000
+      }
+    }
+  },
+  {
+    "scenario": "nested",
+    "unused": 50,
+    "current_instructions": 374205022,
+    "models": {
+      "current": {
+        "instructions": 374205022,
+        "change_pct": 0.0,
+        "allocations": 362000,
+        "frame_allocations": 124000,
+        "teardown_frees": 234000
+      },
+      "shared": {
+        "instructions": 245599394,
+        "change_pct": -34.3676916233369,
+        "allocations": 250000,
+        "frame_allocations": 10000,
+        "teardown_frees": 234000
+      },
+      "parent": {
+        "instructions": 17272126,
+        "change_pct": -95.38431475139315,
+        "allocations": 24000,
+        "frame_allocations": 10000,
+        "teardown_frees": 16000
+      },
+      "cow": {
+        "instructions": 374201022,
+        "change_pct": -0.001068932741365991,
+        "allocations": 362000,
+        "frame_allocations": 124000,
+        "teardown_frees": 234000
+      }
+    }
+  },
+  {
+    "scenario": "nested",
+    "unused": 100,
+    "current_instructions": 693292435,
+    "models": {
+      "current": {
+        "instructions": 693292435,
+        "change_pct": 0.0,
+        "allocations": 668000,
+        "frame_allocations": 226000,
+        "teardown_frees": 434000
+      },
+      "shared": {
+        "instructions": 443832928,
+        "change_pct": -35.98185908375014,
+        "allocations": 454000,
+        "frame_allocations": 10000,
+        "teardown_frees": 434000
+      },
+      "parent": {
+        "instructions": 17298126,
+        "change_pct": -97.50493080167534,
+        "allocations": 24000,
+        "frame_allocations": 10000,
+        "teardown_frees": 16000
+      },
+      "cow": {
+        "instructions": 693288435,
+        "change_pct": -0.0005769571104541349,
+        "allocations": 668000,
+        "frame_allocations": 226000,
+        "teardown_frees": 434000
+      }
+    }
+  },
+  {
+    "scenario": "missing",
+    "unused": 0,
+    "current_instructions": 24129680,
+    "models": {
+      "current": {
+        "instructions": 24129680,
+        "change_pct": 0.0,
+        "allocations": 34000,
+        "frame_allocations": 20000,
+        "teardown_frees": 14000
+      },
+      "shared": {
+        "instructions": 17753353,
+        "change_pct": -26.425244760809097,
+        "allocations": 24000,
+        "frame_allocations": 10000,
+        "teardown_frees": 14000
+      },
+      "parent": {
+        "instructions": 7339111,
+        "change_pct": -69.58471475792469,
+        "allocations": 12000,
+        "frame_allocations": 10000,
+        "teardown_frees": 2000
+      },
+      "cow": {
+        "instructions": 24131680,
+        "change_pct": 0.00828854754808539,
+        "allocations": 34000,
+        "frame_allocations": 20000,
+        "teardown_frees": 14000
+      }
+    }
+  },
+  {
+    "scenario": "missing",
+    "unused": 5,
+    "current_instructions": 42688619,
+    "models": {
+      "current": {
+        "instructions": 42688619,
+        "change_pct": 0.0,
+        "allocations": 54000,
+        "frame_allocations": 30000,
+        "teardown_frees": 24000
+      },
+      "shared": {
+        "instructions": 28730914,
+        "change_pct": -32.696548464123424,
+        "allocations": 34000,
+        "frame_allocations": 10000,
+        "teardown_frees": 24000
+      },
+      "parent": {
+        "instructions": 7727775,
+        "change_pct": -81.89734130307659,
+        "allocations": 12000,
+        "frame_allocations": 10000,
+        "teardown_frees": 2000
+      },
+      "cow": {
+        "instructions": 42690619,
+        "change_pct": 0.00468508948485713,
+        "allocations": 54000,
+        "frame_allocations": 30000,
+        "teardown_frees": 24000
+      }
+    }
+  },
+  {
+    "scenario": "missing",
+    "unused": 16,
+    "current_instructions": 94770319,
+    "models": {
+      "current": {
+        "instructions": 94770319,
+        "change_pct": 0.0,
+        "allocations": 102000,
+        "frame_allocations": 54000,
+        "teardown_frees": 46000
+      },
+      "shared": {
+        "instructions": 55555171,
+        "change_pct": -41.379145299700845,
+        "allocations": 58000,
+        "frame_allocations": 10000,
+        "teardown_frees": 46000
+      },
+      "parent": {
+        "instructions": 8224966,
+        "change_pct": -91.32115826264128,
+        "allocations": 12000,
+        "frame_allocations": 10000,
+        "teardown_frees": 2000
+      },
+      "cow": {
+        "instructions": 94772319,
+        "change_pct": 0.0021103653771614717,
+        "allocations": 102000,
+        "frame_allocations": 54000,
+        "teardown_frees": 46000
+      }
+    }
+  },
+  {
+    "scenario": "missing",
+    "unused": 50,
+    "current_instructions": 232206517,
+    "models": {
+      "current": {
+        "instructions": 232206517,
+        "change_pct": 0.0,
+        "allocations": 242000,
+        "frame_allocations": 124000,
+        "teardown_frees": 114000
+      },
+      "shared": {
+        "instructions": 124870273,
+        "change_pct": -46.22447525880594,
+        "allocations": 128000,
+        "frame_allocations": 10000,
+        "teardown_frees": 114000
+      },
+      "parent": {
+        "instructions": 7313496,
+        "change_pct": -96.85043464994568,
+        "allocations": 12000,
+        "frame_allocations": 10000,
+        "teardown_frees": 2000
+      },
+      "cow": {
+        "instructions": 232208517,
+        "change_pct": 0.0008613022691283945,
+        "allocations": 242000,
+        "frame_allocations": 124000,
+        "teardown_frees": 114000
+      }
+    }
+  },
+  {
+    "scenario": "missing",
+    "unused": 100,
+    "current_instructions": 432534255,
+    "models": {
+      "current": {
+        "instructions": 432534255,
+        "change_pct": 0.0,
+        "allocations": 446000,
+        "frame_allocations": 226000,
+        "teardown_frees": 214000
+      },
+      "shared": {
+        "instructions": 224129195,
+        "change_pct": -48.182324888927006,
+        "allocations": 230000,
+        "frame_allocations": 10000,
+        "teardown_frees": 214000
+      },
+      "parent": {
+        "instructions": 7389496,
+        "change_pct": -98.29158132227008,
+        "allocations": 12000,
+        "frame_allocations": 10000,
+        "teardown_frees": 2000
+      },
+      "cow": {
+        "instructions": 432536255,
+        "change_pct": 0.00046239112321266873,
+        "allocations": 446000,
+        "frame_allocations": 226000,
+        "teardown_frees": 214000
+      }
+    }
+  },
+  {
+    "scenario": "global",
+    "unused": 0,
+    "current_instructions": 23892838,
+    "models": {
+      "current": {
+        "instructions": 23892838,
+        "change_pct": 0.0,
+        "allocations": 34000,
+        "frame_allocations": 20000,
+        "teardown_frees": 14000
+      },
+      "shared": {
+        "instructions": 18730255,
+        "change_pct": -21.60724063001641,
+        "allocations": 26000,
+        "frame_allocations": 10000,
+        "teardown_frees": 14000
+      },
+      "parent": {
+        "instructions": 8267144,
+        "change_pct": -65.39907063363506,
+        "allocations": 14000,
+        "frame_allocations": 10000,
+        "teardown_frees": 2000
+      },
+      "cow": {
+        "instructions": 23888838,
+        "change_pct": -0.016741418495369587,
+        "allocations": 34000,
+        "frame_allocations": 20000,
+        "teardown_frees": 14000
+      }
+    }
+  },
+  {
+    "scenario": "global",
+    "unused": 5,
+    "current_instructions": 42127407,
+    "models": {
+      "current": {
+        "instructions": 42127407,
+        "change_pct": 0.0,
+        "allocations": 54000,
+        "frame_allocations": 30000,
+        "teardown_frees": 24000
+      },
+      "shared": {
+        "instructions": 29213756,
+        "change_pct": -30.653799793564318,
+        "allocations": 36000,
+        "frame_allocations": 10000,
+        "teardown_frees": 24000
+      },
+      "parent": {
+        "instructions": 8335808,
+        "change_pct": -80.21286237721681,
+        "allocations": 14000,
+        "frame_allocations": 10000,
+        "teardown_frees": 2000
+      },
+      "cow": {
+        "instructions": 42123407,
+        "change_pct": -0.00949500642183354,
+        "allocations": 54000,
+        "frame_allocations": 30000,
+        "teardown_frees": 24000
+      }
+    }
+  },
+  {
+    "scenario": "global",
+    "unused": 16,
+    "current_instructions": 94651468,
+    "models": {
+      "current": {
+        "instructions": 94651468,
+        "change_pct": 0.0,
+        "allocations": 102000,
+        "frame_allocations": 54000,
+        "teardown_frees": 46000
+      },
+      "shared": {
+        "instructions": 56712242,
+        "change_pct": -40.083082493765446,
+        "allocations": 60000,
+        "frame_allocations": 10000,
+        "teardown_frees": 46000
+      },
+      "parent": {
+        "instructions": 8527135,
+        "change_pct": -90.99101664223528,
+        "allocations": 14000,
+        "frame_allocations": 10000,
+        "teardown_frees": 2000
+      },
+      "cow": {
+        "instructions": 94647468,
+        "change_pct": -0.004226030598908359,
+        "allocations": 102000,
+        "frame_allocations": 54000,
+        "teardown_frees": 46000
+      }
+    }
+  },
+  {
+    "scenario": "global",
+    "unused": 50,
+    "current_instructions": 232137657,
+    "models": {
+      "current": {
+        "instructions": 232137657,
+        "change_pct": 0.0,
+        "allocations": 242000,
+        "frame_allocations": 124000,
+        "teardown_frees": 114000
+      },
+      "shared": {
+        "instructions": 126187244,
+        "change_pct": -45.641200298665886,
+        "allocations": 130000,
+        "frame_allocations": 10000,
+        "teardown_frees": 114000
+      },
+      "parent": {
+        "instructions": 8331665,
+        "change_pct": -96.4108946787552,
+        "allocations": 14000,
+        "frame_allocations": 10000,
+        "teardown_frees": 2000
+      },
+      "cow": {
+        "instructions": 232133657,
+        "change_pct": -0.0017231155219232797,
+        "allocations": 242000,
+        "frame_allocations": 124000,
+        "teardown_frees": 114000
+      }
+    }
+  },
+  {
+    "scenario": "global",
+    "unused": 100,
+    "current_instructions": 432389494,
+    "models": {
+      "current": {
+        "instructions": 432389494,
+        "change_pct": 0.0,
+        "allocations": 446000,
+        "frame_allocations": 226000,
+        "teardown_frees": 214000
+      },
+      "shared": {
+        "instructions": 225378734,
+        "change_pct": -47.87599210262032,
+        "allocations": 232000,
+        "frame_allocations": 10000,
+        "teardown_frees": 214000
+      },
+      "parent": {
+        "instructions": 8241665,
+        "change_pct": -98.0939257048646,
+        "allocations": 14000,
+        "frame_allocations": 10000,
+        "teardown_frees": 2000
+      },
+      "cow": {
+        "instructions": 432385494,
+        "change_pct": -0.0009250918571068745,
+        "allocations": 446000,
+        "frame_allocations": 226000,
+        "teardown_frees": 214000
+      }
+    }
+  }
+]

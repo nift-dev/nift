@@ -1,0 +1,322 @@
+[
+  {
+    "op": "save",
+    "n": 1000,
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.05671052588149905,
+    "user_system_rss": "0.01 0.03 8996"
+  },
+  {
+    "op": "save",
+    "n": 1000,
+    "repeat": 0,
+    "label": "dispatch",
+    "wall": 0.05528163001872599,
+    "user_system_rss": "0.02 0.03 9012"
+  },
+  {
+    "op": "save",
+    "n": 1000,
+    "repeat": 1,
+    "label": "dispatch",
+    "wall": 0.0566503859590739,
+    "user_system_rss": "0.01 0.03 9056"
+  },
+  {
+    "op": "save",
+    "n": 1000,
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.0655198369640857,
+    "user_system_rss": "0.02 0.04 8728"
+  },
+  {
+    "op": "save",
+    "n": 1000,
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.06039430689997971,
+    "user_system_rss": "0.02 0.03 9120"
+  },
+  {
+    "op": "save",
+    "n": 1000,
+    "repeat": 2,
+    "label": "dispatch",
+    "wall": 0.054047815036028624,
+    "user_system_rss": "0.02 0.02 9148"
+  },
+  {
+    "op": "save",
+    "n": 1000,
+    "repeat": 3,
+    "label": "dispatch",
+    "wall": 0.055736840004101396,
+    "user_system_rss": "0.02 0.02 8668"
+  },
+  {
+    "op": "save",
+    "n": 1000,
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 0.05846573389135301,
+    "user_system_rss": "0.02 0.02 8816"
+  },
+  {
+    "op": "save",
+    "n": 10000,
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.5675084691029042,
+    "user_system_rss": "0.21 0.35 22184"
+  },
+  {
+    "op": "save",
+    "n": 10000,
+    "repeat": 0,
+    "label": "dispatch",
+    "wall": 0.5525757339783013,
+    "user_system_rss": "0.18 0.36 22404"
+  },
+  {
+    "op": "save",
+    "n": 10000,
+    "repeat": 1,
+    "label": "dispatch",
+    "wall": 0.5643766210414469,
+    "user_system_rss": "0.21 0.34 22408"
+  },
+  {
+    "op": "save",
+    "n": 10000,
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.5703735169954598,
+    "user_system_rss": "0.21 0.35 22464"
+  },
+  {
+    "op": "save",
+    "n": 10000,
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.5584113779477775,
+    "user_system_rss": "0.20 0.34 22600"
+  },
+  {
+    "op": "save",
+    "n": 10000,
+    "repeat": 2,
+    "label": "dispatch",
+    "wall": 0.5500021320767701,
+    "user_system_rss": "0.20 0.34 22508"
+  },
+  {
+    "op": "save",
+    "n": 10000,
+    "repeat": 3,
+    "label": "dispatch",
+    "wall": 0.5562937650829554,
+    "user_system_rss": "0.20 0.35 22540"
+  },
+  {
+    "op": "save",
+    "n": 10000,
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 0.5813563158735633,
+    "user_system_rss": "0.23 0.33 22472"
+  },
+  {
+    "op": "save",
+    "n": 100000,
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 5.664661761140451,
+    "user_system_rss": "2.16 3.47 161248"
+  },
+  {
+    "op": "save",
+    "n": 100000,
+    "repeat": 0,
+    "label": "dispatch",
+    "wall": 5.538930102949962,
+    "user_system_rss": "2.02 3.50 161364"
+  },
+  {
+    "op": "save",
+    "n": 100000,
+    "repeat": 1,
+    "label": "dispatch",
+    "wall": 5.509966497076675,
+    "user_system_rss": "1.99 3.48 161560"
+  },
+  {
+    "op": "save",
+    "n": 100000,
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 5.594293295871466,
+    "user_system_rss": "2.18 3.40 161172"
+  },
+  {
+    "op": "save",
+    "n": 100000,
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 5.665811385028064,
+    "user_system_rss": "2.22 3.42 161160"
+  },
+  {
+    "op": "save",
+    "n": 100000,
+    "repeat": 2,
+    "label": "dispatch",
+    "wall": 5.647661745082587,
+    "user_system_rss": "2.17 3.46 161196"
+  },
+  {
+    "op": "save",
+    "n": 100000,
+    "repeat": 3,
+    "label": "dispatch",
+    "wall": 5.657798184081912,
+    "user_system_rss": "2.14 3.50 161364"
+  },
+  {
+    "op": "save",
+    "n": 100000,
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 5.677300313021988,
+    "user_system_rss": "2.24 3.41 160764"
+  },
+  {
+    "op": "string",
+    "n": 5000,
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.03254740498960018,
+    "user_system_rss": "0.02 0.00 7140"
+  },
+  {
+    "op": "string",
+    "n": 5000,
+    "repeat": 0,
+    "label": "dispatch",
+    "wall": 0.03781374217942357,
+    "user_system_rss": "0.02 0.00 7016"
+  },
+  {
+    "op": "string",
+    "n": 5000,
+    "repeat": 1,
+    "label": "dispatch",
+    "wall": 0.028610263019800186,
+    "user_system_rss": "0.02 0.00 6952"
+  },
+  {
+    "op": "string",
+    "n": 5000,
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.03635950293391943,
+    "user_system_rss": "0.03 0.00 7248"
+  },
+  {
+    "op": "string",
+    "n": 5000,
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.03288946091197431,
+    "user_system_rss": "0.02 0.00 7184"
+  },
+  {
+    "op": "string",
+    "n": 5000,
+    "repeat": 2,
+    "label": "dispatch",
+    "wall": 0.027455057948827744,
+    "user_system_rss": "0.02 0.00 7036"
+  },
+  {
+    "op": "string",
+    "n": 5000,
+    "repeat": 3,
+    "label": "dispatch",
+    "wall": 0.03284333390183747,
+    "user_system_rss": "0.02 0.00 7300"
+  },
+  {
+    "op": "string",
+    "n": 5000,
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 0.031910113990306854,
+    "user_system_rss": "0.02 0.00 7196"
+  },
+  {
+    "op": "string",
+    "n": 50000,
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.2919237578753382,
+    "user_system_rss": "0.28 0.00 6848"
+  },
+  {
+    "op": "string",
+    "n": 50000,
+    "repeat": 0,
+    "label": "dispatch",
+    "wall": 0.24767774296924472,
+    "user_system_rss": "0.23 0.00 6952"
+  },
+  {
+    "op": "string",
+    "n": 50000,
+    "repeat": 1,
+    "label": "dispatch",
+    "wall": 0.2523880491498858,
+    "user_system_rss": "0.24 0.00 7056"
+  },
+  {
+    "op": "string",
+    "n": 50000,
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.27985627902671695,
+    "user_system_rss": "0.27 0.00 7364"
+  },
+  {
+    "op": "string",
+    "n": 50000,
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.28526667691767216,
+    "user_system_rss": "0.27 0.00 7192"
+  },
+  {
+    "op": "string",
+    "n": 50000,
+    "repeat": 2,
+    "label": "dispatch",
+    "wall": 0.2515668629202992,
+    "user_system_rss": "0.24 0.00 7008"
+  },
+  {
+    "op": "string",
+    "n": 50000,
+    "repeat": 3,
+    "label": "dispatch",
+    "wall": 0.25017595919780433,
+    "user_system_rss": "0.24 0.00 7172"
+  },
+  {
+    "op": "string",
+    "n": 50000,
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 0.27957648411393166,
+    "user_system_rss": "0.27 0.00 7340"
+  }
+]

@@ -1,0 +1,1202 @@
+[
+  {
+    "n": 2000,
+    "unused": 0,
+    "kind": "identity",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.010783999999999998,
+    "wall": 0.011298222932964563,
+    "rss_kib": 12372
+  },
+  {
+    "n": 2000,
+    "unused": 0,
+    "kind": "identity",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.009840999999999999,
+    "wall": 0.010364697081968188,
+    "rss_kib": 12432
+  },
+  {
+    "n": 2000,
+    "unused": 0,
+    "kind": "identity",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.009455999999999999,
+    "wall": 0.009879602119326591,
+    "rss_kib": 12332
+  },
+  {
+    "n": 2000,
+    "unused": 0,
+    "kind": "captured",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.011824000000000001,
+    "wall": 0.01224983693100512,
+    "rss_kib": 12644
+  },
+  {
+    "n": 2000,
+    "unused": 0,
+    "kind": "captured",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.01171,
+    "wall": 0.012215952854603529,
+    "rss_kib": 12680
+  },
+  {
+    "n": 2000,
+    "unused": 0,
+    "kind": "captured",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.011326,
+    "wall": 0.01171843707561493,
+    "rss_kib": 12728
+  },
+  {
+    "n": 2000,
+    "unused": 5,
+    "kind": "identity",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.012291,
+    "wall": 0.012718572048470378,
+    "rss_kib": 13840
+  },
+  {
+    "n": 2000,
+    "unused": 5,
+    "kind": "identity",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.012795999999999998,
+    "wall": 0.013316176133230329,
+    "rss_kib": 13792
+  },
+  {
+    "n": 2000,
+    "unused": 5,
+    "kind": "identity",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.013080000000000005,
+    "wall": 0.0135991380084306,
+    "rss_kib": 13852
+  },
+  {
+    "n": 2000,
+    "unused": 5,
+    "kind": "captured",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.014653000000000006,
+    "wall": 0.015146716963499784,
+    "rss_kib": 14200
+  },
+  {
+    "n": 2000,
+    "unused": 5,
+    "kind": "captured",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.01395799999999997,
+    "wall": 0.01440946594811976,
+    "rss_kib": 14236
+  },
+  {
+    "n": 2000,
+    "unused": 5,
+    "kind": "captured",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.014325000000000018,
+    "wall": 0.014795426046475768,
+    "rss_kib": 14296
+  },
+  {
+    "n": 2000,
+    "unused": 16,
+    "kind": "identity",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.018655999999999992,
+    "wall": 0.019093430833891034,
+    "rss_kib": 17144
+  },
+  {
+    "n": 2000,
+    "unused": 16,
+    "kind": "identity",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.019279999999999985,
+    "wall": 0.01974545605480671,
+    "rss_kib": 17228
+  },
+  {
+    "n": 2000,
+    "unused": 16,
+    "kind": "identity",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.019622999999999988,
+    "wall": 0.020101503934711218,
+    "rss_kib": 17092
+  },
+  {
+    "n": 2000,
+    "unused": 16,
+    "kind": "captured",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.022410000000000013,
+    "wall": 0.022910708095878363,
+    "rss_kib": 17428
+  },
+  {
+    "n": 2000,
+    "unused": 16,
+    "kind": "captured",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.021912999999999988,
+    "wall": 0.02326006698422134,
+    "rss_kib": 17548
+  },
+  {
+    "n": 2000,
+    "unused": 16,
+    "kind": "captured",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.02180500000000002,
+    "wall": 0.022287972969934344,
+    "rss_kib": 17676
+  },
+  {
+    "n": 2000,
+    "unused": 50,
+    "kind": "identity",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.036248,
+    "wall": 0.036753770895302296,
+    "rss_kib": 27320
+  },
+  {
+    "n": 2000,
+    "unused": 50,
+    "kind": "identity",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.03586999999999997,
+    "wall": 0.03636379516683519,
+    "rss_kib": 27180
+  },
+  {
+    "n": 2000,
+    "unused": 50,
+    "kind": "identity",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.036281000000000035,
+    "wall": 0.036824983078986406,
+    "rss_kib": 27296
+  },
+  {
+    "n": 2000,
+    "unused": 50,
+    "kind": "captured",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.03571599999999993,
+    "wall": 0.03619740903377533,
+    "rss_kib": 27576
+  },
+  {
+    "n": 2000,
+    "unused": 50,
+    "kind": "captured",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.037039000000000016,
+    "wall": 0.03753315610811114,
+    "rss_kib": 27612
+  },
+  {
+    "n": 2000,
+    "unused": 50,
+    "kind": "captured",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.036211999999999994,
+    "wall": 0.03676511999219656,
+    "rss_kib": 27692
+  },
+  {
+    "n": 2000,
+    "unused": 100,
+    "kind": "identity",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.05605700000000005,
+    "wall": 0.056570894084870815,
+    "rss_kib": 42256
+  },
+  {
+    "n": 2000,
+    "unused": 100,
+    "kind": "identity",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.05640999999999999,
+    "wall": 0.056903756922110915,
+    "rss_kib": 42380
+  },
+  {
+    "n": 2000,
+    "unused": 100,
+    "kind": "identity",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.05718899999999996,
+    "wall": 0.05772983795031905,
+    "rss_kib": 42460
+  },
+  {
+    "n": 2000,
+    "unused": 100,
+    "kind": "captured",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.05495,
+    "wall": 0.055462739896029234,
+    "rss_kib": 42864
+  },
+  {
+    "n": 2000,
+    "unused": 100,
+    "kind": "captured",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.05649100000000004,
+    "wall": 0.05707546090707183,
+    "rss_kib": 42692
+  },
+  {
+    "n": 2000,
+    "unused": 100,
+    "kind": "captured",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.05679300000000004,
+    "wall": 0.05729228793643415,
+    "rss_kib": 42820
+  },
+  {
+    "n": 4000,
+    "unused": 0,
+    "kind": "identity",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.018641000000000046,
+    "wall": 0.0191113599576056,
+    "rss_kib": 17756
+  },
+  {
+    "n": 4000,
+    "unused": 0,
+    "kind": "identity",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.019995999999999958,
+    "wall": 0.0204431030433625,
+    "rss_kib": 17752
+  },
+  {
+    "n": 4000,
+    "unused": 0,
+    "kind": "identity",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.019330999999999987,
+    "wall": 0.019828755874186754,
+    "rss_kib": 17728
+  },
+  {
+    "n": 4000,
+    "unused": 0,
+    "kind": "captured",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.02204299999999998,
+    "wall": 0.02249051909893751,
+    "rss_kib": 18032
+  },
+  {
+    "n": 4000,
+    "unused": 0,
+    "kind": "captured",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.02220800000000006,
+    "wall": 0.02266265801154077,
+    "rss_kib": 18028
+  },
+  {
+    "n": 4000,
+    "unused": 0,
+    "kind": "captured",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.022509,
+    "wall": 0.02300518099218607,
+    "rss_kib": 18280
+  },
+  {
+    "n": 4000,
+    "unused": 5,
+    "kind": "identity",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.02392800000000006,
+    "wall": 0.024466868955641985,
+    "rss_kib": 20540
+  },
+  {
+    "n": 4000,
+    "unused": 5,
+    "kind": "identity",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.02438900000000005,
+    "wall": 0.024861625861376524,
+    "rss_kib": 20572
+  },
+  {
+    "n": 4000,
+    "unused": 5,
+    "kind": "identity",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.024632000000000043,
+    "wall": 0.025106234941631556,
+    "rss_kib": 20556
+  },
+  {
+    "n": 4000,
+    "unused": 5,
+    "kind": "captured",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.027086,
+    "wall": 0.027581347851082683,
+    "rss_kib": 21264
+  },
+  {
+    "n": 4000,
+    "unused": 5,
+    "kind": "captured",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.02566099999999999,
+    "wall": 0.026139901019632816,
+    "rss_kib": 21276
+  },
+  {
+    "n": 4000,
+    "unused": 5,
+    "kind": "captured",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.02601300000000001,
+    "wall": 0.0265007468406111,
+    "rss_kib": 21152
+  },
+  {
+    "n": 4000,
+    "unused": 16,
+    "kind": "identity",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.03878500000000007,
+    "wall": 0.039263349026441574,
+    "rss_kib": 27296
+  },
+  {
+    "n": 4000,
+    "unused": 16,
+    "kind": "identity",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.03796000000000005,
+    "wall": 0.03842272097244859,
+    "rss_kib": 27264
+  },
+  {
+    "n": 4000,
+    "unused": 16,
+    "kind": "identity",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.03947099999999987,
+    "wall": 0.039974473882466555,
+    "rss_kib": 27100
+  },
+  {
+    "n": 4000,
+    "unused": 16,
+    "kind": "captured",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.04260800000000009,
+    "wall": 0.043589886045083404,
+    "rss_kib": 27932
+  },
+  {
+    "n": 4000,
+    "unused": 16,
+    "kind": "captured",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.04268199999999994,
+    "wall": 0.04319399991072714,
+    "rss_kib": 27880
+  },
+  {
+    "n": 4000,
+    "unused": 16,
+    "kind": "captured",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.04299500000000006,
+    "wall": 0.043542166939005256,
+    "rss_kib": 27988
+  },
+  {
+    "n": 4000,
+    "unused": 50,
+    "kind": "identity",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.0708269999999998,
+    "wall": 0.07135096983984113,
+    "rss_kib": 47372
+  },
+  {
+    "n": 4000,
+    "unused": 50,
+    "kind": "identity",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.07002399999999998,
+    "wall": 0.07052980898879468,
+    "rss_kib": 47440
+  },
+  {
+    "n": 4000,
+    "unused": 50,
+    "kind": "identity",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.06925700000000007,
+    "wall": 0.0697891900781542,
+    "rss_kib": 47396
+  },
+  {
+    "n": 4000,
+    "unused": 50,
+    "kind": "captured",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.07035900000000006,
+    "wall": 0.07090848498046398,
+    "rss_kib": 47892
+  },
+  {
+    "n": 4000,
+    "unused": 50,
+    "kind": "captured",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.07682299999999997,
+    "wall": 0.07752203801646829,
+    "rss_kib": 48016
+  },
+  {
+    "n": 4000,
+    "unused": 50,
+    "kind": "captured",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.07199500000000003,
+    "wall": 0.07258001808077097,
+    "rss_kib": 47912
+  },
+  {
+    "n": 4000,
+    "unused": 100,
+    "kind": "identity",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.10919200000000018,
+    "wall": 0.10975049692206085,
+    "rss_kib": 77520
+  },
+  {
+    "n": 4000,
+    "unused": 100,
+    "kind": "identity",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.10851,
+    "wall": 0.11511389189399779,
+    "rss_kib": 77664
+  },
+  {
+    "n": 4000,
+    "unused": 100,
+    "kind": "identity",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.10993900000000023,
+    "wall": 0.11658273008652031,
+    "rss_kib": 77460
+  },
+  {
+    "n": 4000,
+    "unused": 100,
+    "kind": "captured",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.11665399999999981,
+    "wall": 0.12410785793326795,
+    "rss_kib": 78244
+  },
+  {
+    "n": 4000,
+    "unused": 100,
+    "kind": "captured",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.1140990000000004,
+    "wall": 0.11466038599610329,
+    "rss_kib": 78216
+  },
+  {
+    "n": 4000,
+    "unused": 100,
+    "kind": "captured",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.11288900000000024,
+    "wall": 0.1135798969771713,
+    "rss_kib": 78384
+  },
+  {
+    "n": 8000,
+    "unused": 0,
+    "kind": "identity",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.04041999999999979,
+    "wall": 0.046516634058207273,
+    "rss_kib": 28264
+  },
+  {
+    "n": 8000,
+    "unused": 0,
+    "kind": "identity",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.03914800000000007,
+    "wall": 0.039625497069209814,
+    "rss_kib": 28480
+  },
+  {
+    "n": 8000,
+    "unused": 0,
+    "kind": "identity",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.04059500000000016,
+    "wall": 0.04110498703084886,
+    "rss_kib": 28472
+  },
+  {
+    "n": 8000,
+    "unused": 0,
+    "kind": "captured",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.04388500000000006,
+    "wall": 0.04440007987432182,
+    "rss_kib": 29696
+  },
+  {
+    "n": 8000,
+    "unused": 0,
+    "kind": "captured",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.0442499999999999,
+    "wall": 0.044787328923121095,
+    "rss_kib": 29704
+  },
+  {
+    "n": 8000,
+    "unused": 0,
+    "kind": "captured",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.04442600000000008,
+    "wall": 0.04497538786381483,
+    "rss_kib": 29784
+  },
+  {
+    "n": 8000,
+    "unused": 5,
+    "kind": "identity",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.05049899999999985,
+    "wall": 0.05100030894391239,
+    "rss_kib": 34216
+  },
+  {
+    "n": 8000,
+    "unused": 5,
+    "kind": "identity",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.04894600000000027,
+    "wall": 0.04943698295392096,
+    "rss_kib": 34196
+  },
+  {
+    "n": 8000,
+    "unused": 5,
+    "kind": "identity",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.05029600000000012,
+    "wall": 0.05079699098132551,
+    "rss_kib": 34312
+  },
+  {
+    "n": 8000,
+    "unused": 5,
+    "kind": "captured",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.05450899999999992,
+    "wall": 0.05510963895358145,
+    "rss_kib": 35544
+  },
+  {
+    "n": 8000,
+    "unused": 5,
+    "kind": "captured",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.05315100000000039,
+    "wall": 0.05366475507616997,
+    "rss_kib": 35460
+  },
+  {
+    "n": 8000,
+    "unused": 5,
+    "kind": "captured",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.05431699999999973,
+    "wall": 0.05482522794045508,
+    "rss_kib": 35472
+  },
+  {
+    "n": 8000,
+    "unused": 16,
+    "kind": "identity",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.0772449999999999,
+    "wall": 0.07775269192643464,
+    "rss_kib": 47580
+  },
+  {
+    "n": 8000,
+    "unused": 16,
+    "kind": "identity",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.07713800000000004,
+    "wall": 0.07767338608391583,
+    "rss_kib": 47624
+  },
+  {
+    "n": 8000,
+    "unused": 16,
+    "kind": "identity",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.07996700000000001,
+    "wall": 0.08102007606066763,
+    "rss_kib": 47444
+  },
+  {
+    "n": 8000,
+    "unused": 16,
+    "kind": "captured",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.08680900000000025,
+    "wall": 0.0873295939527452,
+    "rss_kib": 48828
+  },
+  {
+    "n": 8000,
+    "unused": 16,
+    "kind": "captured",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.08830199999999966,
+    "wall": 0.08893686905503273,
+    "rss_kib": 48720
+  },
+  {
+    "n": 8000,
+    "unused": 16,
+    "kind": "captured",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.08811800000000014,
+    "wall": 0.08868745993822813,
+    "rss_kib": 48608
+  },
+  {
+    "n": 8000,
+    "unused": 50,
+    "kind": "identity",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.14104899999999976,
+    "wall": 0.14162062108516693,
+    "rss_kib": 87672
+  },
+  {
+    "n": 8000,
+    "unused": 50,
+    "kind": "identity",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.13974900000000012,
+    "wall": 0.1461783901322633,
+    "rss_kib": 87700
+  },
+  {
+    "n": 8000,
+    "unused": 50,
+    "kind": "identity",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.1409100000000001,
+    "wall": 0.14712465507909656,
+    "rss_kib": 87740
+  },
+  {
+    "n": 8000,
+    "unused": 50,
+    "kind": "captured",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.1450929999999997,
+    "wall": 0.15148332598619163,
+    "rss_kib": 88900
+  },
+  {
+    "n": 8000,
+    "unused": 50,
+    "kind": "captured",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.15300099999999928,
+    "wall": 0.1539811920374632,
+    "rss_kib": 89080
+  },
+  {
+    "n": 8000,
+    "unused": 50,
+    "kind": "captured",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.1513109999999993,
+    "wall": 0.15187011403031647,
+    "rss_kib": 88980
+  },
+  {
+    "n": 8000,
+    "unused": 100,
+    "kind": "identity",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.22934600000000005,
+    "wall": 0.2298892280086875,
+    "rss_kib": 148188
+  },
+  {
+    "n": 8000,
+    "unused": 100,
+    "kind": "identity",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.22180900000000014,
+    "wall": 0.22236685897223651,
+    "rss_kib": 148252
+  },
+  {
+    "n": 8000,
+    "unused": 100,
+    "kind": "identity",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.21935199999999977,
+    "wall": 0.21986108389683068,
+    "rss_kib": 148196
+  },
+  {
+    "n": 8000,
+    "unused": 100,
+    "kind": "captured",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.22393000000000018,
+    "wall": 0.22457677987404168,
+    "rss_kib": 149564
+  },
+  {
+    "n": 8000,
+    "unused": 100,
+    "kind": "captured",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.22452899999999953,
+    "wall": 0.22510344395413995,
+    "rss_kib": 149412
+  },
+  {
+    "n": 8000,
+    "unused": 100,
+    "kind": "captured",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.22154800000000008,
+    "wall": 0.22214985988102853,
+    "rss_kib": 149420
+  },
+  {
+    "n": 16000,
+    "unused": 0,
+    "kind": "identity",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.08557599999999987,
+    "wall": 0.08610647288151085,
+    "rss_kib": 50024
+  },
+  {
+    "n": 16000,
+    "unused": 0,
+    "kind": "identity",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.08911400000000014,
+    "wall": 0.08963787509128451,
+    "rss_kib": 49928
+  },
+  {
+    "n": 16000,
+    "unused": 0,
+    "kind": "identity",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.0866260000000012,
+    "wall": 0.08717308519408107,
+    "rss_kib": 49960
+  },
+  {
+    "n": 16000,
+    "unused": 0,
+    "kind": "captured",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.09706599999999943,
+    "wall": 0.09763215691782534,
+    "rss_kib": 51972
+  },
+  {
+    "n": 16000,
+    "unused": 0,
+    "kind": "captured",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.09917700000000007,
+    "wall": 0.1001328059937805,
+    "rss_kib": 52228
+  },
+  {
+    "n": 16000,
+    "unused": 0,
+    "kind": "captured",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.09738999999999942,
+    "wall": 0.0982522671110928,
+    "rss_kib": 52348
+  },
+  {
+    "n": 16000,
+    "unused": 5,
+    "kind": "identity",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.10820700000000016,
+    "wall": 0.10873378301039338,
+    "rss_kib": 61196
+  },
+  {
+    "n": 16000,
+    "unused": 5,
+    "kind": "identity",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.10822899999999991,
+    "wall": 0.10876380489207804,
+    "rss_kib": 61288
+  },
+  {
+    "n": 16000,
+    "unused": 5,
+    "kind": "identity",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.1061930000000002,
+    "wall": 0.10677097598090768,
+    "rss_kib": 61368
+  },
+  {
+    "n": 16000,
+    "unused": 5,
+    "kind": "captured",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.11336699999999977,
+    "wall": 0.11391646903939545,
+    "rss_kib": 63612
+  },
+  {
+    "n": 16000,
+    "unused": 5,
+    "kind": "captured",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.11764799999999997,
+    "wall": 0.11820275406353176,
+    "rss_kib": 63588
+  },
+  {
+    "n": 16000,
+    "unused": 5,
+    "kind": "captured",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.11271499999999968,
+    "wall": 0.11324910307303071,
+    "rss_kib": 63716
+  },
+  {
+    "n": 16000,
+    "unused": 16,
+    "kind": "identity",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.16187199999999957,
+    "wall": 0.16251349402591586,
+    "rss_kib": 88072
+  },
+  {
+    "n": 16000,
+    "unused": 16,
+    "kind": "identity",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.16031899999999988,
+    "wall": 0.16087323985993862,
+    "rss_kib": 88052
+  },
+  {
+    "n": 16000,
+    "unused": 16,
+    "kind": "identity",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.1657100000000007,
+    "wall": 0.16632791492156684,
+    "rss_kib": 87732
+  },
+  {
+    "n": 16000,
+    "unused": 16,
+    "kind": "captured",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.18353500000000023,
+    "wall": 0.1840764470398426,
+    "rss_kib": 90268
+  },
+  {
+    "n": 16000,
+    "unused": 16,
+    "kind": "captured",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.18339899999999965,
+    "wall": 0.1839515941683203,
+    "rss_kib": 90380
+  },
+  {
+    "n": 16000,
+    "unused": 16,
+    "kind": "captured",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.1911079999999994,
+    "wall": 0.19191549299284816,
+    "rss_kib": 90432
+  },
+  {
+    "n": 16000,
+    "unused": 50,
+    "kind": "identity",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.30817000000000005,
+    "wall": 0.30924781295470893,
+    "rss_kib": 168268
+  },
+  {
+    "n": 16000,
+    "unused": 50,
+    "kind": "identity",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.30439900000000053,
+    "wall": 0.3050070879980922,
+    "rss_kib": 168264
+  },
+  {
+    "n": 16000,
+    "unused": 50,
+    "kind": "identity",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.2978899999999989,
+    "wall": 0.2984819950070232,
+    "rss_kib": 168164
+  },
+  {
+    "n": 16000,
+    "unused": 50,
+    "kind": "captured",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.30922300000000025,
+    "wall": 0.30989470100030303,
+    "rss_kib": 170628
+  },
+  {
+    "n": 16000,
+    "unused": 50,
+    "kind": "captured",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.31364199999999975,
+    "wall": 0.31417237292043865,
+    "rss_kib": 170692
+  },
+  {
+    "n": 16000,
+    "unused": 50,
+    "kind": "captured",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.3072649999999997,
+    "wall": 0.30786757497116923,
+    "rss_kib": 170552
+  },
+  {
+    "n": 16000,
+    "unused": 100,
+    "kind": "identity",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.47048400000000035,
+    "wall": 0.4716080529615283,
+    "rss_kib": 289176
+  },
+  {
+    "n": 16000,
+    "unused": 100,
+    "kind": "identity",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.4635029999999998,
+    "wall": 0.4699866361916065,
+    "rss_kib": 289288
+  },
+  {
+    "n": 16000,
+    "unused": 100,
+    "kind": "identity",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.4680220000000008,
+    "wall": 0.4742157608270645,
+    "rss_kib": 289360
+  },
+  {
+    "n": 16000,
+    "unused": 100,
+    "kind": "captured",
+    "rep": 0,
+    "cpu_affinity": 0,
+    "cpu": 0.4736739999999995,
+    "wall": 0.47904380480758846,
+    "rss_kib": 291824
+  },
+  {
+    "n": 16000,
+    "unused": 100,
+    "kind": "captured",
+    "rep": 1,
+    "cpu_affinity": 0,
+    "cpu": 0.47996999999999934,
+    "wall": 0.4871120310854167,
+    "rss_kib": 291668
+  },
+  {
+    "n": 16000,
+    "unused": 100,
+    "kind": "captured",
+    "rep": 2,
+    "cpu_affinity": 0,
+    "cpu": 0.4794530000000008,
+    "wall": 0.4858996490947902,
+    "rss_kib": 291628
+  }
+]

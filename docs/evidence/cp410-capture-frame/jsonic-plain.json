@@ -1,0 +1,492 @@
+[
+  {
+    "width": 8,
+    "kind": "unique",
+    "threshold": "baseline",
+    "instructions": 8591,
+    "stdout": "PASS\t8\t\n"
+  },
+  {
+    "width": 8,
+    "kind": "unique",
+    "threshold": "32",
+    "instructions": 8726,
+    "stdout": "PASS\t8\t\n"
+  },
+  {
+    "width": 8,
+    "kind": "early",
+    "threshold": "baseline",
+    "instructions": 63307,
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 8,
+    "kind": "early",
+    "threshold": "32",
+    "instructions": 64119,
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 8,
+    "kind": "middle",
+    "threshold": "baseline",
+    "instructions": 65293,
+    "stdout": "ERROR\t33\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 8,
+    "kind": "middle",
+    "threshold": "32",
+    "instructions": 66129,
+    "stdout": "ERROR\t33\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 8,
+    "kind": "end",
+    "threshold": "baseline",
+    "instructions": 69200,
+    "stdout": "ERROR\t54\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 8,
+    "kind": "end",
+    "threshold": "32",
+    "instructions": 70093,
+    "stdout": "ERROR\t54\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 8,
+    "kind": "escaped",
+    "threshold": "baseline",
+    "instructions": 69348,
+    "stdout": "ERROR\t59\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 8,
+    "kind": "escaped",
+    "threshold": "32",
+    "instructions": 70232,
+    "stdout": "ERROR\t59\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 16,
+    "kind": "unique",
+    "threshold": "baseline",
+    "instructions": 17881,
+    "stdout": "PASS\t16\t\n"
+  },
+  {
+    "width": 16,
+    "kind": "unique",
+    "threshold": "32",
+    "instructions": 18130,
+    "stdout": "PASS\t16\t\n"
+  },
+  {
+    "width": 16,
+    "kind": "early",
+    "threshold": "baseline",
+    "instructions": 63322,
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 16,
+    "kind": "early",
+    "threshold": "32",
+    "instructions": 64134,
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 16,
+    "kind": "middle",
+    "threshold": "baseline",
+    "instructions": 70391,
+    "stdout": "ERROR\t61\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 16,
+    "kind": "middle",
+    "threshold": "32",
+    "instructions": 71275,
+    "stdout": "ERROR\t61\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 16,
+    "kind": "end",
+    "threshold": "baseline",
+    "instructions": 79246,
+    "stdout": "ERROR\t120\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 16,
+    "kind": "end",
+    "threshold": "32",
+    "instructions": 80244,
+    "stdout": "ERROR\t120\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 16,
+    "kind": "escaped",
+    "threshold": "baseline",
+    "instructions": 79394,
+    "stdout": "ERROR\t125\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 16,
+    "kind": "escaped",
+    "threshold": "32",
+    "instructions": 80392,
+    "stdout": "ERROR\t125\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 32,
+    "kind": "unique",
+    "threshold": "baseline",
+    "instructions": 42289,
+    "stdout": "PASS\t32\t\n"
+  },
+  {
+    "width": 32,
+    "kind": "unique",
+    "threshold": "32",
+    "instructions": 43168,
+    "stdout": "PASS\t32\t\n"
+  },
+  {
+    "width": 32,
+    "kind": "early",
+    "threshold": "baseline",
+    "instructions": 63307,
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 32,
+    "kind": "early",
+    "threshold": "32",
+    "instructions": 64119,
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 32,
+    "kind": "middle",
+    "threshold": "baseline",
+    "instructions": 80370,
+    "stdout": "ERROR\t129\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 32,
+    "kind": "middle",
+    "threshold": "32",
+    "instructions": 81419,
+    "stdout": "ERROR\t129\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 32,
+    "kind": "end",
+    "threshold": "baseline",
+    "instructions": 104347,
+    "stdout": "ERROR\t264\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 32,
+    "kind": "end",
+    "threshold": "32",
+    "instructions": 105939,
+    "stdout": "ERROR\t264\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 32,
+    "kind": "escaped",
+    "threshold": "baseline",
+    "instructions": 104495,
+    "stdout": "ERROR\t269\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 32,
+    "kind": "escaped",
+    "threshold": "32",
+    "instructions": 106087,
+    "stdout": "ERROR\t269\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 64,
+    "kind": "unique",
+    "threshold": "baseline",
+    "instructions": 122714,
+    "stdout": "PASS\t64\t\n"
+  },
+  {
+    "width": 64,
+    "kind": "unique",
+    "threshold": "32",
+    "instructions": 112556,
+    "stdout": "PASS\t64\t\n"
+  },
+  {
+    "width": 64,
+    "kind": "early",
+    "threshold": "baseline",
+    "instructions": 63307,
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 64,
+    "kind": "early",
+    "threshold": "32",
+    "instructions": 64119,
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 64,
+    "kind": "middle",
+    "threshold": "baseline",
+    "instructions": 106646,
+    "stdout": "ERROR\t273\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 64,
+    "kind": "middle",
+    "threshold": "32",
+    "instructions": 129131,
+    "stdout": "ERROR\t273\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 64,
+    "kind": "end",
+    "threshold": "baseline",
+    "instructions": 186051,
+    "stdout": "ERROR\t552\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 64,
+    "kind": "end",
+    "threshold": "32",
+    "instructions": 178193,
+    "stdout": "ERROR\t552\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 64,
+    "kind": "escaped",
+    "threshold": "baseline",
+    "instructions": 186199,
+    "stdout": "ERROR\t557\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 64,
+    "kind": "escaped",
+    "threshold": "32",
+    "instructions": 178341,
+    "stdout": "ERROR\t557\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 128,
+    "kind": "unique",
+    "threshold": "baseline",
+    "instructions": 317858,
+    "stdout": "PASS\t128\t\n"
+  },
+  {
+    "width": 128,
+    "kind": "unique",
+    "threshold": "32",
+    "instructions": 213079,
+    "stdout": "PASS\t128\t\n"
+  },
+  {
+    "width": 128,
+    "kind": "early",
+    "threshold": "baseline",
+    "instructions": 63307,
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 128,
+    "kind": "early",
+    "threshold": "32",
+    "instructions": 64119,
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 128,
+    "kind": "middle",
+    "threshold": "baseline",
+    "instructions": 188510,
+    "stdout": "ERROR\t561\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 128,
+    "kind": "middle",
+    "threshold": "32",
+    "instructions": 179582,
+    "stdout": "ERROR\t561\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 128,
+    "kind": "end",
+    "threshold": "baseline",
+    "instructions": 387122,
+    "stdout": "ERROR\t1182\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 128,
+    "kind": "end",
+    "threshold": "32",
+    "instructions": 284083,
+    "stdout": "ERROR\t1182\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 128,
+    "kind": "escaped",
+    "threshold": "baseline",
+    "instructions": 387270,
+    "stdout": "ERROR\t1187\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 128,
+    "kind": "escaped",
+    "threshold": "32",
+    "instructions": 284231,
+    "stdout": "ERROR\t1187\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 512,
+    "kind": "unique",
+    "threshold": "baseline",
+    "instructions": 4262489,
+    "stdout": "PASS\t512\t\n"
+  },
+  {
+    "width": 512,
+    "kind": "unique",
+    "threshold": "32",
+    "instructions": 819544,
+    "stdout": "PASS\t512\t\n"
+  },
+  {
+    "width": 512,
+    "kind": "early",
+    "threshold": "baseline",
+    "instructions": 63591,
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 512,
+    "kind": "early",
+    "threshold": "32",
+    "instructions": 64403,
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 512,
+    "kind": "middle",
+    "threshold": "baseline",
+    "instructions": 1069352,
+    "stdout": "ERROR\t2601\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 512,
+    "kind": "middle",
+    "threshold": "32",
+    "instructions": 500285,
+    "stdout": "ERROR\t2601\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 512,
+    "kind": "end",
+    "threshold": "baseline",
+    "instructions": 4351614,
+    "stdout": "ERROR\t5406\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 512,
+    "kind": "end",
+    "threshold": "32",
+    "instructions": 925646,
+    "stdout": "ERROR\t5406\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 512,
+    "kind": "escaped",
+    "threshold": "baseline",
+    "instructions": 4351762,
+    "stdout": "ERROR\t5411\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 512,
+    "kind": "escaped",
+    "threshold": "32",
+    "instructions": 925794,
+    "stdout": "ERROR\t5411\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 8000,
+    "kind": "unique",
+    "threshold": "baseline",
+    "instructions": 1040157781,
+    "stdout": "PASS\t8000\t\n"
+  },
+  {
+    "width": 8000,
+    "kind": "unique",
+    "threshold": "32",
+    "instructions": 12887494,
+    "stdout": "PASS\t8000\t\n"
+  },
+  {
+    "width": 8000,
+    "kind": "early",
+    "threshold": "baseline",
+    "instructions": 63743,
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 8000,
+    "kind": "early",
+    "threshold": "32",
+    "instructions": 64555,
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 8000,
+    "kind": "middle",
+    "threshold": "baseline",
+    "instructions": 217873802,
+    "stdout": "ERROR\t49785\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 8000,
+    "kind": "middle",
+    "threshold": "32",
+    "instructions": 6889656,
+    "stdout": "ERROR\t49785\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 8000,
+    "kind": "end",
+    "threshold": "baseline",
+    "instructions": 1040744756,
+    "stdout": "ERROR\t101772\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 8000,
+    "kind": "end",
+    "threshold": "32",
+    "instructions": 13758713,
+    "stdout": "ERROR\t101772\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 8000,
+    "kind": "escaped",
+    "threshold": "baseline",
+    "instructions": 1040744904,
+    "stdout": "ERROR\t101777\tduplicate object key 'k0'\n"
+  },
+  {
+    "width": 8000,
+    "kind": "escaped",
+    "threshold": "32",
+    "instructions": 13758861,
+    "stdout": "ERROR\t101777\tduplicate object key 'k0'\n"
+  }
+]

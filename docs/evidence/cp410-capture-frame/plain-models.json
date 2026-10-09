@@ -1,0 +1,794 @@
+[
+  {
+    "model": "current",
+    "scenario": "identity",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 14876350,
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "identity",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 11137929,
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "parent",
+    "scenario": "identity",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 4214047,
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "cow",
+    "scenario": "identity",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 14872350,
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "identity",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 5176114,
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "current",
+    "scenario": "identity",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 344270445,
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "identity",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 178549357,
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "parent",
+    "scenario": "identity",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 4211959,
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "cow",
+    "scenario": "identity",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 344266445,
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "identity",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 42714250,
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "current",
+    "scenario": "captured",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 17510697,
+    "stdout": "4000\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "captured",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 14021460,
+    "stdout": "4000\n"
+  },
+  {
+    "model": "parent",
+    "scenario": "captured",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 5584047,
+    "stdout": "4000\n"
+  },
+  {
+    "model": "cow",
+    "scenario": "captured",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 17506697,
+    "stdout": "4000\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "captured",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 6747896,
+    "stdout": "4000\n"
+  },
+  {
+    "model": "current",
+    "scenario": "captured",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 347447887,
+    "stdout": "4000\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "captured",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 181683378,
+    "stdout": "4000\n"
+  },
+  {
+    "model": "parent",
+    "scenario": "captured",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 5790095,
+    "stdout": "4000\n"
+  },
+  {
+    "model": "cow",
+    "scenario": "captured",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 347443887,
+    "stdout": "4000\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "captured",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 44619083,
+    "stdout": "4000\n"
+  },
+  {
+    "model": "current",
+    "scenario": "changing",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 18879469,
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "changing",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 15399482,
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "cow",
+    "scenario": "changing",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 18875469,
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "changing",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 16556489,
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "current",
+    "scenario": "changing",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 349004922,
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "changing",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 183253199,
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "cow",
+    "scenario": "changing",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 349000922,
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "changing",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 215093267,
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "current",
+    "scenario": "reused-identity",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 6722124,
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "reused-identity",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 2978562,
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "parent",
+    "scenario": "reused-identity",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 2976501,
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "cow",
+    "scenario": "reused-identity",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 6718124,
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "reused-identity",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 2978774,
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "current",
+    "scenario": "reused-identity",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 168357962,
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "reused-identity",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 3062613,
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "parent",
+    "scenario": "reused-identity",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 2977045,
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "cow",
+    "scenario": "reused-identity",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 168353962,
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "reused-identity",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 3062824,
+    "stdout": "1.999e+06\n"
+  },
+  {
+    "model": "current",
+    "scenario": "reused",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 7812299,
+    "stdout": "4000\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "reused",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 4306214,
+    "stdout": "4000\n"
+  },
+  {
+    "model": "parent",
+    "scenario": "reused",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 4350464,
+    "stdout": "4000\n"
+  },
+  {
+    "model": "cow",
+    "scenario": "reused",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 7808299,
+    "stdout": "4000\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "reused",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 4299517,
+    "stdout": "4000\n"
+  },
+  {
+    "model": "current",
+    "scenario": "reused",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 169990720,
+    "stdout": "4000\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "reused",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 4563623,
+    "stdout": "4000\n"
+  },
+  {
+    "model": "parent",
+    "scenario": "reused",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 4559144,
+    "stdout": "4000\n"
+  },
+  {
+    "model": "cow",
+    "scenario": "reused",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 169986720,
+    "stdout": "4000\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "reused",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 4557827,
+    "stdout": "4000\n"
+  },
+  {
+    "model": "current",
+    "scenario": "missing",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 17818209,
+    "stdout": "0\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "missing",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 13296913,
+    "stdout": "0\n"
+  },
+  {
+    "model": "parent",
+    "scenario": "missing",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 5168047,
+    "stdout": "0\n"
+  },
+  {
+    "model": "cow",
+    "scenario": "missing",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 17820209,
+    "stdout": "0\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "missing",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 6035896,
+    "stdout": "0\n"
+  },
+  {
+    "model": "current",
+    "scenario": "missing",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 347543383,
+    "stdout": "0\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "missing",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 180815775,
+    "stdout": "0\n"
+  },
+  {
+    "model": "parent",
+    "scenario": "missing",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 5217959,
+    "stdout": "0\n"
+  },
+  {
+    "model": "cow",
+    "scenario": "missing",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 347545383,
+    "stdout": "0\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "missing",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 43764810,
+    "stdout": "0\n"
+  },
+  {
+    "model": "current",
+    "scenario": "local",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 19118919,
+    "stdout": "14000\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "local",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 14329436,
+    "stdout": "14000\n"
+  },
+  {
+    "model": "parent",
+    "scenario": "local",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 5844047,
+    "stdout": "14000\n"
+  },
+  {
+    "model": "cow",
+    "scenario": "local",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 19114919,
+    "stdout": "14000\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "local",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 7061896,
+    "stdout": "14000\n"
+  },
+  {
+    "model": "current",
+    "scenario": "local",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 349588403,
+    "stdout": "14000\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "local",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 181833998,
+    "stdout": "14000\n"
+  },
+  {
+    "model": "parent",
+    "scenario": "local",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 5842231,
+    "stdout": "14000\n"
+  },
+  {
+    "model": "cow",
+    "scenario": "local",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 349584403,
+    "stdout": "14000\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "local",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 44759219,
+    "stdout": "14000\n"
+  },
+  {
+    "model": "current",
+    "scenario": "global",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 17574809,
+    "stdout": "2000\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "global",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 13901540,
+    "stdout": "2000\n"
+  },
+  {
+    "model": "parent",
+    "scenario": "global",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 5718080,
+    "stdout": "2000\n"
+  },
+  {
+    "model": "cow",
+    "scenario": "global",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 17570809,
+    "stdout": "2000\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "global",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 6645929,
+    "stdout": "2000\n"
+  },
+  {
+    "model": "current",
+    "scenario": "global",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 347393983,
+    "stdout": "2000\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "global",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 181555964,
+    "stdout": "2000\n"
+  },
+  {
+    "model": "parent",
+    "scenario": "global",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 5692128,
+    "stdout": "2000\n"
+  },
+  {
+    "model": "cow",
+    "scenario": "global",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 347389983,
+    "stdout": "2000\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "global",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 44493116,
+    "stdout": "2000\n"
+  },
+  {
+    "model": "current",
+    "scenario": "nested",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 32909394,
+    "stdout": "4000\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "nested",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 28113726,
+    "stdout": "4000\n"
+  },
+  {
+    "model": "parent",
+    "scenario": "nested",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 14789878,
+    "stdout": "4000\n"
+  },
+  {
+    "model": "cow",
+    "scenario": "nested",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 32905394,
+    "stdout": "4000\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "nested",
+    "unused": 0,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 20854560,
+    "stdout": "4000\n"
+  },
+  {
+    "model": "current",
+    "scenario": "nested",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 570088541,
+    "stdout": "4000\n"
+  },
+  {
+    "model": "shared",
+    "scenario": "nested",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 359118670,
+    "stdout": "4000\n"
+  },
+  {
+    "model": "parent",
+    "scenario": "nested",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 15046144,
+    "stdout": "4000\n"
+  },
+  {
+    "model": "cow",
+    "scenario": "nested",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 570084541,
+    "stdout": "4000\n"
+  },
+  {
+    "model": "memo",
+    "scenario": "nested",
+    "unused": 100,
+    "n": 2000,
+    "reads": 1,
+    "instructions": 222171297,
+    "stdout": "4000\n"
+  }
+]

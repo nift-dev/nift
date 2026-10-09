@@ -1,0 +1,10 @@
+{
+  "affected_test": "pagination_ordering_smoke.sh",
+  "cause": "restricted sandbox denies ptrace; strace cannot launch traced child",
+  "independent_probe": [
+    "strace: do_test_ptrace_get_syscall_info: PTRACE_TRACEME: Operation not permitted",
+    "strace: attach: ptrace(PTRACE_SEIZE, 5): Operation not permitted"
+  ],
+  "resolution": "run required certificate with ptrace permitted; no test is skipped",
+  "production_fix_needed": false
+}

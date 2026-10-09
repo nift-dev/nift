@@ -1,0 +1,18 @@
+[
+  {
+    "label": "baseline",
+    "instructions": 214830135,
+    "allocations": 119421,
+    "bytes": 30020581,
+    "memcheck_errors": 0,
+    "syscalls": "% time     seconds  usecs/call     calls    errors syscall\n------ ----------- ----------- --------- --------- ----------------\n 29.57    0.008356           8      1006           openat\n 24.70    0.006980           6      1000           rename\n 17.52    0.004950           1      3011      2009 newfstatat\n 14.90    0.004210           4      1001           write\n  5.32    0.001504           1      1002           getcwd\n  5.23    0.001479           1      1006           close\n  1.30    0.000366         366         1           execve\n  0.78    0.000219           8        25           mmap\n  0.27    0.000075           5        15           brk\n  0.15    0.000042           4         9           read\n  0.14    0.000039          13         3           munmap\n  0.08    0.000022           3         6           fstat\n  0.02    0.000007           3         2           pread64\n  0.02    0.000005           5         1         1 access\n  0.00    0.000000           0         6           mprotect\n  0.00    0.000000           0         8         8 readlink\n  0.00    0.000000           0         1           arch_prctl\n  0.00    0.000000           0         1           futex\n  0.00    0.000000           0         1           set_tid_address\n  0.00    0.000000           0         1           set_robust_list\n  0.00    0.000000           0         1           prlimit64\n  0.00    0.000000           0         1           getrandom\n  0.00    0.000000           0         1           rseq\n------ ----------- ----------- --------- --------- ----------------\n100.00    0.028254           3      8109      2018 total\n"
+  },
+  {
+    "label": "candidate",
+    "instructions": 202203015,
+    "allocations": 119421,
+    "bytes": 30020582,
+    "memcheck_errors": 0,
+    "syscalls": "% time     seconds  usecs/call     calls    errors syscall\n------ ----------- ----------- --------- --------- ----------------\n 29.63    0.006581           6      1006           openat\n 26.56    0.005898           5      1000           rename\n 18.61    0.004134           1      3011      2009 newfstatat\n 13.51    0.003000           2      1001           write\n  5.35    0.001189           1      1006           close\n  5.29    0.001175           1      1002           getcwd\n  0.42    0.000093           6        15           brk\n  0.30    0.000067          22         3           munmap\n  0.09    0.000019           2         9           read\n  0.07    0.000016           2         8         8 readlink\n  0.06    0.000014           0        25           mmap\n  0.05    0.000011           1         6           mprotect\n  0.01    0.000003           0         6           fstat\n  0.01    0.000003           3         1           futex\n  0.01    0.000003           3         1           getrandom\n  0.01    0.000002           2         1           prlimit64\n  0.00    0.000000           0         2           pread64\n  0.00    0.000000           0         1         1 access\n  0.00    0.000000           0         1           execve\n  0.00    0.000000           0         1           arch_prctl\n  0.00    0.000000           0         1           set_tid_address\n  0.00    0.000000           0         1           set_robust_list\n  0.00    0.000000           0         1           rseq\n------ ----------- ----------- --------- --------- ----------------\n100.00    0.022208           2      8109      2018 total\n"
+  }
+]

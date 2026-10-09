@@ -1,0 +1,1762 @@
+[
+  {
+    "case": "unique-8.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "PASS\t8\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "unique-8.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "PASS\t8\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "unique-8.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "PASS\t8\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "unique-8.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "PASS\t8\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "unique-8.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "PASS\t8\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "early-8.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "early-8.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "early-8.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "early-8.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "early-8.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "middle-8.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "ERROR\t33\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "middle-8.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "ERROR\t33\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "middle-8.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "ERROR\t33\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "middle-8.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "ERROR\t33\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "middle-8.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "ERROR\t33\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "end-8.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "ERROR\t54\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "end-8.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "ERROR\t54\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "end-8.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "ERROR\t54\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "end-8.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "ERROR\t54\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "end-8.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "ERROR\t54\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "escaped-8.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "ERROR\t59\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "escaped-8.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "ERROR\t59\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "escaped-8.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "ERROR\t59\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "escaped-8.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "ERROR\t59\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "escaped-8.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "ERROR\t59\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "unique-32.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "PASS\t32\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "unique-32.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "PASS\t32\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "unique-32.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "PASS\t32\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "unique-32.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "PASS\t32\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "unique-32.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "PASS\t32\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "early-32.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "early-32.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "early-32.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "early-32.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "early-32.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "middle-32.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "ERROR\t129\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "middle-32.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "ERROR\t129\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "middle-32.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "ERROR\t129\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "middle-32.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "ERROR\t129\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "middle-32.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "ERROR\t129\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "end-32.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "ERROR\t264\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "end-32.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "ERROR\t264\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "end-32.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "ERROR\t264\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "end-32.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "ERROR\t264\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "end-32.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "ERROR\t264\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "escaped-32.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "ERROR\t269\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "escaped-32.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "ERROR\t269\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "escaped-32.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "ERROR\t269\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "escaped-32.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "ERROR\t269\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "escaped-32.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "ERROR\t269\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "unique-64.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "PASS\t64\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "unique-64.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "PASS\t64\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "unique-64.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "PASS\t64\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "unique-64.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "PASS\t64\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "unique-64.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "PASS\t64\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "early-64.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "early-64.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "early-64.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "early-64.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "early-64.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "middle-64.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "ERROR\t273\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "middle-64.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "ERROR\t273\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "middle-64.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "ERROR\t273\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "middle-64.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "ERROR\t273\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "middle-64.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "ERROR\t273\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "end-64.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "ERROR\t552\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "end-64.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "ERROR\t552\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "end-64.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "ERROR\t552\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "end-64.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "ERROR\t552\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "end-64.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "ERROR\t552\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "escaped-64.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "ERROR\t557\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "escaped-64.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "ERROR\t557\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "escaped-64.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "ERROR\t557\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "escaped-64.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "ERROR\t557\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "escaped-64.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "ERROR\t557\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "unique-128.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "PASS\t128\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "unique-128.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "PASS\t128\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "unique-128.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "PASS\t128\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "unique-128.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "PASS\t128\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "unique-128.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "PASS\t128\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "early-128.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "early-128.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "early-128.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "early-128.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "early-128.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "middle-128.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "ERROR\t561\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "middle-128.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "ERROR\t561\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "middle-128.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "ERROR\t561\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "middle-128.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "ERROR\t561\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "middle-128.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "ERROR\t561\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "end-128.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "ERROR\t1182\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "end-128.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "ERROR\t1182\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "end-128.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "ERROR\t1182\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "end-128.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "ERROR\t1182\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "end-128.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "ERROR\t1182\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "escaped-128.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "ERROR\t1187\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "escaped-128.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "ERROR\t1187\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "escaped-128.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "ERROR\t1187\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "escaped-128.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "ERROR\t1187\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "escaped-128.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "ERROR\t1187\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "unique-1000.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "PASS\t1000\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "unique-1000.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "PASS\t1000\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "unique-1000.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "PASS\t1000\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "unique-1000.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "PASS\t1000\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "unique-1000.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "PASS\t1000\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "early-1000.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "early-1000.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "early-1000.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "early-1000.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "early-1000.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "middle-1000.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "ERROR\t5285\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "middle-1000.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "ERROR\t5285\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "middle-1000.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "ERROR\t5285\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "middle-1000.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "ERROR\t5285\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "middle-1000.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "ERROR\t5285\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "end-1000.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "ERROR\t10774\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "end-1000.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "ERROR\t10774\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "end-1000.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "ERROR\t10774\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "end-1000.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "ERROR\t10774\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "end-1000.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "ERROR\t10774\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "escaped-1000.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "ERROR\t10779\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "escaped-1000.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "ERROR\t10779\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "escaped-1000.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "ERROR\t10779\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "escaped-1000.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "ERROR\t10779\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "escaped-1000.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "ERROR\t10779\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "unique-8000.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "PASS\t8000\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "unique-8000.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "PASS\t8000\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "unique-8000.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "PASS\t8000\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "unique-8000.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "PASS\t8000\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "unique-8000.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "PASS\t8000\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "early-8000.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "early-8000.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "early-8000.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "early-8000.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "early-8000.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "ERROR\t19\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "middle-8000.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "ERROR\t49785\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "middle-8000.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "ERROR\t49785\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "middle-8000.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "ERROR\t49785\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "middle-8000.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "ERROR\t49785\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "middle-8000.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "ERROR\t49785\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "end-8000.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "ERROR\t101772\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "end-8000.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "ERROR\t101772\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "end-8000.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "ERROR\t101772\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "end-8000.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "ERROR\t101772\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "end-8000.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "ERROR\t101772\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "escaped-8000.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "ERROR\t101777\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "escaped-8000.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "ERROR\t101777\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "escaped-8000.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "ERROR\t101777\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "escaped-8000.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "ERROR\t101777\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "escaped-8000.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "ERROR\t101777\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-0.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "ERROR\t10\tduplicate object key 'a'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-0.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "ERROR\t10\tduplicate object key 'a'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-0.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "ERROR\t10\tduplicate object key 'a'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-0.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "ERROR\t10\tduplicate object key 'a'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-0.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "ERROR\t10\tduplicate object key 'a'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-0.json",
+    "mode": "preserve",
+    "threshold": "baseline",
+    "stdout": "ERROR\t11\texpected ':' after object key\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-0.json",
+    "mode": "preserve",
+    "threshold": "16",
+    "stdout": "ERROR\t11\texpected ':' after object key\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-0.json",
+    "mode": "preserve",
+    "threshold": "32",
+    "stdout": "ERROR\t11\texpected ':' after object key\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-0.json",
+    "mode": "preserve",
+    "threshold": "64",
+    "stdout": "ERROR\t11\texpected ':' after object key\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-0.json",
+    "mode": "preserve",
+    "threshold": "128",
+    "stdout": "ERROR\t11\texpected ':' after object key\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-1.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "ERROR\t15\tduplicate object key 'a'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-1.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "ERROR\t15\tduplicate object key 'a'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-1.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "ERROR\t15\tduplicate object key 'a'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-1.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "ERROR\t15\tduplicate object key 'a'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-1.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "ERROR\t15\tduplicate object key 'a'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-1.json",
+    "mode": "preserve",
+    "threshold": "baseline",
+    "stdout": "ERROR\t17\tunexpected character while parsing JSON\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-1.json",
+    "mode": "preserve",
+    "threshold": "16",
+    "stdout": "ERROR\t17\tunexpected character while parsing JSON\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-1.json",
+    "mode": "preserve",
+    "threshold": "32",
+    "stdout": "ERROR\t17\tunexpected character while parsing JSON\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-1.json",
+    "mode": "preserve",
+    "threshold": "64",
+    "stdout": "ERROR\t17\tunexpected character while parsing JSON\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-1.json",
+    "mode": "preserve",
+    "threshold": "128",
+    "stdout": "ERROR\t17\tunexpected character while parsing JSON\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-2.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "ERROR\t15\tduplicate object key 'x'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-2.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "ERROR\t15\tduplicate object key 'x'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-2.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "ERROR\t15\tduplicate object key 'x'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-2.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "ERROR\t15\tduplicate object key 'x'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-2.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "ERROR\t15\tduplicate object key 'x'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-2.json",
+    "mode": "preserve",
+    "threshold": "baseline",
+    "stdout": "PASS\t1\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-2.json",
+    "mode": "preserve",
+    "threshold": "16",
+    "stdout": "PASS\t1\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-2.json",
+    "mode": "preserve",
+    "threshold": "32",
+    "stdout": "PASS\t1\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-2.json",
+    "mode": "preserve",
+    "threshold": "64",
+    "stdout": "PASS\t1\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-2.json",
+    "mode": "preserve",
+    "threshold": "128",
+    "stdout": "PASS\t1\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-3.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "ERROR\t18\thigh surrogate must be followed by a low surrogate\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-3.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "ERROR\t18\thigh surrogate must be followed by a low surrogate\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-3.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "ERROR\t18\thigh surrogate must be followed by a low surrogate\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-3.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "ERROR\t18\thigh surrogate must be followed by a low surrogate\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-3.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "ERROR\t18\thigh surrogate must be followed by a low surrogate\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-3.json",
+    "mode": "preserve",
+    "threshold": "baseline",
+    "stdout": "ERROR\t18\thigh surrogate must be followed by a low surrogate\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-3.json",
+    "mode": "preserve",
+    "threshold": "16",
+    "stdout": "ERROR\t18\thigh surrogate must be followed by a low surrogate\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-3.json",
+    "mode": "preserve",
+    "threshold": "32",
+    "stdout": "ERROR\t18\thigh surrogate must be followed by a low surrogate\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-3.json",
+    "mode": "preserve",
+    "threshold": "64",
+    "stdout": "ERROR\t18\thigh surrogate must be followed by a low surrogate\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-3.json",
+    "mode": "preserve",
+    "threshold": "128",
+    "stdout": "ERROR\t18\thigh surrogate must be followed by a low surrogate\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-4.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "ERROR\t8\ttrailing comma in object\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-4.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "ERROR\t8\ttrailing comma in object\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-4.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "ERROR\t8\ttrailing comma in object\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-4.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "ERROR\t8\ttrailing comma in object\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-4.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "ERROR\t8\ttrailing comma in object\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-4.json",
+    "mode": "preserve",
+    "threshold": "baseline",
+    "stdout": "ERROR\t8\ttrailing comma in object\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-4.json",
+    "mode": "preserve",
+    "threshold": "16",
+    "stdout": "ERROR\t8\ttrailing comma in object\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-4.json",
+    "mode": "preserve",
+    "threshold": "32",
+    "stdout": "ERROR\t8\ttrailing comma in object\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-4.json",
+    "mode": "preserve",
+    "threshold": "64",
+    "stdout": "ERROR\t8\ttrailing comma in object\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-4.json",
+    "mode": "preserve",
+    "threshold": "128",
+    "stdout": "ERROR\t8\ttrailing comma in object\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-5.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "PASS\t0\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-5.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "PASS\t0\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-5.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "PASS\t0\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-5.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "PASS\t0\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-5.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "PASS\t0\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-5.json",
+    "mode": "preserve",
+    "threshold": "baseline",
+    "stdout": "PASS\t0\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-5.json",
+    "mode": "preserve",
+    "threshold": "16",
+    "stdout": "PASS\t0\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-5.json",
+    "mode": "preserve",
+    "threshold": "32",
+    "stdout": "PASS\t0\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-5.json",
+    "mode": "preserve",
+    "threshold": "64",
+    "stdout": "PASS\t0\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-5.json",
+    "mode": "preserve",
+    "threshold": "128",
+    "stdout": "PASS\t0\t\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-6.json",
+    "mode": "reject",
+    "threshold": "baseline",
+    "stdout": "ERROR\t615\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-6.json",
+    "mode": "reject",
+    "threshold": "16",
+    "stdout": "ERROR\t615\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-6.json",
+    "mode": "reject",
+    "threshold": "32",
+    "stdout": "ERROR\t615\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-6.json",
+    "mode": "reject",
+    "threshold": "64",
+    "stdout": "ERROR\t615\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-6.json",
+    "mode": "reject",
+    "threshold": "128",
+    "stdout": "ERROR\t615\tduplicate object key 'k0'\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-6.json",
+    "mode": "preserve",
+    "threshold": "baseline",
+    "stdout": "ERROR\t616\texpected ':' after object key\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-6.json",
+    "mode": "preserve",
+    "threshold": "16",
+    "stdout": "ERROR\t616\texpected ':' after object key\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-6.json",
+    "mode": "preserve",
+    "threshold": "32",
+    "stdout": "ERROR\t616\texpected ':' after object key\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-6.json",
+    "mode": "preserve",
+    "threshold": "64",
+    "stdout": "ERROR\t616\texpected ':' after object key\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  },
+  {
+    "case": "precedence-6.json",
+    "mode": "preserve",
+    "threshold": "128",
+    "stdout": "ERROR\t616\texpected ':' after object key\n",
+    "errors": 0,
+    "exit_heap_bytes": 0
+  }
+]

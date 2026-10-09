@@ -1,0 +1,146 @@
+[
+  {
+    "name": "loops",
+    "n": 2000,
+    "label": "baseline",
+    "instructions": 12507930,
+    "allocations": 4299,
+    "bytes": 797712,
+    "stdout": "1999000\n"
+  },
+  {
+    "name": "loops",
+    "n": 2000,
+    "label": "candidate",
+    "instructions": 12506743,
+    "allocations": 4299,
+    "bytes": 797713,
+    "stdout": "1999000\n"
+  },
+  {
+    "name": "array-build",
+    "n": 2000,
+    "label": "baseline",
+    "instructions": 11755550,
+    "allocations": 4330,
+    "bytes": 1389961,
+    "stdout": "2000\n"
+  },
+  {
+    "name": "array-build",
+    "n": 2000,
+    "label": "candidate",
+    "instructions": 11754356,
+    "allocations": 4330,
+    "bytes": 1389962,
+    "stdout": "2000\n"
+  },
+  {
+    "name": "call-noarg",
+    "n": 2000,
+    "label": "baseline",
+    "instructions": 17912207,
+    "allocations": 8346,
+    "bytes": 1202605,
+    "stdout": "2000\n"
+  },
+  {
+    "name": "call-noarg",
+    "n": 2000,
+    "label": "candidate",
+    "instructions": 17911064,
+    "allocations": 8346,
+    "bytes": 1202606,
+    "stdout": "2000\n"
+  },
+  {
+    "name": "call-scalar",
+    "n": 2000,
+    "label": "baseline",
+    "instructions": 23991185,
+    "allocations": 18356,
+    "bytes": 2387967,
+    "stdout": "2001000\n"
+  },
+  {
+    "name": "call-scalar",
+    "n": 2000,
+    "label": "candidate",
+    "instructions": 23990016,
+    "allocations": 18356,
+    "bytes": 2387968,
+    "stdout": "2001000\n"
+  },
+  {
+    "name": "call-locals",
+    "n": 2000,
+    "label": "baseline",
+    "instructions": 32460314,
+    "allocations": 30383,
+    "bytes": 3738880,
+    "stdout": "4002000\n"
+  },
+  {
+    "name": "call-locals",
+    "n": 2000,
+    "label": "candidate",
+    "instructions": 32459179,
+    "allocations": 30383,
+    "bytes": 3738881,
+    "stdout": "4002000\n"
+  },
+  {
+    "name": "call-closure",
+    "n": 2000,
+    "label": "baseline",
+    "instructions": 94776412,
+    "allocations": 66369,
+    "bytes": 8288329,
+    "stdout": "2001000\n"
+  },
+  {
+    "name": "call-closure",
+    "n": 2000,
+    "label": "candidate",
+    "instructions": 94625278,
+    "allocations": 66369,
+    "bytes": 8288330,
+    "stdout": "2001000\n"
+  },
+  {
+    "name": "call-callback",
+    "n": 2000,
+    "label": "baseline",
+    "instructions": 106270926,
+    "allocations": 88399,
+    "bytes": 10951306,
+    "stdout": "2001000\n"
+  },
+  {
+    "name": "call-callback",
+    "n": 2000,
+    "label": "candidate",
+    "instructions": 106119757,
+    "allocations": 88399,
+    "bytes": 10951307,
+    "stdout": "2001000\n"
+  },
+  {
+    "name": "sort-identity",
+    "n": 2000,
+    "label": "baseline",
+    "instructions": 55531780,
+    "allocations": 60401,
+    "bytes": 10101005,
+    "stdout": "2000\n"
+  },
+  {
+    "name": "sort-identity",
+    "n": 2000,
+    "label": "candidate",
+    "instructions": 55530518,
+    "allocations": 60401,
+    "bytes": 10101006,
+    "stdout": "2000\n"
+  }
+]

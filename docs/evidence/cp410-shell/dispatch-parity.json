@@ -1,0 +1,122 @@
+[
+  {
+    "source": "print(1)",
+    "result": [
+      0,
+      "1\n",
+      ""
+    ]
+  },
+  {
+    "source": "print(\"x\")",
+    "result": [
+      0,
+      "x\n",
+      ""
+    ]
+  },
+  {
+    "source": "print(len(\"abc\"))",
+    "result": [
+      1,
+      "",
+      "error: <command-line>:1:7: undefined callable: len\n"
+    ]
+  },
+  {
+    "source": "print(to_string(1))",
+    "result": [
+      1,
+      "",
+      "error: <command-line>:1:7: undefined callable: to_string\n"
+    ]
+  },
+  {
+    "source": "print(\"abc\".to_upper())",
+    "result": [
+      0,
+      "ABC\n",
+      ""
+    ]
+  },
+  {
+    "source": "print(\"aAaA\".replace(\"A\",\"x\"))",
+    "result": [
+      0,
+      "axax\n",
+      ""
+    ]
+  },
+  {
+    "source": "print(\"é中\".to_upper())",
+    "result": [
+      0,
+      "é中\n",
+      ""
+    ]
+  },
+  {
+    "source": "print(\"abc\".replace(\"\",\"x\"))",
+    "result": [
+      1,
+      "",
+      "error: <command-line>:1:7: replace: old string must not be empty\n"
+    ]
+  },
+  {
+    "source": "print(unknown(1))",
+    "result": [
+      1,
+      "",
+      "error: <command-line>:1:7: undefined callable: unknown\n"
+    ]
+  },
+  {
+    "source": "print(exists(\"missing\"))",
+    "result": [
+      0,
+      "false\n",
+      ""
+    ]
+  },
+  {
+    "source": "print(ls(\"missing/*\").size())",
+    "result": [
+      0,
+      "0\n",
+      ""
+    ]
+  },
+  {
+    "source": "print(error(\"x\").message)",
+    "result": [
+      0,
+      "x\n",
+      ""
+    ]
+  },
+  {
+    "source": "print(print())",
+    "result": [
+      1,
+      "",
+      "error: <command-line>:1:7: print: expected one value\n"
+    ]
+  },
+  {
+    "source": "print( len(\"abc\") )",
+    "result": [
+      1,
+      "",
+      "error: <command-line>:1:8: undefined callable: len\n"
+    ]
+  },
+  {
+    "source": "print(\"alpha\".to_upper().replace(\"A\",\"a\"))",
+    "result": [
+      0,
+      "aLPHa\n",
+      ""
+    ]
+  }
+]

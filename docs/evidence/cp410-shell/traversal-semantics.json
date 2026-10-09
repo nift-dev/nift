@@ -1,0 +1,62 @@
+[
+  {
+    "pattern": "files/**/*.dat",
+    "returncode": 0,
+    "stdout": "files/a.dat\noutside/t.dat\nfiles/sub/z.dat\nfiles/literal*.dat\nfiles/sub/deep/b.dat\nfiles/sub/space name.dat\nfiles/sub/z.dat\nfiles/sub/é.dat\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/**/**/*.dat",
+    "returncode": 0,
+    "stdout": "files/a.dat\noutside/t.dat\nfiles/sub/z.dat\nfiles/literal*.dat\nfiles/sub/deep/b.dat\nfiles/sub/space name.dat\nfiles/sub/z.dat\nfiles/sub/é.dat\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/*",
+    "returncode": 0,
+    "stdout": "files/a.dat\noutside/t.dat\nfiles/sub/z.dat\nfiles/sub\nfiles/literal*.dat\nfiles/sub\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/.hidden/*.dat",
+    "returncode": 0,
+    "stdout": "files/.hidden/x.dat\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/**/.*",
+    "returncode": 0,
+    "stdout": "files/.hidden\nfiles/.hidden.dat\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/literal\\*.dat",
+    "returncode": 1,
+    "stdout": "",
+    "stderr": "error: <command-line>:1:7: ls: No such file or directory\n"
+  },
+  {
+    "pattern": "files/**/*.missing",
+    "returncode": 0,
+    "stdout": "\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "/home/nick/Repositories/nift/nift/.build/cp410-shell/semantic-tree/files/**/*.dat",
+    "returncode": 0,
+    "stdout": "/home/nick/Repositories/nift/nift/.build/cp410-shell/semantic-tree/files/a.dat\n/home/nick/Repositories/nift/nift/.build/cp410-shell/semantic-tree/files/external.dat\n/home/nick/Repositories/nift/nift/.build/cp410-shell/semantic-tree/files/link.dat\n/home/nick/Repositories/nift/nift/.build/cp410-shell/semantic-tree/files/literal*.dat\n/home/nick/Repositories/nift/nift/.build/cp410-shell/semantic-tree/files/sub/deep/b.dat\n/home/nick/Repositories/nift/nift/.build/cp410-shell/semantic-tree/files/sub/space name.dat\n/home/nick/Repositories/nift/nift/.build/cp410-shell/semantic-tree/files/sub/z.dat\n/home/nick/Repositories/nift/nift/.build/cp410-shell/semantic-tree/files/sub/é.dat\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/linked-dir/*.dat",
+    "returncode": 0,
+    "stdout": "files/sub/space name.dat\nfiles/sub/z.dat\nfiles/sub/é.dat\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/external*.dat",
+    "returncode": 0,
+    "stdout": "outside/t.dat\n",
+    "stderr": ""
+  }
+]

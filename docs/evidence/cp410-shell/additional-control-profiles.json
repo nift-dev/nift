@@ -1,0 +1,164 @@
+[
+  {
+    "name": "sort-index",
+    "n": 2000,
+    "label": "baseline",
+    "instructions": 56182902,
+    "allocations": 60408,
+    "bytes": 10078222,
+    "stdout": "2000\n"
+  },
+  {
+    "name": "sort-index",
+    "n": 2000,
+    "label": "candidate",
+    "instructions": 56181665,
+    "allocations": 60408,
+    "bytes": 10078223,
+    "stdout": "2000\n"
+  },
+  {
+    "name": "sort-arithmetic",
+    "n": 2000,
+    "label": "baseline",
+    "instructions": 61011752,
+    "allocations": 62408,
+    "bytes": 10246379,
+    "stdout": "2000\n"
+  },
+  {
+    "name": "sort-arithmetic",
+    "n": 2000,
+    "label": "candidate",
+    "instructions": 61016772,
+    "allocations": 62408,
+    "bytes": 10246380,
+    "stdout": "2000\n"
+  },
+  {
+    "name": "map-identity",
+    "n": 2000,
+    "label": "baseline",
+    "instructions": 24790052,
+    "allocations": 32388,
+    "bytes": 6173060,
+    "stdout": "2000\n"
+  },
+  {
+    "name": "map-identity",
+    "n": 2000,
+    "label": "candidate",
+    "instructions": 24788787,
+    "allocations": 32388,
+    "bytes": 6173061,
+    "stdout": "2000\n"
+  },
+  {
+    "name": "map-set",
+    "n": 2000,
+    "label": "baseline",
+    "instructions": 34114180,
+    "allocations": 14403,
+    "bytes": 3966088,
+    "stdout": "2000\n"
+  },
+  {
+    "name": "map-set",
+    "n": 2000,
+    "label": "candidate",
+    "instructions": 34113003,
+    "allocations": 14403,
+    "bytes": 3966089,
+    "stdout": "2000\n"
+  },
+  {
+    "name": "json-parse-convert",
+    "n": 2000,
+    "label": "baseline",
+    "instructions": 12439864,
+    "allocations": 14345,
+    "bytes": 4034914,
+    "stdout": "2000\n"
+  },
+  {
+    "name": "json-parse-convert",
+    "n": 2000,
+    "label": "candidate",
+    "instructions": 12438772,
+    "allocations": 14345,
+    "bytes": 4034915,
+    "stdout": "2000\n"
+  },
+  {
+    "name": "json-traverse",
+    "n": 2000,
+    "label": "baseline",
+    "instructions": 32957004,
+    "allocations": 42398,
+    "bytes": 13031605,
+    "stdout": "5995\n"
+  },
+  {
+    "name": "json-traverse",
+    "n": 2000,
+    "label": "candidate",
+    "instructions": 32893888,
+    "allocations": 42398,
+    "bytes": 13031606,
+    "stdout": "5995\n"
+  },
+  {
+    "name": "json-mutate",
+    "n": 2000,
+    "label": "baseline",
+    "instructions": 40326771,
+    "allocations": 44424,
+    "bytes": 14509110,
+    "stdout": "11990\n"
+  },
+  {
+    "name": "json-mutate",
+    "n": 2000,
+    "label": "candidate",
+    "instructions": 40263698,
+    "allocations": 44424,
+    "bytes": 14509111,
+    "stdout": "11990\n"
+  },
+  {
+    "name": "json-serialize",
+    "n": 2000,
+    "label": "baseline",
+    "instructions": 27508979,
+    "allocations": 25450,
+    "bytes": 11582575,
+    "stdout": "true\n"
+  },
+  {
+    "name": "json-serialize",
+    "n": 2000,
+    "label": "candidate",
+    "instructions": 27507563,
+    "allocations": 25450,
+    "bytes": 11582576,
+    "stdout": "true\n"
+  },
+  {
+    "name": "bfs",
+    "n": 2000,
+    "label": "baseline",
+    "instructions": 93325609,
+    "allocations": 64569,
+    "bytes": 11054968,
+    "stdout": "2000\n"
+  },
+  {
+    "name": "bfs",
+    "n": 2000,
+    "label": "candidate",
+    "instructions": 93324469,
+    "allocations": 64569,
+    "bytes": 11054969,
+    "stdout": "2000\n"
+  }
+]

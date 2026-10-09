@@ -1,0 +1,20 @@
+[
+  {
+    "label": "baseline",
+    "instructions": "63,506,683",
+    "heap": "53,173 allocs, 53,173 frees, 14,823,308 bytes allocated",
+    "errors": "0 errors from 0 contexts (suppressed: 0 from 0)"
+  },
+  {
+    "label": "prototype",
+    "instructions": "58,899,117",
+    "heap": "49,578 allocs, 49,578 frees, 14,285,578 bytes allocated",
+    "errors": "0 errors from 0 contexts (suppressed: 0 from 0)"
+  },
+  {
+    "label": "native",
+    "instructions": "42,582,196",
+    "heap": "39,633 allocs, 39,633 frees, 12,927,454 bytes allocated",
+    "errors": "0 errors from 0 contexts (suppressed: 0 from 0)"
+  }
+]

@@ -1,0 +1,362 @@
+[
+  {
+    "n": 2000,
+    "unused": 0,
+    "kind": "identity",
+    "phase_instructions": {
+      "capture": 4082620,
+      "frame": 13061258
+    }
+  },
+  {
+    "n": 2000,
+    "unused": 0,
+    "kind": "captured",
+    "phase_instructions": {
+      "capture": 4994816,
+      "frame": 14238734
+    }
+  },
+  {
+    "n": 2000,
+    "unused": 5,
+    "kind": "identity",
+    "phase_instructions": {
+      "capture": 9230793,
+      "frame": 19544133
+    }
+  },
+  {
+    "n": 2000,
+    "unused": 5,
+    "kind": "captured",
+    "phase_instructions": {
+      "capture": 10194805,
+      "frame": 20774496
+    }
+  },
+  {
+    "n": 2000,
+    "unused": 16,
+    "kind": "identity",
+    "phase_instructions": {
+      "capture": 30106475,
+      "frame": 42501046
+    }
+  },
+  {
+    "n": 2000,
+    "unused": 16,
+    "kind": "captured",
+    "phase_instructions": {
+      "capture": 31625200,
+      "frame": 43818144
+    }
+  },
+  {
+    "n": 2000,
+    "unused": 50,
+    "kind": "identity",
+    "phase_instructions": {
+      "capture": 77268547,
+      "frame": 83900584
+    }
+  },
+  {
+    "n": 2000,
+    "unused": 50,
+    "kind": "captured",
+    "phase_instructions": {
+      "capture": 78497386,
+      "frame": 85076346
+    }
+  },
+  {
+    "n": 2000,
+    "unused": 100,
+    "kind": "identity",
+    "phase_instructions": {
+      "capture": 138604887,
+      "frame": 146400199
+    }
+  },
+  {
+    "n": 2000,
+    "unused": 100,
+    "kind": "captured",
+    "phase_instructions": {
+      "capture": 138426848,
+      "frame": 147816522
+    }
+  },
+  {
+    "n": 4000,
+    "unused": 0,
+    "kind": "identity",
+    "phase_instructions": {
+      "capture": 8164756,
+      "frame": 26118706
+    }
+  },
+  {
+    "n": 4000,
+    "unused": 0,
+    "kind": "captured",
+    "phase_instructions": {
+      "capture": 9988816,
+      "frame": 28476223
+    }
+  },
+  {
+    "n": 4000,
+    "unused": 5,
+    "kind": "identity",
+    "phase_instructions": {
+      "capture": 18460220,
+      "frame": 39085008
+    }
+  },
+  {
+    "n": 4000,
+    "unused": 5,
+    "kind": "captured",
+    "phase_instructions": {
+      "capture": 20388217,
+      "frame": 41544396
+    }
+  },
+  {
+    "n": 4000,
+    "unused": 16,
+    "kind": "identity",
+    "phase_instructions": {
+      "capture": 60211591,
+      "frame": 84989097
+    }
+  },
+  {
+    "n": 4000,
+    "unused": 16,
+    "kind": "captured",
+    "phase_instructions": {
+      "capture": 63246786,
+      "frame": 87631549
+    }
+  },
+  {
+    "n": 4000,
+    "unused": 50,
+    "kind": "identity",
+    "phase_instructions": {
+      "capture": 154535025,
+      "frame": 167794010
+    }
+  },
+  {
+    "n": 4000,
+    "unused": 50,
+    "kind": "captured",
+    "phase_instructions": {
+      "capture": 156992678,
+      "frame": 170181395
+    }
+  },
+  {
+    "n": 4000,
+    "unused": 100,
+    "kind": "identity",
+    "phase_instructions": {
+      "capture": 277209101,
+      "frame": 292793017
+    }
+  },
+  {
+    "n": 4000,
+    "unused": 100,
+    "kind": "captured",
+    "phase_instructions": {
+      "capture": 276855037,
+      "frame": 295535568
+    }
+  },
+  {
+    "n": 8000,
+    "unused": 0,
+    "kind": "identity",
+    "phase_instructions": {
+      "capture": 16328756,
+      "frame": 52234182
+    }
+  },
+  {
+    "n": 8000,
+    "unused": 0,
+    "kind": "captured",
+    "phase_instructions": {
+      "capture": 19976816,
+      "frame": 56948928
+    }
+  },
+  {
+    "n": 8000,
+    "unused": 5,
+    "kind": "identity",
+    "phase_instructions": {
+      "capture": 36919029,
+      "frame": 78163139
+    }
+  },
+  {
+    "n": 8000,
+    "unused": 5,
+    "kind": "captured",
+    "phase_instructions": {
+      "capture": 40775095,
+      "frame": 83082929
+    }
+  },
+  {
+    "n": 8000,
+    "unused": 16,
+    "kind": "identity",
+    "phase_instructions": {
+      "capture": 120421266,
+      "frame": 169963360
+    }
+  },
+  {
+    "n": 8000,
+    "unused": 16,
+    "kind": "captured",
+    "phase_instructions": {
+      "capture": 126486080,
+      "frame": 175259402
+    }
+  },
+  {
+    "n": 8000,
+    "unused": 50,
+    "kind": "identity",
+    "phase_instructions": {
+      "capture": 309069171,
+      "frame": 335579694
+    }
+  },
+  {
+    "n": 8000,
+    "unused": 50,
+    "kind": "captured",
+    "phase_instructions": {
+      "capture": 313982839,
+      "frame": 340420609
+    }
+  },
+  {
+    "n": 8000,
+    "unused": 100,
+    "kind": "identity",
+    "phase_instructions": {
+      "capture": 554416313,
+      "frame": 585581503
+    }
+  },
+  {
+    "n": 8000,
+    "unused": 100,
+    "kind": "captured",
+    "phase_instructions": {
+      "capture": 553718938,
+      "frame": 591451914
+    }
+  },
+  {
+    "n": 16000,
+    "unused": 0,
+    "kind": "identity",
+    "phase_instructions": {
+      "capture": 32656756,
+      "frame": 104466670
+    }
+  },
+  {
+    "n": 16000,
+    "unused": 0,
+    "kind": "captured",
+    "phase_instructions": {
+      "capture": 39952816,
+      "frame": 113894277
+    }
+  },
+  {
+    "n": 16000,
+    "unused": 5,
+    "kind": "identity",
+    "phase_instructions": {
+      "capture": 73836707,
+      "frame": 156320886
+    }
+  },
+  {
+    "n": 16000,
+    "unused": 5,
+    "kind": "captured",
+    "phase_instructions": {
+      "capture": 81547126,
+      "frame": 166156258
+    }
+  },
+  {
+    "n": 16000,
+    "unused": 16,
+    "kind": "identity",
+    "phase_instructions": {
+      "capture": 240863453,
+      "frame": 339909938
+    }
+  },
+  {
+    "n": 16000,
+    "unused": 16,
+    "kind": "captured",
+    "phase_instructions": {
+      "capture": 252964362,
+      "frame": 350509888
+    }
+  },
+  {
+    "n": 16000,
+    "unused": 50,
+    "kind": "identity",
+    "phase_instructions": {
+      "capture": 617981480,
+      "frame": 671661054
+    }
+  },
+  {
+    "n": 16000,
+    "unused": 50,
+    "kind": "captured",
+    "phase_instructions": {
+      "capture": 627965200,
+      "frame": 681172564
+    }
+  },
+  {
+    "n": 16000,
+    "unused": 100,
+    "kind": "identity",
+    "phase_instructions": {
+      "capture": 1108823511,
+      "frame": 1171674224
+    }
+  },
+  {
+    "n": 16000,
+    "unused": 100,
+    "kind": "captured",
+    "phase_instructions": {
+      "capture": 1107441340,
+      "frame": 1183307582
+    }
+  }
+]

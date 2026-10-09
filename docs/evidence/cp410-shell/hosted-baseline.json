@@ -1,0 +1,82 @@
+[
+  {
+    "conclusion": "success",
+    "databaseId": 37869960272,
+    "headSha": "8df185e2095037512d2d7315204cd5e3991a65be",
+    "status": "completed",
+    "url": "https://github.com/nift-dev/nift/actions/runs/37869960272",
+    "workflowName": "Performance regression guards"
+  },
+  {
+    "conclusion": "success",
+    "databaseId": 37869960392,
+    "headSha": "8df185e2095037512d2d7315204cd5e3991a65be",
+    "status": "completed",
+    "url": "https://github.com/nift-dev/nift/actions/runs/37869960392",
+    "workflowName": "Gate 6B bytes value semantics"
+  },
+  {
+    "conclusion": "success",
+    "databaseId": 37869960300,
+    "headSha": "8df185e2095037512d2d7315204cd5e3991a65be",
+    "status": "completed",
+    "url": "https://github.com/nift-dev/nift/actions/runs/37869960300",
+    "workflowName": "Init targets"
+  },
+  {
+    "conclusion": "success",
+    "databaseId": 37869960315,
+    "headSha": "8df185e2095037512d2d7315204cd5e3991a65be",
+    "status": "completed",
+    "url": "https://github.com/nift-dev/nift/actions/runs/37869960315",
+    "workflowName": "v4.4/v4.5 cross-platform"
+  },
+  {
+    "conclusion": "success",
+    "databaseId": 37869960444,
+    "headSha": "8df185e2095037512d2d7315204cd5e3991a65be",
+    "status": "completed",
+    "url": "https://github.com/nift-dev/nift/actions/runs/37869960444",
+    "workflowName": "Hosted certification diagnostic"
+  },
+  {
+    "conclusion": "success",
+    "databaseId": 37869960347,
+    "headSha": "8df185e2095037512d2d7315204cd5e3991a65be",
+    "status": "completed",
+    "url": "https://github.com/nift-dev/nift/actions/runs/37869960347",
+    "workflowName": "Checkpoint 10 cross-platform equivalence"
+  },
+  {
+    "conclusion": "success",
+    "databaseId": 37869960677,
+    "headSha": "8df185e2095037512d2d7315204cd5e3991a65be",
+    "status": "completed",
+    "url": "https://github.com/nift-dev/nift/actions/runs/37869960677",
+    "workflowName": "Deep guards"
+  },
+  {
+    "conclusion": "success",
+    "databaseId": 37869960278,
+    "headSha": "8df185e2095037512d2d7315204cd5e3991a65be",
+    "status": "completed",
+    "url": "https://github.com/nift-dev/nift/actions/runs/37869960278",
+    "workflowName": "packaging matrix (build-only, non-publishing)"
+  },
+  {
+    "conclusion": "success",
+    "databaseId": 37869960317,
+    "headSha": "8df185e2095037512d2d7315204cd5e3991a65be",
+    "status": "completed",
+    "url": "https://github.com/nift-dev/nift/actions/runs/37869960317",
+    "workflowName": "Gate 6A-R vendored libffi"
+  },
+  {
+    "conclusion": "success",
+    "databaseId": 37869960314,
+    "headSha": "8df185e2095037512d2d7315204cd5e3991a65be",
+    "status": "completed",
+    "url": "https://github.com/nift-dev/nift/actions/runs/37869960314",
+    "workflowName": "Test integrity guards"
+  }
+]

@@ -53,6 +53,19 @@
 
 namespace fs = std::filesystem;
 
+#ifdef NIFT_TEST_GLOB_PATH_STATS
+namespace {
+struct GlobRelativeStats {
+    std::atomic<std::size_t> bases{0}, matches{0};
+    ~GlobRelativeStats() {
+        if (std::getenv("NIFT_TEST_GLOB_PATH_STATS"))
+            std::fprintf(stderr, "glob-relative bases=%zu matches=%zu\n", bases.load(), matches.load());
+    }
+} glob_relative_stats;
+}
+#endif
+
+
 using nift::detail::nift_binding_type;
 using nift::detail::nift_binding_type_name;
 using nift::detail::nift_type_assignable;
@@ -1840,7 +1853,36 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             if(call_args("remove",args,q)||call_args("rm",args,q)){if(args.empty()){error="remove: expected at least one path";return false;}std::vector<fs::path> paths;if(!path_values("remove",args,q,0,args.size(),paths))return false;for(const auto& rp:paths){std::error_code ec;if(fs::is_directory(rp,ec)){error="remove: directories are not removed recursively";return false;}if(!fs::remove(rp,ec)&&ec)return fail_recoverable(nift::detail::DiagnosticCode::IoRemoveFailed,"remove: "+ec.message(),error);}out=nift::RuntimeValue(nullptr);return true;}
             if(call_args("copy",args,q)||call_args("cp",args,q)||call_args("move",args,q)||call_args("mv",args,q)){const bool mv=text.rfind("move(",0)==0||text.rfind("mv(",0)==0;const std::string name=mv?"move":"copy";if(text.rfind("copy(",0)==0&&args.size()<2){args.clear();q.clear();}else if(args.size()<2){error=name+": expected source(s) and destination";return false;}else{std::vector<fs::path> sources;if(!path_values(name,args,q,0,args.size()-1,sources))return false;if(sources.empty()){error=name+": glob matched no source files";return false;}std::vector<fs::path> dests;if(!path_values(name,args,q,args.size()-1,args.size(),dests)||dests.size()!=1){error=name+": destination must be one path";return false;}fs::path dest=dests.front();std::error_code dec;const bool dest_dir=fs::is_directory(dest,dec);if(sources.size()>1&&!dest_dir){error=name+": destination must be an existing directory for multiple sources";return false;}for(const auto& src:sources){fs::path target=dest_dir?dest/src.filename():dest;std::error_code ec;if(mv)fs::rename(src,target,ec);else fs::copy_file(src,target,fs::copy_options::overwrite_existing,ec);if(ec)return fail_recoverable(mv?nift::detail::DiagnosticCode::IoMoveFailed:nift::detail::DiagnosticCode::IoCopyFailed,name+": "+ec.message(),error);}out=nift::RuntimeValue(nullptr);return true;}}
             if(call_args("cat",args,q)){fs::path p;if(args.size()!=1||!checked_path("cat",args,q,0,p))return false;std::error_code ec;if(fs::is_directory(p,ec)){error="cat: path is a directory";return false;}std::ifstream f(p,std::ios::binary);if(!f)return fail_recoverable(nift::detail::DiagnosticCode::IoOpenFailed,"cat: cannot open path",error);std::ostringstream ss;ss<<f.rdbuf();execution_output_->write_stdout(ss.str());out=nift::RuntimeValue(nullptr);return true;}
-            if(call_args("ls",args,q)){if(args.size()>1){error="ls: expected zero or one path/pattern";return false;}out=nift::RuntimeValue::make_array();if(args.empty()){fs::path p=standalone_script_host_?fs::current_path():host_.root();std::error_code ec;std::vector<std::string> names;for(fs::directory_iterator it(p,ec),end;!ec&&it!=end;it.increment(ec))names.push_back(it->path().filename().generic_string());if(ec)return fail_recoverable(nift::detail::DiagnosticCode::IoDirectoryReadFailed,"ls: "+ec.message(),error);std::sort(names.begin(),names.end());for(const auto& n:names)out.array.emplace_back(n);return true;}std::string raw;if(!string_arg("ls",args,q,0,raw))return false;fs::path p=resolve_path(raw);if(!standalone_script_host_&&!resource_path_authority_.project_root.empty()&&!filesystem::path_within(resource_path_authority_.project_root,p)){error="ls: path must stay inside the Nift project";return false;}if(!nift_fs_root_allowed(p,resource_path_authority_.enforce_filesystem_root?resource_path_authority_.filesystem_root:fs::path{},error)){error="ls: "+error;return false;}if(glob_has_magic(raw)){auto matches=glob_expand(p);const fs::path base=standalone_script_host_?fs::current_path():host_.root();const bool absolute=fs::path(raw).is_absolute();for(const auto&m:matches){std::error_code rec;auto shown=absolute?m:fs::relative(m,base,rec);out.array.emplace_back((rec?m:shown).generic_string());}return true;}std::error_code ec;if(!fs::is_directory(p,ec)||ec){if(ec)return fail_recoverable(nift::detail::DiagnosticCode::IoDirectoryReadFailed,"ls: "+ec.message(),error);error="ls: path is not a readable directory";return false;}std::vector<std::string> names;for(fs::directory_iterator it(p,ec),end;!ec&&it!=end;it.increment(ec))names.push_back(it->path().filename().generic_string());if(ec)return fail_recoverable(nift::detail::DiagnosticCode::IoDirectoryReadFailed,"ls: "+ec.message(),error);std::sort(names.begin(),names.end());for(const auto& n:names)out.array.emplace_back(n);return true;}
+            if(call_args("ls",args,q)){if(args.size()>1){error="ls: expected zero or one path/pattern";return false;}out=nift::RuntimeValue::make_array();if(args.empty()){fs::path p=standalone_script_host_?fs::current_path():host_.root();std::error_code ec;std::vector<std::string> names;for(fs::directory_iterator it(p,ec),end;!ec&&it!=end;it.increment(ec))names.push_back(it->path().filename().generic_string());if(ec)return fail_recoverable(nift::detail::DiagnosticCode::IoDirectoryReadFailed,"ls: "+ec.message(),error);std::sort(names.begin(),names.end());for(const auto& n:names)out.array.emplace_back(n);return true;}std::string raw;if(!string_arg("ls",args,q,0,raw))return false;fs::path p=resolve_path(raw);if(!standalone_script_host_&&!resource_path_authority_.project_root.empty()&&!filesystem::path_within(resource_path_authority_.project_root,p)){error="ls: path must stay inside the Nift project";return false;}if(!nift_fs_root_allowed(p,resource_path_authority_.enforce_filesystem_root?resource_path_authority_.filesystem_root:fs::path{},error)){error="ls: "+error;return false;}if(glob_has_magic(raw)){
+                auto matches=glob_expand(p);
+                const fs::path base=standalone_script_host_?fs::current_path():host_.root();
+                const bool absolute=fs::path(raw).is_absolute();
+                std::error_code base_error;
+                fs::path canonical_base;
+                // relative() canonicalizes both operands. Resolve the common
+                // base once, while still resolving every match's symlinks.
+                if(!absolute&&!matches.empty()){
+#ifdef NIFT_TEST_GLOB_PATH_STATS
+                    ++glob_relative_stats.bases;
+#endif
+                    canonical_base=fs::weakly_canonical(base,base_error);
+                }
+                out.array.reserve(matches.size());
+                for(const auto& m:matches){
+                    std::error_code rec=base_error;
+                    fs::path shown;
+                    if(absolute)shown=m;
+                    if(!absolute&&!rec){
+#ifdef NIFT_TEST_GLOB_PATH_STATS
+                        ++glob_relative_stats.matches;
+#endif
+                        auto canonical_match=fs::weakly_canonical(m,rec);
+                        if(!rec)shown=canonical_match.lexically_relative(canonical_base);
+                    }
+                    out.array.emplace_back((rec?m:shown).generic_string());
+                }
+                return true;
+            }std::error_code ec;if(!fs::is_directory(p,ec)||ec){if(ec)return fail_recoverable(nift::detail::DiagnosticCode::IoDirectoryReadFailed,"ls: "+ec.message(),error);error="ls: path is not a readable directory";return false;}std::vector<std::string> names;for(fs::directory_iterator it(p,ec),end;!ec&&it!=end;it.increment(ec))names.push_back(it->path().filename().generic_string());if(ec)return fail_recoverable(nift::detail::DiagnosticCode::IoDirectoryReadFailed,"ls: "+ec.message(),error);std::sort(names.begin(),names.end());for(const auto& n:names)out.array.emplace_back(n);return true;}
             if(call_args("open",args,q)){fs::path p;if(args.size()!=1||!checked_path("open",args,q,0,p))return false;std::error_code ec;if(fs::is_directory(p,ec)){error="open: path is a directory";return false;}std::ifstream f(p,std::ios::binary);if(!f)return fail_recoverable(nift::detail::DiagnosticCode::IoOpenFailed,"open: cannot open path",error);std::ostringstream ss;ss<<f.rdbuf();out=nift::RuntimeValue(ss.str());return true;}
             if(call_args("open_bytes",args,q)){fs::path p;if(args.size()!=1||!checked_path("open_bytes",args,q,0,p))return false;std::error_code ec;if(fs::is_directory(p,ec)){error="open_bytes: path is a directory";return false;}std::ifstream f(p,std::ios::binary);if(!f)return fail_recoverable(nift::detail::DiagnosticCode::IoOpenFailed,"open_bytes: cannot open path",error);constexpr std::size_t chunk_size=64*1024;std::vector<char> chunk(chunk_size);nift::RuntimeBytes data;while(f){f.read(chunk.data(),static_cast<std::streamsize>(chunk.size()));const auto received=f.gcount();if(received>0)data.insert(data.end(),chunk.begin(),chunk.begin()+received);if(f.bad())return fail_recoverable(nift::detail::DiagnosticCode::IoReadFailed,"open_bytes: input failure",error);if(received<static_cast<std::streamsize>(chunk.size()))break;}out=nift::RuntimeValue(std::move(data));return true;}
             // Native script-land Minify++ (v4.4 package campaign CP19-CP24).

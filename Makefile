@@ -1864,3 +1864,23 @@ test-v410-oracle-paths:
 	python3 tests/v410_oracle_paths_test.py
 
 test-v410-sort-factory-parity test-v410-object-member-parity: test-v410-oracle-paths
+
+# Test-only counters for shared glob-base canonicalization.
+$(TEST_DIR)/glob-relative/ParserExpression.o: src/ParserExpression.cpp
+	mkdir -p "$(dir $@)"
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_TEST_GLOB_PATH_STATS -MMD -MP -c $< -o $@
+-include $(TEST_DIR)/glob-relative/ParserExpression.d
+GLOB_RELATIVE_GUARD := $(TEST_DIR)/nift-glob-relative-guard$(EXEEXT)
+$(GLOB_RELATIVE_GUARD): $(filter-out src/ParserExpression.o,$(CLI_OBJECTS)) $(TEST_DIR)/glob-relative/ParserExpression.o $(LIBFFI_A)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/ParserExpression.o,$(CLI_OBJECTS)) $(TEST_DIR)/glob-relative/ParserExpression.o $(LDLIBS) -o $@
+.PHONY: test-v410-glob-relative-guard test-v410-glob-parity
+test-v410-glob-relative-guard: $(GLOB_RELATIVE_GUARD)
+	NIFT="$(CURDIR)/$(GLOB_RELATIVE_GUARD)" python3 tests/v410_glob_relative_guard.py
+test-v410-glob-parity: $(TARGET)
+	NIFT="$(CURDIR)/$(TARGET)" python3 tests/v410_glob_parity.py
+test: test-v410-glob-relative-guard test-v410-glob-parity
+
+.PHONY: test-v410-native-dispatch-parity
+test-v410-native-dispatch-parity: $(TARGET)
+	NIFT="$(CURDIR)/$(TARGET)" python3 tests/v410_native_dispatch_parity.py
+test: test-v410-native-dispatch-parity

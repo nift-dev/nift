@@ -1,0 +1,247 @@
+[
+  {
+    "name": "root-object-path",
+    "source": "v := {\"longkey\":[{\"field\":1}]}; rows := v[\"longkey\"]; print([2,1].sort_by(x => x*rows[0].field).stringify())",
+    "bindings": {
+      "capture": {
+        "entries": 8,
+        "inserts": 8,
+        "overwrites": 0,
+        "value_refs": 8,
+        "slot_refs": 8,
+        "root_refs": 2,
+        "path_vectors": 2,
+        "path_components": 2,
+        "path_key_bytes": 14,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 8,
+        "inserts": 8,
+        "overwrites": 0,
+        "value_refs": 8,
+        "slot_refs": 8,
+        "root_refs": 2,
+        "path_vectors": 2,
+        "path_components": 2,
+        "path_key_bytes": 14,
+        "default_slots": 2,
+        "explicit_slots": 2
+      }
+    },
+    "returncode": 0,
+    "stdout": "[1,2]\n",
+    "stderr": ""
+  },
+  {
+    "name": "root-path",
+    "source": "a := [{\"longkey\":1}]; for(row : a) { f := x => row.longkey; a.push({\"longkey\":9}); print(f(0)) }",
+    "bindings": {
+      "capture": {
+        "entries": 4,
+        "inserts": 4,
+        "overwrites": 0,
+        "value_refs": 4,
+        "slot_refs": 4,
+        "root_refs": 1,
+        "path_vectors": 1,
+        "path_components": 1,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 0,
+        "inserts": 0,
+        "overwrites": 0,
+        "value_refs": 0,
+        "slot_refs": 0,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      }
+    },
+    "returncode": 0,
+    "stdout": "1\n",
+    "stderr": ""
+  },
+  {
+    "name": "parameter-name-collision",
+    "source": "x := 99; f := x => x; print(f(3))",
+    "bindings": {
+      "capture": {
+        "entries": 3,
+        "inserts": 3,
+        "overwrites": 0,
+        "value_refs": 3,
+        "slot_refs": 3,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 0,
+        "inserts": 0,
+        "overwrites": 0,
+        "value_refs": 0,
+        "slot_refs": 0,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      }
+    },
+    "returncode": 0,
+    "stdout": "3\n",
+    "stderr": ""
+  },
+  {
+    "name": "shadowed-visible-name",
+    "source": "v := 1; if(true) { v := 2; f := x => v; print(f(0)) }",
+    "bindings": {
+      "capture": {
+        "entries": 4,
+        "inserts": 3,
+        "overwrites": 1,
+        "value_refs": 4,
+        "slot_refs": 4,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 0,
+        "inserts": 0,
+        "overwrites": 0,
+        "value_refs": 0,
+        "slot_refs": 0,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      }
+    },
+    "returncode": 0,
+    "stdout": "2\n",
+    "stderr": ""
+  },
+  {
+    "name": "module-context",
+    "source": "import(\"./module.f\"); v := 100; f := mk(); print(f(1))",
+    "bindings": {
+      "capture": {
+        "entries": 4,
+        "inserts": 3,
+        "overwrites": 1,
+        "value_refs": 4,
+        "slot_refs": 4,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 0,
+        "inserts": 0,
+        "overwrites": 0,
+        "value_refs": 0,
+        "slot_refs": 0,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      }
+    },
+    "returncode": 0,
+    "stdout": "8\n",
+    "stderr": ""
+  },
+  {
+    "name": "parameter-shadowed-timer",
+    "source": "x := timer(); f := async x => x; r := f(3); print(await r)",
+    "bindings": {
+      "capture": {
+        "entries": 3,
+        "inserts": 3,
+        "overwrites": 0,
+        "value_refs": 3,
+        "slot_refs": 3,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 0,
+        "inserts": 0,
+        "overwrites": 0,
+        "value_refs": 0,
+        "slot_refs": 0,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      }
+    },
+    "returncode": 1,
+    "stdout": "",
+    "stderr": "error: /home/nick/Repositories/nift/nift/.build/cp410-capture-frame/additional/parameter-shadowed-timer.f:1:39: async function capture contains a non-transferable timer\n"
+  },
+  {
+    "name": "escaping-factory",
+    "source": "saved := []; fn(mk()) { f := x => x; saved.push(f); return f }; print([2,1].sort_by(mk()).stringify()); f := saved[0]; g := saved[1]; print(f(8)); print(g(9)); print(f == g)",
+    "bindings": {
+      "capture": {
+        "entries": 6,
+        "inserts": 6,
+        "overwrites": 0,
+        "value_refs": 6,
+        "slot_refs": 6,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 0,
+        "explicit_slots": 0
+      },
+      "frame": {
+        "entries": 6,
+        "inserts": 6,
+        "overwrites": 0,
+        "value_refs": 6,
+        "slot_refs": 6,
+        "root_refs": 0,
+        "path_vectors": 0,
+        "path_components": 0,
+        "path_key_bytes": 0,
+        "default_slots": 2,
+        "explicit_slots": 2
+      }
+    },
+    "returncode": 0,
+    "stdout": "[1,2]\n8\n9\nfalse\n",
+    "stderr": ""
+  }
+]

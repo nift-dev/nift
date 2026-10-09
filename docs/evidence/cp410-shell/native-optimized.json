@@ -1,0 +1,26 @@
+[
+  {
+    "n": 1000,
+    "matches": 1200,
+    "instructions": 38745672,
+    "allocations": 49241,
+    "bytes": 12155057,
+    "memcheck_errors": 0
+  },
+  {
+    "n": 10000,
+    "matches": 12000,
+    "instructions": 371949587,
+    "allocations": 492047,
+    "bytes": 120055849,
+    "memcheck_errors": 0
+  },
+  {
+    "n": 100000,
+    "matches": 120000,
+    "instructions": 3788189412,
+    "allocations": 4920053,
+    "bytes": 1196230929,
+    "memcheck_errors": 0
+  }
+]

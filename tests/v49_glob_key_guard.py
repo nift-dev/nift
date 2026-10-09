@@ -11,5 +11,5 @@ with tempfile.TemporaryDirectory() as d:
   p=subprocess.run([binary,str(source)],cwd=root,text=True,capture_output=True,env={**os.environ,'NIFT_TEST_GLOB_KEY_STATS':'1'})
   assert p.returncode==0 and p.stdout==f'{n}\n',(p.stdout,p.stderr)
   m=re.search(r'glob-order conversions=(\d+)',p.stderr)
-  assert m and int(m[1])==2*n,p.stderr
-  print(f'PASS {n} entries: {2*n} ordering-key conversions')
+  assert m and int(m[1])==n,p.stderr
+  print(f'PASS {n} entries: {n} ordering-key conversions')

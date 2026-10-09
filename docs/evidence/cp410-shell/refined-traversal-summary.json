@@ -1,0 +1,166 @@
+[
+  {
+    "shape": "flat",
+    "pattern": "files/**/*.dat",
+    "medians": {
+      "prototype": 1.78163148148451,
+      "baseline": 2.2843419805867597,
+      "native": 2.0477460825350136,
+      "unsorted": 1.6717199890408665
+    },
+    "change_pct": {
+      "prototype": -22.006796853294386,
+      "native": -10.357288885045746,
+      "unsorted": -26.81831340281783
+    }
+  },
+  {
+    "shape": "flat",
+    "pattern": "files/**/*.missing",
+    "medians": {
+      "prototype": 0.554566640057601,
+      "baseline": 0.5452014736365527,
+      "unsorted": 0.24485256848856807
+    },
+    "change_pct": {
+      "prototype": 1.7177441503563262,
+      "unsorted": -55.08952555550244
+    }
+  },
+  {
+    "shape": "flat",
+    "pattern": "files/**/obj-*000.dat",
+    "medians": {
+      "prototype": 0.5796935659600422,
+      "baseline": 0.5706353054847568,
+      "unsorted": 0.25013362686149776
+    },
+    "change_pct": {
+      "prototype": 1.5873992352419153,
+      "unsorted": -56.16576393761541
+    }
+  },
+  {
+    "shape": "deep",
+    "pattern": "files/**/*.dat",
+    "medians": {
+      "prototype": 2.856774556450546,
+      "baseline": 3.273913854616694,
+      "native": 2.863388251978904,
+      "unsorted": 2.717244175961241
+    },
+    "change_pct": {
+      "prototype": -12.741303427331218,
+      "native": -12.539291528971951,
+      "unsorted": -17.00318650322665
+    }
+  },
+  {
+    "shape": "deep",
+    "pattern": "files/**/*.missing",
+    "medians": {
+      "prototype": 0.6805883579654619,
+      "baseline": 0.6756211805623025,
+      "unsorted": 0.36816087854094803
+    },
+    "change_pct": {
+      "prototype": 0.7352015517076316,
+      "unsorted": -45.50779502878566
+    }
+  },
+  {
+    "shape": "deep",
+    "pattern": "files/**/obj-*000.dat",
+    "medians": {
+      "prototype": 0.6773097109980881,
+      "baseline": 0.6796226240694523,
+      "unsorted": 0.37505862850230187
+    },
+    "change_pct": {
+      "prototype": -0.3403231424985331,
+      "unsorted": -44.813692890839704
+    }
+  },
+  {
+    "shape": "mixed",
+    "pattern": "files/**/*.dat",
+    "medians": {
+      "prototype": 1.6682527585653588,
+      "baseline": 2.078208486898802,
+      "native": 1.9456596340751275,
+      "unsorted": 1.6281326308380812
+    },
+    "change_pct": {
+      "prototype": -19.726400451053784,
+      "native": -6.378034430100421,
+      "unsorted": -21.656915506698983
+    }
+  },
+  {
+    "shape": "mixed",
+    "pattern": "files/**/*.missing",
+    "medians": {
+      "prototype": 0.2372513620648533,
+      "baseline": 0.23944636911619455,
+      "unsorted": 0.1720925949048251
+    },
+    "change_pct": {
+      "prototype": -0.9167009127944103,
+      "unsorted": -28.12896034296729
+    }
+  },
+  {
+    "shape": "mixed",
+    "pattern": "files/**/obj-*000.dat",
+    "medians": {
+      "prototype": 0.2422152574872598,
+      "baseline": 0.24612769344821572,
+      "unsorted": 0.17606573610100895
+    },
+    "change_pct": {
+      "prototype": -1.589595996347759,
+      "unsorted": -28.465694520453276
+    }
+  },
+  {
+    "shape": "short",
+    "pattern": "files/**/*.dat",
+    "medians": {
+      "prototype": 0.9827789099654183,
+      "baseline": 1.181023005512543,
+      "native": 1.010079726926051,
+      "unsorted": 0.9150028119329363
+    },
+    "change_pct": {
+      "prototype": -16.785794571469026,
+      "native": -14.474170087169947,
+      "unsorted": -22.524556451307966
+    }
+  },
+  {
+    "shape": "short",
+    "pattern": "files/**/*.missing",
+    "medians": {
+      "prototype": 0.25405611691530794,
+      "baseline": 0.2619945250917226,
+      "unsorted": 0.1987814559834078
+    },
+    "change_pct": {
+      "prototype": -3.0299901013715824,
+      "unsorted": -24.12762979920452
+    }
+  },
+  {
+    "shape": "short",
+    "pattern": "files/**/obj-*000.dat",
+    "medians": {
+      "prototype": 0.27029925549868494,
+      "baseline": 0.2654632880585268,
+      "unsorted": 0.20921053050551564
+    },
+    "change_pct": {
+      "prototype": 1.8217085592234339,
+      "unsorted": -21.19040940252692
+    }
+  }
+]
