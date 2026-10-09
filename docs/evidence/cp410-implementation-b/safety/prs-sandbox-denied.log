@@ -1,0 +1,50 @@
+FAIL  contract/curl_facade_smoke.sh
+Traceback (most recent call last):
+  File "<stdin>", line 20, in <module>
+  File "/usr/lib/python3.14/socketserver.py", line 453, in __init__
+    self.socket = socket.socket(self.address_family,
+                  ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+                                self.socket_type)
+                                ^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/socket.py", line 236, in __init__
+    _socket.socket.__init__(self, family, type, proto, fileno)
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 1] Operation not permitted
+error: /tmp/tmp.4TaQJoLpxO/site/t.f:5:7: unknown value or malformed expression: setcookie.size()
+PASS  contract/sqlite_module_smoke.sh
+PASS  contract/database_packages_smoke.sh
+PASS  contract/parameter_binding_smoke.sh
+PASS  contract/transaction_atomicity_smoke.sh
+PASS  contract/imagemagick_package_smoke.sh
+PASS  contract/vips_magick_combined_smoke.sh
+PASS  integration/coexistence_smoke.sh
+PASS  integration/privacy_smoke.sh
+PASS  integration/no_process_smoke.sh
+PASS  integration/source_install_smoke.sh
+FAIL  integration/combined_consumer_smoke.sh
+Traceback (most recent call last):
+  File "<stdin>", line 8, in <module>
+  File "/usr/lib/python3.14/socketserver.py", line 453, in __init__
+    self.socket = socket.socket(self.address_family,
+                  ~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+                                self.socket_type)
+                                ^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.14/socket.py", line 236, in __init__
+    _socket.socket.__init__(self, family, type, proto, fileno)
+    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 1] Operation not permitted
+unexpected combined-consumer output:
+true
+Y
+3
+true
+2nd
+36
+true
+9
+example.com
+false
+null
+true
+
+FAIL: 2 of 12 package regression modules failed

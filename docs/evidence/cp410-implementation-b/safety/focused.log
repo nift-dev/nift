@@ -1,0 +1,82 @@
+CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-linux-gnu-cc"
+NIFT=/home/nick/Repositories/nift/nift/.build/cp410-implementation/traversal/certification/nift /usr/bin/python3 tests/v410_glob_prefix_parity.py
+files/linked-dir/\../*.dat PASS
+files/**/\./*.dat PASS
+files/**/\../*.dat PASS
+files/* PASS
+files/** PASS
+files/**/** PASS
+files/**/**/** PASS
+files/**/*.dat PASS
+files/**/sub/* PASS
+files/*/*.dat PASS
+files/*/deep/?*.dat PASS
+files/**/sub/.. PASS
+files/**/./*.dat PASS
+files/**/../*.dat PASS
+files/linked-dir/*.dat PASS
+files/linked-dir/** PASS
+files/**/deep/** PASS
+files/**/.* PASS
+files/.private/** PASS
+files/.private/*.dat PASS
+files/??.dat PASS
+files/?.dat PASS
+files/[ab]*.dat PASS
+files/**/[ab].dat PASS
+files/**/[a-z].dat PASS
+files/**/*.DAT PASS
+files/**/*.missing PASS
+files/**/no-such/* PASS
+files/linked-dir/../*.dat PASS
+files/dangling* PASS
+files/external* PASS
+files/link* PASS
+./files/**/*.dat PASS
+**/*.dat PASS
+** PASS
+**/** PASS
+../files/**/*.dat PASS
+<ORACLE_ROOT>/files/**/*.dat PASS
+<ORACLE_ROOT>/files/* PASS
+same-parser-retarget PASS
+PASS 40 general/stable and between-operation alias contracts
+PASS actual removed-cwd failure boundary
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_TEST_GLOB_PREFIX_STATS -MMD -MP -c src/ParserHelpers.cpp -o .build/glob-prefix/ParserHelpers.o
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_TEST_GLOB_PREFIX_STATS -MMD -MP -c src/ParserExpression.cpp -o .build/glob-prefix/ParserExpression.o
+g++ -std=c++17 -O2 -Wall -Wextra -pedantic -pthread  src/nift.o src/ProjectOwnership.o src/PackageTransaction.o src/CLI.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o .build/glob-prefix/ParserHelpers.o .build/glob-prefix/ParserExpression.o -ldl .build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a -o .build/nift-glob-prefix-guard
+NIFT_PREFIX_STATS=/home/nick/Repositories/nift/nift/.build/cp410-implementation/traversal/certification/.build/nift-glob-prefix-guard /usr/bin/python3 tests/v410_glob_prefix_guard.py
+PASS shared-prefix scaling, empty/absolute bypass, repeated glob and leaf alias counters
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/traversal/certification/nift" python3 tests/v410_glob_parity.py
+PASS 12 exact glob path/ordering/hidden/Unicode/alias contracts
+mkdir -p ".build/glob-relative/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_TEST_GLOB_PATH_STATS -MMD -MP -c src/ParserExpression.cpp -o .build/glob-relative/ParserExpression.o
+g++ -std=c++17 -O2 -Wall -Wextra -pedantic -pthread  src/nift.o src/ProjectOwnership.o src/PackageTransaction.o src/CLI.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserHelpers.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o .build/glob-relative/ParserExpression.o -ldl .build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a -o .build/nift-glob-relative-guard
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/traversal/certification/.build/nift-glob-relative-guard" python3 tests/v410_glob_relative_guard.py
+PASS relative-base scaling: 32/128/512; absolute and empty globs bypass canonicalization
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/traversal/certification/nift" python3 tests/v49_glob_order.py
+PASS 8 glob ordering/dedup/Unicode/hidden/missing contracts plus POSIX symlinks
+mkdir -p ".build/glob-keys/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_TEST_GLOB_KEY_STATS -MMD -MP -c src/ParserHelpers.cpp -o .build/glob-keys/ParserHelpers.o
+g++ -std=c++17 -O2 -Wall -Wextra -pedantic -pthread  src/nift.o src/ProjectOwnership.o src/PackageTransaction.o src/CLI.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserExpression.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o .build/glob-keys/ParserHelpers.o -ldl .build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a -o .build/nift-glob-key-guard
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/traversal/certification/.build/nift-glob-key-guard" python3 tests/v49_glob_key_guard.py
+PASS 100 entries: 100 ordering-key conversions
+PASS 200 entries: 200 ordering-key conversions
+PASS 400 entries: 400 ordering-key conversions
+python3 tests/v410_callback_overlay_parity.py --nift "/home/nick/Repositories/nift/nift/.build/cp410-implementation/traversal/certification/nift"
+PASS 23 exact callback environment/origin contracts
+mkdir -p ".build/lambda-cache/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_TEST_LAMBDA_CACHE_STATS -MMD -MP -c src/ParserExpression.cpp -o .build/lambda-cache/ParserExpression.o
+g++ -std=c++17 -O2 -Wall -Wextra -pedantic -pthread  src/nift.o src/ProjectOwnership.o src/PackageTransaction.o src/CLI.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserHelpers.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o .build/lambda-cache/ParserExpression.o -ldl .build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a -o .build/nift-lambda-cache-guard
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/traversal/certification/.build/nift-lambda-cache-guard" python3 tests/v410_callback_overlay_guard.py
+PASS parameter: {'overlay_hits': 3, 'capture_hits': 0, 'hydrations': 0, 'misses': 0, 'fallbacks': 0}
+PASS hydrate once per frame: {'overlay_hits': 9, 'capture_hits': 3, 'hydrations': 3, 'misses': 0, 'fallbacks': 0}
+PASS missing x1: {'overlay_hits': 0, 'capture_hits': 0, 'hydrations': 0, 'misses': 3, 'fallbacks': 3}
+PASS missing x8: {'overlay_hits': 0, 'capture_hits': 0, 'hydrations': 0, 'misses': 24, 'fallbacks': 24}
+PASS missing x32: {'overlay_hits': 0, 'capture_hits': 0, 'hydrations': 0, 'misses': 96, 'fallbacks': 96}
+PASS missing x128: {'overlay_hits': 0, 'capture_hits': 0, 'hydrations': 0, 'misses': 0, 'fallbacks': 0}
+PASS missing x256: {'overlay_hits': 0, 'capture_hits': 0, 'hydrations': 0, 'misses': 0, 'fallbacks': 0}
+PASS missing x1024: {'overlay_hits': 0, 'capture_hits': 0, 'hydrations': 0, 'misses': 0, 'fallbacks': 0}
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/traversal/certification/nift" tests/diagnostics_smoke.sh
+diagnostics smoke passed
+diagnostics smoke passed

@@ -1,0 +1,2 @@
+test-integrity clean: 304 files scanned, 0 findings
+report=.build/cp410-implementation/traversal/test-integrity.json

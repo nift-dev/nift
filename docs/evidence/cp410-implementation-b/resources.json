@@ -1,0 +1,14 @@
+[
+  {
+    "label": "accepted",
+    "allocations": 5640343,
+    "frees": 5640343,
+    "allocated_bytes": 953069934
+  },
+  {
+    "label": "shared",
+    "allocations": 4440369,
+    "frees": 4440369,
+    "allocated_bytes": 771886229
+  }
+]

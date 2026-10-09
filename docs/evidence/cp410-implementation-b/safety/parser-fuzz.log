@@ -1,0 +1,5 @@
+CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-address-use-after-scope" bash scripts/build_vendored_libffi.sh ".build/libffi/sanitize-x86_64-linux-gnu-cc"
+mkdir -p .build/checkpoint-9
+env -u LD_PRELOAD python3 scripts/checkpoint9_parser_fuzz.py --nift "/home/nick/Repositories/nift/nift/.build/cp410-implementation/traversal/certification/.build/nift-sanitize" --cases 400 --seeds 9001,17713,424242 --output .build/checkpoint-9/parser-fuzz.json
+checkpoint 9 parser fuzz/resource: PASS (1219 cases; 232 builds, 987 controlled errors)
+evidence=.build/checkpoint-9/parser-fuzz.json

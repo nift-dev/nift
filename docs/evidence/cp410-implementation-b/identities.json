@@ -1,0 +1,11 @@
+{
+  "accepted_head": "69ad5252946d8181cdd6ab17571aad8df93e1fda",
+  "accepted_binary_sha256": "b5311f39ba9c86b6529563fcc2e37df7961916d5273093fb9ecf5fab75b930d7",
+  "candidate_binary_sha256": "784302131470fbbb3eac9bc4f85bb22b1675732401160cfbead252941389d474",
+  "promoted_binary_sha256": "784302131470fbbb3eac9bc4f85bb22b1675732401160cfbead252941389d474",
+  "source_sha256": {
+    "src/ParserHelpers.h": "146058a0bf0a200fe0a40129228d414e45ce65b8d90e07fc59f45e98ac95b945",
+    "src/ParserHelpers.cpp": "1dae229ca2d53f63f3d690e59fb7f5dc1893f78a2b3b936b97364df12a1d3c14",
+    "src/ParserExpression.cpp": "11870541abb5c4bf3cb076c3f1f1604d51552eb7aba4039f2b6687f7aba85601"
+  }
+}

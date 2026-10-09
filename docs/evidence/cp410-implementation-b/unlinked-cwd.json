@@ -1,0 +1,14 @@
+[
+  {
+    "binary": "/home/nick/Repositories/nift/nift/.build/cp410-implementation/snapshot-nift",
+    "exit": 1,
+    "stdout": "true\n0\n",
+    "stderr": "error: filesystem error: cannot get current path: No such file or directory\n"
+  },
+  {
+    "binary": "/home/nick/Repositories/nift/nift/.build/cp410-implementation/traversal/nift",
+    "exit": 1,
+    "stdout": "true\n0\n",
+    "stderr": "error: filesystem error: cannot get current path: No such file or directory\n"
+  }
+]

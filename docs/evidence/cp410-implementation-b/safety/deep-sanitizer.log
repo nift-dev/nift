@@ -1,0 +1,3 @@
+CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-address-use-after-scope" bash scripts/build_vendored_libffi.sh ".build/libffi/sanitize-x86_64-linux-gnu-cc"
+env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$(test "$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 ".build/nift-sanitize" --version
+Nift v4.10.0

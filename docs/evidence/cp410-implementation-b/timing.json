@@ -1,0 +1,434 @@
+[
+  {
+    "shape": "official-traverse-100000",
+    "rep": 0,
+    "label": "accepted",
+    "cpu": 1.7697370000000001,
+    "rss_kib": 205776,
+    "affinity": 0
+  },
+  {
+    "shape": "official-traverse-100000",
+    "rep": 0,
+    "label": "shared",
+    "cpu": 0.938212,
+    "rss_kib": 208724,
+    "affinity": 0
+  },
+  {
+    "shape": "official-traverse-100000",
+    "rep": 0,
+    "label": "native-prefix",
+    "cpu": 0.9202239999999997,
+    "rss_kib": 146232,
+    "affinity": 0
+  },
+  {
+    "shape": "official-traverse-100000",
+    "rep": 1,
+    "label": "native-prefix",
+    "cpu": 0.9113849999999997,
+    "rss_kib": 146252,
+    "affinity": 0
+  },
+  {
+    "shape": "official-traverse-100000",
+    "rep": 1,
+    "label": "shared",
+    "cpu": 0.9411100000000001,
+    "rss_kib": 208588,
+    "affinity": 0
+  },
+  {
+    "shape": "official-traverse-100000",
+    "rep": 1,
+    "label": "accepted",
+    "cpu": 1.7546979999999985,
+    "rss_kib": 205816,
+    "affinity": 0
+  },
+  {
+    "shape": "official-traverse-100000",
+    "rep": 2,
+    "label": "accepted",
+    "cpu": 1.6930500000000013,
+    "rss_kib": 205880,
+    "affinity": 0
+  },
+  {
+    "shape": "official-traverse-100000",
+    "rep": 2,
+    "label": "shared",
+    "cpu": 0.935141999999999,
+    "rss_kib": 208680,
+    "affinity": 0
+  },
+  {
+    "shape": "official-traverse-100000",
+    "rep": 2,
+    "label": "native-prefix",
+    "cpu": 0.9175249999999995,
+    "rss_kib": 146248,
+    "affinity": 0
+  },
+  {
+    "shape": "official-traverse-100000",
+    "rep": 3,
+    "label": "native-prefix",
+    "cpu": 0.9466890000000001,
+    "rss_kib": 146248,
+    "affinity": 0
+  },
+  {
+    "shape": "official-traverse-100000",
+    "rep": 3,
+    "label": "shared",
+    "cpu": 0.9292590000000001,
+    "rss_kib": 208540,
+    "affinity": 0
+  },
+  {
+    "shape": "official-traverse-100000",
+    "rep": 3,
+    "label": "accepted",
+    "cpu": 1.7223259999999998,
+    "rss_kib": 205908,
+    "affinity": 0
+  },
+  {
+    "shape": "official-traverse-100000",
+    "rep": 4,
+    "label": "accepted",
+    "cpu": 1.6779549999999999,
+    "rss_kib": 205460,
+    "affinity": 0
+  },
+  {
+    "shape": "official-traverse-100000",
+    "rep": 4,
+    "label": "shared",
+    "cpu": 0.9488470000000007,
+    "rss_kib": 208592,
+    "affinity": 0
+  },
+  {
+    "shape": "official-traverse-100000",
+    "rep": 4,
+    "label": "native-prefix",
+    "cpu": 0.9270600000000009,
+    "rss_kib": 146248,
+    "affinity": 0
+  },
+  {
+    "shape": "official-traverse-100000",
+    "rep": 5,
+    "label": "native-prefix",
+    "cpu": 0.9171069999999997,
+    "rss_kib": 146252,
+    "affinity": 0
+  },
+  {
+    "shape": "official-traverse-100000",
+    "rep": 5,
+    "label": "shared",
+    "cpu": 0.9270500000000013,
+    "rss_kib": 208408,
+    "affinity": 0
+  },
+  {
+    "shape": "official-traverse-100000",
+    "rep": 5,
+    "label": "accepted",
+    "cpu": 1.698477999999998,
+    "rss_kib": 205652,
+    "affinity": 0
+  },
+  {
+    "shape": "deep-100000",
+    "rep": 0,
+    "label": "accepted",
+    "cpu": 2.567334999999998,
+    "rss_kib": 296260,
+    "affinity": 0
+  },
+  {
+    "shape": "deep-100000",
+    "rep": 0,
+    "label": "shared",
+    "cpu": 1.1142269999999979,
+    "rss_kib": 298648,
+    "affinity": 0
+  },
+  {
+    "shape": "deep-100000",
+    "rep": 0,
+    "label": "native-prefix",
+    "cpu": 1.0757069999999995,
+    "rss_kib": 201024,
+    "affinity": 0
+  },
+  {
+    "shape": "deep-100000",
+    "rep": 1,
+    "label": "native-prefix",
+    "cpu": 1.084054,
+    "rss_kib": 201052,
+    "affinity": 0
+  },
+  {
+    "shape": "deep-100000",
+    "rep": 1,
+    "label": "shared",
+    "cpu": 1.2661879999999996,
+    "rss_kib": 298640,
+    "affinity": 0
+  },
+  {
+    "shape": "deep-100000",
+    "rep": 1,
+    "label": "accepted",
+    "cpu": 2.820022999999999,
+    "rss_kib": 296324,
+    "affinity": 0
+  },
+  {
+    "shape": "deep-100000",
+    "rep": 2,
+    "label": "accepted",
+    "cpu": 2.6656400000000033,
+    "rss_kib": 296504,
+    "affinity": 0
+  },
+  {
+    "shape": "deep-100000",
+    "rep": 2,
+    "label": "shared",
+    "cpu": 1.109649999999995,
+    "rss_kib": 298712,
+    "affinity": 0
+  },
+  {
+    "shape": "deep-100000",
+    "rep": 2,
+    "label": "native-prefix",
+    "cpu": 1.2398560000000032,
+    "rss_kib": 201104,
+    "affinity": 0
+  },
+  {
+    "shape": "deep-100000",
+    "rep": 3,
+    "label": "native-prefix",
+    "cpu": 1.167943000000001,
+    "rss_kib": 201040,
+    "affinity": 0
+  },
+  {
+    "shape": "deep-100000",
+    "rep": 3,
+    "label": "shared",
+    "cpu": 1.1226930000000017,
+    "rss_kib": 298776,
+    "affinity": 0
+  },
+  {
+    "shape": "deep-100000",
+    "rep": 3,
+    "label": "accepted",
+    "cpu": 2.6175680000000057,
+    "rss_kib": 296472,
+    "affinity": 0
+  },
+  {
+    "shape": "deep-100000",
+    "rep": 4,
+    "label": "accepted",
+    "cpu": 2.6249609999999954,
+    "rss_kib": 296508,
+    "affinity": 0
+  },
+  {
+    "shape": "deep-100000",
+    "rep": 4,
+    "label": "shared",
+    "cpu": 1.1737000000000037,
+    "rss_kib": 298748,
+    "affinity": 0
+  },
+  {
+    "shape": "deep-100000",
+    "rep": 4,
+    "label": "native-prefix",
+    "cpu": 1.119372999999996,
+    "rss_kib": 201052,
+    "affinity": 0
+  },
+  {
+    "shape": "deep-100000",
+    "rep": 5,
+    "label": "native-prefix",
+    "cpu": 1.0845069999999986,
+    "rss_kib": 201052,
+    "affinity": 0
+  },
+  {
+    "shape": "deep-100000",
+    "rep": 5,
+    "label": "shared",
+    "cpu": 1.165299000000001,
+    "rss_kib": 298628,
+    "affinity": 0
+  },
+  {
+    "shape": "deep-100000",
+    "rep": 5,
+    "label": "accepted",
+    "cpu": 2.648320000000002,
+    "rss_kib": 296460,
+    "affinity": 0
+  },
+  {
+    "shape": "mixed-100000",
+    "rep": 0,
+    "label": "accepted",
+    "cpu": 1.54223,
+    "rss_kib": 124156,
+    "affinity": 0
+  },
+  {
+    "shape": "mixed-100000",
+    "rep": 0,
+    "label": "shared",
+    "cpu": 0.6708489999999969,
+    "rss_kib": 132300,
+    "affinity": 0
+  },
+  {
+    "shape": "mixed-100000",
+    "rep": 0,
+    "label": "native-prefix",
+    "cpu": 0.7003710000000005,
+    "rss_kib": 130492,
+    "affinity": 0
+  },
+  {
+    "shape": "mixed-100000",
+    "rep": 1,
+    "label": "native-prefix",
+    "cpu": 0.7046720000000022,
+    "rss_kib": 130492,
+    "affinity": 0
+  },
+  {
+    "shape": "mixed-100000",
+    "rep": 1,
+    "label": "shared",
+    "cpu": 0.6655440000000006,
+    "rss_kib": 132136,
+    "affinity": 0
+  },
+  {
+    "shape": "mixed-100000",
+    "rep": 1,
+    "label": "accepted",
+    "cpu": 1.5296490000000063,
+    "rss_kib": 123868,
+    "affinity": 0
+  },
+  {
+    "shape": "mixed-100000",
+    "rep": 2,
+    "label": "accepted",
+    "cpu": 1.5470459999999981,
+    "rss_kib": 124160,
+    "affinity": 0
+  },
+  {
+    "shape": "mixed-100000",
+    "rep": 2,
+    "label": "shared",
+    "cpu": 0.6668870000000098,
+    "rss_kib": 131968,
+    "affinity": 0
+  },
+  {
+    "shape": "mixed-100000",
+    "rep": 2,
+    "label": "native-prefix",
+    "cpu": 0.7006390000000025,
+    "rss_kib": 130488,
+    "affinity": 0
+  },
+  {
+    "shape": "mixed-100000",
+    "rep": 3,
+    "label": "native-prefix",
+    "cpu": 0.7082690000000014,
+    "rss_kib": 130528,
+    "affinity": 0
+  },
+  {
+    "shape": "mixed-100000",
+    "rep": 3,
+    "label": "shared",
+    "cpu": 0.6745530000000031,
+    "rss_kib": 132260,
+    "affinity": 0
+  },
+  {
+    "shape": "mixed-100000",
+    "rep": 3,
+    "label": "accepted",
+    "cpu": 1.514210999999996,
+    "rss_kib": 124280,
+    "affinity": 0
+  },
+  {
+    "shape": "mixed-100000",
+    "rep": 4,
+    "label": "accepted",
+    "cpu": 1.5223219999999955,
+    "rss_kib": 124084,
+    "affinity": 0
+  },
+  {
+    "shape": "mixed-100000",
+    "rep": 4,
+    "label": "shared",
+    "cpu": 0.6823160000000073,
+    "rss_kib": 132244,
+    "affinity": 0
+  },
+  {
+    "shape": "mixed-100000",
+    "rep": 4,
+    "label": "native-prefix",
+    "cpu": 0.7070270000000036,
+    "rss_kib": 130488,
+    "affinity": 0
+  },
+  {
+    "shape": "mixed-100000",
+    "rep": 5,
+    "label": "native-prefix",
+    "cpu": 0.6988229999999973,
+    "rss_kib": 130472,
+    "affinity": 0
+  },
+  {
+    "shape": "mixed-100000",
+    "rep": 5,
+    "label": "shared",
+    "cpu": 0.6790629999999922,
+    "rss_kib": 132032,
+    "affinity": 0
+  },
+  {
+    "shape": "mixed-100000",
+    "rep": 5,
+    "label": "accepted",
+    "cpu": 1.516809000000002,
+    "rss_kib": 124176,
+    "affinity": 0
+  }
+]

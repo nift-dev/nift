@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/home/nick/Repositories/nift/nift/tests/v410_glob_prefix_parity.py", line 17, in <module>
+    assert actual==expected,(pattern,actual,expected)
+           ^^^^^^^^^^^^^^^^
+AssertionError: ('files/linked-dir/\\../*.dat', (1, '["files/[ab].dat","files/a.dat","files/aa.dat","outside/t.dat","files/sub/z.dat","files/space name.dat","files/é.dat"]\n', '==4==LeakSanitizer has encountered a fatal error.\n==4==HINT: For debugging, try setting environment variable LSAN_OPTIONS=verbosity=1:log_threads=1\n==4==HINT: LeakSanitizer does not work under ptrace (strace, gdb, etc)\n'), (0, '["files/[ab].dat","files/a.dat","files/aa.dat","outside/t.dat","files/sub/z.dat","files/space name.dat","files/é.dat"]\n', ''))

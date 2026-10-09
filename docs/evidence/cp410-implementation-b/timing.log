@@ -1,0 +1,4 @@
+official-traverse-100000 {'accepted': {'cpu': 1.7104019999999989, 'rss_kib': 205796.0}, 'shared': {'cpu': 0.9366769999999995, 'rss_kib': 208590.0}, 'native-prefix': {'cpu': 0.9188744999999996, 'rss_kib': 146248.0}}
+deep-100000 {'accepted': {'cpu': 2.6366404999999986, 'rss_kib': 296466.0}, 'shared': {'cpu': 1.1439960000000013, 'rss_kib': 298680.0}, 'native-prefix': {'cpu': 1.1019399999999973, 'rss_kib': 201052.0}}
+mixed-100000 {'accepted': {'cpu': 1.5259855000000009, 'rss_kib': 124158.0}, 'shared': {'cpu': 0.672701, 'rss_kib': 132190.0}, 'native-prefix': {'cpu': 0.7026555000000023, 'rss_kib': 130490.0}}
+COMPLETE isolated six balanced triples per shape

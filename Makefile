@@ -1901,3 +1901,21 @@ test-v410-callback-overlay-guard: $(LAMBDA_CACHE_GUARD)
 	NIFT="$(CURDIR)/$(LAMBDA_CACHE_GUARD)" python3 tests/v410_callback_overlay_guard.py
 
 test: test-v410-callback-overlay-guard
+
+# Operation-local glob prefix and terminal materialization scaling.
+$(TEST_DIR)/glob-prefix/ParserHelpers.o: src/ParserHelpers.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_TEST_GLOB_PREFIX_STATS -MMD -MP -c $< -o $@
+$(TEST_DIR)/glob-prefix/ParserExpression.o: src/ParserExpression.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_TEST_GLOB_PREFIX_STATS -MMD -MP -c $< -o $@
+-include $(TEST_DIR)/glob-prefix/ParserHelpers.d $(TEST_DIR)/glob-prefix/ParserExpression.d
+GLOB_PREFIX_GUARD := $(TEST_DIR)/nift-glob-prefix-guard$(EXEEXT)
+$(GLOB_PREFIX_GUARD): $(filter-out src/ParserHelpers.o src/ParserExpression.o,$(CLI_OBJECTS)) $(TEST_DIR)/glob-prefix/ParserHelpers.o $(TEST_DIR)/glob-prefix/ParserExpression.o $(LIBFFI_A)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/ParserHelpers.o src/ParserExpression.o,$(CLI_OBJECTS)) $(TEST_DIR)/glob-prefix/ParserHelpers.o $(TEST_DIR)/glob-prefix/ParserExpression.o $(LDLIBS) -o $@
+.PHONY: test-v410-glob-prefix-guard test-v410-glob-prefix-parity
+test-v410-glob-prefix-guard: $(GLOB_PREFIX_GUARD)
+	NIFT_PREFIX_STATS=$(abspath $(GLOB_PREFIX_GUARD)) $(PYTHON) tests/v410_glob_prefix_guard.py
+test-v410-glob-prefix-parity: $(TARGET)
+	NIFT=$(abspath $(TARGET)) $(PYTHON) tests/v410_glob_prefix_parity.py
+test: test-v410-glob-prefix-guard test-v410-glob-prefix-parity

@@ -8,7 +8,7 @@
 
 #include <algorithm>
 #include <cctype>
-#if defined(NIFT_TEST_GLOB_KEY_STATS) || defined(NIFT_TEST_GLOB_PREFIX_STATS)
+#ifdef NIFT_TEST_GLOB_KEY_STATS
 #include <cstdio>
 #include <cstdlib>
 #endif
@@ -273,66 +273,38 @@ void sort_glob_paths(std::vector<T>& values, PathOf path_of) {
     for (std::size_t i = 0; i < values.size(); ++i) values[i] = std::move(keyed[i].value);
 }
 
-#ifdef NIFT_TEST_GLOB_PREFIX_STATS
-struct GlobPrefixStats {
-    unsigned long long terminal_paths=0, prefix_nodes=0, prefix_resolves=0, full_display_paths=0, final_values=0;
-    ~GlobPrefixStats() {
-        if (std::getenv("NIFT_TEST_GLOB_PREFIX_STATS"))
-            std::fprintf(stderr,"glob-prefix terminal_paths=%llu prefix_nodes=%llu prefix_resolves=%llu full_display_paths=%llu final_values=%llu\n",terminal_paths,prefix_nodes,prefix_resolves,full_display_paths,final_values);
-    }
-} glob_prefix_stats;
-#endif
-
 // Match descriptors share directory ownership through this operation only.
 struct SharedGlobOutput {
     std::vector<GlobMatch> values;
     std::unordered_map<fs::path, std::shared_ptr<GlobPrefix>> prefixes;
-    std::shared_ptr<GlobPrefix> prefix(const fs::path& directory) {
-        // Final absolute paths have always been normalized before display.
-        // Escaped dot components can make a walked path lexically different;
-        // retain canonical full-leaf resolution for those uncommon cases.
-        auto normalized=fs::absolute(directory).lexically_normal();
-        const bool changed=normalized!=directory;
-        auto found = prefixes.find(normalized);
+    void emit(fs::path absolute, const fs::directory_entry* entry) {
+        auto parent = absolute.parent_path();
+        auto found = prefixes.find(parent);
         if (found == prefixes.end()) {
-            record_glob_prefix_event(GlobPrefixEvent::PrefixNode);
             auto prefix = std::make_shared<GlobPrefix>();
-            prefix->original = normalized;
-            found = prefixes.emplace(std::move(normalized), std::move(prefix)).first;
+            prefix->original = parent;
+            found = prefixes.emplace(std::move(parent), std::move(prefix)).first;
         }
-        if (changed) found->second->requires_leaf_resolution=true;
-        return found->second;
-    }
-    void emit(fs::path absolute, const fs::directory_entry* entry,
-              const std::shared_ptr<GlobPrefix>& parent) {
         std::error_code ec;
-        const bool resolve_leaf = (entry ? entry->is_symlink(ec) : fs::is_symlink(absolute, ec)) || ec || !absolute.has_filename();
-        auto shared = parent ? parent : prefix(absolute.parent_path());
-        values.push_back({std::move(absolute), std::move(shared), resolve_leaf});
+        const bool resolve_leaf = (entry ? entry->is_symlink(ec) : fs::is_symlink(absolute, ec)) || ec;
+        auto suffix = absolute.filename();
+        values.push_back({std::move(absolute), found->second, std::move(suffix), resolve_leaf});
     }
 };
-std::shared_ptr<GlobPrefix> prepare_glob_prefix(std::vector<fs::path>&, const fs::path&) { return {}; }
-std::shared_ptr<GlobPrefix> prepare_glob_prefix(SharedGlobOutput& out, const fs::path& directory) {
-    return out.prefix(directory);
-}
 void emit_glob_match(std::vector<fs::path>& out, fs::path absolute,
-                     const fs::directory_entry*, const std::shared_ptr<GlobPrefix>&) { record_glob_prefix_event(GlobPrefixEvent::TerminalPath); out.push_back(std::move(absolute)); }
+                     const fs::directory_entry*) { out.push_back(std::move(absolute)); }
 void emit_glob_match(SharedGlobOutput& out, fs::path absolute,
-                     const fs::directory_entry* entry, const std::shared_ptr<GlobPrefix>& parent) {
-    record_glob_prefix_event(GlobPrefixEvent::TerminalPath);
-    out.emit(std::move(absolute), entry, parent);
-}
+                     const fs::directory_entry* entry) { out.emit(std::move(absolute), entry); }
 
 template<class Output>
 void glob_walk(const fs::path& base, const std::vector<std::string>& parts,
                std::size_t i, Output& out,
                const std::vector<fs::directory_entry>* scanned = nullptr,
-               const fs::directory_entry* terminal_entry = nullptr,
-               const std::shared_ptr<GlobPrefix>& terminal_parent = {}) {
+               const fs::directory_entry* terminal_entry = nullptr) {
     if (i == parts.size()) {
         std::error_code ec;
         if (fs::exists(base, ec) && !ec)
-            emit_glob_match(out, fs::absolute(base).lexically_normal(), terminal_entry, terminal_parent);
+            emit_glob_match(out, fs::absolute(base).lexically_normal(), terminal_entry);
         return;
     }
     const auto& part = parts[i];
@@ -350,7 +322,7 @@ void glob_walk(const fs::path& base, const std::vector<std::string>& parts,
     if (!scanned) {
         std::error_code ec;
         if (!fs::is_directory(base, ec) || ec) {
-            if (part == "**") glob_walk(base, parts, i + 1, out, nullptr, terminal_entry, terminal_parent);
+            if (part == "**") glob_walk(base, parts, i + 1, out);
             return;
         }
         for (fs::directory_iterator it(base, fs::directory_options::skip_permission_denied, ec), end;
@@ -360,27 +332,18 @@ void glob_walk(const fs::path& base, const std::vector<std::string>& parts,
     // Adjacent components on the same base can share this operation-local scan.
     // Final absolute ordering and deduplication still cover every result.
     if (part == "**") {
-        glob_walk(base, parts, i + 1, out, scanned, terminal_entry, terminal_parent);
+        glob_walk(base, parts, i + 1, out, scanned, terminal_entry);
         for (const auto& e : *scanned) {
             auto name = e.path().filename().string();
             if (!name.empty() && name[0] == '.') continue;
             std::error_code ec;
             if (e.is_directory(ec) && !e.is_symlink(ec))
-                glob_walk(e.path(), parts, i, out, nullptr, &e);
+                glob_walk(e.path(), parts, i, out);
         }
     } else {
-        // Only zero-width ** components may emit this same candidate later.
-        // Intern its parent lazily on the first actual terminal candidate;
-        // unmatched directories never allocate a prefix descriptor.
-        const bool terminal_suffix=std::all_of(parts.begin()+i+1,parts.end(),
-            [](const auto& component){return component=="**";});
-        std::shared_ptr<GlobPrefix> directory_prefix;
-        for (const auto& e : *scanned) {
-            if (glob_component_match(part, e.path().filename().string())) {
-                if (terminal_suffix && !directory_prefix) directory_prefix=prepare_glob_prefix(out,base);
-                glob_walk(e.path(), parts, i + 1, out, nullptr, &e, directory_prefix);
-            }
-        }
+        for (const auto& e : *scanned)
+            if (glob_component_match(part, e.path().filename().string()))
+                glob_walk(e.path(), parts, i + 1, out, nullptr, &e);
     }
 }
 
@@ -432,18 +395,6 @@ bool glob_component_match(const std::string& pattern,const std::string& name){
 std::vector<fs::path> glob_expand(const fs::path& resolved_pattern){
     std::string g=resolved_pattern.generic_string();fs::path root=resolved_pattern.root_path();std::string rel=root.empty()?g:g.substr(root.generic_string().size());while(!rel.empty()&&rel.front()=='/')rel.erase(rel.begin());std::vector<std::string> parts;std::stringstream ss(rel);std::string part;while(std::getline(ss,part,'/'))if(!part.empty())parts.push_back(part);std::vector<fs::path> out;glob_walk(root.empty()?fs::path("."):root,parts,0,out);sort_glob_paths(out, [](const auto& path) -> const fs::path& { return path; });out.erase(std::unique(out.begin(),out.end()),out.end());return out;
 }
-
-#ifdef NIFT_TEST_GLOB_PREFIX_STATS
-void record_glob_prefix_event(GlobPrefixEvent event) {
-    switch(event) {
-    case GlobPrefixEvent::TerminalPath: ++glob_prefix_stats.terminal_paths; break;
-    case GlobPrefixEvent::PrefixNode: ++glob_prefix_stats.prefix_nodes; break;
-    case GlobPrefixEvent::PrefixResolve: ++glob_prefix_stats.prefix_resolves; break;
-    case GlobPrefixEvent::FullDisplayPath: ++glob_prefix_stats.full_display_paths; break;
-    case GlobPrefixEvent::FinalValue: ++glob_prefix_stats.final_values; break;
-    }
-}
-#endif
 
 std::vector<GlobMatch> glob_expand_shared(const fs::path& resolved_pattern) {
     const auto generic = resolved_pattern.generic_string();

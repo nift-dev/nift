@@ -1894,9 +1894,20 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             if(call_args("copy",args,q)||call_args("cp",args,q)||call_args("move",args,q)||call_args("mv",args,q)){const bool mv=text.rfind("move(",0)==0||text.rfind("mv(",0)==0;const std::string name=mv?"move":"copy";if(text.rfind("copy(",0)==0&&args.size()<2){args.clear();q.clear();}else if(args.size()<2){error=name+": expected source(s) and destination";return false;}else{std::vector<fs::path> sources;if(!path_values(name,args,q,0,args.size()-1,sources))return false;if(sources.empty()){error=name+": glob matched no source files";return false;}std::vector<fs::path> dests;if(!path_values(name,args,q,args.size()-1,args.size(),dests)||dests.size()!=1){error=name+": destination must be one path";return false;}fs::path dest=dests.front();std::error_code dec;const bool dest_dir=fs::is_directory(dest,dec);if(sources.size()>1&&!dest_dir){error=name+": destination must be an existing directory for multiple sources";return false;}for(const auto& src:sources){fs::path target=dest_dir?dest/src.filename():dest;std::error_code ec;if(mv)fs::rename(src,target,ec);else fs::copy_file(src,target,fs::copy_options::overwrite_existing,ec);if(ec)return fail_recoverable(mv?nift::detail::DiagnosticCode::IoMoveFailed:nift::detail::DiagnosticCode::IoCopyFailed,name+": "+ec.message(),error);}out=nift::RuntimeValue(nullptr);return true;}}
             if(call_args("cat",args,q)){fs::path p;if(args.size()!=1||!checked_path("cat",args,q,0,p))return false;std::error_code ec;if(fs::is_directory(p,ec)){error="cat: path is a directory";return false;}std::ifstream f(p,std::ios::binary);if(!f)return fail_recoverable(nift::detail::DiagnosticCode::IoOpenFailed,"cat: cannot open path",error);std::ostringstream ss;ss<<f.rdbuf();execution_output_->write_stdout(ss.str());out=nift::RuntimeValue(nullptr);return true;}
             if(call_args("ls",args,q)){if(args.size()>1){error="ls: expected zero or one path/pattern";return false;}out=nift::RuntimeValue::make_array();if(args.empty()){fs::path p=standalone_script_host_?fs::current_path():host_.root();std::error_code ec;std::vector<std::string> names;for(fs::directory_iterator it(p,ec),end;!ec&&it!=end;it.increment(ec))names.push_back(it->path().filename().generic_string());if(ec)return fail_recoverable(nift::detail::DiagnosticCode::IoDirectoryReadFailed,"ls: "+ec.message(),error);std::sort(names.begin(),names.end());for(const auto& n:names)out.array.emplace_back(n);return true;}std::string raw;if(!string_arg("ls",args,q,0,raw))return false;fs::path p=resolve_path(raw);if(!standalone_script_host_&&!resource_path_authority_.project_root.empty()&&!filesystem::path_within(resource_path_authority_.project_root,p)){error="ls: path must stay inside the Nift project";return false;}if(!nift_fs_root_allowed(p,resource_path_authority_.enforce_filesystem_root?resource_path_authority_.filesystem_root:fs::path{},error)){error="ls: "+error;return false;}if(glob_has_magic(raw)){
-                auto matches=glob_expand(p);
-                const fs::path base=standalone_script_host_?fs::current_path():host_.root();
                 const bool absolute=fs::path(raw).is_absolute();
+                if (absolute) {
+                    auto paths=glob_expand(p);
+                    const fs::path base=standalone_script_host_?fs::current_path():host_.root();
+                    (void)base; // Preserve the existing cwd observation/error boundary.
+                    out.array.reserve(paths.size());
+                    for (const auto& path : paths) {
+                        out.array.emplace_back(path.generic_string());
+                        nift::detail::record_glob_prefix_event(nift::detail::GlobPrefixEvent::FinalValue);
+                    }
+                    return true;
+                }
+                auto matches=nift::detail::glob_expand_shared(p);
+                const fs::path base=standalone_script_host_?fs::current_path():host_.root();
                 std::error_code base_error;
                 fs::path canonical_base;
                 // relative() canonicalizes both operands. Resolve the common
@@ -1908,18 +1919,50 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     canonical_base=fs::weakly_canonical(base,base_error);
                 }
                 out.array.reserve(matches.size());
-                for(const auto& m:matches){
-                    std::error_code rec=base_error;
-                    fs::path shown;
-                    if(absolute)shown=m;
-                    if(!absolute&&!rec){
+                for(auto& m:matches){
+                    std::string rendered;
 #ifdef NIFT_TEST_GLOB_PATH_STATS
-                        ++glob_relative_stats.matches;
+                    if (!base_error) ++glob_relative_stats.matches;
 #endif
-                        auto canonical_match=fs::weakly_canonical(m,rec);
-                        if(!rec)shown=canonical_match.lexically_relative(canonical_base);
+                    if (base_error) rendered=m.absolute.generic_string();
+                    else if (m.resolve_leaf || m.prefix->requires_leaf_resolution) {
+                        std::error_code rec;
+                        nift::detail::record_glob_prefix_event(nift::detail::GlobPrefixEvent::FullDisplayPath);
+                        const auto canonical_match=fs::weakly_canonical(m.absolute,rec);
+                        rendered=(rec?m.absolute:canonical_match.lexically_relative(canonical_base)).generic_string();
+                    } else {
+                        auto& prefix=*m.prefix;
+                        if (!prefix.ready) {
+                            nift::detail::record_glob_prefix_event(nift::detail::GlobPrefixEvent::PrefixResolve);
+                            prefix.resolved=fs::weakly_canonical(prefix.original,prefix.error);
+                            if (!prefix.error) {
+                                const auto relative=prefix.resolved.lexically_relative(canonical_base);
+                                prefix.relative_fallback=relative.empty();
+                                bool only_parents=!relative.empty();
+                                for (const auto& component : relative)
+                                    if (component != "..") { only_parents=false; break; }
+                                prefix.relative_fallback=prefix.relative_fallback || only_parents;
+                                if (relative != ".") prefix.relative_display=relative.generic_string();
+                            }
+                            prefix.ready=true;
+                        }
+                        if (prefix.error) rendered=m.absolute.generic_string();
+                        else if (prefix.relative_fallback) {
+                            nift::detail::record_glob_prefix_event(nift::detail::GlobPrefixEvent::FullDisplayPath);
+                            rendered=(prefix.resolved / m.absolute.filename()).lexically_relative(canonical_base).generic_string();
+                        } else {
+                            rendered=prefix.relative_display;
+                            if (!rendered.empty()) rendered+='/';
+                            rendered+=m.absolute.filename().generic_string();
+                            if (rendered.empty()) rendered=".";
+                        }
                     }
-                    out.array.emplace_back((rec?m:shown).generic_string());
+                    out.array.emplace_back(std::move(rendered));
+                    nift::detail::record_glob_prefix_event(nift::detail::GlobPrefixEvent::FinalValue);
+                    // Ordering/dedup is complete. Consume the path owner as its
+                    // final value is emitted, rather than retain both buffers.
+                    fs::path{}.swap(m.absolute);
+                    m.prefix.reset();
                 }
                 return true;
             }std::error_code ec;if(!fs::is_directory(p,ec)||ec){if(ec)return fail_recoverable(nift::detail::DiagnosticCode::IoDirectoryReadFailed,"ls: "+ec.message(),error);error="ls: path is not a readable directory";return false;}std::vector<std::string> names;for(fs::directory_iterator it(p,ec),end;!ec&&it!=end;it.increment(ec))names.push_back(it->path().filename().generic_string());if(ec)return fail_recoverable(nift::detail::DiagnosticCode::IoDirectoryReadFailed,"ls: "+ec.message(),error);std::sort(names.begin(),names.end());for(const auto& n:names)out.array.emplace_back(n);return true;}

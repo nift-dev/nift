@@ -1,0 +1,243 @@
+[
+  {
+    "pattern": "files/linked-dir/\\../*.dat",
+    "exit": 0,
+    "stdout": "[\"files/[ab].dat\",\"files/a.dat\",\"files/aa.dat\",\"outside/t.dat\",\"files/sub/z.dat\",\"files/space name.dat\",\"files/\u00e9.dat\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/**/\\./*.dat",
+    "exit": 0,
+    "stdout": "[\"files/[ab].dat\",\"files/a.dat\",\"files/aa.dat\",\"outside/t.dat\",\"files/sub/z.dat\",\"files/space name.dat\",\"files/sub/deep/b.dat\",\"files/sub/z.dat\",\"files/\u00e9.dat\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/**/\\../*.dat",
+    "exit": 0,
+    "stdout": "[\"files/[ab].dat\",\"files/a.dat\",\"files/aa.dat\",\"outside/t.dat\",\"files/sub/z.dat\",\"files/space name.dat\",\"files/sub/z.dat\",\"files/\u00e9.dat\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/*",
+    "exit": 0,
+    "stdout": "[\"files/[ab].dat\",\"files/a.dat\",\"files/aa.dat\",\"outside/t.dat\",\"files/sub/z.dat\",\"files/sub\",\"files/space name.dat\",\"files/sub\",\"files/upper.DAT\",\"files/\u00e9.dat\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/**",
+    "exit": 0,
+    "stdout": "[\"files\",\"files/sub\",\"files/sub/deep\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/**/**",
+    "exit": 0,
+    "stdout": "[\"files\",\"files/sub\",\"files/sub/deep\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/**/**/**",
+    "exit": 0,
+    "stdout": "[\"files\",\"files/sub\",\"files/sub/deep\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/**/*.dat",
+    "exit": 0,
+    "stdout": "[\"files/[ab].dat\",\"files/a.dat\",\"files/aa.dat\",\"outside/t.dat\",\"files/sub/z.dat\",\"files/space name.dat\",\"files/sub/deep/b.dat\",\"files/sub/z.dat\",\"files/\u00e9.dat\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/**/sub/*",
+    "exit": 0,
+    "stdout": "[\"files/sub/deep\",\"files/sub/z.dat\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/*/*.dat",
+    "exit": 0,
+    "stdout": "[\"files/sub/z.dat\",\"files/sub/z.dat\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/*/deep/?*.dat",
+    "exit": 0,
+    "stdout": "[\"files/sub/deep/b.dat\",\"files/sub/deep/b.dat\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/**/sub/..",
+    "exit": 0,
+    "stdout": "[\"files\",\"files/sub\",\"files/sub/deep\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/**/./*.dat",
+    "exit": 0,
+    "stdout": "[\"files/[ab].dat\",\"files/a.dat\",\"files/aa.dat\",\"outside/t.dat\",\"files/sub/z.dat\",\"files/space name.dat\",\"files/sub/deep/b.dat\",\"files/sub/z.dat\",\"files/\u00e9.dat\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/**/../*.dat",
+    "exit": 0,
+    "stdout": "[\"files/[ab].dat\",\"files/a.dat\",\"files/aa.dat\",\"outside/t.dat\",\"files/sub/z.dat\",\"files/space name.dat\",\"files/\u00e9.dat\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/linked-dir/*.dat",
+    "exit": 0,
+    "stdout": "[\"files/sub/z.dat\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/linked-dir/**",
+    "exit": 0,
+    "stdout": "[\"files/sub\",\"files/sub/deep\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/**/deep/**",
+    "exit": 0,
+    "stdout": "[\"files/sub/deep\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/**/.*",
+    "exit": 0,
+    "stdout": "[\"files/.hidden.dat\",\"files/.private\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/.private/**",
+    "exit": 0,
+    "stdout": "[\"files/.private\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/.private/*.dat",
+    "exit": 0,
+    "stdout": "[\"files/.private/x.dat\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/??.dat",
+    "exit": 0,
+    "stdout": "[\"files/aa.dat\",\"files/\u00e9.dat\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/?.dat",
+    "exit": 0,
+    "stdout": "[\"files/a.dat\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/[ab]*.dat",
+    "exit": 0,
+    "stdout": "[\"files/[ab].dat\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/**/[ab].dat",
+    "exit": 0,
+    "stdout": "[\"files/[ab].dat\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/**/[a-z].dat",
+    "exit": 0,
+    "stdout": "[]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/**/*.DAT",
+    "exit": 0,
+    "stdout": "[\"files/upper.DAT\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/**/*.missing",
+    "exit": 0,
+    "stdout": "[]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/**/no-such/*",
+    "exit": 0,
+    "stdout": "[]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/linked-dir/../*.dat",
+    "exit": 0,
+    "stdout": "[\"files/[ab].dat\",\"files/a.dat\",\"files/aa.dat\",\"outside/t.dat\",\"files/sub/z.dat\",\"files/space name.dat\",\"files/\u00e9.dat\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/dangling*",
+    "exit": 0,
+    "stdout": "[]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/external*",
+    "exit": 0,
+    "stdout": "[\"outside/t.dat\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "files/link*",
+    "exit": 0,
+    "stdout": "[\"files/sub/z.dat\",\"files/sub\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "./files/**/*.dat",
+    "exit": 0,
+    "stdout": "[\"files/[ab].dat\",\"files/a.dat\",\"files/aa.dat\",\"outside/t.dat\",\"files/sub/z.dat\",\"files/space name.dat\",\"files/sub/deep/b.dat\",\"files/sub/z.dat\",\"files/\u00e9.dat\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "**/*.dat",
+    "exit": 0,
+    "stdout": "[\"alternate/q.dat\",\"files/[ab].dat\",\"files/a.dat\",\"files/aa.dat\",\"outside/t.dat\",\"files/sub/z.dat\",\"files/space name.dat\",\"files/sub/deep/b.dat\",\"files/sub/z.dat\",\"files/\u00e9.dat\",\"outside/t.dat\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "**",
+    "exit": 0,
+    "stdout": "[\".\",\"alternate\",\"files\",\"files/sub\",\"files/sub/deep\",\"outside\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "**/**",
+    "exit": 0,
+    "stdout": "[\".\",\"alternate\",\"files\",\"files/sub\",\"files/sub/deep\",\"outside\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "../files/**/*.dat",
+    "exit": 0,
+    "stdout": "[]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "<ORACLE_ROOT>/files/**/*.dat",
+    "exit": 0,
+    "stdout": "[\"<ORACLE_ROOT>/files/[ab].dat\",\"<ORACLE_ROOT>/files/a.dat\",\"<ORACLE_ROOT>/files/aa.dat\",\"<ORACLE_ROOT>/files/external.dat\",\"<ORACLE_ROOT>/files/link.dat\",\"<ORACLE_ROOT>/files/space name.dat\",\"<ORACLE_ROOT>/files/sub/deep/b.dat\",\"<ORACLE_ROOT>/files/sub/z.dat\",\"<ORACLE_ROOT>/files/\u00e9.dat\"]\n",
+    "stderr": ""
+  },
+  {
+    "pattern": "<ORACLE_ROOT>/files/*",
+    "exit": 0,
+    "stdout": "[\"<ORACLE_ROOT>/files/[ab].dat\",\"<ORACLE_ROOT>/files/a.dat\",\"<ORACLE_ROOT>/files/aa.dat\",\"<ORACLE_ROOT>/files/external.dat\",\"<ORACLE_ROOT>/files/link.dat\",\"<ORACLE_ROOT>/files/linked-dir\",\"<ORACLE_ROOT>/files/space name.dat\",\"<ORACLE_ROOT>/files/sub\",\"<ORACLE_ROOT>/files/upper.DAT\",\"<ORACLE_ROOT>/files/\u00e9.dat\"]\n",
+    "stderr": ""
+  },
+  {
+    "name": "same-parser-retarget",
+    "source": "print(ls(\"files/linked-dir/*.dat\").stringify()); result := run(\"ln\",\"-sfn\",\"../alternate\",\"files/linked-dir\"); print(result.launched); print(result.exit_code); print(ls(\"files/linked-dir/*.dat\").stringify())",
+    "exit": 0,
+    "stdout": "[\"files/sub/z.dat\"]\ntrue\n0\n[\"alternate/q.dat\"]\n",
+    "stderr": ""
+  }
+]

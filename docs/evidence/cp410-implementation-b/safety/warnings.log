@@ -1,0 +1,67 @@
+make[1]: Entering directory '/home/nick/Repositories/nift/nift/.build/cp410-implementation/traversal/certification'
+CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-linux-gnu-cc"
+  g++: src/nift.cpp
+  g++: src/ProjectOwnership.cpp
+  g++: src/PackageTransaction.cpp
+  g++: src/CLI.cpp
+  g++: src/Process.cpp
+  g++: src/JobControl.cpp
+  g++: src/RuntimeValue.cpp
+  g++: src/Value.cpp
+  g++: src/FileSystem.cpp
+  g++: src/JsonFile.cpp
+  g++: src/JsonSchema.cpp
+  g++: src/Parser.cpp
+  g++: src/ParserAsyncPool.cpp
+  g++: src/ParserExpression.cpp
+  g++: src/ParserHelpers.cpp
+  g++: src/ParserScript.cpp
+  g++: src/ParserTemplate.cpp
+  g++: src/ProjectInfo.cpp
+  g++: src/ProjectRead.cpp
+  g++: src/ProjectState.cpp
+  g++: src/WatchList.cpp
+  g++: src/BuildProgress.cpp
+  g++: src/Automation.cpp
+  g++: src/Hooks.cpp
+  g++: src/Ast.cpp
+  g++: src/embed/Engine.cpp
+  g++: src/embed/Context.cpp
+  g++: src/embed/c_abi.cpp
+PASS: zero first-party compiler warnings (g++)
+make[1]: Leaving directory '/home/nick/Repositories/nift/nift/.build/cp410-implementation/traversal/certification'
+== clang++ first-party warnings pass ==
+make[1]: Entering directory '/home/nick/Repositories/nift/nift/.build/cp410-implementation/traversal/certification'
+CC="cc" CXX="clang++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-linux-gnu-cc"
+BUILD vendored libffi (x86_64-linux-gnu-cc)
+BUILD vendored libffi: done (7s)
+  clang++: src/nift.cpp
+  clang++: src/ProjectOwnership.cpp
+  clang++: src/PackageTransaction.cpp
+  clang++: src/CLI.cpp
+  clang++: src/Process.cpp
+  clang++: src/JobControl.cpp
+  clang++: src/RuntimeValue.cpp
+  clang++: src/Value.cpp
+  clang++: src/FileSystem.cpp
+  clang++: src/JsonFile.cpp
+  clang++: src/JsonSchema.cpp
+  clang++: src/Parser.cpp
+  clang++: src/ParserAsyncPool.cpp
+  clang++: src/ParserExpression.cpp
+  clang++: src/ParserHelpers.cpp
+  clang++: src/ParserScript.cpp
+  clang++: src/ParserTemplate.cpp
+  clang++: src/ProjectInfo.cpp
+  clang++: src/ProjectRead.cpp
+  clang++: src/ProjectState.cpp
+  clang++: src/WatchList.cpp
+  clang++: src/BuildProgress.cpp
+  clang++: src/Automation.cpp
+  clang++: src/Hooks.cpp
+  clang++: src/Ast.cpp
+  clang++: src/embed/Engine.cpp
+  clang++: src/embed/Context.cpp
+  clang++: src/embed/c_abi.cpp
+PASS: zero first-party compiler warnings (clang++)
+make[1]: Leaving directory '/home/nick/Repositories/nift/nift/.build/cp410-implementation/traversal/certification'
