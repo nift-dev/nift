@@ -1,0 +1,15 @@
+==8== Callgrind, a call-graph generating cache profiler
+==8== Copyright (C) 2002-2017, and GNU GPL'd, by Josef Weidendorfer et al.
+==8== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==8== Command: /home/nick/Repositories/nift/nift/.build/cp410-implementation/save/nift /home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n016000/u100/identity____/official-equivalent.f
+==8== Parent PID: 5
+==8== 
+==8== For interactive control, run 'callgrind_control -h'.
+==8== brk segment overflow in thread #1: can't grow to 0x4c59000
+==8== (see section Limitations in user manual)
+==8== NOTE: further instances of this message will not be shown
+==8== 
+==8== Events    : Ir
+==8== Collected : 720446524
+==8== 
+==8== I   refs:      720,446,524

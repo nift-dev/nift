@@ -1,0 +1,50 @@
+[
+  {
+    "label": "accepted",
+    "scenario": "clean-open-close",
+    "saved_copies": 32,
+    "saved_bytes": 33554432,
+    "working_copies": 32,
+    "working_bytes": 33554432
+  },
+  {
+    "label": "accepted",
+    "scenario": "create-save",
+    "saved_copies": 32,
+    "saved_bytes": 33554432,
+    "working_copies": 0,
+    "working_bytes": 0
+  },
+  {
+    "label": "accepted",
+    "scenario": "mutate-revert",
+    "saved_copies": 32,
+    "saved_bytes": 33554432,
+    "working_copies": 64,
+    "working_bytes": 67108864
+  },
+  {
+    "label": "final",
+    "scenario": "clean-open-close",
+    "saved_copies": 0,
+    "saved_bytes": 0,
+    "working_copies": 0,
+    "working_bytes": 0
+  },
+  {
+    "label": "final",
+    "scenario": "create-save",
+    "saved_copies": 0,
+    "saved_bytes": 0,
+    "working_copies": 0,
+    "working_bytes": 0
+  },
+  {
+    "label": "final",
+    "scenario": "mutate-revert",
+    "saved_copies": 32,
+    "saved_bytes": 33554432,
+    "working_copies": 32,
+    "working_bytes": 33554432
+  }
+]

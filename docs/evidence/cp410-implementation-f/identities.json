@@ -1,0 +1,14 @@
+{
+  "base_head": "e290b85cdb655b3490e051262451a346baf00309",
+  "accepted_binary_sha256": "bf9771454572e1d866a38ffa7b864d8c7ce33e2455ad0b0af55c22ae9b04c30d",
+  "observer_binary_sha256": "7c74cca265aa1c69f869a61e55ea02968d1ba7953477c5301ac7cad1ac5588d6",
+  "private_only": true,
+  "observer_files": {
+    "RuntimeValue.h": "408f729102c34dfab434031300be8752c5839a342455663ca97fd5e16546df2c",
+    "RuntimeValue.cpp": "cf73ea709158771552a326c6d578983ae5ee97b7d1fb3206bf43889b464aa1b0",
+    "Parser.cpp": "785c1503baf306ee4b57baba2cb8d652632da80935eb4a49dde6ae4c9b588eda",
+    "ParserExpression.cpp": "765565d077b4281ef73c0cb5e758b1acc730accd2e40259f83a17ce5fab915de",
+    "ParserTemplate.cpp": "873f36b63341de7ab0ed9785c71a1d6d3147e2047bd981f33a3130bdd5d81632",
+    "Ast.cpp": "809fc067fca8aa5313d8dc08a8856841abce983ba5b58e9f94584d16d59d5941"
+  }
+}

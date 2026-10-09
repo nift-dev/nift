@@ -1,0 +1,164 @@
+[
+  {
+    "label": "accepted",
+    "repeat": 0,
+    "cpu": 0.041464,
+    "wall": 0.04373015998862684,
+    "rss_kib": 8176,
+    "affinity": 0,
+    "binary_sha256": "bf9771454572e1d866a38ffa7b864d8c7ce33e2455ad0b0af55c22ae9b04c30d"
+  },
+  {
+    "label": "file-recipes",
+    "repeat": 0,
+    "cpu": 0.03350399999999999,
+    "wall": 0.03546648798510432,
+    "rss_kib": 8516,
+    "affinity": 0,
+    "binary_sha256": "12a554239767ed0ef53f2d63dcbb4c554c457b00213466c1e9de674af8de69ba"
+  },
+  {
+    "label": "native-atomic",
+    "repeat": 0,
+    "cpu": 0.011393,
+    "wall": 0.01283521088771522,
+    "rss_kib": 4256,
+    "affinity": 0,
+    "binary_sha256": "23aa6fcdef9210fd5270f359f2cb6d333cd4b02853b65187fcb6e8aac11f2d65"
+  },
+  {
+    "label": "native-atomic",
+    "repeat": 1,
+    "cpu": 0.01150799999999999,
+    "wall": 0.013028607936576009,
+    "rss_kib": 4208,
+    "affinity": 0,
+    "binary_sha256": "23aa6fcdef9210fd5270f359f2cb6d333cd4b02853b65187fcb6e8aac11f2d65"
+  },
+  {
+    "label": "file-recipes",
+    "repeat": 1,
+    "cpu": 0.029593999999999995,
+    "wall": 0.03105175797827542,
+    "rss_kib": 8616,
+    "affinity": 0,
+    "binary_sha256": "12a554239767ed0ef53f2d63dcbb4c554c457b00213466c1e9de674af8de69ba"
+  },
+  {
+    "label": "accepted",
+    "repeat": 1,
+    "cpu": 0.037357,
+    "wall": 0.0391450310125947,
+    "rss_kib": 8048,
+    "affinity": 0,
+    "binary_sha256": "bf9771454572e1d866a38ffa7b864d8c7ce33e2455ad0b0af55c22ae9b04c30d"
+  },
+  {
+    "label": "accepted",
+    "repeat": 2,
+    "cpu": 0.03677,
+    "wall": 0.038289633113890886,
+    "rss_kib": 8152,
+    "affinity": 0,
+    "binary_sha256": "bf9771454572e1d866a38ffa7b864d8c7ce33e2455ad0b0af55c22ae9b04c30d"
+  },
+  {
+    "label": "file-recipes",
+    "repeat": 2,
+    "cpu": 0.028443999999999997,
+    "wall": 0.02983394404873252,
+    "rss_kib": 8680,
+    "affinity": 0,
+    "binary_sha256": "12a554239767ed0ef53f2d63dcbb4c554c457b00213466c1e9de674af8de69ba"
+  },
+  {
+    "label": "native-atomic",
+    "repeat": 2,
+    "cpu": 0.01039900000000002,
+    "wall": 0.010838801972568035,
+    "rss_kib": 4248,
+    "affinity": 0,
+    "binary_sha256": "23aa6fcdef9210fd5270f359f2cb6d333cd4b02853b65187fcb6e8aac11f2d65"
+  },
+  {
+    "label": "native-atomic",
+    "repeat": 3,
+    "cpu": 0.010411999999999977,
+    "wall": 0.010892924852669239,
+    "rss_kib": 4244,
+    "affinity": 0,
+    "binary_sha256": "23aa6fcdef9210fd5270f359f2cb6d333cd4b02853b65187fcb6e8aac11f2d65"
+  },
+  {
+    "label": "file-recipes",
+    "repeat": 3,
+    "cpu": 0.030808999999999975,
+    "wall": 0.032250070944428444,
+    "rss_kib": 8624,
+    "affinity": 0,
+    "binary_sha256": "12a554239767ed0ef53f2d63dcbb4c554c457b00213466c1e9de674af8de69ba"
+  },
+  {
+    "label": "accepted",
+    "repeat": 3,
+    "cpu": 0.04001900000000003,
+    "wall": 0.04191796015948057,
+    "rss_kib": 8272,
+    "affinity": 0,
+    "binary_sha256": "bf9771454572e1d866a38ffa7b864d8c7ce33e2455ad0b0af55c22ae9b04c30d"
+  },
+  {
+    "label": "accepted",
+    "repeat": 4,
+    "cpu": 0.03936499999999998,
+    "wall": 0.041222100146114826,
+    "rss_kib": 8360,
+    "affinity": 0,
+    "binary_sha256": "bf9771454572e1d866a38ffa7b864d8c7ce33e2455ad0b0af55c22ae9b04c30d"
+  },
+  {
+    "label": "file-recipes",
+    "repeat": 4,
+    "cpu": 0.032039999999999985,
+    "wall": 0.0337788809556514,
+    "rss_kib": 8404,
+    "affinity": 0,
+    "binary_sha256": "12a554239767ed0ef53f2d63dcbb4c554c457b00213466c1e9de674af8de69ba"
+  },
+  {
+    "label": "native-atomic",
+    "repeat": 4,
+    "cpu": 0.012687999999999977,
+    "wall": 0.014380193082615733,
+    "rss_kib": 4252,
+    "affinity": 0,
+    "binary_sha256": "23aa6fcdef9210fd5270f359f2cb6d333cd4b02853b65187fcb6e8aac11f2d65"
+  },
+  {
+    "label": "native-atomic",
+    "repeat": 5,
+    "cpu": 0.012967000000000034,
+    "wall": 0.014398752013221383,
+    "rss_kib": 4212,
+    "affinity": 0,
+    "binary_sha256": "23aa6fcdef9210fd5270f359f2cb6d333cd4b02853b65187fcb6e8aac11f2d65"
+  },
+  {
+    "label": "file-recipes",
+    "repeat": 5,
+    "cpu": 0.034417999999999976,
+    "wall": 0.03662316803820431,
+    "rss_kib": 8620,
+    "affinity": 0,
+    "binary_sha256": "12a554239767ed0ef53f2d63dcbb4c554c457b00213466c1e9de674af8de69ba"
+  },
+  {
+    "label": "accepted",
+    "repeat": 5,
+    "cpu": 0.04439000000000004,
+    "wall": 0.04655458009801805,
+    "rss_kib": 8192,
+    "affinity": 0,
+    "binary_sha256": "bf9771454572e1d866a38ffa7b864d8c7ce33e2455ad0b0af55c22ae9b04c30d"
+  }
+]

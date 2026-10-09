@@ -1,0 +1,568 @@
+[
+  {
+    "observed_value_instances": 4000,
+    "maximum_width": 5,
+    "totals": {
+      "lookup_reads": 12000,
+      "member_assignments": 8000,
+      "source_copies": 2000,
+      "range_passes": 0,
+      "insertions": 8000
+    },
+    "width_histogram": {
+      "2": 2000,
+      "3": 1000,
+      "5": 1000
+    },
+    "width_read_distribution": [
+      {
+        "width": 2,
+        "reads": 0,
+        "objects": 2000
+      },
+      {
+        "width": 3,
+        "reads": 7,
+        "objects": 1000
+      },
+      {
+        "width": 5,
+        "reads": 5,
+        "objects": 1000
+      }
+    ],
+    "wide_repeated_read_objects": 0,
+    "label": "official-json-transform",
+    "arguments": [
+      "/home/nick/Repositories/nift/nift/.build/cp410/probes/official-json-transform.f"
+    ],
+    "status": 0,
+    "stdout_sha256": "2c9f910541b11f5d89d7f8b9af827d9017b9250944bfcf91bfb5ad4c028f332c"
+  },
+  {
+    "observed_value_instances": 40000,
+    "maximum_width": 5,
+    "totals": {
+      "lookup_reads": 48000,
+      "member_assignments": 40000,
+      "source_copies": 24000,
+      "range_passes": 0,
+      "insertions": 40000
+    },
+    "width_histogram": {
+      "2": 32000,
+      "5": 8000
+    },
+    "width_read_distribution": [
+      {
+        "width": 2,
+        "reads": 0,
+        "objects": 24000
+      },
+      {
+        "width": 2,
+        "reads": 1,
+        "objects": 8000
+      },
+      {
+        "width": 5,
+        "reads": 5,
+        "objects": 8000
+      }
+    ],
+    "wide_repeated_read_objects": 0,
+    "label": "json-traverse-8000",
+    "arguments": [
+      "/home/nick/Repositories/nift/nift/.build/cp410/probes/json-traverse-8000.f"
+    ],
+    "status": 0,
+    "stdout_sha256": "0b9697fcc1a0549fc791f658277c007cd9bfccaf79f77d89badd08f601e53012"
+  },
+  {
+    "observed_value_instances": 1,
+    "maximum_width": 0,
+    "totals": {
+      "lookup_reads": 1,
+      "member_assignments": 0,
+      "source_copies": 0,
+      "range_passes": 0,
+      "insertions": 0
+    },
+    "width_histogram": {
+      "0": 1
+    },
+    "width_read_distribution": [
+      {
+        "width": 0,
+        "reads": 1,
+        "objects": 1
+      }
+    ],
+    "wide_repeated_read_objects": 0,
+    "label": "default-0",
+    "arguments": [
+      "init"
+    ],
+    "status": 0,
+    "artifact_hashes": {
+      "public/index.html": "ce2c5faade0697d543461edc5b5ede7da9d9aab21ba862519bcbbd6d4407aad7",
+      "public/assets/js/script.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "public/assets/css/style.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "observed_value_instances": 0,
+    "maximum_width": 0,
+    "totals": {
+      "lookup_reads": 0,
+      "member_assignments": 0,
+      "source_copies": 0,
+      "range_passes": 0,
+      "insertions": 0
+    },
+    "width_histogram": {},
+    "width_read_distribution": [],
+    "wide_repeated_read_objects": 0,
+    "label": "default-1",
+    "arguments": [
+      "status"
+    ],
+    "status": 0,
+    "artifact_hashes": {
+      "public/index.html": "ce2c5faade0697d543461edc5b5ede7da9d9aab21ba862519bcbbd6d4407aad7",
+      "public/assets/js/script.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "public/assets/css/style.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "observed_value_instances": 1,
+    "maximum_width": 0,
+    "totals": {
+      "lookup_reads": 1,
+      "member_assignments": 0,
+      "source_copies": 0,
+      "range_passes": 0,
+      "insertions": 0
+    },
+    "width_histogram": {
+      "0": 1
+    },
+    "width_read_distribution": [
+      {
+        "width": 0,
+        "reads": 1,
+        "objects": 1
+      }
+    ],
+    "wide_repeated_read_objects": 0,
+    "label": "default-2",
+    "arguments": [
+      "build",
+      "--all"
+    ],
+    "status": 0,
+    "artifact_hashes": {
+      "public/index.html": "ce2c5faade0697d543461edc5b5ede7da9d9aab21ba862519bcbbd6d4407aad7",
+      "public/assets/js/script.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "public/assets/css/style.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "observed_value_instances": 0,
+    "maximum_width": 0,
+    "totals": {
+      "lookup_reads": 0,
+      "member_assignments": 0,
+      "source_copies": 0,
+      "range_passes": 0,
+      "insertions": 0
+    },
+    "width_histogram": {},
+    "width_read_distribution": [],
+    "wide_repeated_read_objects": 0,
+    "label": "default-3",
+    "arguments": [
+      "build"
+    ],
+    "status": 0,
+    "artifact_hashes": {
+      "public/index.html": "ce2c5faade0697d543461edc5b5ede7da9d9aab21ba862519bcbbd6d4407aad7",
+      "public/assets/js/script.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "public/assets/css/style.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "observed_value_instances": 1,
+    "maximum_width": 0,
+    "totals": {
+      "lookup_reads": 1,
+      "member_assignments": 0,
+      "source_copies": 0,
+      "range_passes": 0,
+      "insertions": 0
+    },
+    "width_histogram": {
+      "0": 1
+    },
+    "width_read_distribution": [
+      {
+        "width": 0,
+        "reads": 1,
+        "objects": 1
+      }
+    ],
+    "wide_repeated_read_objects": 0,
+    "label": "migration-0",
+    "arguments": [
+      "init",
+      "--migration"
+    ],
+    "status": 0,
+    "artifact_hashes": {
+      "AGENTS.md": "2eebbba8502f3bbd4aa7c4d7d48af93832e81ce8bff07ad5a8b167b2995b64cb",
+      "HANDOVER.md": "bfa18c5c5b676e2887513d979ad2ca9b6c97367e3a7699ba6cd64e932b588709",
+      "MIGRATION.md": "b5c3c4d47b8f5dadd9e2ac7e8d392e05f4ba787763f5a0c8aab6fae2469a3ab3",
+      "public/index.html": "ce2c5faade0697d543461edc5b5ede7da9d9aab21ba862519bcbbd6d4407aad7",
+      "public/assets/js/script.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "public/assets/css/style.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "observed_value_instances": 0,
+    "maximum_width": 0,
+    "totals": {
+      "lookup_reads": 0,
+      "member_assignments": 0,
+      "source_copies": 0,
+      "range_passes": 0,
+      "insertions": 0
+    },
+    "width_histogram": {},
+    "width_read_distribution": [],
+    "wide_repeated_read_objects": 0,
+    "label": "migration-1",
+    "arguments": [
+      "status"
+    ],
+    "status": 0,
+    "artifact_hashes": {
+      "AGENTS.md": "2eebbba8502f3bbd4aa7c4d7d48af93832e81ce8bff07ad5a8b167b2995b64cb",
+      "HANDOVER.md": "bfa18c5c5b676e2887513d979ad2ca9b6c97367e3a7699ba6cd64e932b588709",
+      "MIGRATION.md": "b5c3c4d47b8f5dadd9e2ac7e8d392e05f4ba787763f5a0c8aab6fae2469a3ab3",
+      "public/index.html": "ce2c5faade0697d543461edc5b5ede7da9d9aab21ba862519bcbbd6d4407aad7",
+      "public/assets/js/script.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "public/assets/css/style.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "observed_value_instances": 1,
+    "maximum_width": 0,
+    "totals": {
+      "lookup_reads": 1,
+      "member_assignments": 0,
+      "source_copies": 0,
+      "range_passes": 0,
+      "insertions": 0
+    },
+    "width_histogram": {
+      "0": 1
+    },
+    "width_read_distribution": [
+      {
+        "width": 0,
+        "reads": 1,
+        "objects": 1
+      }
+    ],
+    "wide_repeated_read_objects": 0,
+    "label": "migration-2",
+    "arguments": [
+      "build",
+      "--all"
+    ],
+    "status": 0,
+    "artifact_hashes": {
+      "AGENTS.md": "2eebbba8502f3bbd4aa7c4d7d48af93832e81ce8bff07ad5a8b167b2995b64cb",
+      "HANDOVER.md": "bfa18c5c5b676e2887513d979ad2ca9b6c97367e3a7699ba6cd64e932b588709",
+      "MIGRATION.md": "b5c3c4d47b8f5dadd9e2ac7e8d392e05f4ba787763f5a0c8aab6fae2469a3ab3",
+      "public/index.html": "ce2c5faade0697d543461edc5b5ede7da9d9aab21ba862519bcbbd6d4407aad7",
+      "public/assets/js/script.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "public/assets/css/style.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "observed_value_instances": 0,
+    "maximum_width": 0,
+    "totals": {
+      "lookup_reads": 0,
+      "member_assignments": 0,
+      "source_copies": 0,
+      "range_passes": 0,
+      "insertions": 0
+    },
+    "width_histogram": {},
+    "width_read_distribution": [],
+    "wide_repeated_read_objects": 0,
+    "label": "migration-3",
+    "arguments": [
+      "build"
+    ],
+    "status": 0,
+    "artifact_hashes": {
+      "AGENTS.md": "2eebbba8502f3bbd4aa7c4d7d48af93832e81ce8bff07ad5a8b167b2995b64cb",
+      "HANDOVER.md": "bfa18c5c5b676e2887513d979ad2ca9b6c97367e3a7699ba6cd64e932b588709",
+      "MIGRATION.md": "b5c3c4d47b8f5dadd9e2ac7e8d392e05f4ba787763f5a0c8aab6fae2469a3ab3",
+      "public/index.html": "ce2c5faade0697d543461edc5b5ede7da9d9aab21ba862519bcbbd6d4407aad7",
+      "public/assets/js/script.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "public/assets/css/style.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "observed_value_instances": 1,
+    "maximum_width": 0,
+    "totals": {
+      "lookup_reads": 1,
+      "member_assignments": 0,
+      "source_copies": 0,
+      "range_passes": 0,
+      "insertions": 0
+    },
+    "width_histogram": {
+      "0": 1
+    },
+    "width_read_distribution": [
+      {
+        "width": 0,
+        "reads": 1,
+        "objects": 1
+      }
+    ],
+    "wide_repeated_read_objects": 0,
+    "label": "rewrite-0",
+    "arguments": [
+      "init",
+      "--rewrite"
+    ],
+    "status": 0,
+    "artifact_hashes": {
+      "AGENTS.md": "c55823c68eeb6e658924d0038906083fe1d0fec31db2a897a131d1760feaca54",
+      "HANDOVER.md": "bfa18c5c5b676e2887513d979ad2ca9b6c97367e3a7699ba6cd64e932b588709",
+      "public/index.html": "ce2c5faade0697d543461edc5b5ede7da9d9aab21ba862519bcbbd6d4407aad7",
+      "public/assets/js/script.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "public/assets/css/style.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "observed_value_instances": 0,
+    "maximum_width": 0,
+    "totals": {
+      "lookup_reads": 0,
+      "member_assignments": 0,
+      "source_copies": 0,
+      "range_passes": 0,
+      "insertions": 0
+    },
+    "width_histogram": {},
+    "width_read_distribution": [],
+    "wide_repeated_read_objects": 0,
+    "label": "rewrite-1",
+    "arguments": [
+      "status"
+    ],
+    "status": 0,
+    "artifact_hashes": {
+      "AGENTS.md": "c55823c68eeb6e658924d0038906083fe1d0fec31db2a897a131d1760feaca54",
+      "HANDOVER.md": "bfa18c5c5b676e2887513d979ad2ca9b6c97367e3a7699ba6cd64e932b588709",
+      "public/index.html": "ce2c5faade0697d543461edc5b5ede7da9d9aab21ba862519bcbbd6d4407aad7",
+      "public/assets/js/script.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "public/assets/css/style.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "observed_value_instances": 1,
+    "maximum_width": 0,
+    "totals": {
+      "lookup_reads": 1,
+      "member_assignments": 0,
+      "source_copies": 0,
+      "range_passes": 0,
+      "insertions": 0
+    },
+    "width_histogram": {
+      "0": 1
+    },
+    "width_read_distribution": [
+      {
+        "width": 0,
+        "reads": 1,
+        "objects": 1
+      }
+    ],
+    "wide_repeated_read_objects": 0,
+    "label": "rewrite-2",
+    "arguments": [
+      "build",
+      "--all"
+    ],
+    "status": 0,
+    "artifact_hashes": {
+      "AGENTS.md": "c55823c68eeb6e658924d0038906083fe1d0fec31db2a897a131d1760feaca54",
+      "HANDOVER.md": "bfa18c5c5b676e2887513d979ad2ca9b6c97367e3a7699ba6cd64e932b588709",
+      "public/index.html": "ce2c5faade0697d543461edc5b5ede7da9d9aab21ba862519bcbbd6d4407aad7",
+      "public/assets/js/script.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "public/assets/css/style.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "observed_value_instances": 0,
+    "maximum_width": 0,
+    "totals": {
+      "lookup_reads": 0,
+      "member_assignments": 0,
+      "source_copies": 0,
+      "range_passes": 0,
+      "insertions": 0
+    },
+    "width_histogram": {},
+    "width_read_distribution": [],
+    "wide_repeated_read_objects": 0,
+    "label": "rewrite-3",
+    "arguments": [
+      "build"
+    ],
+    "status": 0,
+    "artifact_hashes": {
+      "AGENTS.md": "c55823c68eeb6e658924d0038906083fe1d0fec31db2a897a131d1760feaca54",
+      "HANDOVER.md": "bfa18c5c5b676e2887513d979ad2ca9b6c97367e3a7699ba6cd64e932b588709",
+      "public/index.html": "ce2c5faade0697d543461edc5b5ede7da9d9aab21ba862519bcbbd6d4407aad7",
+      "public/assets/js/script.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "public/assets/css/style.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "observed_value_instances": 1,
+    "maximum_width": 0,
+    "totals": {
+      "lookup_reads": 1,
+      "member_assignments": 0,
+      "source_copies": 0,
+      "range_passes": 0,
+      "insertions": 0
+    },
+    "width_histogram": {
+      "0": 1
+    },
+    "width_read_distribution": [
+      {
+        "width": 0,
+        "reads": 1,
+        "objects": 1
+      }
+    ],
+    "wide_repeated_read_objects": 0,
+    "label": "redesign-0",
+    "arguments": [
+      "init",
+      "--redesign"
+    ],
+    "status": 0,
+    "artifact_hashes": {
+      "AGENTS.md": "039d566441885a1415ac4f8932ca05ab1f4974512c516657c2f06646c1d6146f",
+      "HANDOVER.md": "bfa18c5c5b676e2887513d979ad2ca9b6c97367e3a7699ba6cd64e932b588709",
+      "REDESIGN.md": "4469d11216bedb89ab8936de6ccbae068d1f1640571594be0f68825a97c95e13",
+      "public/index.html": "ce2c5faade0697d543461edc5b5ede7da9d9aab21ba862519bcbbd6d4407aad7",
+      "public/assets/js/script.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "public/assets/css/style.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "observed_value_instances": 0,
+    "maximum_width": 0,
+    "totals": {
+      "lookup_reads": 0,
+      "member_assignments": 0,
+      "source_copies": 0,
+      "range_passes": 0,
+      "insertions": 0
+    },
+    "width_histogram": {},
+    "width_read_distribution": [],
+    "wide_repeated_read_objects": 0,
+    "label": "redesign-1",
+    "arguments": [
+      "status"
+    ],
+    "status": 0,
+    "artifact_hashes": {
+      "AGENTS.md": "039d566441885a1415ac4f8932ca05ab1f4974512c516657c2f06646c1d6146f",
+      "HANDOVER.md": "bfa18c5c5b676e2887513d979ad2ca9b6c97367e3a7699ba6cd64e932b588709",
+      "REDESIGN.md": "4469d11216bedb89ab8936de6ccbae068d1f1640571594be0f68825a97c95e13",
+      "public/index.html": "ce2c5faade0697d543461edc5b5ede7da9d9aab21ba862519bcbbd6d4407aad7",
+      "public/assets/js/script.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "public/assets/css/style.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "observed_value_instances": 1,
+    "maximum_width": 0,
+    "totals": {
+      "lookup_reads": 1,
+      "member_assignments": 0,
+      "source_copies": 0,
+      "range_passes": 0,
+      "insertions": 0
+    },
+    "width_histogram": {
+      "0": 1
+    },
+    "width_read_distribution": [
+      {
+        "width": 0,
+        "reads": 1,
+        "objects": 1
+      }
+    ],
+    "wide_repeated_read_objects": 0,
+    "label": "redesign-2",
+    "arguments": [
+      "build",
+      "--all"
+    ],
+    "status": 0,
+    "artifact_hashes": {
+      "AGENTS.md": "039d566441885a1415ac4f8932ca05ab1f4974512c516657c2f06646c1d6146f",
+      "HANDOVER.md": "bfa18c5c5b676e2887513d979ad2ca9b6c97367e3a7699ba6cd64e932b588709",
+      "REDESIGN.md": "4469d11216bedb89ab8936de6ccbae068d1f1640571594be0f68825a97c95e13",
+      "public/index.html": "ce2c5faade0697d543461edc5b5ede7da9d9aab21ba862519bcbbd6d4407aad7",
+      "public/assets/js/script.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "public/assets/css/style.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  {
+    "observed_value_instances": 0,
+    "maximum_width": 0,
+    "totals": {
+      "lookup_reads": 0,
+      "member_assignments": 0,
+      "source_copies": 0,
+      "range_passes": 0,
+      "insertions": 0
+    },
+    "width_histogram": {},
+    "width_read_distribution": [],
+    "wide_repeated_read_objects": 0,
+    "label": "redesign-3",
+    "arguments": [
+      "build"
+    ],
+    "status": 0,
+    "artifact_hashes": {
+      "AGENTS.md": "039d566441885a1415ac4f8932ca05ab1f4974512c516657c2f06646c1d6146f",
+      "HANDOVER.md": "bfa18c5c5b676e2887513d979ad2ca9b6c97367e3a7699ba6cd64e932b588709",
+      "REDESIGN.md": "4469d11216bedb89ab8936de6ccbae068d1f1640571594be0f68825a97c95e13",
+      "public/index.html": "ce2c5faade0697d543461edc5b5ede7da9d9aab21ba862519bcbbd6d4407aad7",
+      "public/assets/js/script.js": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "public/assets/css/style.css": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+]

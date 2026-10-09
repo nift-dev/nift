@@ -1,0 +1,1227 @@
+[
+  {
+    "name": "open-r",
+    "source": "f:=file(\"data\");f.open(\"r\");print(f.modified());f.revert();print(f.modified());f.close();print(f.exists())",
+    "exit": 1,
+    "stdout": "false\n",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:49: revert: file is not open for writing\n",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "open-rw",
+    "source": "f:=file(\"data\");f.open(\"rw\");print(f.modified());f.revert();print(f.modified());f.close();print(f.exists())",
+    "exit": 0,
+    "stdout": "false\nfalse\ntrue\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "open-w",
+    "source": "f:=file(\"data\");f.open(\"w\");print(f.modified());f.revert();print(f.modified());f.close();print(f.exists())",
+    "exit": 0,
+    "stdout": "true\nfalse\ntrue\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "open-a",
+    "source": "f:=file(\"data\");f.open(\"a\");print(f.modified());f.revert();print(f.modified());f.close();print(f.exists())",
+    "exit": 0,
+    "stdout": "false\nfalse\ntrue\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "mutate-write(\"xy\")",
+    "source": "f:=file(\"data\");f.open(\"rw\");f.write(\"xy\");print(f.modified());f.revert();print(f.modified());print(f.read_all().stringify());f.close()",
+    "exit": 0,
+    "stdout": "true\nfalse\n\"ABCDEFGH\"\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "mutate-write(\"\")",
+    "source": "f:=file(\"data\");f.open(\"rw\");f.write(\"\");print(f.modified());f.revert();print(f.modified());print(f.read_all().stringify());f.close()",
+    "exit": 0,
+    "stdout": "false\nfalse\n\"ABCDEFGH\"\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "mutate-write_line(\"xy\")",
+    "source": "f:=file(\"data\");f.open(\"rw\");f.write_line(\"xy\");print(f.modified());f.revert();print(f.modified());print(f.read_all().stringify());f.close()",
+    "exit": 0,
+    "stdout": "true\nfalse\n\"ABCDEFGH\"\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "mutate-write_bytes(bytes([0,255,65]))",
+    "source": "f:=file(\"data\");f.open(\"rw\");f.write_bytes(bytes([0,255,65]));print(f.modified());f.revert();print(f.modified());print(f.read_all().stringify());f.close()",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:30: unknown value or malformed expression: f.write_bytes(bytes([0,255,65]))\n",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "mutate-write(bytes([0,255,65]))",
+    "source": "f:=file(\"data\");f.open(\"rw\");f.write(bytes([0,255,65]));print(f.modified());f.revert();print(f.modified());print(f.read_all().stringify());f.close()",
+    "exit": 0,
+    "stdout": "true\nfalse\n\"ABCDEFGH\"\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "mutate-write_val(42)",
+    "source": "f:=file(\"data\");f.open(\"rw\");f.write_val(42);print(f.modified());f.revert();print(f.modified());print(f.read_all().stringify());f.close()",
+    "exit": 0,
+    "stdout": "true\nfalse\n\"ABCDEFGH\"\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "mutate-append(\"xy\")",
+    "source": "f:=file(\"data\");f.open(\"rw\");f.append(\"xy\");print(f.modified());f.revert();print(f.modified());print(f.read_all().stringify());f.close()",
+    "exit": 0,
+    "stdout": "true\nfalse\n\"ABCDEFGH\"\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "mutate-append(\"\")",
+    "source": "f:=file(\"data\");f.open(\"rw\");f.append(\"\");print(f.modified());f.revert();print(f.modified());print(f.read_all().stringify());f.close()",
+    "exit": 0,
+    "stdout": "false\nfalse\n\"ABCDEFGH\"\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "mutate-prepend(\"xy\")",
+    "source": "f:=file(\"data\");f.open(\"rw\");f.prepend(\"xy\");print(f.modified());f.revert();print(f.modified());print(f.read_all().stringify());f.close()",
+    "exit": 0,
+    "stdout": "true\nfalse\n\"ABCDEFGH\"\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "mutate-insert(2,\"xy\")",
+    "source": "f:=file(\"data\");f.open(\"rw\");f.insert(2,\"xy\");print(f.modified());f.revert();print(f.modified());print(f.read_all().stringify());f.close()",
+    "exit": 0,
+    "stdout": "true\nfalse\n\"ABCDEFGH\"\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "mutate-insert_before(\"CD\",\"xy\")",
+    "source": "f:=file(\"data\");f.open(\"rw\");f.insert_before(\"CD\",\"xy\");print(f.modified());f.revert();print(f.modified());print(f.read_all().stringify());f.close()",
+    "exit": 0,
+    "stdout": "true\nfalse\n\"ABCDEFGH\"\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "mutate-insert_after(\"CD\",\"xy\")",
+    "source": "f:=file(\"data\");f.open(\"rw\");f.insert_after(\"CD\",\"xy\");print(f.modified());f.revert();print(f.modified());print(f.read_all().stringify());f.close()",
+    "exit": 0,
+    "stdout": "true\nfalse\n\"ABCDEFGH\"\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "mutate-replace(\"CD\",\"xy\")",
+    "source": "f:=file(\"data\");f.open(\"rw\");f.replace(\"CD\",\"xy\");print(f.modified());f.revert();print(f.modified());print(f.read_all().stringify());f.close()",
+    "exit": 0,
+    "stdout": "true\nfalse\n\"ABCDEFGH\"\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "mutate-replace(\"CD\",\"CD\")",
+    "source": "f:=file(\"data\");f.open(\"rw\");f.replace(\"CD\",\"CD\");print(f.modified());f.revert();print(f.modified());print(f.read_all().stringify());f.close()",
+    "exit": 0,
+    "stdout": "false\nfalse\n\"ABCDEFGH\"\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "mutate-replace(\"missing\",\"xy\")",
+    "source": "f:=file(\"data\");f.open(\"rw\");f.replace(\"missing\",\"xy\");print(f.modified());f.revert();print(f.modified());print(f.read_all().stringify());f.close()",
+    "exit": 0,
+    "stdout": "false\nfalse\n\"ABCDEFGH\"\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "mutate-replace_once(\"CD\",\"xy\")",
+    "source": "f:=file(\"data\");f.open(\"rw\");f.replace_once(\"CD\",\"xy\");print(f.modified());f.revert();print(f.modified());print(f.read_all().stringify());f.close()",
+    "exit": 0,
+    "stdout": "true\nfalse\n\"ABCDEFGH\"\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "save-then-revert",
+    "source": "f:=file(\"data\");g:=f;f.open(\"rw\");f.write(\"xy\");g.save();print(f.modified());f.append(\"tail\");print(g.modified());g.revert();print(f.read_all().stringify());f.close()",
+    "exit": 0,
+    "stdout": "false\ntrue\n\"xyCDEFGH\"\n",
+    "stderr": "",
+    "files": {
+      "data": "7879434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "overwrite-initial-revert",
+    "source": "f:=file(\"data\");f.open(\"w\");print(f.modified());f.write(\"xy\");f.revert();print(f.modified());f.close();print(open(\"data\"))",
+    "exit": 0,
+    "stdout": "true\nfalse\nABCDEFGH\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "new-empty-write",
+    "source": "f:=file(\"new\");f.open(\"w\");print(f.modified());f.write(\"\");print(f.modified());f.close();print(f.exists())",
+    "exit": 0,
+    "stdout": "true\nfalse\nfalse\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "append-new-empty-write",
+    "source": "f:=file(\"new\");f.open(\"a\");print(f.modified());f.append(\"\");print(f.modified());f.close();print(f.exists())",
+    "exit": 0,
+    "stdout": "true\nfalse\nfalse\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "reopen-external-edit",
+    "source": "f:=file(\"data\");f.open(\"rw\");f.close();g:=file(\"data\");g.open(\"w\");g.write(\"external\");g.save();g.close();f.open(\"rw\");print(f.read_all());f.close()",
+    "exit": 0,
+    "stdout": "external\n",
+    "stderr": "",
+    "files": {
+      "data": "65787465726e616c",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "opaque-closed-reopen",
+    "source": "f:=file(\"data\");f.open(\"rw\");f.close();tag:=\"\u001fnift:file:1\";tag.open(\"rw\");tag.write(\"xy\");tag.save();tag.close();print(open(\"data\"));print(file(\"new\").stringify())",
+    "exit": 1,
+    "stdout": "xyCDEFGH\n",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:140: opaque runtime value is not serializable\n",
+    "files": {
+      "data": "7879434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "write-argument-saves",
+    "source": "f:=file(\"data\");f.open(\"rw\");n:=0;fn(d()){n+=1;f.write(\"saved\");f.save();return \"xy\"};i:=0;while(i<1){f.write(d());i+=1};print(n);print(f.modified());f.revert();print(f.read_all());f.close()",
+    "exit": 0,
+    "stdout": "1\ntrue\nsavedFGH\n",
+    "stderr": "",
+    "files": {
+      "data": "7361766564464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "write-argument-reverts",
+    "source": "f:=file(\"data\");f.open(\"rw\");n:=0;fn(d()){n+=1;f.revert();return \"xy\"};i:=0;while(i<1){f.write(d());i+=1};print(n);f.revert();print(f.read_all());f.close()",
+    "exit": 0,
+    "stdout": "1\nABCDEFGH\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "write-argument-closes",
+    "source": "f:=file(\"data\");f.open(\"rw\");fn(d()){f.close();return \"xy\"};f.write(d());print(f.modified())",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:80: modified: file is not open\n",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "closed-write-factory-count",
+    "source": "f:=file(\"data\");n:=0;fn(d()){n+=1;print(n);return \"xy\"};i:=0;while(i<1){f.write(d());i+=1}",
+    "exit": 1,
+    "stdout": "1\n",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:73: script failed\n",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "readonly-write-factory-count",
+    "source": "f:=file(\"data\");f.open(\"r\");n:=0;fn(d()){n+=1;print(n);return \"xy\"};i:=0;while(i<1){f.write(d());i+=1}",
+    "exit": 1,
+    "stdout": "1\n",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:85: script failed\n",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "failed-save-revert",
+    "source": "f:=file(\"missing/child\");f.open(\"w\");f.write(\"xy\");try{f.save()}catch(e){print(e.message)};print(f.modified());f.revert();print(f.modified());f.close()",
+    "exit": 0,
+    "stdout": "save: parent directory does not exist\ntrue\nfalse\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "duplicate-replace-once-error",
+    "source": "f:=file(\"data\");f.open(\"rw\");f.replace_once(\"A\",\"xy\")",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "error: managed file left open: <ORACLE_ROOT>/data (unsaved changes discarded)\n",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "receiver-factory-count",
+    "source": "f:=file(\"data\");f.open(\"rw\");n:=0;fn(r()){n+=1;return f};r().write(\"xy\");print(n);f.revert();f.close()",
+    "exit": 0,
+    "stdout": "1\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "factory-path-counter",
+    "source": "n:=0;fn(d()){n+=1;return \"data\"};f:=file(d());print(n);print(f.exists());print(f.stringify())",
+    "exit": 1,
+    "stdout": "1\ntrue\n",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:80: opaque runtime value is not serializable\n",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "factory-changing-cwd",
+    "source": "n:=0;fn(d()){n+=1;cd(\"sub\");return \"data\"};f:=file(d());print(n);print(f.path());print(f.exists())",
+    "exit": 0,
+    "stdout": "1\n<ORACLE_ROOT>/sub/data\ntrue\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "open-mode-factory-cwd",
+    "source": "f:=file(\"data\");n:=0;fn(d()){n+=1;cd(\"sub\");return \"rw\"};f.open(d());print(n);print(f.read_all());f.close()",
+    "exit": 0,
+    "stdout": "1\nABCDEFGH\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "closed-file-copy",
+    "source": "f:=file(\"data\");g:=f.copy(\"copied\");print(f.path());print(g.stringify());print(open(\"copied\"))",
+    "exit": 1,
+    "stdout": "<ORACLE_ROOT>/data\n",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:59: opaque runtime value is not serializable\n",
+    "files": {
+      "copied": "4142434445464748",
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "closed-file-move",
+    "source": "f:=file(\"data\");g:=f.move(\"renamed\");print(f.path());print(g.stringify());print(open(\"renamed\"))",
+    "exit": 1,
+    "stdout": "<ORACLE_ROOT>/renamed\n",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:60: opaque runtime value is not serializable\n",
+    "files": {
+      "renamed": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "closed-file-remove",
+    "source": "f:=file(\"data\");f.remove();print(f.exists())",
+    "exit": 0,
+    "stdout": "false\n",
+    "stderr": "",
+    "files": {
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "open-copy-precondition-counter",
+    "source": "f:=file(\"data\");f.open(\"r\");n:=0;fn(d()){n+=1;print(n);return \"copied\"};f.copy(d())",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:73: copy: file must be closed\n",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "copy-invalid-argument",
+    "source": "f:=file(\"data\");f.copy([\"copied\"])",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:17: copy: expected string argument\n",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "unknown-file-tag",
+    "source": "tag:=\"\\u001fnift:file:999\";print(tag.path())",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:34: path: unsupported for this value\n",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "nonfile-receiver-counter",
+    "source": "x:=\"text\";n:=0;fn(d()){n+=1;print(n);return \"value\"};x.write(d())",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:54: write: unsupported for this value\n",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "read-val-token-contract",
+    "source": "f:=file(\"data\");f.open(\"w\");f.write(\"42 \\\"hi\\\" [] {}\");f.save();f.close();f.open(\"r\");print(f.read_val());print(f.read_val());print(f.read_val().stringify());print(f.read_val().stringify());f.close()",
+    "exit": 0,
+    "stdout": "42\nhi\n[]\n{}\n",
+    "stderr": "",
+    "files": {
+      "data": "34322022686922205b5d207b7d",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "invalid-mode-arity",
+    "source": "f:=file(\"data\");f.open(\"w\",\"r\")",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:17: open: expected zero or one mode\n",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "save-argument-arity",
+    "source": "f:=file(\"data\");f.open(\"rw\");f.save(1)",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:30: save: expected no arguments\n",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "empty-write-return-to-clean",
+    "source": "f:=file(\"data\");f.open(\"w\");f.write(\"ABCDEFGH\");print(f.modified());f.close();print(open(\"data\"))",
+    "exit": 0,
+    "stdout": "false\nABCDEFGH\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "nested-method-depth-20",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(f.exists())))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "true\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "nested-method-depth-40",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(f.exists())))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "true\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "nested-method-depth-48",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(f.exists())))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "true\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "nested-method-depth-50",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(f.exists())))))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "true\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "nested-method-depth-60",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(f.exists())))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "true\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-named-20",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(f.exists())))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "true\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-named-40",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(f.exists())))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "true\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-named-48",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(f.exists())))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "true\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-named-50",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(f.exists())))))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "true\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-named-60",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(f.exists())))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "true\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-named-80",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(f.exists())))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "true\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-named-96",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(f.exists())))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:331: expression nesting exceeds parser limit\n",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-named-110",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(id(f.exists())))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:331: expression nesting exceeds parser limit\n",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-html_escape-20",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(\"x\")))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "x\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-html_escape-40",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(\"x\")))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "x\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-html_escape-48",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(\"x\")))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "x\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-html_escape-50",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(\"x\")))))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "x\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-html_escape-60",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(\"x\")))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "x\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-html_escape-80",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(\"x\")))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "x\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-html_escape-96",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(\"x\")))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "x\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-html_escape-110",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(html_escape(\"x\")))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:1195: expression nesting exceeds parser limit\n",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-type-20",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(\"x\")))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "string\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-type-40",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(\"x\")))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "string\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-type-48",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(\"x\")))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "string\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-type-50",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(\"x\")))))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "string\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-type-60",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(\"x\")))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "string\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-type-80",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(\"x\")))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "string\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-type-96",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(\"x\")))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "string\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-type-110",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(type(\"x\")))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:523: expression nesting exceeds parser limit\n",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-min-20",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(1)))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "1\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-min-40",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(1)))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "1\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-min-48",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(1)))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "1\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-min-50",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(1)))))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "1\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-min-60",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(1)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "1\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-min-80",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(1)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "1\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-min-96",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(1)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:427: expression nesting exceeds parser limit\n",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-min-110",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(min(1)))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:427: expression nesting exceeds parser limit\n",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-method-20",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(\"x\" .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim())",
+    "exit": 0,
+    "stdout": "x\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-method-40",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(\"x\" .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim())",
+    "exit": 0,
+    "stdout": "x\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-method-48",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(\"x\" .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim())",
+    "exit": 0,
+    "stdout": "x\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-method-50",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(\"x\" .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim())",
+    "exit": 0,
+    "stdout": "x\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-method-60",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(\"x\" .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim())",
+    "exit": 0,
+    "stdout": "x\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-method-80",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(\"x\" .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim())",
+    "exit": 0,
+    "stdout": "x\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-method-96",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(\"x\" .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim())",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:43: expression nesting exceeds parser limit\n",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-method-110",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(\"x\" .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim() .trim())",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:43: expression nesting exceeds parser limit\n",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-method-argument-20",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\")))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "x\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-method-argument-40",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\")))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "x\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-method-argument-48",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\")))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "x\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-method-argument-50",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\")))))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "x\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-method-argument-60",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\")))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "x\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-method-argument-80",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\")))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 0,
+    "stdout": "x\n",
+    "stderr": "",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-method-argument-96",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\")))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:1563: replace: arguments must be strings\n",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "stack-method-argument-110",
+    "source": "f:=file(\"data\");fn(id(x)){return x};print(\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\".replace(\"x\",\"x\")))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:1563: replace: arguments must be strings\n",
+    "files": {
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  },
+  {
+    "name": "write-preserves-string-slots",
+    "source": "payload:=open(\"data\");alias:=payload;f:=file(\"out\");f.open(\"w\");f.write(payload);print(payload);print(alias);f.save();f.close();print(open(\"out\"))",
+    "exit": 0,
+    "stdout": "ABCDEFGH\nABCDEFGH\nABCDEFGH\n",
+    "stderr": "",
+    "files": {
+      "out": "4142434445464748",
+      "data": "4142434445464748",
+      "sub/data": "4142434445464748",
+      "sub/sub/data": "4142434445464748"
+    }
+  }
+]

@@ -1,0 +1,50 @@
+[
+  {
+    "name": "file-shadow",
+    "source": "fn(file(x)){print(\"SHADOW\");return x};print(file(\"data\").stringify())",
+    "values": [
+      {
+        "exit": 1,
+        "stdout": "",
+        "stderr": "error: <ROOT>/case.f:1:45: opaque runtime value is not serializable\n"
+      },
+      {
+        "exit": 1,
+        "stdout": "",
+        "stderr": "error: <ROOT>/case.f:1:45: opaque runtime value is not serializable\n"
+      }
+    ]
+  },
+  {
+    "name": "open-shadow",
+    "source": "fn(open(x)){print(\"SHADOW\");return x};print(open(\"data\"))",
+    "values": [
+      {
+        "exit": 0,
+        "stdout": "ABC\n",
+        "stderr": ""
+      },
+      {
+        "exit": 0,
+        "stdout": "ABC\n",
+        "stderr": ""
+      }
+    ]
+  },
+  {
+    "name": "stat-shadow",
+    "source": "fn(stat(x)){print(\"SHADOW\");return x};print(stat(\"data\").stringify())",
+    "values": [
+      {
+        "exit": 0,
+        "stdout": "{\"exists\":true,\"type\":\"file\",\"size\":3}\n",
+        "stderr": ""
+      },
+      {
+        "exit": 0,
+        "stdout": "{\"exists\":true,\"type\":\"file\",\"size\":3}\n",
+        "stderr": ""
+      }
+    ]
+  }
+]

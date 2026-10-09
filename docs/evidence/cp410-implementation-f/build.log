@@ -1,0 +1,37 @@
+make: Entering directory '/home/nick/Repositories/nift/nift/.build/cp410-implementation/objects/prototype'
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/nift.cpp -o src/nift.o
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ProjectOwnership.cpp -o src/ProjectOwnership.o
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/PackageTransaction.cpp -o src/PackageTransaction.o
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/CLI.cpp -o src/CLI.o
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/Process.cpp -o src/Process.o
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/JobControl.cpp -o src/JobControl.o
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/RuntimeValue.cpp -o src/RuntimeValue.o
+src/RuntimeValue.cpp: In static member function ‘static void nift::{anonymous}::WorkloadObserver::flush()’:
+src/RuntimeValue.cpp:23:9: warning: this ‘for’ clause does not guard... [-Wmisleading-indentation]
+   23 |         for(const auto& row:observer.finished)emit(row);for(const auto& entry:observer.active)emit(entry.second);std::fclose(out);
+      |         ^~~
+src/RuntimeValue.cpp:23:57: note: ...this statement, but the latter is misleadingly indented as if it were guarded by the ‘for’
+   23 |         for(const auto& row:observer.finished)emit(row);for(const auto& entry:observer.active)emit(entry.second);std::fclose(out);
+      |                                                         ^~~
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/Value.cpp -o src/Value.o
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/FileSystem.cpp -o src/FileSystem.o
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/JsonFile.cpp -o src/JsonFile.o
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/JsonSchema.cpp -o src/JsonSchema.o
+src/JsonSchema.cpp: In function ‘bool jsonschema::{anonymous}::json_equal(const json::Document&, const json::Document&)’:
+src/JsonSchema.cpp:42:45: error: ‘nift’ has not been declared
+   42 |             for (const auto& [key, value] : nift::workload_object_range(a)) {
+      |                                             ^~~~
+src/JsonSchema.cpp: In member function ‘bool jsonschema::{anonymous}::Validator::validate_schema_shape(const json::Document&, const std::string&, std::string&, std::size_t) const’:
+src/JsonSchema.cpp:182:43: error: ‘nift’ has not been declared
+  182 |         for (const auto& [key, ignored] : nift::workload_object_range(schema)) {
+      |                                           ^~~~
+src/JsonSchema.cpp: In member function ‘bool jsonschema::{anonymous}::Validator::apply(const json::Document&, const json::Document&, const std::string&, std::string&, std::size_t) const’:
+src/JsonSchema.cpp:360:56: error: ‘nift’ has not been declared
+  360 |                 for (const auto& [key, child_schema] : nift::workload_object_range(properties)) {
+      |                                                        ^~~~
+src/JsonSchema.cpp:366:49: error: ‘nift’ has not been declared
+  366 |                 for (const auto& [key, value] : nift::workload_object_range(instance)) {
+      |                                                 ^~~~
+make: *** [Makefile:165: src/JsonSchema.o] Error 1
+make: *** Waiting for unfinished jobs....
+make: Leaving directory '/home/nick/Repositories/nift/nift/.build/cp410-implementation/objects/prototype'

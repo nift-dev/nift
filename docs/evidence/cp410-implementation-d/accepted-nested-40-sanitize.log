@@ -1,0 +1,237 @@
+AddressSanitizer:DEADLYSIGNAL
+=================================================================
+==3418904==ERROR: AddressSanitizer: stack-overflow on address 0x7ffd45165208 (pc 0x629029fbdf26 bp 0x7ffd45188230 sp 0x7ffd45165208 T0)
+    #0 0x629029fbdf26 in operator() src/ParserExpression.cpp:1424
+    #1 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #2 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #3 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #4 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #5 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #6 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #7 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #8 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #9 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #10 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #11 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #12 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #13 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #14 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #15 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #16 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #17 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #18 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #19 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #20 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #21 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #22 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #23 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #24 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #25 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #26 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #27 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #28 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #29 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #30 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #31 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #32 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #33 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #34 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #35 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #36 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #37 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #38 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #39 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #40 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #41 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #42 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #43 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #44 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #45 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #46 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #47 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #48 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #49 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #50 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #51 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #52 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #53 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #54 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #55 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #56 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #57 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #58 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #59 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #60 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #61 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #62 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #63 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #64 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #65 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #66 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #67 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #68 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #69 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #70 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #71 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #72 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #73 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #74 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #75 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #76 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #77 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #78 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #79 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #80 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #81 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #82 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #83 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #84 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #85 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #86 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #87 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #88 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #89 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #90 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #91 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #92 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #93 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #94 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #95 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #96 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #97 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #98 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #99 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #100 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #101 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #102 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #103 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #104 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #105 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #106 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #107 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #108 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #109 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #110 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #111 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #112 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #113 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #114 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #115 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #116 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #117 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #118 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #119 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #120 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #121 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #122 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #123 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #124 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #125 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #126 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #127 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #128 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #129 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #130 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #131 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #132 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #133 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #134 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #135 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #136 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #137 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #138 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #139 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #140 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #141 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #142 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #143 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #144 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #145 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #146 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #147 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #148 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #149 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #150 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #151 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #152 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #153 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #154 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #155 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #156 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #157 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #158 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #159 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #160 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #161 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #162 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #163 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #164 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #165 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #166 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #167 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #168 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #169 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #170 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #171 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #172 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #173 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #174 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #175 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #176 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #177 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #178 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #179 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #180 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #181 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #182 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #183 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #184 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #185 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #186 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #187 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #188 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #189 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #190 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #191 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #192 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #193 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #194 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #195 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #196 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #197 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #198 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #199 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #200 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #201 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #202 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #203 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #204 0x62902a081351 in operator() src/ParserExpression.cpp:3185
+    #205 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #206 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #207 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #208 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #209 0x62902a10170a in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #210 0x629029f14bd1 in operator() src/ParserExpression.cpp:1906
+    #211 0x62902a008c89 in operator() src/ParserExpression.cpp:2374
+    #212 0x62902a0c346e in operator() src/ParserExpression.cpp:3968
+    #213 0x62902a0c4172 in __invoke_impl<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:63
+    #214 0x62902a0c4172 in __invoke_r<bool, Parser::evaluate_expression_impl(const std::string&, nift::RuntimeValue&, std::string&, nift::detail::SourceView, const PreparedFilesystemOperation*)::<lambda(const nift::detail::SourceText&, nift::RuntimeValue&, int)>&, const nift::detail::SourceText&, nift::RuntimeValue&, int> /usr/include/c++/15/bits/invoke.h:116
+    #215 0x62902a0c4172 in _M_invoke /usr/include/c++/15/bits/std_function.h:292
+    #216 0x629029e466ab in std::function<bool (nift::detail::SourceText const&, nift::RuntimeValue&, int)>::operator()(nift::detail::SourceText const&, nift::RuntimeValue&, int) const /usr/include/c++/15/bits/std_function.h:593
+    #217 0x629029e466ab in Parser::evaluate_expression_impl(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView, Parser::PreparedFilesystemOperation const*) src/ParserExpression.cpp:3973
+    #218 0x629029e46e1d in Parser::evaluate_filesystem_expression(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView, Parser::PreparedFilesystemOperation const*) src/ParserExpression.cpp:1082
+    #219 0x629029e47b71 in Parser::evaluate_expression(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, nift::detail::SourceView) src/ParserExpression.cpp:1074
+    #220 0x62902a4d9ea3 in Parser::evaluate_expression(nift::detail::SourceText const&, nift::RuntimeValue&, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&) src/Parser.h:495
+    #221 0x62902a458646 in Parser::parse(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, nift::detail::SourceView) src/ParserTemplate.cpp:602
+    #222 0x62902a300d41 in Parser::execute_native_program(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&, int, Parser::SourceProvenance, bool, nift::detail::SourceView) src/ParserScript.cpp:412
+    #223 0x62902a32b1e1 in Parser::run_script(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, std::filesystem::__cxx11::path const&) src/ParserScript.cpp:322
+    #224 0x629029647078 in run_script_source src/CLI.cpp:1463
+    #225 0x629029649138 in run_stdin_script src/CLI.cpp:1517
+    #226 0x629029654316 in run_cli(int, char**) src/CLI.cpp:1959
+    #227 0x6290294d20f5 in main src/nift.cpp:18
+    #228 0x7e26e4c2a600 in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:59
+    #229 0x7e26e4c2a717 in __libc_start_main_impl ../csu/libc-start.c:360
+    #230 0x6290294d2024 in _start (/home/nick/Repositories/nift/nift/.build/cp410-implementation/strings/certification/.build/nift-sanitize-lifetime+0x3542024) (BuildId: 3a2056855c55cf3914d7209ce40e987dd0c46df3)
+
+SUMMARY: AddressSanitizer: stack-overflow src/ParserExpression.cpp:1424 in operator()
+==3418904==ABORTING

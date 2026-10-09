@@ -1,0 +1,2 @@
+"\u001fnift:file:1".open("rw"): open: unsupported for this value
+file-guard: /home/nick/Repositories/nift/nift/.build/cp410-implementation/save/file-guard.cpp:8: SourceTranslationTestAccess::guard(Parser&, const std::filesystem::__cxx11::path&)::<lambda(const std::string&)>: Assertion `ok' failed.

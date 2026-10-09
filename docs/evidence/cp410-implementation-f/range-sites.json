@@ -1,0 +1,90 @@
+[
+  {
+    "file": "ParserExpression.cpp",
+    "range": "x"
+  },
+  {
+    "file": "ParserExpression.cpp",
+    "range": "v"
+  },
+  {
+    "file": "ParserExpression.cpp",
+    "range": "v"
+  },
+  {
+    "file": "ParserExpression.cpp",
+    "range": "v"
+  },
+  {
+    "file": "ParserExpression.cpp",
+    "range": "base"
+  },
+  {
+    "file": "ParserExpression.cpp",
+    "range": "pv"
+  },
+  {
+    "file": "ParserExpression.cpp",
+    "range": "x"
+  },
+  {
+    "file": "ParserExpression.cpp",
+    "range": "base"
+  },
+  {
+    "file": "ParserExpression.cpp",
+    "range": "base"
+  },
+  {
+    "file": "ParserExpression.cpp",
+    "range": "base"
+  },
+  {
+    "file": "ParserExpression.cpp",
+    "range": "r"
+  },
+  {
+    "file": "ParserExpression.cpp",
+    "range": "rhs"
+  },
+  {
+    "file": "ParserExpression.cpp",
+    "range": "entry"
+  },
+  {
+    "file": "ParserExpression.cpp",
+    "range": "v"
+  },
+  {
+    "file": "ParserExpression.cpp",
+    "range": "in"
+  },
+  {
+    "file": "Parser.cpp",
+    "range": "value"
+  },
+  {
+    "file": "Parser.cpp",
+    "range": "value"
+  },
+  {
+    "file": "Parser.cpp",
+    "range": "value"
+  },
+  {
+    "file": "RuntimeValue.cpp",
+    "range": "left"
+  },
+  {
+    "file": "RuntimeValue.cpp",
+    "range": "value"
+  },
+  {
+    "file": "RuntimeValue.cpp",
+    "range": "document"
+  },
+  {
+    "file": "RuntimeValue.cpp",
+    "range": "value"
+  }
+]

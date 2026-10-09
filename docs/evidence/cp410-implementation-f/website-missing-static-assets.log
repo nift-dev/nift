@@ -1,0 +1,492 @@
+8 of 106 files built successfully
+time taken: 0.009833 seconds
+error: while building /
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/advanced
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/getting-started
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/incremental-builds
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/partials
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/markup
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/paths
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/how-nift-works
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/project-structure
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/templating
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/comments
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/use-cases/dashboards
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/use-cases/documentation
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/use-cases/react-islands
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/use-cases/text-assets
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/use-cases/web-apps
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/use-cases/mobile-development
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building examples
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building templates
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/metadata
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/expressions
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/types-optionality-enums
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/declarations-assignments
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/copying-references
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/collections
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/escaping
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/json
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/json-schema
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/control-flow
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/functions-fragments
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/lambdas-closures
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/structs
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/pagination
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/minification
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/commands
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/existing-sites
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/contracts
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/project-contracts
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/routes
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/configuration
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/tracked-json
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/dep
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/user-dependencies
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/installing
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/why-nift
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/comparisons
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/three-primitives
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/developer-experience
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/battle-tested
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/memory-safety
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/performance
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/hosting
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/ai-opinion
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/ai-development
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/production-readiness
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building showcase
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/serverless
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/architectural-rules
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building developers
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building about
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building contact
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building privacy
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/platforms
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/platforms/vercel
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/platforms/netlify
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/platforms/amplify
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/platforms/azure
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/platforms/firebase
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/platforms/render
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/platforms/cloudflare
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/platforms/github-pages
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/platforms/supabase
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building 404
+  templates/404.html:18:42
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+            <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/ai-agents
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/scripting
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/scripting-imports
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/scripting-run-shell
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/scripting-io
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/scripting-filesystem
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/scripting-streams
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/scripting-managed-files
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/runtime-shell-jobs
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/runtime-concurrency
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/runtime-atomics
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/runtime-ffi
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/runtime-embedding
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/project-data
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/hierarchy
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/frontmatter
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/schemas
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/typed-content
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/taxonomies
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/runtime-bytes
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/runtime-errors
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/runtime-utilities
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/rewrites
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+error: while building docs/redesigns
+  templates/partials/head.html:30:41
+  'public/assets/images/favicon.png' is neither a tracked name nor a file that exists
+    <link rel="icon" type="image/png" href="@path('public/assets/images/favicon.png'...">
+                                            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

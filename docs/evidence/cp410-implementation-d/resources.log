@@ -1,0 +1,6 @@
+{'label': 'accepted', 'size': 1, 'count': 1000, 'allocations': 88344, 'allocated_bytes': 19881743, 'binary_sha256': 'bf9771454572e1d866a38ffa7b864d8c7ce33e2455ad0b0af55c22ae9b04c30d'}
+{'label': 'file-recipes', 'size': 1, 'count': 1000, 'allocations': 75427, 'allocated_bytes': 19489091, 'binary_sha256': '5627301b0f850d625bb0cacaf092ddd2be0a29902168375b66179105867c122d'}
+{'label': 'accepted', 'size': 128, 'count': 1000, 'allocations': 92347, 'allocated_bytes': 20398514, 'binary_sha256': 'bf9771454572e1d866a38ffa7b864d8c7ce33e2455ad0b0af55c22ae9b04c30d'}
+{'label': 'file-recipes', 'size': 128, 'count': 1000, 'allocations': 78430, 'allocated_bytes': 19876862, 'binary_sha256': '5627301b0f850d625bb0cacaf092ddd2be0a29902168375b66179105867c122d'}
+{'label': 'accepted', 'size': 1048576, 'count': 32, 'allocations': 3298, 'allocated_bytes': 139180619, 'binary_sha256': 'bf9771454572e1d866a38ffa7b864d8c7ce33e2455ad0b0af55c22ae9b04c30d'}
+{'label': 'file-recipes', 'size': 1048576, 'count': 32, 'allocations': 2933, 'allocated_bytes': 105619735, 'binary_sha256': '5627301b0f850d625bb0cacaf092ddd2be0a29902168375b66179105867c122d'}

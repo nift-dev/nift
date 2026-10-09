@@ -1,0 +1,50 @@
+[
+  {
+    "size": 1,
+    "count": 1000,
+    "label": "accepted",
+    "allocations": 88291,
+    "allocated_bytes": 19865457,
+    "binary_sha256": "bf9771454572e1d866a38ffa7b864d8c7ce33e2455ad0b0af55c22ae9b04c30d"
+  },
+  {
+    "size": 1,
+    "count": 1000,
+    "label": "cow",
+    "allocations": 88291,
+    "allocated_bytes": 19865444,
+    "binary_sha256": "fe7c541970eb8cb3f10f118da760e36b4874f83c14cb0d8c0912bbc9bf9e84a4"
+  },
+  {
+    "size": 128,
+    "count": 1000,
+    "label": "accepted",
+    "allocations": 92327,
+    "allocated_bytes": 20387548,
+    "binary_sha256": "bf9771454572e1d866a38ffa7b864d8c7ce33e2455ad0b0af55c22ae9b04c30d"
+  },
+  {
+    "size": 128,
+    "count": 1000,
+    "label": "cow",
+    "allocations": 91327,
+    "allocated_bytes": 20258535,
+    "binary_sha256": "fe7c541970eb8cb3f10f118da760e36b4874f83c14cb0d8c0912bbc9bf9e84a4"
+  },
+  {
+    "size": 1048576,
+    "count": 32,
+    "label": "accepted",
+    "allocations": 5207,
+    "allocated_bytes": 685540605,
+    "binary_sha256": "bf9771454572e1d866a38ffa7b864d8c7ce33e2455ad0b0af55c22ae9b04c30d"
+  },
+  {
+    "size": 1048576,
+    "count": 32,
+    "label": "cow",
+    "allocations": 5175,
+    "allocated_bytes": 651986128,
+    "binary_sha256": "fe7c541970eb8cb3f10f118da760e36b4874f83c14cb0d8c0912bbc9bf9e84a4"
+  }
+]

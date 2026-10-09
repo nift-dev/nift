@@ -1,0 +1,1444 @@
+NIFT_JSON_GUARD="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/.build/nift-json-preflight-guard" python3 tests/v49_json_preflight_guard.py
+mkdir -p ".build"
+".build/nift-runtime-value"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread tests/json_smoke.cpp -o ".build/nift-json-smoke"
+mkdir -p ".build"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread tests/json_schema_smoke.cpp src/JsonSchema.cpp -o ".build/nift-json-schema-smoke"
+".build/nift-console-smoke"
+console diagnostics smoke passed
+make -C minifypp test-smoke
+make[1]: Entering directory '/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/minifypp'
+mkdir -p .build
+g++ -Iinclude -Isrc -std=c++17 -O2 -Wall -Wextra -pedantic tests/minify_smoke.cpp src/Minify.cpp -o .build/minifypp-smoke
+PASS 100 leaves, depth 48: one preflight, 149 converted nodes
+PASS 200 leaves, depth 48: one preflight, 249 converted nodes
+PASS 400 leaves, depth 48: one preflight, 449 converted nodes
+python3 tests/macos_runner_policy_test.py
+macOS runner-policy guard passed (10 official macOS matrix entries)
+mkdir -p ".build/lambda-cache/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_TEST_LAMBDA_CACHE_STATS -MMD -MP -c src/ParserExpression.cpp -o .build/lambda-cache/ParserExpression.o
+".build/nift-json-smoke"
+JSON smoke test passed
+".build/progress-render"
+progress renderer smoke passed
+python3 tests/snap_release_contract.py
+python3 tests/distribution_summary_test.py
+test_edge_success_is_not_stable_success (__main__.DistributionSummaryTest.test_edge_success_is_not_stable_success) ... ok
+test_install_runtime_failure_classified (__main__.DistributionSummaryTest.test_install_runtime_failure_classified) ... ok
+test_maintained_channels_recorded_from_env (__main__.DistributionSummaryTest.test_maintained_channels_recorded_from_env) ... ok
+test_not_selected (__main__.DistributionSummaryTest.test_not_selected) ... ok
+test_stable_correct (__main__.DistributionSummaryTest.test_stable_correct) ... ok
+test_validate_version_failure_recorded (__main__.DistributionSummaryTest.test_validate_version_failure_recorded) ... ok
+test_version_mismatch_classified (__main__.DistributionSummaryTest.test_version_mismatch_classified) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.226s
+
+OK
+python3 tests/version_consistency_test.py
+test_exact_412_413_failure_rejected (__main__.VersionConsistencyTest.test_exact_412_413_failure_rejected) ... FAIL: version disagreement: executable=4.0.13 Snap-metadata=4.0.12
+FAIL: Snap metadata 4.0.12 != expected 4.0.13
+FAIL: version disagreement: executable=4.0.13 Snap-metadata=4.0.12
+FAIL: executable 4.0.13 != expected 4.0.12
+FAIL: version disagreement: executable=4.0.13 Snap-metadata=4.0.12
+ok
+test_expected_accepts_leading_v_prefix (__main__.VersionConsistencyTest.test_expected_accepts_leading_v_prefix) ... ok
+test_expected_prefix_does_not_mask_repo_mismatch (__main__.VersionConsistencyTest.test_expected_prefix_does_not_mask_repo_mismatch) ... FAIL: version disagreement: executable=4.0.14 Snap-metadata=4.1.0
+FAIL: executable 4.0.14 != expected 4.1.0
+FAIL: version disagreement: executable=4.0.14 Snap-metadata=4.1.0
+FAIL: Snap metadata 4.1.0 != expected 4.0.14
+ok
+test_expected_rejects_malformed_prefixes (__main__.VersionConsistencyTest.test_expected_rejects_malformed_prefixes) ... FAIL: expected/release version is malformed: 'vv4.0.13'
+FAIL: expected/release version is malformed: 'v4.0'
+FAIL: expected/release version is malformed: '4.0.13.1'
+ok
+test_malformed_version_rejected (__main__.VersionConsistencyTest.test_malformed_version_rejected) ... FAIL: executable (src/CLI.cpp) version is missing
+FAIL: Snap metadata (snap/snapcraft.yaml) version is malformed: 'four.zero.thirteen'
+ok
+test_matching_release_versions_agree (__main__.VersionConsistencyTest.test_matching_release_versions_agree) ... ok
+test_missing_version_rejected (__main__.VersionConsistencyTest.test_missing_version_rejected) ... FAIL: executable (src/CLI.cpp) version is missing
+FAIL: Snap metadata (snap/snapcraft.yaml) version is missing
+ok
+test_real_repo_development_versions_match (__main__.VersionConsistencyTest.test_real_repo_development_versions_match) ... ok
+test_tag_version_mismatch_rejected (__main__.VersionConsistencyTest.test_tag_version_mismatch_rejected) ... FAIL: version disagreement: executable=4.0.13 Snap-metadata=4.1.0
+FAIL: executable 4.0.13 != tag version 4.0.12
+FAIL: Snap metadata 4.1.0 != tag version 4.0.12
+ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.008s
+
+OK
+PASS: version consistency (executable=4.10.0, Snap-metadata=4.10.0, expected=4.10.0)
+PASS: version consistency (executable=4.10.0, Snap-metadata=4.10.0, expected=v4.10.0)
+PASS: version consistency (executable=4.10.0, Snap-metadata=4.10.0, expected=v4.10.0, tag=v4.10.0)
+PASS: version consistency (executable=4.10.0, Snap-metadata=4.10.0, expected=v4.10.0, tag=v4.10.0)
+PASS: version consistency (executable=4.1.0, Snap-metadata=4.1.0, expected=4.1.0, tag=v4.1.0)
+PASS: version consistency (executable=4.10.0, Snap-metadata=4.10.0, expected=4.10.0, tag=v4.10.0)
+python3 scripts/check_version_consistency.py
+PASS: version consistency (executable=4.10.0, Snap-metadata=4.10.0)
+.build/source-view-unit
+.build/ast-source-unit
+.build/v49-call-outcome-unit
+python3 tests/v410_oracle_paths_test.py
+...
+----------------------------------------------------------------------
+Ran 3 tests in 0.000s
+
+OK
+mkdir -p .build
+g++ -std=c++17 -O2 -Wall -Wextra -pedantic -Isrc -Ijsonic/include tests/v410_object_member_unit.cpp src/RuntimeValue.cpp -o .build/v410-object-member-unit
+".build/nift-json-schema-smoke"
+JSON Schema smoke test passed
+mkdir -p ".build/glob-relative/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_TEST_GLOB_PATH_STATS -MMD -MP -c src/ParserExpression.cpp -o .build/glob-relative/ParserExpression.o
+.build/v410-object-member-unit
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_TEST_GLOB_PREFIX_STATS -MMD -MP -c src/ParserExpression.cpp -o .build/glob-prefix/ParserExpression.o
+.build/minifypp-smoke
+Standalone minifier smoke test passed
+make[1]: Leaving directory '/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/minifypp'
+python3 scripts/check_binding_warnings.py
+PASS g++: bindings/node/native/nift_node.cc warnings as errors
+PASS g++: bindings/python/src/nift_module.cc warnings as errors
+PASS clang++: bindings/node/native/nift_node.cc warnings as errors
+PASS clang++: bindings/python/src/nift_module.cc warnings as errors
+cd bindings/node && bash build.sh
+using node headers: /usr/include/node
+BUILD vendored libffi (libffi)
+BUILD vendored libffi: done (7s)
+cd bindings/python && bash build.sh
+using python headers: /usr/include/python3.14
+BUILD vendored libffi (libffi)
+BUILD vendored libffi: done (7s)
+CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-linux-gnu-cc"
+g++ -std=c++17 -O2 -Wall -Wextra -pedantic -pthread  src/nift.o src/ProjectOwnership.o src/PackageTransaction.o src/CLI.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserExpression.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o .build/glob-keys/ParserHelpers.o -ldl .build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a -o .build/nift-glob-key-guard
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" python3 tests/v49_glob_order.py
+PASS 8 glob ordering/dedup/Unicode/hidden/missing contracts plus POSIX symlinks
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" python3 tests/v49_selector_parity.py
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" bash tests/v47_deep_expression_smoke.sh
+PASS 58 selector/capture/location/error contracts
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/parser_content_smoke.sh
+Tracked content/input parser smoke test passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/commands_smoke.sh
+CLI grammar smoke test passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/comments_smoke.sh
+Comments smoke test passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/contracts_smoke.sh
+PASS v4.7 deep expression
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/cp15_numeric_repair.sh
+CP15 numeric repair smoke: PASS
+".build/nift-cp17-bytes"
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/cp17_bytes.sh
+CP17 bytes language semantics: PASS
+mkdir -p .build
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread tests/cp18_bytes.cpp src/ProjectOwnership.o src/PackageTransaction.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserExpression.o src/ParserHelpers.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o src/embed/Engine.o src/embed/Context.o src/embed/c_abi.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o -ldl .build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a -o .build/nift-cp18-bytes
+Project contracts smoke test passed
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/cp19_bytes_io.sh
+CP19 bytes I/O: PASS
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/cp20_bytes_ffi.sh
+CP20 bytes/FFI copying bridges: PASS
+cp .build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a libnift_c.a
+ar rcs libnift_c.a src/ProjectOwnership.o src/PackageTransaction.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserExpression.o src/ParserHelpers.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o src/embed/Engine.o src/embed/Context.o src/embed/c_abi.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/diagnostics_smoke.sh
+diagnostics smoke passed
+diagnostics smoke passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/json_schema_integration_smoke.sh
+JSON Schema integration smoke test passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/markup_json_directives_smoke.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/pagination_smoke.sh
+Pagination smoke test passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/pagination_ordering_smoke.sh
+Pagination ordering smoke test passed (output 1 < cleanup 3 < info 4)
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/template_optional_smoke.sh
+Optional tracked template smoke test passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/requirements_smoke.sh
+@json and @markup directive smoke test passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/path_alias_smoke.sh
+Requirements smoke test passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/path_safety_smoke.sh
+Path alias smoke test passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/metadata_safety_smoke.sh
+Path safety smoke test passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/init_targets_smoke.sh
+Metadata safety smoke test passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/init_lock_smoke.sh
+  [PASS] fresh init creates .nift/.lock
+  [PASS] lock contents exactly canonical
+  [PASS] init does not create .unfinished
+  [PASS] init generates a .gitignore
+  [PASS] generated .gitignore ignores .nift/.lock
+  [PASS] ignore rule is scoped (no bare .lock or *.lock)
+  [PASS] lock persists after first build
+  [PASS] no .unfinished after successful build
+  [PASS] init fails cleanly on injected err write failure
+  [PASS] injected err failure leaves no config.json
+  [PASS] injected err failure creates no .unfinished
+  [PASS] init fails cleanly on injected partial write failure
+  [PASS] injected partial failure leaves no config.json
+  [PASS] injected partial failure creates no .unfinished
+  [PASS] init fails cleanly on injected flush write failure
+  [PASS] injected flush failure leaves no config.json
+  [PASS] injected flush failure creates no .unfinished
+  [PASS] init fails cleanly on injected size write failure
+  [PASS] injected size failure leaves no config.json
+  [PASS] injected size failure creates no .unfinished
+  [PASS] older project acquires .lock on first build
+  [PASS] init refuses over an already initialized project
+  [PASS] partial-init preserves an existing non-empty .lock
+  [PASS] partial-init keeps the same .lock inode
+  [PASS] partial-init completes the project
+  [PASS] partial-init repairs an existing empty .lock
+  [PASS] init refuses a directory at .nift/.lock
+  [PASS] directory-.lock refusal leaves no config.json
+  [PASS] init refuses a symlink at .nift/.lock
+  [PASS] symlink-.lock refusal leaves no config.json
+  [PASS] init fails on injected parent-sync failure
+  [PASS] parent-sync failure leaves no config.json
+ALL INIT LOCK SMOKE TESTS PASSED
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/init_migration_smoke.sh
+init targets smoke test passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" python3 tests/init_transformation_smoke.py --mode rewrite
+init-migration smoke test passed: full scaffold deterministic + canonical; guidance content; README/investigation non-destructive; error/keep/append/replace policies; AGENTS create/augment/replace/idempotent/malformed-safe; whitespace clean; plain init unchanged
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" python3 tests/init_transformation_smoke.py --mode redesign
+init-rewrite: PASS (96 black-box initialization cases)
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/control_flow_smoke.sh
+init-redesign: PASS (96 black-box initialization cases)
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/template_variables_smoke.sh
+Nift v4.1 template variable smoke passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/cross_feature_smoke.sh
+Control-flow smoke test passed
+Cross-feature smoke test passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v41_certification_adversarial.sh
+Nift v4.2 certification adversarial passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v41_inject_dependency.sh
+Control-flow loop metadata/sorting extensions passed
+Control-flow adversarial boundary extensions passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v42_null_smoke.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v42_while_smoke.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v42_continue_smoke.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v42_break_smoke.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v42_return_smoke.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v42_fragment_return_smoke.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v42_control_adversarial.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v42_function_program_smoke.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v42_numeric_literals_smoke.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v42_struct_definition_smoke.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v42_struct_instance_smoke.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v41_language_smoke.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v42_struct_fields_smoke.sh
+Nift v4.1 language smoke passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v41_operator_smoke.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v42_struct_constructor_smoke.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_cp0_cp14_smoke.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v42_struct_methods_smoke.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_cp15_cp34_smoke.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v42_struct_this_smoke.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v42_struct_private_smoke.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_cp35_cp44_smoke.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_review_smoke.sh
+v4.2 struct privacy smoke passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v42_struct_copy_smoke.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v42_struct_deepcopy_smoke.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v42_struct_member_expression_smoke.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v42_struct_adversarial.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/config_validation.sh
+config validation PASS: unknown config keys are rejected loudly
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" python3 tests/zero_mutation_smoke.py
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_cp51_cp70_scripting_smoke.sh
+  [PASS] 1 all-pages render failure returns nonzero
+  [PASS] 1 marker cleared (zero mutations)
+  [PASS] 1 fix + ordinary build succeeds
+  [PASS] 2 schema failure returns nonzero
+  [PASS] 2 marker cleared (schema error precedes any write)
+  [PASS] 2 fix + ordinary build succeeds
+  [PASS] 3 mixed success/failure build returns nonzero
+  [PASS] 3 marker REMAINS (a page wrote, b failed)
+  [PASS] 3 ordinary build refuses
+  [PASS] 3 build --repair succeeds
+  [PASS] 3 marker cleared after repair
+  [PASS] 4 initial paginated build succeeds
+  [PASS] 4 page-3 exists
+  [PASS] 4 shrink+break build returns nonzero
+  [PASS] 4 marker REMAINS (stale deletion + partial writes)
+  [PASS] 4 build --repair succeeds
+  [PASS] 4 stale page-3 gone after repair
+  [PASS] 4 marker cleared
+  [PASS] 5 initial build succeeds
+  [PASS] 5 build reached ownership epoch
+  [PASS] 5 marker REMAINS after SIGKILL mid-epoch
+  [PASS] 5 ordinary build refuses after kill
+  [PASS] 5 build --repair succeeds after kill
+  [PASS] 5 marker cleared after repair
+  [PASS] 6 repair fails on broken source
+  [PASS] 6 marker REMAINS after failed repair (evidence unresolved)
+  [PASS] 6 fixed repair succeeds
+  [PASS] 6 marker cleared after successful repair
+  [PASS] 7 build --auto exits non-zero on first failed pass
+  [PASS] 7 marker cleared (pass made zero mutations)
+  [PASS] 7 ordinary build succeeds after fix
+  [PASS] 8 duplicate-name rejection returns nonzero
+  [PASS] 8 no marker after duplicate-name rejection
+  [PASS] 9 no-resolvable-jobs returns nonzero
+  [PASS] 9 no marker after empty targeted build
+  [PASS] 10 watch setup succeeds
+  [PASS] 10 initial watch build succeeds
+  [PASS] 10 watch state created
+  [PASS] 10 corrupt watch state build returns nonzero
+  [PASS] 10 marker cleared (reconcile failed before any derived deletion)
+  [PASS] 10 watched page output intact
+  [PASS] 11 watch setup succeeds
+  [PASS] 11 initial watch build succeeds
+  [PASS] 11 watch state dir created
+  [PASS] 11 failed-reconcile build returns nonzero
+  [PASS] 11 derived deletion happened (p1 output removed)
+  [PASS] 11 marker REMAINS (mutation_started true)
+  [PASS] 11 ordinary build refuses
+  [PASS] 11 build --repair recovers
+  [PASS] 11 marker cleared after repair
+  [PASS] 12 watch setup succeeds
+  [PASS] 12 existing page builds after tracked reallocation
+  [PASS] 12 / output correct
+  [PASS] 13 watch setup succeeds
+  [PASS] 13 newly-discovered page builds
+  [PASS] 13 output exists
+  [PASS] 14 watch setup succeeds
+  [PASS] 14 initial build succeeds
+  [PASS] 14 disappearing-target build fails cleanly
+  [PASS] 14 marker retained (reconcile deleted derived output)
+  [PASS] 14 --repair recovers
+  [PASS] 14 marker cleared after repair
+  [PASS] 15 watch setup succeeds
+  [PASS] 15 initial build succeeds
+  [PASS] 15 unresolvable target fails
+  [PASS] 15 no marker (zero mutations)
+  [PASS] 16 watch setup succeeds
+  [PASS] 16 initial build succeeds
+  [PASS] 16 unresolvable target fails
+  [PASS] 16 marker retained (reconcile performed a derived deletion)
+  [PASS] 16 --repair recovers
+  [PASS] 16 marker cleared after repair
+
+ALL ZERO-MUTATION FAILURE TESTS PASSED
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" python3 tests/repair_campaign.py
+  [PASS] 0 canonical build succeeds
+  [PASS] 0 user file present
+  [PASS] delete-page-output: repair succeeds
+  [PASS] delete-page-output: marker cleared
+  [PASS] delete-page-output: output tree converges
+  [PASS] delete-page-output: second repair succeeds
+  [PASS] delete-page-output: second repair identical tree
+  [PASS] delete-page-output: no marker after second repair
+  [PASS] delete-page-output: ordinary build after repair clean
+  [PASS] delete page output: user file preserved
+  [PASS] truncate-page-output: repair succeeds
+  [PASS] truncate-page-output: marker cleared
+  [PASS] truncate-page-output: output tree converges
+  [PASS] truncate-page-output: second repair succeeds
+  [PASS] truncate-page-output: second repair identical tree
+  [PASS] truncate-page-output: no marker after second repair
+  [PASS] truncate-page-output: ordinary build after repair clean
+  [PASS] truncate page output: user file preserved
+  [PASS] garbage-output: repair succeeds
+  [PASS] garbage-output: marker cleared
+  [PASS] garbage-output: output tree converges
+  [PASS] garbage-output: second repair succeeds
+  [PASS] garbage-output: second repair identical tree
+  [PASS] garbage-output: no marker after second repair
+  [PASS] garbage-output: ordinary build after repair clean
+  [PASS] garbage output: user file preserved
+  [PASS] valid-but-wrong-output: repair succeeds
+  [PASS] valid-but-wrong-output: marker cleared
+  [PASS] valid-but-wrong-output: output tree converges
+  [PASS] valid-but-wrong-output: second repair succeeds
+  [PASS] valid-but-wrong-output: second repair identical tree
+  [PASS] valid-but-wrong-output: no marker after second repair
+  [PASS] valid-but-wrong-output: ordinary build after repair clean
+  [PASS] valid-but-wrong output: user file preserved
+  [PASS] alter-output-permissions: repair succeeds
+  [PASS] alter-output-permissions: marker cleared
+  [PASS] alter-output-permissions: output tree converges
+  [PASS] alter-output-permissions: second repair succeeds
+  [PASS] alter-output-permissions: second repair identical tree
+  [PASS] alter-output-permissions: no marker after second repair
+  [PASS] alter-output-permissions: ordinary build after repair clean
+  [PASS] alter output permissions: user file preserved
+  [PASS] partial-pagination-set: repair succeeds
+  [PASS] partial-pagination-set: marker cleared
+  [PASS] partial-pagination-set: output tree converges
+  [PASS] partial-pagination-set: second repair succeeds
+  [PASS] partial-pagination-set: second repair identical tree
+  [PASS] partial-pagination-set: no marker after second repair
+  [PASS] partial-pagination-set: ordinary build after repair clean
+  [PASS] partial pagination set: user file preserved
+  [PASS] stale-pagination-surplus: repair succeeds
+  [PASS] stale-pagination-surplus: marker cleared
+  [PASS] stale-pagination-surplus: output tree converges
+  [PASS] stale-pagination-surplus: second repair succeeds
+  [PASS] stale-pagination-surplus: second repair identical tree
+  [PASS] stale-pagination-surplus: no marker after second repair
+  [PASS] stale-pagination-surplus: ordinary build after repair clean
+  [PASS] stale pagination surplus: user file preserved
+  [PASS] corrupt-.info.json: repair succeeds
+  [PASS] corrupt-.info.json: marker cleared
+  [PASS] corrupt-.info.json: output tree converges
+  [PASS] corrupt-.info.json: second repair succeeds
+  [PASS] corrupt-.info.json: second repair identical tree
+  [PASS] corrupt-.info.json: no marker after second repair
+  [PASS] corrupt-.info.json: ordinary build after repair clean
+  [PASS] corrupt .info.json: user file preserved
+  [PASS] remove-.info.json: repair succeeds
+  [PASS] remove-.info.json: marker cleared
+  [PASS] remove-.info.json: output tree converges
+  [PASS] remove-.info.json: second repair succeeds
+  [PASS] remove-.info.json: second repair identical tree
+  [PASS] remove-.info.json: no marker after second repair
+  [PASS] remove-.info.json: ordinary build after repair clean
+  [PASS] remove .info.json: user file preserved
+  [PASS] orphan: repair succeeds
+  [PASS] orphan: marker cleared
+  [PASS] orphan: orphan .info.json removed
+  [PASS] orphan: historical output preserved (limitation)
+  [PASS] orphan: user file preserved
+  [PASS] orphan: ordinary build after repair clean
+  [PASS] mixed-corruption: repair succeeds
+  [PASS] mixed-corruption: marker cleared
+  [PASS] mixed-corruption: output tree converges
+  [PASS] mixed-corruption: second repair succeeds
+  [PASS] mixed-corruption: second repair identical tree
+  [PASS] mixed-corruption: no marker after second repair
+  [PASS] mixed-corruption: ordinary build after repair clean
+  [PASS] mixed corruption: user file preserved
+  [PASS] pagination-shrink-corrupt: repair succeeds
+  [PASS] pagination-shrink-corrupt: stale blog-3 removed
+  [PASS] pagination-shrink-corrupt: no marker
+  [PASS] repair-failure: broken template repair returns nonzero
+  [PASS] repair-failure: marker remains
+  [PASS] repair-failure: fixed repair succeeds
+  [PASS] repair-failure: marker cleared
+  [PASS] repair-failure: tree converges
+  [PASS] interrupted-repair: marker remains after kill
+  [PASS] interrupted-repair: ordinary build refuses
+  [PASS] interrupted-repair: second repair succeeds
+  [PASS] interrupted-repair: tree converges
+  [PASS] interrupted-repair: marker cleared
+  [PASS] repair-concurrency: build refuses while repair owns
+  [PASS] repair-concurrency: second repair refuses while repair owns
+  [PASS] repair-concurrency: repair completed
+  [PASS] repair-concurrency: repair refuses while build owns
+  [PASS] repair-concurrency: no marker after both complete
+  [PASS] hostile-output-path: repair succeeds
+  [PASS] hostile-output-path: marker cleared
+  [PASS] hostile-output-path: orphan .info.json removed
+  [PASS] hostile-output-path: user file preserved
+  [PASS] hostile-output-path: no output beyond project deleted
+  [PASS] hostile-traversal: repair succeeds
+  [PASS] hostile-traversal: marker cleared
+  [PASS] hostile-traversal: orphan .info.json removed
+  [PASS] hostile-traversal: no output beyond project deleted
+  [PASS] hostile-absolute: repair succeeds
+  [PASS] hostile-absolute: marker cleared
+  [PASS] hostile-absolute: orphan .info.json removed
+  [PASS] hostile-absolute: no output beyond project deleted
+  [PASS] hostile-corrupt-guess: repair succeeds
+  [PASS] hostile-corrupt-guess: marker cleared
+  [PASS] hostile-corrupt-guess: orphan .info.json removed
+  [PASS] hostile-corrupt-guess: user file preserved
+  [PASS] hostile-corrupt-guess: no output beyond project deleted
+  [PASS] hostile-custom-ext: repair succeeds
+  [PASS] hostile-custom-ext: marker cleared
+  [PASS] hostile-custom-ext: orphan .info.json removed
+  [PASS] hostile-custom-ext: user file preserved
+  [PASS] hostile-custom-ext: no output beyond project deleted
+  [PASS] sweep-failure: initial build succeeds
+  [PASS] sweep-failure: repair returns non-zero
+  [PASS] sweep-failure: marker retained
+  [PASS] sweep-failure: ordinary build refuses
+  [PASS] sweep-failure: second repair succeeds
+  [PASS] sweep-failure: marker cleared
+  [PASS] sweep-failure: orphan info removed
+  [PASS] hash-mode: initial build succeeds
+  [PASS] hash-mode: hashes written
+  [PASS] hash-mode: repair succeeds
+  [PASS] hash-mode: orphaned data hash removed
+  [PASS] hash-mode: valid content hash kept
+  [PASS] pagination-ownership: repair succeeds
+  [PASS] pagination-ownership: blog-0.html preserved byte-for-byte
+  [PASS] pagination-ownership: blog-1.html preserved byte-for-byte
+  [PASS] pagination-ownership: blog-00.html preserved byte-for-byte
+  [PASS] pagination-ownership: blog-01.html preserved byte-for-byte
+  [PASS] pagination-ownership: blog-0001.html preserved byte-for-byte
+  [PASS] pagination-ownership: blog-02.html preserved byte-for-byte
+  [PASS] pagination-ownership: blog-03.html preserved byte-for-byte
+  [PASS] pagination-ownership: blog-0002.html preserved byte-for-byte
+  [PASS] pagination-ownership: blog-0003.html preserved byte-for-byte
+  [PASS] pagination-ownership: blog-0009.html preserved byte-for-byte
+  [PASS] pagination-ownership: blog-99999999999999999999.html preserved byte-for-byte
+  [PASS] pagination-ownership: current page-2 correct
+  [PASS] pagination-ownership: current page-3 correct
+  [PASS] pagination-ownership: stale N>=2 surplus removed
+  [PASS] pagination-ownership: no marker
+  [PASS] pagination-primary-collision: initial build succeeds
+  [PASS] pagination-primary-collision: blog-5 page output exists
+  [PASS] pagination-primary-collision: repair succeeds
+  [PASS] pagination-primary-collision: tracked primary blog-5 preserved
+  [PASS] pagination-primary-collision: stale surplus removed
+
+ALL REPAIR CAMPAIGN TESTS PASSED
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" python3 tests/ownership_concurrency.py
+v4.3 CP51-CP70 scripting smoke: PASS
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/script_import_syntax.sh
+script import syntax: PASS
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_cp71_cp87_native_io_smoke.sh
+v4.3 CP71-CP87 native I/O smoke: PASS
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_cp78_streams_smoke.sh
+v4.3 CP78 stream ownership smoke: PASS
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_cp85_repl_multiline_smoke.sh
+  [PASS] 1 clean build succeeds
+  [PASS] 1 marker absent after successful build
+  [PASS] 1 .nift/.lock left by a successful build
+  [PASS] 1 .nift/.lock contains the explanatory sentence
+  [PASS] 1 no legacy .ownership-gate created in a fresh project
+  [PASS] 2 malformed tracked.json build fails
+  [PASS] 2 no marker after pre-mutation validation failure
+  [PASS] 3 failing build returns nonzero
+  [PASS] 3 marker remains after failed post-mutation build
+  [PASS] 3 .nift/.lock retained after a failed build
+  [PASS] 4 ordinary build refuses on stale marker
+  [PASS] 4 refusal directs toward build --repair
+  [PASS] 4 build --all refuses on stale marker
+  [PASS] 4 targeted build refuses on stale marker
+  [PASS] 4 build --repair succeeds on stale marker
+  [PASS] 4 marker removed after successful repair
+  [PASS] 4 .nift/.lock retained after repair
+  [PASS] 5 build refuses on live lock
+  [PASS] 5 build --all refuses on live lock
+  [PASS] 5 build --repair refuses on live lock
+  [PASS] 5 build p0 refuses on live lock
+  [PASS] 5 untrack refuses on live lock
+  [PASS] 5 cp refuses on live lock
+  [PASS] 5 mv refuses on live lock
+  [PASS] 5 info --names is read-only and works
+  [PASS] 5 status is read-only and works
+  [PASS] 6 ordinary build refuses while child holds live lock
+  [PASS] 6 marker survives SIGKILL
+  [PASS] 6 ordinary build refuses after SIGKILL (stale)
+  [PASS] 6 repair acquires after SIGKILL
+  [PASS] 6 marker removed after repair
+  [PASS] 7 mutator untrack acquired ownership
+  [PASS] 7 build refuses while untrack owns (mutator first)
+  [PASS] 7 untrack completed after release
+  [PASS] 7 mutator mv acquired ownership
+  [PASS] 7 build refuses while mv owns (mutator first)
+  [PASS] 7 mv completed after release
+  [PASS] 7 mutator rm acquired ownership
+  [PASS] 7 build refuses while rm owns (mutator first)
+  [PASS] 7 rm completed after release
+  [PASS] 7 no marker after mutators completed
+  [PASS] 7b rm owns the lock
+  [PASS] 7b untrack refuses while rm owns
+  [PASS] 7b cp refuses while rm owns
+  [PASS] 7b no marker after mutator completed
+  [PASS] 8 concurrent builds: >=1 succeeds and refusals are live-lock
+  [PASS] 8 concurrent builds leave byte-identical outputs
+  [PASS] 8 no marker left after all concurrent builds completed
+  [PASS] 9 repeated command leaves .lock
+  [PASS] 9 repeated command reuses the same .lock inode
+  [PASS] 9 .lock contents unchanged after repeated commands
+  [PASS] 9a idle legacy .ownership-gate migrates (build succeeds)
+  [PASS] 9a .lock established with the explanation
+  [PASS] 9a unlocked legacy .ownership-gate removed
+  [PASS] 9b locked legacy .ownership-gate refuses the build
+  [PASS] 9b locked legacy .ownership-gate is never removed
+  [PASS] 9b no .lock created while the legacy gate is locked
+  [PASS] 9b recovery after releasing the legacy lock
+
+ALL OWNERSHIP/CONCURRENCY TESTS PASSED
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v44_execution_shell_smoke.sh
+MARK exec-shell start
+v4.3 CP85 multiline REPL smoke: PASS
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_cp88_repl_lifetime_smoke.sh
+MARK after run.f
+MARK after pipeline
+MARK assign
+v4.3 CP88 long-running REPL smoke: PASS
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_cp90_scripting_wall_smoke.sh
+MARK interp
+MARK fn
+MARK bg
+v4.3 CP90 scripting sanitizer-wall smoke: PASS
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_cp94_cp97_inspection_smoke.sh
+MARK bare
+MARK builtins
+MARK shadow
+CP94-CP97 inspection smoke: PASS
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_cp100_cp103_string_expr_smoke.sh
+MARK nope
+MARK noprocess
+MARK multi
+mkdir -p .build
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread  tests/parser_statement_state_unit.cpp src/ProjectOwnership.o src/PackageTransaction.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserExpression.o src/ParserHelpers.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o src/embed/Engine.o src/embed/Context.o src/embed/c_abi.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o -ldl .build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a -o .build/parser-statement-state-unit
+CP100-CP103 string/expression ergonomics smoke: PASS
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_cp105_cp113_filevalue_smoke.sh
+CP105-CP113 managed FileValue smoke: PASS
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_cp112_filevalue_wall_smoke.sh
+v4.3 CP112 FileValue adversarial/resource smoke: PASS
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_pay_for_use_smoke.sh
+pay-for-use smoke passed: ordinary builds construct no project model; project-aware builds keep the semantic dependency
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_readval_writeval_smoke.sh
+PASS  string
+PASS  int
+PASS  double
+PASS  boolean
+PASS  array
+PASS  nested
+PASS  whitespace
+PASS  sequential
+PASS  eof-null
+PASS  malformed-errors
+PASS  write-only-rejected
+PASS  writeval-obj
+PASS  writeval-seq
+PASS  writeval-file
+PASS  writeval-readonly-stream
+read_val/write_val smoke passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_collection_ops_smoke.sh
+PASS  map-double
+PASS  filter-evens
+PASS  reduce-total
+PASS  any-true
+PASS  any-false
+PASS  all-true
+PASS  all-empty-true
+PASS  any-empty-false
+PASS  find
+PASS  find-none
+PASS  find_index
+PASS  find_index-none
+PASS  count
+PASS  sort_by-titles
+PASS  group_by-years
+PASS  unique
+PASS  flatten
+PASS  sum
+PASS  sum-empty
+PASS  min
+PASS  max
+PASS  max-year
+PASS  first
+PASS  last
+PASS  slice
+PASS  join-csv
+PASS  contains-true
+PASS  contains-nested
+PASS  index_of
+PASS  size
+PASS  length
+PASS  empty-false
+PASS  empty-true
+PASS  keys
+PASS  values
+PASS  entries-size
+PASS  has-true
+PASS  has-false
+PASS  get
+PASS  get-default
+PASS  get-missing-null
+PASS  merge
+PASS  obj-size
+PASS  published-titles
+PASS  all-tags-unique
+PASS  recent-count
+PASS  has-markup
+collection-operations smoke passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_postfix_composition_smoke.sh
+PASS  member-after-first
+PASS  member-after-map-index
+PASS  index-after-method
+PASS  member-after-find
+PASS  member-after-first-tags
+PASS  member-after-last
+PASS  paren-index-member
+PASS  paren-call-member
+PASS  method-after-index
+PASS  deep-chain
+PASS  method-after-method
+PASS  object-get-member
+PASS  values-first-member
+PASS  filter-count-chain
+PASS  missing-member
+PASS  out-of-range
+PASS  non-object-member
+PASS  nested-nonobject
+PASS  index-scalar
+PASS  object-missing-get
+postfix-composition smoke passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_hierarchy_smoke.sh
+PASS  parent
+PASS  root-no-parent
+PASS  top-level-parent
+PASS  children
+PASS  ancestors
+PASS  descendants
+PASS  siblings
+PASS  root-children
+PASS  missing-intermediate
+PASS  composition
+PASS  chain
+PASS  index
+PASS  data
+PASS  leaf-children
+PASS  leaf-descendants
+PASS  leaf-ancestors
+PASS  leaf-siblings
+PASS  template-current-page
+PASS  eval-parity
+hierarchy smoke passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_hierarchy_incremental_smoke.sh
+PASS  no-change-clean
+PASS  unrelated-edit-scope
+PASS  add-child
+PASS  remove-child
+PASS  rename
+PASS  reparent
+PASS  clean-vs-incremental-parity
+PASS  ordinary-page-no-hierarchy-dep
+hierarchy incremental-correctness wall passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_hierarchy_adversarial_smoke.sh
+PASS  traversal
+PASS  absolute
+PASS  empty-name
+PASS  unknown
+PASS  null-member
+PASS  bad-member
+PASS  no-child-of-leaf
+PASS  unicode-parent
+PASS  unicode-child
+PASS  root-no-siblings
+PASS  no-ancestor
+PASS  wide-children
+PASS  missing-intermediate
+PASS  parallel-access
+hierarchy adversarial wall passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_hierarchy_pay_for_use_smoke.sh
+PASS  plain-template-no-hierarchy-state
+PASS  hierarchy-build-publishes-fingerprint-once
+hierarchy pay-for-use gate passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_mundane_surface_smoke.sh
+PASS  str-empty-true
+PASS  str-empty-false
+PASS  num-abs
+PASS  num-floor
+PASS  num-ceil
+PASS  num-round-up
+PASS  num-round-down
+PASS  num-round-neg
+PASS  lit-array-index
+PASS  lit-obj-index
+PASS  lit-nested
+PASS  arr-bind-index
+PASS  arr-expr-index
+PASS  arr-nested-index
+PASS  html-escape
+PASS  attr-escape
+PASS  url-encode
+PASS  url-unicode
+PASS  comp-1
+PASS  comp-2
+PASS  comp-3
+mundane surface smoke passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_frontend_surface_dogfood.sh
+frontend surface dogfood passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_surface_robustness_smoke.sh
+PASS  html-escape-array
+PASS  html-escape-arity
+PASS  url-encode-object
+PASS  floor-non-number
+PASS  empty-non-string
+PASS  abs-non-number
+PASS  abs-arity
+PASS  index-missing-key
+PASS  index-non-string-key
+PASS  json-index-non-string-key
+PASS  imm-trim
+PASS  imm-floor
+PASS  imm-replace
+PASS  imm-lower
+PASS  imm-escape
+PASS  imm-url
+PASS  imm-obj
+PASS  uni-length
+PASS  uni-contains
+PASS  uni-starts
+PASS  uni-escape
+PASS  uni-url
+PASS  uni-trim
+PASS  uni-replace
+PASS  uni-split
+PASS  uni-lower-ascii
+surface robustness smoke passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_object_expressions_smoke.sh
+PASS  expr-binding
+PASS  expr-arithmetic
+PASS  expr-string
+PASS  expr-fn-call
+PASS  expr-range
+PASS  expr-collection
+PASS  expr-null
+PASS  enum-compose
+PASS  nested-expr
+PASS  nested-enum
+PASS  coalesce
+PASS  coalesce-bind
+PASS  safe
+PASS  safe-nonnull
+PASS  ternary
+PASS  eval-once
+PASS  types
+PASS  dup-key
+PASS  trailing-comma
+PASS  single-quote-key
+PASS  missing-value
+PASS  missing-colon
+PASS  error-prop
+PASS  error-nested
+PASS  json-escaped
+PASS  json-bigint
+PASS  json-sci
+PASS  json-dup
+PASS  serialize-enum-int
+PASS  template-parity
+PASS  eval-parity
+PASS  eval-json
+object expression literals smoke passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_recursion_guard_smoke.sh
+PASS  shallow-recursion
+PASS  deep-lambda-guard
+PASS  deep-fn-guard
+PASS  int64-max
+PASS  int64-overflow-diagnostic
+recursion + integer-boundary guard smoke passed
+PASS  int64-max
+PASS  int64-overflow-diagnostic
+recursion + integer-boundary guard smoke passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_cp167_dogfood.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_cp141_cp163_content_model.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_cp137_cp140_frontmatter.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_cp131_cp136_project_model.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_cp130_eval_parity.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_cp129_eval_capabilities.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_cp127_eval_json_smoke.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_cp126_eval_smoke.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_cp124_json_object_wall.sh
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_cp117_object_methods_smoke.sh
+object methods smoke passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_final_language_smoke.sh
+final v4.3 language smoke passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" python3 benchmarks/hierarchy_scaling.py
+500 pages: 0.008s  2000 pages: 0.026s  ratio=3.2x  (4x pages -> 0.8x per 4x)
+PASS: hierarchy index construction approximately O(N)
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_cp172_from_entries_smoke.sh
+CP172 from_entries smoke passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_cp173_index_by_smoke.sh
+CP173 index_by smoke passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_cp174_pick_omit_smoke.sh
+CP174 pick/omit smoke passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_cp175_merge_deep_smoke.sh
+CP175 merge_deep smoke passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_cp176_cp182_collection_algebra_smoke.sh
+CP176-CP182 collection algebra smoke passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_cp183_collection_composition_smoke.sh
+CP183 collection composition smoke passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v43_cp184_cp186_sort_by_smoke.sh
+CP184-CP186 stable compound sort_by smoke passed
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" python3 benchmarks/typed_content_scaling.py
+250 pages: 0.011s  1000 pages: 0.027s  ratio=2.6x
+PASS: full-build typed-content scaling approximately linear
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" python3 benchmarks/project_dependency_scaling.py
+dependency-bookkeeping check (every page references project.*):
+  n=1000: max per-page dependencies = 5
+1000 pages: 0.070s  4000 pages: 0.251s  ratio=3.6x
+PASS: project-using dependency bookkeeping is O(1) and full-build scaling is approximately linear
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v44_shell_glob.sh ; st=$?; if [ $st -eq 77 ]; then echo "  (skipped)"; else exit $st; fi
+PASS v4.4 shell glob
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v44_cp21_history_smoke.sh
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v44_cp22_completion_smoke.sh
+PASS tab-completes-command
+PASS completed-command-runs
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" bash tests/v472_prepared_method_parity.sh
+invalid encodings rejected: PASS
+PASS v4.7 prepared method-argument parity
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" bash tests/v48_warn_smoke.sh
+PASS v4.8 warn primitive
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" bash tests/v48_bytes_index_parity.sh
+PASS v4.8 bytes indexing parity
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" bash tests/v48_comparison_parity.sh
+PASS v4.8 comparison parity
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" bash tests/v48_callable_parity.sh
+PASS v4.8 callable parity
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" bash tests/v48_map_set_index_smoke.sh
+PASS history-up-arrow
+PASS v4.8 map/set index semantics
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" bash tests/v48_map_set_scaling_guard.sh
+PASS tab-completes-builtin
+PASS tab-completes-path
+PASS v4.8 map/set scaling guard (get 3->3ms, contains 4->3ms, set.contains 3->3ms, replace 2->2ms, build 18->1163ms)
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" bash tests/v48_prepared_object_literal_parity.sh
+PASS v4.8 prepared object-literal parity
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" bash tests/v48_prepared_object_literal_guard.sh
+PASS v4.8 prepared object-literal scaling guard (scalar 80ms, object 130ms, bound 1060ms)
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" bash tests/v48_prepared_collection_parity.sh
+PASS v4.8 prepared collection-method parity
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" bash tests/v48_prepared_collection_guard.sh
+PASS ctrl-c-keeps-shell
+PASS v4.8 prepared collection-method scaling guard (push 70ms, contains 110ms, set 70ms, bound 1130ms)
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" bash tests/location_method_receiver.sh
+PASS location method receiver synchronization
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" bash tests/v48_identifier_parity.sh
+PASS v4.8 identifier and callback compatibility parity
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" python3 tests/v48_identifier_guard.py
+PASS ctrl-c-then-command
+PASS identifier dispatch ratios: identity/build=2.14, filter/build=3.14
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" bash tests/v48_callback_parity.sh
+PASS v4.8 identifier and callback compatibility parity
+PASS v4.8 callback compatibility matrix
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" python3 tests/v48_callback_numeric_parity.py
+PASS tab-completes-user-function
+PASS user-function-runs
+PASS ctrl-d-exits
+PASS v4.4 interactive completion PTY
+MARK run1
+PASS 470 ordinary/callback numeric and fallback parity pairs
+g++ -std=c++17 -O2 -Wall -Wextra -pedantic -pthread  src/nift.o src/ProjectOwnership.o src/PackageTransaction.o src/CLI.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserHelpers.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o .build/lambda-cache/ParserExpression.o -ldl .build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a -o .build/nift-lambda-cache-guard
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v46_time_smoke.sh
+PASS v4.6 time runtime
+mkdir -p .build
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread  tests/v46_timer_unit.cpp src/ProjectOwnership.o src/PackageTransaction.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserExpression.o src/ParserHelpers.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o src/embed/Engine.o src/embed/Context.o src/embed/c_abi.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o -ldl .build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a -o .build/v46-timer-unit
+PASS foreground-stdin-tty
+PASS foreground-stdout-tty
+PASS foreground-stderr-tty
+MARK run2
+PASS redirection-routes-stdout
+MARK run3
+PASS run-captures-not-tty
+PASS v4.4 shell foreground terminal inheritance
+bash tests/v44_cp27_restricted_smoke.sh /home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift
+PASS v4.4 restricted mode
+mkdir -p .build
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread  tests/v46_time_embed.cpp src/ProjectOwnership.o src/PackageTransaction.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserExpression.o src/ParserHelpers.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o src/embed/Engine.o src/embed/Context.o src/embed/c_abi.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o -ldl .build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a -o .build/v46-time-embed
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v46_secure_random_smoke.sh
+PASS v4.6 secure random bytes
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v46_output_smoke.sh
+PASS v4.6 execution output separation
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" bash tests/v44_relative_import_ownership_smoke.sh
+PASS v4.4 relative import module ownership
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" bash tests/v46_import_worker_ownership_smoke.sh
+PASS v4.6 worker module import ownership
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/progress_pty_smoke.sh; \
+  status=$?; \
+  if [ $status -eq 77 ]; then echo "test-progress-pty: skipped (PTY tooling unavailable)"; \
+  else exit $status; fi
+Darwin script invocation structurally verified (script -q FILE /bin/sh -c CMD + exit marker)
+exit marker parsing verified (footer-free BSD-style transcripts)
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/unreadable_source_smoke.sh
+unreadable-source smoke test passed: unreadable content/@input/template fail cleanly and preserve last good output
+NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/incremental_modified_immediate.sh
+mkdir -p .build
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread tests/source_translation_unit.cpp src/ProjectOwnership.o src/PackageTransaction.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserExpression.o src/ParserHelpers.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o -ldl .build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a -o .build/source-translation-unit
+progress PTY smoke passed (success, failure and NO_COLOR)
+mkdir -p .build
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread tests/source_map_probe.cpp src/ProjectOwnership.o src/PackageTransaction.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserExpression.o src/ParserHelpers.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o -ldl .build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a -o .build/source-map-probe
+python3 tests/v410_sort_factory_parity.py --nift ./nift
+PASS 31 exact sort/factory/capture/origin contracts
+python3 tests/v410_object_member_parity.py --nift ./nift
+PASS 86 exact object/member/location/origin contracts
+g++ -std=c++17 -O2 -Wall -Wextra -pedantic -pthread  src/nift.o src/ProjectOwnership.o src/PackageTransaction.o src/CLI.o src/Process.o src/JobControl.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserExpression.o src/ParserHelpers.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o .build/object-lookup/RuntimeValue.o -ldl .build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a -o .build/nift-object-lookup-guard
+g++ -std=c++17 -O2 -Wall -Wextra -pedantic -pthread  src/nift.o src/ProjectOwnership.o src/PackageTransaction.o src/CLI.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserHelpers.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o .build/glob-relative/ParserExpression.o -ldl .build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a -o .build/nift-glob-relative-guard
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" python3 tests/v410_glob_parity.py
+PASS 12 exact glob path/ordering/hidden/Unicode/alias contracts
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" python3 tests/v410_native_dispatch_parity.py
+PASS 15 exact native dispatch/method/error contracts
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" python3 tests/v410_string_replace_parity.py
+PASS 20 exact byte-string replacement contracts
+python3 tests/v410_callback_overlay_parity.py --nift "/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift"
+PASS 23 exact callback environment/origin contracts
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/.build/nift-lambda-cache-guard" python3 tests/v410_callback_overlay_guard.py
+PASS parameter: {'overlay_hits': 3, 'capture_hits': 0, 'hydrations': 0, 'misses': 0, 'fallbacks': 0}
+PASS hydrate once per frame: {'overlay_hits': 9, 'capture_hits': 3, 'hydrations': 3, 'misses': 0, 'fallbacks': 0}
+PASS missing x1: {'overlay_hits': 0, 'capture_hits': 0, 'hydrations': 0, 'misses': 3, 'fallbacks': 3}
+PASS missing x8: {'overlay_hits': 0, 'capture_hits': 0, 'hydrations': 0, 'misses': 24, 'fallbacks': 24}
+PASS missing x32: {'overlay_hits': 0, 'capture_hits': 0, 'hydrations': 0, 'misses': 96, 'fallbacks': 96}
+PASS missing x128: {'overlay_hits': 0, 'capture_hits': 0, 'hydrations': 0, 'misses': 0, 'fallbacks': 0}
+PASS missing x256: {'overlay_hits': 0, 'capture_hits': 0, 'hydrations': 0, 'misses': 0, 'fallbacks': 0}
+PASS missing x1024: {'overlay_hits': 0, 'capture_hits': 0, 'hydrations': 0, 'misses': 0, 'fallbacks': 0}
+g++ -std=c++17 -O2 -Wall -Wextra -pedantic -pthread  src/nift.o src/ProjectOwnership.o src/PackageTransaction.o src/CLI.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o .build/glob-prefix/ParserHelpers.o .build/glob-prefix/ParserExpression.o -ldl .build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a -o .build/nift-glob-prefix-guard
+NIFT=/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift /usr/bin/python3 tests/v410_glob_prefix_parity.py
+files/linked-dir/\../*.dat PASS
+files/**/\./*.dat PASS
+files/**/\../*.dat PASS
+files/* PASS
+files/** PASS
+files/**/** PASS
+files/**/**/** PASS
+files/**/*.dat PASS
+files/**/sub/* PASS
+files/*/*.dat PASS
+files/*/deep/?*.dat PASS
+files/**/sub/.. PASS
+files/**/./*.dat PASS
+files/**/../*.dat PASS
+files/linked-dir/*.dat PASS
+files/linked-dir/** PASS
+files/**/deep/** PASS
+files/**/.* PASS
+files/.private/** PASS
+files/.private/*.dat PASS
+files/??.dat PASS
+files/?.dat PASS
+files/[ab]*.dat PASS
+files/**/[ab].dat PASS
+files/**/[a-z].dat PASS
+files/**/*.DAT PASS
+files/**/*.missing PASS
+files/**/no-such/* PASS
+files/linked-dir/../*.dat PASS
+files/dangling* PASS
+files/external* PASS
+files/link* PASS
+./files/**/*.dat PASS
+**/*.dat PASS
+** PASS
+**/** PASS
+../files/**/*.dat PASS
+<ORACLE_ROOT>/files/**/*.dat PASS
+<ORACLE_ROOT>/files/* PASS
+same-parser-retarget PASS
+PASS 40 general/stable and between-operation alias contracts
+PASS actual removed-cwd failure boundary
+NIFT=/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift /usr/bin/python3 tests/v410_filesystem_recipe_parity.py
+PASS stat-prepared
+PASS stat-compatibility
+PASS stat-wrong-arity
+PASS stat-wrong-type
+PASS stat-first-error
+PASS named-stat-prepared
+PASS named-stat-compatibility
+PASS move-order
+PASS move-argument-mutates-source
+PASS move-first-source-error
+PASS move-first-destination-error
+PASS move-wrong-arity
+PASS move-cwd-boundary
+PASS copy-order
+PASS copy-argument-mutates-source
+PASS copy-first-source-error
+PASS copy-first-destination-error
+PASS copy-wrong-arity
+PASS copy-cwd-boundary
+PASS move-unmatched-source
+PASS move-array-source
+PASS move-bad-source-array
+PASS move-second-destination-error
+PASS move-second-source-error
+PASS move-spread
+PASS copy-unmatched-source
+PASS copy-array-source
+PASS copy-bad-source-array
+PASS copy-second-destination-error
+PASS copy-second-source-error
+PASS copy-spread
+PASS move-loop-location
+PASS move-index-probe-order
+PASS move-root-path-replacement
+PASS copy-loop-location
+PASS copy-index-probe-order
+PASS copy-root-path-replacement
+PASS all 37 exact source-count/order/origin/error/file-effect contracts
+PASS 60 pure-string canonical fallback contracts
+NIFT_FS_STATS=/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/.build/nift-fs-recipe-guard /usr/bin/python3 tests/v410_filesystem_recipe_guard.py
+PASS immutable recipe reuse, canonical operands, pure plans, factories and spread fallback counters
+NIFT=/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift /usr/bin/python3 tests/v410_large_string_parity.py
+PASS payload-8192-Z-q
+PASS payload-8192-_-__
+PASS payload-8192-_-
+PASS payload-8192-_-_
+PASS payload-8192-missing-x
+PASS payload-16384-Z-q
+PASS payload-16384-_-__
+PASS payload-16384-_-
+PASS payload-16384-_-_
+PASS payload-16384-missing-x
+PASS payload-32768-Z-q
+PASS payload-32768-_-__
+PASS payload-32768-_-
+PASS payload-32768-_-_
+PASS payload-32768-missing-x
+PASS payload-65536-Z-q
+PASS payload-65536-_-__
+PASS payload-65536-_-
+PASS payload-65536-_-_
+PASS payload-65536-missing-x
+PASS payload-131072-Z-q
+PASS payload-131072-_-__
+PASS payload-131072-_-
+PASS payload-131072-_-_
+PASS payload-131072-missing-x
+PASS shape-.to_upper().replace("A","x")
+PASS shape-.to_upper().replace("A","x",)
+PASS shape-.to_upper().replace(,"A","x")
+PASS shape-.to_upper().replace("","x")
+PASS shape-.to_upper(,).replace("A","x")
+PASS shape-.trim().replace("a","x")
+PASS shape-.to_lower().replace("a","x")
+PASS shape-.replace("a",7)
+PASS mixed-body-counts
+PASS receiver-factory
+PASS argument-factory
+PASS nested-error
+PASS 37 exact payload/factory/diagnostic contracts
+.build/large-string-guard
+PASS bounded canonical cache: peak owned-capacity allowance=3891684 entries=10
+NIFT=/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift /usr/bin/python3 tests/v410_file_buffer_parity.py
+PASS open-r
+PASS open-rw
+PASS open-w
+PASS open-a
+PASS mutate-write("xy")
+PASS mutate-write("")
+PASS mutate-write_line("xy")
+PASS mutate-write_bytes(bytes([0,255,65]))
+PASS mutate-write(bytes([0,255,65]))
+PASS mutate-write_val(42)
+PASS mutate-append("xy")
+PASS mutate-append("")
+PASS mutate-prepend("xy")
+PASS mutate-insert(2,"xy")
+PASS mutate-insert_before("CD","xy")
+PASS mutate-insert_after("CD","xy")
+PASS mutate-replace("CD","xy")
+PASS mutate-replace("CD","CD")
+PASS mutate-replace("missing","xy")
+PASS mutate-replace_once("CD","xy")
+PASS save-then-revert
+PASS overwrite-initial-revert
+PASS new-empty-write
+PASS append-new-empty-write
+PASS reopen-external-edit
+PASS opaque-closed-reopen
+PASS write-argument-saves
+PASS write-argument-reverts
+PASS write-argument-closes
+PASS closed-write-factory-count
+PASS readonly-write-factory-count
+PASS failed-save-revert
+PASS duplicate-replace-once-error
+PASS receiver-factory-count
+PASS factory-path-counter
+PASS factory-changing-cwd
+PASS open-mode-factory-cwd
+PASS closed-file-copy
+PASS closed-file-move
+PASS closed-file-remove
+PASS open-copy-precondition-counter
+PASS copy-invalid-argument
+PASS unknown-file-tag
+PASS nonfile-receiver-counter
+PASS read-val-token-contract
+PASS invalid-mode-arity
+PASS save-argument-arity
+PASS empty-write-return-to-clean
+PASS nested-method-depth-20
+PASS nested-method-depth-40
+PASS nested-method-depth-48
+PASS nested-method-depth-50
+PASS nested-method-depth-60
+PASS stack-named-20
+PASS stack-named-40
+PASS stack-named-48
+PASS stack-named-50
+PASS stack-named-60
+PASS stack-named-80
+PASS stack-named-96
+PASS stack-named-110
+PASS stack-html_escape-20
+PASS stack-html_escape-40
+PASS stack-html_escape-48
+PASS stack-html_escape-50
+PASS stack-html_escape-60
+PASS stack-html_escape-80
+PASS stack-html_escape-96
+PASS stack-html_escape-110
+PASS stack-type-20
+PASS stack-type-40
+PASS stack-type-48
+PASS stack-type-50
+PASS stack-type-60
+PASS stack-type-80
+PASS stack-type-96
+PASS stack-type-110
+PASS stack-min-20
+PASS stack-min-40
+PASS stack-min-48
+PASS stack-min-50
+PASS stack-min-60
+PASS stack-min-80
+PASS stack-min-96
+PASS stack-min-110
+PASS stack-method-20
+PASS stack-method-40
+PASS stack-method-48
+PASS stack-method-50
+PASS stack-method-60
+PASS stack-method-80
+PASS stack-method-96
+PASS stack-method-110
+PASS stack-method-argument-20
+PASS stack-method-argument-40
+PASS stack-method-argument-48
+PASS stack-method-argument-50
+PASS stack-method-argument-60
+PASS stack-method-argument-80
+PASS stack-method-argument-96
+PASS stack-method-argument-110
+PASS write-preserves-string-slots
+PASS 102 exact buffer/factory/cwd/reentry/file-effect contracts
+.build/file-buffer-guard
+PASS saved-state alias, lazy snapshots, no-op writes, revert, retained shell/IDs; cache=32 entries/1089024 conservative bytes
+mkdir -p .build/pic/src/
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/ParserExpression.cpp -o .build/pic/src/ParserExpression.o
+mkdir -p .build/pic/src/
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -fPIC -MMD -MP -c src/ParserTemplate.cpp -o .build/pic/src/ParserTemplate.o
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/.build/nift-glob-key-guard" python3 tests/v49_glob_key_guard.py
+PASS 100 entries: 100 ordering-key conversions
+PASS 200 entries: 200 ordering-key conversions
+PASS 400 entries: 400 ordering-key conversions
+.build/nift-cp18-bytes
+CP18 bytes transfer: PASS
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/cp18_bytes.sh
+CP18 bytes language transfer: PASS
+mkdir -p .build
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread tests/cp21_bytes_embed.cpp libnift_c.a -ldl .build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a -o .build/nift-cp21-bytes-embed
+python3 scripts/gen_migration_content.py --check
+verify: src/migration_content.h byte-exact (16939 bytes)
+verify: src/rewrite_content.h byte-exact (8385 bytes)
+verify: src/redesign_content.h byte-exact (9483 bytes)
+.build/parser-statement-state-unit
+tests/v44_ast_expression_smoke.sh
+v4.4 AST expression smoke: PASS
+tests/v44_ast_constant_fold_smoke.sh
+v4.4 AST constant-fold smoke: PASS
+tests/v44_ast_differential_corpus.sh
+v4.4 AST differential corpus: PASS (20 programs, legacy-equivalent)
+tests/v44_root_path_corruption_reproducers.sh
+PASS v4.4 root+path corruption reproducers (destruct/growth/structarr/mapstruct/formap/forarr)
+v4.4 AST fuzz: PASS (120 runs, prepared == legacy, deterministic)
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v44_perf_scaling_smoke.sh
+push 40k=41ms 80k=67ms | set 40k=69ms 80k=133ms | map 40k=87ms 80k=243ms | str += 160k=120ms 320k=220ms
+PASS performance scaling guards (array push + set add + map set + string += remain linear)
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v44_element_assignment_smoke.sh
+PASS element assignment (arrays, objects, nested, compound, errors)
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v44_cp2_variadic_functions_smoke.sh
+PASS v4.4 CP2 variadic functions
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v44_struct_variadic_methods_smoke.sh
+PASS v4.4 variadic struct named methods
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v44_cp3_variadic_lambdas_smoke.sh
+PASS v4.4 CP3 variadic lambdas
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v44_cp4_spread_smoke.sh
+PASS v4.4 CP4 spread
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v44_cp5_generalized_native_smoke.sh
+PASS v4.4 CP5 generalized native operations
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v44_cp6_cp7_glob_filesystem_smoke.sh
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/.build/nift-lambda-cache-guard" python3 tests/v48_callback_guard.py
+PASS v4.4 CP6-CP7 filesystem globs
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v44_cp8_structured_wildcards_smoke.sh
+PASS v4.4 CP8 structured wildcards
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v44_cp9_map_markup_smoke.sh
+PASS v4.4 CP9 map-to-markup
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v44_cp10_filesystem_authority_smoke.sh
+PASS v4.4 CP10 standalone filesystem authority
+.build/v46-timer-unit
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift" tests/v46_timer_smoke.sh
+PASS v4.6 timer runtime
+.build/v46-time-embed
+.build/source-translation-unit
+python3 tests/source_map_matrix.py .build/source-map-probe
+top-level expected 3:1 actual 3:1 internal.legacy_failure unknown value or malformed expression: missing_value
+top-level-tabs expected 2:3 actual 2:3 internal.legacy_failure unknown value or malformed expression: missing_value
+while expected 3:5 actual 3:5 internal.legacy_failure unknown value or malformed expression: missing_value
+for expected 3:5 actual 3:5 internal.legacy_failure unknown value or malformed expression: missing_value
+nested-if expected 4:9 actual 4:9 internal.legacy_failure unknown value or malformed expression: missing_value
+function-loop expected 4:9 actual 4:9 internal.legacy_failure unknown value or malformed expression: missing_value
+function-nested-loops expected 5:17 actual 5:17 internal.legacy_failure unknown value or malformed expression: missing_value
+prepared-callable expected 2:12 actual 2:12 internal.legacy_failure division by zero
+array-index expected 4:5 actual 4:5 internal.legacy_failure JSON array index 9 is out of range in 'a[9]'
+object-member expected 4:5 actual 4:5 internal.legacy_failure value has no member: absent
+array-expression expected 3:14 actual 3:14 internal.legacy_failure unknown value or malformed expression: missing_value
+object-expression expected 3:16 actual 3:16 internal.legacy_failure unknown value or malformed expression: missing_value
+multiline-args expected 4:9 actual 4:9 internal.legacy_failure unknown value or malformed expression: missing_value
+multiline-array expected 4:5 actual 4:5 internal.legacy_failure unknown value or malformed expression: missing_value
+multiline-object expected 3:10 actual 3:10 internal.legacy_failure unknown value or malformed expression: missing_value
+multiline-arithmetic expected 3:9 actual 3:9 internal.legacy_failure unknown value or malformed expression: missing_value
+multiline-boolean expected 3:13 actual 3:13 internal.legacy_failure unknown value or malformed expression: missing_value
+nested-calls expected 3:8 actual 3:8 internal.legacy_failure unknown value or malformed expression: missing_value
+chained-index expected 3:1 actual 3:1 internal.legacy_failure JSON array index 9 is out of range in 'a[0].x[9]'
+malformed expected 2:7 actual 2:7 internal.legacy_failure expression cannot be empty
+invalid-callable expected 3:5 actual 3:5 internal.legacy_failure undefined callable: absent_callable
+invalid-collection expected 3:5 actual 3:5 internal.legacy_failure pop: array is empty
+legacy-fallback expected 3:5 actual 3:5 internal.legacy_failure bytes: array values must be integers from 0 to 255
+expression-lambda expected 2:15 actual 2:15 internal.legacy_failure lambda body error: unknown value or malformed expression: missing_value
+block-lambda expected 3:5 actual 3:5 internal.legacy_failure return: unknown value or malformed expression: missing_value
+named-callable-value expected 2:5 actual 2:5 internal.legacy_failure return: division by zero
+callback-map expected 2:5 actual 2:5 internal.legacy_failure return: division by zero
+callback-filter expected 2:5 actual 2:5 internal.legacy_failure return: division by zero
+callback-reduce expected 2:5 actual 2:5 internal.legacy_failure return: division by zero
+callback-sort_by expected 2:5 actual 2:5 internal.legacy_failure return: division by zero
+numeric-plan-fallback expected 2:21 actual 2:21 internal.legacy_failure lambda body error: division by zero
+template-expression expected 3:1 actual 3:1 internal.legacy_failure division by zero
+template-for expected 3:5 actual 3:5 internal.legacy_failure division by zero
+template-nested expected 4:9 actual 4:9 internal.legacy_failure division by zero
+template-script expected 3:5 actual 3:5 internal.legacy_failure unknown value or malformed expression: missing_value
+template-include expected 3:1 actual 3:1 internal.legacy_failure division by zero
+import-module expected 3:1 actual 3:1 internal.legacy_failure import: unknown value or malformed expression: missing_value
+recoverable expected 3:5 actual 3:5 ffi.library_load_failed ffi_open: ./missing-library-cpf.so: cannot open shared object file: No such file or directory
+explicit-throw expected 2:1 actual 2:1 user.raised sample
+imported-callable expected 2:12 actual 2:12 internal.legacy_failure division by zero
+same-lambda-text expected 4:13 actual 4:13 internal.legacy_failure lambda body error: unknown value or malformed expression: missing_value
+try-catch expected 4:9 actual 0:0 None 
+translation-malformed expected 2:1 actual 2:1 native.translation_error function while requires a block
+template-multiline expected 2:1 actual 2:1 internal.legacy_failure division by zero
+content-file expected 3:1 actual 3:1 internal.legacy_failure division by zero
+PASS 45 canonical source-map and frozen diagnostic contracts
+python3 tests/v410_object_member_guard.py --nift ./.build/nift-object-lookup-guard
+PASS one traversal per object lookup, exact comparison positions and missing checks
+NIFT="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/.build/nift-glob-relative-guard" python3 tests/v410_glob_relative_guard.py
+PASS relative-base scaling: 32/128/512; absolute and empty globs bypass canonicalization
+NIFT_PREFIX_STATS=/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/.build/nift-glob-prefix-guard /usr/bin/python3 tests/v410_glob_prefix_guard.py
+PASS shared-prefix scaling, empty/absolute bypass, repeated glob and leaf alias counters
+g++ -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -shared -Wl,--exclude-libs,ALL -Wl,-Bsymbolic -o libnift_c.so .build/pic/src/ProjectOwnership.o .build/pic/src/PackageTransaction.o .build/pic/src/Process.o .build/pic/src/JobControl.o .build/pic/src/RuntimeValue.o .build/pic/src/Value.o .build/pic/src/FileSystem.o .build/pic/src/JsonFile.o .build/pic/src/JsonSchema.o .build/pic/minifypp/src/Minify.o .build/pic/markuppp/src/Markup.o .build/pic/markuppp/src/AsciiDoc.o .build/pic/markuppp/src/ReStructuredText.o .build/pic/src/Parser.o .build/pic/src/ParserAsyncPool.o .build/pic/src/ParserExpression.o .build/pic/src/ParserHelpers.o .build/pic/src/ParserScript.o .build/pic/src/ParserTemplate.o .build/pic/src/ProjectInfo.o .build/pic/src/ProjectRead.o .build/pic/src/ProjectState.o .build/pic/src/WatchList.o .build/pic/src/BuildProgress.o .build/pic/src/Automation.o .build/pic/src/Hooks.o .build/pic/src/Ast.o .build/pic/src/embed/Engine.o .build/pic/src/embed/Context.o .build/pic/src/embed/c_abi.o .build/pic/markuppp/vendor/cmark/blocks.o .build/pic/markuppp/vendor/cmark/buffer.o .build/pic/markuppp/vendor/cmark/cmark.o .build/pic/markuppp/vendor/cmark/cmark_ctype.o .build/pic/markuppp/vendor/cmark/houdini_href_e.o .build/pic/markuppp/vendor/cmark/houdini_html_e.o .build/pic/markuppp/vendor/cmark/houdini_html_u.o .build/pic/markuppp/vendor/cmark/html.o .build/pic/markuppp/vendor/cmark/inlines.o .build/pic/markuppp/vendor/cmark/iterator.o .build/pic/markuppp/vendor/cmark/node.o .build/pic/markuppp/vendor/cmark/references.o .build/pic/markuppp/vendor/cmark/render.o .build/pic/markuppp/vendor/cmark/scanners.o .build/pic/markuppp/vendor/cmark/utf8.o .build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a
+.build/nift-cp21-bytes-embed
+CP21 bytes embedding: PASS
+cmp -s include/nift/c_abi.h bindings/go/cabi/include/nift/c_abi.h
+rm -rf dist/embed-prefix
+mkdir -p dist/embed-prefix/include/nift dist/embed-prefix/lib/pkgconfig
+cp include/nift/*.h dist/embed-prefix/include/nift/
+cp libnift_c.a libnift_c.so dist/embed-prefix/lib/
+# Dev prefix: the version here is not release metadata (the real per-release
+# nift.pc is generated by packaging/stage-release.sh with the validated
+# version). 0.0.0-dev avoids running the CLI binary inside make (fragile on
+# Windows); ABI compatibility is governed by the C ABI version.
+bash packaging/gen-dev-pc.sh
+gen-dev-pc: uname_s=Linux uname_m=x86_64
+gen-dev-pc: wrote dist/embed-prefix/lib/pkgconfig/nift.pc with PC_LIBS=-L${libdir} -Wl,-Bstatic -lnift_c -Wl,-Bdynamic -lstdc++ -lm -pthread
+cd bindings/csharp/apps/NiftEmbedHarness && dotnet build -v q --nologo
+PASS indexed map: {'syntax': 1, 'numeric': 1, 'instances': 1, 'prepared': 100000, 'legacy': 0}
+PASS indexed sort: {'syntax': 1, 'numeric': 1, 'instances': 100000, 'prepared': 100000, 'legacy': 0}
+PASS identity map: {'syntax': 1, 'numeric': 0, 'instances': 1, 'prepared': 100000, 'legacy': 0}
+PASS identity sort: {'syntax': 1, 'numeric': 0, 'instances': 100000, 'prepared': 100000, 'legacy': 0}
+PASS identity typed fallback: {'syntax': 1, 'numeric': 0, 'instances': 1, 'prepared': 1, 'legacy': 1}
+PASS sort: {'syntax': 1, 'numeric': 1, 'instances': 100000, 'prepared': 100000, 'legacy': 0}
+PASS reduce: {'syntax': 1, 'numeric': 1, 'instances': 1, 'prepared': 100000, 'legacy': 0}
+PASS numeric filter: {'syntax': 1, 'numeric': 1, 'instances': 1, 'prepared': 100000, 'legacy': 0}
+PASS numeric equality filter: {'syntax': 1, 'numeric': 1, 'instances': 1, 'prepared': 100000, 'legacy': 0}
+PASS bounded cache: {'syntax': 300, 'numeric': 256, 'instances': 300, 'prepared': 256, 'legacy': 44}
+PASS oversized body: {'syntax': 1, 'numeric': 0, 'instances': 1, 'prepared': 0, 'legacy': 1}
+PASS typed fallback: {'syntax': 1, 'numeric': 1, 'instances': 1, 'prepared': 1, 'legacy': 1}
+cd bindings/go && PKG_CONFIG_PATH="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/dist/embed-prefix/lib/pkgconfig" go build -o embed-harness ./cmd/embed-harness
+cd bindings/go && PKG_CONFIG_PATH="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/dist/embed-prefix/lib/pkgconfig" go test -race ./...
+ok  	nift.dev/embed/v4	(cached)
+?   	nift.dev/embed/v4/bench	[no test files]
+ok  	nift.dev/embed/v4/cmd/embed-harness	(cached)
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:01.63
+cd bindings/csharp/tests/Nift.Tests && dotnet run -v q --nologo
+PASS ABI version
+PASS CP6 captured script and render output
+PASS engine new/dispose lifecycle
+PASS project-aware open + isOpen/openError
+PASS setRoot + composed render
+PASS string/int/number/bool/json bindings
+PASS context bindings
+PASS context-over-engine precedence
+PASS invalid engine binding name -> setup failure
+PASS invalid context binding name -> setup failure
+PASS malformed JSON content render failure family
+PASS loader exception containment across the native boundary
+PASS loader: found / not-found / missing input
+PASS environment: found / not-found / error diagnostic
+PASS pagination (three pages)
+PASS dependencies + requirements
+PASS text vs path render sources
+PASS ThrowIfFailed
+PASS concurrent renders with loader
+PASS lifetime: repeated create/dispose
+PASS delegate rooting survives GC
+PASS context disposal safety
+PASS context cleanup across success/failure/exception renders
+PASS dispose engine during in-flight render is deferred
+PASS dispose context during in-flight render is deferred
+PASS non-render operation vs Dispose: engine setter
+PASS non-render operation vs Dispose: query
+PASS non-render operation vs Dispose: context setter
+PASS CP19 render API
+
+C# binding tests: 29 passed, 0 failed
+no dynamic libffi dependency: build/nift_node.node
+private non-preemptible libffi symbols: build/nift_node.node
+built build/nift_node.node
+cd bindings/node && node --test test/nift.test.js
+TAP version 13
+# PASS v4.5 execute/evaluate
+# PASS abi: values/bindings render
+# PASS context bindings + context-over-engine precedence
+# PASS invalid engine binding -> setup failure
+# PASS invalid context binding -> setup failure
+# PASS malformed JSON content -> error_prefix family
+# PASS loader Found / NotFound / Error(diagnostic)
+# PASS environment Found / NotFound / Error(diagnostic)
+# PASS page/pagination render with project engine
+# PASS partial render
+# PASS output capture on render success and failure
+# PASS script result preserves output and compatibility
+# PASS concurrent renders with callbacks
+# PASS pagination callbacks fire from C++ worker threads
+# PASS callbacks survive GC
+# PASS repeated engine create/dispose (lifetime)
+# PASS GC pressure: many engines/contexts without leaks
+# PASS disposed object use is rejected
+# PASS shutdown while callbacks are quiescent
+# PASS exception containment: throwing in loader
+# PASS close engine during in-flight render: safe + deterministic
+# PASS close context during in-flight render: safe + deterministic
+# PASS close engine during render with loader/env callbacks (tsfns survive)
+# PASS close engine + contexts during concurrent renders
+# PASS repeated/idempotent close
+# PASS GC pressure after close-during-render
+# PASS long-lived engine across many renders
+# PASS CP19 render API: render/renderPath/renderText
+# Node binding tests: 28 passed, 0 failed
+# Subtest: test/nift.test.js
+ok 1 - test/nift.test.js
+  ---
+  duration_ms: 208.906225
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 220.776576
+no dynamic libffi dependency: nift/_nift.cpython-314-x86_64-linux-gnu.so
+private non-preemptible libffi symbols: nift/_nift.cpython-314-x86_64-linux-gnu.so
+built nift/_nift.cpython-314-x86_64-linux-gnu.so
+cd bindings/python && python3 -m unittest tests.test_nift
+.........................
+----------------------------------------------------------------------
+Ran 25 tests in 0.057s
+
+OK

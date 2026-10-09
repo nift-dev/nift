@@ -1,0 +1,29 @@
+named 20 PASS
+named 40 PASS
+named 48 PASS
+named 50 PASS
+named 60 PASS
+named 80 PASS
+named 96 PASS
+named 110 PASS
+builtin 20 PASS
+builtin 40 PASS
+builtin 48 PASS
+builtin 50 PASS
+builtin 60 PASS
+builtin 80 PASS
+builtin 96 PASS
+builtin 110 PASS
+method 20 PASS
+method 40 PASS
+method 48 PASS
+method 50 PASS
+method 60 PASS
+method 80 PASS
+method 96 FAIL
+method 110 FAIL
+Traceback (most recent call last):
+  File "/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/stack-boundaries.py", line 20, in <module>
+    assert all(r['match'] for r in rows)
+           ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

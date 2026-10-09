@@ -1,0 +1,200 @@
+CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-linux-gnu-cc"
+BUILD vendored libffi (x86_64-linux-gnu-cc)
+BUILD vendored libffi: done (6s)
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ParserExpression.cpp -o src/ParserExpression.o
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ParserTemplate.cpp -o src/ParserTemplate.o
+g++ -std=c++17 -O2 -Wall -Wextra -pedantic -pthread  src/nift.o src/ProjectOwnership.o src/PackageTransaction.o src/CLI.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserExpression.o src/ParserHelpers.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o -ldl .build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a -o nift
+NIFT=/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift /usr/bin/python3 tests/v410_file_buffer_parity.py
+PASS open-r
+PASS open-rw
+PASS open-w
+PASS open-a
+PASS mutate-write("xy")
+PASS mutate-write("")
+PASS mutate-write_line("xy")
+PASS mutate-write_bytes(bytes([0,255,65]))
+PASS mutate-write(bytes([0,255,65]))
+PASS mutate-write_val(42)
+PASS mutate-append("xy")
+PASS mutate-append("")
+PASS mutate-prepend("xy")
+PASS mutate-insert(2,"xy")
+PASS mutate-insert_before("CD","xy")
+PASS mutate-insert_after("CD","xy")
+PASS mutate-replace("CD","xy")
+PASS mutate-replace("CD","CD")
+PASS mutate-replace("missing","xy")
+PASS mutate-replace_once("CD","xy")
+PASS save-then-revert
+PASS overwrite-initial-revert
+PASS new-empty-write
+PASS append-new-empty-write
+PASS reopen-external-edit
+PASS opaque-closed-reopen
+PASS write-argument-saves
+PASS write-argument-reverts
+PASS write-argument-closes
+PASS closed-write-factory-count
+PASS readonly-write-factory-count
+PASS failed-save-revert
+PASS duplicate-replace-once-error
+PASS receiver-factory-count
+PASS factory-path-counter
+PASS factory-changing-cwd
+PASS open-mode-factory-cwd
+PASS closed-file-copy
+PASS closed-file-move
+PASS closed-file-remove
+PASS open-copy-precondition-counter
+PASS copy-invalid-argument
+PASS unknown-file-tag
+PASS nonfile-receiver-counter
+PASS read-val-token-contract
+PASS invalid-mode-arity
+PASS save-argument-arity
+PASS empty-write-return-to-clean
+PASS nested-method-depth-20
+PASS nested-method-depth-40
+PASS nested-method-depth-48
+PASS nested-method-depth-50
+PASS nested-method-depth-60
+PASS stack-named-20
+PASS stack-named-40
+PASS stack-named-48
+PASS stack-named-50
+PASS stack-named-60
+PASS stack-named-80
+PASS stack-named-96
+PASS stack-named-110
+PASS stack-html_escape-20
+PASS stack-html_escape-40
+PASS stack-html_escape-48
+PASS stack-html_escape-50
+PASS stack-html_escape-60
+PASS stack-html_escape-80
+PASS stack-html_escape-96
+PASS stack-html_escape-110
+PASS stack-type-20
+PASS stack-type-40
+PASS stack-type-48
+PASS stack-type-50
+PASS stack-type-60
+PASS stack-type-80
+PASS stack-type-96
+PASS stack-type-110
+PASS stack-min-20
+PASS stack-min-40
+PASS stack-min-48
+PASS stack-min-50
+PASS stack-min-60
+PASS stack-min-80
+PASS stack-min-96
+PASS stack-min-110
+PASS stack-method-20
+PASS stack-method-40
+PASS stack-method-48
+PASS stack-method-50
+PASS stack-method-60
+PASS stack-method-80
+PASS stack-method-96
+PASS stack-method-110
+PASS stack-method-argument-20
+PASS stack-method-argument-40
+PASS stack-method-argument-48
+PASS stack-method-argument-50
+PASS stack-method-argument-60
+PASS stack-method-argument-80
+PASS stack-method-argument-96
+PASS stack-method-argument-110
+PASS write-preserves-string-slots
+PASS 102 exact buffer/factory/cwd/reentry/file-effect contracts
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread tests/v410_file_buffer_guard.cpp src/ProjectOwnership.o src/PackageTransaction.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserExpression.o src/ParserHelpers.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o  -ldl .build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a -o .build/file-buffer-guard
+.build/file-buffer-guard
+PASS saved-state alias, lazy snapshots, no-op writes, revert, retained shell/IDs; cache=32 entries/1089024 conservative bytes
+NIFT=/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift /usr/bin/python3 tests/v410_large_string_parity.py
+PASS payload-8192-Z-q
+PASS payload-8192-_-__
+PASS payload-8192-_-
+PASS payload-8192-_-_
+PASS payload-8192-missing-x
+PASS payload-16384-Z-q
+PASS payload-16384-_-__
+PASS payload-16384-_-
+PASS payload-16384-_-_
+PASS payload-16384-missing-x
+PASS payload-32768-Z-q
+PASS payload-32768-_-__
+PASS payload-32768-_-
+PASS payload-32768-_-_
+PASS payload-32768-missing-x
+PASS payload-65536-Z-q
+PASS payload-65536-_-__
+PASS payload-65536-_-
+PASS payload-65536-_-_
+PASS payload-65536-missing-x
+PASS payload-131072-Z-q
+PASS payload-131072-_-__
+PASS payload-131072-_-
+PASS payload-131072-_-_
+PASS payload-131072-missing-x
+PASS shape-.to_upper().replace("A","x")
+PASS shape-.to_upper().replace("A","x",)
+PASS shape-.to_upper().replace(,"A","x")
+PASS shape-.to_upper().replace("","x")
+PASS shape-.to_upper(,).replace("A","x")
+PASS shape-.trim().replace("a","x")
+PASS shape-.to_lower().replace("a","x")
+PASS shape-.replace("a",7)
+PASS mixed-body-counts
+PASS receiver-factory
+PASS argument-factory
+PASS nested-error
+PASS 37 exact payload/factory/diagnostic contracts
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread tests/v410_large_string_guard.cpp src/ProjectOwnership.o src/PackageTransaction.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserExpression.o src/ParserHelpers.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o  -ldl .build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a -o .build/large-string-guard
+.build/large-string-guard
+PASS bounded canonical cache: peak owned-capacity allowance=3891684 entries=10
+NIFT=/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/nift /usr/bin/python3 tests/v410_filesystem_recipe_parity.py
+PASS stat-prepared
+PASS stat-compatibility
+PASS stat-wrong-arity
+PASS stat-wrong-type
+PASS stat-first-error
+PASS named-stat-prepared
+PASS named-stat-compatibility
+PASS move-order
+PASS move-argument-mutates-source
+PASS move-first-source-error
+PASS move-first-destination-error
+PASS move-wrong-arity
+PASS move-cwd-boundary
+PASS copy-order
+PASS copy-argument-mutates-source
+PASS copy-first-source-error
+PASS copy-first-destination-error
+PASS copy-wrong-arity
+PASS copy-cwd-boundary
+PASS move-unmatched-source
+PASS move-array-source
+PASS move-bad-source-array
+PASS move-second-destination-error
+PASS move-second-source-error
+PASS move-spread
+PASS copy-unmatched-source
+PASS copy-array-source
+PASS copy-bad-source-array
+PASS copy-second-destination-error
+PASS copy-second-source-error
+PASS copy-spread
+PASS move-loop-location
+PASS move-index-probe-order
+PASS move-root-path-replacement
+PASS copy-loop-location
+PASS copy-index-probe-order
+PASS copy-root-path-replacement
+PASS all 37 exact source-count/order/origin/error/file-effect contracts
+PASS 60 pure-string canonical fallback contracts
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_TEST_FS_RECIPE_STATS -MMD -MP -c src/ParserExpression.cpp -o .build/fs-recipe/ParserExpression.o
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -DNIFT_TEST_FS_RECIPE_STATS -MMD -MP -c src/ParserTemplate.cpp -o .build/fs-recipe/ParserTemplate.o
+g++ -std=c++17 -O2 -Wall -Wextra -pedantic -pthread  src/nift.o src/ProjectOwnership.o src/PackageTransaction.o src/CLI.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserHelpers.o src/ParserScript.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o .build/fs-recipe/ParserExpression.o .build/fs-recipe/ParserTemplate.o -ldl .build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a -o .build/nift-fs-recipe-guard
+NIFT_FS_STATS=/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/.build/nift-fs-recipe-guard /usr/bin/python3 tests/v410_filesystem_recipe_guard.py
+PASS immutable recipe reuse, canonical operands, pure plans, factories and spread fallback counters

@@ -1,0 +1,7 @@
+PASS balanced triple 0
+PASS balanced triple 1
+PASS balanced triple 2
+PASS balanced triple 3
+PASS balanced triple 4
+PASS balanced triple 5
+{'accepted': {'cpu': 0.04462649999999998, 'wall': 0.046274416032247245, 'rss_kib': 8200.0}, 'file-recipes': {'cpu': 0.03537300000000001, 'wall': 0.0373569029616192, 'rss_kib': 8298.0}, 'native-atomic': {'cpu': 0.01285700000000001, 'wall': 0.01390346244443208, 'rss_kib': 4234.0}}

@@ -932,14 +932,25 @@ RenderResult Parser::parse(const std::string& input, const fs::path& source_path
         std::optional<nift::ast::Context> prepared_context_;
         std::unordered_map<std::string,std::shared_ptr<const PreparedFilesystemOperation>> prepared_filesystem_recipes;
         std::unordered_map<std::string,std::shared_ptr<const nift::ast::Expr>> prepared_pure_string_plans;
+        auto file_method_recipe=[&](const std::string& x,nift::RuntimeValue& out,std::string& error,nift::detail::SourceView view,bool& used){
+            used=false;
+            if(x.empty()||x.back()!=')')return false;
+            const auto open=x.find('('),dot=x.find('.');
+            if(open==std::string::npos||dot>=open||!known_file_method(std::string_view(x).substr(dot+1,open-dot-1)))return false;
+            auto found=prepared_filesystem_recipes.find(x);
+            if(found==prepared_filesystem_recipes.end())found=prepared_filesystem_recipes.emplace(x,prepare_filesystem_operation(x)).first;
+            if(!found->second||found->second->kind!=PreparedFilesystemOperation::Kind::FileMethod)return false;
+            used=true;return evaluate_filesystem_expression(x,out,error,std::move(view),found->second.get());
+        };
         auto ast_context=[&]() -> nift::ast::Context& {if(!prepared_context_){nift::ast::Context& c=prepared_context_.emplace();c.resolve=[&](const std::string& name,nift::RuntimeValue& out,std::string& e){for(auto sc=variable_scopes_.rbegin();sc!=variable_scopes_.rend();++sc){auto it=sc->find(name);if(it!=sc->end()){it->second.sync();if(!it->second.value){e="reference target no longer exists: "+name;return false;}out=*it->second.value;if(out.is_string()&&out.string.rfind("\x1fnift:atomic:",0)==0){auto ai=atomic_instances_.find(out.string.substr(13));if(ai==atomic_instances_.end()){e="atomic: invalid handle";return false;}if(ai->second->kind==AtomicInstance::Kind::Bool)out=nift::RuntimeValue(ai->second->bool_value.load());else{auto v=ai->second->int_value.load();out=nift::RuntimeValue((double)v);if(v>9007199254740992LL||v<-9007199254740992LL){out.type=nift::RuntimeType::StrNumber;out.string=std::to_string(v);}}}return true;}}
 // v4.3 first-class callable values: a bare named function is a valid value
 // (identical to ordinary evaluation). Preserve callable identity across
 // prepared loop/body/template execution so a named function passed as an
 // argument or assigned inside a prepared body keeps working.
 {const Callable* named_callable=nullptr;std::shared_ptr<ModuleEnv> named_owner;if(active_module_env_){auto f=active_module_env_->callables.find(name);if(f!=active_module_env_->callables.end()){named_callable=&f->second;named_owner=f->second.module_env?f->second.module_env:active_module_env_;}}if(!named_callable){auto f=callables_.find(name);if(f!=callables_.end()){named_callable=&f->second;named_owner=f->second.module_env;}}if(named_callable){if(!named_owner&&loading_module_env_)named_owner=loading_module_env_;out=nift::RuntimeValue(named_callable_tag(name,named_owner));return true;}}
-e="unknown value or malformed expression: "+name;return false;};c.legacy=[&](const std::string& x,nift::RuntimeValue& out,std::string& e){return evaluate_expression(x,out,e,prepared_view->slice(prepared_statement_span.begin,x.size()));};c.legacy_with_span=[&](const std::string& x,nift::ast::SourceSpan span,nift::RuntimeValue& out,std::string& e){
-    if(x.rfind("move(",0)==0||x.rfind("mv(",0)==0||x.rfind("copy(",0)==0||x.rfind("cp(",0)==0||x.rfind("stat(",0)==0){
+e="unknown value or malformed expression: "+name;return false;};c.legacy=[&](const std::string& x,nift::RuntimeValue& out,std::string& e){auto view=prepared_view->slice(prepared_statement_span.begin,x.size());bool used=false;const bool result=file_method_recipe(x,out,e,view,used);if(used)return result;return evaluate_expression(x,out,e,view);};c.legacy_with_span=[&](const std::string& x,nift::ast::SourceSpan span,nift::RuntimeValue& out,std::string& e){
+    bool used=false;const bool result=file_method_recipe(x,out,e,prepared_view->slice(span.begin,span.end-span.begin),used);if(used)return result;
+    if(x.rfind("move(",0)==0||x.rfind("mv(",0)==0||x.rfind("copy(",0)==0||x.rfind("cp(",0)==0||x.rfind("stat(",0)==0||x.rfind("file(",0)==0){
         auto found=prepared_filesystem_recipes.find(x);
         if(found==prepared_filesystem_recipes.end())found=prepared_filesystem_recipes.emplace(x,prepare_filesystem_operation(x)).first;
         if(found->second){nift::detail::record_filesystem_plan_event(nift::detail::FilesystemPlanEvent::Recipe);return evaluate_filesystem_expression(x,out,e,prepared_view->slice(span.begin,span.end-span.begin),found->second.get());}
@@ -1166,12 +1177,13 @@ c.arg_is_location=[&](const std::string& arg)->bool{const std::string ref_source
                     if(st.op=="write"||st.op=="write_line"){
                         if(av.size()!=1||!f->open||!(f->mode=="w"||f->mode=="a"||f->mode=="rw")){if(av.size()!=1&&e.empty())e=st.op+": expected one value";return false;}
                         nift::RuntimeValue v=std::move(av[0]);
-                        std::string d;if(st.op=="write"&&v.is_bytes()){const nift::RuntimeBytes empty;const auto& raw=v.bytes?*v.bytes:empty;d.assign(raw.begin(),raw.end());}else{if(v.is_error()||v.is_timer()||v.is_bytes()||v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0&&v.string.rfind("\x1fnift:timer:",0)!=0)){e=st.op+": value is not directly renderable";return false;}d=render_expression_value(v);if(st.op=="write_line")d+='\n';}
+                        std::string d;if(st.op=="write"&&v.is_bytes()){const nift::RuntimeBytes empty;const auto& raw=v.bytes?*v.bytes:empty;d.assign(raw.begin(),raw.end());}else{if(v.is_error()||v.is_timer()||v.is_bytes()||v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0&&v.string.rfind("\x1fnift:timer:",0)!=0)){e=st.op+": value is not directly renderable";return false;}d=v.is_string()?std::move(v.string):render_expression_value(v);if(st.op=="write_line")d+='\n';}
                         const std::size_t base=std::min(f->cursor,f->working.size());
                         const std::size_t ov=std::min(d.size(),f->working.size()-base);
+                        if(ov!=d.size()||f->working.compare(base,ov,d)!=0)f->prepare_mutation();
                         f->working.replace(base,ov,d);
                         f->cursor=base+d.size();
-                        f->dirty=f->working!=f->saved;
+                        f->update_dirty();
                         return true;
                     }
                     {nift::RuntimeValue lege;return c.legacy(st.text,lege,e);}

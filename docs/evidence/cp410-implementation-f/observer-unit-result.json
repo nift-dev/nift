@@ -1,0 +1,23 @@
+{
+  "pass": true,
+  "expected_and_actual": [
+    {
+      "id": "2",
+      "width": "2",
+      "lookup_reads": "1",
+      "member_assignments": "1",
+      "source_copies": "0",
+      "range_passes": "0",
+      "insertions": "0"
+    },
+    {
+      "id": "1",
+      "width": "2",
+      "lookup_reads": "5",
+      "member_assignments": "2",
+      "source_copies": "1",
+      "range_passes": "1",
+      "insertions": "2"
+    }
+  ]
+}

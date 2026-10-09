@@ -1,0 +1,98 @@
+[
+  {
+    "name": "loops",
+    "n": 8000,
+    "label": "accepted",
+    "instructions": 41894177
+  },
+  {
+    "name": "loops",
+    "n": 8000,
+    "label": "file-recipes",
+    "instructions": 41919556
+  },
+  {
+    "name": "call-scalar",
+    "n": 8000,
+    "label": "accepted",
+    "instructions": 87649938
+  },
+  {
+    "name": "call-scalar",
+    "n": 8000,
+    "label": "file-recipes",
+    "instructions": 87811589
+  },
+  {
+    "name": "call-noarg",
+    "n": 8000,
+    "label": "accepted",
+    "instructions": 63372734
+  },
+  {
+    "name": "call-noarg",
+    "n": 8000,
+    "label": "file-recipes",
+    "instructions": 63390583
+  },
+  {
+    "name": "call-closure",
+    "n": 8000,
+    "label": "accepted",
+    "instructions": 374965545
+  },
+  {
+    "name": "call-closure",
+    "n": 8000,
+    "label": "file-recipes",
+    "instructions": 379735871
+  },
+  {
+    "name": "call-callback",
+    "n": 8000,
+    "label": "accepted",
+    "instructions": 419370648
+  },
+  {
+    "name": "call-callback",
+    "n": 8000,
+    "label": "file-recipes",
+    "instructions": 424012850
+  },
+  {
+    "name": "bfs",
+    "n": 8000,
+    "label": "accepted",
+    "instructions": 362657554
+  },
+  {
+    "name": "bfs",
+    "n": 8000,
+    "label": "file-recipes",
+    "instructions": 362921394
+  },
+  {
+    "name": "json-traverse",
+    "n": 8000,
+    "label": "accepted",
+    "instructions": 123646047
+  },
+  {
+    "name": "json-traverse",
+    "n": 8000,
+    "label": "file-recipes",
+    "instructions": 123743523
+  },
+  {
+    "name": "map-set",
+    "n": 8000,
+    "label": "accepted",
+    "instructions": 127724050
+  },
+  {
+    "name": "map-set",
+    "n": 8000,
+    "label": "file-recipes",
+    "instructions": 127663811
+  }
+]

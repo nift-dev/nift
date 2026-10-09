@@ -1,0 +1,30 @@
+PASS open-r
+PASS open-rw
+PASS open-w
+PASS open-a
+PASS mutate-write("xy")
+PASS mutate-write("")
+PASS mutate-write_line("xy")
+PASS mutate-write_bytes(bytes([0,255,65]))
+PASS mutate-write_val(42)
+PASS mutate-append("xy")
+PASS mutate-append("")
+PASS mutate-prepend("xy")
+PASS mutate-insert(2,"xy")
+PASS mutate-insert_before("CD","xy")
+PASS mutate-insert_after("CD","xy")
+PASS mutate-replace("CD","xy")
+PASS mutate-replace("CD","CD")
+PASS mutate-replace("missing","xy")
+PASS mutate-replace_once("CD","xy")
+PASS save-then-revert
+PASS overwrite-initial-revert
+PASS new-empty-write
+PASS append-new-empty-write
+PASS reopen-external-edit
+PASS opaque-closed-reopen
+Traceback (most recent call last):
+  File "/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/contracts.py", line 34, in <module>
+    assert values[0]==values[1],(name,values)
+           ^^^^^^^^^^^^^^^^^^^^
+AssertionError: ('write-argument-saves', [{'exit': 0, 'stdout': '1\ntrue\nsavedFGH\n', 'stderr': '', 'files': {'data': '7361766564464748'}}, {'exit': 0, 'stdout': '1\ntrue\nsavedxyH\n', 'stderr': '', 'files': {'data': '7361766564464748'}}])

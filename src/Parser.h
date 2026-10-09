@@ -341,11 +341,21 @@ private:
     static std::shared_ptr<const nift::ast::Expr> prepare_pure_string_plan(const std::string& source, bool large=false);
     bool evaluate_pure_string_plan(const nift::ast::Expr& expression, nift::RuntimeValue& out);
     struct PreparedFilesystemOperation {
-        enum class Kind { Stat, Copy, Move };
+        enum class Kind { Stat, Copy, Move, FileMethod, FileFactory };
         Kind kind=Kind::Stat;
+        std::string receiver;
         std::string method;
         std::vector<PreparedFilesystemOperand> operands;
     };
+    // Syntax-only canonical recipes, bounded by a conservative owned-memory
+    // allowance. No values, bindings, cwd or source-view owners are retained.
+    std::unordered_map<std::string,std::shared_ptr<const PreparedFilesystemOperation>> canonical_file_plans_;
+    std::size_t canonical_file_plan_bytes_=0;
+    static bool known_file_method(std::string_view method);
+    bool execute_file_method(const nift::RuntimeValue& base,const std::string& method,std::size_t operand_count,
+        const std::function<bool(std::size_t,nift::RuntimeValue&)>& operand,
+        const std::function<bool(const std::string&,nift::RuntimeValue&)>& evaluate_token,
+        nift::RuntimeValue& out,std::string& error,bool& handled);
     bool execute_filesystem_operation(PreparedFilesystemOperation::Kind kind, std::size_t operand_count,
         const std::function<bool(std::size_t,nift::RuntimeValue&)>& operand,
         nift::RuntimeValue& out, std::string& error);
@@ -407,6 +417,10 @@ private:
         std::string mode, working, saved;
         std::size_t cursor = 0;
         bool open = false, dirty = false, existed_at_open = false;
+        // A clean saved state aliases working without a second owned buffer.
+        bool saved_is_working = false;
+        void prepare_mutation(){if(saved_is_working){saved=working;saved_is_working=false;}}
+        void update_dirty(){dirty=!saved_is_working&&working!=saved;if(!dirty){saved_is_working=true;saved.clear();}}
     };
     std::unordered_map<std::string, std::shared_ptr<FileInstance>> file_instances_;
     std::uint64_t next_file_instance_id_ = 1;

@@ -1,0 +1,134 @@
+mkdir -p ".build/san-lifetime/src/"
+mkdir -p ".build/san-lifetime/src/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fstack-usage -MMD -MP -c "src/ParserExpression.cpp" -o ".build/san-lifetime/src/ParserExpression.o"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fstack-usage -MMD -MP -c "src/ParserTemplate.cpp" -o ".build/san-lifetime/src/ParserTemplate.o"
+CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-address-use-after-scope" bash scripts/build_vendored_libffi.sh ".build/libffi/sanitize-x86_64-linux-gnu-cc"
+mkdir -p ".build"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fstack-usage tests/v410_file_buffer_guard.cpp .build/san-lifetime/src/ProjectOwnership.o .build/san-lifetime/src/PackageTransaction.o .build/san-lifetime/src/Process.o .build/san-lifetime/src/JobControl.o .build/san-lifetime/src/RuntimeValue.o .build/san-lifetime/src/Value.o .build/san-lifetime/src/FileSystem.o .build/san-lifetime/src/JsonFile.o .build/san-lifetime/src/JsonSchema.o .build/san-lifetime/minifypp/src/Minify.o .build/san-lifetime/markuppp/src/Markup.o .build/san-lifetime/markuppp/src/AsciiDoc.o .build/san-lifetime/markuppp/src/ReStructuredText.o .build/san-lifetime/src/Parser.o .build/san-lifetime/src/ParserAsyncPool.o .build/san-lifetime/src/ParserExpression.o .build/san-lifetime/src/ParserHelpers.o .build/san-lifetime/src/ParserScript.o .build/san-lifetime/src/ParserTemplate.o .build/san-lifetime/src/ProjectInfo.o .build/san-lifetime/src/ProjectRead.o .build/san-lifetime/src/ProjectState.o .build/san-lifetime/src/WatchList.o .build/san-lifetime/src/BuildProgress.o .build/san-lifetime/src/Automation.o .build/san-lifetime/src/Hooks.o .build/san-lifetime/src/Ast.o .build/san-lifetime/markuppp/vendor/cmark/blocks.o .build/san-lifetime/markuppp/vendor/cmark/buffer.o .build/san-lifetime/markuppp/vendor/cmark/cmark.o .build/san-lifetime/markuppp/vendor/cmark/cmark_ctype.o .build/san-lifetime/markuppp/vendor/cmark/houdini_href_e.o .build/san-lifetime/markuppp/vendor/cmark/houdini_html_e.o .build/san-lifetime/markuppp/vendor/cmark/houdini_html_u.o .build/san-lifetime/markuppp/vendor/cmark/html.o .build/san-lifetime/markuppp/vendor/cmark/inlines.o .build/san-lifetime/markuppp/vendor/cmark/iterator.o .build/san-lifetime/markuppp/vendor/cmark/node.o .build/san-lifetime/markuppp/vendor/cmark/references.o .build/san-lifetime/markuppp/vendor/cmark/render.o .build/san-lifetime/markuppp/vendor/cmark/scanners.o .build/san-lifetime/markuppp/vendor/cmark/utf8.o .build/libffi/sanitize-x86_64-linux-gnu-cc/install/lib/libffi.a -ldl .build/libffi/x86_64-linux-gnu-cc/install/lib/libffi.a -o .build/file-buffer-lifetime-guard
+g++ -std=c++17 -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fstack-usage .build/san-lifetime/src/nift.o .build/san-lifetime/src/ProjectOwnership.o .build/san-lifetime/src/PackageTransaction.o .build/san-lifetime/src/CLI.o .build/san-lifetime/src/Process.o .build/san-lifetime/src/JobControl.o .build/san-lifetime/src/RuntimeValue.o .build/san-lifetime/src/Value.o .build/san-lifetime/src/FileSystem.o .build/san-lifetime/src/JsonFile.o .build/san-lifetime/src/JsonSchema.o .build/san-lifetime/minifypp/src/Minify.o .build/san-lifetime/markuppp/src/Markup.o .build/san-lifetime/markuppp/src/AsciiDoc.o .build/san-lifetime/markuppp/src/ReStructuredText.o .build/san-lifetime/src/Parser.o .build/san-lifetime/src/ParserAsyncPool.o .build/san-lifetime/src/ParserExpression.o .build/san-lifetime/src/ParserHelpers.o .build/san-lifetime/src/ParserScript.o .build/san-lifetime/src/ParserTemplate.o .build/san-lifetime/src/ProjectInfo.o .build/san-lifetime/src/ProjectRead.o .build/san-lifetime/src/ProjectState.o .build/san-lifetime/src/WatchList.o .build/san-lifetime/src/BuildProgress.o .build/san-lifetime/src/Automation.o .build/san-lifetime/src/Hooks.o .build/san-lifetime/src/Ast.o .build/san-lifetime/src/embed/Engine.o .build/san-lifetime/src/embed/Context.o .build/san-lifetime/src/embed/c_abi.o .build/san-lifetime/markuppp/vendor/cmark/blocks.o .build/san-lifetime/markuppp/vendor/cmark/buffer.o .build/san-lifetime/markuppp/vendor/cmark/cmark.o .build/san-lifetime/markuppp/vendor/cmark/cmark_ctype.o .build/san-lifetime/markuppp/vendor/cmark/houdini_href_e.o .build/san-lifetime/markuppp/vendor/cmark/houdini_html_e.o .build/san-lifetime/markuppp/vendor/cmark/houdini_html_u.o .build/san-lifetime/markuppp/vendor/cmark/html.o .build/san-lifetime/markuppp/vendor/cmark/inlines.o .build/san-lifetime/markuppp/vendor/cmark/iterator.o .build/san-lifetime/markuppp/vendor/cmark/node.o .build/san-lifetime/markuppp/vendor/cmark/references.o .build/san-lifetime/markuppp/vendor/cmark/render.o .build/san-lifetime/markuppp/vendor/cmark/scanners.o .build/san-lifetime/markuppp/vendor/cmark/utf8.o .build/libffi/sanitize-x86_64-linux-gnu-cc/install/lib/libffi.a -o ".build/nift-sanitize-lifetime"
+env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$(test "$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT=/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/.build/nift-sanitize-lifetime /usr/bin/python3 tests/v410_file_buffer_parity.py
+PASS open-r
+PASS open-rw
+PASS open-w
+PASS open-a
+PASS mutate-write("xy")
+PASS mutate-write("")
+PASS mutate-write_line("xy")
+PASS mutate-write_bytes(bytes([0,255,65]))
+PASS mutate-write(bytes([0,255,65]))
+PASS mutate-write_val(42)
+PASS mutate-append("xy")
+PASS mutate-append("")
+PASS mutate-prepend("xy")
+PASS mutate-insert(2,"xy")
+PASS mutate-insert_before("CD","xy")
+PASS mutate-insert_after("CD","xy")
+PASS mutate-replace("CD","xy")
+PASS mutate-replace("CD","CD")
+PASS mutate-replace("missing","xy")
+PASS mutate-replace_once("CD","xy")
+PASS save-then-revert
+PASS overwrite-initial-revert
+PASS new-empty-write
+PASS append-new-empty-write
+PASS reopen-external-edit
+PASS opaque-closed-reopen
+PASS write-argument-saves
+PASS write-argument-reverts
+PASS write-argument-closes
+PASS closed-write-factory-count
+PASS readonly-write-factory-count
+PASS failed-save-revert
+PASS duplicate-replace-once-error
+PASS receiver-factory-count
+PASS factory-path-counter
+PASS factory-changing-cwd
+PASS open-mode-factory-cwd
+PASS closed-file-copy
+PASS closed-file-move
+PASS closed-file-remove
+PASS open-copy-precondition-counter
+PASS copy-invalid-argument
+PASS unknown-file-tag
+PASS nonfile-receiver-counter
+PASS read-val-token-contract
+PASS invalid-mode-arity
+PASS save-argument-arity
+PASS empty-write-return-to-clean
+PASS nested-method-depth-20
+PASS nested-method-depth-40
+PASS nested-method-depth-48
+PASS nested-method-depth-50
+PASS nested-method-depth-60
+PASS stack-named-20
+PASS stack-named-40
+PASS stack-named-48
+PASS stack-named-50
+PASS stack-named-60
+PASS stack-named-80
+PASS stack-named-96
+PASS stack-named-110
+PASS stack-html_escape-20
+PASS stack-html_escape-40
+PASS stack-html_escape-48
+PASS stack-html_escape-50
+PASS stack-html_escape-60
+PASS stack-html_escape-80
+PASS stack-html_escape-96
+PASS stack-html_escape-110
+PASS stack-type-20
+PASS stack-type-40
+PASS stack-type-48
+PASS stack-type-50
+PASS stack-type-60
+PASS stack-type-80
+PASS stack-type-96
+PASS stack-type-110
+PASS stack-min-20
+PASS stack-min-40
+PASS stack-min-48
+PASS stack-min-50
+PASS stack-min-60
+PASS stack-min-80
+PASS stack-min-96
+PASS stack-min-110
+PASS stack-method-20
+PASS stack-method-40
+PASS stack-method-48
+PASS stack-method-50
+PASS stack-method-60
+PASS stack-method-80
+PASS stack-method-96
+PASS stack-method-110
+PASS stack-method-argument-20
+PASS stack-method-argument-40
+PASS stack-method-argument-48
+PASS stack-method-argument-50
+PASS stack-method-argument-60
+PASS stack-method-argument-80
+PASS stack-method-argument-96
+PASS stack-method-argument-110
+PASS write-preserves-string-slots
+PASS 102 exact buffer/factory/cwd/reentry/file-effect contracts
+env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$(test "$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 .build/file-buffer-lifetime-guard
+PASS saved-state alias, lazy snapshots, no-op writes, revert, retained shell/IDs; cache=32 entries/1089024 conservative bytes
+sanitizer profiles differ: lifetime use-after-scope ON, deep OFF
+env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$(test "$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 ".build/nift-sanitize-lifetime" --version
+Nift v4.10.0
+env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$(test "$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/.build/nift-sanitize-lifetime" tests/v43_cp0_cp14_smoke.sh
+env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$(test "$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/.build/nift-sanitize-lifetime" tests/v43_cp15_cp34_smoke.sh
+env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$(test "$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/.build/nift-sanitize-lifetime" tests/collection_ops_smoke.sh
+collection ops smoke: PASS
+env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$(test "$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/.build/nift-sanitize-lifetime" tests/v43_cp117_object_methods_smoke.sh
+object methods smoke passed
+env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$(test "$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/.build/nift-sanitize-lifetime" tests/v43_cp51_cp70_scripting_smoke.sh
+v4.3 CP51-CP70 scripting smoke: PASS
+env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$(test "$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/.build/nift-sanitize-lifetime" tests/v46_b4_cp3_recoverable_errors.sh
+env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$(test "$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/.build/nift-sanitize-lifetime" tests/v45_threads.sh
+v4.5 thread primitive smoke passed
+env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$(test "$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/.build/nift-sanitize-lifetime" tests/v44_ast_expression_smoke.sh
+v4.4 AST expression smoke: PASS
+env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$(test "$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/save/certification/.build/nift-sanitize-lifetime" bash tests/v44_ast_differential_corpus.sh
+v4.4 AST differential corpus: PASS (20 programs, legacy-equivalent)
+echo "lifetime sanitizer shallow corpus passed"
+lifetime sanitizer shallow corpus passed

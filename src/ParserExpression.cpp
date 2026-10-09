@@ -20,6 +20,22 @@
 #include <nift/context.h>
 
 #include <algorithm>
+// Lifetime ASan cannot reuse the compatibility evaluator's many stack slots.
+// Keep independent dispatch frames there; ordinary builds retain inlining choices.
+#if defined(__SANITIZE_ADDRESS__)
+#define NIFT_COMPAT_SPLIT_FRAMES 1
+#define NIFT_COMPAT_NOINLINE __attribute__((noinline))
+#elif defined(__clang__)
+#if __has_feature(address_sanitizer)
+#define NIFT_COMPAT_SPLIT_FRAMES 1
+#define NIFT_COMPAT_NOINLINE __attribute__((noinline))
+#else
+#define NIFT_COMPAT_NOINLINE
+#endif
+#else
+#define NIFT_COMPAT_NOINLINE
+#endif
+
 #ifdef NIFT_TEST_FS_RECIPE_STATS
 #include <cstdio>
 #endif
@@ -930,12 +946,61 @@ std::string r;
                             return r;
 }
 }}
+bool Parser::known_file_method(std::string_view method){
+    static const std::unordered_set<std::string_view> methods={"open","close","save","revert","modified","tell","seek","eof","read","read_all","read_bytes","read_all_bytes","read_line","read_val","write","write_line","write_val","flush","replace","replace_once","insert","insert_before","insert_after","prepend","append","path","exists","cat","copy","move","remove"};
+    return methods.find(method)!=methods.end();
+}
+
+bool Parser::execute_file_method(const nift::RuntimeValue& base,const std::string& method,std::size_t operand_count,
+    const std::function<bool(std::size_t,nift::RuntimeValue&)>& eval_arg,
+    const std::function<bool(const std::string&,nift::RuntimeValue&)>& evaluate_token,
+    nift::RuntimeValue& out,std::string& error,bool& handled) {
+    handled=true;
+    auto no_args=[&](){if(operand_count){error=method+": expected no arguments";return false;}return true;};
+                        auto fit=file_instances_.find(base.string.substr(11)); if(fit==file_instances_.end()){error="file: invalid FileValue";return false;} auto f=fit->second;
+                        auto can_read=[&](){return f->mode=="r"||f->mode=="rw";}; auto can_write=[&](){return f->mode=="w"||f->mode=="a"||f->mode=="rw";};
+                        auto need_open=[&](){if(!f->open){error=method+": file is not open";return false;}return true;};
+                        auto need_read=[&](){if(!need_open())return false;if(!can_read()){error=method+": file is not open for reading";return false;}return true;};
+                        auto need_write=[&](){if(!need_open())return false;if(!can_write()){error=method+": file is not open for writing";return false;}return true;};
+                        auto sarg=[&](size_t i,std::string& x){nift::RuntimeValue v;if(!eval_arg(i,v)||!v.is_string()){error=method+": expected string argument";return false;}x=v.string;return true;};
+                        auto dirty=[&](){f->update_dirty();};
+                        if(method=="path"){if(!no_args())return false;out=nift::RuntimeValue(f->path.generic_string());return true;}
+                        if(method=="exists"){if(!no_args())return false;std::error_code ec;out=nift::RuntimeValue(fs::exists(f->path,ec)&&!ec);return true;}
+                        if(method=="open"){
+                            if(f->open){error="open: file is already open";return false;}if(operand_count>1){error="open: expected zero or one mode";return false;}std::string m="r";if(operand_count==1&&!sarg(0,m))return false;
+                            if(m!="r"&&m!="w"&&m!="a"&&m!="rw"){error="open: mode must be r, w, a or rw";return false;}std::error_code ec;bool ex=fs::exists(f->path,ec)&&!ec;
+                            if((m=="r"||m=="rw")&&!ex)return fail_recoverable(nift::detail::DiagnosticCode::IoOpenFailed,"open: file does not exist",error);
+                            if(ex&&fs::is_directory(f->path,ec)){error="open: path is a directory";return false;}
+                            std::string data;if(ex){std::ifstream in(f->path,std::ios::binary);if(!in)return fail_recoverable(nift::detail::DiagnosticCode::IoOpenFailed,"open: cannot read path",error);std::ostringstream ss;ss<<in.rdbuf();data=ss.str();}
+                            f->mode=m;f->existed_at_open=ex;if(m=="w"){f->saved=std::move(data);f->working.clear();f->saved_is_working=false;}else{f->working=std::move(data);f->saved.clear();f->saved_is_working=true;}f->cursor=m=="a"?f->working.size():0;f->dirty=(m=="w")||(m=="a"&&!ex);f->open=true;out=nift::RuntimeValue(nullptr);return true;
+                        }
+                        if(method=="close"){if(!no_args()||!need_open())return false;if(f->dirty){error="close: file has unsaved changes; save() or revert() first";return false;}f->open=false;f->mode.clear();f->working.clear();f->saved.clear();f->saved_is_working=false;f->cursor=0;out=nift::RuntimeValue(nullptr);return true;}
+                        if(method=="modified"){if(!no_args()||!need_open())return false;out=nift::RuntimeValue(f->dirty);return true;}
+                        if(method=="tell"){if(!no_args()||!need_open())return false;out=nift::RuntimeValue((double)f->cursor);return true;}
+                        if(method=="seek"){if(operand_count!=1||!need_open()){if(operand_count!=1&&error.empty())error="seek: expected byte position";return false;}nift::RuntimeValue n;std::size_t position=0;if(!eval_arg(0,n)||!nift::runtime_number_to_size(n,position)||position>f->working.size()){error="seek: byte position out of range";return false;}f->cursor=position;out=nift::RuntimeValue(nullptr);return true;}
+                        if(method=="eof"){if(!no_args()||!need_read())return false;out=nift::RuntimeValue(f->cursor>=f->working.size());return true;}
+                        if(method=="read"||method=="read_all"){if(!need_read())return false;size_t base=std::min(f->cursor,f->working.size());size_t n=f->working.size()-base;if(method=="read"&&!(operand_count==0)){if(operand_count!=1){error="read: expected zero or one byte count";return false;}nift::RuntimeValue d;std::size_t count=0;if(!eval_arg(0,d)||!nift::runtime_number_to_size(d,count)){error="read: invalid byte count";return false;}n=std::min(n,count);}else if(method=="read_all"&&!(operand_count==0)){error="read_all: expected no arguments";return false;}out=nift::RuntimeValue(f->working.substr(base,n));f->cursor=base+n;return true;}
+                        if(method=="read_bytes"||method=="read_all_bytes"){if(!need_read())return false;size_t base=std::min(f->cursor,f->working.size());size_t n=f->working.size()-base;if(method=="read_bytes"){if(operand_count!=1){error="read_bytes: expected one byte count";return false;}nift::RuntimeValue d;std::size_t count=0;if(!eval_arg(0,d)||!nift::runtime_number_to_size(d,count)){error="read_bytes: invalid byte count";return false;}n=std::min(n,count);}else if(!(operand_count==0)){error="read_all_bytes: expected no arguments";return false;}const auto begin=f->working.begin()+static_cast<std::ptrdiff_t>(base);out=nift::RuntimeValue(nift::RuntimeBytes(begin,begin+static_cast<std::ptrdiff_t>(n)));f->cursor=base+n;return true;}
+                        if(method=="read_line"){if(!no_args()||!need_read())return false;if(f->cursor>=f->working.size()){out=nift::RuntimeValue(nullptr);return true;}auto e=f->working.find('\n',f->cursor);size_t z=e==std::string::npos?f->working.size():e;std::string line=f->working.substr(f->cursor,z-f->cursor);if(!line.empty()&&line.back()=='\r')line.pop_back();f->cursor=e==std::string::npos?f->working.size():e+1;out=nift::RuntimeValue(line);return true;}
+                        if(method=="read_val"){if(!no_args()||!need_read())return false;while(f->cursor<f->working.size()&&std::isspace((unsigned char)f->working[f->cursor]))++f->cursor;if(f->cursor>=f->working.size()){out=nift::RuntimeValue(nullptr);return true;}size_t st=f->cursor;char first=f->working[f->cursor];if(first=='"'||first=='['||first=='{'){char op=first,cl=first=='['?']':first=='{'?'}':'"';int dep=0;bool qd=false,esc=false;while(f->cursor<f->working.size()){char c=f->working[f->cursor++];if(op=='"'){if(esc){esc=false;continue;}if(c=='\\'){esc=true;continue;}if(f->cursor>st+1&&c=='"')break;}else{if(qd){if(esc)esc=false;else if(c=='\\')esc=true;else if(c=='"')qd=false;}else if(c=='"')qd=true;else if(c==op)++dep;else if(c==cl&&--dep==0)break;}}}else while(f->cursor<f->working.size()&&!std::isspace((unsigned char)f->working[f->cursor]))++f->cursor;std::string tok=f->working.substr(st,f->cursor-st);nift::RuntimeValue v;if(!evaluate_token(tok,v)){error="read_val: "+error;return false;}if(runtime_contains_bytes(v)){error="read_val: bytes values are not serializable";return false;}out=v;return true;}
+                        if(method=="write_val"){if(operand_count!=1||!need_write()){if(operand_count!=1&&error.empty())error="write_val: expected one value";return false;}nift::RuntimeValue v;if(!eval_arg(0,v))return false;std::string d;if(!serialize_value(v,false,d,error,0,true))return false;d+="\n";size_t base=std::min(f->cursor,f->working.size());size_t ov=std::min(d.size(),f->working.size()-base);if(ov!=d.size()||f->working.compare(base,ov,d)!=0)f->prepare_mutation();f->working.replace(base,ov,d);f->cursor=base+d.size();dirty();out=nift::RuntimeValue(nullptr);return true;}
+                        if(method=="write"||method=="write_line"){if(operand_count!=1||!need_write()){if(operand_count!=1&&error.empty())error=method+": expected one value";return false;}nift::RuntimeValue v;if(!eval_arg(0,v))return false;std::string d;if(method=="write"&&v.is_bytes()){const nift::RuntimeBytes empty;const auto& raw=v.bytes?*v.bytes:empty;d.assign(raw.begin(),raw.end());}else{if(v.is_error()||v.is_timer()||v.is_bytes()||v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0&&v.string.rfind("\x1fnift:timer:",0)!=0)){error=method+": value is not directly renderable";return false;}d=v.is_string()?std::move(v.string):render_expression_value(v);if(method=="write_line")d+='\n';}size_t base=std::min(f->cursor,f->working.size());size_t ov=std::min(d.size(),f->working.size()-base);if(ov!=d.size()||f->working.compare(base,ov,d)!=0)f->prepare_mutation();f->working.replace(base,ov,d);f->cursor=base+d.size();dirty();out=nift::RuntimeValue(nullptr);return true;}
+                        if(method=="flush"){if(!no_args()||!need_write())return false;out=nift::RuntimeValue(nullptr);return true;}
+                        if(method=="replace"||method=="replace_once"){if(operand_count!=2||!need_write()){if(operand_count!=2&&error.empty())error=method+": expected old and replacement strings";return false;}std::string a,b;if(!sarg(0,a)||!sarg(1,b))return false;if(a.empty()){error=method+": old string must not be empty";return false;}size_t count=0,pos=0;while((pos=f->working.find(a,pos))!=std::string::npos){++count;pos+=a.size();}if(method=="replace_once"&&count!=1){error="replace_once: expected exactly one match, found "+std::to_string(count);return false;}pos=0;while((pos=f->working.find(a,pos))!=std::string::npos){if(a!=b)f->prepare_mutation();f->working.replace(pos,a.size(),b);pos+=b.size();if(method=="replace_once")break;}if(f->cursor>f->working.size())f->cursor=f->working.size();dirty();out=method=="replace"?nift::RuntimeValue((double)count):nift::RuntimeValue(nullptr);return true;}
+                        if(method=="insert"||method=="insert"||method=="insert_before"||method=="insert_after"||method=="prepend"||method=="append"){if(!need_write())return false;size_t pos=0;std::string d;if(method=="prepend"||method=="append"){if(operand_count!=1||!sarg(0,d)){if(operand_count!=1&&error.empty())error=method+": expected text";return false;}pos=method=="prepend"?0:f->working.size();}else if(method=="insert"){if(operand_count!=2){error="insert: expected byte position and text";return false;}nift::RuntimeValue n;if(!eval_arg(0,n)||!nift::runtime_number_to_size(n,pos)||pos>f->working.size()||!sarg(1,d)){error="insert: invalid byte position or text";return false;}}else{if(operand_count!=2){error=method+": expected anchor and text";return false;}std::string a;if(!sarg(0,a)||!sarg(1,d))return false;if(a.empty()){error=method+": anchor must not be empty";return false;}auto at=f->working.find(a);if(at==std::string::npos||f->working.find(a,at+a.size())!=std::string::npos){error=method+": expected exactly one anchor";return false;}pos=at+(method=="insert_after"?a.size():0);}if(!d.empty())f->prepare_mutation();f->working.insert(pos,d);if(f->cursor>f->working.size())f->cursor=f->working.size();dirty();out=nift::RuntimeValue(nullptr);return true;}
+                        if(method=="revert"){if(!no_args()||!need_write())return false;if(!f->saved_is_working)f->working=f->saved;f->saved_is_working=true;f->saved.clear();f->cursor=0;f->dirty=false;out=nift::RuntimeValue(nullptr);return true;}
+                        if(method=="save"){if(!no_args()||!need_write())return false;if(!f->dirty){out=nift::RuntimeValue(nullptr);return true;}std::error_code ec;auto parent=f->path.parent_path();if(!parent.empty()&&!fs::exists(parent,ec))return fail_recoverable(nift::detail::DiagnosticCode::IoWriteFailed,"save: parent directory does not exist",error);fs::perms perms=fs::perms::unknown;if(fs::exists(f->path,ec)&&!ec)perms=fs::status(f->path,ec).permissions();fs::path tmp=f->path;tmp+=".nift-tmp-"+std::to_string((unsigned long long)std::chrono::steady_clock::now().time_since_epoch().count());{std::ofstream o(tmp,std::ios::binary|std::ios::trunc);if(!o)return fail_recoverable(nift::detail::DiagnosticCode::IoWriteFailed,"save: cannot create temporary file",error);o.write(f->working.data(),(std::streamsize)f->working.size());o.flush();if(!o){o.close();fs::remove(tmp,ec);return fail_recoverable(nift::detail::DiagnosticCode::IoWriteFailed,"save: temporary write failed",error);}}if(perms!=fs::perms::unknown)fs::permissions(tmp,perms,ec);if(!filesystem::replace_file_atomic(tmp,f->path))return fail_recoverable(nift::detail::DiagnosticCode::IoAtomicReplaceFailed,"save: atomic replace failed",error);f->saved_is_working=true;f->saved.clear();f->dirty=false;f->existed_at_open=true;out=nift::RuntimeValue(nullptr);return true;}
+                        if(method=="cat"){if(!no_args()||!need_read())return false;execution_output_->write_stdout(f->working);out=nift::RuntimeValue(nullptr);return true;}
+                        if(method=="copy"||method=="move"||method=="remove"){if(f->open){error=method+": file must be closed";return false;}if((method=="remove"&&!(operand_count==0))||(method!="remove"&&operand_count!=1)){error=method+": invalid arguments";return false;}std::error_code ec;if(method=="remove"){if(fs::is_directory(f->path,ec)){error="remove: directories are not removed recursively";return false;}if(!fs::remove(f->path,ec)&&ec)return fail_recoverable(nift::detail::DiagnosticCode::IoRemoveFailed,"remove: "+ec.message(),error);out=nift::RuntimeValue(nullptr);return true;}std::string raw;if(!sarg(0,raw))return false;fs::path dest(raw);if(dest.is_relative())dest=(standalone_script_host_?fs::current_path():host_.root())/dest;dest=fs::absolute(dest).lexically_normal();if(!standalone_script_host_&&!host_.root().empty()&&!filesystem::path_within(fs::absolute(host_.root()).lexically_normal(),dest)){error=method+": path must stay inside the Nift project";return false;}if(next_file_instance_id_==0||next_file_instance_id_==std::numeric_limits<std::uint64_t>::max()){error="file: instance identity space exhausted";return false;}if(method=="move")fs::rename(f->path,dest,ec);else fs::copy_file(f->path,dest,fs::copy_options::overwrite_existing,ec);if(ec)return fail_recoverable(method=="move"?nift::detail::DiagnosticCode::IoMoveFailed:nift::detail::DiagnosticCode::IoCopyFailed,method+": "+ec.message(),error);if(method=="move")f->path=dest;return make_file_value(std::move(dest),out,error);}
+    handled=false;return false;
+}
+
 bool Parser::execute_filesystem_operation(PreparedFilesystemOperation::Kind kind,std::size_t operand_count,
     const std::function<bool(std::size_t,nift::RuntimeValue&)>& operand,nift::RuntimeValue& out,std::string& error) {
     nift::detail::record_filesystem_plan_event(nift::detail::FilesystemPlanEvent::Backend);
     auto evaluate_operand=[&](std::size_t i,nift::RuntimeValue& value){nift::detail::record_filesystem_plan_event(nift::detail::FilesystemPlanEvent::Operand);return operand(i,value);};
     const bool moving=kind==PreparedFilesystemOperation::Kind::Move;
-    const std::string operation=kind==PreparedFilesystemOperation::Kind::Stat?"stat":moving?"move":"copy";
+    const std::string operation=kind==PreparedFilesystemOperation::Kind::FileFactory?"file":kind==PreparedFilesystemOperation::Kind::Stat?"stat":moving?"move":"copy";
             auto resolve_path=[&](const std::string& raw)->fs::path{std::string expanded=raw;if(standalone_script_host_&&!expanded.empty()&&expanded[0]=='~'&&(expanded.size()==1||expanded[1]=='/'||expanded[1]=='\\')){const char* home=std::getenv("HOME");
 #ifdef _WIN32
 if(!home)home=std::getenv("USERPROFILE");
@@ -945,6 +1010,11 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path path(expanded);i
                 if(!standalone_script_host_&&!resource_path_authority_.project_root.empty()&&!filesystem::path_within(resource_path_authority_.project_root,path)){error=operation+": path must stay inside the Nift project";return false;}
                 if(!nift_fs_root_allowed(path,resource_path_authority_.enforce_filesystem_root?resource_path_authority_.filesystem_root:fs::path{},error)){error=operation+": "+error;return false;}return true;
             };
+            if(kind==PreparedFilesystemOperation::Kind::FileFactory){
+                nift::RuntimeValue path_value;if(!evaluate_operand(0,path_value)||!path_value.is_string()){error="file: expected string path";return false;}
+                auto path=resolve_path(path_value.string);if(!validate(path))return false;
+                return make_file_value(std::move(path),out,error);
+            }
             if(kind==PreparedFilesystemOperation::Kind::Stat) {
                 nift::RuntimeValue path_value;if(!evaluate_operand(0,path_value)||!path_value.is_string()){error="stat: expected string path";return false;}
                 auto path=resolve_path(path_value.string);if(!validate(path))return false;
@@ -1053,15 +1123,20 @@ std::shared_ptr<const Parser::PreparedFilesystemOperation> Parser::prepare_files
     nift::detail::record_filesystem_plan_event(nift::detail::FilesystemPlanEvent::Prepare);
     const auto open=source.find('(');
     if (open==std::string::npos || source.empty() || source.back()!=')') return {};
-    const auto method=source.substr(0,open);
-    if (method!="move" && method!="mv" && method!="copy" && method!="cp" && method!="stat") return {};
+    auto method=source.substr(0,open);std::string receiver;
+    const auto dot=method.find('.');
+    if(dot!=std::string::npos){receiver=method.substr(0,dot);method=method.substr(dot+1);
+        if(!valid_binding_identifier(receiver))return {};
+        if(!known_file_method(method))return {};
+    }else if(method!="move"&&method!="mv"&&method!="copy"&&method!="cp"&&method!="stat"&&method!="file")return {};
     std::size_t close=0;
-    if (!find_balanced(source,open,'(',')',close) || close!=source.size()-1) return {};
+    if(!find_balanced(source,open,'(',')',close)||close!=source.size()-1)return {};
     auto identity=nift::detail::SourceView::identity({},source);
     bool ok=false;std::vector<bool> quoted;
     auto args=parse_parameters(nift::detail::SourceText(source,identity).substr(open+1,source.size()-open-2),ok,&quoted);
-    if (!ok || (method=="stat" ? args.size()!=1 : args.size()<2)) return {};
-    auto recipe=std::make_shared<PreparedFilesystemOperation>();recipe->method=method;recipe->kind=method=="stat"?PreparedFilesystemOperation::Kind::Stat:(method=="move"||method=="mv")?PreparedFilesystemOperation::Kind::Move:PreparedFilesystemOperation::Kind::Copy;
+    if(!ok|| (receiver.empty()&&((method=="stat"||method=="file")?args.size()!=1:args.size()<2)))return {};
+    auto recipe=std::make_shared<PreparedFilesystemOperation>();recipe->method=method;recipe->receiver=receiver;
+    recipe->kind=!receiver.empty()?PreparedFilesystemOperation::Kind::FileMethod:method=="file"?PreparedFilesystemOperation::Kind::FileFactory:method=="stat"?PreparedFilesystemOperation::Kind::Stat:(method=="move"||method=="mv")?PreparedFilesystemOperation::Kind::Move:PreparedFilesystemOperation::Kind::Copy;
     for (std::size_t i=0;i<args.size();++i) {
         if (!quoted[i] && trim_copy(args[i]).rfind("...",0)==0) return {};
         const auto range=args[i].view.original_range(0,args[i].size());
@@ -1430,14 +1505,68 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
         if(depth>96){error="expression nesting exceeds parser limit";return false;}
         if(auto plan=large_plan(text);plan&&evaluate_pure_string_plan(*plan,out))return true;
 
-        if (recipe && depth==0) {
+        const PreparedFilesystemOperation* operation_recipe=depth==0?recipe:nullptr;
+        std::shared_ptr<const PreparedFilesystemOperation> operation_recipe_owner;
+        if(!operation_recipe&&depth<96&&text.size()<=4096&&text.back()==')'){
+            // Inspect only the call head. Scanning arbitrary argument/body text
+            // here taxes unrelated named calls and callback factories.
+            bool candidate=text.rfind("file(",0)==0;
+            if(!candidate&&(std::isalpha(static_cast<unsigned char>(text.front()))||text.front()=='_')){
+                std::size_t head=1;
+                while(head<text.size()&&(std::isalnum(static_cast<unsigned char>(text[head]))||text[head]=='_'))++head;
+                if(head<text.size()&&text[head]=='.'){
+                    const auto method_begin=++head;
+                    while(head<text.size()&&(std::isalnum(static_cast<unsigned char>(text[head]))||text[head]=='_'))++head;
+                    candidate=head<text.size()&&text[head]=='('&&known_file_method(std::string_view(text).substr(method_begin,head-method_begin));
+                }
+            }
+            if(candidate){
+                auto found=canonical_file_plans_.find(text);
+                if(found==canonical_file_plans_.end()){
+                    operation_recipe_owner=prepare_filesystem_operation(text);
+                    // Each pure operand plan is capped at 64 nodes/4 KiB.
+                    // Charge worst-case repeated source ownership plus node,
+                    // operand, hash-node and shared control-block allowance.
+                    const std::size_t charge=text.size()*128+16384*(operation_recipe_owner?operation_recipe_owner->operands.size()+1:1);
+                    if(charge<=4*1024*1024){
+                        if(canonical_file_plans_.size()>=32||canonical_file_plan_bytes_+charge>4*1024*1024){canonical_file_plans_.clear();canonical_file_plan_bytes_=0;found=canonical_file_plans_.end();}
+                        found=canonical_file_plans_.emplace(text,operation_recipe_owner).first;canonical_file_plan_bytes_+=charge;
+                    }
+                }
+                if(found!=canonical_file_plans_.end())operation_recipe_owner=found->second;
+                if(operation_recipe_owner&&(operation_recipe_owner->kind==PreparedFilesystemOperation::Kind::FileFactory||operation_recipe_owner->kind==PreparedFilesystemOperation::Kind::FileMethod))operation_recipe=operation_recipe_owner.get();
+            }
+        }
+        bool file_recipe_eligible=false;
+        if(operation_recipe&&operation_recipe->kind==PreparedFilesystemOperation::Kind::FileMethod){
+            // Inspect the same logical slot without sync or evaluation. A
+            // non-FileValue follows the untouched canonical method route.
+            for(auto scope=variable_scopes_.rbegin();scope!=variable_scopes_.rend();++scope){
+                auto found=scope->find(operation_recipe->receiver);if(found==scope->end())continue;
+                auto& binding=found->second;std::shared_ptr<nift::RuntimeValue> owner;
+                if(binding.is_location_ref()){
+                    if(binding.ref_root_slot){auto root=*binding.ref_root_slot;auto* value=binding.resolve_location();if(root&&value)owner=std::shared_ptr<nift::RuntimeValue>(std::move(root),value);}
+                }else owner=binding.slot?*binding.slot:binding.value;
+                file_recipe_eligible=owner&&owner->is_string()&&owner->string.rfind("\x1fnift:file:",0)==0;break;
+            }
+        }
+        if (operation_recipe && (operation_recipe->kind!=PreparedFilesystemOperation::Kind::FileMethod||file_recipe_eligible)) {
             auto operand=[&](std::size_t i,nift::RuntimeValue& value) {
-                const auto& arg=recipe->operands[i];
+                const auto& arg=operation_recipe->operands[i];
                 if (arg.quoted) { value=nift::RuntimeValue(arg.text);return true; }
-                if(arg.pure_plan&&evaluate_pure_string_plan(*arg.pure_plan,value))return true;
+                if(depth<=79&&arg.pure_plan&&evaluate_pure_string_plan(*arg.pure_plan,value))return true;
                 return eval(nift::detail::SourceText(arg.text,text.view.slice(arg.begin,arg.length)),value,depth+1);
             };
-            return execute_filesystem_operation(recipe->kind,recipe->operands.size(),operand,out,error);
+            if(operation_recipe->kind==PreparedFilesystemOperation::Kind::FileMethod){
+                nift::RuntimeValue base;
+                // Eligibility proved a live FileValue in the exact logical slot.
+                // Canonical direct resolution performs the same sync and copy;
+                // it invokes no user code and cannot select a different owner.
+                if(!resolve_direct(operation_recipe->receiver,base))return false;
+                bool handled=false;
+                return execute_file_method(base,operation_recipe->method,operation_recipe->operands.size(),operand,[&](const std::string& token,nift::RuntimeValue& value){return eval(token,value,depth+1);},out,error,handled);
+            }
+            return execute_filesystem_operation(operation_recipe->kind,operation_recipe->operands.size(),operand,out,error);
         }
         auto find_binding = [&](const std::string& name) -> VariableBinding* {
             for (auto scope=variable_scopes_.rbegin(); scope!=variable_scopes_.rend(); ++scope) { auto it=scope->find(name); if(it!=scope->end()) { it->second.sync(); return &it->second; } }
@@ -1840,6 +1969,12 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
             if (!error.empty()) return false;
         }
         {
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+            bool handled = true;
+            const auto evaluate_lambda_factory = [&]()
+                NIFT_COMPAT_NOINLINE
+                -> bool {
+#endif
             auto instantiate_lambda = [&](const LambdaSyntax& code) {
                 NIFT_LAMBDA_COUNT(instances);
                 auto li = std::make_shared<LambdaInstance>();
@@ -1882,10 +2017,24 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
                     lambda_syntax_cache.emplace(text, code);
                 return instantiate_lambda(*code);
             }
+
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                handled = false;
+                return false;
+            };
+            const bool result = evaluate_lambda_factory();
+            if (handled) return result;
+#endif
         }
 
         // v4.3 native scripting filesystem, console and stream primitives.
         {
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+            bool handled = true;
+            const auto evaluate_native_call = [&]()
+                NIFT_COMPAT_NOINLINE
+                -> bool {
+#endif
             std::vector<nift::RuntimeValue> spread_values;
             auto call_args=[&](std::string_view name,std::vector<nift::detail::SourceText>& args,std::vector<bool>& quoted)->bool{
                 if(text.size()<name.size()+2||text.compare(0,name.size(),name.data(),name.size())!=0||text[name.size()]!='('||text.back()!=')')return false;
@@ -1943,6 +2092,13 @@ if(!home)home=std::getenv("USERPROFILE");
 if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p.is_relative())p=(standalone_script_host_?fs::current_path():host_.root())/p;return fs::absolute(p).lexically_normal();};
             auto checked_path=[&](const std::string& name,const std::vector<nift::detail::SourceText>& aa,const std::vector<bool>& qq,size_t i,fs::path& p)->bool{std::string raw;if(!string_arg(name,aa,qq,i,raw))return false;p=resolve_path(raw);if(!standalone_script_host_&&!resource_path_authority_.project_root.empty()&&!filesystem::path_within(resource_path_authority_.project_root,p)){error=name+": path must stay inside the Nift project";return false;}if(!nift_fs_root_allowed(p,resource_path_authority_.enforce_filesystem_root?resource_path_authority_.filesystem_root:fs::path{},error)){error=name+": "+error;return false;}return true;};
             std::vector<nift::detail::SourceText> args;std::vector<bool> q;
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+            {
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+            bool group_handled = true;
+            const auto evaluate_native_family_0 = [&]() NIFT_COMPAT_NOINLINE -> bool {
+#endif
             if(call_args("cmd",args,q)){
                 if(args.empty()){error="cmd: expected executable and optional arguments";return false;}std::vector<std::string> vals;
                 for(std::size_t ai=0;ai<args.size();++ai){nift::RuntimeValue v;if(!arg_value(args,q,ai,v))return false;if(v.is_array()){for(const auto&x:v.array){if(!(x.is_string()||x.is_number()||x.is_bool())){error="cmd: arguments must be scalar";return false;}vals.push_back(render_expression_value(x));}}else if(v.is_string()||v.is_number()||v.is_bool())vals.push_back(render_expression_value(v));else{error="cmd: arguments must be scalar";return false;}}
@@ -2030,6 +2186,22 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 if(!ok(initial)){error="mutex: initial value contains a non-transferable resource";return false;}
                 auto st=std::make_shared<MutexInstance>();st->value=std::move(initial);static std::atomic<std::uint64_t> mutex_ids{1};const std::string id=std::to_string(mutex_ids.fetch_add(1));mutex_instances_[id]=st;out=nift::RuntimeValue(std::string("\x1fnift:mutex:")+id);return true;
             }
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                group_handled = false;return false;
+            };
+            const bool group_result = evaluate_native_family_0();
+            if (group_handled) return group_result;
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+            }
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+            {
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+            bool group_handled = true;
+            const auto evaluate_native_family_1 = [&]() NIFT_COMPAT_NOINLINE -> bool {
+#endif
             if(call_args("ffi_open",args,q)){
                 if(args.size()!=1){error="ffi_open: expected library path";return false;}
                 std::string path;if(!string_arg("ffi_open",args,q,0,path))return false;
@@ -2119,6 +2291,22 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 ffi_cif cif;if(ffi_prep_cif(&cif,FFI_DEFAULT_ABI,static_cast<unsigned>(ffi_types.size()),nift_ffi_type(rt),ffi_types.empty()?nullptr:ffi_types.data())!=FFI_OK){error="ffi_call: libffi could not prepare signature";return false;}NiftFfiValue result{};const bool integer_result=rt=="bool"||rt=="i8"||rt=="i16"||rt=="i32"||rt=="i64"||rt=="u8"||rt=="u16"||rt=="u32"||rt=="u64";void* result_storage=nullptr;if(integer_result)result_storage=nift_ffi_integer_return_storage(result,nift_ffi_integer_type(rt));else if(rt=="f32")result_storage=&result.f32;else if(rt=="f64")result_storage=&result.f64;else if(rt=="ptr"||rt=="cstr")result_storage=&result.pointer;ffi_call(&cif,sym,result_storage,ffi_values.empty()?nullptr:ffi_values.data());if(!callback_activation.error().empty()){error="ffi callback: "+callback_activation.error();return false;}
                 if(rt=="void"){out=nift::RuntimeValue(nullptr);return true;}if(rt=="cstr"){const char* p=static_cast<const char*>(result.pointer);out=p?nift::RuntimeValue(std::string(p)):nift::RuntimeValue(nullptr);return true;}if(rt=="ptr"){if(!result.pointer){out=nift::RuntimeValue(nullptr);return true;}const std::string id=std::to_string(next_ffi_pointer_id_++);ffi_pointers_[id]=result.pointer;out=nift::RuntimeValue(std::string("\x1fnift:ffi-ptr:")+id);return true;}if(rt=="f32"){out=nift::RuntimeValue(static_cast<double>(result.f32));return true;}if(rt=="f64"){out=nift::RuntimeValue(result.f64);return true;}const auto integer_type=nift_ffi_integer_type(rt);if(rt=="bool"){out=nift::RuntimeValue(nift_ffi_read_unsigned_return(result,integer_type)!=0);return true;}if(!rt.empty()&&rt[0]=='u')out=nift::runtime_unsigned_integer(nift_ffi_read_unsigned_return(result,integer_type));else out=nift::runtime_integer(nift_ffi_read_signed_return(result,integer_type));return true;
             }
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                group_handled = false;return false;
+            };
+            const bool group_result = evaluate_native_family_1();
+            if (group_handled) return group_result;
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+            }
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+            {
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+            bool group_handled = true;
+            const auto evaluate_native_family_2 = [&]() NIFT_COMPAT_NOINLINE -> bool {
+#endif
             if(call_args("setenv",args,q)){if(!standalone_script_host_){error="setenv: only available in standalone Nift scripts/shell";return false;}if(args.size()!=2){error="setenv: expected name and value";return false;}std::string k,v;if(!string_arg("setenv",args,q,0,k)||!string_arg("setenv",args,q,1,v))return false;
 #ifdef _WIN32
                 if(_putenv_s(k.c_str(),v.c_str())!=0){error="setenv: failed";return false;}
@@ -2220,6 +2408,22 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             }std::error_code ec;if(!fs::is_directory(p,ec)||ec){if(ec)return fail_recoverable(nift::detail::DiagnosticCode::IoDirectoryReadFailed,"ls: "+ec.message(),error);error="ls: path is not a readable directory";return false;}std::vector<std::string> names;for(fs::directory_iterator it(p,ec),end;!ec&&it!=end;it.increment(ec))names.push_back(it->path().filename().generic_string());if(ec)return fail_recoverable(nift::detail::DiagnosticCode::IoDirectoryReadFailed,"ls: "+ec.message(),error);std::sort(names.begin(),names.end());for(const auto& n:names)out.array.emplace_back(n);return true;}
             if(call_args("open",args,q)){fs::path p;if(args.size()!=1||!checked_path("open",args,q,0,p))return false;std::error_code ec;if(fs::is_directory(p,ec)){error="open: path is a directory";return false;}std::ifstream f(p,std::ios::binary);if(!f)return fail_recoverable(nift::detail::DiagnosticCode::IoOpenFailed,"open: cannot open path",error);std::ostringstream ss;ss<<f.rdbuf();out=nift::RuntimeValue(ss.str());return true;}
             if(call_args("open_bytes",args,q)){fs::path p;if(args.size()!=1||!checked_path("open_bytes",args,q,0,p))return false;std::error_code ec;if(fs::is_directory(p,ec)){error="open_bytes: path is a directory";return false;}std::ifstream f(p,std::ios::binary);if(!f)return fail_recoverable(nift::detail::DiagnosticCode::IoOpenFailed,"open_bytes: cannot open path",error);constexpr std::size_t chunk_size=64*1024;std::vector<char> chunk(chunk_size);nift::RuntimeBytes data;while(f){f.read(chunk.data(),static_cast<std::streamsize>(chunk.size()));const auto received=f.gcount();if(received>0)data.insert(data.end(),chunk.begin(),chunk.begin()+received);if(f.bad())return fail_recoverable(nift::detail::DiagnosticCode::IoReadFailed,"open_bytes: input failure",error);if(received<static_cast<std::streamsize>(chunk.size()))break;}out=nift::RuntimeValue(std::move(data));return true;}
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                group_handled = false;return false;
+            };
+            const bool group_result = evaluate_native_family_2();
+            if (group_handled) return group_result;
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+            }
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+            {
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+            bool group_handled = true;
+            const auto evaluate_native_family_3 = [&]() NIFT_COMPAT_NOINLINE -> bool {
+#endif
             // Native script-land Minify++ (v4.4 package campaign CP19-CP24).
             // Delegates to the same embedded Minify++ the CLI uses; never a
             // subprocess, so it also works under --no-process. Overloads:
@@ -2280,7 +2484,23 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 if(!filesystem::write_file(dest,out_text)){out=minify_fail("failed to write "+dest.generic_string(),format_name,"");return true;}
                 nift::RuntimeValue r=nift::RuntimeValue::make_object();r["ok"]=nift::RuntimeValue(true);r["output"]=nift::RuntimeValue(out_text);r["error"]=nift::RuntimeValue("");r["format"]=nift::RuntimeValue(format_name);r["written"]=nift::RuntimeValue(dest.generic_string());out=std::move(r);return true;
             }
-            if(call_args("file",args,q)){fs::path p;if(args.size()!=1||!checked_path("file",args,q,0,p))return false;return make_file_value(std::move(p),out,error);}
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                group_handled = false;return false;
+            };
+            const bool group_result = evaluate_native_family_3();
+            if (group_handled) return group_result;
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+            }
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+            {
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+            bool group_handled = true;
+            const auto evaluate_native_family_4 = [&]() NIFT_COMPAT_NOINLINE -> bool {
+#endif
+            if(call_args("file",args,q)){if(args.size()!=1)return false;return execute_filesystem_operation(PreparedFilesystemOperation::Kind::FileFactory,args.size(),[&](std::size_t i,nift::RuntimeValue& value){return arg_value(args,q,i,value);},out,error);}
             if(call_args("page",args,q)){if(args.size()!=1){error="page: expected one page name";return false;}nift::RuntimeValue d;if(!arg_value(args,q,0,d)||!d.is_string()){error="page: name must be a string";return false;}std::string ref;if(!host_.page_ref_for(d.string,ref)){error="page: unknown tracked page '"+d.string+"'";return false;}out=nift::RuntimeValue(ref);return true;}
             if(call_args("min",args,q)||call_args("max",args,q)){const bool want_min=text.rfind("min(",0)==0;const std::string name=want_min?"min":"max";std::vector<nift::RuntimeValue> vals;if(args.size()==1){nift::RuntimeValue v;if(!arg_value(args,q,0,v))return false;if(v.is_array())vals=v.array;else vals.push_back(std::move(v));}else for(std::size_t ai=0;ai<args.size();++ai){nift::RuntimeValue v;if(!arg_value(args,q,ai,v))return false;vals.push_back(std::move(v));}if(vals.empty()){error=name+": expected at least one value";return false;}out=vals.front();for(std::size_t ai=1;ai<vals.size();++ai){const auto& v=vals[ai];bool take=false;if(out.is_number()&&v.is_number()){const int cmp=nift::runtime_compare_numbers(v,out);take=want_min?cmp<0:cmp>0;}else if(out.is_string()&&v.is_string())take=want_min?v.string<out.string:v.string>out.string;else{error=name+": values must be comparable and homogeneous";return false;}if(take)out=v;}return true;}
             // CP204-205: stable public runtime introspection. Internal marker
@@ -2366,6 +2586,22 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 }
                 out=nift::RuntimeValue(std::move(r));return true;
             }
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                group_handled = false;return false;
+            };
+            const bool group_result = evaluate_native_family_4();
+            if (group_handled) return group_result;
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+            }
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+            {
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+            bool group_handled = true;
+            const auto evaluate_native_family_5 = [&]() NIFT_COMPAT_NOINLINE -> bool {
+#endif
             if(call_args("ifstream",args,q)||call_args("ofstream",args,q)){const bool output=text.rfind("ofstream(",0)==0;const std::string name=output?"ofstream":"ifstream";auto st=std::make_shared<StreamInstance>();st->kind=output?StreamInstance::Kind::Output:StreamInstance::Kind::Input;if(args.size()==1){fs::path p;if(!checked_path(name,args,q,0,p))return false;if(!stream_open(st,p,error))return false;}else if(args.size()!=0){error=name+": expected zero or one path";return false;}auto id=std::to_string(next_stream_instance_id_++);stream_instances_[id]=st;out=nift::RuntimeValue(std::string("\x1fnift:stream:")+id);return true;}
             if(call_args("close",args,q)){if(args.size()!=1){error="close: expected stream";return false;}nift::RuntimeValue d;if(!arg_value(args,q,0,d)||!d.is_string()||d.string.rfind("\x1fnift:stream:",0)!=0){error="close: expected stream";return false;}auto it=stream_instances_.find(d.string.substr(13));if(it==stream_instances_.end()){error="close: invalid stream";return false;}if(!stream_close(it->second,error))return false;out=nift::RuntimeValue(nullptr);return true;}
             const bool print_call=call_args("print",args,q);
@@ -2373,6 +2609,23 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             const bool warn_call=!print_call&&!err_call&&call_args("warn",args,q);
             if(print_call||err_call||warn_call){const std::string name=err_call?"err":(warn_call?"warn":"print");if(args.size()!=1){error=name+": expected one value";return false;}nift::RuntimeValue d;if(!arg_value(args,q,0,d))return false;if(d.is_string()&&q.size()>0&&q[0]&&d.string.find("$[")!=std::string::npos){std::string r,e;if(!interpolate_parameter(d.string,r,e)){error=name+": "+e;return false;}d=nift::RuntimeValue(r);}if(d.is_bytes()){error=name+": bytes values cannot be rendered as text";return false;}if(d.is_error()||d.is_timer()||d.is_array()||d.is_object()||(d.is_string()&&d.string.rfind("\x1fnift:",0)==0&&d.string.rfind("\x1fnift:timer:",0)!=0&&d.string.rfind("\x1fnift:enum:",0)!=0&&d.string.rfind("\x1fnift:atomic:",0)!=0)){error=name+": value is not directly renderable";return false;}const std::string rendered=render_expression_value(d)+'\n';if(err_call)execution_output_->write_stderr(rendered);else if(warn_call)execution_output_->write_warning(rendered);else execution_output_->write_stdout(rendered);out=nift::RuntimeValue(nullptr);return true;}
             if(call_args("read",args,q)){if(!args.empty()){error="read: expected no arguments";return false;}if(!standalone_script_host_){error="read: interactive input is only available in standalone Nift scripts/shell";return false;}std::string line;if(!std::getline(std::cin,line)){if(std::cin.eof()){std::cin.clear();out=nift::RuntimeValue(nullptr);return true;}error="read: input failure";return false;}out=nift::RuntimeValue(line);return true;}
+
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                group_handled = false;return false;
+            };
+            const bool group_result = evaluate_native_family_5();
+            if (group_handled) return group_result;
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+            }
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                handled = false;
+                return false;
+            };
+            const bool result = evaluate_native_call();
+            if (handled) return result;
+#endif
         }
 
         // v4.3 canonical value presentation. Presentation modifiers compose over the
@@ -2381,12 +2634,26 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
         // "pretty + highlighted when directly inspected by the REPL". ANSI remains
         // a presentation concern; expression evaluation always returns a plain string.
         {
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+            bool handled = true;
+            const auto evaluate_presentation = [&]()
+                NIFT_COMPAT_NOINLINE
+                -> bool {
+#endif
             std::string target; bool pretty=false, highlight=false;
             if (strip_presentation_chain(text, target, pretty, highlight)) {
                 nift::RuntimeValue v;if(!eval(target,v,depth+1))return false;
                 std::string rendered;if(!serialize_value(v,pretty,rendered,error))return false;
                 out=nift::RuntimeValue(rendered);return true;
             }
+
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                handled = false;
+                return false;
+            };
+            const bool result = evaluate_presentation();
+            if (handled) return result;
+#endif
         }
 
         // v4.3 CP100/CP102 scalar/string and read-only postfix ergonomics.
@@ -2394,6 +2661,12 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
         // receiver makes literals and call/expression results chain naturally without
         // teaching each primitive about every possible trailing method.
         {
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+            bool handled = true;
+            const auto evaluate_postfix = [&]()
+                NIFT_COMPAT_NOINLINE
+                -> bool {
+#endif
             auto final_postfix = [&](nift::detail::SourceText& receiver, std::string& method, nift::detail::SourceText& arg_text)->bool {
                 if (text.empty() || text.back() != ')') return false;
                 bool quoted=false; char quote=0; int parens=0;
@@ -2496,6 +2769,12 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     }
                     nift::RuntimeValue base;
                     if (!eval(receiver,base,depth+1)) return false;
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                    bool value_handled = true;
+                    const auto evaluate_method_value = [&]()
+                        NIFT_COMPAT_NOINLINE
+                        -> bool {
+#endif
                     bool aok=false; std::vector<bool> aq;
                     auto args=parse_parameters(arg_text,aok,&aq);
                     if(!aok){error=method+": malformed arguments";return false;}
@@ -2505,6 +2784,13 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         return eval(args[i],v,depth+1);
                     };
                     auto no_args=[&]()->bool{if(!args.empty()){error=method+": expected no arguments";return false;}return true;};
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                    {
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                    bool group_handled = true;
+                    const auto evaluate_value_family_0 = [&]() NIFT_COMPAT_NOINLINE -> bool {
+#endif
                     if(base.is_timer()){std::vector<nift::RuntimeValue> values;for(std::size_t i=0;i<args.size();++i){nift::RuntimeValue value;if(!eval_arg(i,value))return false;values.push_back(std::move(value));}return call_timer_method(base,method,values,out,error);}
                     if(base.is_bytes()){
                         const nift::RuntimeBytes empty;
@@ -2548,6 +2834,15 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         if(method=="to_string"){out=nift::RuntimeValue(base.string.substr(prev+1,last-prev-1));return true;}
                         std::int64_t v=0;auto r=std::from_chars(base.string.data()+last+1,base.string.data()+base.string.size(),v);if(r.ec!=std::errc()){error="invalid enum backing value";return false;}out=nift::RuntimeValue((double)v);if(v>9007199254740992LL||v<-9007199254740992LL){out.type=nift::RuntimeType::StrNumber;out.string=std::to_string(v);}return true;
                     }
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                        group_handled = false;return false;
+                    };
+                    const bool group_result = evaluate_value_family_0();
+                    if (group_handled) return group_result;
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                    }
+#endif
                     // CP171: all operations that construct object keys from values
                     // share one conversion rule. JSON objects ultimately have string
                     // keys, so Nift accepts only renderable scalar key values and
@@ -2557,6 +2852,13 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         rendered=key.is_string()?key.string:render_expression_value(key);
                         return true;
                     };
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                    {
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                    bool group_handled = true;
+                    const auto evaluate_resource_file_methods = [&]() NIFT_COMPAT_NOINLINE -> bool {
+#endif
                     if(base.is_string() && base.string.rfind("\x1fnift:cmd:",0)==0) {
                         auto ci=command_instances_.find(base.string.substr(10));if(ci==command_instances_.end()){error="invalid command";return false;}auto c=ci->second;
                         auto& aa=args; auto& qq=aq;
@@ -2567,42 +2869,26 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         if(method=="run"){if(!aa.empty()){error="run: command method takes no arguments";return false;}if(std::getenv("NIFT_NO_PROCESS")){error="run: external process execution disabled";return false;}auto pr=nift_run_pipeline(c->stages,true,false);out=nift::RuntimeValue::make_object();out["exit_code"]=nift::RuntimeValue((double)pr.exit_code);out["stdout"]=nift::RuntimeValue(pr.out);out["stderr"]=nift::RuntimeValue(pr.err);out["launched"]=nift::RuntimeValue(pr.launched);return true;}
                     }
                     if(base.is_string() && base.string.rfind("\x1fnift:file:",0)==0) {
-                        auto fit=file_instances_.find(base.string.substr(11)); if(fit==file_instances_.end()){error="file: invalid FileValue";return false;} auto f=fit->second;
-                        auto can_read=[&](){return f->mode=="r"||f->mode=="rw";}; auto can_write=[&](){return f->mode=="w"||f->mode=="a"||f->mode=="rw";};
-                        auto need_open=[&](){if(!f->open){error=method+": file is not open";return false;}return true;};
-                        auto need_read=[&](){if(!need_open())return false;if(!can_read()){error=method+": file is not open for reading";return false;}return true;};
-                        auto need_write=[&](){if(!need_open())return false;if(!can_write()){error=method+": file is not open for writing";return false;}return true;};
-                        auto sarg=[&](size_t i,std::string& x){nift::RuntimeValue v;if(!eval_arg(i,v)||!v.is_string()){error=method+": expected string argument";return false;}x=v.string;return true;};
-                        auto dirty=[&](){f->dirty=f->working!=f->saved;};
-                        if(method=="path"){if(!no_args())return false;out=nift::RuntimeValue(f->path.generic_string());return true;}
-                        if(method=="exists"){if(!no_args())return false;std::error_code ec;out=nift::RuntimeValue(fs::exists(f->path,ec)&&!ec);return true;}
-                        if(method=="open"){
-                            if(f->open){error="open: file is already open";return false;}if(args.size()>1){error="open: expected zero or one mode";return false;}std::string m="r";if(args.size()==1&&!sarg(0,m))return false;
-                            if(m!="r"&&m!="w"&&m!="a"&&m!="rw"){error="open: mode must be r, w, a or rw";return false;}std::error_code ec;bool ex=fs::exists(f->path,ec)&&!ec;
-                            if((m=="r"||m=="rw")&&!ex)return fail_recoverable(nift::detail::DiagnosticCode::IoOpenFailed,"open: file does not exist",error);
-                            if(ex&&fs::is_directory(f->path,ec)){error="open: path is a directory";return false;}
-                            std::string data;if(ex){std::ifstream in(f->path,std::ios::binary);if(!in)return fail_recoverable(nift::detail::DiagnosticCode::IoOpenFailed,"open: cannot read path",error);std::ostringstream ss;ss<<in.rdbuf();data=ss.str();}
-                            f->mode=m;f->existed_at_open=ex;f->saved=data;f->working=m=="w"?std::string():data;f->cursor=m=="a"?f->working.size():0;f->dirty=(m=="w")||(m=="a"&&!ex);f->open=true;out=nift::RuntimeValue(nullptr);return true;
-                        }
-                        if(method=="close"){if(!no_args()||!need_open())return false;if(f->dirty){error="close: file has unsaved changes; save() or revert() first";return false;}f->open=false;f->mode.clear();f->working.clear();f->saved.clear();f->cursor=0;out=nift::RuntimeValue(nullptr);return true;}
-                        if(method=="modified"){if(!no_args()||!need_open())return false;out=nift::RuntimeValue(f->dirty);return true;}
-                        if(method=="tell"){if(!no_args()||!need_open())return false;out=nift::RuntimeValue((double)f->cursor);return true;}
-                        if(method=="seek"){if(args.size()!=1||!need_open()){if(args.size()!=1&&error.empty())error="seek: expected byte position";return false;}nift::RuntimeValue n;std::size_t position=0;if(!eval_arg(0,n)||!nift::runtime_number_to_size(n,position)||position>f->working.size()){error="seek: byte position out of range";return false;}f->cursor=position;out=nift::RuntimeValue(nullptr);return true;}
-                        if(method=="eof"){if(!no_args()||!need_read())return false;out=nift::RuntimeValue(f->cursor>=f->working.size());return true;}
-                        if(method=="read"||method=="read_all"){if(!need_read())return false;size_t base=std::min(f->cursor,f->working.size());size_t n=f->working.size()-base;if(method=="read"&&!args.empty()){if(args.size()!=1){error="read: expected zero or one byte count";return false;}nift::RuntimeValue d;std::size_t count=0;if(!eval_arg(0,d)||!nift::runtime_number_to_size(d,count)){error="read: invalid byte count";return false;}n=std::min(n,count);}else if(method=="read_all"&&!args.empty()){error="read_all: expected no arguments";return false;}out=nift::RuntimeValue(f->working.substr(base,n));f->cursor=base+n;return true;}
-                        if(method=="read_bytes"||method=="read_all_bytes"){if(!need_read())return false;size_t base=std::min(f->cursor,f->working.size());size_t n=f->working.size()-base;if(method=="read_bytes"){if(args.size()!=1){error="read_bytes: expected one byte count";return false;}nift::RuntimeValue d;std::size_t count=0;if(!eval_arg(0,d)||!nift::runtime_number_to_size(d,count)){error="read_bytes: invalid byte count";return false;}n=std::min(n,count);}else if(!args.empty()){error="read_all_bytes: expected no arguments";return false;}const auto begin=f->working.begin()+static_cast<std::ptrdiff_t>(base);out=nift::RuntimeValue(nift::RuntimeBytes(begin,begin+static_cast<std::ptrdiff_t>(n)));f->cursor=base+n;return true;}
-                        if(method=="read_line"){if(!no_args()||!need_read())return false;if(f->cursor>=f->working.size()){out=nift::RuntimeValue(nullptr);return true;}auto e=f->working.find('\n',f->cursor);size_t z=e==std::string::npos?f->working.size():e;std::string line=f->working.substr(f->cursor,z-f->cursor);if(!line.empty()&&line.back()=='\r')line.pop_back();f->cursor=e==std::string::npos?f->working.size():e+1;out=nift::RuntimeValue(line);return true;}
-                        if(method=="read_val"){if(!no_args()||!need_read())return false;while(f->cursor<f->working.size()&&std::isspace((unsigned char)f->working[f->cursor]))++f->cursor;if(f->cursor>=f->working.size()){out=nift::RuntimeValue(nullptr);return true;}size_t st=f->cursor;char first=f->working[f->cursor];if(first=='"'||first=='['||first=='{'){char op=first,cl=first=='['?']':first=='{'?'}':'"';int dep=0;bool qd=false,esc=false;while(f->cursor<f->working.size()){char c=f->working[f->cursor++];if(op=='"'){if(esc){esc=false;continue;}if(c=='\\'){esc=true;continue;}if(f->cursor>st+1&&c=='"')break;}else{if(qd){if(esc)esc=false;else if(c=='\\')esc=true;else if(c=='"')qd=false;}else if(c=='"')qd=true;else if(c==op)++dep;else if(c==cl&&--dep==0)break;}}}else while(f->cursor<f->working.size()&&!std::isspace((unsigned char)f->working[f->cursor]))++f->cursor;std::string tok=f->working.substr(st,f->cursor-st);nift::RuntimeValue v;if(!eval(tok,v,depth+1)){error="read_val: "+error;return false;}if(runtime_contains_bytes(v)){error="read_val: bytes values are not serializable";return false;}out=v;return true;}
-                        if(method=="write_val"){if(args.size()!=1||!need_write()){if(args.size()!=1&&error.empty())error="write_val: expected one value";return false;}nift::RuntimeValue v;if(!eval_arg(0,v))return false;std::string d;if(!serialize_value(v,false,d,error,0,true))return false;d+="\n";size_t base=std::min(f->cursor,f->working.size());size_t ov=std::min(d.size(),f->working.size()-base);f->working.replace(base,ov,d);f->cursor=base+d.size();dirty();out=nift::RuntimeValue(nullptr);return true;}
-                        if(method=="write"||method=="write_line"){if(args.size()!=1||!need_write()){if(args.size()!=1&&error.empty())error=method+": expected one value";return false;}nift::RuntimeValue v;if(!eval_arg(0,v))return false;std::string d;if(method=="write"&&v.is_bytes()){const nift::RuntimeBytes empty;const auto& raw=v.bytes?*v.bytes:empty;d.assign(raw.begin(),raw.end());}else{if(v.is_error()||v.is_timer()||v.is_bytes()||v.is_array()||v.is_object()||(v.is_string()&&v.string.rfind("\x1fnift:",0)==0&&v.string.rfind("\x1fnift:timer:",0)!=0)){error=method+": value is not directly renderable";return false;}d=render_expression_value(v);if(method=="write_line")d+='\n';}size_t base=std::min(f->cursor,f->working.size());size_t ov=std::min(d.size(),f->working.size()-base);f->working.replace(base,ov,d);f->cursor=base+d.size();dirty();out=nift::RuntimeValue(nullptr);return true;}
-                        if(method=="flush"){if(!no_args()||!need_write())return false;out=nift::RuntimeValue(nullptr);return true;}
-                        if(method=="replace"||method=="replace_once"){if(args.size()!=2||!need_write()){if(args.size()!=2&&error.empty())error=method+": expected old and replacement strings";return false;}std::string a,b;if(!sarg(0,a)||!sarg(1,b))return false;if(a.empty()){error=method+": old string must not be empty";return false;}size_t count=0,pos=0;while((pos=f->working.find(a,pos))!=std::string::npos){++count;pos+=a.size();}if(method=="replace_once"&&count!=1){error="replace_once: expected exactly one match, found "+std::to_string(count);return false;}pos=0;while((pos=f->working.find(a,pos))!=std::string::npos){f->working.replace(pos,a.size(),b);pos+=b.size();if(method=="replace_once")break;}if(f->cursor>f->working.size())f->cursor=f->working.size();dirty();out=method=="replace"?nift::RuntimeValue((double)count):nift::RuntimeValue(nullptr);return true;}
-                        if(method=="insert"||method=="insert"||method=="insert_before"||method=="insert_after"||method=="prepend"||method=="append"){if(!need_write())return false;size_t pos=0;std::string d;if(method=="prepend"||method=="append"){if(args.size()!=1||!sarg(0,d)){if(args.size()!=1&&error.empty())error=method+": expected text";return false;}pos=method=="prepend"?0:f->working.size();}else if(method=="insert"){if(args.size()!=2){error="insert: expected byte position and text";return false;}nift::RuntimeValue n;if(!eval_arg(0,n)||!nift::runtime_number_to_size(n,pos)||pos>f->working.size()||!sarg(1,d)){error="insert: invalid byte position or text";return false;}}else{if(args.size()!=2){error=method+": expected anchor and text";return false;}std::string a;if(!sarg(0,a)||!sarg(1,d))return false;if(a.empty()){error=method+": anchor must not be empty";return false;}auto at=f->working.find(a);if(at==std::string::npos||f->working.find(a,at+a.size())!=std::string::npos){error=method+": expected exactly one anchor";return false;}pos=at+(method=="insert_after"?a.size():0);}f->working.insert(pos,d);if(f->cursor>f->working.size())f->cursor=f->working.size();dirty();out=nift::RuntimeValue(nullptr);return true;}
-                        if(method=="revert"){if(!no_args()||!need_write())return false;f->working=f->saved;f->cursor=0;f->dirty=false;out=nift::RuntimeValue(nullptr);return true;}
-                        if(method=="save"){if(!no_args()||!need_write())return false;if(!f->dirty){out=nift::RuntimeValue(nullptr);return true;}std::error_code ec;auto parent=f->path.parent_path();if(!parent.empty()&&!fs::exists(parent,ec))return fail_recoverable(nift::detail::DiagnosticCode::IoWriteFailed,"save: parent directory does not exist",error);fs::perms perms=fs::perms::unknown;if(fs::exists(f->path,ec)&&!ec)perms=fs::status(f->path,ec).permissions();fs::path tmp=f->path;tmp+=".nift-tmp-"+std::to_string((unsigned long long)std::chrono::steady_clock::now().time_since_epoch().count());{std::ofstream o(tmp,std::ios::binary|std::ios::trunc);if(!o)return fail_recoverable(nift::detail::DiagnosticCode::IoWriteFailed,"save: cannot create temporary file",error);o.write(f->working.data(),(std::streamsize)f->working.size());o.flush();if(!o){o.close();fs::remove(tmp,ec);return fail_recoverable(nift::detail::DiagnosticCode::IoWriteFailed,"save: temporary write failed",error);}}if(perms!=fs::perms::unknown)fs::permissions(tmp,perms,ec);if(!filesystem::replace_file_atomic(tmp,f->path))return fail_recoverable(nift::detail::DiagnosticCode::IoAtomicReplaceFailed,"save: atomic replace failed",error);f->saved=f->working;f->dirty=false;f->existed_at_open=true;out=nift::RuntimeValue(nullptr);return true;}
-                        if(method=="cat"){if(!no_args()||!need_read())return false;execution_output_->write_stdout(f->working);out=nift::RuntimeValue(nullptr);return true;}
-                        if(method=="copy"||method=="move"||method=="remove"){if(f->open){error=method+": file must be closed";return false;}if((method=="remove"&&!args.empty())||(method!="remove"&&args.size()!=1)){error=method+": invalid arguments";return false;}std::error_code ec;if(method=="remove"){if(fs::is_directory(f->path,ec)){error="remove: directories are not removed recursively";return false;}if(!fs::remove(f->path,ec)&&ec)return fail_recoverable(nift::detail::DiagnosticCode::IoRemoveFailed,"remove: "+ec.message(),error);out=nift::RuntimeValue(nullptr);return true;}std::string raw;if(!sarg(0,raw))return false;fs::path dest(raw);if(dest.is_relative())dest=(standalone_script_host_?fs::current_path():host_.root())/dest;dest=fs::absolute(dest).lexically_normal();if(!standalone_script_host_&&!host_.root().empty()&&!filesystem::path_within(fs::absolute(host_.root()).lexically_normal(),dest)){error=method+": path must stay inside the Nift project";return false;}if(next_file_instance_id_==0||next_file_instance_id_==std::numeric_limits<std::uint64_t>::max()){error="file: instance identity space exhausted";return false;}if(method=="move")fs::rename(f->path,dest,ec);else fs::copy_file(f->path,dest,fs::copy_options::overwrite_existing,ec);if(ec)return fail_recoverable(method=="move"?nift::detail::DiagnosticCode::IoMoveFailed:nift::detail::DiagnosticCode::IoCopyFailed,method+": "+ec.message(),error);if(method=="move")f->path=dest;return make_file_value(std::move(dest),out,error);}
+                        bool handled=false;
+                        bool result=execute_file_method(base,method,args.size(),eval_arg,[&](const std::string& token,nift::RuntimeValue& value){return eval(token,value,depth+1);},out,error,handled);
+                        if(handled)return result;
                     }
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                        group_handled = false;return false;
+                    };
+                    const bool group_result = evaluate_resource_file_methods();
+                    if (group_handled) return group_result;
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                    }
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                    {
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                    bool group_handled = true;
+                    const auto evaluate_value_family_1 = [&]() NIFT_COMPAT_NOINLINE -> bool {
+#endif
                     if(base.is_string() && base.string.rfind("\x1fnift:",0)!=0) {
                         const std::string& str=base.string;
                         if(method=="encode"){if(args.size()!=1){error="encode: expected encoding";return false;}nift::RuntimeValue encoding;if(!eval_arg(0,encoding)||!encoding.is_string()||encoding.string!="utf-8"){error="encode: encoding must be exactly 'utf-8'";return false;}if(!nift::runtime_valid_utf8(str)){error="encode: invalid UTF-8 text";return false;}out=nift::RuntimeValue(nift::RuntimeBytes(str.begin(),str.end()));return true;}
@@ -2647,6 +2933,22 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                             if(args.empty()||args.size()>2){error="substr: expected pos and optional length";return false;}nift::RuntimeValue p,n;std::size_t at=0;if(!eval_arg(0,p)||!nift::runtime_number_to_size(p,at)){error="substr: invalid pos";return false;}if(at>str.size())at=str.size();std::size_t len=std::string::npos;if(args.size()==2){if(!eval_arg(1,n)||!nift::runtime_number_to_size(n,len)){error="substr: invalid length";return false;}}out=nift::RuntimeValue(str.substr(at,len));return true;
                         }
                     }
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                        group_handled = false;return false;
+                    };
+                    const bool group_result = evaluate_value_family_1();
+                    if (group_handled) return group_result;
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                    }
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                    {
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                    bool group_handled = true;
+                    const auto evaluate_value_family_2 = [&]() NIFT_COMPAT_NOINLINE -> bool {
+#endif
                     if(method=="to_string" && base.is_number()) { if(!no_args())return false;out=nift::RuntimeValue(render_expression_value(base));return true; }
                     if(method=="to_string" && base.is_bool()) { if(!no_args())return false;out=nift::RuntimeValue(base.boolean?"true":"false");return true; }
                     if(method=="to_string" && base.is_null()) { if(!no_args())return false;out=nift::RuntimeValue("null");return true; }
@@ -2657,6 +2959,22 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         if(method=="ceil"){if(!no_args())return false;out=nift::RuntimeValue(std::ceil(base.num));return true;}
                         if(method=="round"){if(!no_args())return false;out=nift::RuntimeValue(std::round(base.num));return true;}
                     }
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                        group_handled = false;return false;
+                    };
+                    const bool group_result = evaluate_value_family_2();
+                    if (group_handled) return group_result;
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                    }
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                    {
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                    bool group_handled = true;
+                    const auto evaluate_value_family_3 = [&]() NIFT_COMPAT_NOINLINE -> bool {
+#endif
                     if(base.is_object()) {
                         if(method=="size"||method=="empty"||method=="keys"||method=="values"||method=="entries") {
                             if(!no_args())return false;
@@ -2712,6 +3030,22 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                             out=base;for(const auto& kv:rhs.object)out[kv.first]=kv.second;return true;
                         }
                     }
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                        group_handled = false;return false;
+                    };
+                    const bool group_result = evaluate_value_family_3();
+                    if (group_handled) return group_result;
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                    }
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                    {
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                    bool group_handled = true;
+                    const auto evaluate_value_family_4 = [&]() NIFT_COMPAT_NOINLINE -> bool {
+#endif
                     if(base.is_array()) {
                         const auto& a=base.array;
                         if(method=="from_entries"){
@@ -2853,11 +3187,35 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                         if(method=="join"){if(args.size()!=1){error="join: expected separator";return false;}nift::RuntimeValue sep;if(!eval_arg(0,sep)||!sep.is_string()){error="join: separator must be a string";return false;}std::string r;for(std::size_t i=0;i<a.size();++i){if(i)r+=sep.string;if(a[i].is_error()||a[i].is_timer()||a[i].is_bytes()||a[i].is_array()||a[i].is_object()||(a[i].is_string()&&a[i].string.rfind("\x1fnift:",0)==0&&a[i].string.rfind("\x1fnift:timer:",0)!=0)){error="join: elements must be renderable scalar values";return false;}r+=render_expression_value(a[i]);}out=nift::RuntimeValue(r);return true;}
                         if(method=="slice"){if(args.empty()||args.size()>2){error="slice: expected start and optional end";return false;}nift::RuntimeValue st,en;std::size_t b=0,e=a.size();if(!eval_arg(0,st)||!nift::runtime_number_to_size(st,b)){error="slice: invalid start";return false;}if(args.size()==2){if(!eval_arg(1,en)||!nift::runtime_number_to_size(en,e)){error="slice: invalid end";return false;}}b=std::min(b,a.size());e=std::min(e,a.size());if(e<b)e=b;out=nift::RuntimeValue::make_array();out.array.assign(a.begin()+b,a.begin()+e);return true;}
                     }
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                        group_handled = false;return false;
+                    };
+                    const bool group_result = evaluate_value_family_4();
+                    if (group_handled) return group_result;
+#endif
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                    }
+#endif
                     if(method=="to_string" && (base.is_array()||base.is_object())){error="to_string: use stringify() for composite values";return false;}
                     if(method=="to_string" && !(base.is_string() && base.string.rfind("\x1fnift:",0)==0)){error="to_string: expected int, double, bool, null or string";return false;}
                     if((base.is_string() && base.string.rfind("\x1fnift:",0)!=0)||base.is_number()||(base.is_array()&&method!="insert"&&method!="remove")){error=method+": unsupported for this value";return false;}
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                        value_handled = false;
+                        return false;
+                    };
+                    const bool value_result = evaluate_method_value();
+                    if (value_handled) return value_result;
+#endif
                 }
             }
+
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                handled = false;
+                return false;
+            };
+            const bool result = evaluate_postfix();
+            if (handled) return result;
+#endif
         }
 
         // v4.3 collection constructors. Collections are identity-bearing runtime
@@ -2894,6 +3252,12 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
         }
 
         {
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+            bool handled = true;
+            const auto evaluate_collection_method = [&]()
+                NIFT_COMPAT_NOINLINE
+                -> bool {
+#endif
             const auto lp=text.find('(');
             if(lp!=std::string::npos&&text.back()==')'){std::size_t call_close=0;auto target = trim_copy(text.substr(0,lp));const auto dot=target.rfind('.');if(dot!=std::string::npos&&find_balanced(text,lp,'(',')',call_close)&&call_close==text.size()-1){
                 const std::string root=target.substr(0,dot), method=target.substr(dot+1); VariableBinding* rb=find_binding(root);
@@ -3001,9 +3365,23 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     }
                 }
             }}
+
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                handled = false;
+                return false;
+            };
+            const bool result = evaluate_collection_method();
+            if (handled) return result;
+#endif
         }
 
         {
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+            bool handled = true;
+            const auto evaluate_array_method = [&]()
+                NIFT_COMPAT_NOINLINE
+                -> bool {
+#endif
             const auto lp=text.find('(');
             if(lp!=std::string::npos&&text.back()==')'){std::size_t call_close=0;auto target = trim_copy(text.substr(0,lp));const auto dot=target.rfind('.');if(dot!=std::string::npos&&find_balanced(text,lp,'(',')',call_close)&&call_close==text.size()-1){
                 const std::string root=target.substr(0,dot), method=target.substr(dot+1); VariableBinding* rb=find_binding(root);
@@ -3045,9 +3423,23 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                     }
                 }
             }}
+
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                handled = false;
+                return false;
+            };
+            const bool result = evaluate_array_method();
+            if (handled) return result;
+#endif
         }
 
         {
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+            bool handled = true;
+            const auto evaluate_resource_method = [&]()
+                NIFT_COMPAT_NOINLINE
+                -> bool {
+#endif
             const auto lp=text.find('(');
             if(lp!=std::string::npos&&text.back()==')'){std::size_t call_close=0;auto target = trim_copy(text.substr(0,lp));const auto dot=target.rfind('.');if(dot!=std::string::npos&&find_balanced(text,lp,'(',')',call_close)&&call_close==text.size()-1){
                 const std::string root=target.substr(0,dot),method=target.substr(dot+1);VariableBinding* rb=find_binding(root);
@@ -3076,9 +3468,23 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 const std::string root=target.substr(0,dot),method=target.substr(dot+1);VariableBinding* rb=find_binding(root);
                 if(rb&&rb->value&&rb->value->is_string()&&method=="substr") { bool ok=false;auto args=parse_parameters(text.substr(lp+1,text.size()-lp-2),ok);if(!ok||args.empty()||args.size()>2){error="substr: expected pos and optional length";return false;}nift::RuntimeValue pos,len;size_t p=0;if(!eval(args[0],pos,depth+1)||!nift::runtime_number_to_size(pos,p)){error="substr: invalid pos";return false;}if(p>rb->value->string.size())p=rb->value->string.size();size_t n=std::string::npos;if(args.size()==2){if(!eval(args[1],len,depth+1)||!nift::runtime_number_to_size(len,n)){error="substr: invalid length";return false;}}out=nift::RuntimeValue(rb->value->string.substr(p,n));return true;}
             }}
+
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                handled = false;
+                return false;
+            };
+            const bool result = evaluate_resource_method();
+            if (handled) return result;
+#endif
         }
 
         {
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+            bool handled = true;
+            const auto evaluate_callable_call = [&]()
+                NIFT_COMPAT_NOINLINE
+                -> bool {
+#endif
             const auto lp = text.find('(');
             std::size_t call_close = 0;
             const bool terminal_call = lp != std::string::npos && text.back() == ')' &&
@@ -3218,6 +3624,14 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
                 if(host_.has_host_callable(call_name)){bool aok=false;std::vector<bool> aq;auto ar=parse_parameters(text.substr(lp+1,text.size()-lp-2),aok,&aq);if(!aok){error="malformed host callable arguments";return false;}std::vector<nift::RuntimeValue> av;for(size_t ai=0;ai<ar.size();++ai){nift::RuntimeValue v;if(ai<aq.size()&&aq[ai])v=nift::RuntimeValue(ar[ai]);else if(!eval(ar[ai],v,depth+1))return false;if(contains_timer_resource(v)){error="host callable '"+call_name+"' cannot receive a timer value";return false;}av.push_back(std::move(v));}return call_runtime_host(host_, call_name, av, out, error);}
                 if (call_name != "inject" && call_name != "validate" && call_name != "copy" && call_name != "deepcopy") { error = "undefined callable: " + call_name; return false; }
             }
+
+#ifdef NIFT_COMPAT_SPLIT_FRAMES
+                handled = false;
+                return false;
+            };
+            const bool result = evaluate_callable_call();
+            if (handled) return result;
+#endif
         }
 
         if (text.rfind("copy(",0)==0 && text.back()==')') {
@@ -4183,3 +4597,7 @@ bool Parser::invoke_struct_method(std::shared_ptr<StructInstance> instance,
     if(method.constructor && pending_control_.kind==ControlFlow::Return && pending_control_.value && !pending_control_.value->is_null()){error="constructor cannot return a value";pending_control_={};return false;}
     consume_return(out); return true;
 }
+
+#undef NIFT_COMPAT_NOINLINE
+
+#undef NIFT_COMPAT_SPLIT_FRAMES

@@ -1,0 +1,12 @@
+[
+  {
+    "root": "/home/nick/Repositories/nift/scripting-benchmark/evidence/campaign-20261009-v490",
+    "checked": 30,
+    "mismatches": []
+  },
+  {
+    "root": "/home/nick/Repositories/nift/nift-experiments/lab-evidence/benchmarks/shell/20261009-v4100-shell-expanded",
+    "checked": 51,
+    "mismatches": []
+  }
+]

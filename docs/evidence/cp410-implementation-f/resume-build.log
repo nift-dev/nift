@@ -1,0 +1,12 @@
+make: Entering directory '/home/nick/Repositories/nift/nift/.build/cp410-implementation/objects/prototype'
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/JsonSchema.cpp -o src/JsonSchema.o
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ProjectInfo.cpp -o src/ProjectInfo.o
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ProjectRead.cpp -o src/ProjectRead.o
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/x86_64-linux-gnu-cc/install/include -std=c++17 -O2 -Wall -Wextra -pedantic -pthread -MMD -MP -c src/ProjectState.cpp -o src/ProjectState.o
+src/ProjectRead.cpp: In function ‘bool project_read::load_config(const std::filesystem::__cxx11::path&, Config&, std::string&)’:
+src/ProjectRead.cpp:205:36: error: ‘workload_object_range’ is not a member of ‘nift’
+  205 |     for (const auto& entry : nift::workload_object_range(value)) {
+      |                                    ^~~~~~~~~~~~~~~~~~~~~
+make: *** [Makefile:165: src/ProjectRead.o] Error 1
+make: *** Waiting for unfinished jobs....
+make: Leaving directory '/home/nick/Repositories/nift/nift/.build/cp410-implementation/objects/prototype'

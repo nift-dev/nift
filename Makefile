@@ -65,12 +65,9 @@ LIBFFI_INCLUDE := $(LIBFFI_BUILD)/install/include
 # suppression applies only to the libffi build, never to Nift's own sources.
 LIBFFI_CFLAGS ?= -O2 -fPIC -Wno-deprecated-declarations
 CPPFLAGS += -I$(LIBFFI_INCLUDE)
-# -fno-sanitize-address-use-after-scope: with it enabled, ASan keeps each local
-# variable's stack slot alive for its whole lexical scope (no slot reuse), which
-# inflates the stack frame of the very large evaluate_expression_impl lambda by
-# ~16x (229 KB vs 14 KB) and makes deep-but-legitimate recursion overflow the
-# stack long before the language's own limits. Heap/stack overflow, UAF and UBSan
-# detection are unaffected; only lifetime-scoped stack-use-after-scope is dropped.
+# The deep profile permits stack-slot reuse for the broad recursion corpus.
+# The lifetime profile retains use-after-scope checking. Compatibility dispatch
+# uses independent sanitizer frames so expression depth guards remain reachable.
 SANITIZER_FLAGS ?= -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-address-use-after-scope
 SAN_TARGET := $(TEST_DIR)/nift-sanitize$(EXEEXT)
 SAN_OBJECTS := $(patsubst %.cpp,$(TEST_DIR)/san/%.o,$(SOURCES)) $(patsubst %.c,$(TEST_DIR)/san/%.o,$(MARKUP_C_SOURCES))
@@ -79,13 +76,9 @@ SAN_LIBFFI_STAMP := $(SAN_LIBFFI_BUILD)/.nift-built
 SAN_LIBFFI_A := $(SAN_LIBFFI_BUILD)/install/lib/libffi.a
 SAN_LIBFFI_INCLUDE := $(SAN_LIBFFI_BUILD)/install/include
 SAN_CPPFLAGS = $(filter-out -I$(LIBFFI_INCLUDE),$(CPPFLAGS)) -I$(SAN_LIBFFI_INCLUDE)
-# Lifetime sanitizer: the same ASan/UBSan profile as the default sanitizer but
-# WITH stack use-after-scope instrumentation retained, so lifetime bugs are
-# still caught. It deliberately runs only a shallow corpus (see
-# test-sanitize-lifetime): use-after-scope inflates every local's stack slot
-# (evaluate_expression_impl's frame ~16x, to ~229 KB) and only becomes unsafe at
-# the deep-recursion limits the default deep-capable sanitizer exists to test.
-# The two profiles are intentionally different; do not consolidate them.
+# Lifetime sanitizer retains stack use-after-scope instrumentation. It runs the
+# targeted lifetime corpus plus the exact file/recursion boundary oracle.
+# Keep the profiles distinct: deep recursion also exercises other runtime frames.
 SAN_LIFETIME_FLAGS ?= -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined
 SAN_LIFETIME_TARGET := $(TEST_DIR)/nift-sanitize-lifetime$(EXEEXT)
 SAN_LIFETIME_OBJECTS := $(patsubst %.cpp,$(TEST_DIR)/san-lifetime/%.o,$(SOURCES)) $(patsubst %.c,$(TEST_DIR)/san-lifetime/%.o,$(MARKUP_C_SOURCES))
@@ -1948,3 +1941,24 @@ test-v410-large-string-parity: $(TARGET)
 test-v410-large-string-guard: $(LARGE_STRING_GUARD)
 	$(LARGE_STRING_GUARD)
 test: test-v410-large-string-parity test-v410-large-string-guard
+
+FILE_BUFFER_GUARD := $(TEST_DIR)/file-buffer-guard$(EXEEXT)
+$(FILE_BUFFER_GUARD): tests/v410_file_buffer_guard.cpp $(filter-out src/nift.o src/CLI.o,$(CLI_OBJECTS)) $(LIBFFI_A)
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) tests/v410_file_buffer_guard.cpp $(filter-out src/nift.o src/CLI.o,$(CLI_OBJECTS)) $(LDFLAGS) $(LDLIBS) -o $@
+.PHONY: test-v410-file-buffer-parity test-v410-file-buffer-guard
+test-v410-file-buffer-parity: $(TARGET)
+	NIFT=$(abspath $(TARGET)) $(PYTHON) tests/v410_file_buffer_parity.py
+test-v410-file-buffer-guard: $(FILE_BUFFER_GUARD)
+	$(FILE_BUFFER_GUARD)
+test: test-v410-file-buffer-parity test-v410-file-buffer-guard
+
+FILE_BUFFER_LIFETIME_GUARD := $(TEST_DIR)/file-buffer-lifetime-guard$(EXEEXT)
+FILE_BUFFER_LIFETIME_OBJECTS := $(patsubst %.o,$(TEST_DIR)/san-lifetime/%.o,$(filter-out src/nift.o src/CLI.o,$(CLI_OBJECTS)))
+$(FILE_BUFFER_LIFETIME_GUARD): tests/v410_file_buffer_guard.cpp $(FILE_BUFFER_LIFETIME_OBJECTS) $(SAN_LIBFFI_A)
+	$(CXX) $(SAN_CPPFLAGS) -std=c++17 -pthread $(SAN_LIFETIME_FLAGS) tests/v410_file_buffer_guard.cpp $(FILE_BUFFER_LIFETIME_OBJECTS) $(SAN_LIBFFI_A) $(LDLIBS) -o $@
+.PHONY: test-v410-file-buffer-lifetime
+test-v410-file-buffer-lifetime: $(SAN_LIFETIME_TARGET) $(FILE_BUFFER_LIFETIME_GUARD)
+	$(LIFETIME_RUN) NIFT=$(abspath $(SAN_LIFETIME_TARGET)) $(PYTHON) tests/v410_file_buffer_parity.py
+	$(LIFETIME_RUN) $(FILE_BUFFER_LIFETIME_GUARD)
+test-sanitize-lifetime: test-v410-file-buffer-lifetime

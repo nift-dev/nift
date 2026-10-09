@@ -1,0 +1,17 @@
+{
+  "baseline_commit": "e290b85cdb655b3490e051262451a346baf00309",
+  "baseline_binary_sha256": "bf9771454572e1d866a38ffa7b864d8c7ce33e2455ad0b0af55c22ae9b04c30d",
+  "candidate_binary_sha256": "f3f999b247fe5375902306f983311402225ca279947dd1b16a6073830db62dd0",
+  "main_matches_certified_binary": true,
+  "source_hashes": {
+    "src/Parser.cpp": "74fb087570fbcc120860e2748b3ff80f4f0b899a7306132e7f16b5ef490caf89",
+    "src/Parser.h": "18db43c16d4aa680e9a5786a102cbb101860addcf6acf7346ca1be8082c48452",
+    "src/ParserExpression.cpp": "0429d9fc36e03bceadeaef8eac03e8ddff368ca42545811aa54d1df0c3b1f122",
+    "src/ParserTemplate.cpp": "0b9226dfd270bc6f8eb857d0102b56fde2d4ca2c16a4f7131185300f10a2db29",
+    "Makefile": "2bff4b69a05da1a9944b11762215db7ae40a0f931f2670c520dce5f1f48b69a4",
+    ".github/workflows/checkpoint-10-cross-platform.yml": "fba1cf4e23072fe9f4badd4288a1bcd2e3cf1e87ff9857b28833c2654fc1120e",
+    "tests/v410_file_buffer_guard.cpp": "bb0c4a0de6209a13b25496d477d901c7ed3bf76daa34fd7cfdeacb10f8e5a525",
+    "tests/v410_file_buffer_parity.py": "f6854cb258fcca8274e6d55bfc1a2567584f73a8239457f875135725b9771d5b",
+    "tests/data/v410-file-buffer-oracle.json.gz": "58884b3e29656f7e81293c3c426796cbda60b8014783cbcfe589b9a1d4f5ea65"
+  }
+}

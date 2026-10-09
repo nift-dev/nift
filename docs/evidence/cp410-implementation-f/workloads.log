@@ -1,0 +1,19 @@
+official-json-transform 5 {'lookup_reads': 12000, 'member_assignments': 8000, 'source_copies': 2000, 'range_passes': 0, 'insertions': 8000}
+json-traverse-8000 5 {'lookup_reads': 48000, 'member_assignments': 40000, 'source_copies': 24000, 'range_passes': 0, 'insertions': 40000}
+default-0 0 {'lookup_reads': 1, 'member_assignments': 0, 'source_copies': 0, 'range_passes': 0, 'insertions': 0}
+default-1 0 {'lookup_reads': 0, 'member_assignments': 0, 'source_copies': 0, 'range_passes': 0, 'insertions': 0}
+default-2 0 {'lookup_reads': 1, 'member_assignments': 0, 'source_copies': 0, 'range_passes': 0, 'insertions': 0}
+default-3 0 {'lookup_reads': 0, 'member_assignments': 0, 'source_copies': 0, 'range_passes': 0, 'insertions': 0}
+migration-0 0 {'lookup_reads': 1, 'member_assignments': 0, 'source_copies': 0, 'range_passes': 0, 'insertions': 0}
+migration-1 0 {'lookup_reads': 0, 'member_assignments': 0, 'source_copies': 0, 'range_passes': 0, 'insertions': 0}
+migration-2 0 {'lookup_reads': 1, 'member_assignments': 0, 'source_copies': 0, 'range_passes': 0, 'insertions': 0}
+migration-3 0 {'lookup_reads': 0, 'member_assignments': 0, 'source_copies': 0, 'range_passes': 0, 'insertions': 0}
+rewrite-0 0 {'lookup_reads': 1, 'member_assignments': 0, 'source_copies': 0, 'range_passes': 0, 'insertions': 0}
+rewrite-1 0 {'lookup_reads': 0, 'member_assignments': 0, 'source_copies': 0, 'range_passes': 0, 'insertions': 0}
+rewrite-2 0 {'lookup_reads': 1, 'member_assignments': 0, 'source_copies': 0, 'range_passes': 0, 'insertions': 0}
+rewrite-3 0 {'lookup_reads': 0, 'member_assignments': 0, 'source_copies': 0, 'range_passes': 0, 'insertions': 0}
+redesign-0 0 {'lookup_reads': 1, 'member_assignments': 0, 'source_copies': 0, 'range_passes': 0, 'insertions': 0}
+redesign-1 0 {'lookup_reads': 0, 'member_assignments': 0, 'source_copies': 0, 'range_passes': 0, 'insertions': 0}
+redesign-2 0 {'lookup_reads': 1, 'member_assignments': 0, 'source_copies': 0, 'range_passes': 0, 'insertions': 0}
+redesign-3 0 {'lookup_reads': 0, 'member_assignments': 0, 'source_copies': 0, 'range_passes': 0, 'insertions': 0}
+COMPLETE actual probes and four real build/tracking lifecycles

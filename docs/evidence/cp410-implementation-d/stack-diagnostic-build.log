@@ -1,0 +1,7 @@
+src/ParserExpression.cpp: In lambda function:
+src/ParserExpression.cpp:1483:37: note: variable tracking size limit exceeded with ‘-fvar-tracking-assignments’, retrying without
+ 1483 |         const auto evaluate_slice = [&]() -> bool {
+      |                                     ^
+src/ParserExpression.cpp:4039:9: warning: the frame size of 218128 bytes is larger than 32768 bytes [-Wframe-larger-than=]
+ 4039 |         };
+      |         ^

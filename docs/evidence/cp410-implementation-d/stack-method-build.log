@@ -1,0 +1,12 @@
+src/ParserExpression.cpp: In lambda function:
+src/ParserExpression.cpp:2501:13: warning: the frame size of 69328 bytes is larger than 32768 bytes [-Wframe-larger-than=]
+ 2501 |             };
+      |             ^
+src/ParserExpression.cpp: In lambda function:
+src/ParserExpression.cpp:2981:21: warning: the frame size of 47008 bytes is larger than 32768 bytes [-Wframe-larger-than=]
+ 2981 |                     };
+      |                     ^
+src/ParserExpression.cpp: In lambda function:
+src/ParserExpression.cpp:4146:9: warning: the frame size of 39792 bytes is larger than 32768 bytes [-Wframe-larger-than=]
+ 4146 |         };
+      |         ^

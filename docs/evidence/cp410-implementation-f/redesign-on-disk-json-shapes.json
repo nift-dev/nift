@@ -1,0 +1,9 @@
+{
+  "note": "on-disk config/tracking shape; not RuntimeValue access counts",
+  "width_histogram": {
+    "1": 2,
+    "3": 1,
+    "8": 1,
+    "16": 1
+  }
+}
