@@ -1,0 +1,12 @@
+{
+  "production_modified": false,
+  "models": [
+    "ordered vector",
+    "lazy index",
+    "width-128 hybrid",
+    "operation-local width-32 index"
+  ],
+  "validation": "120 exact-output instruction comparisons using actual RuntimeValue ordered storage",
+  "major_finding": "8k reads: lazy/hybrid 119x isolated lookup gain; cold copy/move with one lookup about 5x slower because index rebuild does not amortize",
+  "approval_boundary": "Persistent index needs complete key-set mutation interception and small-object representation/RSS review. No production RuntimeValue change authorized."
+}

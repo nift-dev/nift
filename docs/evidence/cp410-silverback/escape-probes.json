@@ -1,0 +1,10 @@
+[
+  {
+    "name": "file-tag-after-scope",
+    "source": "fn(make()) { f := file(\"x\"); f.open(\"w\"); f.write(\"abc\"); f.save(); f.close(); return 0 }; make(); g := bytes([31, 110, 105, 102, 116, 58, 102, 105, 108, 101, 58, 49]).decode(\"utf-8\"); print(g.path()); g.open(\"r\"); print(g.read_all()); g.close()"
+  },
+  {
+    "name": "lambda-tag-after-scope",
+    "source": "fn(make()) { f := x => x; return 0 }; make(); g := bytes([31, 110, 105, 102, 116, 58, 99, 97, 108, 108, 97, 98, 108, 101, 58, 108, 97, 109, 98, 100, 97, 58, 49]).decode(\"utf-8\"); print(g(7))"
+  }
+]

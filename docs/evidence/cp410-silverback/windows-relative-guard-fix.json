@@ -1,0 +1,8 @@
+{
+  "failed_run": 37887584492,
+  "failed_sha": "959869d",
+  "cause": "Same cygpath wildcard-to-U+F02A transport in a second fixture, absolute relative-scaling guard",
+  "fix": "Convert directory, append wildcard after conversion; feed UTF-8 stdin; identify failing pattern in assertion",
+  "local_guard": "PASS 32/128/512 plus absolute/empty; instrumentation expectation unchanged",
+  "runtime_change": false
+}

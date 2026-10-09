@@ -1,0 +1,382 @@
+[
+  {
+    "n": 1,
+    "phases": {
+      "FileConstruction": {
+        "calls": 1,
+        "allocations": 3,
+        "bytes": 336
+      },
+      "Registry": {
+        "calls": 1,
+        "allocations": 2,
+        "bytes": 168
+      },
+      "FileTag": {
+        "calls": 1,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "CheckedPath": {
+        "calls": 2,
+        "allocations": 51,
+        "bytes": 9432
+      },
+      "PathResolution": {
+        "calls": 2,
+        "allocations": 49,
+        "bytes": 9370
+      },
+      "Cwd": {
+        "calls": 2,
+        "allocations": 6,
+        "bytes": 1082
+      },
+      "Open": {
+        "calls": 1,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "Write": {
+        "calls": 1,
+        "allocations": 3,
+        "bytes": 387
+      },
+      "Save": {
+        "calls": 1,
+        "allocations": 12,
+        "bytes": 9891
+      },
+      "Comparison": {
+        "calls": 1,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "ParentCheck": {
+        "calls": 1,
+        "allocations": 3,
+        "bytes": 595
+      },
+      "Permissions": {
+        "calls": 1,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "TempName": {
+        "calls": 1,
+        "allocations": 7,
+        "bytes": 975
+      },
+      "Stream": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 8192
+      },
+      "AtomicReplace": {
+        "calls": 1,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "SavedState": {
+        "calls": 1,
+        "allocations": 1,
+        "bytes": 129
+      },
+      "Close": {
+        "calls": 1,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "FileTeardown": {
+        "calls": 1,
+        "allocations": 0,
+        "bytes": 0
+      }
+    }
+  },
+  {
+    "n": 1000,
+    "phases": {
+      "FileConstruction": {
+        "calls": 1000,
+        "allocations": 2007,
+        "bytes": 249080
+      },
+      "Registry": {
+        "calls": 1000,
+        "allocations": 1007,
+        "bytes": 81080
+      },
+      "FileTag": {
+        "calls": 1000,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "CheckedPath": {
+        "calls": 1001,
+        "allocations": 30021,
+        "bytes": 4934556
+      },
+      "PathResolution": {
+        "calls": 1001,
+        "allocations": 28021,
+        "bytes": 4872556
+      },
+      "Cwd": {
+        "calls": 1001,
+        "allocations": 3003,
+        "bytes": 547547
+      },
+      "Open": {
+        "calls": 1000,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "Write": {
+        "calls": 1000,
+        "allocations": 3000,
+        "bytes": 387000
+      },
+      "Save": {
+        "calls": 1000,
+        "allocations": 12000,
+        "bytes": 9909000
+      },
+      "Comparison": {
+        "calls": 1000,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "ParentCheck": {
+        "calls": 1000,
+        "allocations": 3000,
+        "bytes": 601000
+      },
+      "Permissions": {
+        "calls": 1000,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "TempName": {
+        "calls": 1000,
+        "allocations": 7000,
+        "bytes": 987000
+      },
+      "Stream": {
+        "calls": 1000,
+        "allocations": 1000,
+        "bytes": 8192000
+      },
+      "AtomicReplace": {
+        "calls": 1000,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "SavedState": {
+        "calls": 1000,
+        "allocations": 1000,
+        "bytes": 129000
+      },
+      "Close": {
+        "calls": 1000,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "FileTeardown": {
+        "calls": 1,
+        "allocations": 0,
+        "bytes": 0
+      }
+    }
+  },
+  {
+    "n": 10000,
+    "phases": {
+      "FileConstruction": {
+        "calls": 10000,
+        "allocations": 20011,
+        "bytes": 2478847
+      },
+      "Registry": {
+        "calls": 10000,
+        "allocations": 10010,
+        "bytes": 798816
+      },
+      "FileTag": {
+        "calls": 10000,
+        "allocations": 1,
+        "bytes": 31
+      },
+      "CheckedPath": {
+        "calls": 10001,
+        "allocations": 300021,
+        "bytes": 49394565
+      },
+      "PathResolution": {
+        "calls": 10001,
+        "allocations": 280021,
+        "bytes": 48774565
+      },
+      "Cwd": {
+        "calls": 10001,
+        "allocations": 30003,
+        "bytes": 5490549
+      },
+      "Open": {
+        "calls": 10000,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "Write": {
+        "calls": 10000,
+        "allocations": 30000,
+        "bytes": 3870000
+      },
+      "Save": {
+        "calls": 10000,
+        "allocations": 120000,
+        "bytes": 99150000
+      },
+      "Comparison": {
+        "calls": 10000,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "ParentCheck": {
+        "calls": 10000,
+        "allocations": 30000,
+        "bytes": 6030000
+      },
+      "Permissions": {
+        "calls": 10000,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "TempName": {
+        "calls": 10000,
+        "allocations": 70000,
+        "bytes": 9910000
+      },
+      "Stream": {
+        "calls": 10000,
+        "allocations": 10000,
+        "bytes": 81920000
+      },
+      "AtomicReplace": {
+        "calls": 10000,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "SavedState": {
+        "calls": 10000,
+        "allocations": 10000,
+        "bytes": 1290000
+      },
+      "Close": {
+        "calls": 10000,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "FileTeardown": {
+        "calls": 1,
+        "allocations": 0,
+        "bytes": 0
+      }
+    }
+  },
+  {
+    "n": 100000,
+    "phases": {
+      "FileConstruction": {
+        "calls": 100000,
+        "allocations": 290015,
+        "bytes": 28716511
+      },
+      "Registry": {
+        "calls": 100000,
+        "allocations": 100014,
+        "bytes": 9126480
+      },
+      "FileTag": {
+        "calls": 100000,
+        "allocations": 90001,
+        "bytes": 2790031
+      },
+      "CheckedPath": {
+        "calls": 100001,
+        "allocations": 3000021,
+        "bytes": 494804574
+      },
+      "PathResolution": {
+        "calls": 100001,
+        "allocations": 2800021,
+        "bytes": 488604574
+      },
+      "Cwd": {
+        "calls": 100001,
+        "allocations": 300003,
+        "bytes": 55100551
+      },
+      "Open": {
+        "calls": 100000,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "Write": {
+        "calls": 100000,
+        "allocations": 300000,
+        "bytes": 38700000
+      },
+      "Save": {
+        "calls": 100000,
+        "allocations": 1200000,
+        "bytes": 992100000
+      },
+      "Comparison": {
+        "calls": 100000,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "ParentCheck": {
+        "calls": 100000,
+        "allocations": 300000,
+        "bytes": 60500000
+      },
+      "Permissions": {
+        "calls": 100000,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "TempName": {
+        "calls": 100000,
+        "allocations": 700000,
+        "bytes": 99500000
+      },
+      "Stream": {
+        "calls": 100000,
+        "allocations": 100000,
+        "bytes": 819200000
+      },
+      "AtomicReplace": {
+        "calls": 100000,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "SavedState": {
+        "calls": 100000,
+        "allocations": 100000,
+        "bytes": 12900000
+      },
+      "Close": {
+        "calls": 100000,
+        "allocations": 0,
+        "bytes": 0
+      },
+      "FileTeardown": {
+        "calls": 1,
+        "allocations": 0,
+        "bytes": 0
+      }
+    }
+  }
+]

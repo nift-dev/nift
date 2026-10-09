@@ -1,0 +1,42 @@
+[
+  {
+    "mode": "direct",
+    "n": 1000,
+    "instructions": 3168885,
+    "scope": "fresh-file successful write floor; atomic includes write/close/rename but omits Nift registry/revert/permission/failure contracts"
+  },
+  {
+    "mode": "atomic",
+    "n": 1000,
+    "instructions": 5380205,
+    "scope": "fresh-file successful write floor; atomic includes write/close/rename but omits Nift registry/revert/permission/failure contracts"
+  },
+  {
+    "operation": "concat",
+    "label": "current",
+    "n": 1000,
+    "instructions": 46137934,
+    "scope": "controlled successful fixture, lower bound omits general error/ownership/value contracts"
+  },
+  {
+    "operation": "concat",
+    "label": "native-floor",
+    "n": 1000,
+    "instructions": 5282719,
+    "scope": "controlled successful fixture, lower bound omits general error/ownership/value contracts"
+  },
+  {
+    "operation": "string",
+    "label": "current",
+    "n": 1000,
+    "instructions": 70668448,
+    "scope": "controlled successful fixture, lower bound omits general error/ownership/value contracts"
+  },
+  {
+    "operation": "string",
+    "label": "native-floor",
+    "n": 1000,
+    "instructions": 3236103,
+    "scope": "controlled successful fixture, lower bound omits general error/ownership/value contracts"
+  }
+]

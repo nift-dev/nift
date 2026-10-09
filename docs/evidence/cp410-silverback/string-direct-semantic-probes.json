@@ -1,0 +1,5 @@
+[
+ "i := 0; fn(old()) { i+=1; return \"a\" }; j := 0; while(j<2) { s := \"aaa\".replace(old(),\"b\"); j+=1 }; print(i)",
+ "i := 0; fn(receiver()) { i+=1; return \"aaa\" }; j := 0; while(j<2) { s := receiver().replace(\"a\",\"b\"); j+=1 }; print(i)",
+ "j := 0; while(j<2) { print(\"aaa\".replace(\"a\",\"bb\")); j+=1 }"
+]

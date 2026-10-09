@@ -1,0 +1,44 @@
+[
+  {
+    "mode": "key-floor",
+    "n": 16000,
+    "unused": 0,
+    "instructions": 3513656,
+    "scope": "selector construction/key/sort/reconstruction/operation retention and teardown; excludes language dispatch, descriptor richness and fixture construction"
+  },
+  {
+    "mode": "retained-shared",
+    "n": 16000,
+    "unused": 0,
+    "instructions": 3913659,
+    "scope": "selector construction/key/sort/reconstruction/operation retention and teardown; excludes language dispatch, descriptor richness and fixture construction"
+  },
+  {
+    "mode": "retained-copy",
+    "n": 16000,
+    "unused": 0,
+    "instructions": 48539446,
+    "scope": "selector construction/key/sort/reconstruction/operation retention and teardown; excludes language dispatch, descriptor richness and fixture construction"
+  },
+  {
+    "mode": "key-floor",
+    "n": 16000,
+    "unused": 100,
+    "instructions": 3512378,
+    "scope": "selector construction/key/sort/reconstruction/operation retention and teardown; excludes language dispatch, descriptor richness and fixture construction"
+  },
+  {
+    "mode": "retained-shared",
+    "n": 16000,
+    "unused": 100,
+    "instructions": 3912381,
+    "scope": "selector construction/key/sort/reconstruction/operation retention and teardown; excludes language dispatch, descriptor richness and fixture construction"
+  },
+  {
+    "mode": "retained-copy",
+    "n": 16000,
+    "unused": 100,
+    "instructions": 796417506,
+    "scope": "selector construction/key/sort/reconstruction/operation retention and teardown; excludes language dispatch, descriptor richness and fixture construction"
+  }
+]

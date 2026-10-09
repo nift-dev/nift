@@ -1,0 +1,16 @@
+{
+  "official_v490": {
+    "unchanged": true,
+    "files": 30,
+    "head": null,
+    "missing": [],
+    "changed": [],
+    "added": []
+  },
+  "expanded_shell": {
+    "root": "/home/nick/Repositories/nift/nift-experiments/lab-evidence/benchmarks/shell/20261009-v4100-shell-expanded",
+    "checked_files": 51,
+    "unchanged": true
+  },
+  "older_workspace_snapshot": "Historical whole-workspace checker no longer matches preexisting sibling/Labs reorganizations; not used as a claim of workspace-wide immutability. No sibling/Labs files modified by this phase."
+}

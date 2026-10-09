@@ -1,0 +1,11 @@
+{
+  "string-direct-nift": "343be2538852b19e09541c87c1a3d111ced4f5a7be70727702c05483affe8256",
+  "large-ast-only-nift": "f6b0990ece62910e51198748a81f7af0977b474bb85a0a3277584d65af95753c",
+  "string-direct-large-nift": "1ec72b1e60a715f5953d847907358e469ab26d4e1a9704b7fcc1afe8ec0fb2ec",
+  "fs-context-nift": "492677dc1a75fbe44a2808624ce03d1a991bb9f2e1e34b231fb0fb66b46f00cc",
+  "native-prefix-cache": "863867114f55ab94c119108e4f33e600bbe28e8f6ed3808df6258b8050b3d807",
+  "sort-floor": "447e80c70d8a7bb32c0c72a4dd369fe85189c0b1eacf74f4019f3ef6fcdfa24c",
+  "object/probe": "98dfaafca34d1020e80cf94b8d2e35260873c76b46e6ce4c46c6df123811821a",
+  "object/alloc-probe": "e825c7bee53d020d16ebb0ff27c395c423a449adcd0a92262587ec05e107a5e4",
+  "file-phases/nift": "721704c8a1809734941aea2e15a391228077343b7a4e92ae1557f711c1af6dab"
+}

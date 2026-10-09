@@ -1,0 +1,6 @@
+{
+  "n": 16000,
+  "instructions": 104073415,
+  "stdout": "16000\n1\n",
+  "scope": "actual Nift fixture construction and output, sort call removed; decomposition control, not exact same program"
+}

@@ -1,0 +1,14 @@
+[
+  {
+    "label": "large-ast-only",
+    "instructions": 5231141018,
+    "stdout_sha256": "ae1ec14f4090efded7c68f1ed54a437f32f4219ecff03eac4ead206deb62d6e9",
+    "scope": "exact original pure large literal fixture; scratch 64KiB prepared-source ceiling, original nesting guard preserved; general error/side-effect/resource-limit contract uncertified"
+  },
+  {
+    "label": "string-direct-large",
+    "instructions": 1348369876,
+    "stdout_sha256": "ae1ec14f4090efded7c68f1ed54a437f32f4219ecff03eac4ead206deb62d6e9",
+    "scope": "exact original pure large literal fixture; scratch 64KiB prepared-source ceiling, original nesting guard preserved; general error/side-effect/resource-limit contract uncertified"
+  }
+]

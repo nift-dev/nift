@@ -1,0 +1,74 @@
+[
+  {
+    "operation": "metadata",
+    "label": "current",
+    "instructions": 43282661,
+    "stdout": "128000\n",
+    "n": 1000,
+    "scope": "controlled standalone success paths only; dispatch/source/error/argument-side-effect equivalence not certified"
+  },
+  {
+    "operation": "metadata",
+    "label": "resolved-context",
+    "instructions": 43282529,
+    "stdout": "128000\n",
+    "n": 1000,
+    "scope": "controlled standalone success paths only; dispatch/source/error/argument-side-effect equivalence not certified"
+  },
+  {
+    "operation": "metadata",
+    "label": "native-floor",
+    "instructions": 4847703,
+    "stdout": "128000\n",
+    "n": 1000,
+    "scope": "controlled standalone success paths only; dispatch/source/error/argument-side-effect equivalence not certified"
+  },
+  {
+    "operation": "move",
+    "label": "current",
+    "instructions": 228572140,
+    "stdout": "OK\n",
+    "n": 1000,
+    "scope": "controlled standalone success paths only; dispatch/source/error/argument-side-effect equivalence not certified"
+  },
+  {
+    "operation": "move",
+    "label": "resolved-context",
+    "instructions": 228380144,
+    "stdout": "OK\n",
+    "n": 1000,
+    "scope": "controlled standalone success paths only; dispatch/source/error/argument-side-effect equivalence not certified"
+  },
+  {
+    "operation": "move",
+    "label": "native-floor",
+    "instructions": 6247283,
+    "stdout": "OK\n",
+    "n": 1000,
+    "scope": "controlled standalone success paths only; dispatch/source/error/argument-side-effect equivalence not certified"
+  },
+  {
+    "operation": "copy",
+    "label": "current",
+    "instructions": 230129107,
+    "stdout": "OK\n",
+    "n": 1000,
+    "scope": "controlled standalone success paths only; dispatch/source/error/argument-side-effect equivalence not certified"
+  },
+  {
+    "operation": "copy",
+    "label": "resolved-context",
+    "instructions": 229834430,
+    "stdout": "OK\n",
+    "n": 1000,
+    "scope": "controlled standalone success paths only; dispatch/source/error/argument-side-effect equivalence not certified"
+  },
+  {
+    "operation": "copy",
+    "label": "native-floor",
+    "instructions": 6716576,
+    "stdout": "OK\n",
+    "n": 1000,
+    "scope": "controlled standalone success paths only; dispatch/source/error/argument-side-effect equivalence not certified"
+  }
+]

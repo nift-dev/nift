@@ -1,0 +1,962 @@
+[
+  {
+    "width": 8,
+    "operation": "reads",
+    "model": "vector",
+    "instructions": 867397,
+    "stdout": "14336\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8,
+    "operation": "reads",
+    "model": "lazy",
+    "instructions": 961616,
+    "stdout": "14336\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8,
+    "operation": "reads",
+    "model": "hybrid",
+    "instructions": 891973,
+    "stdout": "14336\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8,
+    "operation": "reads",
+    "model": "operation-local",
+    "instructions": 892012,
+    "stdout": "14336\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8,
+    "operation": "writes",
+    "model": "vector",
+    "instructions": 900202,
+    "stdout": "8.38656e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8,
+    "operation": "writes",
+    "model": "lazy",
+    "instructions": 994421,
+    "stdout": "8.38656e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8,
+    "operation": "writes",
+    "model": "hybrid",
+    "instructions": 924778,
+    "stdout": "8.38656e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8,
+    "operation": "writes",
+    "model": "operation-local",
+    "instructions": 924817,
+    "stdout": "8.38656e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8,
+    "operation": "iteration",
+    "model": "vector",
+    "instructions": 1130,
+    "stdout": "896\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8,
+    "operation": "iteration",
+    "model": "lazy",
+    "instructions": 1130,
+    "stdout": "896\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8,
+    "operation": "iteration",
+    "model": "hybrid",
+    "instructions": 1130,
+    "stdout": "896\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8,
+    "operation": "iteration",
+    "model": "operation-local",
+    "instructions": 1169,
+    "stdout": "896\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8,
+    "operation": "mutation",
+    "model": "vector",
+    "instructions": 29874,
+    "stdout": "496\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8,
+    "operation": "mutation",
+    "model": "lazy",
+    "instructions": 48912,
+    "stdout": "496\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8,
+    "operation": "mutation",
+    "model": "hybrid",
+    "instructions": 30322,
+    "stdout": "496\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8,
+    "operation": "mutation",
+    "model": "operation-local",
+    "instructions": 30361,
+    "stdout": "496\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8,
+    "operation": "copy-move",
+    "model": "vector",
+    "instructions": 31896,
+    "stdout": "56\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8,
+    "operation": "copy-move",
+    "model": "lazy",
+    "instructions": 100603,
+    "stdout": "56\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8,
+    "operation": "copy-move",
+    "model": "hybrid",
+    "instructions": 32008,
+    "stdout": "56\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8,
+    "operation": "copy-move",
+    "model": "operation-local",
+    "instructions": 32047,
+    "stdout": "56\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 32,
+    "operation": "reads",
+    "model": "vector",
+    "instructions": 1791333,
+    "stdout": "63488\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 32,
+    "operation": "reads",
+    "model": "lazy",
+    "instructions": 851041,
+    "stdout": "63488\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 32,
+    "operation": "reads",
+    "model": "hybrid",
+    "instructions": 1815909,
+    "stdout": "63488\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 32,
+    "operation": "reads",
+    "model": "operation-local",
+    "instructions": 855465,
+    "stdout": "63488\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 32,
+    "operation": "writes",
+    "model": "vector",
+    "instructions": 1824138,
+    "stdout": "8.38656e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 32,
+    "operation": "writes",
+    "model": "lazy",
+    "instructions": 883846,
+    "stdout": "8.38656e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 32,
+    "operation": "writes",
+    "model": "hybrid",
+    "instructions": 1848714,
+    "stdout": "8.38656e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 32,
+    "operation": "writes",
+    "model": "operation-local",
+    "instructions": 888270,
+    "stdout": "8.38656e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 32,
+    "operation": "iteration",
+    "model": "vector",
+    "instructions": 3050,
+    "stdout": "15872\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 32,
+    "operation": "iteration",
+    "model": "lazy",
+    "instructions": 3050,
+    "stdout": "15872\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 32,
+    "operation": "iteration",
+    "model": "hybrid",
+    "instructions": 3050,
+    "stdout": "15872\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 32,
+    "operation": "iteration",
+    "model": "operation-local",
+    "instructions": 3089,
+    "stdout": "15872\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 32,
+    "operation": "mutation",
+    "model": "vector",
+    "instructions": 45973,
+    "stdout": "496\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 32,
+    "operation": "mutation",
+    "model": "lazy",
+    "instructions": 82766,
+    "stdout": "496\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 32,
+    "operation": "mutation",
+    "model": "hybrid",
+    "instructions": 46421,
+    "stdout": "496\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 32,
+    "operation": "mutation",
+    "model": "operation-local",
+    "instructions": 87301,
+    "stdout": "496\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 32,
+    "operation": "copy-move",
+    "model": "vector",
+    "instructions": 78481,
+    "stdout": "232\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 32,
+    "operation": "copy-move",
+    "model": "lazy",
+    "instructions": 413246,
+    "stdout": "232\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 32,
+    "operation": "copy-move",
+    "model": "hybrid",
+    "instructions": 78593,
+    "stdout": "232\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 32,
+    "operation": "copy-move",
+    "model": "operation-local",
+    "instructions": 413285,
+    "stdout": "232\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 128,
+    "operation": "reads",
+    "model": "vector",
+    "instructions": 6177573,
+    "stdout": "260096\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 128,
+    "operation": "reads",
+    "model": "lazy",
+    "instructions": 905339,
+    "stdout": "260096\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 128,
+    "operation": "reads",
+    "model": "hybrid",
+    "instructions": 905339,
+    "stdout": "260096\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 128,
+    "operation": "reads",
+    "model": "operation-local",
+    "instructions": 929685,
+    "stdout": "260096\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 128,
+    "operation": "writes",
+    "model": "vector",
+    "instructions": 6210378,
+    "stdout": "8.38656e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 128,
+    "operation": "writes",
+    "model": "lazy",
+    "instructions": 938144,
+    "stdout": "8.38656e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 128,
+    "operation": "writes",
+    "model": "hybrid",
+    "instructions": 938144,
+    "stdout": "8.38656e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 128,
+    "operation": "writes",
+    "model": "operation-local",
+    "instructions": 962490,
+    "stdout": "8.38656e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 128,
+    "operation": "iteration",
+    "model": "vector",
+    "instructions": 10730,
+    "stdout": "260096\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 128,
+    "operation": "iteration",
+    "model": "lazy",
+    "instructions": 10730,
+    "stdout": "260096\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 128,
+    "operation": "iteration",
+    "model": "hybrid",
+    "instructions": 10730,
+    "stdout": "260096\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 128,
+    "operation": "iteration",
+    "model": "operation-local",
+    "instructions": 10769,
+    "stdout": "260096\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 128,
+    "operation": "mutation",
+    "model": "vector",
+    "instructions": 137183,
+    "stdout": "496\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 128,
+    "operation": "mutation",
+    "model": "lazy",
+    "instructions": 189870,
+    "stdout": "496\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 128,
+    "operation": "mutation",
+    "model": "hybrid",
+    "instructions": 189870,
+    "stdout": "496\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 128,
+    "operation": "mutation",
+    "model": "operation-local",
+    "instructions": 214292,
+    "stdout": "496\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 128,
+    "operation": "copy-move",
+    "model": "vector",
+    "instructions": 273209,
+    "stdout": "904\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 128,
+    "operation": "copy-move",
+    "model": "lazy",
+    "instructions": 1631011,
+    "stdout": "904\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 128,
+    "operation": "copy-move",
+    "model": "hybrid",
+    "instructions": 1631011,
+    "stdout": "904\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 128,
+    "operation": "copy-move",
+    "model": "operation-local",
+    "instructions": 1631050,
+    "stdout": "904\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 512,
+    "operation": "reads",
+    "model": "vector",
+    "instructions": 28337925,
+    "stdout": "1.04653e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 512,
+    "operation": "reads",
+    "model": "lazy",
+    "instructions": 1112540,
+    "stdout": "1.04653e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 512,
+    "operation": "reads",
+    "model": "hybrid",
+    "instructions": 1112540,
+    "stdout": "1.04653e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 512,
+    "operation": "reads",
+    "model": "operation-local",
+    "instructions": 1215407,
+    "stdout": "1.04653e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 512,
+    "operation": "writes",
+    "model": "vector",
+    "instructions": 28370730,
+    "stdout": "8.38656e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 512,
+    "operation": "writes",
+    "model": "lazy",
+    "instructions": 1145345,
+    "stdout": "8.38656e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 512,
+    "operation": "writes",
+    "model": "hybrid",
+    "instructions": 1145345,
+    "stdout": "8.38656e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 512,
+    "operation": "writes",
+    "model": "operation-local",
+    "instructions": 1248212,
+    "stdout": "8.38656e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 512,
+    "operation": "iteration",
+    "model": "vector",
+    "instructions": 41450,
+    "stdout": "4.18611e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 512,
+    "operation": "iteration",
+    "model": "lazy",
+    "instructions": 41450,
+    "stdout": "4.18611e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 512,
+    "operation": "iteration",
+    "model": "hybrid",
+    "instructions": 41450,
+    "stdout": "4.18611e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 512,
+    "operation": "iteration",
+    "model": "operation-local",
+    "instructions": 41489,
+    "stdout": "4.18611e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 512,
+    "operation": "mutation",
+    "model": "vector",
+    "instructions": 761609,
+    "stdout": "496\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 512,
+    "operation": "mutation",
+    "model": "lazy",
+    "instructions": 708817,
+    "stdout": "496\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 512,
+    "operation": "mutation",
+    "model": "hybrid",
+    "instructions": 708817,
+    "stdout": "496\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 512,
+    "operation": "mutation",
+    "model": "operation-local",
+    "instructions": 812146,
+    "stdout": "496\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 512,
+    "operation": "copy-move",
+    "model": "vector",
+    "instructions": 1049400,
+    "stdout": "3592\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 512,
+    "operation": "copy-move",
+    "model": "lazy",
+    "instructions": 6499411,
+    "stdout": "3592\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 512,
+    "operation": "copy-move",
+    "model": "hybrid",
+    "instructions": 6499411,
+    "stdout": "3592\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 512,
+    "operation": "copy-move",
+    "model": "operation-local",
+    "instructions": 6499450,
+    "stdout": "3592\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 2000,
+    "operation": "reads",
+    "model": "vector",
+    "instructions": 79478737,
+    "stdout": "4.09464e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 2000,
+    "operation": "reads",
+    "model": "lazy",
+    "instructions": 1699900,
+    "stdout": "4.09464e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 2000,
+    "operation": "reads",
+    "model": "hybrid",
+    "instructions": 1699900,
+    "stdout": "4.09464e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 2000,
+    "operation": "reads",
+    "model": "operation-local",
+    "instructions": 2107290,
+    "stdout": "4.09464e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 2000,
+    "operation": "writes",
+    "model": "vector",
+    "instructions": 79511542,
+    "stdout": "8.38656e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 2000,
+    "operation": "writes",
+    "model": "lazy",
+    "instructions": 1732705,
+    "stdout": "8.38656e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 2000,
+    "operation": "writes",
+    "model": "hybrid",
+    "instructions": 1732705,
+    "stdout": "8.38656e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 2000,
+    "operation": "writes",
+    "model": "operation-local",
+    "instructions": 2140095,
+    "stdout": "8.38656e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 2000,
+    "operation": "iteration",
+    "model": "vector",
+    "instructions": 160490,
+    "stdout": "6.3968e+07\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 2000,
+    "operation": "iteration",
+    "model": "lazy",
+    "instructions": 160490,
+    "stdout": "6.3968e+07\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 2000,
+    "operation": "iteration",
+    "model": "hybrid",
+    "instructions": 160490,
+    "stdout": "6.3968e+07\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 2000,
+    "operation": "iteration",
+    "model": "operation-local",
+    "instructions": 160529,
+    "stdout": "6.3968e+07\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 2000,
+    "operation": "mutation",
+    "model": "vector",
+    "instructions": 4076307,
+    "stdout": "496\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 2000,
+    "operation": "mutation",
+    "model": "lazy",
+    "instructions": 2814239,
+    "stdout": "496\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 2000,
+    "operation": "mutation",
+    "model": "hybrid",
+    "instructions": 2814239,
+    "stdout": "496\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 2000,
+    "operation": "mutation",
+    "model": "operation-local",
+    "instructions": 3222128,
+    "stdout": "496\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 2000,
+    "operation": "copy-move",
+    "model": "vector",
+    "instructions": 4044504,
+    "stdout": "20280\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 2000,
+    "operation": "copy-move",
+    "model": "lazy",
+    "instructions": 24514647,
+    "stdout": "20280\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 2000,
+    "operation": "copy-move",
+    "model": "hybrid",
+    "instructions": 24514647,
+    "stdout": "20280\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 2000,
+    "operation": "copy-move",
+    "model": "operation-local",
+    "instructions": 24514686,
+    "stdout": "20280\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8000,
+    "operation": "reads",
+    "model": "vector",
+    "instructions": 484667960,
+    "stdout": "1.64726e+07\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8000,
+    "operation": "reads",
+    "model": "lazy",
+    "instructions": 4218019,
+    "stdout": "1.64726e+07\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8000,
+    "operation": "reads",
+    "model": "hybrid",
+    "instructions": 4218019,
+    "stdout": "1.64726e+07\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8000,
+    "operation": "reads",
+    "model": "operation-local",
+    "instructions": 5854815,
+    "stdout": "1.64726e+07\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8000,
+    "operation": "writes",
+    "model": "vector",
+    "instructions": 484700765,
+    "stdout": "8.38656e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8000,
+    "operation": "writes",
+    "model": "lazy",
+    "instructions": 4250824,
+    "stdout": "8.38656e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8000,
+    "operation": "writes",
+    "model": "hybrid",
+    "instructions": 4250824,
+    "stdout": "8.38656e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8000,
+    "operation": "writes",
+    "model": "operation-local",
+    "instructions": 5887620,
+    "stdout": "8.38656e+06\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8000,
+    "operation": "iteration",
+    "model": "vector",
+    "instructions": 640490,
+    "stdout": "1.02387e+09\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8000,
+    "operation": "iteration",
+    "model": "lazy",
+    "instructions": 640490,
+    "stdout": "1.02387e+09\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8000,
+    "operation": "iteration",
+    "model": "hybrid",
+    "instructions": 640490,
+    "stdout": "1.02387e+09\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8000,
+    "operation": "iteration",
+    "model": "operation-local",
+    "instructions": 640529,
+    "stdout": "1.02387e+09\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8000,
+    "operation": "mutation",
+    "model": "vector",
+    "instructions": 19901001,
+    "stdout": "496\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8000,
+    "operation": "mutation",
+    "model": "lazy",
+    "instructions": 12164855,
+    "stdout": "496\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8000,
+    "operation": "mutation",
+    "model": "hybrid",
+    "instructions": 12164855,
+    "stdout": "496\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8000,
+    "operation": "mutation",
+    "model": "operation-local",
+    "instructions": 13801118,
+    "stdout": "496\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8000,
+    "operation": "copy-move",
+    "model": "vector",
+    "instructions": 18279003,
+    "stdout": "110280\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8000,
+    "operation": "copy-move",
+    "model": "lazy",
+    "instructions": 96140661,
+    "stdout": "110280\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8000,
+    "operation": "copy-move",
+    "model": "hybrid",
+    "instructions": 96140661,
+    "stdout": "110280\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  },
+  {
+    "width": 8000,
+    "operation": "copy-move",
+    "model": "operation-local",
+    "instructions": 96140700,
+    "stdout": "110280\n",
+    "scope": "isolated actual RuntimeValue ordered storage plus scratch membership index; excludes public-API mutation interception"
+  }
+]

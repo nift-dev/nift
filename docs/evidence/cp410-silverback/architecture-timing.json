@@ -1,0 +1,362 @@
+[
+  {
+    "name": "official-traverse-100000",
+    "label": "current",
+    "repeat": 0,
+    "wall": 1.6654399461112916,
+    "cpu": 1.661332,
+    "rss_kib": 205644,
+    "output_sha256": "7f7815524381b310ff5ef0995161dffd8ecea2a1b889f24242f2ec68411e47b0",
+    "affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "label": "cached-prefix-native",
+    "repeat": 0,
+    "wall": 0.8881292219739407,
+    "cpu": 0.8814309999999999,
+    "rss_kib": 146240,
+    "output_sha256": "7f7815524381b310ff5ef0995161dffd8ecea2a1b889f24242f2ec68411e47b0",
+    "affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "label": "cached-prefix-native",
+    "repeat": 1,
+    "wall": 0.8943199440836906,
+    "cpu": 0.8879140000000001,
+    "rss_kib": 146252,
+    "output_sha256": "7f7815524381b310ff5ef0995161dffd8ecea2a1b889f24242f2ec68411e47b0",
+    "affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "label": "current",
+    "repeat": 1,
+    "wall": 1.6559180030599236,
+    "cpu": 1.6492030000000002,
+    "rss_kib": 205984,
+    "output_sha256": "7f7815524381b310ff5ef0995161dffd8ecea2a1b889f24242f2ec68411e47b0",
+    "affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "label": "current",
+    "repeat": 2,
+    "wall": 1.6615303358994424,
+    "cpu": 1.6549069999999997,
+    "rss_kib": 205664,
+    "output_sha256": "7f7815524381b310ff5ef0995161dffd8ecea2a1b889f24242f2ec68411e47b0",
+    "affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "label": "cached-prefix-native",
+    "repeat": 2,
+    "wall": 0.8941153159830719,
+    "cpu": 0.8883490000000007,
+    "rss_kib": 146252,
+    "output_sha256": "7f7815524381b310ff5ef0995161dffd8ecea2a1b889f24242f2ec68411e47b0",
+    "affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "label": "cached-prefix-native",
+    "repeat": 3,
+    "wall": 0.9092731450218707,
+    "cpu": 0.9023220000000007,
+    "rss_kib": 146248,
+    "output_sha256": "7f7815524381b310ff5ef0995161dffd8ecea2a1b889f24242f2ec68411e47b0",
+    "affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "label": "current",
+    "repeat": 3,
+    "wall": 1.6551259101834148,
+    "cpu": 1.6486960000000002,
+    "rss_kib": 205972,
+    "output_sha256": "7f7815524381b310ff5ef0995161dffd8ecea2a1b889f24242f2ec68411e47b0",
+    "affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "label": "current",
+    "repeat": 4,
+    "wall": 1.659921761834994,
+    "cpu": 1.653886,
+    "rss_kib": 205860,
+    "output_sha256": "7f7815524381b310ff5ef0995161dffd8ecea2a1b889f24242f2ec68411e47b0",
+    "affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "label": "cached-prefix-native",
+    "repeat": 4,
+    "wall": 0.9316213480196893,
+    "cpu": 0.924430000000001,
+    "rss_kib": 146284,
+    "output_sha256": "7f7815524381b310ff5ef0995161dffd8ecea2a1b889f24242f2ec68411e47b0",
+    "affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "label": "cached-prefix-native",
+    "repeat": 5,
+    "wall": 0.9268256349023432,
+    "cpu": 0.9204169999999978,
+    "rss_kib": 146260,
+    "output_sha256": "7f7815524381b310ff5ef0995161dffd8ecea2a1b889f24242f2ec68411e47b0",
+    "affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "label": "current",
+    "repeat": 5,
+    "wall": 1.656329580117017,
+    "cpu": 1.648421,
+    "rss_kib": 205836,
+    "output_sha256": "7f7815524381b310ff5ef0995161dffd8ecea2a1b889f24242f2ec68411e47b0",
+    "affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "label": "current",
+    "repeat": 0,
+    "wall": 2.51232692389749,
+    "cpu": 2.5045860000000015,
+    "rss_kib": 296420,
+    "output_sha256": "b80500a01f984c764f1a3b486622d0ef7cc5b13fa9bd57ec9015113eaf875597",
+    "affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "label": "cached-prefix-native",
+    "repeat": 0,
+    "wall": 1.060890685999766,
+    "cpu": 1.0533809999999981,
+    "rss_kib": 201044,
+    "output_sha256": "b80500a01f984c764f1a3b486622d0ef7cc5b13fa9bd57ec9015113eaf875597",
+    "affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "label": "cached-prefix-native",
+    "repeat": 1,
+    "wall": 1.098986219149083,
+    "cpu": 1.0981349999999992,
+    "rss_kib": 201044,
+    "output_sha256": "b80500a01f984c764f1a3b486622d0ef7cc5b13fa9bd57ec9015113eaf875597",
+    "affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "label": "current",
+    "repeat": 1,
+    "wall": 2.5644522400107235,
+    "cpu": 2.5557739999999978,
+    "rss_kib": 296216,
+    "output_sha256": "b80500a01f984c764f1a3b486622d0ef7cc5b13fa9bd57ec9015113eaf875597",
+    "affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "label": "current",
+    "repeat": 2,
+    "wall": 2.600495412014425,
+    "cpu": 2.592811000000001,
+    "rss_kib": 296328,
+    "output_sha256": "b80500a01f984c764f1a3b486622d0ef7cc5b13fa9bd57ec9015113eaf875597",
+    "affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "label": "cached-prefix-native",
+    "repeat": 2,
+    "wall": 1.1006635681260377,
+    "cpu": 1.0993689999999994,
+    "rss_kib": 201040,
+    "output_sha256": "b80500a01f984c764f1a3b486622d0ef7cc5b13fa9bd57ec9015113eaf875597",
+    "affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "label": "cached-prefix-native",
+    "repeat": 3,
+    "wall": 1.0891449570190161,
+    "cpu": 1.0822369999999957,
+    "rss_kib": 201040,
+    "output_sha256": "b80500a01f984c764f1a3b486622d0ef7cc5b13fa9bd57ec9015113eaf875597",
+    "affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "label": "current",
+    "repeat": 3,
+    "wall": 2.5442278750706464,
+    "cpu": 2.5426139999999986,
+    "rss_kib": 296540,
+    "output_sha256": "b80500a01f984c764f1a3b486622d0ef7cc5b13fa9bd57ec9015113eaf875597",
+    "affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "label": "current",
+    "repeat": 4,
+    "wall": 2.5752956341020763,
+    "cpu": 2.567407000000003,
+    "rss_kib": 296412,
+    "output_sha256": "b80500a01f984c764f1a3b486622d0ef7cc5b13fa9bd57ec9015113eaf875597",
+    "affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "label": "cached-prefix-native",
+    "repeat": 4,
+    "wall": 1.0863844470586628,
+    "cpu": 1.079620999999996,
+    "rss_kib": 201044,
+    "output_sha256": "b80500a01f984c764f1a3b486622d0ef7cc5b13fa9bd57ec9015113eaf875597",
+    "affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "label": "cached-prefix-native",
+    "repeat": 5,
+    "wall": 1.0649108591023833,
+    "cpu": 1.0634840000000025,
+    "rss_kib": 201020,
+    "output_sha256": "b80500a01f984c764f1a3b486622d0ef7cc5b13fa9bd57ec9015113eaf875597",
+    "affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "label": "current",
+    "repeat": 5,
+    "wall": 2.5296165209729224,
+    "cpu": 2.522696,
+    "rss_kib": 296380,
+    "output_sha256": "b80500a01f984c764f1a3b486622d0ef7cc5b13fa9bd57ec9015113eaf875597",
+    "affinity": 0
+  },
+  {
+    "name": "mixed-100000",
+    "label": "current",
+    "repeat": 0,
+    "wall": 1.4755703210830688,
+    "cpu": 1.4683329999999977,
+    "rss_kib": 124060,
+    "output_sha256": "b80500a01f984c764f1a3b486622d0ef7cc5b13fa9bd57ec9015113eaf875597",
+    "affinity": 0
+  },
+  {
+    "name": "mixed-100000",
+    "label": "cached-prefix-native",
+    "repeat": 0,
+    "wall": 0.6890328270383179,
+    "cpu": 0.682815999999999,
+    "rss_kib": 130480,
+    "output_sha256": "b80500a01f984c764f1a3b486622d0ef7cc5b13fa9bd57ec9015113eaf875597",
+    "affinity": 0
+  },
+  {
+    "name": "mixed-100000",
+    "label": "cached-prefix-native",
+    "repeat": 1,
+    "wall": 0.6902093850076199,
+    "cpu": 0.6834649999999982,
+    "rss_kib": 130484,
+    "output_sha256": "b80500a01f984c764f1a3b486622d0ef7cc5b13fa9bd57ec9015113eaf875597",
+    "affinity": 0
+  },
+  {
+    "name": "mixed-100000",
+    "label": "current",
+    "repeat": 1,
+    "wall": 1.4848934749606997,
+    "cpu": 1.4771180000000008,
+    "rss_kib": 124076,
+    "output_sha256": "b80500a01f984c764f1a3b486622d0ef7cc5b13fa9bd57ec9015113eaf875597",
+    "affinity": 0
+  },
+  {
+    "name": "mixed-100000",
+    "label": "current",
+    "repeat": 2,
+    "wall": 1.4941017089877278,
+    "cpu": 1.4867579999999982,
+    "rss_kib": 124008,
+    "output_sha256": "b80500a01f984c764f1a3b486622d0ef7cc5b13fa9bd57ec9015113eaf875597",
+    "affinity": 0
+  },
+  {
+    "name": "mixed-100000",
+    "label": "cached-prefix-native",
+    "repeat": 2,
+    "wall": 0.7013415829278529,
+    "cpu": 0.6953710000000051,
+    "rss_kib": 130484,
+    "output_sha256": "b80500a01f984c764f1a3b486622d0ef7cc5b13fa9bd57ec9015113eaf875597",
+    "affinity": 0
+  },
+  {
+    "name": "mixed-100000",
+    "label": "cached-prefix-native",
+    "repeat": 3,
+    "wall": 0.6948034111410379,
+    "cpu": 0.6884599999999956,
+    "rss_kib": 130484,
+    "output_sha256": "b80500a01f984c764f1a3b486622d0ef7cc5b13fa9bd57ec9015113eaf875597",
+    "affinity": 0
+  },
+  {
+    "name": "mixed-100000",
+    "label": "current",
+    "repeat": 3,
+    "wall": 1.4813476840499789,
+    "cpu": 1.47485,
+    "rss_kib": 124056,
+    "output_sha256": "b80500a01f984c764f1a3b486622d0ef7cc5b13fa9bd57ec9015113eaf875597",
+    "affinity": 0
+  },
+  {
+    "name": "mixed-100000",
+    "label": "current",
+    "repeat": 4,
+    "wall": 1.4819044808391482,
+    "cpu": 1.4746009999999963,
+    "rss_kib": 124024,
+    "output_sha256": "b80500a01f984c764f1a3b486622d0ef7cc5b13fa9bd57ec9015113eaf875597",
+    "affinity": 0
+  },
+  {
+    "name": "mixed-100000",
+    "label": "cached-prefix-native",
+    "repeat": 4,
+    "wall": 0.6963833149056882,
+    "cpu": 0.6899940000000022,
+    "rss_kib": 130492,
+    "output_sha256": "b80500a01f984c764f1a3b486622d0ef7cc5b13fa9bd57ec9015113eaf875597",
+    "affinity": 0
+  },
+  {
+    "name": "mixed-100000",
+    "label": "cached-prefix-native",
+    "repeat": 5,
+    "wall": 0.6912100580520928,
+    "cpu": 0.6844639999999984,
+    "rss_kib": 130484,
+    "output_sha256": "b80500a01f984c764f1a3b486622d0ef7cc5b13fa9bd57ec9015113eaf875597",
+    "affinity": 0
+  },
+  {
+    "name": "mixed-100000",
+    "label": "current",
+    "repeat": 5,
+    "wall": 1.4847040001768619,
+    "cpu": 1.478114999999999,
+    "rss_kib": 124236,
+    "output_sha256": "b80500a01f984c764f1a3b486622d0ef7cc5b13fa9bd57ec9015113eaf875597",
+    "affinity": 0
+  }
+]

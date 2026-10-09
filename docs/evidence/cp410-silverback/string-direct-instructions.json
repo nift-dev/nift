@@ -1,0 +1,58 @@
+[
+  {
+    "name": "ascii-no-match",
+    "label": "current",
+    "instructions": 71630783,
+    "stdout_sha256": "1aa37f940a02cd34ef7e64edc950516acf773dc1b767f328ae7ef11bf18c1646",
+    "semantic_scope": "pure literal operands only; known receiver/argument side-effect mismatch prevents general production promotion"
+  },
+  {
+    "name": "ascii-no-match",
+    "label": "prepared-prototype",
+    "instructions": 17278863,
+    "stdout_sha256": "1aa37f940a02cd34ef7e64edc950516acf773dc1b767f328ae7ef11bf18c1646",
+    "semantic_scope": "pure literal operands only; known receiver/argument side-effect mismatch prevents general production promotion"
+  },
+  {
+    "name": "ascii-many",
+    "label": "current",
+    "instructions": 137262109,
+    "stdout_sha256": "f26a0f81e0a27817d4db18815acb8c247ffc81bbf92443992075324b2485d97b",
+    "semantic_scope": "pure literal operands only; known receiver/argument side-effect mismatch prevents general production promotion"
+  },
+  {
+    "name": "ascii-many",
+    "label": "prepared-prototype",
+    "instructions": 47517916,
+    "stdout_sha256": "f26a0f81e0a27817d4db18815acb8c247ffc81bbf92443992075324b2485d97b",
+    "semantic_scope": "pure literal operands only; known receiver/argument side-effect mismatch prevents general production promotion"
+  },
+  {
+    "name": "utf8-short",
+    "label": "current",
+    "instructions": 72459336,
+    "stdout_sha256": "ff9d423450ebb57501043811e20c95a3a2bedae35bce38b86b81b62713cc46c2",
+    "semantic_scope": "pure literal operands only; known receiver/argument side-effect mismatch prevents general production promotion"
+  },
+  {
+    "name": "utf8-short",
+    "label": "prepared-prototype",
+    "instructions": 17669549,
+    "stdout_sha256": "ff9d423450ebb57501043811e20c95a3a2bedae35bce38b86b81b62713cc46c2",
+    "semantic_scope": "pure literal operands only; known receiver/argument side-effect mismatch prevents general production promotion"
+  },
+  {
+    "name": "utf8-large",
+    "label": "current",
+    "instructions": 8185533287,
+    "stdout_sha256": "ae1ec14f4090efded7c68f1ed54a437f32f4219ecff03eac4ead206deb62d6e9",
+    "semantic_scope": "pure literal operands only; known receiver/argument side-effect mismatch prevents general production promotion"
+  },
+  {
+    "name": "utf8-large",
+    "label": "prepared-prototype",
+    "instructions": 8185030274,
+    "stdout_sha256": "ae1ec14f4090efded7c68f1ed54a437f32f4219ecff03eac4ead206deb62d6e9",
+    "semantic_scope": "pure literal operands only; known receiver/argument side-effect mismatch prevents general production promotion"
+  }
+]

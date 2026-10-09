@@ -1,0 +1,5 @@
+{
+  "instructions": 3465902701,
+  "stdout": "120000\n",
+  "scope": "fixed recursive suffix control with shared canonical directory prefixes; stable-filesystem prototype, not a full general-glob implementation"
+}

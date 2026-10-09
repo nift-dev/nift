@@ -1,0 +1,20 @@
+[
+  {
+    "shape": "mixed-aliases",
+    "matched": 7,
+    "ordered_output_equal": true,
+    "scope": "fixed suffix under stable filesystem; hidden entries, symlink leaves/aliases/dangling and non-followed directory symlinks"
+  },
+  {
+    "shape": "deep",
+    "matched": 41,
+    "ordered_output_equal": true,
+    "scope": "fixed suffix under stable filesystem; hidden entries, symlink leaves/aliases/dangling and non-followed directory symlinks"
+  },
+  {
+    "shape": "wide",
+    "matched": 4007,
+    "ordered_output_equal": true,
+    "scope": "fixed suffix under stable filesystem; hidden entries, symlink leaves/aliases/dangling and non-followed directory symlinks"
+  }
+]
