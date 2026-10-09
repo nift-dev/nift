@@ -16,7 +16,7 @@ def native_symlink(link,target):
    if os.environ.get('MSYSTEM'):return subprocess.run(['cygpath','-aw',str(path)],text=True,capture_output=True,check=True).stdout.strip()
    return str(path)
   command='$ErrorActionPreference = "Stop"; New-Item -ItemType SymbolicLink -Path $env:NIFT_TEST_SYMLINK_PATH -Target $env:NIFT_TEST_SYMLINK_TARGET | Out-Null; $item = Get-Item -LiteralPath $env:NIFT_TEST_SYMLINK_PATH -Force; if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0 -or $item.LinkType -ne "SymbolicLink") { exit 2 }'
-  subprocess.run(['powershell.exe','-NoProfile','-NonInteractive','-Command',command],env=dict(os.environ,MSYS2_ARG_CONV_EXCL='*',NIFT_TEST_SYMLINK_PATH=native(link),NIFT_TEST_SYMLINK_TARGET=native(target)),capture_output=True,text=True,check=True,timeout=30)
+  subprocess.run(['powershell.exe','-NoProfile','-NonInteractive','-Command',command],check=True,env=dict(os.environ,MSYS2_ARG_CONV_EXCL='*',NIFT_TEST_SYMLINK_PATH=native(link),NIFT_TEST_SYMLINK_TARGET=native(target)),capture_output=True,text=True,timeout=30)
  else:link.symlink_to(target)
 
 def project(p,entries):

@@ -2,11 +2,5 @@
   "schema": 1,
   "campaign": "bh2",
   "scanned_files": 309,
-  "findings": [
-    {
-      "rule": "swallowed-returncode",
-      "file": "tests/v410_build_pipeline.py",
-      "detail": "subprocess result '(discarded)' never controls a failure path (no check=True, no gating use of its returncode)"
-    }
-  ]
+  "findings": []
 }
