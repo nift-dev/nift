@@ -51,7 +51,7 @@ struct TrackedInfo {
     std::map<std::string, std::string> build_hooks;
     std::shared_ptr<ItemBuildPipeline> build_pipeline{};
     const ItemBuildPipeline& pipeline() const {return build_pipeline?*build_pipeline:empty_item_pipeline;}
-    ItemBuildPipeline& mutable_pipeline() {if(!build_pipeline)build_pipeline=std::make_shared<ItemBuildPipeline>();else if(!build_pipeline.unique())build_pipeline=std::make_shared<ItemBuildPipeline>(*build_pipeline);return *build_pipeline;}
+    ItemBuildPipeline& mutable_pipeline() {if(!build_pipeline)build_pipeline=std::make_shared<ItemBuildPipeline>();else if(build_pipeline.use_count()!=1)build_pipeline=std::make_shared<ItemBuildPipeline>(*build_pipeline);return *build_pipeline;}
 };
 
 struct BuildError {

@@ -1,0 +1,61 @@
+macos-clang complete FFI wall	macOS Clang complete FFI wall	﻿2026-10-09T16:20:09.6074360Z ##[group]Run make clean
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:09.6075450Z [36;1mmake clean[0m
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:09.6075670Z [36;1mmake CC=clang CXX=clang++ test-libffi-source[0m
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:09.6075990Z [36;1mmake CC=clang CXX=clang++ warnings-check[0m
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:09.6076350Z [36;1mmake -j2 CC=clang CXX=clang++ test-gate6ar-ffi[0m
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:09.6076900Z [36;1mmake -j2 CC=clang CXX=clang++ test-v45-ffi test-cp20-bytes test-cp21-bytes test-libffi-static-archive embed[0m
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:09.6077430Z [36;1mmake CC=clang CXX=clang++ test-pic-depfiles[0m
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:09.6077830Z [36;1mmake CC=clang CXX=clang++ node-binding python-binding[0m
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:09.6078280Z [36;1mbash scripts/audit_no_dynamic_libffi.sh nift libnift_c.dylib[0m
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:09.6078890Z [36;1mbash scripts/audit_no_dynamic_libffi.sh bindings/node/build/nift_node.node bindings/python/nift/_nift*.so[0m
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:09.6079700Z [36;1mbash scripts/audit_private_libffi.sh libnift_c.dylib bindings/node/build/nift_node.node bindings/python/nift/_nift*.so[0m
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:09.6080290Z [36;1mCC=clang bash tests/libffi_private_audit.sh[0m
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:09.6080650Z [36;1mpython3 scripts/check_node_package_licenses.py[0m
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:09.6179780Z shell: /bin/bash -e {0}
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:09.6180080Z env:
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:09.6180350Z   pythonLocation: /Users/runner/hostedtoolcache/Python/3.12.10/arm64
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:09.6180820Z   PKG_CONFIG_PATH: /Users/runner/hostedtoolcache/Python/3.12.10/arm64/lib/pkgconfig
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:09.6181260Z   Python_ROOT_DIR: /Users/runner/hostedtoolcache/Python/3.12.10/arm64
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:09.6181750Z   Python2_ROOT_DIR: /Users/runner/hostedtoolcache/Python/3.12.10/arm64
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:09.6182220Z   Python3_ROOT_DIR: /Users/runner/hostedtoolcache/Python/3.12.10/arm64
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:09.6182610Z ##[endgroup]
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:13.7549140Z rm -f src/nift.o src/ProjectOwnership.o src/PackageTransaction.o src/CLI.o src/Process.o src/JobControl.o src/RuntimeValue.o src/Value.o src/FileSystem.o src/JsonFile.o src/JsonSchema.o minifypp/src/Minify.o markuppp/src/Markup.o markuppp/src/AsciiDoc.o markuppp/src/ReStructuredText.o src/Parser.o src/ParserAsyncPool.o src/ParserExpression.o src/ParserHelpers.o src/ParserScript.o src/ParserTemplate.o src/ProjectInfo.o src/ProjectRead.o src/ProjectState.o src/WatchList.o src/BuildProgress.o src/Automation.o src/Hooks.o src/Ast.o src/embed/Engine.o src/embed/Context.o src/embed/c_abi.o markuppp/vendor/cmark/blocks.o markuppp/vendor/cmark/buffer.o markuppp/vendor/cmark/cmark.o markuppp/vendor/cmark/cmark_ctype.o markuppp/vendor/cmark/houdini_href_e.o markuppp/vendor/cmark/houdini_html_e.o markuppp/vendor/cmark/houdini_html_u.o markuppp/vendor/cmark/html.o markuppp/vendor/cmark/inlines.o markuppp/vendor/cmark/iterator.o markuppp/vendor/cmark/node.o markuppp/vendor/cmark/references.o markuppp/vendor/cmark/render.o markuppp/vendor/cmark/scanners.o markuppp/vendor/cmark/utf8.o src/nift.d src/ProjectOwnership.d src/PackageTransaction.d src/CLI.d src/Process.d src/JobControl.d src/RuntimeValue.d src/Value.d src/FileSystem.d src/JsonFile.d src/JsonSchema.d minifypp/src/Minify.d markuppp/src/Markup.d markuppp/src/AsciiDoc.d markuppp/src/ReStructuredText.d src/Parser.d src/ParserAsyncPool.d src/ParserExpression.d src/ParserHelpers.d src/ParserScript.d src/ParserTemplate.d src/ProjectInfo.d src/ProjectRead.d src/ProjectState.d src/WatchList.d src/BuildProgress.d src/Automation.d src/Hooks.d src/Ast.d src/embed/Engine.d src/embed/Context.d src/embed/c_abi.d markuppp/vendor/cmark/blocks.d markuppp/vendor/cmark/buffer.d markuppp/vendor/cmark/cmark.d markuppp/vendor/cmark/cmark_ctype.d markuppp/vendor/cmark/houdini_href_e.d markuppp/vendor/cmark/houdini_html_e.d markuppp/vendor/cmark/houdini_html_u.d markuppp/vendor/cmark/html.d markuppp/vendor/cmark/inlines.d markuppp/vendor/cmark/iterator.d markuppp/vendor/cmark/node.d markuppp/vendor/cmark/references.d markuppp/vendor/cmark/render.d markuppp/vendor/cmark/scanners.d markuppp/vendor/cmark/utf8.d "nift"
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:13.7750310Z # Ordinary development clean removes Nift build products but PRESERVES the
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:13.7828890Z # reusable vendored libffi dependency cache so clean+make does not re-pay
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:13.7919300Z # the configure/build/install bootstrap. Use `make distclean` (or
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:13.7983800Z # `make pristine`) for a fully cold state. Genuine removal failures are
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:13.8029630Z # reported; concurrent `make` + `make clean` on one checkout is explicitly
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:13.8114660Z # unsupported.
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:13.8346910Z rm -f libnift_c.a libnift_c.so libnift_c.dylib bindings/go/embed-harness
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:13.8398460Z rm -rf dist/embed-prefix bindings/node/build bindings/python/build
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:13.8478900Z rm -f bindings/python/nift/_nift*.so
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:13.8555000Z rm -rf bindings/csharp/src/Nift/bin bindings/csharp/src/Nift/obj
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:13.8596090Z rm -rf bindings/csharp/apps/NiftEmbedHarness/bin bindings/csharp/apps/NiftEmbedHarness/obj
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:13.8680820Z rm -rf bindings/csharp/apps/NiftAspDogfood/bin bindings/csharp/apps/NiftAspDogfood/obj
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:13.8967270Z rm -rf bindings/csharp/tests/Nift.Tests/bin bindings/csharp/tests/Nift.Tests/obj
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:13.9272900Z rm -rf bindings/csharp/bench/bin bindings/csharp/bench/obj
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:14.1226560Z python3 scripts/check_vendored_libffi.py
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:16.2255130Z CC="clang" CXX="clang++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/arm64-apple-darwin25.6.0-clang"
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:16.6500130Z BUILD vendored libffi (arm64-apple-darwin25.6.0-clang)
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:41.6111020Z BUILD vendored libffi: done (24s)
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:41.6220910Z   clang++: src/nift.cpp
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:41.6708610Z   clang++: src/ProjectOwnership.cpp
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:43.3876560Z   clang++: src/PackageTransaction.cpp
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:44.8228260Z   clang++: src/CLI.cpp
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:46.0246060Z In file included from src/CLI.cpp:10:
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:46.0247700Z In file included from src/ProjectInfo.h:3:
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:46.0250030Z src/Types.h:54:140: error: 'unique' is deprecated [-Werror,-Wdeprecated-declarations]
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:46.0254040Z    54 |     ItemBuildPipeline& mutable_pipeline() {if(!build_pipeline)build_pipeline=std::make_shared<ItemBuildPipeline>();else if(!build_pipeline.unique())build_pipeline=std::make_shared<ItemBuildPipeline>(*build_pipeline);return *build_pipeline;}
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:46.0272500Z       |                                                                                                                                            ^
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:46.0274210Z /Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__memory/shared_ptr.h:643:3: note: 'unique' has been explicitly marked deprecated here
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:46.0277650Z   643 |   _LIBCPP_DEPRECATED_IN_CXX17 _LIBCPP_HIDE_FROM_ABI bool unique() const _NOEXCEPT { return use_count() == 1; }
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:46.0279410Z       |   ^
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:46.0281820Z /Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__config:581:41: note: expanded from macro '_LIBCPP_DEPRECATED_IN_CXX17'
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:46.0284350Z   581 | #    define _LIBCPP_DEPRECATED_IN_CXX17 _LIBCPP_DEPRECATED
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:46.0285500Z       |                                         ^
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:46.0288120Z /Applications/Xcode_26.6.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__config:554:49: note: expanded from macro '_LIBCPP_DEPRECATED'
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:46.0290580Z   554 | #      define _LIBCPP_DEPRECATED __attribute__((__deprecated__))
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:46.0291950Z       |                                                 ^
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:48.6678470Z 1 error generated.
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:48.7006240Z make: *** [warnings-check] Error 1
+macos-clang complete FFI wall	macOS Clang complete FFI wall	2026-10-09T16:20:48.7222360Z ##[error]Process completed with exit code 2.

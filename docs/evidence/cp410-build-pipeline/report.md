@@ -85,6 +85,16 @@ filesystem-boundary, integrity and changed-source GCC/Clang warning checks
 pass; lifetime certification is recorded alongside the correction. Final
 acceptance still requires the new exact-head Windows and full hosted cohort.
 
+## Current macOS C++17 warning correction
+
+Gate 6A-R run `37958179092` passed Linux GCC/Clang sanitizer walls and Windows,
+but current macOS libc++ rejected `shared_ptr::unique()` as deprecated in
+C++17 under the existing `-Werror` policy. The copy-on-write check now uses
+`use_count() != 1`, preserving the same ownership decision without suppressing
+warnings. Native pipeline and integrity checks plus GCC/Clang warning checks
+pass locally. The failed hosted log is retained; the new exact-head cohort must
+pass the current macOS warning wall before acceptance.
+
 ## Hosted publication wall and stopping rule
 
 Publish Nift main, the pinned NRS revision, and website generated main/source stage commits. Dispatch only the ordinary non-release walls: Hosted certification diagnostic; v4.4/v4.5 cross-platform; Test integrity; Init targets; Gate 6B bytes; Gate 6A-R libffi; build-only packaging; Performance regression; Checkpoint 10 cross-platform; Deep guards. Deep includes the exact 94-module NRS pin. No release or package submission is dispatched.

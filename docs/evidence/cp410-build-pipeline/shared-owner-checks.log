@@ -1,0 +1,38 @@
+CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-linux-gnu-cc"
+python3 tests/v410_build_pipeline.py --nift "/home/nick/Repositories/nift/nift/nift"
+PASS custom replaces render; pre/main/post; dependency recording; incremental
+PASS all scripts and content invalidate
+PASS pre-build generates missing content before render
+PASS script-relevant tracked metadata invalidates
+PASS failure pre-build
+PASS repair pre-build
+PASS failure build
+PASS repair build
+PASS failure post-build
+PASS repair post-build
+PASS failure missing-output
+PASS repair missing-output
+PASS sidecars; removal invalidation; conflict; explicit precedence
+PASS chain ordering, targeted closure, clean prerequisites and no invalidation
+PASS diamond ordering, targeted closure, clean prerequisites and no invalidation
+PASS transitive failure propagation; independent branch; recovery
+PASS missing/self/duplicate/cycle/type validation before mutation
+PASS parallel independent branches with deterministic barrier
+PASS normal/custom composition
+PASS 10k iterative cycle diagnostic
+PASS transitive closure across a clean intermediate
+PASS same-pass ordinary file invalidation, multiple consumers hash
+PASS same-pass ordinary file invalidation, multiple consumers modified
+PASS generated output alias cache freshness
+PASS tracking serialization, rename references and safe prerequisite removal
+PASS build-auto reloads changed script and dependency graph
+PASS existing project preservation/idempotency ('rewrite', 'redesign')
+PASS existing project preservation/idempotency ('redesign', 'rewrite')
+PASS fresh rewrite
+PASS fresh redesign
+PASS 30 build pipeline groups
+python3 scripts/test_integrity_check.py tests scripts --output ".build/bh2/test-integrity-report.json"
+test-integrity clean: 309 files scanned, 0 findings
+report=.build/bh2/test-integrity-report.json
+python3 scripts/check_header_name_collisions.py
+header-name collisions: none
