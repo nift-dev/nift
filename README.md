@@ -218,3 +218,5 @@ Cross-mode contracts and malformed owned boundaries fail before scaffold writes.
 See [Migrations](https://nift.dev/docs/existing-sites.html),
 [Rewrites](https://nift.dev/docs/rewrites.html) and
 [Redesigns](https://nift.dev/docs/redesigns.html).
+
+Tracked-item custom builds, lifecycle sidecars and completion dependencies are documented in [Build Scripts](docs/BUILD-SCRIPTS.md). Existing-project rewrite/redesign initialization adds only missing workflow files.

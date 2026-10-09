@@ -154,12 +154,15 @@ public:
     bool source_exists(const std::filesystem::path& path) const override { return filesystem::path_exists(path); }
     bool source_readable(const std::filesystem::path& path) const override { return filesystem::file_readable(path); }
 
+    std::map<std::string,std::string> build_environment;
     nift::HostResult environment(const std::string& name) const override {
+        auto found=build_environment.find(name);
+        if(found!=build_environment.end()) return {nift::HostStatus::Found,found->second,{}};
         if (const char* value = std::getenv(name.c_str()))
             return {nift::HostStatus::Found, std::string(value), ""};
         return {nift::HostStatus::NotFound, "", ""};
     }
-    bool environment_snapshot(nift::RuntimeValue& out, std::string& error) const override { return nift_environment::process_snapshot(out, error); }
+    bool environment_snapshot(nift::RuntimeValue& out, std::string& error) const override { if(!nift_environment::process_snapshot(out, error)) return false; for(const auto& value:build_environment) out[value.first]=value.second; return true; }
 
 private:
     ProjectInfo& project_;

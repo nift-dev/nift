@@ -1,3 +1,4 @@
+#include <condition_variable>
 #include "ProjectInfo.h"
 #include "RuntimeJson.h"
 #include "ProjectInfoHost.h"
@@ -24,6 +25,34 @@
 namespace fs = std::filesystem;
 
 namespace {
+// DAG outputs can be read through symlinks. Share their cache identity while
+// preserving the ordinary no-dependency path and retaining lexical fallback.
+std::string build_cache_key(const fs::path& path, bool canonical) {
+    if (canonical) {
+        std::error_code error;
+        const auto resolved = fs::weakly_canonical(path, error);
+        if (!error) return resolved.generic_string();
+    }
+    return path.lexically_normal().generic_string();
+}
+
+std::string build_script_signature(const TrackedInfo& info) {
+    std::string signature;
+    for (const auto* hooks : {&info.build_hooks, &info.pipeline().discovered_hooks})
+        for (const auto& hook : *hooks) {
+            signature += hook.first; signature += '\0';
+            signature += hook.second; signature += '\0';
+        }
+    if (!signature.empty()) {
+        // Native scripts can inspect these tracked metadata values.
+        signature += "type"; signature += '\0';
+        signature += info.type.value_or(""); signature += '\0';
+        signature += "frontmatter"; signature += '\0';
+        signature += info.frontmatter.value_or(""); signature += '\0';
+    }
+    return signature;
+}
+
 // Keep ordinary builds informative without flooding the terminal on large sites.
 constexpr std::size_t detailed_build_output_limit = 10;
 constexpr std::size_t summary_path_sample_limit = 5;
@@ -81,6 +110,8 @@ bool ProjectInfo::load_tracking() {
         return false;
     }
     rebuild_tracked_index();
+    has_build_dependencies=false;
+    for(const auto& info:tracked) has_build_dependencies=has_build_dependencies||!info.pipeline().depends.empty();
     return true;
 }
 
@@ -105,6 +136,10 @@ bool ProjectInfo::save_tracking() const {
             if (info.paginate->separator_path.has_value()) paginate["separator"] = *info.paginate->separator_path;
             entry["paginate"] = paginate;
         }
+        if(info.type) entry["type"]=*info.type;
+        if(info.frontmatter) entry["frontmatter"]=*info.frontmatter;
+        for(const auto& hook:info.build_hooks) entry[hook.first]=hook.second;
+        if(!info.pipeline().depends.empty()){entry["depends"]=json::Document::make_array();for(const auto& name:info.pipeline().depends)entry["depends"].push_back(json::Document(name));}
         document["tracked"].push_back(entry);
     }
     return save_json_file(root / ".nift/tracked.json", document);
@@ -293,7 +328,20 @@ std::string ProjectInfo::relative(const fs::path& path) const {
 }
 
 const std::string* ProjectInfo::read_shared_source(const fs::path& path) const {
-    const std::string key = path.lexically_normal().generic_string();
+    const std::string key = build_cache_key(path, has_build_dependencies);
+    if (has_build_dependencies) {
+        // Keep an in-flight read from publishing old output bytes after a
+        // producer has invalidated that identity at scheduler completion.
+        std::lock_guard<std::mutex> lock(source_cache_mutex_);
+        const auto existing = shared_source_cache_.find(key);
+        if (existing != shared_source_cache_.end()) return existing->second.get();
+        const auto read = filesystem::read_file_checked(path);
+        if (!read) return nullptr;
+        auto contents = std::make_unique<const std::string>(*read);
+        const auto result = contents.get();
+        shared_source_cache_.emplace(key, std::move(contents));
+        return result;
+    }
     {
         std::lock_guard<std::mutex> lock(source_cache_mutex_);
         const auto it = shared_source_cache_.find(key);
@@ -318,7 +366,7 @@ const std::string* ProjectInfo::read_shared_source(const fs::path& path) const {
 
 std::shared_ptr<const json::Document> ProjectInfo::read_shared_json(const fs::path& path, std::string& error) const {
     const fs::path normalized = fs::absolute(path).lexically_normal();
-    const std::string key = normalized.generic_string();
+    const std::string key = build_cache_key(normalized, has_build_dependencies);
 
     std::lock_guard<std::mutex> lock(json_cache_mutex_);
     const auto existing = shared_json_cache_.find(key);
@@ -345,7 +393,7 @@ std::shared_ptr<const json::Document> ProjectInfo::read_shared_json(const fs::pa
 std::shared_ptr<const nift::RuntimeValue> ProjectInfo::read_shared_runtime_json(
     const fs::path& path, std::string& error) const {
     const fs::path normalized = fs::absolute(path).lexically_normal();
-    const std::string key = normalized.generic_string();
+    const std::string key = build_cache_key(normalized, has_build_dependencies);
     std::lock_guard<std::mutex> lock(json_cache_mutex_);
     const auto existing = shared_runtime_json_cache_.find(key);
     if (existing != shared_runtime_json_cache_.end()) return existing->second;
@@ -392,9 +440,10 @@ bool ProjectInfo::load_user_dependencies(const TrackedInfo& info, std::set<std::
 }
 
 bool ProjectInfo::hash_changed_cached(const fs::path& dependency) const {
-    const std::string key = dependency.lexically_normal().generic_string();
+    const std::string key = build_cache_key(dependency, has_build_dependencies);
     {
         std::lock_guard<std::mutex> lock(hash_mutex_);
+        if(has_build_dependencies){const auto complete=completed_output_hash_changes_.find(key);if(complete!=completed_output_hash_changes_.end())return complete->second;}
         const auto it = hash_change_cache_.find(key);
         if (it != hash_change_cache_.end()) return it->second;
     }
@@ -416,10 +465,12 @@ void ProjectInfo::reset_build_caches() {
         std::lock_guard<std::mutex> lock(hash_mutex_);
         hash_change_cache_.clear();
         refreshed_hashes_.clear();
+        completed_output_hash_changes_.clear();
     }
     {
         std::lock_guard<std::mutex> lock(source_cache_mutex_);
         shared_source_cache_.clear();
+        retired_sources_.clear();
     }
     {
         std::lock_guard<std::mutex> lock(json_cache_mutex_);
@@ -440,7 +491,7 @@ void ProjectInfo::refresh_hash_once(const fs::path& dependency) {
     const bool is_content_file = !relative_to_content.empty() &&
                                  *relative_to_content.begin() != "..";
     if (!is_content_file) {
-        const std::string key = normalized.generic_string();
+        const std::string key = build_cache_key(normalized, has_build_dependencies);
         std::lock_guard<std::mutex> lock(hash_mutex_);
         if (!refreshed_hashes_.insert(key).second) return;
     }
@@ -529,6 +580,9 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
         return reasons;
     }
 
+    const std::string current_hooks = build_script_signature(info);
+    const std::string old_hooks=document.has("build-hooks")&&document["build-hooks"].is_string()?document["build-hooks"].string:std::string{};
+    if(old_hooks!=current_hooks) reasons.push_back("build scripts changed");
     if (document["name"].string != info.name) reasons.push_back("tracked name changed");
     if (document["title"].string != info.title) reasons.push_back("tracked title changed");
     if (document["template"].string != info.template_path) reasons.push_back("tracked template changed");
@@ -770,6 +824,8 @@ bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::s
     json::Document::append_escaped_string(output, pagination_separator);
     output += "\",\n  \"pagination-pages\": ";
     output += std::to_string(pagination_pages);
+    const std::string hooks_signature = build_script_signature(info);
+    if(!hooks_signature.empty()) {output += ",\n  \"build-hooks\": \"";json::Document::append_escaped_string(output,hooks_signature);output += "\"";}
     output += ",\n  \"project-fingerprint\": \"";
     if (dependencies.count(".nift/project.fingerprint") != 0)
         json::Document::append_escaped_string(output,
@@ -807,6 +863,9 @@ bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::s
 }
 
 bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_error) {
+    std::string legacy_error;
+    if(!nift_hooks::run_file_hooks(root,info,"pre",current_hook_mode_,legacy_error)){report_build_error({info.name,{},0,legacy_error},out_error);return false;}
+
     // The previous pagination page count is historical state required for
     // stale-output cleanup: when pagination is removed or its page count
     // decreases, page-2..N outputs from the previous build must be removed.
@@ -827,14 +886,37 @@ bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_er
         }
     }
     const fs::path content = content_path(info);
+
+    ProjectInfoHost host(*this);
+    std::set<std::string> hook_dependencies;
+    auto item_script = [&](const std::string& phase, RenderResult* returned=nullptr) {
+        auto it=info.build_hooks.find(phase); std::string path;
+        if(it!=info.build_hooks.end())path=it->second;
+        else {auto found=info.pipeline().discovered_hooks.find(phase);if(found!=info.pipeline().discovered_hooks.end())path=found->second;}
+        if(path.empty())return true;
+        const fs::path source=(root/path).lexically_normal();
+        if(!filesystem::path_within(root,source)||source.extension()!=".f"||!filesystem::file_readable(source)) {report_build_error({info.name,source,0,"build script must be a readable project-local .f file"},out_error);return false;}
+        host.build_environment={{"NIFT_HOOK_PHASE",phase},{"NIFT_HOOK_MODE",current_hook_mode_},{"NIFT_HOOK_TARGET",info.name},{"NIFT_HOOK_CONTENT",relative(content)},{"NIFT_HOOK_OUTPUT",relative(output_path(info))},{"NIFT_HOOK_TEMPLATE",info.template_path},{"NIFT_HOOK_ROOT",root.generic_string()}};
+        Parser script(host,info);
+        // Script writes are recovery-relevant even if it later fails.
+        mark_mutation();
+        auto rr=script.run_script(filesystem::read_file(source),source,true);
+        if(!rr.ok){report_build_error(rr.error,out_error);return false;}
+        hook_dependencies.insert(relative(source));hook_dependencies.insert(rr.dependencies.begin(),rr.dependencies.end());
+        if(returned)*returned=std::move(rr);
+        return true;
+    };
+    if(!item_script("pre-build"))return false;
     if (!filesystem::path_exists(content)) {
         report_build_error({info.name, content, 0, "content file does not exist"}, out_error);
         return false;
     }
 
-    ProjectInfoHost host(*this);
-    Parser parser(host, info);
-    RenderResult result = parser.render();
+    const bool custom=info.build_hooks.count("build")||info.pipeline().discovered_hooks.count("build");
+    RenderResult result;
+    if(custom){if(!item_script("build",&result))return false;result.dependencies.insert(relative(content));}
+    else {Parser parser(host,info);result=parser.render();}
+    result.dependencies.insert(hook_dependencies.begin(),hook_dependencies.end());
     if (!result.ok) { report_build_error(result.error, out_error); return false; }
     if (!load_user_dependencies(info, result.dependencies, &result.error)) { report_build_error(result.error, out_error); return false; }
 
@@ -846,7 +928,7 @@ bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_er
     const bool should_minify = info.minify.has_value()
         ? *info.minify
         : config.minify_exts.count(normalized_extension) != 0;
-    if (should_minify) {
+    if (should_minify && !custom) {
         minify::Format format;
         if (!minify::format_for_extension(extension, format)) {
             report_build_error({info.name, output, 0, "no minifier is available for output extension " + extension}, out_error);
@@ -880,7 +962,10 @@ bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_er
     // flag is set BEFORE the write: an interruption during the write is
     // precisely the case the marker must protect.
     mark_mutation();
-    if (!result.pagination_outputs.empty()) {
+    if(custom) {
+        std::error_code ec;
+        if(!filesystem::path_within(root,output)||!fs::is_regular_file(output,ec)||ec){report_build_error({info.name,output,0,"custom build did not produce the tracked output file"},out_error);return false;}
+    } else if (!result.pagination_outputs.empty()) {
         std::vector<std::pair<fs::path, std::string>> page_files;
         page_files.reserve(result.pagination_outputs.size());
         for (std::size_t page = 1; page <= result.pagination_outputs.size(); ++page)
@@ -894,6 +979,17 @@ bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_er
         return false;
     }
 
+    if(!item_script("post-build"))return false;
+    if(!nift_hooks::run_file_hooks(root,info,"post",current_hook_mode_,legacy_error)){report_build_error({info.name,{},0,legacy_error},out_error);return false;}
+    if(custom){std::error_code ec;if(!filesystem::path_within(root,output)||!fs::is_regular_file(output,ec)||ec){report_build_error({info.name,output,0,"custom post-build removed the tracked output"},out_error);return false;}}
+    for(const auto& hook:info.build_hooks)if(hook.first.find(' ')!=std::string::npos)hook_dependencies.insert(relative((root/hook.second).lexically_normal()));
+    result.dependencies.insert(hook_dependencies.begin(),hook_dependencies.end());
+    if(recheck_build_outputs_ && config.incremental_mode!="modified") {
+        const auto key=build_cache_key(output, has_build_dependencies);
+        const bool changed=filesystem::stored_hash_changed(root,output);
+        std::lock_guard<std::mutex> lock(hash_mutex_);
+        completed_output_hash_changes_[key]=changed;
+    }
     if (config.incremental_mode != "modified") {
         for (const auto& dependency : result.dependencies) {
             const fs::path dependency_path = root / dependency;
@@ -919,7 +1015,23 @@ bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_er
     return true;
 }
 
-int ProjectInfo::build_many(const std::vector<BuildJob>& jobs, bool targeted, bool full_detail, std::size_t requested_count) {
+int ProjectInfo::build_many(const std::vector<BuildJob>& initial_jobs, bool targeted, bool full_detail, std::size_t requested_count) {
+    std::vector<BuildJob> expanded_jobs;
+    if(has_build_dependencies) {
+        expanded_jobs=initial_jobs;
+        auto& jobs=expanded_jobs;
+        std::unordered_set<std::string> included;included.reserve(jobs.size());
+        for(const auto& job:jobs)included.insert(job.info->name);
+        if(!targeted)for(auto& info:tracked)if(included.insert(info.name).second)jobs.push_back({&info,{},true});
+        // Iterate closure; up-to-date prerequisites require no execution.
+        for(std::size_t i=0;i<jobs.size();++i) for(const auto& name:jobs[i].info->pipeline().depends) {
+            auto* prerequisite=find(name);
+            if(!prerequisite){console::error("unknown build prerequisite '"+name+"'");return 1;}
+            if(included.insert(name).second){auto reasons=build_reasons(*prerequisite);const bool clean=reasons.empty();jobs.push_back({prerequisite,std::move(reasons),clean});}
+        }
+    }
+    const auto& jobs=has_build_dependencies?expanded_jobs:initial_jobs;
+    recheck_build_outputs_=has_build_dependencies&&std::any_of(jobs.begin(),jobs.end(),[](const BuildJob& job){return job.validation_only;});
     last_build_affected.clear();
     if (jobs.empty()) {
         if (!console::build_quiet()) {
@@ -938,7 +1050,7 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& jobs, bool targeted, bo
     // any affected file with hooks serializes the build to keep hooks safe
     // and their output readable.
     bool any_file_hooks = false;
-    for (const auto& job : jobs) if (!job.info->build_hooks.empty()) { any_file_hooks = true; break; }
+    for (const auto& job : jobs) for(const auto& hook:job.info->build_hooks) if(hook.first.find(' ')!=std::string::npos) any_file_hooks=true;
     if (any_file_hooks) thread_count = 1;
 
     std::atomic<std::size_t> next{0};
@@ -947,37 +1059,76 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& jobs, bool targeted, bo
     std::vector<std::optional<BuildError>> errors(jobs.size());
     BuildProgress progress(jobs.size(), completed);
 
+    std::vector<std::vector<std::size_t>> dependents;
+    std::vector<std::size_t> pending;
+    std::vector<unsigned char> blocked,executed,prerequisite_executed;
+    std::vector<std::size_t> ready;
+    std::size_t ready_cursor=0;
+    std::mutex scheduler_mutex;
+    std::condition_variable scheduler_cv;
+    std::size_t remaining=jobs.size();
+    const bool scheduler_stats=std::getenv("NIFT_TEST_BUILD_DAG_STATS")!=nullptr;
+    const auto planning_started=scheduler_stats?std::chrono::steady_clock::now():std::chrono::steady_clock::time_point{};
+    std::size_t edge_count=0,active=0,peak_active=0,peak_ready=0,blocked_count=0,wakeups=0;
+    std::int64_t lock_wait_ns=0;
+    struct QueueSample {std::size_t completed, ready, active;std::int64_t elapsed_ns;};
+    std::vector<QueueSample> queue_samples;
+    const std::size_t sample_stride=std::max<std::size_t>(1, jobs.size()/32);
+
+    if(has_build_dependencies) {
+        dependents.resize(jobs.size());pending.resize(jobs.size());blocked.resize(jobs.size());ready.reserve(jobs.size());executed.resize(jobs.size());prerequisite_executed.resize(jobs.size());
+        for(std::size_t i=0;i<jobs.size();++i)executed[i]=!jobs[i].validation_only;
+        std::unordered_map<std::string,std::size_t> index;index.reserve(jobs.size());
+        for(std::size_t i=0;i<jobs.size();++i)index.emplace(jobs[i].info->name,i);
+        for(std::size_t i=0;i<jobs.size();++i)for(const auto& name:jobs[i].info->pipeline().depends){auto found=index.find(name);if(found!=index.end()){dependents[found->second].push_back(i);++pending[i];++edge_count;}}
+        for(std::size_t i=0;i<jobs.size();++i)if(!pending[i])ready.push_back(i);
+    }
+    peak_ready=ready.size();
+    if(scheduler_stats&&has_build_dependencies) {queue_samples.reserve(34);queue_samples.push_back({0,ready.size(),0,0});}
+    const auto planning_ns=scheduler_stats?std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now()-planning_started).count():0;
+    auto complete_job=[&](std::size_t index) {
+        ++completed;
+        if(!has_build_dependencies)return;
+        if(executed[index]&&succeeded[index]) {
+            const auto key=build_cache_key(output_path(*jobs[index].info), true);
+            {std::lock_guard<std::mutex> lock(source_cache_mutex_);auto found=shared_source_cache_.find(key);if(found!=shared_source_cache_.end()){retired_sources_.push_back(std::move(found->second));shared_source_cache_.erase(found);}}
+            {std::lock_guard<std::mutex> lock(json_cache_mutex_);shared_json_cache_.erase(key);shared_runtime_json_cache_.erase(key);}
+        }
+        std::lock_guard<std::mutex> lock(scheduler_mutex);
+        --remaining;
+        if(scheduler_stats)--active;
+        for(auto dependent:dependents[index]){
+            prerequisite_executed[dependent]=prerequisite_executed[dependent]||executed[index]||prerequisite_executed[index];
+            if(!succeeded[index]){if(!blocked[dependent])++blocked_count;blocked[dependent]=1;errors[dependent]=BuildError{jobs[dependent].info->name,{},0,"blocked because prerequisite '"+jobs[index].info->name+"' failed"};}
+            if(--pending[dependent]==0)ready.push_back(dependent);
+        }
+        if(scheduler_stats) {
+            peak_ready=std::max(peak_ready,ready.size()-ready_cursor);
+            const auto finished=jobs.size()-remaining;
+            if(finished==jobs.size()||finished/sample_stride>queue_samples.back().completed/sample_stride)
+                queue_samples.push_back({finished,ready.size()-ready_cursor,active,std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now()-planning_started).count()});
+        }
+        scheduler_cv.notify_all();
+    };
     auto worker = [&] {
-        const std::string hook_mode = current_hook_mode_;
         while (true) {
-            const std::size_t index = next.fetch_add(1);
-            if (index >= jobs.size()) break;
+            std::size_t index;
+            if(has_build_dependencies){const auto lock_started=scheduler_stats?std::chrono::steady_clock::now():std::chrono::steady_clock::time_point{};std::unique_lock<std::mutex> lock(scheduler_mutex);if(scheduler_stats){lock_wait_ns+=std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now()-lock_started).count();}while(ready_cursor==ready.size()&&remaining!=0){scheduler_cv.wait(lock);if(scheduler_stats)++wakeups;}if(!remaining)break;index=ready[ready_cursor++];if(scheduler_stats){++active;peak_active=std::max(peak_active,active);}}
+            else {index=next.fetch_add(1);if(index>=jobs.size())break;}
+            if(has_build_dependencies&&blocked[index]){complete_job(index);continue;}
+            if(jobs[index].validation_only) {
+                if(prerequisite_executed[index]) {
+                    auto reasons=build_reasons(*jobs[index].info);
+                    if(!reasons.empty()){executed[index]=1;expanded_jobs[index].reasons=std::move(reasons);}
+                }
+                if(!executed[index]){succeeded[index]=1;complete_job(index);continue;}
+            }
             // Worker-generated build errors are buffered per job index (each
             // worker owns its slots, so no shared buffer needs locking). They
             // are emitted only after progress has stopped, so no diagnostic
             // can ever be written into an active progress line.
-            if (any_file_hooks) {
-                std::string hook_error;
-                if (!nift_hooks::run_file_hooks(root, *jobs[index].info, "pre", hook_mode, hook_error)) {
-                    std::lock_guard<std::mutex> lock(console::output_mutex);
-                    std::cerr << console::error_label() << ' ' << hook_error << '\n';
-                    errors[index] = BuildError{jobs[index].info->name, {}, 0, hook_error};
-                    succeeded[index] = 0;
-                    ++completed;
-                    continue;
-                }
-            }
             succeeded[index] = build_one(*jobs[index].info, &errors[index]) ? 1 : 0;
-            if (succeeded[index] && any_file_hooks) {
-                std::string hook_error;
-                if (!nift_hooks::run_file_hooks(root, *jobs[index].info, "post", hook_mode, hook_error)) {
-                    std::lock_guard<std::mutex> lock(console::output_mutex);
-                    std::cerr << console::error_label() << ' ' << hook_error << '\n';
-                    errors[index] = BuildError{jobs[index].info->name, {}, 0, hook_error};
-                    succeeded[index] = 0;
-                }
-            }
-            ++completed;
+            complete_job(index);
         }
     };
 
@@ -989,18 +1140,26 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& jobs, bool targeted, bo
     // Deterministic shutdown: stop the renderer, join it, erase the transient
     // line and flush — only then may diagnostics and the summary be written.
     progress.finish();
+    if(scheduler_stats)std::cerr<<"BUILD_DAG nodes="<<pending.size()<<" edges="<<edge_count<<" peak_ready="<<peak_ready<<" peak_active="<<peak_active<<" blocked="<<blocked_count<<" wakeups="<<wakeups<<" lock_wait_ns="<<lock_wait_ns<<" plan_ns="<<planning_ns<<'\n';
+
+    if(scheduler_stats&&!queue_samples.empty()) {
+        std::cerr<<"BUILD_DAG_QUEUE";
+        for(const auto& sample:queue_samples)std::cerr<<' '<<sample.completed<<':'<<sample.ready<<':'<<sample.active<<':'<<sample.elapsed_ns;
+        std::cerr<<'\n';
+    }
 
     last_build_affected.clear();
     for (std::size_t i = 0; i < jobs.size(); ++i)
-        if (succeeded[i]) last_build_affected.push_back(jobs[i].info->name);
+        if (succeeded[i] && (!has_build_dependencies||executed[i])) last_build_affected.push_back(jobs[i].info->name);
 
     for (std::size_t i = 0; i < jobs.size(); ++i)
         if (errors[i].has_value()) print_build_error(*errors[i]);
 
     std::size_t successful_count = 0;
-    for (unsigned char success : succeeded) if (success) ++successful_count;
-    const std::size_t missing_requested = targeted && requested_count > jobs.size() ? requested_count - jobs.size() : 0;
-    const std::size_t failed_count = jobs.size() - successful_count + missing_requested;
+    std::size_t validated_count=0;
+    for(std::size_t i=0;i<jobs.size();++i)if(succeeded[i]){if(has_build_dependencies&&!executed[i])++validated_count;else ++successful_count;}
+    const std::size_t missing_requested = targeted && requested_count > initial_jobs.size() ? requested_count - initial_jobs.size() : 0;
+    const std::size_t failed_count = jobs.size() - successful_count - validated_count + missing_requested;
 
     std::lock_guard<std::mutex> lock(console::output_mutex);
 
@@ -1013,7 +1172,7 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& jobs, bool targeted, bo
     if (!console::build_quiet()) {
     if (detailed) {
         for (std::size_t i = 0; i < jobs.size(); ++i) {
-            if (!succeeded[i]) continue;
+            if (!succeeded[i] || (has_build_dependencies&&!executed[i])) continue;
             std::cout << console::good("built") << ' ' << console::path(jobs[i].info->name) << '\n';
             for (const auto& reason : jobs[i].reasons)
                 std::cout << console::dim("    ↳ " + reason) << '\n';
@@ -1021,7 +1180,7 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& jobs, bool targeted, bo
     } else if (has_rebuild_reasons) {
         std::map<std::string, std::size_t> reason_counts;
         for (std::size_t i = 0; i < jobs.size(); ++i) {
-            if (!succeeded[i]) continue;
+            if (!succeeded[i] || (has_build_dependencies&&!executed[i])) continue;
             for (const auto& reason : jobs[i].reasons) ++reason_counts[reason];
         }
 
@@ -1034,7 +1193,7 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& jobs, bool targeted, bo
         std::cout << console::dim("affected files: ");
         std::size_t shown = 0;
         for (std::size_t i = 0; i < jobs.size() && shown < summary_path_sample_limit; ++i) {
-            if (!succeeded[i]) continue;
+            if (!succeeded[i] || (has_build_dependencies&&!executed[i])) continue;
             if (shown) std::cout << console::dim(", ");
             std::cout << console::path(jobs[i].info->name);
             ++shown;
@@ -1043,7 +1202,11 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& jobs, bool targeted, bo
         std::cout << '\n';
     }
 
-    if (targeted) {
+    if(!successful_count&&!failed_count&&!targeted) {
+        std::cout<<console::good("✓")<<' '<<requested_count<<" tracked files are up to date\n";
+    } else if(targeted&&has_build_dependencies) {
+        std::cout<<successful_count<<" target/prerequisite items built; "<<validated_count<<" prerequisites up to date"<<(failed_count?"; build failed":"; build succeeded")<<'\n';
+    } else if (targeted) {
         // Keep the historical wording because scripts and the regression suite rely on it.
         if (failed_count == 0) std::cout << console::good("📦") << " all " << successful_count << " specified files built successfully\n";
         else std::cout << successful_count << " of " << requested_count << " specified files built successfully\n";

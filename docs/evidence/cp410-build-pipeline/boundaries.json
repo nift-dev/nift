@@ -1,0 +1,17 @@
+{
+  "frozen_files_verified": 81,
+  "components": [
+    {
+      "root": "/home/nick/Repositories/nift/jsonic/jsonic",
+      "sha": "a956c50a4ba0092080902c19aa14132e7a885eb0",
+      "clean": true
+    },
+    {
+      "root": "/home/nick/Repositories/nift/minify/minify",
+      "sha": "ea089d8f1550a02f8a9e7926d58156527b8d36e9",
+      "clean": true
+    }
+  ],
+  "runtime_layout_and_public_abi_unchanged": true,
+  "abi": "1.3"
+}

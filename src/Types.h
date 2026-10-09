@@ -9,6 +9,7 @@
 #include <set>
 #include <optional>
 #include <map>
+#include <memory>
 
 struct Config {
     std::string content_dir = "content/";
@@ -31,6 +32,12 @@ struct PaginationConfig {
     std::optional<std::string> separator_path;
 };
 
+struct ItemBuildPipeline {
+    std::vector<std::string> depends;
+    std::map<std::string,std::string> discovered_hooks;
+};
+inline const ItemBuildPipeline empty_item_pipeline{};
+
 struct TrackedInfo {
     std::string name;
     std::string title;
@@ -42,6 +49,9 @@ struct TrackedInfo {
     std::optional<std::string> type;
     std::optional<std::string> frontmatter;
     std::map<std::string, std::string> build_hooks;
+    std::shared_ptr<ItemBuildPipeline> build_pipeline{};
+    const ItemBuildPipeline& pipeline() const {return build_pipeline?*build_pipeline:empty_item_pipeline;}
+    ItemBuildPipeline& mutable_pipeline() {if(!build_pipeline)build_pipeline=std::make_shared<ItemBuildPipeline>();else if(!build_pipeline.unique())build_pipeline=std::make_shared<ItemBuildPipeline>(*build_pipeline);return *build_pipeline;}
 };
 
 struct BuildError {

@@ -22,6 +22,7 @@ public:
     std::filesystem::path root;
     Config config;
     std::vector<TrackedInfo> tracked;
+    bool has_build_dependencies = false;
     std::string target_ = "native";
 
     ProjectInfo();
@@ -125,8 +126,14 @@ private:
     mutable std::mutex hash_mutex_;
     mutable std::unordered_map<std::string, bool> hash_change_cache_;
     std::unordered_set<std::string> refreshed_hashes_;
+    // Immutable per-output hash decisions for a dependency build epoch. A
+    // consumer refreshing the shared stored hash must not hide a change from
+    // another ready consumer.
+    std::unordered_map<std::string,bool> completed_output_hash_changes_;
+    bool recheck_build_outputs_ = false;
     mutable std::mutex source_cache_mutex_;
     mutable std::unordered_map<std::string, std::unique_ptr<const std::string>> shared_source_cache_;
+    std::vector<std::unique_ptr<const std::string>> retired_sources_;
     mutable std::mutex json_cache_mutex_;
     mutable std::unordered_map<std::string, std::shared_ptr<const json::Document>> shared_json_cache_;
     mutable std::unordered_map<std::string, std::shared_ptr<const nift::RuntimeValue>> shared_runtime_json_cache_;
@@ -137,6 +144,7 @@ private:
     struct BuildJob {
         TrackedInfo* info = nullptr;
         std::vector<std::string> reasons;
+        bool validation_only = false;
     };
 
     void rebuild_tracked_index() const;
@@ -150,5 +158,5 @@ private:
     bool write_page_info(const TrackedInfo& info, const std::set<std::string>& dependencies, const std::set<std::string>& reqs, std::size_t pagination_pages = 0) const;
     void print_build_error(const BuildError& error) const;
     void report_build_error(const BuildError& error, std::optional<BuildError>* out_error) const;
-    int build_many(const std::vector<BuildJob>& jobs, bool targeted, bool full_detail, std::size_t requested_count);
+    int build_many(const std::vector<BuildJob>& initial_jobs, bool targeted, bool full_detail, std::size_t requested_count);
 };

@@ -1962,3 +1962,15 @@ test-v410-file-buffer-lifetime: $(SAN_LIFETIME_TARGET) $(FILE_BUFFER_LIFETIME_GU
 	$(LIFETIME_RUN) NIFT=$(abspath $(SAN_LIFETIME_TARGET)) $(PYTHON) tests/v410_file_buffer_parity.py
 	$(LIFETIME_RUN) $(FILE_BUFFER_LIFETIME_GUARD)
 test-sanitize-lifetime: test-v410-file-buffer-lifetime
+
+.PHONY: test-v410-build-pipeline
+test-v410-build-pipeline: $(TARGET)
+	python3 tests/v410_build_pipeline.py --nift "$(CURDIR)/$(TARGET)"
+test: test-v410-build-pipeline
+
+.PHONY: test-v410-build-pipeline-lifetime
+test-v410-build-pipeline-lifetime: $(SAN_LIFETIME_TARGET)
+	$(LIFETIME_RUN) $(PYTHON) tests/v410_build_pipeline.py --nift "$(CURDIR)/$(SAN_LIFETIME_TARGET)"
+test-sanitize-lifetime: test-v410-build-pipeline-lifetime
+
+.PHONY: test-v410-build-pipeline test-v410-build-pipeline-lifetime

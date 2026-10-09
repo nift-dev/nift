@@ -144,7 +144,7 @@ jobs:
           name: package-sources
           path: package-sources.json
   independent-regression-contract:
-    name: Independent NRS contract (93 modules)
+    name: Independent NRS contract (94 modules)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -157,9 +157,9 @@ jobs:
           set -euo pipefail
           git init nift-regression-suite
           git -C nift-regression-suite remote add origin https://github.com/nift-dev/nift-regression-suite.git
-          git -C nift-regression-suite fetch --depth=1 --no-tags origin 34b1c2ff4d1a3f591176f3ce79b74ad2958b6852
+          git -C nift-regression-suite fetch --depth=1 --no-tags origin 80ac41bfbeee7ca1bee4cd8cec2376cdf617b2e0
           git -C nift-regression-suite checkout --detach FETCH_HEAD
-          test "$(git -C nift-regression-suite rev-parse HEAD)" = 34b1c2ff4d1a3f591176f3ce79b74ad2958b6852
+          test "$(git -C nift-regression-suite rev-parse HEAD)" = 80ac41bfbeee7ca1bee4cd8cec2376cdf617b2e0
       - name: Run independent contract with embedding consumers enabled
         shell: bash
         run: |

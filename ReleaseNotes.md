@@ -2,8 +2,20 @@
 
 ## v4.10.0 (unreleased development)
 
-Development has advanced to v4.10.0 after the verified v4.9.0 release. No
-v4.10.0 user-visible changes have been recorded yet.
+The accepted bounded performance campaign improves capture-heavy sort, traversal,
+filesystem wrappers, large strings and FileValue ownership. Ordinary sort and tiny
+save remain architecture targets; official benchmark series stay frozen.
+
+Tracked items add `pre-build`, custom `build`, `post-build` and completion-order
+`depends`. Canonical dotted sidecars are discovered; deprecated hyphenated pre/post
+sidecars remain fallback with clear ambiguity diagnostics. Custom scripts replace
+normal rendering, retain incremental dependency tracking, and must produce their
+tracked output. Independent dependency branches run concurrently; existing
+space-separated hooks keep their compatibility behavior.
+
+`init --rewrite` and `init --redesign` can add missing transformation files inside
+an existing project, preserving every existing file. Build Scripts documentation
+and the documentation-link audit accompany these changes. C ABI remains **1.3**.
 
 ## v4.9.0 (released 2026-10-09)
 

@@ -1,0 +1,8 @@
+check-canonical-display passed: displayed HANDOVER.md is byte-identical to public/HANDOVER.md
+check-canonical-display passed: displayed MIGRATION.md is byte-identical to public/MIGRATION.md
+check-canonical-display passed: displayed REWRITE.md is byte-identical to public/REWRITE.md
+check-canonical-display passed: displayed REDESIGN.md is byte-identical to public/REDESIGN.md
+PASS: transformation routes, metadata, two menus, canonical identity and 19028 local references
+check-syntax-highlight passed: modern Nift + shell grammar recognized
+PASS: agent-readiness surfaces coherent (98 sitemap URLs)
+script extension gate: PASS

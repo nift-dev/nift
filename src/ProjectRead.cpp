@@ -1,3 +1,14 @@
+#ifndef _WIN32
+#include <dirent.h>
+#else
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
+#include <string_view>
+#include <unordered_map>
+#include <unordered_set>
 #include "ProjectRead.h"
 #include "FileSystem.h"
 #include "JsonFile.h"
@@ -251,6 +262,21 @@ bool load_tracking(const fs::path& root, const Config& config, std::vector<Track
             if (entry.has("type")) { if(!entry["type"].is_string()){entries_valid=false;entry_error="tracked type must be a string";return false;} info.type=entry["type"].string; }
             if (entry.has("frontmatter")) { if(!entry["frontmatter"].is_string()){entries_valid=false;entry_error="tracked frontmatter must be a string";return false;} info.frontmatter=entry["frontmatter"].string; }
             for (const auto& key : hook_keys) if (entry.has(key)) { if(!entry[key].is_string()||entry[key].string.empty()){entries_valid=false;entry_error="tracked build hook '"+key+"' must be a non-empty .f path string";return false;} info.build_hooks[key]=entry[key].string; }
+            if(entry.object.size()>3 || (entry.object.size()==3 && !entry.has("template"))) {
+            for (const auto& key : {"pre-build", "build", "post-build"}) if (entry.has(key)) {
+                if (!entry[key].is_string() || entry[key].string.empty() || entry[key].string.find('\0') != std::string::npos || fs::path(entry[key].string).extension() != ".f") { entries_valid=false; entry_error="tracked '"+info.name+"': "+key+" must be a non-empty .f path string"; return false; }
+                info.build_hooks[key]=entry[key].string;
+            }
+            for(const auto& phase:{"pre","post"})if(info.build_hooks.count(std::string(phase)+"-build")&&info.build_hooks.count(std::string(phase)+" build")){entries_valid=false;entry_error="tracked '"+info.name+"': configure only one generic "+phase+" build hook";return false;}
+            if (entry.has("depends")) {
+                if (!entry["depends"].is_array()) { entries_valid=false; entry_error="tracked '"+info.name+"': depends must be an array of tracked names"; return false; }
+                std::unordered_set<std::string> names;
+                for (const auto& value : entry["depends"].array) {
+                    if (!value.is_string() || !valid_tracked_name(value.string) || !names.insert(value.string).second || value.string==info.name) { entries_valid=false; entry_error="tracked '"+info.name+"': invalid, duplicate or self dependency"; return false; }
+                    info.mutable_pipeline().depends.push_back(value.string);
+                }
+            }
+            }
             if (entry.has("content-ext")) {
                 if (!entry["content-ext"].is_string()) {
                     entries_valid = false;
@@ -360,6 +386,7 @@ bool load_tracking(const fs::path& root, const Config& config, std::vector<Track
         }
     }
 
+    std::unordered_map<std::string, std::unordered_set<std::string>> sidecars;
     {
         std::vector<std::string> paths;
         paths.reserve(tracked.size());
@@ -372,6 +399,34 @@ bool load_tracking(const fs::path& root, const Config& config, std::vector<Track
             return false;
         }
 
+        std::unordered_set<std::string_view> parents;
+        for(const auto& path:paths){const auto slash=path.find_last_of('/');parents.insert(slash==std::string::npos?std::string_view("."):std::string_view(path).substr(0,slash));}
+        for(const auto parent:parents) {
+            auto collect=[&](std::string_view filename) {
+                if(filename.size()<2||filename.substr(filename.size()-2)!=".f")return;
+                bool match=false;
+                for(const auto suffix:{".build.f",".pre-build.f",".post-build.f","-pre-build.f","-post-build.f"}) {
+                    const std::string_view ending(suffix);
+                    if(filename.size()>=ending.size()&&filename.substr(filename.size()-ending.size())==ending){match=true;break;}
+                }
+                if(match)sidecars[std::string(parent)].emplace(filename);
+            };
+#ifdef _WIN32
+            const auto pattern=(fs::path(std::string(parent))/"*.f").native();
+            WIN32_FIND_DATAW data;
+            const HANDLE handle=FindFirstFileW(pattern.c_str(),&data);
+            if(handle!=INVALID_HANDLE_VALUE) {
+                struct CloseFind {HANDLE value;~CloseFind(){FindClose(value);}} close{handle};
+                do {collect(fs::path(data.cFileName).generic_u8string());}while(FindNextFileW(handle,&data));
+            }
+#else
+            // Names only: ordinary content must not allocate fs::path per entry.
+            using Directory=std::unique_ptr<DIR,int(*)(DIR*)>;
+            Directory directory(opendir(std::string(parent).c_str()),closedir);
+            if(directory)while(const auto* entry=readdir(directory.get()))collect(entry->d_name);
+#endif
+        }
+        parents.clear();
         paths.clear();
         for (const auto& info : tracked)
             paths.push_back(output_path_of(root, config, info).lexically_normal().generic_string());
@@ -383,6 +438,43 @@ bool load_tracking(const fs::path& root, const Config& config, std::vector<Track
         }
     }
 
+    if(!sidecars.empty()) for (auto& info : tracked) {
+        const auto content = content_path_of(root, config, info).lexically_normal();
+        const auto parent = content.parent_path();
+        const auto it=sidecars.find(parent.empty()?std::string("."):parent.generic_string());
+        if(it==sidecars.end())continue;
+        for (const auto& phase : {"pre-build", "build", "post-build"}) {
+            // Existing explicit space-separated generic hooks take precedence too.
+            const std::string legacy_key = std::string(phase)=="pre-build" ? "pre build" : "post build";
+            if (info.build_hooks.count(phase) || (std::string(phase)!="build" && info.build_hooks.count(legacy_key))) continue;
+            const std::string canonical=content.stem().generic_string()+"."+phase+".f";
+            const std::string legacy=content.stem().generic_string()+"-"+phase+".f";
+            if (it->second.count(canonical) && it->second.count(legacy) && std::string(phase)!="build") {error="tracked '"+info.name+"': both dotted and deprecated sidecars exist; remove or explicitly select one";return false;}
+            if (it->second.count(canonical)) info.mutable_pipeline().discovered_hooks[phase]=(parent/canonical).lexically_relative(root).generic_string();
+            else if (std::string(phase)!="build" && it->second.count(legacy)) info.mutable_pipeline().discovered_hooks[phase]=(parent/legacy).lexically_relative(root).generic_string();
+        }
+    }
+    // Validation is linear and iterative: long chains cannot exhaust the C++ stack.
+    bool any=false; for(const auto& info:tracked) any=any||!info.pipeline().depends.empty();
+    if (any) {
+        std::unordered_map<std::string,std::size_t> names; names.reserve(tracked.size());
+        for(std::size_t i=0;i<tracked.size();++i) names.emplace(tracked[i].name,i);
+        std::vector<unsigned char> color(tracked.size(),0);
+        std::vector<std::pair<std::size_t,std::size_t>> stack;
+        for(std::size_t start=0;start<tracked.size();++start) {
+            if(color[start]) continue;
+            color[start]=1; stack.emplace_back(start,0);
+            while(!stack.empty()) {
+                auto& frame=stack.back(); const auto& deps=tracked[frame.first].pipeline().depends;
+                if(frame.second==deps.size()) {color[frame.first]=2;stack.pop_back();continue;}
+                const auto& name=deps[frame.second++]; auto found=names.find(name);
+                if(found==names.end()){error="tracked '"+tracked[frame.first].name+"': unknown prerequisite '"+name+"'";return false;}
+                const auto next=found->second;
+                if(color[next]==1){error="tracked dependency cycle: ";bool show=false;for(const auto& f:stack){show=show||f.first==next;if(show)error+=tracked[f.first].name+" -> ";}error+=tracked[next].name;return false;}
+                if(!color[next]) {color[next]=1;stack.emplace_back(next,0);}
+            }
+        }
+    }
     return true;
 }
 

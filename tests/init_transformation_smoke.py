@@ -67,8 +67,10 @@ with tempfile.TemporaryDirectory(prefix='nift-transformation-') as tmp:
     for name, data in snapshot(fresh).items():
         if name.endswith('.md'):
             assert snapshot(second)[name] == data, name
-    run(fresh, '--' + mode, f'--{mode}-existing=replace', ok=False)
-    run(fresh, '--' + mode, ok=False)
+    original = snapshot(fresh)
+    run(fresh, '--' + mode, f'--{mode}-existing=replace')
+    run(fresh, '--' + mode)
+    assert snapshot(fresh) == original, 'existing project rerun changed a file'
     for policy in ('error', 'keep', 'append', 'replace'):
         root = project(policy, {workbook: 'owned by user\n', 'HANDOVER.md': 'state\n', 'README.md': '# custom\n', 'AGENTS.md': '# owner instructions\n'})
         run(root, '--' + mode, f'--{mode}-existing={policy}', ok=policy != 'error')

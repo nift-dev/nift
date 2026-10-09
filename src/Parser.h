@@ -74,7 +74,7 @@ public:
     RenderResult render();
 
     // Native script hosts used by direct scripts / the Nift shell.
-    RenderResult run_script(const std::string& source, const std::filesystem::path& source_path);
+    RenderResult run_script(const std::string& source, const std::filesystem::path& source_path, bool project_build = false);
     bool run_embedded_script(const std::string& source, const std::filesystem::path& source_path, nift::RuntimeValue& value, std::string& error, nift::detail::Diagnostic* diagnostic = nullptr);
     RenderResult run_statement(const std::string& source, const std::filesystem::path& source_path);
     void reset_script_control();

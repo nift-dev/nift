@@ -368,7 +368,7 @@ void print_commands() {
     row("packages", "[name]", "Explain why packages are installed (dependency graph)");
 
     std::cout << '\n' << console::dim("General") << '\n';
-    row("init", "[--target=platform] [--ext=.ext] [--handover] [--migration|--rewrite|--redesign] [--MODE-existing=POLICY]", "Create a Nift project; transformation modes add agent-ready workbooks (rewrite/redesign experimental)");
+    row("init", "[--target=platform] [--ext=.ext] [--handover] [--migration|--rewrite|--redesign] [--MODE-existing=POLICY]", "Create a project; rewrite/redesign also add missing workbooks to existing projects (experimental)");
     row("minify", "[-i|--in-place] <files...>", "Minify to *.min.ext by default; -i overwrites sources");
     row("about", "", "About Nift and where to learn more");
     row("version", "", "Show version information");
@@ -1294,6 +1294,33 @@ GuidanceFiles transformation_guidance(TransformationMode mode) {
 }  // namespace
 
 bool initialise_project(const InitOptions& options) {
+    // Existing-project transformation workspaces only add missing files. Even
+    // explicit replace/append options cannot overwrite an existing project.
+    if(options.mode==TransformationMode::Rewrite || options.mode==TransformationMode::Redesign) {
+        fs::path existing=fs::current_path();
+        while(true){if(fs::exists(existing/".nift/config.json")&&fs::exists(existing/".nift/tracked.json"))break;const auto parent=existing.parent_path();if(parent==existing){existing.clear();break;}existing=parent;}
+        if(!existing.empty()) {
+            const std::string mode=transformation_name(options.mode);
+            auto files=transformation_guidance(options.mode);
+            files.emplace_back(transformation_workbook(options.mode),options.mode==TransformationMode::Rewrite?rewrite_content:redesign_content);
+            files.emplace_back("HANDOVER.md",handover_content);
+            files.emplace_back("AGENTS.md",transformation_agents(options.mode));
+            for(const auto& file:files) {
+                const auto destination=existing/file.first;
+                std::error_code ec;
+                const auto state=fs::symlink_status(destination,ec);
+                if(fs::exists(state)){std::cout<<"existing file kept: "<<file.first<<'\n';continue;}
+                // Never follow an existing scaffold directory symlink.
+                for(auto parent=destination.parent_path();parent!=existing;parent=parent.parent_path()) {
+                    ec.clear();if(fs::is_symlink(fs::symlink_status(parent,ec))){console::error("cannot scaffold through symlink: "+parent.generic_string());return false;}
+                }
+                ec.clear();fs::create_directories(destination.parent_path(),ec);
+                if(ec||!filesystem::write_file(destination,file.second)){console::error("failed to scaffold "+file.first);return false;}
+            }
+            std::cout<<"Added missing "<<mode<<" workspace files; existing project files kept\n";
+            return true;
+        }
+    }
     // Refuse to initialize over an existing Nift project. A project root is
     // identified by its project configuration; a partial .nift directory that
     // is not yet a project (for example one left behind by a failed earlier
@@ -2249,6 +2276,17 @@ int run_cli(int argc, char** argv) {
 
     if (command == "untrack" || command == "rm" || command == "del") {
         if (argc < 3) return 1;
+        std::set<std::string> removed;
+        for (int i = 2; i < argc; ++i) removed.insert(argv[i]);
+        for (const auto& info : project.tracked) {
+            if (removed.count(info.name)) continue;
+            for (const auto& dependency : info.pipeline().depends) {
+                if (removed.count(dependency)) {
+                    console::error("cannot remove prerequisite '" + dependency + "' while tracked item '" + info.name + "' depends on it");
+                    return 1;
+                }
+            }
+        }
         // CP2.1: these mutators run a full ownership epoch instead of a probe,
         // so the lock is held continuously for the whole mutation window (no
         // TOCTOU against a concurrently starting build). A live owner and a
@@ -2354,6 +2392,11 @@ int run_cli(int argc, char** argv) {
         if (command == "mv" || command == "move") {
             project.tracked.erase(std::remove_if(project.tracked.begin(), project.tracked.end(), [&](const TrackedInfo& info) { return info.name == source_name; }), project.tracked.end());
             project.invalidate_tracked_index();
+            for (auto& info : project.tracked) {
+                if (std::find(info.pipeline().depends.begin(), info.pipeline().depends.end(), source_name) == info.pipeline().depends.end()) continue;
+                for (auto& dependency : info.mutable_pipeline().depends)
+                    if (dependency == source_name) dependency = destination_name;
+            }
         }
 
         if (!project.save_tracking()) {

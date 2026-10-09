@@ -1,0 +1,1170 @@
+[
+  {
+    "page": "docs/advanced",
+    "source": "content/docs/advanced.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/getting-started.html",
+      "content/examples.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/ai-agents",
+    "source": "content/docs/ai-agents.html",
+    "menu": true,
+    "inbound": [
+      "content/about.html",
+      "content/contact.html",
+      "content/docs.html",
+      "content/docs/getting-started.html",
+      "content/docs/installing.html",
+      "content/docs/why-nift.html",
+      "content/index.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/ai-assistants",
+    "source": "content/docs/ai-assistants.html",
+    "menu": false,
+    "inbound": [],
+    "sitemap": false,
+    "search": "no site-wide search index found",
+    "recommendation": "LINK: needs contextual entry"
+  },
+  {
+    "page": "docs/ai-development",
+    "source": "content/docs/ai-development.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/ai-agents.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/ai-opinion",
+    "source": "content/docs/ai-opinion.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/ai-development.html",
+      "content/docs/comparisons.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/architectural-rules",
+    "source": "content/docs/architectural-rules.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/minification.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/battle-tested",
+    "source": "content/docs/battle-tested.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/ai-development.html",
+      "content/docs/ai-opinion.html",
+      "content/docs/comparisons.html",
+      "content/docs/developer-experience.html",
+      "content/docs/memory-safety.html",
+      "content/docs/production-readiness.html",
+      "content/docs/three-primitives.html",
+      "content/index.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/collections",
+    "source": "content/docs/collections.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/control-flow.html",
+      "content/docs/copying-references.html",
+      "content/docs/declarations-assignments.html",
+      "content/docs/escaping.html",
+      "content/docs/json.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/commands",
+    "source": "content/docs/commands.html",
+    "menu": true,
+    "inbound": [
+      "content/developers.html",
+      "content/docs.html",
+      "content/docs/getting-started.html",
+      "content/docs/incremental-builds.html",
+      "content/docs/metadata.html",
+      "content/docs/partials.html",
+      "content/docs/paths.html",
+      "content/docs/tracked-json.html",
+      "content/docs/use-cases/documentation.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/comments",
+    "source": "content/docs/comments.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/comparisons",
+    "source": "content/docs/comparisons.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/configuration",
+    "source": "content/docs/configuration.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/minification.html",
+      "content/docs/use-cases/documentation.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/contracts",
+    "source": "content/docs/contracts.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/battle-tested.html",
+      "content/docs/project-contracts.html",
+      "content/docs/routes.html",
+      "content/docs/why-nift.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/control-flow",
+    "source": "content/docs/control-flow.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/expressions.html",
+      "content/docs/json-schema.html",
+      "content/docs/pagination.html",
+      "content/docs/templating.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/copying-references",
+    "source": "content/docs/copying-references.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/declarations-assignments",
+    "source": "content/docs/declarations-assignments.html",
+    "menu": true,
+    "inbound": [
+      "content/docs/copying-references.html",
+      "content/docs/expressions.html",
+      "content/docs/json.html",
+      "content/docs/structs.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/dep",
+    "source": "content/docs/dep.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/templating.html",
+      "content/docs/user-dependencies.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/developer-experience",
+    "source": "content/docs/developer-experience.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/escaping",
+    "source": "content/docs/escaping.html",
+    "menu": true,
+    "inbound": [
+      "content/docs/templating.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/existing-sites",
+    "source": "content/docs/existing-sites.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/ai-opinion.html",
+      "content/docs/commands.html",
+      "content/docs/getting-started.html",
+      "content/docs/redesigns.html",
+      "content/docs/rewrites.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/expressions",
+    "source": "content/docs/expressions.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/metadata.html",
+      "content/docs/templating.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/frontmatter",
+    "source": "content/docs/frontmatter.html",
+    "menu": true,
+    "inbound": [
+      "content/docs/project-data.html",
+      "content/docs/taxonomies.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/functions-fragments",
+    "source": "content/docs/functions-fragments.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/structs.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/getting-started",
+    "source": "content/docs/getting-started.html",
+    "menu": true,
+    "inbound": [
+      "content/about.html",
+      "content/docs.html",
+      "content/docs/battle-tested.html",
+      "content/docs/how-nift-works.html",
+      "content/docs/installing.html",
+      "content/docs/partials.html",
+      "content/docs/templating.html",
+      "content/docs/three-primitives.html",
+      "content/docs/use-cases/documentation.html",
+      "content/index.html",
+      "content/templates.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/hierarchy",
+    "source": "content/docs/hierarchy.html",
+    "menu": true,
+    "inbound": [],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/hosting",
+    "source": "content/docs/hosting.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/getting-started.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/how-nift-works",
+    "source": "content/docs/how-nift-works.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/architectural-rules.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/incremental-builds",
+    "source": "content/docs/incremental-builds.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/commands.html",
+      "content/docs/dep.html",
+      "content/docs/getting-started.html",
+      "content/docs/how-nift-works.html",
+      "content/docs/paths.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/installing",
+    "source": "content/docs/installing.html",
+    "menu": true,
+    "inbound": [
+      "content/developers.html",
+      "content/docs.html",
+      "content/docs/getting-started.html",
+      "content/index.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/json-schema",
+    "source": "content/docs/json-schema.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/json.html",
+      "content/docs/project-contracts.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/json",
+    "source": "content/docs/json.html",
+    "menu": true,
+    "inbound": [
+      "content/about.html",
+      "content/docs.html",
+      "content/docs/collections.html",
+      "content/docs/escaping.html",
+      "content/docs/templating.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/lambdas-closures",
+    "source": "content/docs/lambdas-closures.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/collections.html",
+      "content/docs/functions-fragments.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/markdown",
+    "source": "content/docs/markdown.html",
+    "menu": false,
+    "inbound": [],
+    "sitemap": false,
+    "search": "no site-wide search index found",
+    "recommendation": "LINK: needs contextual entry"
+  },
+  {
+    "page": "docs/markup",
+    "source": "content/docs/markup.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/templating.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/memory-safety",
+    "source": "content/docs/memory-safety.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/battle-tested.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/metadata",
+    "source": "content/docs/metadata.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/comments.html",
+      "content/docs/templating.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/minification",
+    "source": "content/docs/minification.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/commands.html",
+      "content/docs/configuration.html",
+      "content/docs/tracked-json.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/pagination",
+    "source": "content/docs/pagination.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/tracked-json.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/partials",
+    "source": "content/docs/partials.html",
+    "menu": true,
+    "inbound": [
+      "content/docs/markup.html",
+      "content/docs/project-structure.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/paths",
+    "source": "content/docs/paths.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/getting-started.html",
+      "content/docs/partials.html",
+      "content/docs/templating.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/performance",
+    "source": "content/docs/performance.html",
+    "menu": false,
+    "inbound": [],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "LINK: needs contextual entry"
+  },
+  {
+    "page": "docs/platforms/amplify",
+    "source": "content/docs/platforms/amplify.html",
+    "menu": true,
+    "inbound": [
+      "content/docs/platforms.html",
+      "content/docs/platforms/netlify.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/platforms/azure",
+    "source": "content/docs/platforms/azure.html",
+    "menu": true,
+    "inbound": [
+      "content/docs/platforms.html",
+      "content/docs/platforms/amplify.html",
+      "content/docs/serverless.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/platforms/cloudflare",
+    "source": "content/docs/platforms/cloudflare.html",
+    "menu": true,
+    "inbound": [
+      "content/docs/platforms.html",
+      "content/docs/platforms/render.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/platforms/firebase",
+    "source": "content/docs/platforms/firebase.html",
+    "menu": true,
+    "inbound": [
+      "content/docs/platforms.html",
+      "content/docs/platforms/azure.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/platforms/github-pages",
+    "source": "content/docs/platforms/github-pages.html",
+    "menu": true,
+    "inbound": [
+      "content/docs/platforms.html",
+      "content/docs/platforms/cloudflare.html",
+      "content/docs/serverless.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/platforms/netlify",
+    "source": "content/docs/platforms/netlify.html",
+    "menu": true,
+    "inbound": [
+      "content/docs/platforms.html",
+      "content/docs/platforms/vercel.html",
+      "content/docs/serverless.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/platforms/render",
+    "source": "content/docs/platforms/render.html",
+    "menu": true,
+    "inbound": [
+      "content/docs/platforms.html",
+      "content/docs/platforms/firebase.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/platforms/supabase",
+    "source": "content/docs/platforms/supabase.html",
+    "menu": true,
+    "inbound": [
+      "content/docs/platforms.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/platforms/vercel",
+    "source": "content/docs/platforms/vercel.html",
+    "menu": true,
+    "inbound": [
+      "content/docs/platforms.html",
+      "content/docs/serverless.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/platforms",
+    "source": "content/docs/platforms.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/commands.html",
+      "content/docs/hosting.html",
+      "content/docs/platforms/github-pages.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/production-readiness",
+    "source": "content/docs/production-readiness.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/comparisons.html",
+      "content/docs/memory-safety.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/project-contracts",
+    "source": "content/docs/project-contracts.html",
+    "menu": true,
+    "inbound": [
+      "content/developers.html",
+      "content/docs.html",
+      "content/docs/battle-tested.html",
+      "content/docs/configuration.html",
+      "content/docs/contracts.html",
+      "content/docs/routes.html",
+      "content/docs/three-primitives.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/project-data",
+    "source": "content/docs/project-data.html",
+    "menu": true,
+    "inbound": [
+      "content/docs/frontmatter.html",
+      "content/docs/hierarchy.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/project-structure",
+    "source": "content/docs/project-structure.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/how-nift-works.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/redesigns",
+    "source": "content/docs/redesigns.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/ai-opinion.html",
+      "content/docs/commands.html",
+      "content/docs/existing-sites.html",
+      "content/docs/rewrites.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/rewrites",
+    "source": "content/docs/rewrites.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/ai-opinion.html",
+      "content/docs/commands.html",
+      "content/docs/existing-sites.html",
+      "content/docs/redesigns.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/routes",
+    "source": "content/docs/routes.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/contracts.html",
+      "content/docs/platforms/vercel.html",
+      "content/docs/project-contracts.html",
+      "content/docs/serverless.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/runtime-atomics",
+    "source": "content/docs/runtime-atomics.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/runtime-concurrency.html",
+      "content/docs/types-optionality-enums.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/runtime-bytes",
+    "source": "content/docs/runtime-bytes.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/runtime-utilities.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/runtime-concurrency",
+    "source": "content/docs/runtime-concurrency.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/functions-fragments.html",
+      "content/docs/runtime-atomics.html",
+      "content/docs/types-optionality-enums.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/runtime-embedding",
+    "source": "content/docs/runtime-embedding.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/ai-opinion.html",
+      "content/docs/runtime-ffi.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/runtime-errors",
+    "source": "content/docs/runtime-errors.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/runtime-utilities.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/runtime-ffi",
+    "source": "content/docs/runtime-ffi.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/runtime-bytes.html",
+      "content/docs/runtime-errors.html",
+      "content/docs/types-optionality-enums.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/runtime-shell-jobs",
+    "source": "content/docs/runtime-shell-jobs.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/runtime-utilities",
+    "source": "content/docs/runtime-utilities.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/schemas",
+    "source": "content/docs/schemas.html",
+    "menu": true,
+    "inbound": [],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/scripting-filesystem",
+    "source": "content/docs/scripting-filesystem.html",
+    "menu": true,
+    "inbound": [
+      "content/docs/scripting-io.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/scripting-imports",
+    "source": "content/docs/scripting-imports.html",
+    "menu": true,
+    "inbound": [
+      "content/about.html",
+      "content/docs/lambdas-closures.html",
+      "content/docs/runtime-errors.html",
+      "content/docs/scripting.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/scripting-io",
+    "source": "content/docs/scripting-io.html",
+    "menu": true,
+    "inbound": [
+      "content/docs/runtime-bytes.html",
+      "content/docs/scripting-run-shell.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/scripting-managed-files",
+    "source": "content/docs/scripting-managed-files.html",
+    "menu": true,
+    "inbound": [
+      "content/docs/scripting-filesystem.html",
+      "content/docs/scripting-streams.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/scripting-run-shell",
+    "source": "content/docs/scripting-run-shell.html",
+    "menu": true,
+    "inbound": [
+      "content/about.html",
+      "content/docs.html",
+      "content/docs/runtime-shell-jobs.html",
+      "content/docs/scripting-imports.html",
+      "content/docs/scripting.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/scripting-streams",
+    "source": "content/docs/scripting-streams.html",
+    "menu": true,
+    "inbound": [
+      "content/docs/scripting-managed-files.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/scripting",
+    "source": "content/docs/scripting.html",
+    "menu": true,
+    "inbound": [
+      "content/about.html",
+      "content/docs.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/serverless",
+    "source": "content/docs/serverless.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/platforms/supabase.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/structs",
+    "source": "content/docs/structs.html",
+    "menu": true,
+    "inbound": [
+      "content/docs/declarations-assignments.html",
+      "content/docs/lambdas-closures.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/taxonomies",
+    "source": "content/docs/taxonomies.html",
+    "menu": true,
+    "inbound": [
+      "content/docs/typed-content.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/template_files",
+    "source": "content/docs/template_files.html",
+    "menu": false,
+    "inbound": [],
+    "sitemap": false,
+    "search": "no site-wide search index found",
+    "recommendation": "LINK: needs contextual entry"
+  },
+  {
+    "page": "docs/templating",
+    "source": "content/docs/templating.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/escaping.html",
+      "content/docs/getting-started.html",
+      "content/docs/how-nift-works.html",
+      "content/docs/partials.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/three-primitives",
+    "source": "content/docs/three-primitives.html",
+    "menu": true,
+    "inbound": [
+      "content/developers.html",
+      "content/docs.html",
+      "content/docs/control-flow.html",
+      "content/docs/getting-started.html",
+      "content/docs/templating.html",
+      "content/docs/why-nift.html",
+      "content/showcase.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/tracked-json",
+    "source": "content/docs/tracked-json.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/configuration.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/typed-content",
+    "source": "content/docs/typed-content.html",
+    "menu": true,
+    "inbound": [
+      "content/docs/schemas.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/types-optionality-enums",
+    "source": "content/docs/types-optionality-enums.html",
+    "menu": true,
+    "inbound": [
+      "content/docs/declarations-assignments.html",
+      "content/docs/expressions.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/use-cases/dashboards",
+    "source": "content/docs/use-cases/dashboards.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/use-cases/documentation",
+    "source": "content/docs/use-cases/documentation.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/use-cases/mobile-development",
+    "source": "content/docs/use-cases/mobile-development.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/use-cases/web-apps.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/use-cases/react-islands",
+    "source": "content/docs/use-cases/react-islands.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/use-cases/text-assets",
+    "source": "content/docs/use-cases/text-assets.html",
+    "menu": true,
+    "inbound": [],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/use-cases/web-apps",
+    "source": "content/docs/use-cases/web-apps.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/hosting.html",
+      "content/docs/use-cases/mobile-development.html",
+      "content/examples.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/user-dependencies",
+    "source": "content/docs/user-dependencies.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/dep.html",
+      "content/docs/how-nift-works.html",
+      "content/docs/project-structure.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  },
+  {
+    "page": "docs/why-nift",
+    "source": "content/docs/why-nift.html",
+    "menu": true,
+    "inbound": [
+      "content/docs.html",
+      "content/docs/advanced.html",
+      "content/docs/ai-opinion.html",
+      "content/docs/battle-tested.html",
+      "content/index.html",
+      "content/showcase.html"
+    ],
+    "sitemap": true,
+    "search": "no site-wide search index found",
+    "recommendation": "menu"
+  }
+]

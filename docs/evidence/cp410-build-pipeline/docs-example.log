@@ -1,0 +1,9 @@
+Preparing search-index
+Finished search-index
+built search-index
+built api-index
+    ↳ generated output is missing
+    ↳ page build metadata is missing
+2 target/prerequisite items built; 0 prerequisites up to date; build succeeded
+time taken: 0.002153 seconds
+PASS canonical full example

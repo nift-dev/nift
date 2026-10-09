@@ -1,0 +1,45 @@
+CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-linux-gnu-cc"
+python3 tests/v410_build_pipeline.py --nift "/home/nick/Repositories/nift/nift/nift"
+NIFT_BIN="/home/nick/Repositories/nift/nift/nift" python3 tests/init_transformation_smoke.py --mode rewrite
+PASS custom replaces render; pre/main/post; dependency recording; incremental
+PASS all scripts and content invalidate
+PASS failure pre-build
+PASS repair pre-build
+PASS failure build
+PASS repair build
+PASS failure post-build
+PASS repair post-build
+PASS failure missing-output
+PASS repair missing-output
+PASS sidecars; conflict; explicit precedence
+PASS chain ordering, targeted closure, clean prerequisites and no invalidation
+PASS diamond ordering, targeted closure, clean prerequisites and no invalidation
+PASS transitive failure propagation; independent branch; recovery
+PASS missing/self/duplicate/cycle/type validation before mutation
+PASS parallel independent branches with deterministic barrier
+PASS normal/custom composition
+init-rewrite: PASS (96 black-box initialization cases)
+NIFT_BIN="/home/nick/Repositories/nift/nift/nift" python3 tests/init_transformation_smoke.py --mode redesign
+PASS 10k iterative cycle diagnostic
+PASS transitive closure across a clean intermediate
+PASS same-pass ordinary file invalidation, multiple consumers hash
+PASS same-pass ordinary file invalidation, multiple consumers modified
+PASS generated output alias cache freshness
+PASS tracking serialization, rename references and safe prerequisite removal
+init-redesign: PASS (96 black-box initialization cases)
+PASS build-auto reloads changed script and dependency graph
+python3 tests/init_scaffold_functional_truth.py --nift "/home/nick/Repositories/nift/nift/nift"
+PASS existing project preservation/idempotency ('rewrite', 'redesign')
+PASS existing project preservation/idempotency ('redesign', 'rewrite')
+PASS fresh rewrite
+PASS fresh redesign
+BH6 init/starter functional truth: PASS
+NIFT_BIN="/home/nick/Repositories/nift/nift/nift" tests/init_targets_smoke.sh
+PASS 28 build pipeline groups
+NIFT_BIN="/home/nick/Repositories/nift/nift/nift" tests/pagination_ordering_smoke.sh
+Pagination ordering smoke test passed (output 1 < cleanup 3 < info 4)
+python3 scripts/gen_migration_content.py --check
+verify: src/migration_content.h byte-exact (16939 bytes)
+verify: src/rewrite_content.h byte-exact (8385 bytes)
+verify: src/redesign_content.h byte-exact (9483 bytes)
+init targets smoke test passed
