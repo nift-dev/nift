@@ -328,7 +328,26 @@ private:
                            const std::vector<nift::RuntimeValue>& args,
                            nift::RuntimeValue& out, std::string& error);
     bool callable_contains_timer_resource(const nift::RuntimeValue& callable) const;
-    bool evaluate_expression_impl(const std::string& expression, nift::RuntimeValue& value, std::string& error, nift::detail::SourceView view);
+    struct PreparedFilesystemOperand {
+        std::string text;
+        std::size_t begin=0, length=0;
+        bool quoted=false;
+        std::shared_ptr<const nift::ast::Expr> pure_plan;
+    };
+    static std::shared_ptr<const nift::ast::Expr> prepare_pure_string_plan(const std::string& source);
+    bool evaluate_pure_string_plan(const nift::ast::Expr& expression, nift::RuntimeValue& out);
+    struct PreparedFilesystemOperation {
+        enum class Kind { Stat, Copy, Move };
+        Kind kind=Kind::Stat;
+        std::string method;
+        std::vector<PreparedFilesystemOperand> operands;
+    };
+    bool execute_filesystem_operation(PreparedFilesystemOperation::Kind kind, std::size_t operand_count,
+        const std::function<bool(std::size_t,nift::RuntimeValue&)>& operand,
+        nift::RuntimeValue& out, std::string& error);
+    std::shared_ptr<const PreparedFilesystemOperation> prepare_filesystem_operation(const std::string& source) const;
+    bool evaluate_filesystem_expression(const std::string& expression, nift::RuntimeValue& value, std::string& error, nift::detail::SourceView view, const PreparedFilesystemOperation* recipe);
+    bool evaluate_expression_impl(const std::string& expression, nift::RuntimeValue& value, std::string& error, nift::detail::SourceView view, const PreparedFilesystemOperation* recipe=nullptr);
     struct FfiLibraryInstance {
         void* handle = nullptr;
         bool closed = false;

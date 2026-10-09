@@ -1,0 +1,239 @@
+mkdir -p ".build/san-lifetime/src/"
+mkdir -p ".build/san-lifetime/src/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "src/nift.cpp" -o ".build/san-lifetime/src/nift.o"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "src/ProjectOwnership.cpp" -o ".build/san-lifetime/src/ProjectOwnership.o"
+mkdir -p ".build/san-lifetime/src/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "src/PackageTransaction.cpp" -o ".build/san-lifetime/src/PackageTransaction.o"
+mkdir -p ".build/san-lifetime/src/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "src/CLI.cpp" -o ".build/san-lifetime/src/CLI.o"
+mkdir -p ".build/san-lifetime/src/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "src/Process.cpp" -o ".build/san-lifetime/src/Process.o"
+mkdir -p ".build/san-lifetime/src/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "src/JobControl.cpp" -o ".build/san-lifetime/src/JobControl.o"
+mkdir -p ".build/san-lifetime/src/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "src/RuntimeValue.cpp" -o ".build/san-lifetime/src/RuntimeValue.o"
+mkdir -p ".build/san-lifetime/src/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "src/Value.cpp" -o ".build/san-lifetime/src/Value.o"
+mkdir -p ".build/san-lifetime/src/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "src/FileSystem.cpp" -o ".build/san-lifetime/src/FileSystem.o"
+mkdir -p ".build/san-lifetime/src/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "src/JsonFile.cpp" -o ".build/san-lifetime/src/JsonFile.o"
+mkdir -p ".build/san-lifetime/src/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "src/JsonSchema.cpp" -o ".build/san-lifetime/src/JsonSchema.o"
+In file included from /usr/include/c++/15/regex:51,
+                 from src/JsonSchema.cpp:7:
+In constructor ‘std::function<_Res(_ArgTypes ...)>::function(std::function<_Res(_ArgTypes ...)>&&) [with _Res = bool; _ArgTypes = {char}]’,
+    inlined from ‘std::__detail::_State<_Char_type>::_State(std::__detail::_State<_Char_type>&&) [with _Char_type = char]’ at /usr/include/c++/15/bits/regex_automaton.h:152:4,
+    inlined from ‘std::__detail::_StateIdT std::__detail::_NFA<_TraitsT>::_M_insert_subexpr_end() [with _TraitsT = std::__cxx11::regex_traits<char>]’ at /usr/include/c++/15/bits/regex_automaton.h:293:24:
+/usr/include/c++/15/bits/std_function.h:407:42: warning: ‘*(std::function<bool(char)>*)((char*)&__tmp + offsetof(std::__detail::_StateT, std::__detail::_State<char>::<unnamed>.std::__detail::_State_base::<unnamed>)).std::function<bool(char)>::_M_invoker’ may be used uninitialized [-Wmaybe-uninitialized]
+  407 |       : _Function_base(), _M_invoker(__x._M_invoker)
+      |                                      ~~~~^~~~~~~~~~
+In file included from /usr/include/c++/15/regex:66:
+/usr/include/c++/15/bits/regex_automaton.h: In member function ‘std::__detail::_StateIdT std::__detail::_NFA<_TraitsT>::_M_insert_subexpr_end() [with _TraitsT = std::__cxx11::regex_traits<char>]’:
+/usr/include/c++/15/bits/regex_automaton.h:290:17: note: ‘__tmp’ declared here
+  290 |         _StateT __tmp(_S_opcode_subexpr_end);
+      |                 ^~~~~
+In member function ‘bool std::_Function_base::_M_empty() const’,
+    inlined from ‘std::function<_Res(_ArgTypes ...)>::operator bool() const [with _Res = bool; _ArgTypes = {char}]’ at /usr/include/c++/15/bits/std_function.h:576:25,
+    inlined from ‘std::function<_Res(_ArgTypes ...)>::function(std::function<_Res(_ArgTypes ...)>&&) [with _Res = bool; _ArgTypes = {char}]’ at /usr/include/c++/15/bits/std_function.h:409:6,
+    inlined from ‘std::__detail::_State<_Char_type>::_State(std::__detail::_State<_Char_type>&&) [with _Char_type = char]’ at /usr/include/c++/15/bits/regex_automaton.h:152:4,
+    inlined from ‘std::__detail::_StateIdT std::__detail::_NFA<_TraitsT>::_M_insert_subexpr_end() [with _TraitsT = std::__cxx11::regex_traits<char>]’ at /usr/include/c++/15/bits/regex_automaton.h:293:24:
+/usr/include/c++/15/bits/std_function.h:249:37: warning: ‘*(const std::_Function_base*)((char*)&__tmp + offsetof(std::__detail::_StateT, std::__detail::_State<char>::<unnamed>.std::__detail::_State_base::<unnamed>)).std::_Function_base::_M_manager’ may be used uninitialized [-Wmaybe-uninitialized]
+  249 |     bool _M_empty() const { return !_M_manager; }
+      |                                     ^~~~~~~~~~
+/usr/include/c++/15/bits/regex_automaton.h: In member function ‘std::__detail::_StateIdT std::__detail::_NFA<_TraitsT>::_M_insert_subexpr_end() [with _TraitsT = std::__cxx11::regex_traits<char>]’:
+/usr/include/c++/15/bits/regex_automaton.h:290:17: note: ‘__tmp’ declared here
+  290 |         _StateT __tmp(_S_opcode_subexpr_end);
+      |                 ^~~~~
+In constructor ‘std::function<_Res(_ArgTypes ...)>::function(std::function<_Res(_ArgTypes ...)>&&) [with _Res = bool; _ArgTypes = {char}]’,
+    inlined from ‘std::__detail::_State<_Char_type>::_State(std::__detail::_State<_Char_type>&&) [with _Char_type = char]’ at /usr/include/c++/15/bits/regex_automaton.h:152:4,
+    inlined from ‘std::__detail::_StateIdT std::__detail::_NFA<_TraitsT>::_M_insert_subexpr_begin() [with _TraitsT = std::__cxx11::regex_traits<char>]’ at /usr/include/c++/15/bits/regex_automaton.h:284:24:
+/usr/include/c++/15/bits/std_function.h:407:42: warning: ‘*(std::function<bool(char)>*)((char*)&__tmp + offsetof(std::__detail::_StateT, std::__detail::_State<char>::<unnamed>.std::__detail::_State_base::<unnamed>)).std::function<bool(char)>::_M_invoker’ may be used uninitialized [-Wmaybe-uninitialized]
+  407 |       : _Function_base(), _M_invoker(__x._M_invoker)
+      |                                      ~~~~^~~~~~~~~~
+/usr/include/c++/15/bits/regex_automaton.h: In member function ‘std::__detail::_StateIdT std::__detail::_NFA<_TraitsT>::_M_insert_subexpr_begin() [with _TraitsT = std::__cxx11::regex_traits<char>]’:
+/usr/include/c++/15/bits/regex_automaton.h:282:17: note: ‘__tmp’ declared here
+  282 |         _StateT __tmp(_S_opcode_subexpr_begin);
+      |                 ^~~~~
+In member function ‘bool std::_Function_base::_M_empty() const’,
+    inlined from ‘std::function<_Res(_ArgTypes ...)>::operator bool() const [with _Res = bool; _ArgTypes = {char}]’ at /usr/include/c++/15/bits/std_function.h:576:25,
+    inlined from ‘std::function<_Res(_ArgTypes ...)>::function(std::function<_Res(_ArgTypes ...)>&&) [with _Res = bool; _ArgTypes = {char}]’ at /usr/include/c++/15/bits/std_function.h:409:6,
+    inlined from ‘std::__detail::_State<_Char_type>::_State(std::__detail::_State<_Char_type>&&) [with _Char_type = char]’ at /usr/include/c++/15/bits/regex_automaton.h:152:4,
+    inlined from ‘std::__detail::_StateIdT std::__detail::_NFA<_TraitsT>::_M_insert_subexpr_begin() [with _TraitsT = std::__cxx11::regex_traits<char>]’ at /usr/include/c++/15/bits/regex_automaton.h:284:24:
+/usr/include/c++/15/bits/std_function.h:249:37: warning: ‘*(const std::_Function_base*)((char*)&__tmp + offsetof(std::__detail::_StateT, std::__detail::_State<char>::<unnamed>.std::__detail::_State_base::<unnamed>)).std::_Function_base::_M_manager’ may be used uninitialized [-Wmaybe-uninitialized]
+  249 |     bool _M_empty() const { return !_M_manager; }
+      |                                     ^~~~~~~~~~
+/usr/include/c++/15/bits/regex_automaton.h: In member function ‘std::__detail::_StateIdT std::__detail::_NFA<_TraitsT>::_M_insert_subexpr_begin() [with _TraitsT = std::__cxx11::regex_traits<char>]’:
+/usr/include/c++/15/bits/regex_automaton.h:282:17: note: ‘__tmp’ declared here
+  282 |         _StateT __tmp(_S_opcode_subexpr_begin);
+      |                 ^~~~~
+In constructor ‘std::function<_Res(_ArgTypes ...)>::function(std::function<_Res(_ArgTypes ...)>&&) [with _Res = bool; _ArgTypes = {char}]’,
+    inlined from ‘std::__detail::_State<_Char_type>::_State(std::__detail::_State<_Char_type>&&) [with _Char_type = char]’ at /usr/include/c++/15/bits/regex_automaton.h:152:4,
+    inlined from ‘std::__detail::_StateIdT std::__detail::_NFA<_TraitsT>::_M_insert_backref(std::size_t) [with _TraitsT = std::__cxx11::regex_traits<char>]’ at /usr/include/c++/15/bits/regex_automaton.tcc:177:29:
+/usr/include/c++/15/bits/std_function.h:407:42: warning: ‘*(std::function<bool(char)>*)((char*)&__tmp + offsetof(std::__detail::_StateT, std::__detail::_State<char>::<unnamed>.std::__detail::_State_base::<unnamed>)).std::function<bool(char)>::_M_invoker’ may be used uninitialized [-Wmaybe-uninitialized]
+  407 |       : _Function_base(), _M_invoker(__x._M_invoker)
+      |                                      ~~~~^~~~~~~~~~
+In file included from /usr/include/c++/15/bits/regex_automaton.h:405:
+/usr/include/c++/15/bits/regex_automaton.tcc: In member function ‘std::__detail::_StateIdT std::__detail::_NFA<_TraitsT>::_M_insert_backref(std::size_t) [with _TraitsT = std::__cxx11::regex_traits<char>]’:
+/usr/include/c++/15/bits/regex_automaton.tcc:175:15: note: ‘__tmp’ declared here
+  175 |       _StateT __tmp(_S_opcode_backref);
+      |               ^~~~~
+In member function ‘bool std::_Function_base::_M_empty() const’,
+    inlined from ‘std::function<_Res(_ArgTypes ...)>::operator bool() const [with _Res = bool; _ArgTypes = {char}]’ at /usr/include/c++/15/bits/std_function.h:576:25,
+    inlined from ‘std::function<_Res(_ArgTypes ...)>::function(std::function<_Res(_ArgTypes ...)>&&) [with _Res = bool; _ArgTypes = {char}]’ at /usr/include/c++/15/bits/std_function.h:409:6,
+    inlined from ‘std::__detail::_State<_Char_type>::_State(std::__detail::_State<_Char_type>&&) [with _Char_type = char]’ at /usr/include/c++/15/bits/regex_automaton.h:152:4,
+    inlined from ‘std::__detail::_StateIdT std::__detail::_NFA<_TraitsT>::_M_insert_backref(std::size_t) [with _TraitsT = std::__cxx11::regex_traits<char>]’ at /usr/include/c++/15/bits/regex_automaton.tcc:177:29:
+/usr/include/c++/15/bits/std_function.h:249:37: warning: ‘*(const std::_Function_base*)((char*)&__tmp + offsetof(std::__detail::_StateT, std::__detail::_State<char>::<unnamed>.std::__detail::_State_base::<unnamed>)).std::_Function_base::_M_manager’ may be used uninitialized [-Wmaybe-uninitialized]
+  249 |     bool _M_empty() const { return !_M_manager; }
+      |                                     ^~~~~~~~~~
+/usr/include/c++/15/bits/regex_automaton.tcc: In member function ‘std::__detail::_StateIdT std::__detail::_NFA<_TraitsT>::_M_insert_backref(std::size_t) [with _TraitsT = std::__cxx11::regex_traits<char>]’:
+/usr/include/c++/15/bits/regex_automaton.tcc:175:15: note: ‘__tmp’ declared here
+  175 |       _StateT __tmp(_S_opcode_backref);
+      |               ^~~~~
+In constructor ‘std::function<_Res(_ArgTypes ...)>::function(std::function<_Res(_ArgTypes ...)>&&) [with _Res = bool; _ArgTypes = {char}]’,
+    inlined from ‘std::__detail::_State<_Char_type>::_State(std::__detail::_State<_Char_type>&&) [with _Char_type = char]’ at /usr/include/c++/15/bits/regex_automaton.h:152:4,
+    inlined from ‘std::__detail::_StateIdT std::__detail::_NFA<_TraitsT>::_M_insert_repeat(std::__detail::_StateIdT, std::__detail::_StateIdT, bool) [with _TraitsT = std::__cxx11::regex_traits<char>]’ at /usr/include/c++/15/bits/regex_automaton.h:266:24:
+/usr/include/c++/15/bits/std_function.h:407:42: warning: ‘*(std::function<bool(char)>*)((char*)&__tmp + offsetof(std::__detail::_StateT, std::__detail::_State<char>::<unnamed>.std::__detail::_State_base::<unnamed>)).std::function<bool(char)>::_M_invoker’ may be used uninitialized [-Wmaybe-uninitialized]
+  407 |       : _Function_base(), _M_invoker(__x._M_invoker)
+      |                                      ~~~~^~~~~~~~~~
+/usr/include/c++/15/bits/regex_automaton.h: In member function ‘std::__detail::_StateIdT std::__detail::_NFA<_TraitsT>::_M_insert_repeat(std::__detail::_StateIdT, std::__detail::_StateIdT, bool) [with _TraitsT = std::__cxx11::regex_traits<char>]’:
+/usr/include/c++/15/bits/regex_automaton.h:260:17: note: ‘__tmp’ declared here
+  260 |         _StateT __tmp(_S_opcode_repeat);
+      |                 ^~~~~
+In member function ‘bool std::_Function_base::_M_empty() const’,
+    inlined from ‘std::function<_Res(_ArgTypes ...)>::operator bool() const [with _Res = bool; _ArgTypes = {char}]’ at /usr/include/c++/15/bits/std_function.h:576:25,
+    inlined from ‘std::function<_Res(_ArgTypes ...)>::function(std::function<_Res(_ArgTypes ...)>&&) [with _Res = bool; _ArgTypes = {char}]’ at /usr/include/c++/15/bits/std_function.h:409:6,
+    inlined from ‘std::__detail::_State<_Char_type>::_State(std::__detail::_State<_Char_type>&&) [with _Char_type = char]’ at /usr/include/c++/15/bits/regex_automaton.h:152:4,
+    inlined from ‘std::__detail::_StateIdT std::__detail::_NFA<_TraitsT>::_M_insert_repeat(std::__detail::_StateIdT, std::__detail::_StateIdT, bool) [with _TraitsT = std::__cxx11::regex_traits<char>]’ at /usr/include/c++/15/bits/regex_automaton.h:266:24:
+/usr/include/c++/15/bits/std_function.h:249:37: warning: ‘*(const std::_Function_base*)((char*)&__tmp + offsetof(std::__detail::_StateT, std::__detail::_State<char>::<unnamed>.std::__detail::_State_base::<unnamed>)).std::_Function_base::_M_manager’ may be used uninitialized [-Wmaybe-uninitialized]
+  249 |     bool _M_empty() const { return !_M_manager; }
+      |                                     ^~~~~~~~~~
+/usr/include/c++/15/bits/regex_automaton.h: In member function ‘std::__detail::_StateIdT std::__detail::_NFA<_TraitsT>::_M_insert_repeat(std::__detail::_StateIdT, std::__detail::_StateIdT, bool) [with _TraitsT = std::__cxx11::regex_traits<char>]’:
+/usr/include/c++/15/bits/regex_automaton.h:260:17: note: ‘__tmp’ declared here
+  260 |         _StateT __tmp(_S_opcode_repeat);
+      |                 ^~~~~
+mkdir -p ".build/san-lifetime/minifypp/src/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "minifypp/src/Minify.cpp" -o ".build/san-lifetime/minifypp/src/Minify.o"
+In constructor ‘std::function<_Res(_ArgTypes ...)>::function(std::function<_Res(_ArgTypes ...)>&&) [with _Res = bool; _ArgTypes = {char}]’,
+    inlined from ‘std::__detail::_State<_Char_type>::_State(std::__detail::_State<_Char_type>&&) [with _Char_type = char]’ at /usr/include/c++/15/bits/regex_automaton.h:152:4,
+    inlined from ‘std::__detail::_StateIdT std::__detail::_NFA<_TraitsT>::_M_insert_alt(std::__detail::_StateIdT, std::__detail::_StateIdT, bool) [with _TraitsT = std::__cxx11::regex_traits<char>]’ at /usr/include/c++/15/bits/regex_automaton.h:254:24,
+    inlined from ‘void std::__detail::_Compiler<_TraitsT>::_M_disjunction() [with _TraitsT = std::__cxx11::regex_traits<char>]’ at /usr/include/c++/15/bits/regex_compiler.tcc:106:18:
+/usr/include/c++/15/bits/std_function.h:407:42: warning: ‘*(std::function<bool(char)>*)((char*)&__tmp + offsetof(std::__detail::_StateT, std::__detail::_State<char>::<unnamed>.std::__detail::_State_base::<unnamed>)).std::function<bool(char)>::_M_invoker’ may be used uninitialized [-Wmaybe-uninitialized]
+  407 |       : _Function_base(), _M_invoker(__x._M_invoker)
+      |                                      ~~~~^~~~~~~~~~
+/usr/include/c++/15/bits/regex_automaton.h: In member function ‘void std::__detail::_Compiler<_TraitsT>::_M_disjunction() [with _TraitsT = std::__cxx11::regex_traits<char>]’:
+/usr/include/c++/15/bits/regex_automaton.h:249:17: note: ‘__tmp’ declared here
+  249 |         _StateT __tmp(_S_opcode_alternative);
+      |                 ^~~~~
+In member function ‘bool std::_Function_base::_M_empty() const’,
+    inlined from ‘std::function<_Res(_ArgTypes ...)>::operator bool() const [with _Res = bool; _ArgTypes = {char}]’ at /usr/include/c++/15/bits/std_function.h:576:25,
+    inlined from ‘std::function<_Res(_ArgTypes ...)>::function(std::function<_Res(_ArgTypes ...)>&&) [with _Res = bool; _ArgTypes = {char}]’ at /usr/include/c++/15/bits/std_function.h:409:6,
+    inlined from ‘std::__detail::_State<_Char_type>::_State(std::__detail::_State<_Char_type>&&) [with _Char_type = char]’ at /usr/include/c++/15/bits/regex_automaton.h:152:4,
+    inlined from ‘std::__detail::_StateIdT std::__detail::_NFA<_TraitsT>::_M_insert_alt(std::__detail::_StateIdT, std::__detail::_StateIdT, bool) [with _TraitsT = std::__cxx11::regex_traits<char>]’ at /usr/include/c++/15/bits/regex_automaton.h:254:24,
+    inlined from ‘void std::__detail::_Compiler<_TraitsT>::_M_disjunction() [with _TraitsT = std::__cxx11::regex_traits<char>]’ at /usr/include/c++/15/bits/regex_compiler.tcc:106:18:
+/usr/include/c++/15/bits/std_function.h:249:37: warning: ‘*(const std::_Function_base*)((char*)&__tmp + offsetof(std::__detail::_StateT, std::__detail::_State<char>::<unnamed>.std::__detail::_State_base::<unnamed>)).std::_Function_base::_M_manager’ may be used uninitialized [-Wmaybe-uninitialized]
+  249 |     bool _M_empty() const { return !_M_manager; }
+      |                                     ^~~~~~~~~~
+/usr/include/c++/15/bits/regex_automaton.h: In member function ‘void std::__detail::_Compiler<_TraitsT>::_M_disjunction() [with _TraitsT = std::__cxx11::regex_traits<char>]’:
+/usr/include/c++/15/bits/regex_automaton.h:249:17: note: ‘__tmp’ declared here
+  249 |         _StateT __tmp(_S_opcode_alternative);
+      |                 ^~~~~
+mkdir -p ".build/san-lifetime/markuppp/src/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "markuppp/src/Markup.cpp" -o ".build/san-lifetime/markuppp/src/Markup.o"
+mkdir -p ".build/san-lifetime/markuppp/src/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "markuppp/src/AsciiDoc.cpp" -o ".build/san-lifetime/markuppp/src/AsciiDoc.o"
+mkdir -p ".build/san-lifetime/markuppp/src/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "markuppp/src/ReStructuredText.cpp" -o ".build/san-lifetime/markuppp/src/ReStructuredText.o"
+mkdir -p ".build/san-lifetime/src/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "src/Parser.cpp" -o ".build/san-lifetime/src/Parser.o"
+mkdir -p ".build/san-lifetime/src/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "src/ParserAsyncPool.cpp" -o ".build/san-lifetime/src/ParserAsyncPool.o"
+mkdir -p ".build/san-lifetime/src/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "src/ParserExpression.cpp" -o ".build/san-lifetime/src/ParserExpression.o"
+mkdir -p ".build/san-lifetime/src/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "src/ParserHelpers.cpp" -o ".build/san-lifetime/src/ParserHelpers.o"
+mkdir -p ".build/san-lifetime/src/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "src/ParserScript.cpp" -o ".build/san-lifetime/src/ParserScript.o"
+mkdir -p ".build/san-lifetime/src/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "src/ParserTemplate.cpp" -o ".build/san-lifetime/src/ParserTemplate.o"
+mkdir -p ".build/san-lifetime/src/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "src/ProjectInfo.cpp" -o ".build/san-lifetime/src/ProjectInfo.o"
+mkdir -p ".build/san-lifetime/src/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "src/ProjectRead.cpp" -o ".build/san-lifetime/src/ProjectRead.o"
+mkdir -p ".build/san-lifetime/src/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "src/ProjectState.cpp" -o ".build/san-lifetime/src/ProjectState.o"
+mkdir -p ".build/san-lifetime/src/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "src/WatchList.cpp" -o ".build/san-lifetime/src/WatchList.o"
+mkdir -p ".build/san-lifetime/src/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "src/BuildProgress.cpp" -o ".build/san-lifetime/src/BuildProgress.o"
+mkdir -p ".build/san-lifetime/src/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "src/Automation.cpp" -o ".build/san-lifetime/src/Automation.o"
+mkdir -p ".build/san-lifetime/src/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "src/Hooks.cpp" -o ".build/san-lifetime/src/Hooks.o"
+src/ParserExpression.cpp: In lambda function:
+src/ParserExpression.cpp:1381:37: note: variable tracking size limit exceeded with ‘-fvar-tracking-assignments’, retrying without
+ 1381 |         const auto evaluate_slice = [&]() -> bool {
+      |                                     ^
+mkdir -p ".build/san-lifetime/src/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "src/Ast.cpp" -o ".build/san-lifetime/src/Ast.o"
+mkdir -p ".build/san-lifetime/src/embed/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "src/embed/Engine.cpp" -o ".build/san-lifetime/src/embed/Engine.o"
+mkdir -p ".build/san-lifetime/src/embed/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "src/embed/Context.cpp" -o ".build/san-lifetime/src/embed/Context.o"
+mkdir -p ".build/san-lifetime/src/embed/"
+g++ -Isrc -Iinclude -Iminifypp/include -Iminifypp/src -Imarkuppp/include -Imarkuppp/vendor/cmark -I.build/libffi/sanitize-x86_64-linux-gnu-cc/install/include -std=c++17 -Wall -Wextra -pedantic -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "src/embed/c_abi.cpp" -o ".build/san-lifetime/src/embed/c_abi.o"
+mkdir -p ".build/san-lifetime/markuppp/vendor/cmark/"
+cc -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "markuppp/vendor/cmark/blocks.c" -o ".build/san-lifetime/markuppp/vendor/cmark/blocks.o"
+mkdir -p ".build/san-lifetime/markuppp/vendor/cmark/"
+cc -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "markuppp/vendor/cmark/buffer.c" -o ".build/san-lifetime/markuppp/vendor/cmark/buffer.o"
+mkdir -p ".build/san-lifetime/markuppp/vendor/cmark/"
+cc -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "markuppp/vendor/cmark/cmark.c" -o ".build/san-lifetime/markuppp/vendor/cmark/cmark.o"
+mkdir -p ".build/san-lifetime/markuppp/vendor/cmark/"
+cc -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "markuppp/vendor/cmark/cmark_ctype.c" -o ".build/san-lifetime/markuppp/vendor/cmark/cmark_ctype.o"
+mkdir -p ".build/san-lifetime/markuppp/vendor/cmark/"
+cc -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "markuppp/vendor/cmark/houdini_href_e.c" -o ".build/san-lifetime/markuppp/vendor/cmark/houdini_href_e.o"
+mkdir -p ".build/san-lifetime/markuppp/vendor/cmark/"
+cc -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "markuppp/vendor/cmark/houdini_html_e.c" -o ".build/san-lifetime/markuppp/vendor/cmark/houdini_html_e.o"
+mkdir -p ".build/san-lifetime/markuppp/vendor/cmark/"
+cc -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "markuppp/vendor/cmark/houdini_html_u.c" -o ".build/san-lifetime/markuppp/vendor/cmark/houdini_html_u.o"
+mkdir -p ".build/san-lifetime/markuppp/vendor/cmark/"
+cc -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "markuppp/vendor/cmark/html.c" -o ".build/san-lifetime/markuppp/vendor/cmark/html.o"
+mkdir -p ".build/san-lifetime/markuppp/vendor/cmark/"
+cc -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "markuppp/vendor/cmark/inlines.c" -o ".build/san-lifetime/markuppp/vendor/cmark/inlines.o"
+mkdir -p ".build/san-lifetime/markuppp/vendor/cmark/"
+cc -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "markuppp/vendor/cmark/iterator.c" -o ".build/san-lifetime/markuppp/vendor/cmark/iterator.o"
+mkdir -p ".build/san-lifetime/markuppp/vendor/cmark/"
+cc -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "markuppp/vendor/cmark/node.c" -o ".build/san-lifetime/markuppp/vendor/cmark/node.o"
+mkdir -p ".build/san-lifetime/markuppp/vendor/cmark/"
+cc -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "markuppp/vendor/cmark/references.c" -o ".build/san-lifetime/markuppp/vendor/cmark/references.o"
+mkdir -p ".build/san-lifetime/markuppp/vendor/cmark/"
+cc -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "markuppp/vendor/cmark/render.c" -o ".build/san-lifetime/markuppp/vendor/cmark/render.o"
+mkdir -p ".build/san-lifetime/markuppp/vendor/cmark/"
+cc -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "markuppp/vendor/cmark/scanners.c" -o ".build/san-lifetime/markuppp/vendor/cmark/scanners.o"
+mkdir -p ".build/san-lifetime/markuppp/vendor/cmark/"
+cc -Imarkuppp/vendor/cmark -std=c99 -Wall -Wextra -pedantic -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -MMD -MP -c "markuppp/vendor/cmark/utf8.c" -o ".build/san-lifetime/markuppp/vendor/cmark/utf8.o"
+CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-address-use-after-scope" bash scripts/build_vendored_libffi.sh ".build/libffi/sanitize-x86_64-linux-gnu-cc"
+BUILD vendored libffi (sanitize-x86_64-linux-gnu-cc)
+BUILD vendored libffi: done (6s)
+mkdir -p ".build"
+g++ -std=c++17 -pthread -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined .build/san-lifetime/src/nift.o .build/san-lifetime/src/ProjectOwnership.o .build/san-lifetime/src/PackageTransaction.o .build/san-lifetime/src/CLI.o .build/san-lifetime/src/Process.o .build/san-lifetime/src/JobControl.o .build/san-lifetime/src/RuntimeValue.o .build/san-lifetime/src/Value.o .build/san-lifetime/src/FileSystem.o .build/san-lifetime/src/JsonFile.o .build/san-lifetime/src/JsonSchema.o .build/san-lifetime/minifypp/src/Minify.o .build/san-lifetime/markuppp/src/Markup.o .build/san-lifetime/markuppp/src/AsciiDoc.o .build/san-lifetime/markuppp/src/ReStructuredText.o .build/san-lifetime/src/Parser.o .build/san-lifetime/src/ParserAsyncPool.o .build/san-lifetime/src/ParserExpression.o .build/san-lifetime/src/ParserHelpers.o .build/san-lifetime/src/ParserScript.o .build/san-lifetime/src/ParserTemplate.o .build/san-lifetime/src/ProjectInfo.o .build/san-lifetime/src/ProjectRead.o .build/san-lifetime/src/ProjectState.o .build/san-lifetime/src/WatchList.o .build/san-lifetime/src/BuildProgress.o .build/san-lifetime/src/Automation.o .build/san-lifetime/src/Hooks.o .build/san-lifetime/src/Ast.o .build/san-lifetime/src/embed/Engine.o .build/san-lifetime/src/embed/Context.o .build/san-lifetime/src/embed/c_abi.o .build/san-lifetime/markuppp/vendor/cmark/blocks.o .build/san-lifetime/markuppp/vendor/cmark/buffer.o .build/san-lifetime/markuppp/vendor/cmark/cmark.o .build/san-lifetime/markuppp/vendor/cmark/cmark_ctype.o .build/san-lifetime/markuppp/vendor/cmark/houdini_href_e.o .build/san-lifetime/markuppp/vendor/cmark/houdini_html_e.o .build/san-lifetime/markuppp/vendor/cmark/houdini_html_u.o .build/san-lifetime/markuppp/vendor/cmark/html.o .build/san-lifetime/markuppp/vendor/cmark/inlines.o .build/san-lifetime/markuppp/vendor/cmark/iterator.o .build/san-lifetime/markuppp/vendor/cmark/node.o .build/san-lifetime/markuppp/vendor/cmark/references.o .build/san-lifetime/markuppp/vendor/cmark/render.o .build/san-lifetime/markuppp/vendor/cmark/scanners.o .build/san-lifetime/markuppp/vendor/cmark/utf8.o .build/libffi/sanitize-x86_64-linux-gnu-cc/install/lib/libffi.a -o ".build/nift-sanitize-lifetime"
+sanitizer profiles differ: lifetime use-after-scope ON, deep OFF
+env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$(test "$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 ".build/nift-sanitize-lifetime" --version
+Nift v4.10.0
+env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$(test "$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/filesystem/certification/.build/nift-sanitize-lifetime" tests/v43_cp0_cp14_smoke.sh
+env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$(test "$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/filesystem/certification/.build/nift-sanitize-lifetime" tests/v43_cp15_cp34_smoke.sh
+env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$(test "$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/filesystem/certification/.build/nift-sanitize-lifetime" tests/collection_ops_smoke.sh
+collection ops smoke: PASS
+env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$(test "$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/filesystem/certification/.build/nift-sanitize-lifetime" tests/v43_cp117_object_methods_smoke.sh
+object methods smoke passed
+env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$(test "$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/filesystem/certification/.build/nift-sanitize-lifetime" tests/v43_cp51_cp70_scripting_smoke.sh
+v4.3 CP51-CP70 scripting smoke: PASS
+env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$(test "$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/filesystem/certification/.build/nift-sanitize-lifetime" tests/v46_b4_cp3_recoverable_errors.sh
+env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$(test "$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/filesystem/certification/.build/nift-sanitize-lifetime" tests/v45_threads.sh
+v4.5 thread primitive smoke passed
+env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$(test "$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/filesystem/certification/.build/nift-sanitize-lifetime" tests/v44_ast_expression_smoke.sh
+v4.4 AST expression smoke: PASS
+env -u LD_PRELOAD ASAN_OPTIONS=detect_leaks=$(test "$(uname -s)" = Darwin && echo 0 || echo 1):halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 NIFT_BIN="/home/nick/Repositories/nift/nift/.build/cp410-implementation/filesystem/certification/.build/nift-sanitize-lifetime" bash tests/v44_ast_differential_corpus.sh
+v4.4 AST differential corpus: PASS (20 programs, legacy-equivalent)
+echo "lifetime sanitizer shallow corpus passed"
+lifetime sanitizer shallow corpus passed

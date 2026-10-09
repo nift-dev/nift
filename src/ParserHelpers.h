@@ -47,6 +47,12 @@ NIFT_PARSER_HELPER_HIDDEN bool numeric_exponent_sign(const std::string& text, st
 
 NIFT_PARSER_HELPER_HIDDEN bool glob_has_magic(const std::string& value);
 NIFT_PARSER_HELPER_HIDDEN bool glob_component_match(const std::string& pattern, const std::string& name);
+enum class FilesystemPlanEvent { Prepare, Recipe, Backend, Operand, Pure, Reject, Fallback };
+#ifdef NIFT_TEST_FS_RECIPE_STATS
+NIFT_PARSER_HELPER_HIDDEN void record_filesystem_plan_event(FilesystemPlanEvent event);
+#else
+inline void record_filesystem_plan_event(FilesystemPlanEvent) {}
+#endif
 enum class GlobPrefixEvent { TerminalPath, PrefixNode, PrefixResolve, FullDisplayPath, FinalValue };
 #ifdef NIFT_TEST_GLOB_PREFIX_STATS
 NIFT_PARSER_HELPER_HIDDEN void record_glob_prefix_event(GlobPrefixEvent event);

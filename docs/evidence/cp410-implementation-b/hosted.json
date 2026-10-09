@@ -1,0 +1,98 @@
+{
+  "sha": "e3ef89d6e8d364088eb7559116b72c6cfe37cf98",
+  "expected_workflows": [
+    "Checkpoint 10 cross-platform equivalence",
+    "Deep guards",
+    "Gate 6A-R vendored libffi",
+    "Gate 6B bytes value semantics",
+    "Hosted certification diagnostic",
+    "Init targets",
+    "Performance regression guards",
+    "Test integrity guards",
+    "packaging matrix (build-only, non-publishing)",
+    "v4.4/v4.5 cross-platform"
+  ],
+  "runs": [
+    {
+      "conclusion": "success",
+      "databaseId": 37905868424,
+      "headSha": "e3ef89d6e8d364088eb7559116b72c6cfe37cf98",
+      "status": "completed",
+      "url": "https://github.com/nift-dev/nift/actions/runs/37905868424",
+      "workflowName": "v4.4/v4.5 cross-platform"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 37905868427,
+      "headSha": "e3ef89d6e8d364088eb7559116b72c6cfe37cf98",
+      "status": "completed",
+      "url": "https://github.com/nift-dev/nift/actions/runs/37905868427",
+      "workflowName": "Hosted certification diagnostic"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 37905868429,
+      "headSha": "e3ef89d6e8d364088eb7559116b72c6cfe37cf98",
+      "status": "completed",
+      "url": "https://github.com/nift-dev/nift/actions/runs/37905868429",
+      "workflowName": "Init targets"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 37905868454,
+      "headSha": "e3ef89d6e8d364088eb7559116b72c6cfe37cf98",
+      "status": "completed",
+      "url": "https://github.com/nift-dev/nift/actions/runs/37905868454",
+      "workflowName": "Performance regression guards"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 37905868467,
+      "headSha": "e3ef89d6e8d364088eb7559116b72c6cfe37cf98",
+      "status": "completed",
+      "url": "https://github.com/nift-dev/nift/actions/runs/37905868467",
+      "workflowName": "Gate 6A-R vendored libffi"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 37905868494,
+      "headSha": "e3ef89d6e8d364088eb7559116b72c6cfe37cf98",
+      "status": "completed",
+      "url": "https://github.com/nift-dev/nift/actions/runs/37905868494",
+      "workflowName": "Checkpoint 10 cross-platform equivalence"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 37905868497,
+      "headSha": "e3ef89d6e8d364088eb7559116b72c6cfe37cf98",
+      "status": "completed",
+      "url": "https://github.com/nift-dev/nift/actions/runs/37905868497",
+      "workflowName": "packaging matrix (build-only, non-publishing)"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 37905868503,
+      "headSha": "e3ef89d6e8d364088eb7559116b72c6cfe37cf98",
+      "status": "completed",
+      "url": "https://github.com/nift-dev/nift/actions/runs/37905868503",
+      "workflowName": "Gate 6B bytes value semantics"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 37905868524,
+      "headSha": "e3ef89d6e8d364088eb7559116b72c6cfe37cf98",
+      "status": "completed",
+      "url": "https://github.com/nift-dev/nift/actions/runs/37905868524",
+      "workflowName": "Test integrity guards"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 37905994470,
+      "headSha": "e3ef89d6e8d364088eb7559116b72c6cfe37cf98",
+      "status": "completed",
+      "url": "https://github.com/nift-dev/nift/actions/runs/37905994470",
+      "workflowName": "Deep guards"
+    }
+  ],
+  "all_green": true
+}

@@ -1,0 +1,42 @@
+[
+  {
+    "name": "loops",
+    "n": 8000,
+    "source": "s := 0\n\ni := 0\nwhile(i < 8000) { s += i; i += 1 }\nprint(s)\n\n"
+  },
+  {
+    "name": "call-scalar",
+    "n": 8000,
+    "source": "fn(f(x)) { return x + 1 }\ns := 0\n\ni := 0\nwhile(i < 8000) { s += f(i); i += 1 }\nprint(s)\n\n"
+  },
+  {
+    "name": "call-noarg",
+    "n": 8000,
+    "source": "fn(f()) { return 1 }\ns := 0\n\ni := 0\nwhile(i < 8000) { s += f(); i += 1 }\nprint(s)\n\n"
+  },
+  {
+    "name": "call-closure",
+    "n": 8000,
+    "source": "offset := 1\nf := x => x + offset\ns := 0\n\ni := 0\nwhile(i < 8000) { s += f(i); i += 1 }\nprint(s)\n\n"
+  },
+  {
+    "name": "call-callback",
+    "n": 8000,
+    "source": "fn(apply(f,x)) { return f(x) }\nf := x => x + 1\ns := 0\n\ni := 0\nwhile(i < 8000) { s += apply(f,i); i += 1 }\nprint(s)\n\n"
+  },
+  {
+    "name": "bfs",
+    "n": 8000,
+    "source": "adj := []\ni := 0\nwhile(i < 8000) { row := []; if(i+1 < 8000) { row.push(i+1) }; if(i+2 < 8000) { row.push(i+2) }; adj.push(row); i += 1 }\nseen := set(); seen.add(0); q := [0]; qi := 0\n\nwhile(qi < q.size()) { v := q[qi]; qi += 1; for(w : adj[v]) { if(!seen.contains(w)) { seen.add(w); q.push(w) } } }\nprint(seen.size())\n\n"
+  },
+  {
+    "name": "json-traverse",
+    "n": 8000,
+    "source": "a := inject(\"/home/nick/Repositories/nift/nift/.build/cp49/probes/records-8000.json\")\ns := 0\n\nfor(e : a) { s += e.v }; print(s)\n\n"
+  },
+  {
+    "name": "map-set",
+    "n": 8000,
+    "source": "m := map(); s := set()\n\ni := 0\nwhile(i < 8000) { m.set(i,i+1); s.add(i); i += 1 }\nprint(m.size())\n\n"
+  }
+]

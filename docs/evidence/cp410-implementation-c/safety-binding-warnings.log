@@ -1,0 +1,5 @@
+python3 scripts/check_binding_warnings.py
+PASS g++: bindings/node/native/nift_node.cc warnings as errors
+PASS g++: bindings/python/src/nift_module.cc warnings as errors
+PASS clang++: bindings/node/native/nift_node.cc warnings as errors
+PASS clang++: bindings/python/src/nift_module.cc warnings as errors

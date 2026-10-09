@@ -1,0 +1,490 @@
+[
+  {
+    "name": "stat-prepared",
+    "source": "i := 0; fn(path()) { i+=1; print(i); return \"a\" }; j:=0; while(j<2) { v:=stat(path()); j+=1 }; print(i)",
+    "exit": 0,
+    "stdout": "1\n2\n3\n4\n4\n",
+    "stderr": "",
+    "files": {
+      "b": "B",
+      "a": "A",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "stat-compatibility",
+    "source": "i := 0; fn(path()) { i+=1; print(i); return \"a\" }; print(stat(path()).size); print(i)",
+    "exit": 0,
+    "stdout": "1\n1\n1\n",
+    "stderr": "",
+    "files": {
+      "b": "B",
+      "a": "A",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "stat-wrong-arity",
+    "source": "i := 0; fn(path()) { i+=1; print(i); return \"a\" }; j:=0; while(j<1) { v:=stat(path(),path()); j+=1 }; print(i)",
+    "exit": 1,
+    "stdout": "1\n2\n",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:74: script failed\n",
+    "files": {
+      "b": "B",
+      "a": "A",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "stat-wrong-type",
+    "source": "i := 0; fn(path()) { i+=1; print(i); return 7 }; j:=0; while(j<1) { v:=stat(path()); j+=1 }; print(i)",
+    "exit": 1,
+    "stdout": "1\n2\n",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:72: stat: expected string path\n",
+    "files": {
+      "b": "B",
+      "a": "A",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "stat-first-error",
+    "source": "i:=0; fn(path()) { i+=1; print(i); return no_such_value }; j:=0; while(j<1) { v:=stat(path()); j+=1 }",
+    "exit": 1,
+    "stdout": "1\n",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:43: unknown value or malformed expression: no_such_value\n",
+    "files": {
+      "b": "B",
+      "a": "A",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "named-stat-prepared",
+    "source": "fn(stat(p)) { print(\"named\"); return 7 }; j:=0; while(j<1) { print(stat(\"a\")); j+=1 }",
+    "exit": 1,
+    "stdout": "named\n",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:62: print: value is not directly renderable\n",
+    "files": {
+      "b": "B",
+      "a": "A",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "named-stat-compatibility",
+    "source": "fn(stat(p)) { print(\"named\"); return 7 }; print(stat(\"a\").size)",
+    "exit": 0,
+    "stdout": "1\n",
+    "stderr": "",
+    "files": {
+      "b": "B",
+      "a": "A",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "move-order",
+    "source": "n:=0; fn(src()) { n+=1; print(\"s\"+n); return \"a\" }; fn(dst()) { n+=1; print(\"d\"+n); return \"out\" }; j:=0; while(j<1) { move(src(),dst()); j+=1 }; print(n)",
+    "exit": 0,
+    "stdout": "s1\nd2\ns3\nd4\n4\n",
+    "stderr": "",
+    "files": {
+      "out": "A",
+      "b": "B",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "move-argument-mutates-source",
+    "source": "source:=\"a\"; fn(dst()) { source=\"b\"; print(\"dest\"); return \"out\" }; j:=0; while(j<1) { move(source,dst()); j+=1 }",
+    "exit": 0,
+    "stdout": "dest\ndest\n",
+    "stderr": "",
+    "files": {
+      "out": "B",
+      "a": "A",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "move-first-source-error",
+    "source": "n:=0; fn(src()) { n+=1; print(n); return no_such_value }; fn(dst()) { print(\"dest\"); return \"out\" }; j:=0; while(j<1) { move(src(),dst()); j+=1 }",
+    "exit": 1,
+    "stdout": "1\n",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:42: unknown value or malformed expression: no_such_value\n",
+    "files": {
+      "b": "B",
+      "a": "A",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "move-first-destination-error",
+    "source": "n:=0; fn(src()) { n+=1; print(n); return \"a\" }; fn(dst()) { print(\"dest\"); return no_such_value }; j:=0; while(j<1) { move(src(),dst()); j+=1 }",
+    "exit": 1,
+    "stdout": "1\ndest\n",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:83: unknown value or malformed expression: no_such_value\n",
+    "files": {
+      "b": "B",
+      "a": "A",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "move-wrong-arity",
+    "source": "n:=0; fn(src()) { n+=1; print(n); return \"a\" }; j:=0; while(j<1) { move(src()); j+=1 }",
+    "exit": 1,
+    "stdout": "1\n",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:68: move: expected source(s) and destination\n",
+    "files": {
+      "b": "B",
+      "a": "A",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "move-cwd-boundary",
+    "source": "n:=0; fn(dst()) { n+=1; if(n==1) { cd(\"<ORACLE_ROOT>\"+\"/two\") } else { cd(\"<ORACLE_ROOT>\"+\"/one\") }; print(n); return \"out\" }; j:=0; while(j<1) { move(\"a\",dst()); j+=1 }; print(pwd())",
+    "exit": 0,
+    "stdout": "1\n2\n<ORACLE_ROOT>/one\n",
+    "stderr": "",
+    "files": {
+      "b": "B",
+      "a": "A",
+      "one/out": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "copy-order",
+    "source": "n:=0; fn(src()) { n+=1; print(\"s\"+n); return \"a\" }; fn(dst()) { n+=1; print(\"d\"+n); return \"out\" }; j:=0; while(j<1) { copy(src(),dst()); j+=1 }; print(n)",
+    "exit": 0,
+    "stdout": "s1\nd2\ns3\nd4\n4\n",
+    "stderr": "",
+    "files": {
+      "out": "A",
+      "b": "B",
+      "a": "A",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "copy-argument-mutates-source",
+    "source": "source:=\"a\"; fn(dst()) { source=\"b\"; print(\"dest\"); return \"out\" }; j:=0; while(j<1) { copy(source,dst()); j+=1 }",
+    "exit": 0,
+    "stdout": "dest\ndest\n",
+    "stderr": "",
+    "files": {
+      "out": "B",
+      "b": "B",
+      "a": "A",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "copy-first-source-error",
+    "source": "n:=0; fn(src()) { n+=1; print(n); return no_such_value }; fn(dst()) { print(\"dest\"); return \"out\" }; j:=0; while(j<1) { copy(src(),dst()); j+=1 }",
+    "exit": 1,
+    "stdout": "1\n",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:42: unknown value or malformed expression: no_such_value\n",
+    "files": {
+      "b": "B",
+      "a": "A",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "copy-first-destination-error",
+    "source": "n:=0; fn(src()) { n+=1; print(n); return \"a\" }; fn(dst()) { print(\"dest\"); return no_such_value }; j:=0; while(j<1) { copy(src(),dst()); j+=1 }",
+    "exit": 1,
+    "stdout": "1\ndest\n",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:83: unknown value or malformed expression: no_such_value\n",
+    "files": {
+      "b": "B",
+      "a": "A",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "copy-wrong-arity",
+    "source": "n:=0; fn(src()) { n+=1; print(n); return \"a\" }; j:=0; while(j<1) { copy(src()); j+=1 }",
+    "exit": 0,
+    "stdout": "1\n2\n",
+    "stderr": "",
+    "files": {
+      "b": "B",
+      "a": "A",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "copy-cwd-boundary",
+    "source": "n:=0; fn(dst()) { n+=1; if(n==1) { cd(\"<ORACLE_ROOT>\"+\"/two\") } else { cd(\"<ORACLE_ROOT>\"+\"/one\") }; print(n); return \"out\" }; j:=0; while(j<1) { copy(\"a\",dst()); j+=1 }; print(pwd())",
+    "exit": 0,
+    "stdout": "1\n2\n<ORACLE_ROOT>/one\n",
+    "stderr": "",
+    "files": {
+      "b": "B",
+      "a": "A",
+      "two/a": "TWO",
+      "one/out": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "move-unmatched-source",
+    "source": "n:=0; fn(src()) { n+=1; print(\"s\"+n); return \"*.missing\" }; fn(dst()) { n+=1; print(\"d\"+n); return \"out\" }; j:=0; while(j<1) { move(src(),dst()); j+=1 }",
+    "exit": 1,
+    "stdout": "s1\nd2\ns3\n",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:128: move: glob matched no source files\n",
+    "files": {
+      "b": "B",
+      "a": "A",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "move-array-source",
+    "source": "n:=0; fn(src()) { n+=1; print(\"s\"+n); return [\"a\",\"b\"] }; fn(dst()) { n+=1; print(\"d\"+n); return \"one\" }; j:=0; while(j<1) { move(src(),dst()); j+=1 }",
+    "exit": 0,
+    "stdout": "s1\nd2\ns3\nd4\n",
+    "stderr": "",
+    "files": {
+      "two/a": "TWO",
+      "one/b": "B",
+      "one/a": "A"
+    }
+  },
+  {
+    "name": "move-bad-source-array",
+    "source": "n:=0; fn(src()) { n+=1; print(\"s\"+n); return [\"a\",7] }; fn(dst()) { n+=1; print(\"d\"+n); return \"one\" }; j:=0; while(j<1) { move(src(),dst()); j+=1 }",
+    "exit": 1,
+    "stdout": "s1\nd2\ns3\n",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:124: move: path arrays must contain strings\n",
+    "files": {
+      "b": "B",
+      "a": "A",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "move-second-destination-error",
+    "source": "n:=0; fn(dst()) { n+=1; print(n); if(n==2) { return no_such_value }; return \"out\" }; j:=0; while(j<1) { move(\"a\",dst()); j+=1 }",
+    "exit": 1,
+    "stdout": "1\n2\n",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:46: return: unknown value or malformed expression: no_such_value\n",
+    "files": {
+      "b": "B",
+      "a": "A",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "move-second-source-error",
+    "source": "n:=0; fn(src()) { n+=1; print(n); if(n==2) { return no_such_value }; return \"a\" }; fn(dst()) { print(\"dest\"); return \"out\" }; j:=0; while(j<1) { move(src(),dst()); j+=1 }",
+    "exit": 1,
+    "stdout": "1\ndest\n2\n",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:46: return: unknown value or malformed expression: no_such_value\n",
+    "files": {
+      "b": "B",
+      "a": "A",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "move-spread",
+    "source": "n:=0; fn(paths()) { n+=1; print(n); return [\"a\",\"out\"] }; j:=0; while(j<1) { move(...paths()); j+=1 }",
+    "exit": 0,
+    "stdout": "1\n",
+    "stderr": "",
+    "files": {
+      "out": "A",
+      "b": "B",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "copy-unmatched-source",
+    "source": "n:=0; fn(src()) { n+=1; print(\"s\"+n); return \"*.missing\" }; fn(dst()) { n+=1; print(\"d\"+n); return \"out\" }; j:=0; while(j<1) { copy(src(),dst()); j+=1 }",
+    "exit": 1,
+    "stdout": "s1\nd2\ns3\n",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:128: copy: glob matched no source files\n",
+    "files": {
+      "b": "B",
+      "a": "A",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "copy-array-source",
+    "source": "n:=0; fn(src()) { n+=1; print(\"s\"+n); return [\"a\",\"b\"] }; fn(dst()) { n+=1; print(\"d\"+n); return \"one\" }; j:=0; while(j<1) { copy(src(),dst()); j+=1 }",
+    "exit": 0,
+    "stdout": "s1\nd2\ns3\nd4\n",
+    "stderr": "",
+    "files": {
+      "b": "B",
+      "a": "A",
+      "two/a": "TWO",
+      "one/b": "B",
+      "one/a": "A"
+    }
+  },
+  {
+    "name": "copy-bad-source-array",
+    "source": "n:=0; fn(src()) { n+=1; print(\"s\"+n); return [\"a\",7] }; fn(dst()) { n+=1; print(\"d\"+n); return \"one\" }; j:=0; while(j<1) { copy(src(),dst()); j+=1 }",
+    "exit": 1,
+    "stdout": "s1\nd2\ns3\n",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:124: copy: path arrays must contain strings\n",
+    "files": {
+      "b": "B",
+      "a": "A",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "copy-second-destination-error",
+    "source": "n:=0; fn(dst()) { n+=1; print(n); if(n==2) { return no_such_value }; return \"out\" }; j:=0; while(j<1) { copy(\"a\",dst()); j+=1 }",
+    "exit": 1,
+    "stdout": "1\n2\n",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:46: return: unknown value or malformed expression: no_such_value\n",
+    "files": {
+      "b": "B",
+      "a": "A",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "copy-second-source-error",
+    "source": "n:=0; fn(src()) { n+=1; print(n); if(n==2) { return no_such_value }; return \"a\" }; fn(dst()) { print(\"dest\"); return \"out\" }; j:=0; while(j<1) { copy(src(),dst()); j+=1 }",
+    "exit": 1,
+    "stdout": "1\ndest\n2\n",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:46: return: unknown value or malformed expression: no_such_value\n",
+    "files": {
+      "b": "B",
+      "a": "A",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "copy-spread",
+    "source": "n:=0; fn(paths()) { n+=1; print(n); return [\"a\",\"out\"] }; j:=0; while(j<1) { copy(...paths()); j+=1 }",
+    "exit": 0,
+    "stdout": "1\n",
+    "stderr": "",
+    "files": {
+      "out": "A",
+      "b": "B",
+      "a": "A",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "move-loop-location",
+    "source": "n:=0; paths:=[\"a\"]; fn(dst()) { n+=1; print(n); return \"out\" }; for(p:paths) { move(p,dst()) }; print(n)",
+    "exit": 0,
+    "stdout": "1\n2\n2\n",
+    "stderr": "",
+    "files": {
+      "out": "A",
+      "b": "B",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "move-index-probe-order",
+    "source": "n:=0; paths:=[\"a\"]; fn(index()) { n+=1; print(\"i\"+n); return 0 }; fn(dst()) { n+=1; print(\"d\"+n); return \"out\" }; j:=0; while(j<1) { move(paths[index()],dst()); j+=1 }; print(n)",
+    "exit": 0,
+    "stdout": "i1\ni2\nd3\ni4\nd5\n5\n",
+    "stderr": "",
+    "files": {
+      "out": "A",
+      "b": "B",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "move-root-path-replacement",
+    "source": "obj:={\"p\":\"a\"}; source:=obj.p; fn(dst()) { obj={\"p\":\"b\"}; print(\"dest\"); return \"out\" }; j:=0; while(j<1) { move(source,dst()); j+=1 }",
+    "exit": 0,
+    "stdout": "dest\ndest\n",
+    "stderr": "",
+    "files": {
+      "out": "A",
+      "b": "B",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "copy-loop-location",
+    "source": "n:=0; paths:=[\"a\"]; fn(dst()) { n+=1; print(n); return \"out\" }; for(p:paths) { copy(p,dst()) }; print(n)",
+    "exit": 0,
+    "stdout": "1\n2\n2\n",
+    "stderr": "",
+    "files": {
+      "out": "A",
+      "b": "B",
+      "a": "A",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "copy-index-probe-order",
+    "source": "n:=0; paths:=[\"a\"]; fn(index()) { n+=1; print(\"i\"+n); return 0 }; fn(dst()) { n+=1; print(\"d\"+n); return \"out\" }; j:=0; while(j<1) { copy(paths[index()],dst()); j+=1 }; print(n)",
+    "exit": 0,
+    "stdout": "i1\ni2\nd3\ni4\nd5\n5\n",
+    "stderr": "",
+    "files": {
+      "out": "A",
+      "b": "B",
+      "a": "A",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  },
+  {
+    "name": "copy-root-path-replacement",
+    "source": "obj:={\"p\":\"a\"}; source:=obj.p; fn(dst()) { obj={\"p\":\"b\"}; print(\"dest\"); return \"out\" }; j:=0; while(j<1) { copy(source,dst()); j+=1 }",
+    "exit": 0,
+    "stdout": "dest\ndest\n",
+    "stderr": "",
+    "files": {
+      "out": "A",
+      "b": "B",
+      "a": "A",
+      "two/a": "TWO",
+      "one/a": "ONE"
+    }
+  }
+]

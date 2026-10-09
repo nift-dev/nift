@@ -1,0 +1,13 @@
+{
+  "accepted_head": "e3ef89d6e8d364088eb7559116b72c6cfe37cf98",
+  "accepted_binary_sha256": "784302131470fbbb3eac9bc4f85bb22b1675732401160cfbead252941389d474",
+  "candidate_binary_sha256": "9d1e0ed43856b02bd834857137c647b4445cad89fabf59cc3ad67341af3e8314",
+  "candidate_stage_binary_sha256": "9d1e0ed43856b02bd834857137c647b4445cad89fabf59cc3ad67341af3e8314",
+  "source_sha256": {
+    "Parser.h": "7d24d93e756233704f991069f040ebd8e6f4a7e5733ed2edf5a74621f7657f6d",
+    "ParserExpression.cpp": "71e0e1cdebaa3a2bed71e395bc8e080735c795f10e2047f0cc4a2713999f7e38",
+    "ParserTemplate.cpp": "873f36b63341de7ab0ed9785c71a1d6d3147e2047bd981f33a3130bdd5d81632",
+    "ParserHelpers.h": "b2e5d1b7e4ab63cda3c31b136dc9ac21a16d815c7d2744bbee07fcdab93f1cc8"
+  },
+  "main_binary_sha256": "9d1e0ed43856b02bd834857137c647b4445cad89fabf59cc3ad67341af3e8314"
+}

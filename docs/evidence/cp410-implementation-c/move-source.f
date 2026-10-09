@@ -1,0 +1,1 @@
+paths := open("targets.txt").trim().split("\n"); for(p : paths) { move(p,"moved/" + p.split("/").last()) }; print("OK")

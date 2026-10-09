@@ -1,0 +1,1 @@
+paths := open("targets.txt").trim().split("\n"); total := 0; for(p : paths) { total += stat(p).size }; print(total)

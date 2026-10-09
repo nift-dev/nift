@@ -20,6 +20,9 @@
 #include <nift/context.h>
 
 #include <algorithm>
+#ifdef NIFT_TEST_FS_RECIPE_STATS
+#include <cstdio>
+#endif
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
@@ -899,12 +902,154 @@ bool Parser::evaluate_collection_value(const std::string& expression, nift::Runt
     value = nift::RuntimeValue::make_array(); for (auto index : order) value.array.push_back(root->array[index]); return true;
 }
 
+#ifdef NIFT_TEST_FS_RECIPE_STATS
+namespace nift::detail {
+struct FilesystemPlanStats {
+    unsigned long long prepares=0,recipes=0,backends=0,operands=0,pure=0,rejects=0,fallbacks=0;
+    ~FilesystemPlanStats(){if(std::getenv("NIFT_TEST_FS_RECIPE_STATS"))std::fprintf(stderr,"fs-plan prepares=%llu recipes=%llu backends=%llu operands=%llu pure=%llu rejects=%llu fallbacks=%llu\n",prepares,recipes,backends,operands,pure,rejects,fallbacks);}
+} filesystem_plan_stats;
+void record_filesystem_plan_event(FilesystemPlanEvent event){
+    auto& s=filesystem_plan_stats;
+    switch(event){case FilesystemPlanEvent::Prepare:++s.prepares;break;case FilesystemPlanEvent::Recipe:++s.recipes;break;case FilesystemPlanEvent::Backend:++s.backends;break;case FilesystemPlanEvent::Operand:++s.operands;break;case FilesystemPlanEvent::Pure:++s.pure;break;case FilesystemPlanEvent::Reject:++s.rejects;break;case FilesystemPlanEvent::Fallback:++s.fallbacks;break;}
+}
+}
+#endif
+
+bool Parser::execute_filesystem_operation(PreparedFilesystemOperation::Kind kind,std::size_t operand_count,
+    const std::function<bool(std::size_t,nift::RuntimeValue&)>& operand,nift::RuntimeValue& out,std::string& error) {
+    nift::detail::record_filesystem_plan_event(nift::detail::FilesystemPlanEvent::Backend);
+    auto evaluate_operand=[&](std::size_t i,nift::RuntimeValue& value){nift::detail::record_filesystem_plan_event(nift::detail::FilesystemPlanEvent::Operand);return operand(i,value);};
+    const bool moving=kind==PreparedFilesystemOperation::Kind::Move;
+    const std::string operation=kind==PreparedFilesystemOperation::Kind::Stat?"stat":moving?"move":"copy";
+            auto resolve_path=[&](const std::string& raw)->fs::path{std::string expanded=raw;if(standalone_script_host_&&!expanded.empty()&&expanded[0]=='~'&&(expanded.size()==1||expanded[1]=='/'||expanded[1]=='\\')){const char* home=std::getenv("HOME");
+#ifdef _WIN32
+if(!home)home=std::getenv("USERPROFILE");
+#endif
+if(home)expanded=std::string(home)+expanded.substr(1);}fs::path path(expanded);if(path.is_relative())path=(standalone_script_host_?fs::current_path():host_.root())/path;return fs::absolute(path).lexically_normal();};
+            auto validate=[&](const fs::path& path) {
+                if(!standalone_script_host_&&!resource_path_authority_.project_root.empty()&&!filesystem::path_within(resource_path_authority_.project_root,path)){error=operation+": path must stay inside the Nift project";return false;}
+                if(!nift_fs_root_allowed(path,resource_path_authority_.enforce_filesystem_root?resource_path_authority_.filesystem_root:fs::path{},error)){error=operation+": "+error;return false;}return true;
+            };
+            if(kind==PreparedFilesystemOperation::Kind::Stat) {
+                nift::RuntimeValue path_value;if(!evaluate_operand(0,path_value)||!path_value.is_string()){error="stat: expected string path";return false;}
+                auto path=resolve_path(path_value.string);if(!validate(path))return false;
+                const auto info=inspect_path(path);if(info.error)return fail_recoverable(nift::detail::DiagnosticCode::IoMetadataFailed,"stat: "+info.error_message,error);
+                out=nift::RuntimeValue::make_object();out["exists"]=nift::RuntimeValue(info.exists);
+                if(info.exists){out["type"]=nift::RuntimeValue(info.type);if(info.type=="file")out["size"]=nift::RuntimeValue(static_cast<double>(info.size));}return true;
+            }
+            auto paths=[&](std::size_t begin,std::size_t end,std::vector<fs::path>& result) {
+                for(std::size_t i=begin;i<end;++i){nift::RuntimeValue value;if(!evaluate_operand(i,value))return false;std::vector<std::string> raws;
+                    if(value.is_string())raws.push_back(value.string);else if(value.is_array()){for(const auto& x:value.array){if(!x.is_string()){error=operation+": path arrays must contain strings";return false;}raws.push_back(x.string);}}else{error=operation+": expected string path or array of paths";return false;}
+                    for(const auto& raw:raws){auto path=resolve_path(raw);if(!validate(path))return false;if(glob_has_magic(raw)){auto matches=glob_expand(path);result.insert(result.end(),matches.begin(),matches.end());}else result.push_back(std::move(path));}
+                }return true;
+            };
+            std::vector<fs::path> sources;if(!paths(0,operand_count-1,sources))return false;
+            if(sources.empty()){error=operation+": glob matched no source files";return false;}
+            std::vector<fs::path> destinations;if(!paths(operand_count-1,operand_count,destinations)||destinations.size()!=1){error=operation+": destination must be one path";return false;}
+            const auto& destination=destinations.front();std::error_code destination_error;const bool destination_directory=fs::is_directory(destination,destination_error);
+            if(sources.size()>1&&!destination_directory){error=operation+": destination must be an existing directory for multiple sources";return false;}
+            for(const auto& source:sources){auto target=destination_directory?destination/source.filename():destination;std::error_code ec;if(moving)fs::rename(source,target,ec);else fs::copy_file(source,target,fs::copy_options::overwrite_existing,ec);if(ec)return fail_recoverable(moving?nift::detail::DiagnosticCode::IoMoveFailed:nift::detail::DiagnosticCode::IoCopyFailed,operation+": "+ec.message(),error);}
+            out=nift::RuntimeValue(nullptr);return true;
+}
+
+std::shared_ptr<const nift::ast::Expr> Parser::prepare_pure_string_plan(const std::string& source) {
+    // Conservative canonical string-only grammar, with bounded structure.
+    // Escapes and effectful/unknown nodes retain the full legacy evaluator.
+    if(source.size()>4096||source.find('\\')!=std::string::npos)return {};
+    auto parsed=nift::ast::parse_expression(source);if(!parsed.supported||!parsed.expr)return {};
+    std::size_t nodes=0;
+    std::function<int(const nift::ast::Expr&,unsigned)> type;
+    type=[&](const nift::ast::Expr& e,unsigned depth)->int{
+        if(++nodes>64||depth>16)return 0;
+        using nift::ast::Kind;
+        if(e.kind==Kind::Literal)return e.literal.is_string()&&e.literal.string.find('\x1f')==std::string::npos?1:0;
+        if(e.kind==Kind::Binding)return 1;
+        if(e.kind==Kind::Binary&&e.op=="+"&&e.left&&e.right)
+            return type(*e.left,depth+1)==1&&type(*e.right,depth+1)==1?1:0;
+        if(e.kind!=Kind::Call||!e.left||e.left->kind!=Kind::Member||!e.left->left)return 0;
+        const auto& method=e.left->name;
+        if(e.text.find("."+method+"(")==std::string::npos)return 0;
+        if(method=="split"&&e.items.size()==1&&e.items[0]->kind==Kind::Literal&&e.items[0]->literal.is_string()&&!e.items[0]->literal.string.empty())
+            return type(*e.left->left,depth+1)==1?2:0;
+        if((method=="first"||method=="last")&&e.items.empty())return type(*e.left->left,depth+1)==2?1:0;
+        return 0;
+    };
+    if(type(*parsed.expr,0)==0)return {};
+    return std::shared_ptr<const nift::ast::Expr>(std::move(parsed.expr));
+}
+
+bool Parser::evaluate_pure_string_plan(const nift::ast::Expr& expression,nift::RuntimeValue& out) {
+    std::unordered_map<std::string,std::pair<std::shared_ptr<const nift::RuntimeValue>,VariableBinding*>> inputs;
+    std::function<bool(const nift::ast::Expr&)> eligible;
+    eligible=[&](const nift::ast::Expr& e){
+        if(e.kind==nift::ast::Kind::Binding){
+            if(inputs.count(e.name))return true;
+            for(auto scope=variable_scopes_.rbegin();scope!=variable_scopes_.rend();++scope){
+                auto found=scope->find(e.name);if(found==scope->end())continue;
+                auto& binding=found->second;
+                std::shared_ptr<nift::RuntimeValue> value;
+                if(binding.is_location_ref()){
+                    auto root=*binding.ref_root_slot;auto* member=binding.resolve_location();
+                    if(root&&member)value=std::shared_ptr<nift::RuntimeValue>(std::move(root),member);
+                }else value=binding.slot?*binding.slot:binding.value;
+                if(!value||!value->is_string()||value->string.find('\x1f')!=std::string::npos)return false;
+                inputs.emplace(e.name,std::make_pair(std::move(value),&binding));return true;
+            }return false;
+        }
+        if(e.kind==nift::ast::Kind::Call)return eligible(*e.left->left);
+        return (!e.left||eligible(*e.left))&&(!e.right||eligible(*e.right));
+    };
+    // Unsupported is decided before evaluating any operand. This tree cannot
+    // call user code or change a slot while these operation-local owners live.
+    if(!eligible(expression)){nift::detail::record_filesystem_plan_event(nift::detail::FilesystemPlanEvent::Reject);return false;}
+    nift::detail::record_filesystem_plan_event(nift::detail::FilesystemPlanEvent::Pure);
+    std::function<nift::RuntimeValue(const nift::ast::Expr&)> execute;
+    execute=[&](const nift::ast::Expr& e)->nift::RuntimeValue{
+        if(e.kind==nift::ast::Kind::Literal)return e.literal;
+        if(e.kind==nift::ast::Kind::Binding){auto* binding=inputs.at(e.name).second;binding->sync();return *binding->value;}
+        if(e.kind==nift::ast::Kind::Binary){auto left=execute(*e.left);auto right=execute(*e.right);return nift::RuntimeValue(left.string+right.string);}
+        const auto& receiver=*e.left->left;
+        auto value=execute(receiver);
+        if(e.left->name=="split"){
+            nift::RuntimeValue result=nift::RuntimeValue::make_array();const auto& delimiter=e.items[0]->literal.string;
+            std::size_t pos=0;while(true){const auto at=value.string.find(delimiter,pos);if(at==std::string::npos){result.array.emplace_back(value.string.substr(pos));break;}result.array.emplace_back(value.string.substr(pos,at-pos));pos=at+delimiter.size();}return result;
+        }
+        return e.left->name=="first"?value.array.front():value.array.back();
+    };
+    out=execute(expression);return true;
+}
+
+std::shared_ptr<const Parser::PreparedFilesystemOperation> Parser::prepare_filesystem_operation(const std::string& source) const {
+    nift::detail::record_filesystem_plan_event(nift::detail::FilesystemPlanEvent::Prepare);
+    const auto open=source.find('(');
+    if (open==std::string::npos || source.empty() || source.back()!=')') return {};
+    const auto method=source.substr(0,open);
+    if (method!="move" && method!="mv" && method!="copy" && method!="cp" && method!="stat") return {};
+    std::size_t close=0;
+    if (!find_balanced(source,open,'(',')',close) || close!=source.size()-1) return {};
+    auto identity=nift::detail::SourceView::identity({},source);
+    bool ok=false;std::vector<bool> quoted;
+    auto args=parse_parameters(nift::detail::SourceText(source,identity).substr(open+1,source.size()-open-2),ok,&quoted);
+    if (!ok || (method=="stat" ? args.size()!=1 : args.size()<2)) return {};
+    auto recipe=std::make_shared<PreparedFilesystemOperation>();recipe->method=method;recipe->kind=method=="stat"?PreparedFilesystemOperation::Kind::Stat:(method=="move"||method=="mv")?PreparedFilesystemOperation::Kind::Move:PreparedFilesystemOperation::Kind::Copy;
+    for (std::size_t i=0;i<args.size();++i) {
+        if (!quoted[i] && trim_copy(args[i]).rfind("...",0)==0) return {};
+        const auto range=args[i].view.original_range(0,args[i].size());
+        recipe->operands.push_back({args[i],range.first,range.second,quoted[i],quoted[i]?nullptr:prepare_pure_string_plan(args[i])});
+    }
+    return recipe;
+}
+
 bool Parser::evaluate_expression(const std::string& expression, nift::RuntimeValue& value, std::string& error, nift::detail::SourceView view) {
+    return evaluate_filesystem_expression(expression,value,error,std::move(view),nullptr);
+}
+
+bool Parser::evaluate_filesystem_expression(const std::string& expression,nift::RuntimeValue& value,std::string& error,nift::detail::SourceView view,const PreparedFilesystemOperation* recipe) {
     const std::uint64_t file_checkpoint = begin_file_operation();
     try {
         const auto previous_failure = expression_failure_view_;
         expression_failure_view_ = {};
-        const bool ok = evaluate_expression_impl(expression, value, error, std::move(view));
+        const bool ok = evaluate_expression_impl(expression, value, error, std::move(view), recipe);
         if (ok) expression_failure_view_ = previous_failure;
         if (!ok) rollback_file_operation(file_checkpoint);
         return ok;
@@ -914,7 +1059,7 @@ bool Parser::evaluate_expression(const std::string& expression, nift::RuntimeVal
     }
 }
 
-bool Parser::evaluate_expression_impl(const std::string& expression, nift::RuntimeValue& value, std::string& error, nift::detail::SourceView view) {
+bool Parser::evaluate_expression_impl(const std::string& expression, nift::RuntimeValue& value, std::string& error, nift::detail::SourceView view, const PreparedFilesystemOperation* recipe) {
     last_expression_mutation_ = false;
     auto resolve_direct = [&](const std::string& raw, nift::RuntimeValue& out) -> bool {
         const std::string text = trim_copy(raw);
@@ -1241,6 +1386,15 @@ bool Parser::evaluate_expression_impl(const std::string& expression, nift::Runti
         // deterministically instead of exhausting the C++ stack.
         if(depth>96){error="expression nesting exceeds parser limit";return false;}
 
+        if (recipe && depth==0) {
+            auto operand=[&](std::size_t i,nift::RuntimeValue& value) {
+                const auto& arg=recipe->operands[i];
+                if (arg.quoted) { value=nift::RuntimeValue(arg.text);return true; }
+                if(arg.pure_plan&&evaluate_pure_string_plan(*arg.pure_plan,value))return true;
+                return eval(nift::detail::SourceText(arg.text,text.view.slice(arg.begin,arg.length)),value,depth+1);
+            };
+            return execute_filesystem_operation(recipe->kind,recipe->operands.size(),operand,out,error);
+        }
         auto find_binding = [&](const std::string& name) -> VariableBinding* {
             for (auto scope=variable_scopes_.rbegin(); scope!=variable_scopes_.rend(); ++scope) { auto it=scope->find(name); if(it!=scope->end()) { it->second.sync(); return &it->second; } }
             if(!receiver_stack_.empty()){auto it=receiver_stack_.back()->fields.find(name);if(it!=receiver_stack_.back()->fields.end())return &it->second;}
@@ -1886,12 +2040,12 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             if(call_args("exists",args,q)){fs::path p;if(args.size()!=1||!checked_path("exists",args,q,0,p))return false;FsInfo info=inspect_path(p);if(info.error)return fail_recoverable(nift::detail::DiagnosticCode::IoMetadataFailed,"exists: "+info.error_message,error);out=nift::RuntimeValue(info.exists);return true;}
             if(call_args("is_file",args,q)){fs::path p;if(args.size()!=1||!checked_path("is_file",args,q,0,p))return false;FsInfo info=inspect_path(p);if(info.error)return fail_recoverable(nift::detail::DiagnosticCode::IoMetadataFailed,"is_file: "+info.error_message,error);out=nift::RuntimeValue(info.exists&&info.type=="file");return true;}
             if(call_args("is_dir",args,q)){fs::path p;if(args.size()!=1||!checked_path("is_dir",args,q,0,p))return false;FsInfo info=inspect_path(p);if(info.error)return fail_recoverable(nift::detail::DiagnosticCode::IoMetadataFailed,"is_dir: "+info.error_message,error);out=nift::RuntimeValue(info.exists&&info.type=="directory");return true;}
-            if(call_args("stat",args,q)){fs::path p;if(args.size()!=1||!checked_path("stat",args,q,0,p))return false;FsInfo info=inspect_path(p);if(info.error)return fail_recoverable(nift::detail::DiagnosticCode::IoMetadataFailed,"stat: "+info.error_message,error);nift::RuntimeValue d=nift::RuntimeValue::make_object();d["exists"]=nift::RuntimeValue(info.exists);if(info.exists){d["type"]=nift::RuntimeValue(info.type);if(info.type=="file")d["size"]=nift::RuntimeValue(static_cast<double>(info.size));}out=std::move(d);return true;}
+            if(call_args("stat",args,q)){if(args.size()!=1)return false;return execute_filesystem_operation(PreparedFilesystemOperation::Kind::Stat,args.size(),[&](std::size_t i,nift::RuntimeValue& value){return arg_value(args,q,i,value);},out,error);}
             if(call_args("make_dir",args,q)||call_args("mkdir",args,q)){fs::path p;if(args.size()!=1||!checked_path("make_dir",args,q,0,p))return false;std::error_code ec;fs::create_directories(p,ec);if(ec)return fail_recoverable(nift::detail::DiagnosticCode::IoCreateFailed,"make_dir: "+ec.message(),error);out=nift::RuntimeValue(nullptr);return true;}
             if(call_args("touch",args,q)){fs::path p;if(args.size()!=1||!checked_path("touch",args,q,0,p))return false;std::ofstream f(p,std::ios::app);if(!f)return fail_recoverable(nift::detail::DiagnosticCode::IoCreateFailed,"touch: cannot open path",error);out=nift::RuntimeValue(nullptr);return true;}
             auto path_values=[&](const std::string& name,const std::vector<nift::detail::SourceText>& aa,const std::vector<bool>& qq,std::size_t begin,std::size_t end,std::vector<fs::path>& paths)->bool{for(std::size_t ai=begin;ai<end;++ai){nift::RuntimeValue v;if(!arg_value(aa,qq,ai,v))return false;std::vector<std::string> raws;if(v.is_string())raws.push_back(v.string);else if(v.is_array()){for(const auto& x:v.array){if(!x.is_string()){error=name+": path arrays must contain strings";return false;}raws.push_back(x.string);}}else{error=name+": expected string path or array of paths";return false;}for(const auto& raw:raws){fs::path p=resolve_path(raw);if(!standalone_script_host_&&!resource_path_authority_.project_root.empty()&&!filesystem::path_within(resource_path_authority_.project_root,p)){error=name+": path must stay inside the Nift project";return false;}if(!nift_fs_root_allowed(p,resource_path_authority_.enforce_filesystem_root?resource_path_authority_.filesystem_root:fs::path{},error)){error=name+": "+error;return false;}if(glob_has_magic(raw)){auto matches=glob_expand(p);paths.insert(paths.end(),matches.begin(),matches.end());}else paths.push_back(std::move(p));}}return true;};
             if(call_args("remove",args,q)||call_args("rm",args,q)){if(args.empty()){error="remove: expected at least one path";return false;}std::vector<fs::path> paths;if(!path_values("remove",args,q,0,args.size(),paths))return false;for(const auto& rp:paths){std::error_code ec;if(fs::is_directory(rp,ec)){error="remove: directories are not removed recursively";return false;}if(!fs::remove(rp,ec)&&ec)return fail_recoverable(nift::detail::DiagnosticCode::IoRemoveFailed,"remove: "+ec.message(),error);}out=nift::RuntimeValue(nullptr);return true;}
-            if(call_args("copy",args,q)||call_args("cp",args,q)||call_args("move",args,q)||call_args("mv",args,q)){const bool mv=text.rfind("move(",0)==0||text.rfind("mv(",0)==0;const std::string name=mv?"move":"copy";if(text.rfind("copy(",0)==0&&args.size()<2){args.clear();q.clear();}else if(args.size()<2){error=name+": expected source(s) and destination";return false;}else{std::vector<fs::path> sources;if(!path_values(name,args,q,0,args.size()-1,sources))return false;if(sources.empty()){error=name+": glob matched no source files";return false;}std::vector<fs::path> dests;if(!path_values(name,args,q,args.size()-1,args.size(),dests)||dests.size()!=1){error=name+": destination must be one path";return false;}fs::path dest=dests.front();std::error_code dec;const bool dest_dir=fs::is_directory(dest,dec);if(sources.size()>1&&!dest_dir){error=name+": destination must be an existing directory for multiple sources";return false;}for(const auto& src:sources){fs::path target=dest_dir?dest/src.filename():dest;std::error_code ec;if(mv)fs::rename(src,target,ec);else fs::copy_file(src,target,fs::copy_options::overwrite_existing,ec);if(ec)return fail_recoverable(mv?nift::detail::DiagnosticCode::IoMoveFailed:nift::detail::DiagnosticCode::IoCopyFailed,name+": "+ec.message(),error);}out=nift::RuntimeValue(nullptr);return true;}}
+            if(call_args("copy",args,q)||call_args("cp",args,q)||call_args("move",args,q)||call_args("mv",args,q)){const bool mv=text.rfind("move(",0)==0||text.rfind("mv(",0)==0;const std::string name=mv?"move":"copy";if(text.rfind("copy(",0)==0&&args.size()<2){args.clear();q.clear();}else if(args.size()<2){error=name+": expected source(s) and destination";return false;}else{return execute_filesystem_operation(mv?PreparedFilesystemOperation::Kind::Move:PreparedFilesystemOperation::Kind::Copy,args.size(),[&](std::size_t i,nift::RuntimeValue& value){return arg_value(args,q,i,value);},out,error);}}
             if(call_args("cat",args,q)){fs::path p;if(args.size()!=1||!checked_path("cat",args,q,0,p))return false;std::error_code ec;if(fs::is_directory(p,ec)){error="cat: path is a directory";return false;}std::ifstream f(p,std::ios::binary);if(!f)return fail_recoverable(nift::detail::DiagnosticCode::IoOpenFailed,"cat: cannot open path",error);std::ostringstream ss;ss<<f.rdbuf();execution_output_->write_stdout(ss.str());out=nift::RuntimeValue(nullptr);return true;}
             if(call_args("ls",args,q)){if(args.size()>1){error="ls: expected zero or one path/pattern";return false;}out=nift::RuntimeValue::make_array();if(args.empty()){fs::path p=standalone_script_host_?fs::current_path():host_.root();std::error_code ec;std::vector<std::string> names;for(fs::directory_iterator it(p,ec),end;!ec&&it!=end;it.increment(ec))names.push_back(it->path().filename().generic_string());if(ec)return fail_recoverable(nift::detail::DiagnosticCode::IoDirectoryReadFailed,"ls: "+ec.message(),error);std::sort(names.begin(),names.end());for(const auto& n:names)out.array.emplace_back(n);return true;}std::string raw;if(!string_arg("ls",args,q,0,raw))return false;fs::path p=resolve_path(raw);if(!standalone_script_host_&&!resource_path_authority_.project_root.empty()&&!filesystem::path_within(resource_path_authority_.project_root,p)){error="ls: path must stay inside the Nift project";return false;}if(!nift_fs_root_allowed(p,resource_path_authority_.enforce_filesystem_root?resource_path_authority_.filesystem_root:fs::path{},error)){error="ls: "+error;return false;}if(glob_has_magic(raw)){
                 const bool absolute=fs::path(raw).is_absolute();

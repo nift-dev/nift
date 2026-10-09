@@ -1,0 +1,362 @@
+[
+  {
+    "source": "p:=\"a/b//\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"/\").first()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:a\"\n\"prefix:a\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"a/b//\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"/\").last()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:\"\n\"prefix:\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"a/b//\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"::\").first()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:a/b//\"\n\"prefix:a/b//\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"a/b//\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"::\").last()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:a/b//\"\n\"prefix:a/b//\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"a/b//\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\" \").first()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:a/b//\"\n\"prefix:a/b//\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"a/b//\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\" \").last()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:a/b//\"\n\"prefix:a/b//\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"a/b//\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"\u00e9\").first()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:a/b//\"\n\"prefix:a/b//\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"a/b//\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"\u00e9\").last()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:a/b//\"\n\"prefix:a/b//\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"/\").first()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:\"\n\"prefix:\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"/\").last()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:\"\n\"prefix:\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"::\").first()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:\"\n\"prefix:\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"::\").last()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:\"\n\"prefix:\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\" \").first()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:\"\n\"prefix:\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\" \").last()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:\"\n\"prefix:\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"\u00e9\").first()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:\"\n\"prefix:\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"\u00e9\").last()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:\"\n\"prefix:\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"/first/last/\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"/\").first()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:\"\n\"prefix:\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"/first/last/\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"/\").last()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:\"\n\"prefix:\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"/first/last/\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"::\").first()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:/first/last/\"\n\"prefix:/first/last/\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"/first/last/\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"::\").last()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:/first/last/\"\n\"prefix:/first/last/\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"/first/last/\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\" \").first()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:/first/last/\"\n\"prefix:/first/last/\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"/first/last/\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\" \").last()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:/first/last/\"\n\"prefix:/first/last/\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"/first/last/\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"\u00e9\").first()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:/first/last/\"\n\"prefix:/first/last/\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"/first/last/\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"\u00e9\").last()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:/first/last/\"\n\"prefix:/first/last/\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"\u00e9::\u732b::\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"/\").first()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:\u00e9::\u732b::\"\n\"prefix:\u00e9::\u732b::\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"\u00e9::\u732b::\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"/\").last()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:\u00e9::\u732b::\"\n\"prefix:\u00e9::\u732b::\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"\u00e9::\u732b::\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"::\").first()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:\u00e9\"\n\"prefix:\u00e9\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"\u00e9::\u732b::\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"::\").last()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:\"\n\"prefix:\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"\u00e9::\u732b::\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\" \").first()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:\u00e9::\u732b::\"\n\"prefix:\u00e9::\u732b::\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"\u00e9::\u732b::\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\" \").last()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:\u00e9::\u732b::\"\n\"prefix:\u00e9::\u732b::\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"\u00e9::\u732b::\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"\u00e9\").first()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:\"\n\"prefix:\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"\u00e9::\u732b::\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"\u00e9\").last()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:::\u732b::\"\n\"prefix:::\u732b::\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"no-match\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"/\").first()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:no-match\"\n\"prefix:no-match\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"no-match\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"/\").last()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:no-match\"\n\"prefix:no-match\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"no-match\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"::\").first()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:no-match\"\n\"prefix:no-match\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"no-match\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"::\").last()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:no-match\"\n\"prefix:no-match\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"no-match\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\" \").first()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:no-match\"\n\"prefix:no-match\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"no-match\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\" \").last()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:no-match\"\n\"prefix:no-match\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"no-match\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"\u00e9\").first()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:no-match\"\n\"prefix:no-match\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"no-match\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"\u00e9\").last()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:no-match\"\n\"prefix:no-match\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"a a  b\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"/\").first()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:a a  b\"\n\"prefix:a a  b\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"a a  b\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"/\").last()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:a a  b\"\n\"prefix:a a  b\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"a a  b\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"::\").first()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:a a  b\"\n\"prefix:a a  b\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"a a  b\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"::\").last()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:a a  b\"\n\"prefix:a a  b\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"a a  b\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\" \").first()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:a\"\n\"prefix:a\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"a a  b\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\" \").last()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:b\"\n\"prefix:b\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"a a  b\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"\u00e9\").first()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:a a  b\"\n\"prefix:a a  b\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"a a  b\"; j:=0; while(j<2) { print((\"prefix:\"+p.split(\"\u00e9\").last()).stringify()); j+=1 }",
+    "exit": 0,
+    "stdout": "\"prefix:a a  b\"\n\"prefix:a a  b\"\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"a/b\"; j:=0; while(j<2) { print(p.split(\"/\").last()); p=7; j+=1 }",
+    "exit": 1,
+    "stdout": "b\n",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:58: cannot change binding type: p\n"
+  },
+  {
+    "source": "n:=0; fn(p()) { n+=1; print(n); return \"a/b\" }; j:=0; while(j<1) { print(p().split(\"/\").last()); j+=1 }; print(n)",
+    "exit": 0,
+    "stdout": "1\n2\n3\nb\n3\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"a/b\"; n:=0; fn(d()) { n+=1; print(n); return \"/\" }; j:=0; while(j<1) { print(p.split(d()).last()); j+=1 }; print(n)",
+    "exit": 0,
+    "stdout": "1\n2\n3\nb\n3\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"a/b\"; j:=0; while(j<1) { print(p.split(\"\").last()); j+=1 }",
+    "exit": 0,
+    "stdout": "b\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"a/b\"; j:=0; while(j<1) { print(p.split(\"/\",7).last()); j+=1 }",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:36: split: expected one delimiter\n"
+  },
+  {
+    "source": "p:=\"a/b\"; j:=0; while(j<1) { print(p.split(\"/\").last(7)); j+=1 }",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:36: last: expected no arguments\n"
+  },
+  {
+    "source": "j:=0; while(j<1) { print(absent.split(\"/\").last()); j+=1 }",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "error: <ORACLE_ROOT>/case.f:1:26: unknown value or malformed expression: absent\n"
+  },
+  {
+    "source": "obj:={\"p\":\"a/b\"}; p:=obj.p; j:=0; while(j<1) { print(p.split(\"/\").last()); j+=1 }",
+    "exit": 0,
+    "stdout": "b\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"a/b\"; j:=0; while(j<1) { print(p.split (\"/\").last()); j+=1 }",
+    "exit": 0,
+    "stdout": "b\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"a/b\"; j:=0; while(j<1) { print((p).split(\"/\").last()); j+=1 }",
+    "exit": 0,
+    "stdout": "b\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"a/b\"; j:=0; while(j<1) { print(\"x\"+1+p.split(\"/\").last()); j+=1 }",
+    "exit": 0,
+    "stdout": "x1b\n",
+    "stderr": ""
+  },
+  {
+    "source": "p:=\"a/b\"; j:=0; while(j<1) { print(p.split(\"/\").first().split(\"a\").last()); j+=1 }",
+    "exit": 0,
+    "stdout": "\n",
+    "stderr": ""
+  }
+]

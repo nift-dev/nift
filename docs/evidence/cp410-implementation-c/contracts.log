@@ -1,0 +1,99 @@
+stat-prepared 0 1
+2
+3
+4
+4
+stat-compatibility 0 1
+1
+1
+stat-wrong-arity 1 1
+2
+stat-wrong-type 1 1
+2
+stat-first-error 1 1
+named-stat-prepared 1 named
+named-stat-compatibility 0 1
+move-order 0 s1
+d2
+s3
+d4
+4
+move-argument-mutates-source 0 dest
+dest
+move-first-source-error 1 1
+move-first-destination-error 1 1
+dest
+move-wrong-arity 1 1
+move-cwd-boundary 0 1
+2
+<ORACLE_ROOT>/one
+copy-order 0 s1
+d2
+s3
+d4
+4
+copy-argument-mutates-source 0 dest
+dest
+copy-first-source-error 1 1
+copy-first-destination-error 1 1
+dest
+copy-wrong-arity 0 1
+2
+copy-cwd-boundary 0 1
+2
+<ORACLE_ROOT>/one
+move-unmatched-source 1 s1
+d2
+s3
+move-array-source 0 s1
+d2
+s3
+d4
+move-bad-source-array 1 s1
+d2
+s3
+move-second-destination-error 1 1
+2
+move-second-source-error 1 1
+dest
+2
+move-spread 0 1
+copy-unmatched-source 1 s1
+d2
+s3
+copy-array-source 0 s1
+d2
+s3
+d4
+copy-bad-source-array 1 s1
+d2
+s3
+copy-second-destination-error 1 1
+2
+copy-second-source-error 1 1
+dest
+2
+copy-spread 0 1
+move-loop-location 0 1
+2
+2
+move-index-probe-order 0 i1
+i2
+d3
+i4
+d5
+5
+move-root-path-replacement 0 dest
+dest
+copy-loop-location 0 1
+2
+2
+copy-index-probe-order 0 i1
+i2
+d3
+i4
+d5
+5
+copy-root-path-replacement 0 dest
+dest
+RECORDED 37 source evaluation, precedence, error and filesystem-effect contracts

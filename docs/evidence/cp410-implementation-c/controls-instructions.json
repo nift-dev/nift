@@ -1,0 +1,98 @@
+[
+  {
+    "name": "loops",
+    "n": 8000,
+    "label": "accepted",
+    "instructions": 41799104
+  },
+  {
+    "name": "loops",
+    "n": 8000,
+    "label": "recipe",
+    "instructions": 41789494
+  },
+  {
+    "name": "call-scalar",
+    "n": 8000,
+    "label": "accepted",
+    "instructions": 87554549
+  },
+  {
+    "name": "call-scalar",
+    "n": 8000,
+    "label": "recipe",
+    "instructions": 87545406
+  },
+  {
+    "name": "call-noarg",
+    "n": 8000,
+    "label": "accepted",
+    "instructions": 63277268
+  },
+  {
+    "name": "call-noarg",
+    "n": 8000,
+    "label": "recipe",
+    "instructions": 63268006
+  },
+  {
+    "name": "call-closure",
+    "n": 8000,
+    "label": "accepted",
+    "instructions": 371702423
+  },
+  {
+    "name": "call-closure",
+    "n": 8000,
+    "label": "recipe",
+    "instructions": 372036181
+  },
+  {
+    "name": "call-callback",
+    "n": 8000,
+    "label": "accepted",
+    "instructions": 416914873
+  },
+  {
+    "name": "call-callback",
+    "n": 8000,
+    "label": "recipe",
+    "instructions": 417425671
+  },
+  {
+    "name": "bfs",
+    "n": 8000,
+    "label": "accepted",
+    "instructions": 362475038
+  },
+  {
+    "name": "bfs",
+    "n": 8000,
+    "label": "recipe",
+    "instructions": 362250208
+  },
+  {
+    "name": "json-traverse",
+    "n": 8000,
+    "label": "accepted",
+    "instructions": 123486198
+  },
+  {
+    "name": "json-traverse",
+    "n": 8000,
+    "label": "recipe",
+    "instructions": 123485238
+  },
+  {
+    "name": "map-set",
+    "n": 8000,
+    "label": "accepted",
+    "instructions": 127533098
+  },
+  {
+    "name": "map-set",
+    "n": 8000,
+    "label": "recipe",
+    "instructions": 127450619
+  }
+]

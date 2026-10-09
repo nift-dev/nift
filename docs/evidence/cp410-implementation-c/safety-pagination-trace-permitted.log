@@ -1,0 +1,44 @@
++ set -euo pipefail
++ NIFT_BIN=/home/nick/Repositories/nift/nift/.build/cp410-implementation/filesystem/certification/nift
++ command -v strace
+++ mktemp -d /tmp/nift-pagination-order.XXXXXX
++ TMP=/tmp/nift-pagination-order.MlIJr5
++ trap 'rm -rf "$TMP"' EXIT
++ cd /tmp/nift-pagination-order.MlIJr5
++ mkdir -p .nift content templates public
++ cat
++ cat
++ echo @content
++ cat
++ cat
++ /home/nick/Repositories/nift/nift/.build/cp410-implementation/filesystem/certification/nift build --all
++ test -f public/blog.html -a -f public/blog-2.html -a -f public/blog-3.html
++ cat
++ strace -f -y -e trace=write,unlink,unlinkat -o trace.txt /home/nick/Repositories/nift/nift/.build/cp410-implementation/filesystem/certification/nift build --all
++ grep -E 'write\(|unlink(\(|at\()' trace.txt
++ grep blog
+++ grep -nE 'blog\.html' ops.txt
+++ grep -v 'blog-[0-9]'
+++ tail -1
+++ cut -d: -f1
++ output_seq=1
+++ grep -nE 'blog-3\.html' ops.txt
+++ tail -1
+++ cut -d: -f1
++ stale_seq=3
+++ grep -nE 'blog\.info\.json' ops.txt
+++ tail -1
+++ cut -d: -f1
++ info_seq=4
++ for v in output_seq stale_seq info_seq
++ '[' -n 1 ']'
++ for v in output_seq stale_seq info_seq
++ '[' -n 3 ']'
++ for v in output_seq stale_seq info_seq
++ '[' -n 4 ']'
++ '[' 1 -ge 4 ']'
++ '[' 3 -ge 4 ']'
++ test '!' -f public/blog-3.html
++ echo 'Pagination ordering smoke test passed (output 1 < cleanup 3 < info 4)'
+Pagination ordering smoke test passed (output 1 < cleanup 3 < info 4)
++ rm -rf /tmp/nift-pagination-order.MlIJr5

@@ -1,0 +1,19 @@
+metadata 0 PASS
+metadata 1 PASS
+metadata 2 PASS
+metadata 3 PASS
+metadata 4 PASS
+metadata 5 PASS
+move 0 PASS
+move 1 PASS
+move 2 PASS
+move 3 PASS
+move 4 PASS
+move 5 PASS
+copy 0 PASS
+copy 1 PASS
+copy 2 PASS
+copy 3 PASS
+copy 4 PASS
+copy 5 PASS
+{'metadata': {'accepted': {'wall': 0.07323480548802763, 'cpu': 0.07263249999999999, 'rss_kib': 10620.0}, 'recipe': {'wall': 0.06865556701086462, 'cpu': 0.06794800000000002, 'rss_kib': 10720.0}, 'native': {'wall': 0.03332122112624347, 'cpu': 0.03270399999999998, 'rss_kib': 4688.0}}, 'move': {'accepted': {'wall': 0.24646988254971802, 'cpu': 0.24246650000000003, 'rss_kib': 10656.0}, 'recipe': {'wall': 0.11919045797549188, 'cpu': 0.11511899999999997, 'rss_kib': 10736.0}, 'native': {'wall': 0.039453807985410094, 'cpu': 0.037434999999999774, 'rss_kib': 4768.0}}, 'copy': {'accepted': {'wall': 0.3130197930149734, 'cpu': 0.30858050000000015, 'rss_kib': 10578.0}, 'recipe': {'wall': 0.1846397949848324, 'cpu': 0.18074300000000032, 'rss_kib': 10548.0}, 'native': {'wall': 0.10219050699379295, 'cpu': 0.09973799999999988, 'rss_kib': 4638.0}}}

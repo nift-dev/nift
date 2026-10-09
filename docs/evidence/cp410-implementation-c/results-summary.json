@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "cpu_speedup": 1.0689424265614877,
+    "instruction_speedup": 1.1817180632351547,
+    "allocation_reduction": 0.05124553939061216,
+    "allocated_byte_reduction": 0.0010622036623632036,
+    "candidate_native_instruction_ratio": 7.567248241074175
+  },
+  "move": {
+    "cpu_speedup": 2.106224862967886,
+    "instruction_speedup": 3.111791346527021,
+    "allocation_reduction": 0.26876662383072836,
+    "allocated_byte_reduction": 0.07267452363316662,
+    "candidate_native_instruction_ratio": 11.753774240737934
+  },
+  "copy": {
+    "cpu_speedup": 1.7072888023325916,
+    "instruction_speedup": 3.108754214768744,
+    "allocation_reduction": 0.2731021288478792,
+    "allocated_byte_reduction": 0.07561516029065773,
+    "candidate_native_instruction_ratio": 11.018564518588043
+  }
+}

@@ -1,0 +1,74 @@
+[
+  {
+    "operation": "metadata",
+    "label": "accepted",
+    "instructions": 43271112,
+    "stdout": "128000\n",
+    "n": 1000,
+    "scope": "controlled fixture success paths; side effects independently checked by 31 exact contracts"
+  },
+  {
+    "operation": "metadata",
+    "label": "recipe",
+    "instructions": 36726622,
+    "stdout": "128000\n",
+    "n": 1000,
+    "scope": "controlled fixture success paths; side effects independently checked by 31 exact contracts"
+  },
+  {
+    "operation": "metadata",
+    "label": "native-floor",
+    "instructions": 4847703,
+    "stdout": "128000\n",
+    "n": 1000,
+    "scope": "controlled fixture success paths; side effects independently checked by 31 exact contracts"
+  },
+  {
+    "operation": "move",
+    "label": "accepted",
+    "instructions": 228810237,
+    "stdout": "OK\n",
+    "n": 1000,
+    "scope": "controlled fixture success paths; side effects independently checked by 31 exact contracts"
+  },
+  {
+    "operation": "move",
+    "label": "recipe",
+    "instructions": 73342069,
+    "stdout": "OK\n",
+    "n": 1000,
+    "scope": "controlled fixture success paths; side effects independently checked by 31 exact contracts"
+  },
+  {
+    "operation": "move",
+    "label": "native-floor",
+    "instructions": 6247283,
+    "stdout": "OK\n",
+    "n": 1000,
+    "scope": "controlled fixture success paths; side effects independently checked by 31 exact contracts"
+  },
+  {
+    "operation": "copy",
+    "label": "accepted",
+    "instructions": 230354069,
+    "stdout": "OK\n",
+    "n": 1000,
+    "scope": "controlled fixture success paths; side effects independently checked by 31 exact contracts"
+  },
+  {
+    "operation": "copy",
+    "label": "recipe",
+    "instructions": 73977975,
+    "stdout": "OK\n",
+    "n": 1000,
+    "scope": "controlled fixture success paths; side effects independently checked by 31 exact contracts"
+  },
+  {
+    "operation": "copy",
+    "label": "native-floor",
+    "instructions": 6716576,
+    "stdout": "OK\n",
+    "n": 1000,
+    "scope": "controlled fixture success paths; side effects independently checked by 31 exact contracts"
+  }
+]

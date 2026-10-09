@@ -1,0 +1,56 @@
+[
+  {
+    "operation": "metadata",
+    "label": "accepted",
+    "allocations": 58288,
+    "allocated_bytes": 13150962,
+    "stdout": "128000\n",
+    "n": 1000,
+    "scope": "controlled fixture success paths; side effects independently checked by 37 exact contracts"
+  },
+  {
+    "operation": "metadata",
+    "label": "recipe",
+    "allocations": 55301,
+    "allocated_bytes": 13136993,
+    "stdout": "128000\n",
+    "n": 1000,
+    "scope": "controlled fixture success paths; side effects independently checked by 37 exact contracts"
+  },
+  {
+    "operation": "move",
+    "label": "accepted",
+    "allocations": 167305,
+    "allocated_bytes": 25519094,
+    "stdout": "OK\n",
+    "n": 1000,
+    "scope": "controlled fixture success paths; side effects independently checked by 37 exact contracts"
+  },
+  {
+    "operation": "move",
+    "label": "recipe",
+    "allocations": 122339,
+    "allocated_bytes": 23664506,
+    "stdout": "OK\n",
+    "n": 1000,
+    "scope": "controlled fixture success paths; side effects independently checked by 37 exact contracts"
+  },
+  {
+    "operation": "copy",
+    "label": "accepted",
+    "allocations": 168307,
+    "allocated_bytes": 25610195,
+    "stdout": "OK\n",
+    "n": 1000,
+    "scope": "controlled fixture success paths; side effects independently checked by 37 exact contracts"
+  },
+  {
+    "operation": "copy",
+    "label": "recipe",
+    "allocations": 122342,
+    "allocated_bytes": 23673676,
+    "stdout": "OK\n",
+    "n": 1000,
+    "scope": "controlled fixture success paths; side effects independently checked by 37 exact contracts"
+  }
+]

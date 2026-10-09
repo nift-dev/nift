@@ -1919,3 +1919,21 @@ test-v410-glob-prefix-guard: $(GLOB_PREFIX_GUARD)
 test-v410-glob-prefix-parity: $(TARGET)
 	NIFT=$(abspath $(TARGET)) $(PYTHON) tests/v410_glob_prefix_parity.py
 test: test-v410-glob-prefix-guard test-v410-glob-prefix-parity
+
+# Canonical filesystem recipe reuse; test-only counters.
+$(TEST_DIR)/fs-recipe/ParserExpression.o: src/ParserExpression.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_TEST_FS_RECIPE_STATS -MMD -MP -c $< -o $@
+$(TEST_DIR)/fs-recipe/ParserTemplate.o: src/ParserTemplate.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) -DNIFT_TEST_FS_RECIPE_STATS -MMD -MP -c $< -o $@
+-include $(TEST_DIR)/fs-recipe/ParserExpression.d $(TEST_DIR)/fs-recipe/ParserTemplate.d
+FS_RECIPE_GUARD := $(TEST_DIR)/nift-fs-recipe-guard$(EXEEXT)
+$(FS_RECIPE_GUARD): $(filter-out src/ParserExpression.o src/ParserTemplate.o,$(CLI_OBJECTS)) $(TEST_DIR)/fs-recipe/ParserExpression.o $(TEST_DIR)/fs-recipe/ParserTemplate.o $(LIBFFI_A)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(filter-out src/ParserExpression.o src/ParserTemplate.o,$(CLI_OBJECTS)) $(TEST_DIR)/fs-recipe/ParserExpression.o $(TEST_DIR)/fs-recipe/ParserTemplate.o $(LDLIBS) -o $@
+.PHONY: test-v410-filesystem-recipe-parity test-v410-filesystem-recipe-guard
+test-v410-filesystem-recipe-parity: $(TARGET)
+	NIFT=$(abspath $(TARGET)) $(PYTHON) tests/v410_filesystem_recipe_parity.py
+test-v410-filesystem-recipe-guard: $(FS_RECIPE_GUARD)
+	NIFT_FS_STATS=$(abspath $(FS_RECIPE_GUARD)) $(PYTHON) tests/v410_filesystem_recipe_guard.py
+test: test-v410-filesystem-recipe-parity test-v410-filesystem-recipe-guard
