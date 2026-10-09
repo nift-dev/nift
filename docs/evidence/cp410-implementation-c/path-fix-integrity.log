@@ -1,0 +1,2 @@
+test-integrity clean: 306 files scanned, 0 findings
+report=.build/cp410-implementation/filesystem/path-fix-integrity.json
