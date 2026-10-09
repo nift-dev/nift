@@ -1,0 +1,8 @@
+{
+  "failed_run": 37887154064,
+  "failed_sha": "851f24164e09b61827958fb85fc090c4ec3f6518",
+  "cause": "cygpath -m applied to a path containing wildcard star mapped it to Windows forbidden-character private-use U+F02A; glob became literal",
+  "fix": "Convert existing directory only; append /*.dat after conversion",
+  "production_change": false,
+  "retry_policy": "Fix deterministic fixture transport; no blind rerun"
+}

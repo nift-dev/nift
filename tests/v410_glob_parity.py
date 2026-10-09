@@ -17,8 +17,11 @@ with tempfile.TemporaryDirectory() as d:
  cases=[('files/**/*.dat',all_matches),('files/**/**/*.dat',all_matches),('files/**/**/**/*.dat',all_matches),('files/.private/*.dat',['files/.private/x.dat']),('files/**/.*',['files/.hidden.dat','files/.private']),('files/**/*.missing',[]),('files/sub/?.dat',['files/sub/z.dat']),('files/**/deep/*.dat',['files/sub/deep/b.dat'])]
  cases.append(('files/literal＊.?at' if native_windows else r'files/literal\*.?at',['files/'+literal]))
  if links:cases += [('files/linked-dir/*.dat',['files/sub/space name.dat','files/sub/z.dat','files/sub/é.dat']),('files/external*.dat',['outside/t.dat'])]
- absolute=(root/'files'/'*.dat').as_posix()
- if os.environ.get('MSYSTEM'):absolute=subprocess.check_output(['cygpath','-m',absolute],text=True,encoding='utf-8').strip()
+ directory=(root/'files').as_posix()
+ # cygpath maps forbidden Windows '*' to U+F02A even in a pattern.
+ # Convert only the existing directory; append glob syntax afterwards.
+ if os.environ.get('MSYSTEM'):directory=subprocess.check_output(['cygpath','-m',directory],text=True,encoding='utf-8').strip()
+ absolute=directory+'/*.dat'
  prefix=absolute[:-5];names=['a.dat',literal]+(['external.dat','link.dat'] if links else []);cases.append((absolute,sorted(prefix+name for name in names)))
  for pattern,expected in cases:
   code='print(ls('+json.dumps(pattern,ensure_ascii=False)+').stringify())'
