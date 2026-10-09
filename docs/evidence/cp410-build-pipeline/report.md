@@ -56,6 +56,18 @@ The opt-in statistics are absent from normal execution. `plan_ns` covers schedul
 - Pagination trace ordering: PASS (`output 1 < cleanup 3 < info 4`). The initial sandbox failure was reproduced as a ptrace permission denial; the unchanged test passed with tracing permitted. It never represented flaky ordering behavior. Both the denied trace and successful receipt are retained.
 - Boundary verification: all **81** frozen benchmark evidence files match their prior hashes; canonical Jsonic++ and Minify++ checkouts are clean, vendored copies unchanged, RuntimeValue layout/public C ABI headers unchanged. See [boundaries.json](boundaries.json).
 
+## Hosted Windows fixture correction
+
+Checkpoint 10 run `37954160154` failed the output-alias assertion on Windows.
+The fixture treated MSYS Python's POSIX `os.name` as proof that POSIX symlink
+creation was appropriate, despite running native Nift. MSYS links can be copies
+or runtime-emulated links. The test now uses PowerShell to create a real Windows
+symbolic link and verifies its ReparsePoint attribute and SymbolicLink type.
+The original freshness assertions are unchanged, and the alias test now runs
+on native Windows as well. The failed log is retained; an unchanged workflow
+is not rerun to conceal the failure. Native and sanitized local contracts pass,
+with the corrected Windows fixture requiring a new exact-head hosted cohort.
+
 ## Hosted publication wall and stopping rule
 
 Publish Nift main, the pinned NRS revision, and website generated main/source stage commits. Dispatch only the ordinary non-release walls: Hosted certification diagnostic; v4.4/v4.5 cross-platform; Test integrity; Init targets; Gate 6B bytes; Gate 6A-R libffi; build-only packaging; Performance regression; Checkpoint 10 cross-platform; Deep guards. Deep includes the exact 94-module NRS pin. No release or package submission is dispatched.

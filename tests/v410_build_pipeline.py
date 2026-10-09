@@ -8,6 +8,17 @@ def run(p,*args,ok=True,env=None):
  assert (r.returncode==0)==ok,(args,r.returncode,r.stdout,r.stderr)
  return r.stdout+r.stderr
 
+def native_symlink(link,target):
+ # MSYS os.name is POSIX, but its symlink emulation is invisible to native Nift.
+ # Create and verify an actual Windows reparse-point link instead of a copy.
+ if os.name=='nt' or os.environ.get('MSYSTEM'):
+  def native(path):
+   if os.environ.get('MSYSTEM'):return subprocess.run(['cygpath','-aw',str(path)],text=True,capture_output=True,check=True).stdout.strip()
+   return str(path)
+  command='$ErrorActionPreference = "Stop"; New-Item -ItemType SymbolicLink -Path $env:NIFT_TEST_SYMLINK_PATH -Target $env:NIFT_TEST_SYMLINK_TARGET | Out-Null; $item = Get-Item -LiteralPath $env:NIFT_TEST_SYMLINK_PATH -Force; if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -eq 0 -or $item.LinkType -ne "SymbolicLink") { exit 2 }'
+  subprocess.run(['powershell.exe','-NoProfile','-NonInteractive','-Command',command],env=dict(os.environ,MSYS2_ARG_CONV_EXCL='*',NIFT_TEST_SYMLINK_PATH=native(link),NIFT_TEST_SYMLINK_TARGET=native(target)),capture_output=True,text=True,check=True,timeout=30)
+ else:link.symlink_to(target)
+
 def project(p,entries):
  (p/'.nift').mkdir(exist_ok=True);(p/'content').mkdir(exist_ok=True);(p/'public').mkdir(exist_ok=True)
  (p/'.nift/config.json').write_text(json.dumps({'config':{'content-dir':'content/','content-ext':'.html','output-dir':'public/','output-ext':'.html','default-template':'','build-threads':4,'incremental-mode':'hash','minify-exts':[]}}))
@@ -96,11 +107,10 @@ with tempfile.TemporaryDirectory(prefix='nift-pipeline-') as tmp:
   check('same-pass ordinary file invalidation, multiple consumers '+mode)
  # A producer may read its old output through a symlink before replacing it.
  # Dependents must see the replacement, even if that alias was cached earlier.
- if os.name != 'nt':
-  q=root/'output-alias';q.mkdir();project(q,[item('a'),item('b',depends=['a'])]);(q/'public/a.html').write_text('seed');(q/'alias.html').symlink_to('public/a.html')
-  (q/'content/a.html').write_text('@input("alias.html")X');(q/'content/b.html').write_text('@input("alias.html")');run(q,'build','--all')
-  assert (q/'public/b.html').read_text()=='seedX'
-  (q/'content/a.html').write_text('@input("alias.html")Y');run(q,'build');assert (q/'public/b.html').read_text()=='seedXY';check('generated output alias cache freshness')
+ q=root/'output-alias';q.mkdir();project(q,[item('a'),item('b',depends=['a'])]);(q/'public/a.html').write_text('seed');native_symlink(q/'alias.html',q/'public/a.html')
+ (q/'content/a.html').write_text('@input("alias.html")X');(q/'content/b.html').write_text('@input("alias.html")');run(q,'build','--all')
+ assert (q/'public/b.html').read_text()=='seedX'
+ (q/'content/a.html').write_text('@input("alias.html")Y');run(q,'build');assert (q/'public/b.html').read_text()=='seedXY';check('generated output alias cache freshness')
  # Tracking mutations preserve explicit pipeline metadata and graph integrity.
  q=root/'tracking-mutations';q.mkdir();entries=[item('a'),item('b',depends=['a'],build='b.f',type='article',frontmatter='none')];project(q,entries);(q/'b.f').write_text(output('B'))
  run(q,'track','extra','Extra','unused-template.html');saved=json.loads((q/'.nift/tracked.json').read_text())['tracked'];b=next(x for x in saved if x['name']=='b');assert b['depends']==['a'] and b['build']=='b.f' and b['type']=='article' and b['frontmatter']=='none'
