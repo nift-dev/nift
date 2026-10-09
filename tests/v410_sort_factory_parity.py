@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import subprocess
 import tempfile
+from v410_oracle_paths import fixture_root_aliases, normalize_fixture_paths
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--nift', default='./nift')
@@ -15,6 +16,7 @@ baseline = str(Path(args.baseline).resolve()) if args.baseline else None
 contract = json.loads(Path(__file__).with_name('v410_sort_factory_cases.json').read_text(encoding='utf-8'))
 with tempfile.TemporaryDirectory(prefix='nift-v410-sort-oracle-') as directory:
     root = Path(directory)
+    root_aliases = fixture_root_aliases(root)
     for name, source in contract['fixtures'].items():
         (root / name).write_text(source, encoding='utf-8')
     for case in contract['cases']:
@@ -25,13 +27,8 @@ with tempfile.TemporaryDirectory(prefix='nift-v410-sort-oracle-') as directory:
                                     text=True, encoding='utf-8', timeout=60)
             # Only the deliberate temporary fixture root differs. Preserve
             # source file, line, column, error text and all diagnostic frames.
-            stderr = result.stderr
-            # Windows may render the fixture prefix with native separators.
-            # Normalize only that exact prefix, never filenames or diagnostics.
-            for prefix in (str(root) + '\\', root.as_posix() + '/', str(root) + '/'):
-                stderr = stderr.replace(prefix, '<ORACLE_ROOT>/')
             return (result.returncode, result.stdout,
-                    stderr.replace(str(root), '<ORACLE_ROOT>'))
+                    normalize_fixture_paths(result.stderr, root_aliases))
         expected = (case['exit'], case['stdout'], case['stderr'])
         actual = execute(binary)
         if actual != expected:

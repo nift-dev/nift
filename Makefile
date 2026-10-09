@@ -1858,3 +1858,9 @@ test-v410-object-member-guard: $(OBJECT_LOOKUP_GUARD)
 	python3 tests/v410_object_member_guard.py --nift ./$(OBJECT_LOOKUP_GUARD)
 
 test: test-v410-sort-factory-parity test-v410-object-member-parity test-v410-object-member-unit test-v410-object-member-guard
+
+.PHONY: test-v410-oracle-paths
+test-v410-oracle-paths:
+	python3 tests/v410_oracle_paths_test.py
+
+test-v410-sort-factory-parity test-v410-object-member-parity: test-v410-oracle-paths
