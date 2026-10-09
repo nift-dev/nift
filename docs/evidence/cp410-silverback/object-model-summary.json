@@ -1,12 +1,512 @@
-{
-  "production_modified": false,
-  "models": [
-    "ordered vector",
-    "lazy index",
-    "width-128 hybrid",
-    "operation-local width-32 index"
-  ],
-  "validation": "120 exact-output instruction comparisons using actual RuntimeValue ordered storage",
-  "major_finding": "8k reads: lazy/hybrid 119x isolated lookup gain; cold copy/move with one lookup about 5x slower because index rebuild does not amortize",
-  "approval_boundary": "Persistent index needs complete key-set mutation interception and small-object representation/RSS review. No production RuntimeValue change authorized."
-}
+[
+  {
+    "width": 8,
+    "operation": "reads",
+    "instructions": {
+      "vector": 867397,
+      "lazy": 961616,
+      "hybrid": 891973,
+      "operation-local": 892012
+    },
+    "speedup_vs_vector": {
+      "vector": 1.0,
+      "lazy": 0.9020201410958221,
+      "hybrid": 0.9724475965079661,
+      "operation-local": 0.9724050797522903
+    },
+    "version": "final duplicate-aware prototype and final binary"
+  },
+  {
+    "width": 8,
+    "operation": "writes",
+    "instructions": {
+      "vector": 900202,
+      "lazy": 994421,
+      "hybrid": 924778,
+      "operation-local": 924817
+    },
+    "speedup_vs_vector": {
+      "vector": 1.0,
+      "lazy": 0.9052524031572141,
+      "hybrid": 0.9734249733449541,
+      "operation-local": 0.9733839235221671
+    },
+    "version": "final duplicate-aware prototype and final binary"
+  },
+  {
+    "width": 8,
+    "operation": "iteration",
+    "instructions": {
+      "vector": 1130,
+      "lazy": 1130,
+      "hybrid": 1130,
+      "operation-local": 1169
+    },
+    "speedup_vs_vector": {
+      "vector": 1.0,
+      "lazy": 1.0,
+      "hybrid": 1.0,
+      "operation-local": 0.9666381522668948
+    },
+    "version": "final duplicate-aware prototype and final binary"
+  },
+  {
+    "width": 8,
+    "operation": "mutation",
+    "instructions": {
+      "vector": 29874,
+      "lazy": 48912,
+      "hybrid": 30322,
+      "operation-local": 30361
+    },
+    "speedup_vs_vector": {
+      "vector": 1.0,
+      "lazy": 0.6107703631010795,
+      "hybrid": 0.9852252489941297,
+      "operation-local": 0.9839596851223609
+    },
+    "version": "final duplicate-aware prototype and final binary"
+  },
+  {
+    "width": 8,
+    "operation": "copy-move",
+    "instructions": {
+      "vector": 31896,
+      "lazy": 100603,
+      "hybrid": 32008,
+      "operation-local": 32047
+    },
+    "speedup_vs_vector": {
+      "vector": 1.0,
+      "lazy": 0.31704819935787204,
+      "hybrid": 0.9965008747813047,
+      "operation-local": 0.9952881704995787
+    },
+    "version": "final duplicate-aware prototype and final binary"
+  },
+  {
+    "width": 32,
+    "operation": "reads",
+    "instructions": {
+      "vector": 1791333,
+      "lazy": 851041,
+      "hybrid": 1815909,
+      "operation-local": 855465
+    },
+    "speedup_vs_vector": {
+      "vector": 1.0,
+      "lazy": 2.1048727382112027,
+      "hybrid": 0.9864662821760342,
+      "operation-local": 2.093987480493065
+    },
+    "version": "final duplicate-aware prototype and final binary"
+  },
+  {
+    "width": 32,
+    "operation": "writes",
+    "instructions": {
+      "vector": 1824138,
+      "lazy": 883846,
+      "hybrid": 1848714,
+      "operation-local": 888270
+    },
+    "speedup_vs_vector": {
+      "vector": 1.0,
+      "lazy": 2.06386406681707,
+      "hybrid": 0.9867064348514697,
+      "operation-local": 2.053585058597048
+    },
+    "version": "final duplicate-aware prototype and final binary"
+  },
+  {
+    "width": 32,
+    "operation": "iteration",
+    "instructions": {
+      "vector": 3050,
+      "lazy": 3050,
+      "hybrid": 3050,
+      "operation-local": 3089
+    },
+    "speedup_vs_vector": {
+      "vector": 1.0,
+      "lazy": 1.0,
+      "hybrid": 1.0,
+      "operation-local": 0.9873745548721269
+    },
+    "version": "final duplicate-aware prototype and final binary"
+  },
+  {
+    "width": 32,
+    "operation": "mutation",
+    "instructions": {
+      "vector": 45973,
+      "lazy": 82766,
+      "hybrid": 46421,
+      "operation-local": 87301
+    },
+    "speedup_vs_vector": {
+      "vector": 1.0,
+      "lazy": 0.5554575550346761,
+      "hybrid": 0.9903491954072511,
+      "operation-local": 0.5266033607862453
+    },
+    "version": "final duplicate-aware prototype and final binary"
+  },
+  {
+    "width": 32,
+    "operation": "copy-move",
+    "instructions": {
+      "vector": 78481,
+      "lazy": 413246,
+      "hybrid": 78593,
+      "operation-local": 413285
+    },
+    "speedup_vs_vector": {
+      "vector": 1.0,
+      "lazy": 0.1899135139844064,
+      "hybrid": 0.9985749366991972,
+      "operation-local": 0.1898955926297833
+    },
+    "version": "final duplicate-aware prototype and final binary"
+  },
+  {
+    "width": 128,
+    "operation": "reads",
+    "instructions": {
+      "vector": 6177573,
+      "lazy": 905339,
+      "hybrid": 905339,
+      "operation-local": 929685
+    },
+    "speedup_vs_vector": {
+      "vector": 1.0,
+      "lazy": 6.82349153190131,
+      "hybrid": 6.82349153190131,
+      "operation-local": 6.644802271737201
+    },
+    "version": "final duplicate-aware prototype and final binary"
+  },
+  {
+    "width": 128,
+    "operation": "writes",
+    "instructions": {
+      "vector": 6210378,
+      "lazy": 938144,
+      "hybrid": 938144,
+      "operation-local": 962490
+    },
+    "speedup_vs_vector": {
+      "vector": 1.0,
+      "lazy": 6.619855800388853,
+      "hybrid": 6.619855800388853,
+      "operation-local": 6.452407817224075
+    },
+    "version": "final duplicate-aware prototype and final binary"
+  },
+  {
+    "width": 128,
+    "operation": "iteration",
+    "instructions": {
+      "vector": 10730,
+      "lazy": 10730,
+      "hybrid": 10730,
+      "operation-local": 10769
+    },
+    "speedup_vs_vector": {
+      "vector": 1.0,
+      "lazy": 1.0,
+      "hybrid": 1.0,
+      "operation-local": 0.9963784938248677
+    },
+    "version": "final duplicate-aware prototype and final binary"
+  },
+  {
+    "width": 128,
+    "operation": "mutation",
+    "instructions": {
+      "vector": 137183,
+      "lazy": 189870,
+      "hybrid": 189870,
+      "operation-local": 214292
+    },
+    "speedup_vs_vector": {
+      "vector": 1.0,
+      "lazy": 0.7225101385158266,
+      "hybrid": 0.7225101385158266,
+      "operation-local": 0.6401685550557183
+    },
+    "version": "final duplicate-aware prototype and final binary"
+  },
+  {
+    "width": 128,
+    "operation": "copy-move",
+    "instructions": {
+      "vector": 273209,
+      "lazy": 1631011,
+      "hybrid": 1631011,
+      "operation-local": 1631050
+    },
+    "speedup_vs_vector": {
+      "vector": 1.0,
+      "lazy": 0.16750898675729348,
+      "hybrid": 0.16750898675729348,
+      "operation-local": 0.16750498145366483
+    },
+    "version": "final duplicate-aware prototype and final binary"
+  },
+  {
+    "width": 512,
+    "operation": "reads",
+    "instructions": {
+      "vector": 28337925,
+      "lazy": 1112540,
+      "hybrid": 1112540,
+      "operation-local": 1215407
+    },
+    "speedup_vs_vector": {
+      "vector": 1.0,
+      "lazy": 25.471376310065256,
+      "hybrid": 25.471376310065256,
+      "operation-local": 23.31558482055805
+    },
+    "version": "final duplicate-aware prototype and final binary"
+  },
+  {
+    "width": 512,
+    "operation": "writes",
+    "instructions": {
+      "vector": 28370730,
+      "lazy": 1145345,
+      "hybrid": 1145345,
+      "operation-local": 1248212
+    },
+    "speedup_vs_vector": {
+      "vector": 1.0,
+      "lazy": 24.770466540649323,
+      "hybrid": 24.770466540649323,
+      "operation-local": 22.729095698487114
+    },
+    "version": "final duplicate-aware prototype and final binary"
+  },
+  {
+    "width": 512,
+    "operation": "iteration",
+    "instructions": {
+      "vector": 41450,
+      "lazy": 41450,
+      "hybrid": 41450,
+      "operation-local": 41489
+    },
+    "speedup_vs_vector": {
+      "vector": 1.0,
+      "lazy": 1.0,
+      "hybrid": 1.0,
+      "operation-local": 0.9990599918050568
+    },
+    "version": "final duplicate-aware prototype and final binary"
+  },
+  {
+    "width": 512,
+    "operation": "mutation",
+    "instructions": {
+      "vector": 761609,
+      "lazy": 708817,
+      "hybrid": 708817,
+      "operation-local": 812146
+    },
+    "speedup_vs_vector": {
+      "vector": 1.0,
+      "lazy": 1.0744790263213213,
+      "hybrid": 1.0744790263213213,
+      "operation-local": 0.9377735037788772
+    },
+    "version": "final duplicate-aware prototype and final binary"
+  },
+  {
+    "width": 512,
+    "operation": "copy-move",
+    "instructions": {
+      "vector": 1049400,
+      "lazy": 6499411,
+      "hybrid": 6499411,
+      "operation-local": 6499450
+    },
+    "speedup_vs_vector": {
+      "vector": 1.0,
+      "lazy": 0.1614607846772577,
+      "hybrid": 0.1614607846772577,
+      "operation-local": 0.16145981583057029
+    },
+    "version": "final duplicate-aware prototype and final binary"
+  },
+  {
+    "width": 2000,
+    "operation": "reads",
+    "instructions": {
+      "vector": 79478737,
+      "lazy": 1699900,
+      "hybrid": 1699900,
+      "operation-local": 2107290
+    },
+    "speedup_vs_vector": {
+      "vector": 1.0,
+      "lazy": 46.754948526383906,
+      "hybrid": 46.754948526383906,
+      "operation-local": 37.71608891040151
+    },
+    "version": "final duplicate-aware prototype and final binary"
+  },
+  {
+    "width": 2000,
+    "operation": "writes",
+    "instructions": {
+      "vector": 79511542,
+      "lazy": 1732705,
+      "hybrid": 1732705,
+      "operation-local": 2140095
+    },
+    "speedup_vs_vector": {
+      "vector": 1.0,
+      "lazy": 45.888678107352376,
+      "hybrid": 45.888678107352376,
+      "operation-local": 37.15327684051409
+    },
+    "version": "final duplicate-aware prototype and final binary"
+  },
+  {
+    "width": 2000,
+    "operation": "iteration",
+    "instructions": {
+      "vector": 160490,
+      "lazy": 160490,
+      "hybrid": 160490,
+      "operation-local": 160529
+    },
+    "speedup_vs_vector": {
+      "vector": 1.0,
+      "lazy": 1.0,
+      "hybrid": 1.0,
+      "operation-local": 0.9997570532427162
+    },
+    "version": "final duplicate-aware prototype and final binary"
+  },
+  {
+    "width": 2000,
+    "operation": "mutation",
+    "instructions": {
+      "vector": 4076307,
+      "lazy": 2814239,
+      "hybrid": 2814239,
+      "operation-local": 3222128
+    },
+    "speedup_vs_vector": {
+      "vector": 1.0,
+      "lazy": 1.4484580023231857,
+      "hybrid": 1.4484580023231857,
+      "operation-local": 1.2650977863076824
+    },
+    "version": "final duplicate-aware prototype and final binary"
+  },
+  {
+    "width": 2000,
+    "operation": "copy-move",
+    "instructions": {
+      "vector": 4044504,
+      "lazy": 24514647,
+      "hybrid": 24514647,
+      "operation-local": 24514686
+    },
+    "speedup_vs_vector": {
+      "vector": 1.0,
+      "lazy": 0.16498316292296603,
+      "hybrid": 0.16498316292296603,
+      "operation-local": 0.16498290045403805
+    },
+    "version": "final duplicate-aware prototype and final binary"
+  },
+  {
+    "width": 8000,
+    "operation": "reads",
+    "instructions": {
+      "vector": 484667960,
+      "lazy": 4218019,
+      "hybrid": 4218019,
+      "operation-local": 5854815
+    },
+    "speedup_vs_vector": {
+      "vector": 1.0,
+      "lazy": 114.9041670983464,
+      "hybrid": 114.9041670983464,
+      "operation-local": 82.78108872782488
+    },
+    "version": "final duplicate-aware prototype and final binary"
+  },
+  {
+    "width": 8000,
+    "operation": "writes",
+    "instructions": {
+      "vector": 484700765,
+      "lazy": 4250824,
+      "hybrid": 4250824,
+      "operation-local": 5887620
+    },
+    "speedup_vs_vector": {
+      "vector": 1.0,
+      "lazy": 114.02513136276637,
+      "hybrid": 114.02513136276637,
+      "operation-local": 82.32541587262764
+    },
+    "version": "final duplicate-aware prototype and final binary"
+  },
+  {
+    "width": 8000,
+    "operation": "iteration",
+    "instructions": {
+      "vector": 640490,
+      "lazy": 640490,
+      "hybrid": 640490,
+      "operation-local": 640529
+    },
+    "speedup_vs_vector": {
+      "vector": 1.0,
+      "lazy": 1.0,
+      "hybrid": 1.0,
+      "operation-local": 0.9999391128270538
+    },
+    "version": "final duplicate-aware prototype and final binary"
+  },
+  {
+    "width": 8000,
+    "operation": "mutation",
+    "instructions": {
+      "vector": 19901001,
+      "lazy": 12164855,
+      "hybrid": 12164855,
+      "operation-local": 13801118
+    },
+    "speedup_vs_vector": {
+      "vector": 1.0,
+      "lazy": 1.6359423108619051,
+      "hybrid": 1.6359423108619051,
+      "operation-local": 1.441984700080095
+    },
+    "version": "final duplicate-aware prototype and final binary"
+  },
+  {
+    "width": 8000,
+    "operation": "copy-move",
+    "instructions": {
+      "vector": 18279003,
+      "lazy": 96140661,
+      "hybrid": 96140661,
+      "operation-local": 96140700
+    },
+    "speedup_vs_vector": {
+      "vector": 1.0,
+      "lazy": 0.19012770257529227,
+      "hybrid": 0.19012770257529227,
+      "operation-local": 0.19012762544895137
+    },
+    "version": "final duplicate-aware prototype and final binary"
+  }
+]

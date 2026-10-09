@@ -1,0 +1,16 @@
+[
+  {
+    "label": "current",
+    "source": "i := 0; fn(path()) { i+=1; return \"a\" }; j:=0; while(j<2) { v:=stat(path()); j+=1 }; print(i)",
+    "exit": 0,
+    "stdout": "4\n",
+    "stderr": ""
+  },
+  {
+    "label": "resolved-context",
+    "source": "i := 0; fn(path()) { i+=1; return \"a\" }; j:=0; while(j<2) { v:=stat(path()); j+=1 }; print(i)",
+    "exit": 0,
+    "stdout": "2\n",
+    "stderr": ""
+  }
+]

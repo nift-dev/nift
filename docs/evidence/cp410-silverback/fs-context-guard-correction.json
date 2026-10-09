@@ -1,0 +1,9 @@
+{
+  "previous_result": "Disabled-guard v1; not a valid routing conclusion",
+  "cause": "CLI sets enforce_filesystem_root=true even when filesystem_root is empty; !enforce rejected all CLI operations",
+  "corrected_gate": "standalone_script_host_ && resource_path_authority_.filesystem_root.empty()",
+  "production_change": false,
+  "instruction_result": "stat 1.30x; move 2.90x; copy 2.90x",
+  "cpu_result_10k": "stat 1.16x; move 2.00x; copy 1.59x",
+  "semantic_counterexample": "stat argument factory executes 4 times in baseline and 2 in prototype; no promotion"
+}

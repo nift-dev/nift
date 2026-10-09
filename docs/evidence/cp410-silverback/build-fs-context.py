@@ -2,7 +2,7 @@ from pathlib import Path
 import subprocess,json
 p=Path(__file__).parent.resolve();s=Path('src/ParserTemplate.cpp').read_text();mark='            // Prepared dispatch for user callables: bind args, run the prepared';assert s.count(mark)==1
 branch=r'''            // Research only: controlled standalone, plain paths, value operands.
-            if(standalone_script_host_&&!resource_path_authority_.enforce_filesystem_root&&((name=="stat"&&args.size()==1)||((name=="move"||name=="copy")&&args.size()==2))){
+            if(standalone_script_host_&&resource_path_authority_.filesystem_root.empty()&&((name=="stat"&&args.size()==1)||((name=="move"||name=="copy")&&args.size()==2))){
                 bool plain=true;for(const auto& v:args)if(!v.is_string()||v.string.empty()||v.string[0]=='~'||nift::detail::glob_has_magic(v.string))plain=false;
                 if(plain){
                     struct ResolvedOperation {fs::path base;std::vector<fs::path> paths;};

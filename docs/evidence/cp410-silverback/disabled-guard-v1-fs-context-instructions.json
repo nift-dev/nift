@@ -10,7 +10,7 @@
   {
     "operation": "metadata",
     "label": "resolved-context",
-    "instructions": 33392237,
+    "instructions": 43282529,
     "stdout": "128000\n",
     "n": 1000,
     "scope": "controlled standalone success paths only; dispatch/source/error/argument-side-effect equivalence not certified"
@@ -34,7 +34,7 @@
   {
     "operation": "move",
     "label": "resolved-context",
-    "instructions": 78759601,
+    "instructions": 228380144,
     "stdout": "OK\n",
     "n": 1000,
     "scope": "controlled standalone success paths only; dispatch/source/error/argument-side-effect equivalence not certified"
@@ -58,7 +58,7 @@
   {
     "operation": "copy",
     "label": "resolved-context",
-    "instructions": 79261850,
+    "instructions": 229834430,
     "stdout": "OK\n",
     "n": 1000,
     "scope": "controlled standalone success paths only; dispatch/source/error/argument-side-effect equivalence not certified"
