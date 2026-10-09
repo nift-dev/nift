@@ -12,17 +12,17 @@ parser.add_argument('--baseline')
 args = parser.parse_args()
 binary = str(Path(args.nift).resolve())
 baseline = str(Path(args.baseline).resolve()) if args.baseline else None
-contract = json.loads(Path(__file__).with_name('v410_object_member_cases.json').read_text())
+contract = json.loads(Path(__file__).with_name('v410_object_member_cases.json').read_text(encoding='utf-8'))
 with tempfile.TemporaryDirectory(prefix='nift-v410-object-oracle-') as directory:
     root = Path(directory)
     for name, source in contract['fixtures'].items():
-        (root / name).write_text(source)
+        (root / name).write_text(source, encoding='utf-8')
     for case in contract['cases']:
         path = root / (case['name'] + '.f')
-        path.write_text(case['source'] + '\n')
+        path.write_text(case['source'] + '\n', encoding='utf-8')
         def execute(command):
             result = subprocess.run([command, str(path)], capture_output=True,
-                                    text=True, timeout=60)
+                                    text=True, encoding='utf-8', timeout=60)
             # Only the deliberate temporary fixture root differs. Preserve
             # source file, line, column, error text and all diagnostic frames.
             stderr = result.stderr
