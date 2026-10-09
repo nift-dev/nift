@@ -1,0 +1,65 @@
+[
+  {
+    "source": "f := file(\"x\"); f.open(\"w\"); f.write(\"abc\"); f.save(); f.close(); g := f; print(f==g); g.open(\"rw\"); print(g.read_all()); g.close()",
+    "result": [
+      [
+        0,
+        "true\nabc\n",
+        ""
+      ],
+      {
+        "x": "616263"
+      }
+    ]
+  },
+  {
+    "source": "f := file(\"x\"); f.open(\"w\"); f.write(\"abc\"); f.save(); f.close(); f.open(\"rw\"); f.seek(0); f.write(\"xyz\"); f.revert(); f.seek(0); print(f.read_all()); f.save(); f.close()",
+    "result": [
+      [
+        0,
+        "abc\n",
+        ""
+      ],
+      {
+        "x": "616263"
+      }
+    ]
+  },
+  {
+    "source": "f := file(\"x\"); f.open(\"w\"); f.write(\"abc\"); f.save(); f.save(); f.close(); f.open(\"a\"); f.write(\"def\"); f.save(); f.close(); print(open(\"x\"))",
+    "result": [
+      [
+        0,
+        "abcdef\n",
+        ""
+      ],
+      {
+        "x": "616263646566"
+      }
+    ]
+  },
+  {
+    "source": "f := file(\"x\"); a := [f]; f.open(\"w\"); f.write(\"abc\"); f.save(); f.close(); a[0].open(\"r\"); print(a[0].read_all()); a[0].close()",
+    "result": [
+      [
+        0,
+        "abc\n",
+        ""
+      ],
+      {
+        "x": "616263"
+      }
+    ]
+  },
+  {
+    "source": "f := file(\"x\"); f.open(\"w\"); f.write(\"abc\"); f.close()",
+    "result": [
+      [
+        1,
+        "",
+        "error: <command-line>:1:46: close: file has unsaved changes; save() or revert() first\n"
+      ],
+      {}
+    ]
+  }
+]

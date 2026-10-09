@@ -1,0 +1,178 @@
+[
+  {
+    "name": "loops",
+    "label": "baseline",
+    "instructions": 42044743,
+    "allocations": 16299,
+    "bytes": 2813710,
+    "memcheck_errors": 0
+  },
+  {
+    "name": "loops",
+    "label": "snapshot",
+    "instructions": 45191001,
+    "allocations": 16299,
+    "bytes": 2813787,
+    "memcheck_errors": 0
+  },
+  {
+    "name": "call-scalar",
+    "label": "baseline",
+    "instructions": 87799979,
+    "allocations": 72356,
+    "bytes": 9155965,
+    "memcheck_errors": 0
+  },
+  {
+    "name": "call-scalar",
+    "label": "snapshot",
+    "instructions": 92506393,
+    "allocations": 72356,
+    "bytes": 9156138,
+    "memcheck_errors": 0
+  },
+  {
+    "name": "call-closure",
+    "label": "baseline",
+    "instructions": 370179218,
+    "allocations": 264369,
+    "bytes": 32756327,
+    "memcheck_errors": 0
+  },
+  {
+    "name": "call-closure",
+    "label": "snapshot",
+    "instructions": 369560332,
+    "allocations": 240370,
+    "bytes": 30324596,
+    "memcheck_errors": 0
+  },
+  {
+    "name": "call-callback",
+    "label": "baseline",
+    "instructions": 416143724,
+    "allocations": 352399,
+    "bytes": 43393304,
+    "memcheck_errors": 0
+  },
+  {
+    "name": "call-callback",
+    "label": "snapshot",
+    "instructions": 416619490,
+    "allocations": 328400,
+    "bytes": 40961573,
+    "memcheck_errors": 0
+  },
+  {
+    "name": "sort-identity",
+    "label": "baseline",
+    "instructions": 216515633,
+    "allocations": 240405,
+    "bytes": 40021659,
+    "memcheck_errors": 0
+  },
+  {
+    "name": "sort-identity",
+    "label": "snapshot",
+    "instructions": 185481270,
+    "allocations": 160411,
+    "bytes": 30422456,
+    "memcheck_errors": 0
+  },
+  {
+    "name": "map-set",
+    "label": "baseline",
+    "instructions": 127634928,
+    "allocations": 56413,
+    "bytes": 15506054,
+    "memcheck_errors": 0
+  },
+  {
+    "name": "map-set",
+    "label": "snapshot",
+    "instructions": 132341397,
+    "allocations": 56413,
+    "bytes": 15506131,
+    "memcheck_errors": 0
+  },
+  {
+    "name": "json-parse-convert",
+    "label": "baseline",
+    "instructions": 41838830,
+    "allocations": 56347,
+    "bytes": 15728864,
+    "memcheck_errors": 0
+  },
+  {
+    "name": "json-parse-convert",
+    "label": "snapshot",
+    "instructions": 41839754,
+    "allocations": 56347,
+    "bytes": 15728893,
+    "memcheck_errors": 0
+  },
+  {
+    "name": "json-traverse",
+    "label": "baseline",
+    "instructions": 123539826,
+    "allocations": 168400,
+    "bytes": 51701555,
+    "memcheck_errors": 0
+  },
+  {
+    "name": "json-traverse",
+    "label": "snapshot",
+    "instructions": 126542548,
+    "allocations": 168400,
+    "bytes": 51701632,
+    "memcheck_errors": 0
+  },
+  {
+    "name": "json-mutate",
+    "label": "baseline",
+    "instructions": 152946308,
+    "allocations": 176426,
+    "bytes": 57595060,
+    "memcheck_errors": 0
+  },
+  {
+    "name": "json-mutate",
+    "label": "snapshot",
+    "instructions": 156132150,
+    "allocations": 176426,
+    "bytes": 57595137,
+    "memcheck_errors": 0
+  },
+  {
+    "name": "json-serialize",
+    "label": "baseline",
+    "instructions": 102263651,
+    "allocations": 103456,
+    "bytes": 46008079,
+    "memcheck_errors": 0
+  },
+  {
+    "name": "json-serialize",
+    "label": "snapshot",
+    "instructions": 102267007,
+    "allocations": 103456,
+    "bytes": 46008108,
+    "memcheck_errors": 0
+  },
+  {
+    "name": "bfs",
+    "label": "baseline",
+    "instructions": 362889341,
+    "allocations": 256577,
+    "bytes": 43709174,
+    "memcheck_errors": 0
+  },
+  {
+    "name": "bfs",
+    "label": "snapshot",
+    "instructions": 379263109,
+    "allocations": 256577,
+    "bytes": 43709347,
+    "memcheck_errors": 0
+  }
+]

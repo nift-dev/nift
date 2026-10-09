@@ -1,0 +1,56 @@
+[
+  {
+    "n": 16000,
+    "unused": 0,
+    "kind": "identity",
+    "label": "baseline",
+    "instructions": 442816047,
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n016000/u000/identity____/official-equivalent.f",
+    "stdout": "1\n16000\n"
+  },
+  {
+    "n": 16000,
+    "unused": 0,
+    "kind": "identity",
+    "label": "snapshot",
+    "instructions": 380701477,
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n016000/u000/identity____/official-equivalent.f",
+    "stdout": "1\n16000\n"
+  },
+  {
+    "n": 16000,
+    "unused": 0,
+    "kind": "captured",
+    "label": "baseline",
+    "instructions": 532353456,
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n016000/u000/captured____/official-equivalent.f",
+    "stdout": "1\n16000\n"
+  },
+  {
+    "n": 16000,
+    "unused": 0,
+    "kind": "captured",
+    "label": "snapshot",
+    "instructions": 464296275,
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n016000/u000/captured____/official-equivalent.f",
+    "stdout": "1\n16000\n"
+  },
+  {
+    "n": 16000,
+    "unused": 0,
+    "kind": "identity",
+    "label": "baseline",
+    "instructions": 442816047,
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n016000/u000/identity____/official-equivalent.f",
+    "stdout": "1\n16000\n"
+  },
+  {
+    "n": 16000,
+    "unused": 0,
+    "kind": "identity",
+    "label": "snapshot",
+    "instructions": 380701477,
+    "source": "/home/nick/Repositories/nift/nift/.build/cp410-capture-frame/cases/n016000/u000/identity____/official-equivalent.f",
+    "stdout": "1\n16000\n"
+  }
+]

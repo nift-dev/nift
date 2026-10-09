@@ -1,0 +1,2882 @@
+[
+  {
+    "name": "official-traverse-100000",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 1.8701063669286668,
+    "cpu": 1.868656,
+    "rss_kib": 206556,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "repeat": 0,
+    "label": "string",
+    "wall": 1.9203511660452932,
+    "cpu": 1.9129079999999996,
+    "rss_kib": 205936,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "repeat": 1,
+    "label": "string",
+    "wall": 1.9216374391689897,
+    "cpu": 1.9202850000000007,
+    "rss_kib": 205840,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 1.9387776129879057,
+    "cpu": 1.9317909999999996,
+    "rss_kib": 206636,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 1.8427232629619539,
+    "cpu": 1.8355350000000001,
+    "rss_kib": 206656,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "repeat": 2,
+    "label": "string",
+    "wall": 1.718395798932761,
+    "cpu": 1.7114399999999987,
+    "rss_kib": 205844,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "repeat": 3,
+    "label": "string",
+    "wall": 1.720634328899905,
+    "cpu": 1.7132889999999996,
+    "rss_kib": 205840,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 1.8614109018817544,
+    "cpu": 1.8543739999999982,
+    "rss_kib": 206528,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "repeat": 4,
+    "label": "baseline",
+    "wall": 1.8326273621059954,
+    "cpu": 1.8312869999999997,
+    "rss_kib": 206696,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "repeat": 4,
+    "label": "string",
+    "wall": 1.7276623779907823,
+    "cpu": 1.7209730000000008,
+    "rss_kib": 205864,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "repeat": 5,
+    "label": "string",
+    "wall": 1.7463161500636488,
+    "cpu": 1.7396700000000003,
+    "rss_kib": 205928,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "repeat": 5,
+    "label": "baseline",
+    "wall": 1.8288771400693804,
+    "cpu": 1.821693999999999,
+    "rss_kib": 206572,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 2.758723939070478,
+    "cpu": 2.756768000000001,
+    "rss_kib": 297936,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "repeat": 0,
+    "label": "string",
+    "wall": 2.630211957031861,
+    "cpu": 2.6230139999999995,
+    "rss_kib": 296324,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "repeat": 1,
+    "label": "string",
+    "wall": 2.596119242021814,
+    "cpu": 2.5944719999999997,
+    "rss_kib": 296316,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 2.755424145143479,
+    "cpu": 2.747654999999998,
+    "rss_kib": 298116,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 2.830137589946389,
+    "cpu": 2.828357000000004,
+    "rss_kib": 298164,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "repeat": 2,
+    "label": "string",
+    "wall": 2.645250865025446,
+    "cpu": 2.6387300000000025,
+    "rss_kib": 296440,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "repeat": 3,
+    "label": "string",
+    "wall": 2.7631911679636687,
+    "cpu": 2.7555689999999977,
+    "rss_kib": 296472,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 2.7997346099000424,
+    "cpu": 2.797879000000002,
+    "rss_kib": 298260,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "repeat": 4,
+    "label": "baseline",
+    "wall": 2.764284461038187,
+    "cpu": 2.756014999999998,
+    "rss_kib": 297992,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "repeat": 4,
+    "label": "string",
+    "wall": 2.6346785710193217,
+    "cpu": 2.6272610000000007,
+    "rss_kib": 296372,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "repeat": 5,
+    "label": "string",
+    "wall": 2.600805500987917,
+    "cpu": 2.5991320000000044,
+    "rss_kib": 296240,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "repeat": 5,
+    "label": "baseline",
+    "wall": 2.7933296088594943,
+    "cpu": 2.7856379999999987,
+    "rss_kib": 298140,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "mixed-100000",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 1.6156879279296845,
+    "cpu": 1.6093090000000032,
+    "rss_kib": 124224,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "mixed-100000",
+    "repeat": 0,
+    "label": "string",
+    "wall": 1.545553504023701,
+    "cpu": 1.5375370000000004,
+    "rss_kib": 124012,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "mixed-100000",
+    "repeat": 1,
+    "label": "string",
+    "wall": 1.6193658879492432,
+    "cpu": 1.6123289999999955,
+    "rss_kib": 124104,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "mixed-100000",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 1.648167097941041,
+    "cpu": 1.6401250000000047,
+    "rss_kib": 124416,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "mixed-100000",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 1.6083492198958993,
+    "cpu": 1.601770000000002,
+    "rss_kib": 124436,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "mixed-100000",
+    "repeat": 2,
+    "label": "string",
+    "wall": 1.5271353889256716,
+    "cpu": 1.521135000000001,
+    "rss_kib": 123936,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "mixed-100000",
+    "repeat": 3,
+    "label": "string",
+    "wall": 1.5277905431576073,
+    "cpu": 1.5209880000000027,
+    "rss_kib": 124204,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "mixed-100000",
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 1.6263788910582662,
+    "cpu": 1.619320000000009,
+    "rss_kib": 124320,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "mixed-100000",
+    "repeat": 4,
+    "label": "baseline",
+    "wall": 1.6130764379631728,
+    "cpu": 1.605370999999998,
+    "rss_kib": 124280,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "mixed-100000",
+    "repeat": 4,
+    "label": "string",
+    "wall": 1.543813694966957,
+    "cpu": 1.5363260000000025,
+    "rss_kib": 124112,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "mixed-100000",
+    "repeat": 5,
+    "label": "string",
+    "wall": 1.549627489876002,
+    "cpu": 1.5426229999999919,
+    "rss_kib": 124176,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "mixed-100000",
+    "repeat": 5,
+    "label": "baseline",
+    "wall": 1.6186262429691851,
+    "cpu": 1.6118109999999959,
+    "rss_kib": 124392,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-5000",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.035995000042021275,
+    "cpu": 0.03036600000000078,
+    "rss_kib": 7280,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-5000",
+    "repeat": 0,
+    "label": "string",
+    "wall": 0.03144029504619539,
+    "cpu": 0.031031000000005804,
+    "rss_kib": 7248,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-5000",
+    "repeat": 1,
+    "label": "string",
+    "wall": 0.03187037701718509,
+    "cpu": 0.03141999999999001,
+    "rss_kib": 6960,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-5000",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.03179220296442509,
+    "cpu": 0.03139499999999629,
+    "rss_kib": 7148,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-5000",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.031717120902612805,
+    "cpu": 0.031261999999998125,
+    "rss_kib": 7320,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-5000",
+    "repeat": 2,
+    "label": "string",
+    "wall": 0.03177260514348745,
+    "cpu": 0.03134400000000426,
+    "rss_kib": 7104,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-5000",
+    "repeat": 3,
+    "label": "string",
+    "wall": 0.03172922506928444,
+    "cpu": 0.03131700000000848,
+    "rss_kib": 7264,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-5000",
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 0.03172568208537996,
+    "cpu": 0.03120100000000292,
+    "rss_kib": 7252,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-5000",
+    "repeat": 4,
+    "label": "baseline",
+    "wall": 0.03125843987800181,
+    "cpu": 0.03083300000000122,
+    "rss_kib": 7124,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-5000",
+    "repeat": 4,
+    "label": "string",
+    "wall": 0.031216566916555166,
+    "cpu": 0.030819000000008145,
+    "rss_kib": 7144,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-5000",
+    "repeat": 5,
+    "label": "string",
+    "wall": 0.031786723993718624,
+    "cpu": 0.03137199999999751,
+    "rss_kib": 7260,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-5000",
+    "repeat": 5,
+    "label": "baseline",
+    "wall": 0.03151471703313291,
+    "cpu": 0.03108700000001363,
+    "rss_kib": 7348,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-5000",
+    "repeat": 6,
+    "label": "baseline",
+    "wall": 0.031604503048583865,
+    "cpu": 0.031194999999989648,
+    "rss_kib": 7312,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-5000",
+    "repeat": 6,
+    "label": "string",
+    "wall": 0.031490222085267305,
+    "cpu": 0.03109400000001017,
+    "rss_kib": 7308,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-5000",
+    "repeat": 7,
+    "label": "string",
+    "wall": 0.031511706998571754,
+    "cpu": 0.031091000000003532,
+    "rss_kib": 7096,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-5000",
+    "repeat": 7,
+    "label": "baseline",
+    "wall": 0.03111276007257402,
+    "cpu": 0.030712000000001183,
+    "rss_kib": 7488,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-5000",
+    "repeat": 8,
+    "label": "baseline",
+    "wall": 0.031283312011510134,
+    "cpu": 0.030889999999999418,
+    "rss_kib": 7060,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-5000",
+    "repeat": 8,
+    "label": "string",
+    "wall": 0.030945772072300315,
+    "cpu": 0.030540999999999485,
+    "rss_kib": 7232,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-5000",
+    "repeat": 9,
+    "label": "string",
+    "wall": 0.031051323050633073,
+    "cpu": 0.030670999999998116,
+    "rss_kib": 7228,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-5000",
+    "repeat": 9,
+    "label": "baseline",
+    "wall": 0.03134619793854654,
+    "cpu": 0.0309350000000137,
+    "rss_kib": 7088,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-5000",
+    "repeat": 10,
+    "label": "baseline",
+    "wall": 0.03140492690727115,
+    "cpu": 0.03094899999999967,
+    "rss_kib": 7180,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-5000",
+    "repeat": 10,
+    "label": "string",
+    "wall": 0.03150797379203141,
+    "cpu": 0.031098999999997545,
+    "rss_kib": 7244,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-5000",
+    "repeat": 11,
+    "label": "string",
+    "wall": 0.032538503874093294,
+    "cpu": 0.03116300000000649,
+    "rss_kib": 7208,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-5000",
+    "repeat": 11,
+    "label": "baseline",
+    "wall": 0.03143379697576165,
+    "cpu": 0.03102099999998842,
+    "rss_kib": 7348,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-50000",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.29956968198530376,
+    "cpu": 0.29902299999999826,
+    "rss_kib": 7320,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-50000",
+    "repeat": 0,
+    "label": "string",
+    "wall": 0.29410658590495586,
+    "cpu": 0.2875530000000026,
+    "rss_kib": 7348,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-50000",
+    "repeat": 1,
+    "label": "string",
+    "wall": 0.29291305504739285,
+    "cpu": 0.28694699999999784,
+    "rss_kib": 7212,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-50000",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.29632563004270196,
+    "cpu": 0.290060000000004,
+    "rss_kib": 7196,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-50000",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.29313174611888826,
+    "cpu": 0.2870049999999935,
+    "rss_kib": 7204,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-50000",
+    "repeat": 2,
+    "label": "string",
+    "wall": 0.2907840481493622,
+    "cpu": 0.2845429999999922,
+    "rss_kib": 7044,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-50000",
+    "repeat": 3,
+    "label": "string",
+    "wall": 0.29228020715527236,
+    "cpu": 0.28547899999999515,
+    "rss_kib": 7060,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-50000",
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 0.291160681983456,
+    "cpu": 0.2848430000000022,
+    "rss_kib": 7136,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-50000",
+    "repeat": 4,
+    "label": "baseline",
+    "wall": 0.29249059106223285,
+    "cpu": 0.2861479999999972,
+    "rss_kib": 7120,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-50000",
+    "repeat": 4,
+    "label": "string",
+    "wall": 0.2929777861572802,
+    "cpu": 0.2859820000000042,
+    "rss_kib": 7380,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-50000",
+    "repeat": 5,
+    "label": "string",
+    "wall": 0.29939791886135936,
+    "cpu": 0.2922500000000028,
+    "rss_kib": 7204,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-50000",
+    "repeat": 5,
+    "label": "baseline",
+    "wall": 0.29947328520938754,
+    "cpu": 0.2930550000000025,
+    "rss_kib": 7116,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-50000",
+    "repeat": 6,
+    "label": "baseline",
+    "wall": 0.29648146708495915,
+    "cpu": 0.2897230000000022,
+    "rss_kib": 7452,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-50000",
+    "repeat": 6,
+    "label": "string",
+    "wall": 0.29626431898213923,
+    "cpu": 0.2949120000000036,
+    "rss_kib": 7052,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-50000",
+    "repeat": 7,
+    "label": "string",
+    "wall": 0.2935608068946749,
+    "cpu": 0.29308900000000193,
+    "rss_kib": 7184,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-50000",
+    "repeat": 7,
+    "label": "baseline",
+    "wall": 0.2924729969818145,
+    "cpu": 0.2862170000000006,
+    "rss_kib": 7292,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-50000",
+    "repeat": 8,
+    "label": "baseline",
+    "wall": 0.2875078178476542,
+    "cpu": 0.28663599999999434,
+    "rss_kib": 7324,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-50000",
+    "repeat": 8,
+    "label": "string",
+    "wall": 0.2961753089912236,
+    "cpu": 0.2896829999999895,
+    "rss_kib": 7172,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-50000",
+    "repeat": 9,
+    "label": "string",
+    "wall": 0.29642728297039866,
+    "cpu": 0.29011900000001134,
+    "rss_kib": 7216,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-50000",
+    "repeat": 9,
+    "label": "baseline",
+    "wall": 0.2943506680894643,
+    "cpu": 0.2881279999999862,
+    "rss_kib": 7344,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-50000",
+    "repeat": 10,
+    "label": "baseline",
+    "wall": 0.30027417792007327,
+    "cpu": 0.2933169999999947,
+    "rss_kib": 7348,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-50000",
+    "repeat": 10,
+    "label": "string",
+    "wall": 0.2962276379112154,
+    "cpu": 0.2904669999999996,
+    "rss_kib": 7224,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-50000",
+    "repeat": 11,
+    "label": "string",
+    "wall": 0.2925163069739938,
+    "cpu": 0.2864450000000005,
+    "rss_kib": 7268,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-small-50000",
+    "repeat": 11,
+    "label": "baseline",
+    "wall": 0.2882931779604405,
+    "cpu": 0.28735500000000513,
+    "rss_kib": 7076,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-large",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.5682443650439382,
+    "cpu": 0.5623780000000025,
+    "rss_kib": 7892,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-large",
+    "repeat": 0,
+    "label": "string",
+    "wall": 0.36633838107809424,
+    "cpu": 0.3600399999999979,
+    "rss_kib": 7532,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-large",
+    "repeat": 1,
+    "label": "string",
+    "wall": 0.37019282300025225,
+    "cpu": 0.3639739999999989,
+    "rss_kib": 7740,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-large",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.5693820300512016,
+    "cpu": 0.5624020000000058,
+    "rss_kib": 8016,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-large",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.5669554041232914,
+    "cpu": 0.5611519999999999,
+    "rss_kib": 7780,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-large",
+    "repeat": 2,
+    "label": "string",
+    "wall": 0.3642179740127176,
+    "cpu": 0.3580120000000022,
+    "rss_kib": 7748,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-large",
+    "repeat": 3,
+    "label": "string",
+    "wall": 0.36780835897661746,
+    "cpu": 0.36052999999999713,
+    "rss_kib": 7932,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-large",
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 0.569498211145401,
+    "cpu": 0.562972000000002,
+    "rss_kib": 7960,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-large",
+    "repeat": 4,
+    "label": "baseline",
+    "wall": 0.5746806310489774,
+    "cpu": 0.5681610000000035,
+    "rss_kib": 7964,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-large",
+    "repeat": 4,
+    "label": "string",
+    "wall": 0.3727755160070956,
+    "cpu": 0.3667219999999958,
+    "rss_kib": 7820,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-large",
+    "repeat": 5,
+    "label": "string",
+    "wall": 0.36285051610320807,
+    "cpu": 0.36170699999999556,
+    "rss_kib": 7760,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "string-large",
+    "repeat": 5,
+    "label": "baseline",
+    "wall": 0.5804757149890065,
+    "cpu": 0.5739619999999945,
+    "rss_kib": 7644,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-1",
+    "repeat": 0,
+    "label": "string",
+    "wall": 0.0030421228148043156,
+    "cpu": 0.002751000000010606,
+    "rss_kib": 7256,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-1",
+    "repeat": 0,
+    "label": "close-capacity",
+    "wall": 0.0025184371042996645,
+    "cpu": 0.0022820000000010054,
+    "rss_kib": 7160,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-1",
+    "repeat": 1,
+    "label": "close-capacity",
+    "wall": 0.002037225989624858,
+    "cpu": 0.001817000000002622,
+    "rss_kib": 7064,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-1",
+    "repeat": 1,
+    "label": "string",
+    "wall": 0.0019899739418178797,
+    "cpu": 0.001820999999992523,
+    "rss_kib": 7260,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-1",
+    "repeat": 2,
+    "label": "string",
+    "wall": 0.0018271789886057377,
+    "cpu": 0.0016389999999972815,
+    "rss_kib": 7056,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-1",
+    "repeat": 2,
+    "label": "close-capacity",
+    "wall": 0.0018953192047774792,
+    "cpu": 0.0017379999999960205,
+    "rss_kib": 7052,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-1",
+    "repeat": 3,
+    "label": "close-capacity",
+    "wall": 0.0017444989643990993,
+    "cpu": 0.0015920000000022583,
+    "rss_kib": 7036,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-1",
+    "repeat": 3,
+    "label": "string",
+    "wall": 0.001630624057725072,
+    "cpu": 0.0014859999999927709,
+    "rss_kib": 7036,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-1000",
+    "repeat": 0,
+    "label": "string",
+    "wall": 0.04720970895141363,
+    "cpu": 0.04622099999999563,
+    "rss_kib": 8836,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-1000",
+    "repeat": 0,
+    "label": "close-capacity",
+    "wall": 0.04648756608366966,
+    "cpu": 0.045785999999992555,
+    "rss_kib": 8556,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-1000",
+    "repeat": 1,
+    "label": "close-capacity",
+    "wall": 0.046832181978970766,
+    "cpu": 0.04575300000001192,
+    "rss_kib": 8612,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-1000",
+    "repeat": 1,
+    "label": "string",
+    "wall": 0.046982110012322664,
+    "cpu": 0.045658999999993455,
+    "rss_kib": 8928,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-1000",
+    "repeat": 2,
+    "label": "string",
+    "wall": 0.046823648968711495,
+    "cpu": 0.0458370000000059,
+    "rss_kib": 8808,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-1000",
+    "repeat": 2,
+    "label": "close-capacity",
+    "wall": 0.0467378671746701,
+    "cpu": 0.04558899999999255,
+    "rss_kib": 8616,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-1000",
+    "repeat": 3,
+    "label": "close-capacity",
+    "wall": 0.04650911199860275,
+    "cpu": 0.045476000000007843,
+    "rss_kib": 8548,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-1000",
+    "repeat": 3,
+    "label": "string",
+    "wall": 0.04730852413922548,
+    "cpu": 0.04615899999999584,
+    "rss_kib": 8748,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-10000",
+    "repeat": 0,
+    "label": "string",
+    "wall": 0.4641364871058613,
+    "cpu": 0.46199000000000723,
+    "rss_kib": 23368,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-10000",
+    "repeat": 0,
+    "label": "close-capacity",
+    "wall": 0.46355033898726106,
+    "cpu": 0.46017899999998946,
+    "rss_kib": 21384,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-10000",
+    "repeat": 1,
+    "label": "close-capacity",
+    "wall": 0.46763553586788476,
+    "cpu": 0.4643530000000098,
+    "rss_kib": 21284,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-10000",
+    "repeat": 1,
+    "label": "string",
+    "wall": 0.4909112451132387,
+    "cpu": 0.4886499999999998,
+    "rss_kib": 23292,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-10000",
+    "repeat": 2,
+    "label": "string",
+    "wall": 0.467395176878199,
+    "cpu": 0.4644909999999953,
+    "rss_kib": 23156,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-10000",
+    "repeat": 2,
+    "label": "close-capacity",
+    "wall": 0.46401767805218697,
+    "cpu": 0.46189299999999633,
+    "rss_kib": 21160,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-10000",
+    "repeat": 3,
+    "label": "close-capacity",
+    "wall": 0.46517913811840117,
+    "cpu": 0.46271600000000035,
+    "rss_kib": 21224,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-10000",
+    "repeat": 3,
+    "label": "string",
+    "wall": 0.4556940069887787,
+    "cpu": 0.4531649999999985,
+    "rss_kib": 23428,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-100000",
+    "repeat": 0,
+    "label": "string",
+    "wall": 4.913069161120802,
+    "cpu": 4.898480000000006,
+    "rss_kib": 171928,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-100000",
+    "repeat": 0,
+    "label": "close-capacity",
+    "wall": 4.949448142200708,
+    "cpu": 4.931114999999991,
+    "rss_kib": 144604,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-100000",
+    "repeat": 1,
+    "label": "close-capacity",
+    "wall": 5.212900016922504,
+    "cpu": 5.177396999999999,
+    "rss_kib": 144628,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-100000",
+    "repeat": 1,
+    "label": "string",
+    "wall": 4.935936257941648,
+    "cpu": 4.904609000000008,
+    "rss_kib": 172012,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-100000",
+    "repeat": 2,
+    "label": "string",
+    "wall": 5.298800115007907,
+    "cpu": 5.243182999999995,
+    "rss_kib": 171892,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-100000",
+    "repeat": 2,
+    "label": "close-capacity",
+    "wall": 5.3094580608885735,
+    "cpu": 5.269919000000002,
+    "rss_kib": 144444,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-100000",
+    "repeat": 3,
+    "label": "close-capacity",
+    "wall": 5.5098542149644345,
+    "cpu": 5.397886000000014,
+    "rss_kib": 144624,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "closed-capacity-100000",
+    "repeat": 3,
+    "label": "string",
+    "wall": 5.387627599062398,
+    "cpu": 5.1728200000000015,
+    "rss_kib": 171868,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-loops",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.011349753011018038,
+    "cpu": 0.005266000000020199,
+    "rss_kib": 7072,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-loops",
+    "repeat": 0,
+    "label": "string",
+    "wall": 0.004827321041375399,
+    "cpu": 0.004584000000008359,
+    "rss_kib": 7224,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-loops",
+    "repeat": 1,
+    "label": "string",
+    "wall": 0.0048376580234616995,
+    "cpu": 0.004601000000008071,
+    "rss_kib": 7372,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-loops",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.0048005490098148584,
+    "cpu": 0.0045950000000090085,
+    "rss_kib": 7016,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-loops",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.0049152441788464785,
+    "cpu": 0.004653000000004681,
+    "rss_kib": 7408,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-loops",
+    "repeat": 2,
+    "label": "string",
+    "wall": 0.005427871132269502,
+    "cpu": 0.005178999999998268,
+    "rss_kib": 7216,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-loops",
+    "repeat": 3,
+    "label": "string",
+    "wall": 0.00494010210968554,
+    "cpu": 0.004722999999998478,
+    "rss_kib": 7348,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-loops",
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 0.004889561096206307,
+    "cpu": 0.00467500000000598,
+    "rss_kib": 7220,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-loops",
+    "repeat": 4,
+    "label": "baseline",
+    "wall": 0.004625027999281883,
+    "cpu": 0.004432000000008429,
+    "rss_kib": 7060,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-loops",
+    "repeat": 4,
+    "label": "string",
+    "wall": 0.0050706020556390285,
+    "cpu": 0.00485499999999206,
+    "rss_kib": 7276,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-loops",
+    "repeat": 5,
+    "label": "string",
+    "wall": 0.005138109205290675,
+    "cpu": 0.004879999999985785,
+    "rss_kib": 7316,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-loops",
+    "repeat": 5,
+    "label": "baseline",
+    "wall": 0.005442936904728413,
+    "cpu": 0.005172999999999206,
+    "rss_kib": 7028,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-loops",
+    "repeat": 6,
+    "label": "baseline",
+    "wall": 0.004873602883890271,
+    "cpu": 0.0046629999999936445,
+    "rss_kib": 7408,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-loops",
+    "repeat": 6,
+    "label": "string",
+    "wall": 0.004808790981769562,
+    "cpu": 0.00461000000001377,
+    "rss_kib": 7244,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-loops",
+    "repeat": 7,
+    "label": "string",
+    "wall": 0.004795208806172013,
+    "cpu": 0.004590999999990686,
+    "rss_kib": 7208,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-loops",
+    "repeat": 7,
+    "label": "baseline",
+    "wall": 0.005222794134169817,
+    "cpu": 0.004948000000013053,
+    "rss_kib": 7412,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-loops",
+    "repeat": 8,
+    "label": "baseline",
+    "wall": 0.0048171961680054665,
+    "cpu": 0.004608999999987873,
+    "rss_kib": 7284,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-loops",
+    "repeat": 8,
+    "label": "string",
+    "wall": 0.005003003869205713,
+    "cpu": 0.004800000000017235,
+    "rss_kib": 7240,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-loops",
+    "repeat": 9,
+    "label": "string",
+    "wall": 0.004826748976483941,
+    "cpu": 0.004641999999989821,
+    "rss_kib": 7152,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-loops",
+    "repeat": 9,
+    "label": "baseline",
+    "wall": 0.004729099804535508,
+    "cpu": 0.004554000000013048,
+    "rss_kib": 6876,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-loops",
+    "repeat": 10,
+    "label": "baseline",
+    "wall": 0.0048380650114268064,
+    "cpu": 0.0046590000000037435,
+    "rss_kib": 7444,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-loops",
+    "repeat": 10,
+    "label": "string",
+    "wall": 0.004839560016989708,
+    "cpu": 0.0046539999999879456,
+    "rss_kib": 7260,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-loops",
+    "repeat": 11,
+    "label": "string",
+    "wall": 0.0047235561069101095,
+    "cpu": 0.004553000000015572,
+    "rss_kib": 7380,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-loops",
+    "repeat": 11,
+    "label": "baseline",
+    "wall": 0.004946022992953658,
+    "cpu": 0.004701999999994655,
+    "rss_kib": 7064,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-scalar",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.009648539125919342,
+    "cpu": 0.009371000000015783,
+    "rss_kib": 7392,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-scalar",
+    "repeat": 0,
+    "label": "string",
+    "wall": 0.009587857872247696,
+    "cpu": 0.009317999999979065,
+    "rss_kib": 7116,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-scalar",
+    "repeat": 1,
+    "label": "string",
+    "wall": 0.009676124900579453,
+    "cpu": 0.0093260000000015,
+    "rss_kib": 7264,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-scalar",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.009618389885872602,
+    "cpu": 0.00929999999999609,
+    "rss_kib": 7212,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-scalar",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.009250191040337086,
+    "cpu": 0.008977000000015778,
+    "rss_kib": 7356,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-scalar",
+    "repeat": 2,
+    "label": "string",
+    "wall": 0.00962277315557003,
+    "cpu": 0.009283999999993853,
+    "rss_kib": 7248,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-scalar",
+    "repeat": 3,
+    "label": "string",
+    "wall": 0.009898348012939095,
+    "cpu": 0.009602999999998474,
+    "rss_kib": 7240,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-scalar",
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 0.009306130930781364,
+    "cpu": 0.009038000000003876,
+    "rss_kib": 7040,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-scalar",
+    "repeat": 4,
+    "label": "baseline",
+    "wall": 0.009089173981919885,
+    "cpu": 0.008797000000015487,
+    "rss_kib": 7528,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-scalar",
+    "repeat": 4,
+    "label": "string",
+    "wall": 0.009163558017462492,
+    "cpu": 0.008855999999994424,
+    "rss_kib": 7140,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-scalar",
+    "repeat": 5,
+    "label": "string",
+    "wall": 0.009969715029001236,
+    "cpu": 0.009626999999994723,
+    "rss_kib": 7288,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-scalar",
+    "repeat": 5,
+    "label": "baseline",
+    "wall": 0.00946060405112803,
+    "cpu": 0.009186000000028116,
+    "rss_kib": 7356,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-scalar",
+    "repeat": 6,
+    "label": "baseline",
+    "wall": 0.009337961906567216,
+    "cpu": 0.00900900000000604,
+    "rss_kib": 7412,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-scalar",
+    "repeat": 6,
+    "label": "string",
+    "wall": 0.00966660212725401,
+    "cpu": 0.009316000000012536,
+    "rss_kib": 7104,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-scalar",
+    "repeat": 7,
+    "label": "string",
+    "wall": 0.009263378800824285,
+    "cpu": 0.009013999999993416,
+    "rss_kib": 7336,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-scalar",
+    "repeat": 7,
+    "label": "baseline",
+    "wall": 0.009251543087884784,
+    "cpu": 0.008981000000005679,
+    "rss_kib": 7372,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-scalar",
+    "repeat": 8,
+    "label": "baseline",
+    "wall": 0.009843899868428707,
+    "cpu": 0.009493000000006191,
+    "rss_kib": 7400,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-scalar",
+    "repeat": 8,
+    "label": "string",
+    "wall": 0.009621797129511833,
+    "cpu": 0.009313999999989164,
+    "rss_kib": 7036,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-scalar",
+    "repeat": 9,
+    "label": "string",
+    "wall": 0.009473812067881227,
+    "cpu": 0.009187999999994645,
+    "rss_kib": 7116,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-scalar",
+    "repeat": 9,
+    "label": "baseline",
+    "wall": 0.009428561897948384,
+    "cpu": 0.00913500000000056,
+    "rss_kib": 7148,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-scalar",
+    "repeat": 10,
+    "label": "baseline",
+    "wall": 0.009682692121714354,
+    "cpu": 0.009347000000005323,
+    "rss_kib": 7424,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-scalar",
+    "repeat": 10,
+    "label": "string",
+    "wall": 0.009276116965338588,
+    "cpu": 0.009001999999995292,
+    "rss_kib": 7232,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-scalar",
+    "repeat": 11,
+    "label": "string",
+    "wall": 0.009329084074124694,
+    "cpu": 0.00899999999997192,
+    "rss_kib": 7008,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-scalar",
+    "repeat": 11,
+    "label": "baseline",
+    "wall": 0.009799775900319219,
+    "cpu": 0.009432000000018093,
+    "rss_kib": 6956,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-closure",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.03308902797289193,
+    "cpu": 0.03275499999999454,
+    "rss_kib": 7536,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-closure",
+    "repeat": 0,
+    "label": "string",
+    "wall": 0.03431882103905082,
+    "cpu": 0.033935000000013815,
+    "rss_kib": 7484,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-closure",
+    "repeat": 1,
+    "label": "string",
+    "wall": 0.03352775890380144,
+    "cpu": 0.03311099999999101,
+    "rss_kib": 7268,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-closure",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.03410287690348923,
+    "cpu": 0.03370000000002449,
+    "rss_kib": 7564,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-closure",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.033549817046150565,
+    "cpu": 0.03308700000000897,
+    "rss_kib": 7372,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-closure",
+    "repeat": 2,
+    "label": "string",
+    "wall": 0.034083362901583314,
+    "cpu": 0.03367499999998813,
+    "rss_kib": 7408,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-closure",
+    "repeat": 3,
+    "label": "string",
+    "wall": 0.034480161033570766,
+    "cpu": 0.03357300000001828,
+    "rss_kib": 7508,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-closure",
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 0.034537291154265404,
+    "cpu": 0.03412299999999391,
+    "rss_kib": 7460,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-closure",
+    "repeat": 4,
+    "label": "baseline",
+    "wall": 0.03507349593564868,
+    "cpu": 0.03463700000000358,
+    "rss_kib": 7212,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-closure",
+    "repeat": 4,
+    "label": "string",
+    "wall": 0.03451428795233369,
+    "cpu": 0.034101999999990085,
+    "rss_kib": 7444,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-closure",
+    "repeat": 5,
+    "label": "string",
+    "wall": 0.03430949407629669,
+    "cpu": 0.03390299999996671,
+    "rss_kib": 7396,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-closure",
+    "repeat": 5,
+    "label": "baseline",
+    "wall": 0.03430648986250162,
+    "cpu": 0.033892000000022904,
+    "rss_kib": 7276,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-closure",
+    "repeat": 6,
+    "label": "baseline",
+    "wall": 0.03399984701536596,
+    "cpu": 0.03357699999999397,
+    "rss_kib": 7348,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-closure",
+    "repeat": 6,
+    "label": "string",
+    "wall": 0.03454755200073123,
+    "cpu": 0.03410800000000336,
+    "rss_kib": 7384,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-closure",
+    "repeat": 7,
+    "label": "string",
+    "wall": 0.0367086969781667,
+    "cpu": 0.03625700000002041,
+    "rss_kib": 7528,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-closure",
+    "repeat": 7,
+    "label": "baseline",
+    "wall": 0.034850469091907144,
+    "cpu": 0.03429400000000271,
+    "rss_kib": 7660,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-closure",
+    "repeat": 8,
+    "label": "baseline",
+    "wall": 0.034435726003721356,
+    "cpu": 0.03403299999999376,
+    "rss_kib": 7640,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-closure",
+    "repeat": 8,
+    "label": "string",
+    "wall": 0.033901949878782034,
+    "cpu": 0.0335009999999869,
+    "rss_kib": 7180,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-closure",
+    "repeat": 9,
+    "label": "string",
+    "wall": 0.03390999510884285,
+    "cpu": 0.03349700000001121,
+    "rss_kib": 7240,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-closure",
+    "repeat": 9,
+    "label": "baseline",
+    "wall": 0.03389534214511514,
+    "cpu": 0.033504999999991014,
+    "rss_kib": 7624,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-closure",
+    "repeat": 10,
+    "label": "baseline",
+    "wall": 0.03371652099303901,
+    "cpu": 0.03332499999997651,
+    "rss_kib": 7480,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-closure",
+    "repeat": 10,
+    "label": "string",
+    "wall": 0.03368545905686915,
+    "cpu": 0.03327000000000169,
+    "rss_kib": 7180,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-closure",
+    "repeat": 11,
+    "label": "string",
+    "wall": 0.034018586156889796,
+    "cpu": 0.03363000000001648,
+    "rss_kib": 7448,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-closure",
+    "repeat": 11,
+    "label": "baseline",
+    "wall": 0.034112623892724514,
+    "cpu": 0.03368799999999794,
+    "rss_kib": 7416,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-callback",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.03892227099277079,
+    "cpu": 0.038533999999998514,
+    "rss_kib": 7036,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-callback",
+    "repeat": 0,
+    "label": "string",
+    "wall": 0.03993233107030392,
+    "cpu": 0.03950299999999629,
+    "rss_kib": 7284,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-callback",
+    "repeat": 1,
+    "label": "string",
+    "wall": 0.039420187938958406,
+    "cpu": 0.03897600000001944,
+    "rss_kib": 7016,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-callback",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.04009226895868778,
+    "cpu": 0.03969399999996881,
+    "rss_kib": 7308,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-callback",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.03929002210497856,
+    "cpu": 0.03885599999999556,
+    "rss_kib": 7388,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-callback",
+    "repeat": 2,
+    "label": "string",
+    "wall": 0.03925825306214392,
+    "cpu": 0.038831000000001836,
+    "rss_kib": 7260,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-callback",
+    "repeat": 3,
+    "label": "string",
+    "wall": 0.03943181689828634,
+    "cpu": 0.03903200000000595,
+    "rss_kib": 7216,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-callback",
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 0.03932979400269687,
+    "cpu": 0.03888699999998835,
+    "rss_kib": 7500,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-callback",
+    "repeat": 4,
+    "label": "baseline",
+    "wall": 0.039095668122172356,
+    "cpu": 0.03866100000001893,
+    "rss_kib": 7552,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-callback",
+    "repeat": 4,
+    "label": "string",
+    "wall": 0.039646766148507595,
+    "cpu": 0.03922699999999679,
+    "rss_kib": 7288,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-callback",
+    "repeat": 5,
+    "label": "string",
+    "wall": 0.03893204592168331,
+    "cpu": 0.03847199999999873,
+    "rss_kib": 7224,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-callback",
+    "repeat": 5,
+    "label": "baseline",
+    "wall": 0.040140985045582056,
+    "cpu": 0.039754000000016276,
+    "rss_kib": 7548,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-callback",
+    "repeat": 6,
+    "label": "baseline",
+    "wall": 0.039604187943041325,
+    "cpu": 0.03918599999998662,
+    "rss_kib": 7508,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-callback",
+    "repeat": 6,
+    "label": "string",
+    "wall": 0.03916552010923624,
+    "cpu": 0.03873100000001273,
+    "rss_kib": 7476,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-callback",
+    "repeat": 7,
+    "label": "string",
+    "wall": 0.03897238103672862,
+    "cpu": 0.03856400000002225,
+    "rss_kib": 7140,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-callback",
+    "repeat": 7,
+    "label": "baseline",
+    "wall": 0.03924388508312404,
+    "cpu": 0.038791999999986615,
+    "rss_kib": 7388,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-callback",
+    "repeat": 8,
+    "label": "baseline",
+    "wall": 0.04132531397044659,
+    "cpu": 0.04089700000001528,
+    "rss_kib": 7264,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-callback",
+    "repeat": 8,
+    "label": "string",
+    "wall": 0.040437306044623256,
+    "cpu": 0.03998299999999233,
+    "rss_kib": 7356,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-callback",
+    "repeat": 9,
+    "label": "string",
+    "wall": 0.03973280685022473,
+    "cpu": 0.0392750000000035,
+    "rss_kib": 7420,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-callback",
+    "repeat": 9,
+    "label": "baseline",
+    "wall": 0.039143175119534135,
+    "cpu": 0.038736000000000104,
+    "rss_kib": 7600,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-callback",
+    "repeat": 10,
+    "label": "baseline",
+    "wall": 0.03905825107358396,
+    "cpu": 0.03865700000000061,
+    "rss_kib": 7288,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-callback",
+    "repeat": 10,
+    "label": "string",
+    "wall": 0.039426733972504735,
+    "cpu": 0.039017999999998665,
+    "rss_kib": 7260,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-callback",
+    "repeat": 11,
+    "label": "string",
+    "wall": 0.039362007984891534,
+    "cpu": 0.03894099999999412,
+    "rss_kib": 7260,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-call-callback",
+    "repeat": 11,
+    "label": "baseline",
+    "wall": 0.039222599007189274,
+    "cpu": 0.03883000000000436,
+    "rss_kib": 7200,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-sort-identity",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.03099691984243691,
+    "cpu": 0.030578000000005545,
+    "rss_kib": 21896,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-sort-identity",
+    "repeat": 0,
+    "label": "string",
+    "wall": 0.029577404959127307,
+    "cpu": 0.029087000000004082,
+    "rss_kib": 21860,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-sort-identity",
+    "repeat": 1,
+    "label": "string",
+    "wall": 0.029511083150282502,
+    "cpu": 0.02903899999998316,
+    "rss_kib": 21748,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-sort-identity",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.029653528006747365,
+    "cpu": 0.029177000000004227,
+    "rss_kib": 22084,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-sort-identity",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.029750423040241003,
+    "cpu": 0.029285999999999035,
+    "rss_kib": 22012,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-sort-identity",
+    "repeat": 2,
+    "label": "string",
+    "wall": 0.029708885122090578,
+    "cpu": 0.02919799999999384,
+    "rss_kib": 21880,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-sort-identity",
+    "repeat": 3,
+    "label": "string",
+    "wall": 0.029356264974921942,
+    "cpu": 0.02889399999999398,
+    "rss_kib": 21976,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-sort-identity",
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 0.029671747935935855,
+    "cpu": 0.029212000000001126,
+    "rss_kib": 21844,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-sort-identity",
+    "repeat": 4,
+    "label": "baseline",
+    "wall": 0.030502475099638104,
+    "cpu": 0.030065000000007558,
+    "rss_kib": 21932,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-sort-identity",
+    "repeat": 4,
+    "label": "string",
+    "wall": 0.03244108194485307,
+    "cpu": 0.0319820000000135,
+    "rss_kib": 21864,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-sort-identity",
+    "repeat": 5,
+    "label": "string",
+    "wall": 0.031693359138444066,
+    "cpu": 0.031191000000006852,
+    "rss_kib": 21772,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-sort-identity",
+    "repeat": 5,
+    "label": "baseline",
+    "wall": 0.031067471019923687,
+    "cpu": 0.03058799999999451,
+    "rss_kib": 22012,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-sort-identity",
+    "repeat": 6,
+    "label": "baseline",
+    "wall": 0.03156188898719847,
+    "cpu": 0.031080000000002883,
+    "rss_kib": 21740,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-sort-identity",
+    "repeat": 6,
+    "label": "string",
+    "wall": 0.03166122501716018,
+    "cpu": 0.030709999999999127,
+    "rss_kib": 21784,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-sort-identity",
+    "repeat": 7,
+    "label": "string",
+    "wall": 0.030278882943093777,
+    "cpu": 0.029848000000001207,
+    "rss_kib": 21704,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-sort-identity",
+    "repeat": 7,
+    "label": "baseline",
+    "wall": 0.033214238937944174,
+    "cpu": 0.03269299999998054,
+    "rss_kib": 22068,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-sort-identity",
+    "repeat": 8,
+    "label": "baseline",
+    "wall": 0.030762851936742663,
+    "cpu": 0.030337000000017156,
+    "rss_kib": 21960,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-sort-identity",
+    "repeat": 8,
+    "label": "string",
+    "wall": 0.030836349818855524,
+    "cpu": 0.030360999999984983,
+    "rss_kib": 21704,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-sort-identity",
+    "repeat": 9,
+    "label": "string",
+    "wall": 0.02969265589490533,
+    "cpu": 0.02912700000001678,
+    "rss_kib": 21964,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-sort-identity",
+    "repeat": 9,
+    "label": "baseline",
+    "wall": 0.030122342985123396,
+    "cpu": 0.02960400000000618,
+    "rss_kib": 22016,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-sort-identity",
+    "repeat": 10,
+    "label": "baseline",
+    "wall": 0.030188872944563627,
+    "cpu": 0.02974100000001556,
+    "rss_kib": 21764,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-sort-identity",
+    "repeat": 10,
+    "label": "string",
+    "wall": 0.03288875613361597,
+    "cpu": 0.03230100000000391,
+    "rss_kib": 21856,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-sort-identity",
+    "repeat": 11,
+    "label": "string",
+    "wall": 0.029176590964198112,
+    "cpu": 0.0287309999999934,
+    "rss_kib": 21788,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-sort-identity",
+    "repeat": 11,
+    "label": "baseline",
+    "wall": 0.029300483874976635,
+    "cpu": 0.028784000000001697,
+    "rss_kib": 22072,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-map-set",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.017574466997757554,
+    "cpu": 0.017098000000004276,
+    "rss_kib": 12504,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-map-set",
+    "repeat": 0,
+    "label": "string",
+    "wall": 0.016783047001808882,
+    "cpu": 0.016390000000001237,
+    "rss_kib": 12408,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-map-set",
+    "repeat": 1,
+    "label": "string",
+    "wall": 0.01671847002580762,
+    "cpu": 0.016308000000009315,
+    "rss_kib": 12528,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-map-set",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.016187398927286267,
+    "cpu": 0.015788999999998055,
+    "rss_kib": 12520,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-map-set",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.01702585886232555,
+    "cpu": 0.0165890000000104,
+    "rss_kib": 12460,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-map-set",
+    "repeat": 2,
+    "label": "string",
+    "wall": 0.0165596769656986,
+    "cpu": 0.01615699999999265,
+    "rss_kib": 12484,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-map-set",
+    "repeat": 3,
+    "label": "string",
+    "wall": 0.016945835202932358,
+    "cpu": 0.016526999999982195,
+    "rss_kib": 12264,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-map-set",
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 0.017413228983059525,
+    "cpu": 0.017005000000011705,
+    "rss_kib": 12468,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-map-set",
+    "repeat": 4,
+    "label": "baseline",
+    "wall": 0.017193327890709043,
+    "cpu": 0.01671499999999071,
+    "rss_kib": 12680,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-map-set",
+    "repeat": 4,
+    "label": "string",
+    "wall": 0.01683285995386541,
+    "cpu": 0.01643500000000131,
+    "rss_kib": 12408,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-map-set",
+    "repeat": 5,
+    "label": "string",
+    "wall": 0.01730435900390148,
+    "cpu": 0.016864999999981478,
+    "rss_kib": 12456,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-map-set",
+    "repeat": 5,
+    "label": "baseline",
+    "wall": 0.017032225849106908,
+    "cpu": 0.016638000000014586,
+    "rss_kib": 12728,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-map-set",
+    "repeat": 6,
+    "label": "baseline",
+    "wall": 0.017393182031810284,
+    "cpu": 0.01694700000000182,
+    "rss_kib": 12652,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-map-set",
+    "repeat": 6,
+    "label": "string",
+    "wall": 0.017789159901440144,
+    "cpu": 0.017324000000002115,
+    "rss_kib": 12552,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-map-set",
+    "repeat": 7,
+    "label": "string",
+    "wall": 0.016481610015034676,
+    "cpu": 0.016124000000004912,
+    "rss_kib": 12468,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-map-set",
+    "repeat": 7,
+    "label": "baseline",
+    "wall": 0.016279895091429353,
+    "cpu": 0.01590299999999445,
+    "rss_kib": 12520,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-map-set",
+    "repeat": 8,
+    "label": "baseline",
+    "wall": 0.01657342305406928,
+    "cpu": 0.0161420000000021,
+    "rss_kib": 12500,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-map-set",
+    "repeat": 8,
+    "label": "string",
+    "wall": 0.016766662010923028,
+    "cpu": 0.016379999999998063,
+    "rss_kib": 12520,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-map-set",
+    "repeat": 9,
+    "label": "string",
+    "wall": 0.016599908005446196,
+    "cpu": 0.01622000000000412,
+    "rss_kib": 12408,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-map-set",
+    "repeat": 9,
+    "label": "baseline",
+    "wall": 0.01678593293763697,
+    "cpu": 0.016393999999976927,
+    "rss_kib": 12472,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-map-set",
+    "repeat": 10,
+    "label": "baseline",
+    "wall": 0.01583376294001937,
+    "cpu": 0.01549500000001558,
+    "rss_kib": 12716,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-map-set",
+    "repeat": 10,
+    "label": "string",
+    "wall": 0.01677551306784153,
+    "cpu": 0.01638899999998955,
+    "rss_kib": 12548,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-map-set",
+    "repeat": 11,
+    "label": "string",
+    "wall": 0.01726327696815133,
+    "cpu": 0.016809000000009178,
+    "rss_kib": 12624,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-map-set",
+    "repeat": 11,
+    "label": "baseline",
+    "wall": 0.017163754906505346,
+    "cpu": 0.01674300000000528,
+    "rss_kib": 12532,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-json-mutate",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.024038374889642,
+    "cpu": 0.023458000000005086,
+    "rss_kib": 16028,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-json-mutate",
+    "repeat": 0,
+    "label": "string",
+    "wall": 0.022215109085664153,
+    "cpu": 0.0216959999999915,
+    "rss_kib": 16064,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-json-mutate",
+    "repeat": 1,
+    "label": "string",
+    "wall": 0.023493595188483596,
+    "cpu": 0.02296400000000176,
+    "rss_kib": 16016,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-json-mutate",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.023854559054598212,
+    "cpu": 0.023338999999992893,
+    "rss_kib": 16252,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-json-mutate",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.02143997303210199,
+    "cpu": 0.021011000000015656,
+    "rss_kib": 16064,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-json-mutate",
+    "repeat": 2,
+    "label": "string",
+    "wall": 0.0233381949365139,
+    "cpu": 0.022888999999992166,
+    "rss_kib": 15788,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-json-mutate",
+    "repeat": 3,
+    "label": "string",
+    "wall": 0.02252300688996911,
+    "cpu": 0.022017000000019493,
+    "rss_kib": 16012,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-json-mutate",
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 0.021588948788121343,
+    "cpu": 0.021144000000006713,
+    "rss_kib": 15936,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-json-mutate",
+    "repeat": 4,
+    "label": "baseline",
+    "wall": 0.022360801929607987,
+    "cpu": 0.02189599999999814,
+    "rss_kib": 16028,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-json-mutate",
+    "repeat": 4,
+    "label": "string",
+    "wall": 0.021115452982485294,
+    "cpu": 0.0206749999999829,
+    "rss_kib": 15996,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-json-mutate",
+    "repeat": 5,
+    "label": "string",
+    "wall": 0.021990455919876695,
+    "cpu": 0.021540999999999144,
+    "rss_kib": 16020,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-json-mutate",
+    "repeat": 5,
+    "label": "baseline",
+    "wall": 0.02269944199360907,
+    "cpu": 0.02219300000000146,
+    "rss_kib": 16240,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-json-mutate",
+    "repeat": 6,
+    "label": "baseline",
+    "wall": 0.022508690133690834,
+    "cpu": 0.02207400000000348,
+    "rss_kib": 16248,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-json-mutate",
+    "repeat": 6,
+    "label": "string",
+    "wall": 0.023069425020366907,
+    "cpu": 0.022590999999991368,
+    "rss_kib": 15940,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-json-mutate",
+    "repeat": 7,
+    "label": "string",
+    "wall": 0.02278008288703859,
+    "cpu": 0.022283000000015818,
+    "rss_kib": 16004,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-json-mutate",
+    "repeat": 7,
+    "label": "baseline",
+    "wall": 0.024210924049839377,
+    "cpu": 0.0237149999999815,
+    "rss_kib": 16256,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-json-mutate",
+    "repeat": 8,
+    "label": "baseline",
+    "wall": 0.02751238690689206,
+    "cpu": 0.026989000000000374,
+    "rss_kib": 16228,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-json-mutate",
+    "repeat": 8,
+    "label": "string",
+    "wall": 0.04538545501418412,
+    "cpu": 0.04470499999999333,
+    "rss_kib": 16128,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-json-mutate",
+    "repeat": 9,
+    "label": "string",
+    "wall": 0.045296849915757775,
+    "cpu": 0.044428999999993835,
+    "rss_kib": 15812,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-json-mutate",
+    "repeat": 9,
+    "label": "baseline",
+    "wall": 0.03888712311163545,
+    "cpu": 0.03794899999999757,
+    "rss_kib": 16248,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-json-mutate",
+    "repeat": 10,
+    "label": "baseline",
+    "wall": 0.031347149051725864,
+    "cpu": 0.030767000000025746,
+    "rss_kib": 16032,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-json-mutate",
+    "repeat": 10,
+    "label": "string",
+    "wall": 0.028450761921703815,
+    "cpu": 0.027769999999989636,
+    "rss_kib": 15964,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-json-mutate",
+    "repeat": 11,
+    "label": "string",
+    "wall": 0.04474869999103248,
+    "cpu": 0.04398900000001049,
+    "rss_kib": 15892,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-json-mutate",
+    "repeat": 11,
+    "label": "baseline",
+    "wall": 0.044514583889395,
+    "cpu": 0.04370500000000277,
+    "rss_kib": 16244,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-bfs",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.06354677700437605,
+    "cpu": 0.06278000000000361,
+    "rss_kib": 15036,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-bfs",
+    "repeat": 0,
+    "label": "string",
+    "wall": 0.04091073200106621,
+    "cpu": 0.04039600000002963,
+    "rss_kib": 14848,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-bfs",
+    "repeat": 1,
+    "label": "string",
+    "wall": 0.038554169004783034,
+    "cpu": 0.038145000000000095,
+    "rss_kib": 14952,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-bfs",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.03791185002774,
+    "cpu": 0.037488999999993666,
+    "rss_kib": 14576,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-bfs",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.037965920055285096,
+    "cpu": 0.037536999999986165,
+    "rss_kib": 14856,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-bfs",
+    "repeat": 2,
+    "label": "string",
+    "wall": 0.038276253966614604,
+    "cpu": 0.03778100000000961,
+    "rss_kib": 14724,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-bfs",
+    "repeat": 3,
+    "label": "string",
+    "wall": 0.03946666792035103,
+    "cpu": 0.03899700000000905,
+    "rss_kib": 14796,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-bfs",
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 0.03846987895667553,
+    "cpu": 0.03801099999998314,
+    "rss_kib": 15044,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-bfs",
+    "repeat": 4,
+    "label": "baseline",
+    "wall": 0.03888655919581652,
+    "cpu": 0.03840599999999483,
+    "rss_kib": 15036,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-bfs",
+    "repeat": 4,
+    "label": "string",
+    "wall": 0.03816603682935238,
+    "cpu": 0.03770800000000918,
+    "rss_kib": 14844,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-bfs",
+    "repeat": 5,
+    "label": "string",
+    "wall": 0.038562644040212035,
+    "cpu": 0.038141000000010195,
+    "rss_kib": 14900,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-bfs",
+    "repeat": 5,
+    "label": "baseline",
+    "wall": 0.04142718599177897,
+    "cpu": 0.04083900000001961,
+    "rss_kib": 14972,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-bfs",
+    "repeat": 6,
+    "label": "baseline",
+    "wall": 0.04098924109712243,
+    "cpu": 0.04001800000000344,
+    "rss_kib": 15048,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-bfs",
+    "repeat": 6,
+    "label": "string",
+    "wall": 0.03934717085212469,
+    "cpu": 0.03889699999999152,
+    "rss_kib": 15004,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-bfs",
+    "repeat": 7,
+    "label": "string",
+    "wall": 0.04057080391794443,
+    "cpu": 0.04007900000000575,
+    "rss_kib": 14920,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-bfs",
+    "repeat": 7,
+    "label": "baseline",
+    "wall": 0.03969844593666494,
+    "cpu": 0.0392360000000167,
+    "rss_kib": 14884,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-bfs",
+    "repeat": 8,
+    "label": "baseline",
+    "wall": 0.03953511198051274,
+    "cpu": 0.03900999999999044,
+    "rss_kib": 14856,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-bfs",
+    "repeat": 8,
+    "label": "string",
+    "wall": 0.03965246700681746,
+    "cpu": 0.03915799999998626,
+    "rss_kib": 14792,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-bfs",
+    "repeat": 9,
+    "label": "string",
+    "wall": 0.039697631960734725,
+    "cpu": 0.03922500000000184,
+    "rss_kib": 14652,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-bfs",
+    "repeat": 9,
+    "label": "baseline",
+    "wall": 0.03970482596196234,
+    "cpu": 0.039185000000003356,
+    "rss_kib": 15116,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-bfs",
+    "repeat": 10,
+    "label": "baseline",
+    "wall": 0.0391853351611644,
+    "cpu": 0.03870999999998048,
+    "rss_kib": 14952,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-bfs",
+    "repeat": 10,
+    "label": "string",
+    "wall": 0.03883234388194978,
+    "cpu": 0.03832500000000039,
+    "rss_kib": 14860,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-bfs",
+    "repeat": 11,
+    "label": "string",
+    "wall": 0.037861531134694815,
+    "cpu": 0.03740100000001689,
+    "rss_kib": 14812,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "control-bfs",
+    "repeat": 11,
+    "label": "baseline",
+    "wall": 0.03758724802173674,
+    "cpu": 0.037140000000007944,
+    "rss_kib": 15132,
+    "cpu_affinity": 0
+  }
+]

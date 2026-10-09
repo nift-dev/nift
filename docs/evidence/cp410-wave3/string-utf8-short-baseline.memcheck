@@ -1,0 +1,15 @@
+==14== Memcheck, a memory error detector
+==14== Copyright (C) 2002-2024, and GNU GPL'd, by Julian Seward et al.
+==14== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==14== Command: /home/nick/Repositories/nift/nift/.build/cp410-wave3/baseline-nift -e s\ :=\ "______Z";\ i\ :=\ 0;\ while(i\ \<\ 1000)\ {\ s="______Z".to_upper().replace("__","__");\ i+=1\ };\ print(s)
+==14== Parent PID: 4
+==14== 
+==14== 
+==14== HEAP SUMMARY:
+==14==     in use at exit: 0 bytes in 0 blocks
+==14==   total heap usage: 26,254 allocs, 26,254 frees, 2,716,227 bytes allocated
+==14== 
+==14== All heap blocks were freed -- no leaks are possible
+==14== 
+==14== For lists of detected and suppressed errors, rerun with: -s
+==14== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)

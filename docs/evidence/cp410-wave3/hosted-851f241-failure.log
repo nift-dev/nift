@@ -1,0 +1,22 @@
+windows behavioural corpus	v4.9 contracts on Windows	﻿2026-10-09T05:12:29.1841523Z ##[group]Run make test-v410-native-dispatch-parity test-v410-glob-parity test-v410-glob-relative-guard test-v49-selector-parity test-v49-glob-order test-v49-glob-key-guard test-v49-json-preflight-guard test-runtime-value test-v48-callback-parity test-v48-callback-guard test-v410-sort-factory-parity test-v410-object-member-parity test-v410-object-member-unit test-v410-object-member-guard
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T05:12:29.1844835Z [36;1mmake test-v410-native-dispatch-parity test-v410-glob-parity test-v410-glob-relative-guard test-v49-selector-parity test-v49-glob-order test-v49-glob-key-guard test-v49-json-preflight-guard test-runtime-value test-v48-callback-parity test-v48-callback-guard test-v410-sort-factory-parity test-v410-object-member-parity test-v410-object-member-unit test-v410-object-member-guard[0m
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T05:12:29.1848988Z shell: D:\a\_temp\setup-msys2\msys2.CMD {0}
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T05:12:29.1849343Z env:
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T05:12:29.1849682Z   pythonLocation: C:\hostedtoolcache\windows\Python\3.13.15\x64
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T05:12:29.1850497Z   PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.13.15\x64/lib/pkgconfig
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T05:12:29.1851012Z   Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.13.15\x64
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T05:12:29.1851502Z   Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.13.15\x64
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T05:12:29.1851951Z   Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.13.15\x64
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T05:12:29.1852318Z   MSYSTEM: UCRT64
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T05:12:29.1852560Z ##[endgroup]
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T05:12:30.6635476Z CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-w64-mingw32-cc"
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T05:12:31.5007410Z NIFT="/d/a/nift/nift/nift.exe" python3 tests/v410_native_dispatch_parity.py
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T05:12:32.2533651Z PASS 15 exact native dispatch/method/error contracts
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T05:12:32.2649593Z NIFT="/d/a/nift/nift/nift.exe" python3 tests/v410_glob_parity.py
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T05:12:32.8071993Z Traceback (most recent call last):
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T05:12:32.8079723Z   File "/d/a/nift/nift/tests/v410_glob_parity.py", line 26, in <module>
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T05:12:32.8080436Z     assert p.returncode==0,(pattern,code,p.returncode,p.stderr)
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T05:12:32.8080872Z            ^^^^^^^^^^^^^^^
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T05:12:32.8081693Z AssertionError: ('D:/a/_temp/msys64/tmp/tmphn02e71e/files/\uf02a.dat', 'print(ls("D:/a/_temp/msys64/tmp/tmphn02e71e/files/\uf02a.dat").stringify())', 1, 'error: <stdin>:1:7: ls: No such file or directory\n')
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T05:12:32.8209403Z make: *** [Makefile:1880: test-v410-glob-parity] Error 1
+windows behavioural corpus	v4.9 contracts on Windows	2026-10-09T05:12:32.8284464Z ##[error]Process completed with exit code 2.

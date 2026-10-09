@@ -1,0 +1,15 @@
+==8== Memcheck, a memory error detector
+==8== Copyright (C) 2002-2024, and GNU GPL'd, by Julian Seward et al.
+==8== Using Valgrind-3.26.0 and LibVEX; rerun with -h for copyright info
+==8== Command: /home/nick/Repositories/nift/nift/.build/cp410-wave3/close-capacity-nift -e paths\ :=\ open("targets.txt").trim().split("\\n");\ for(p\ :\ paths)\ {\ f\ :=\ file(p);\ f.open("w");\ f.write("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcde\\n");\ f.save();\ f.close()\ };\ print("OK")
+==8== Parent PID: 4
+==8== 
+==8== 
+==8== HEAP SUMMARY:
+==8==     in use at exit: 0 bytes in 0 blocks
+==8==   total heap usage: 119,421 allocs, 119,421 frees, 30,020,587 bytes allocated
+==8== 
+==8== All heap blocks were freed -- no leaks are possible
+==8== 
+==8== For lists of detected and suppressed errors, rerun with: -s
+==8== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)

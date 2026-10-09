@@ -1,0 +1,16 @@
+[
+  {
+    "label": "string",
+    "instructions": 214532694,
+    "allocations": 119421,
+    "bytes": 30020579,
+    "memcheck_errors": 0
+  },
+  {
+    "label": "close-capacity",
+    "instructions": 214893582,
+    "allocations": 119421,
+    "bytes": 30020587,
+    "memcheck_errors": 0
+  }
+]

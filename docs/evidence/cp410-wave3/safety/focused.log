@@ -1,0 +1,56 @@
+CC="cc" CXX="g++" CFLAGS="-O2 -fPIC -Wno-deprecated-declarations" bash scripts/build_vendored_libffi.sh ".build/libffi/x86_64-linux-gnu-cc"
+NIFT="/home/nick/Repositories/nift/nift/nift" python3 tests/v410_string_replace_parity.py
+PASS 20 exact byte-string replacement contracts
+NIFT="/home/nick/Repositories/nift/nift/nift" python3 tests/v410_native_dispatch_parity.py
+PASS 15 exact native dispatch/method/error contracts
+NIFT="/home/nick/Repositories/nift/nift/nift" python3 tests/v410_glob_parity.py
+PASS 11 exact glob path/ordering/hidden/Unicode/alias contracts
+NIFT="/home/nick/Repositories/nift/nift/.build/nift-glob-relative-guard" python3 tests/v410_glob_relative_guard.py
+PASS relative-base scaling: 32/128/512; absolute and empty globs bypass canonicalization
+NIFT="/home/nick/Repositories/nift/nift/nift" python3 tests/v49_glob_order.py
+PASS 8 glob ordering/dedup/Unicode/hidden/missing contracts plus POSIX symlinks
+NIFT="/home/nick/Repositories/nift/nift/.build/nift-glob-key-guard" python3 tests/v49_glob_key_guard.py
+PASS 100 entries: 100 ordering-key conversions
+PASS 200 entries: 200 ordering-key conversions
+PASS 400 entries: 400 ordering-key conversions
+NIFT_BIN="/home/nick/Repositories/nift/nift/nift" tests/diagnostics_smoke.sh
+diagnostics smoke passed
+diagnostics smoke passed
+python3 tests/v410_oracle_paths_test.py
+...
+----------------------------------------------------------------------
+Ran 3 tests in 0.001s
+
+OK
+python3 tests/v410_sort_factory_parity.py --nift ./nift
+PASS 31 exact sort/factory/capture/origin contracts
+python3 tests/v410_object_member_parity.py --nift ./nift
+PASS 86 exact object/member/location/origin contracts
+mkdir -p .build
+g++ -std=c++17 -O2 -Wall -Wextra -pedantic -Isrc -Ijsonic/include tests/v410_object_member_unit.cpp src/RuntimeValue.cpp -o .build/v410-object-member-unit
+.build/v410-object-member-unit
+python3 tests/v410_object_member_guard.py --nift ./.build/nift-object-lookup-guard
+PASS one traversal per object lookup, exact comparison positions and missing checks
+NIFT="/home/nick/Repositories/nift/nift/nift" bash tests/v48_callable_parity.sh
+PASS v4.8 callable parity
+NIFT="/home/nick/Repositories/nift/nift/nift" bash tests/v48_callback_parity.sh
+PASS v4.8 identifier and callback compatibility parity
+PASS v4.8 callback compatibility matrix
+NIFT="/home/nick/Repositories/nift/nift/nift" python3 tests/v48_callback_numeric_parity.py
+PASS 470 ordinary/callback numeric and fallback parity pairs
+NIFT="/home/nick/Repositories/nift/nift/nift" python3 tests/v410_allocation_guard.py
+[
+  {
+    "low": 100,
+    "high": 200,
+    "capture_slope": 2.25,
+    "dispatch_slope": 33.0
+  },
+  {
+    "low": 200,
+    "high": 400,
+    "capture_slope": 2.25,
+    "dispatch_slope": 33.0
+  }
+]
+PASS capture and native-dispatch allocation slopes (N/2N/4N)

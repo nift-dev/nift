@@ -1884,3 +1884,8 @@ test: test-v410-glob-relative-guard test-v410-glob-parity
 test-v410-native-dispatch-parity: $(TARGET)
 	NIFT="$(CURDIR)/$(TARGET)" python3 tests/v410_native_dispatch_parity.py
 test: test-v410-native-dispatch-parity
+
+.PHONY: test-v410-string-replace-parity
+test-v410-string-replace-parity: $(TARGET)
+	NIFT="$(CURDIR)/$(TARGET)" python3 tests/v410_string_replace_parity.py
+test: test-v410-string-replace-parity

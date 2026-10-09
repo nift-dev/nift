@@ -1,0 +1,2 @@
+{'label': 'baseline', 'instructions': 5356232167, 'allocations': 7440409, 'bytes': 1334489192, 'memcheck_errors': 0}
+{'label': 'traversal', 'instructions': 4376109795, 'allocations': 5760386, 'bytes': 975032804, 'memcheck_errors': 0}

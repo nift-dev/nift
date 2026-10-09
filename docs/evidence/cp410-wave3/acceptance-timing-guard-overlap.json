@@ -1,0 +1,209 @@
+[
+  {
+    "name": "official-traverse-100000",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 1.934189838822931,
+    "cpu": 1.9331189999999998,
+    "rss_kib": 206644,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "repeat": 0,
+    "label": "string",
+    "wall": 1.8461718088947237,
+    "cpu": 1.8446270000000005,
+    "rss_kib": 205852,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "repeat": 1,
+    "label": "string",
+    "wall": 1.7973850038833916,
+    "cpu": 1.7959099999999997,
+    "rss_kib": 205816,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 2.026536355027929,
+    "cpu": 2.019128,
+    "rss_kib": 206596,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 2.0838816228788346,
+    "cpu": 2.075861999999999,
+    "rss_kib": 206656,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "repeat": 2,
+    "label": "string",
+    "wall": 1.827043900033459,
+    "cpu": 1.8205290000000005,
+    "rss_kib": 205772,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "repeat": 3,
+    "label": "string",
+    "wall": 1.7930285329930484,
+    "cpu": 1.7855179999999997,
+    "rss_kib": 205860,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 1.9978932680096477,
+    "cpu": 1.9907700000000013,
+    "rss_kib": 206484,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "repeat": 4,
+    "label": "baseline",
+    "wall": 2.061579453991726,
+    "cpu": 2.0547349999999973,
+    "rss_kib": 206700,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "repeat": 4,
+    "label": "string",
+    "wall": 1.8603287388104945,
+    "cpu": 1.853226000000003,
+    "rss_kib": 205840,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "repeat": 5,
+    "label": "string",
+    "wall": 1.7851876220665872,
+    "cpu": 1.7834380000000003,
+    "rss_kib": 205916,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "official-traverse-100000",
+    "repeat": 5,
+    "label": "baseline",
+    "wall": 1.9030529789160937,
+    "cpu": 1.8954889999999978,
+    "rss_kib": 206520,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 2.793676502071321,
+    "cpu": 2.792027000000001,
+    "rss_kib": 298140,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "repeat": 0,
+    "label": "string",
+    "wall": 2.6248588010203093,
+    "cpu": 2.6169149999999988,
+    "rss_kib": 296376,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "repeat": 1,
+    "label": "string",
+    "wall": 2.6002534681465477,
+    "cpu": 2.5927270000000036,
+    "rss_kib": 296204,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 2.7246515739243478,
+    "cpu": 2.723066999999997,
+    "rss_kib": 297692,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 2.8360850939061493,
+    "cpu": 2.833820999999997,
+    "rss_kib": 298068,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "repeat": 2,
+    "label": "string",
+    "wall": 2.711893703090027,
+    "cpu": 2.7047179999999997,
+    "rss_kib": 296560,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "repeat": 3,
+    "label": "string",
+    "wall": 2.774219192098826,
+    "cpu": 2.7670790000000025,
+    "rss_kib": 296420,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 2.884149380028248,
+    "cpu": 2.8814799999999963,
+    "rss_kib": 298148,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "repeat": 4,
+    "label": "baseline",
+    "wall": 2.9063233230262995,
+    "cpu": 2.8985339999999944,
+    "rss_kib": 297948,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "repeat": 4,
+    "label": "string",
+    "wall": 2.6599140469916165,
+    "cpu": 2.6576820000000048,
+    "rss_kib": 296372,
+    "cpu_affinity": 0
+  },
+  {
+    "name": "deep-100000",
+    "repeat": 5,
+    "label": "string",
+    "wall": 2.6788591898512095,
+    "cpu": 2.671246,
+    "rss_kib": 296220,
+    "cpu_affinity": 0
+  }
+]

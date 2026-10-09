@@ -1,0 +1,19 @@
+official-traverse-100000 {'baseline': {'wall': 1.8520670824218541, 'cpu': 1.8449544999999992, 'rss_kib': 206604.0}, 'string': {'wall': 1.7369892640272155, 'cpu': 1.7303215000000005, 'rss_kib': 205854.0}}
+deep-100000 {'baseline': {'wall': 2.7788070349488407, 'cpu': 2.771203, 'rss_kib': 298128.0}, 'string': {'wall': 2.6324452640255913, 'cpu': 2.6251375, 'rss_kib': 296348.0}}
+mixed-100000 {'baseline': {'wall': 1.6171570854494348, 'cpu': 1.6105599999999995, 'rss_kib': 124356.0}, 'string': {'wall': 1.544683599495329, 'cpu': 1.5369315000000014, 'rss_kib': 124108.0}}
+string-small-5000 {'baseline': {'wall': 0.03147425700444728, 'cpu': 0.030984999999994045, 'rss_kib': 7266.0}, 'string': {'wall': 0.03150984039530158, 'cpu': 0.031096500000003857, 'rss_kib': 7230.0}}
+string-small-50000 {'baseline': {'wall': 0.2937412071041763, 'cpu': 0.28774149999999565, 'rss_kib': 7248.0}, 'string': {'wall': 0.2938336963998154, 'cpu': 0.28861799999999604, 'rss_kib': 7208.0}}
+string-large {'baseline': {'wall': 0.5694401205983013, 'cpu': 0.5626870000000039, 'rss_kib': 7926.0}, 'string': {'wall': 0.36707337002735585, 'cpu': 0.36111849999999635, 'rss_kib': 7754.0}}
+closed-capacity-1 {'string': {'wall': 0.0019085764652118087, 'cpu': 0.0017299999999949023, 'rss_kib': 7156.0}, 'close-capacity': {'wall': 0.0019662725972011685, 'cpu': 0.0017774999999993213, 'rss_kib': 7058.0}}
+closed-capacity-1000 {'string': {'wall': 0.04709590948186815, 'cpu': 0.04599800000000087, 'rss_kib': 8822.0}, 'close-capacity': {'wall': 0.046623489586636424, 'cpu': 0.04567100000000224, 'rss_kib': 8584.0}}
+closed-capacity-10000 {'string': {'wall': 0.46576583199203014, 'cpu': 0.4632405000000013, 'rss_kib': 23330.0}, 'close-capacity': {'wall': 0.46459840808529407, 'cpu': 0.46230449999999834, 'rss_kib': 21254.0}}
+closed-capacity-100000 {'string': {'wall': 5.117368186474778, 'cpu': 5.038714500000005, 'rss_kib': 171910.0}, 'close-capacity': {'wall': 5.261179038905539, 'cpu': 5.223658, 'rss_kib': 144614.0}}
+control-loops {'baseline': {'wall': 0.004881581990048289, 'cpu': 0.004660999999998694, 'rss_kib': 7146.0}, 'string': {'wall': 0.004838609020225704, 'cpu': 0.004647999999988883, 'rss_kib': 7252.0}}
+control-call-scalar {'baseline': {'wall': 0.009444582974538207, 'cpu': 0.009160500000014338, 'rss_kib': 7364.0}, 'string': {'wall': 0.009604827500879765, 'cpu': 0.009298999999991509, 'rss_kib': 7186.0}}
+control-call-closure {'baseline': {'wall': 0.03410775039810687, 'cpu': 0.033694000000011215, 'rss_kib': 7470.0}, 'string': {'wall': 0.03419642848894, 'cpu': 0.033652500000002306, 'rss_kib': 7402.0}}
+control-call-callback {'baseline': {'wall': 0.0392669535940513, 'cpu': 0.03884299999999996, 'rss_kib': 7388.0}, 'string': {'wall': 0.03942346095573157, 'cpu': 0.03899700000000905, 'rss_kib': 7260.0}}
+control-sort-identity {'baseline': {'wall': 0.030345674022100866, 'cpu': 0.02990300000001156, 'rss_kib': 21986.0}, 'string': {'wall': 0.029993884032592177, 'cpu': 0.029522999999997523, 'rss_kib': 21822.0}}
+control-map-set {'baseline': {'wall': 0.01702904235571623, 'cpu': 0.016613500000012493, 'rss_kib': 12520.0}, 'string': {'wall': 0.016779280034825206, 'cpu': 0.016389499999995394, 'rss_kib': 12476.0}}
+control-json-mutate {'baseline': {'wall': 0.023946466972120106, 'cpu': 0.02339849999999899, 'rss_kib': 16234.0}, 'string': {'wall': 0.023203809978440404, 'cpu': 0.022739999999991767, 'rss_kib': 16000.0}}
+control-bfs {'baseline': {'wall': 0.03936022357083857, 'cpu': 0.03885999999998546, 'rss_kib': 15004.0}, 'string': {'wall': 0.03908975736703724, 'cpu': 0.038610999999995954, 'rss_kib': 14846.0}}
+COMPLETE isolated acceptance timings

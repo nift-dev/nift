@@ -1,0 +1,4 @@
+ascii-no-match PASS
+ascii-many PASS
+utf8-short PASS
+utf8-large PASS

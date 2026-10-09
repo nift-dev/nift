@@ -1,0 +1,162 @@
+[
+  {
+    "source": "print(\"abc\".replace(\"z\",\"q\"))",
+    "result": [
+      0,
+      "abc\n",
+      ""
+    ]
+  },
+  {
+    "source": "print(\"abc\".replace(\"b\",\"XYZ\"))",
+    "result": [
+      0,
+      "aXYZc\n",
+      ""
+    ]
+  },
+  {
+    "source": "print(\"aaaa\".replace(\"aa\",\"b\"))",
+    "result": [
+      0,
+      "bb\n",
+      ""
+    ]
+  },
+  {
+    "source": "print(\"aaa\".replace(\"aa\",\"aaaa\"))",
+    "result": [
+      0,
+      "aaaaa\n",
+      ""
+    ]
+  },
+  {
+    "source": "print(\"aaaa\".replace(\"a\",\"\"))",
+    "result": [
+      0,
+      "\n",
+      ""
+    ]
+  },
+  {
+    "source": "print(\"abcabc\".replace(\"abc\",\"XYZ\"))",
+    "result": [
+      0,
+      "XYZXYZ\n",
+      ""
+    ]
+  },
+  {
+    "source": "print(\"é_λ_é\".replace(\"é\",\"øø\"))",
+    "result": [
+      0,
+      "øø_λ_øø\n",
+      ""
+    ]
+  },
+  {
+    "source": "print(\"ababa\".replace(\"aba\",\"x\"))",
+    "result": [
+      0,
+      "xba\n",
+      ""
+    ]
+  },
+  {
+    "source": "print(\"aaaa\".replace(\"a\",\"aa\"))",
+    "result": [
+      0,
+      "aaaaaaaa\n",
+      ""
+    ]
+  },
+  {
+    "source": "print(\"abababab\".replace(\"ab\",\"\"))",
+    "result": [
+      0,
+      "\n",
+      ""
+    ]
+  },
+  {
+    "source": "print(\"abc\".replace(\"\",\"x\"))",
+    "result": [
+      1,
+      "",
+      "error: <command-line>:1:7: replace: old string must not be empty\n"
+    ]
+  },
+  {
+    "source": "print(\"abc\".replace(2,\"x\"))",
+    "result": [
+      1,
+      "",
+      "error: <command-line>:1:7: replace: arguments must be strings\n"
+    ]
+  },
+  {
+    "source": "print(\"abc\".replace(\"a\",2))",
+    "result": [
+      1,
+      "",
+      "error: <command-line>:1:7: replace: arguments must be strings\n"
+    ]
+  },
+  {
+    "source": "print(\"\".replace(\"a\",\"b\"))",
+    "result": [
+      0,
+      "\n",
+      ""
+    ]
+  },
+  {
+    "source": "print(\"abc\".replace(\"abc\",\"\"))",
+    "result": [
+      0,
+      "\n",
+      ""
+    ]
+  },
+  {
+    "source": "print(\"ééé\".replace(\"éé\",\"λ\"))",
+    "result": [
+      0,
+      "λé\n",
+      ""
+    ]
+  },
+  {
+    "source": "print(\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\".replace(\"a\",\"XYZ\"))",
+    "result": [
+      0,
+      "XYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZXYZ\n",
+      ""
+    ]
+  },
+  {
+    "source": "print(\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\".replace(\"aa\",\"a\"))",
+    "result": [
+      0,
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+      ""
+    ]
+  },
+  {
+    "source": "print(\"prefix_suffix\".replace(\"_\",\"--\"))",
+    "result": [
+      0,
+      "prefix--suffix\n",
+      ""
+    ]
+  },
+  {
+    "source": "print(\"aaaaab\".replace(\"aa\",\"aaa\"))",
+    "result": [
+      0,
+      "aaaaaaab\n",
+      ""
+    ]
+  }
+]

@@ -1,0 +1,674 @@
+[
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/*.dat",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 1.8056175610981882
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/*.dat",
+    "repeat": 0,
+    "label": "traversal",
+    "wall": 1.6891907809767872
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/*.dat",
+    "repeat": 1,
+    "label": "traversal",
+    "wall": 1.6584840170107782
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/*.dat",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 1.77121856296435
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/*.dat",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 1.7793459449894726
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/*.dat",
+    "repeat": 2,
+    "label": "traversal",
+    "wall": 1.670104930875823
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/*.dat",
+    "repeat": 3,
+    "label": "traversal",
+    "wall": 1.6611881968565285
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/*.dat",
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 1.8027343568392098
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/*.missing",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.2927615020889789
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/*.missing",
+    "repeat": 0,
+    "label": "traversal",
+    "wall": 0.18312673503533006
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/*.missing",
+    "repeat": 1,
+    "label": "traversal",
+    "wall": 0.1885328609496355
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/*.missing",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.2949370800051838
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/*.missing",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.2885612139943987
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/*.missing",
+    "repeat": 2,
+    "label": "traversal",
+    "wall": 0.1982985930517316
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/*.missing",
+    "repeat": 3,
+    "label": "traversal",
+    "wall": 0.1829621351789683
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/*.missing",
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 0.2908987000118941
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.28904923098161817
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 0,
+    "label": "traversal",
+    "wall": 0.18585891998372972
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 1,
+    "label": "traversal",
+    "wall": 0.18705799314193428
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.2945352110546082
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.29485524096526206
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 2,
+    "label": "traversal",
+    "wall": 0.18997838511131704
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 3,
+    "label": "traversal",
+    "wall": 0.18077301606535912
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 0.2904949269723147
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/**/*.dat",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 1.9104175129905343
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/**/*.dat",
+    "repeat": 0,
+    "label": "traversal",
+    "wall": 1.7466215558815747
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/**/*.dat",
+    "repeat": 1,
+    "label": "traversal",
+    "wall": 1.7582787049468607
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/**/*.dat",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 1.9649797540623695
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/**/*.dat",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 1.9811279121786356
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/**/*.dat",
+    "repeat": 2,
+    "label": "traversal",
+    "wall": 1.7408488001674414
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/**/*.dat",
+    "repeat": 3,
+    "label": "traversal",
+    "wall": 1.7402349340263754
+  },
+  {
+    "shape": "official-traverse-100000",
+    "pattern": "files/**/**/*.dat",
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 1.9769454638008028
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/*.dat",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 2.776586406864226
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/*.dat",
+    "repeat": 0,
+    "label": "traversal",
+    "wall": 2.6516708019189537
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/*.dat",
+    "repeat": 1,
+    "label": "traversal",
+    "wall": 2.631551584927365
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/*.dat",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 2.808448087191209
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/*.dat",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 2.8096238530706614
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/*.dat",
+    "repeat": 2,
+    "label": "traversal",
+    "wall": 2.6959812298882753
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/*.dat",
+    "repeat": 3,
+    "label": "traversal",
+    "wall": 2.712133988039568
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/*.dat",
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 2.7417875819373876
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/*.missing",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.3783703160006553
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/*.missing",
+    "repeat": 0,
+    "label": "traversal",
+    "wall": 0.23849441204220057
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/*.missing",
+    "repeat": 1,
+    "label": "traversal",
+    "wall": 0.23785601183772087
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/*.missing",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.3719112859107554
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/*.missing",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.36767887603491545
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/*.missing",
+    "repeat": 2,
+    "label": "traversal",
+    "wall": 0.2319171861745417
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/*.missing",
+    "repeat": 3,
+    "label": "traversal",
+    "wall": 0.23365284386090934
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/*.missing",
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 0.37846036488190293
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.37015072884969413
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 0,
+    "label": "traversal",
+    "wall": 0.2324795590247959
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 1,
+    "label": "traversal",
+    "wall": 0.2354675659444183
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.36947480496019125
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.3679418640676886
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 2,
+    "label": "traversal",
+    "wall": 0.2473733581136912
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 3,
+    "label": "traversal",
+    "wall": 0.2456895939540118
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 0.3756284068804234
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/**/*.dat",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 16.611905404832214
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/**/*.dat",
+    "repeat": 0,
+    "label": "traversal",
+    "wall": 14.77645565313287
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/**/*.dat",
+    "repeat": 1,
+    "label": "traversal",
+    "wall": 14.768012118991464
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/**/*.dat",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 16.76737202797085
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/**/*.dat",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 16.80471100891009
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/**/*.dat",
+    "repeat": 2,
+    "label": "traversal",
+    "wall": 15.142256209161133
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/**/*.dat",
+    "repeat": 3,
+    "label": "traversal",
+    "wall": 16.052194703835994
+  },
+  {
+    "shape": "deep-100000",
+    "pattern": "files/**/**/*.dat",
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 18.870616419939324
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/*.dat",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 1.7967886510305107
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/*.dat",
+    "repeat": 0,
+    "label": "traversal",
+    "wall": 1.699213933898136
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/*.dat",
+    "repeat": 1,
+    "label": "traversal",
+    "wall": 1.7242699321359396
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/*.dat",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 1.7895832201465964
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/*.dat",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 1.7869119858369231
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/*.dat",
+    "repeat": 2,
+    "label": "traversal",
+    "wall": 1.6900104759261012
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/*.dat",
+    "repeat": 3,
+    "label": "traversal",
+    "wall": 1.7299690339714289
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/*.dat",
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 1.7830941160209477
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/*.missing",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.18330225092358887
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/*.missing",
+    "repeat": 0,
+    "label": "traversal",
+    "wall": 0.09591067279689014
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/*.missing",
+    "repeat": 1,
+    "label": "traversal",
+    "wall": 0.10530337202362716
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/*.missing",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.18704575207084417
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/*.missing",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.17840196192264557
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/*.missing",
+    "repeat": 2,
+    "label": "traversal",
+    "wall": 0.09458080283366144
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/*.missing",
+    "repeat": 3,
+    "label": "traversal",
+    "wall": 0.09856547485105693
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/*.missing",
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 0.202628011116758
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 0.19713302399031818
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 0,
+    "label": "traversal",
+    "wall": 0.14689162792637944
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 1,
+    "label": "traversal",
+    "wall": 0.17324729706160724
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 0.2381906418595463
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 0.20453424798324704
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 2,
+    "label": "traversal",
+    "wall": 0.10372152109630406
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 3,
+    "label": "traversal",
+    "wall": 0.10633265413343906
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/obj-*000.dat",
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 0.2841444869991392
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/**/*.dat",
+    "repeat": 0,
+    "label": "baseline",
+    "wall": 5.351314852014184
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/**/*.dat",
+    "repeat": 0,
+    "label": "traversal",
+    "wall": 4.458716965047643
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/**/*.dat",
+    "repeat": 1,
+    "label": "traversal",
+    "wall": 4.662544687045738
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/**/*.dat",
+    "repeat": 1,
+    "label": "baseline",
+    "wall": 5.360087109031156
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/**/*.dat",
+    "repeat": 2,
+    "label": "baseline",
+    "wall": 5.482330241939053
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/**/*.dat",
+    "repeat": 2,
+    "label": "traversal",
+    "wall": 5.005682168994099
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/**/*.dat",
+    "repeat": 3,
+    "label": "traversal",
+    "wall": 4.841927353059873
+  },
+  {
+    "shape": "mixed-100000",
+    "pattern": "files/**/**/*.dat",
+    "repeat": 3,
+    "label": "baseline",
+    "wall": 5.457196936942637
+  }
+]

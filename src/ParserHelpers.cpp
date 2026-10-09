@@ -272,20 +272,53 @@ void sort_glob_paths(std::vector<T>& values, PathOf path_of) {
     for (std::size_t i = 0; i < values.size(); ++i) values[i] = std::move(keyed[i].value);
 }
 
-void glob_walk(const fs::path& base,const std::vector<std::string>& parts,std::size_t i,std::vector<fs::path>& out){
-    if(i==parts.size()){std::error_code ec;if(fs::exists(base,ec)&&!ec)out.push_back(fs::absolute(base).lexically_normal());return;}
-    const auto& part=parts[i];
-    if(part=="**"){
-        glob_walk(base,parts,i+1,out);
-        std::error_code ec; if(!fs::is_directory(base,ec)||ec)return;
-        std::vector<fs::directory_entry> entries; for(fs::directory_iterator it(base,fs::directory_options::skip_permission_denied,ec),end;!ec&&it!=end;it.increment(ec))entries.push_back(*it);
-        /* Final glob ordering covers entries from every directory. */
-        for(const auto& e:entries){auto name=e.path().filename().string();if(!name.empty()&&name[0]=='.')continue;std::error_code sec;if(e.is_directory(sec)&&!e.is_symlink(sec))glob_walk(e.path(),parts,i,out);}
+void glob_walk(const fs::path& base, const std::vector<std::string>& parts,
+               std::size_t i, std::vector<fs::path>& out,
+               const std::vector<fs::directory_entry>* scanned = nullptr) {
+    if (i == parts.size()) {
+        std::error_code ec;
+        if (fs::exists(base, ec) && !ec)
+            out.push_back(fs::absolute(base).lexically_normal());
         return;
     }
-    if(!glob_has_magic(part)){std::string literal;literal.reserve(part.size());for(std::size_t k=0;k<part.size();++k){if(part[k]=='\\'&&k+1<part.size())literal+=part[++k];else literal+=part[k];}glob_walk(base/literal,parts,i+1,out);return;}
-    std::error_code ec;if(!fs::is_directory(base,ec)||ec)return;std::vector<fs::directory_entry> entries;for(fs::directory_iterator it(base,fs::directory_options::skip_permission_denied,ec),end;!ec&&it!=end;it.increment(ec))entries.push_back(*it);
-    /* Final glob ordering covers entries from every directory. */for(const auto&e:entries)if(glob_component_match(part,e.path().filename().string()))glob_walk(e.path(),parts,i+1,out);
+    const auto& part = parts[i];
+    if (part != "**" && !glob_has_magic(part)) {
+        std::string literal;
+        literal.reserve(part.size());
+        for (std::size_t k = 0; k < part.size(); ++k) {
+            if (part[k] == '\\' && k + 1 < part.size()) literal += part[++k];
+            else literal += part[k];
+        }
+        glob_walk(base / literal, parts, i + 1, out);
+        return;
+    }
+    std::vector<fs::directory_entry> owned;
+    if (!scanned) {
+        std::error_code ec;
+        if (!fs::is_directory(base, ec) || ec) {
+            if (part == "**") glob_walk(base, parts, i + 1, out);
+            return;
+        }
+        for (fs::directory_iterator it(base, fs::directory_options::skip_permission_denied, ec), end;
+             !ec && it != end; it.increment(ec)) owned.push_back(*it);
+        scanned = &owned;
+    }
+    // Adjacent components on the same base can share this operation-local scan.
+    // Final absolute ordering and deduplication still cover every result.
+    if (part == "**") {
+        glob_walk(base, parts, i + 1, out, scanned);
+        for (const auto& e : *scanned) {
+            auto name = e.path().filename().string();
+            if (!name.empty() && name[0] == '.') continue;
+            std::error_code ec;
+            if (e.is_directory(ec) && !e.is_symlink(ec))
+                glob_walk(e.path(), parts, i, out);
+        }
+    } else {
+        for (const auto& e : *scanned)
+            if (glob_component_match(part, e.path().filename().string()))
+                glob_walk(e.path(), parts, i + 1, out);
+    }
 }
 
 bool is_single_quoted_parameter(const std::string& text) {

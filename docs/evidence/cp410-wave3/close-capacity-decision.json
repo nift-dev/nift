@@ -1,0 +1,13 @@
+{
+  "decision": "DROP as production candidate",
+  "rss_100k_kib": {
+    "baseline": 171910,
+    "candidate": 144614
+  },
+  "cpu_100k_seconds": {
+    "baseline": 5.0387145,
+    "candidate": 5.223658
+  },
+  "reason": "15.9% lower RSS but 3.7% higher primary save CPU; does not solve wrapper/runtime gap. Registry retention and saved-state architecture remain review targets.",
+  "source_modified": false
+}

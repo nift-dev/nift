@@ -1,0 +1,4 @@
+string callgrind PASS
+string memcheck PASS
+close-capacity callgrind PASS
+close-capacity memcheck PASS
