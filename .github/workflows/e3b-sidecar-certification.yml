@@ -71,6 +71,7 @@ jobs:
             .build/sidecar-*.json
             .build/sidecar-*.txt
           if-no-files-found: error
+          include-hidden-files: true
 
   crossover:
     needs: native
@@ -118,3 +119,4 @@ jobs:
           name: sidecar-crossover-${{ matrix.id }}
           path: .build/sidecar-crossover.json
           if-no-files-found: error
+          include-hidden-files: true

@@ -14,6 +14,16 @@ OPS=['content','template','add','remove','rename','directory_rename','atomic',
      'fanout','explicit_dependency','sidecar','sidecar_remove','build_script','symlink_add','symlink_retarget',
      'symlink_remove','recreate_dependency','interrupted','repair','targeted','full','noop']
 
+def remove_oracle(root):
+ # Nift metadata is deliberately readonly. Native Windows cannot unlink it
+ # until the readonly attribute is cleared; retry only that cleanup failure.
+ def retry_readonly(function, path, error):
+  if os.name != 'nt' or not isinstance(error[1], PermissionError):
+   raise error[1]
+  os.chmod(path, 0o700)
+  function(path)
+ shutil.rmtree(root, onerror=retry_readonly)
+
 def tree(root):
  return {p.relative_to(root/'public').as_posix():p.read_bytes() for p in (root/'public').rglob('*') if p.is_file()}
 def script_output(text):
@@ -142,7 +152,7 @@ def campaign(binary,seeds,steps,modes,retain,selected_ops=None):
       # Copy authored inputs and control files only. Never copy output, page
       # metadata, hashes, unfinished markers, or incremental state into oracle.
       fresh=base/'oracle'
-      if fresh.exists():shutil.rmtree(fresh)
+      if fresh.exists():remove_oracle(fresh)
       fresh.mkdir()
       for path in root.iterdir():
        if path.name in ['public','.nift']:continue
