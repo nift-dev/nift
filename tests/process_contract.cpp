@@ -102,7 +102,7 @@ int main(int argc,char**argv){
  SetFileAttributesW(readonly.c_str(),FILE_ATTRIBUTE_NORMAL);
 #endif
  auto echo=s;echo.args={"echoerr"};auto pipeline=nift_run_pipeline({s,echo,echo});require(pipeline.exit_code==0&&pipeline.out=="A\n"&&pipeline.err=="err\nerr\nerr\n","pipeline bytes/EOF");
- auto cwd=s;cwd.cwd=dir;cwd.args={"cwd"};auto cr=nift_run_process(cwd);require(cr.exit_code==0 && cr.out==dir.u8string(),"cwd contract");
+ auto cwd=s;cwd.cwd=dir;cwd.args={"cwd"};auto cr=nift_run_process(cwd);require(cr.exit_code==0 && std::filesystem::equivalent(std::filesystem::u8path(cr.out),dir),"cwd contract");
  auto missing=s;missing.program="nift-missing-executable-411";auto mr=nift_run_process(missing);require(mr.exit_code!=7,"missing executable contract");
 #ifdef _WIN32
  SECURITY_ATTRIBUTES sa{sizeof(sa),nullptr,TRUE};HANDLE sentinel=CreateEventW(&sa,TRUE,FALSE,nullptr);require(sentinel!=nullptr,"sentinel creation");
@@ -111,7 +111,7 @@ int main(int argc,char**argv){
  auto executable=unicode_dir/std::filesystem::u8path(u8"子-é.exe");std::filesystem::copy_file(std::filesystem::u8path(self),executable);
  auto unicode=s;unicode.program=executable.u8string();unicode.cwd=unicode_dir;unicode.args={"unicode"};unicode.env["NIFT_PROCESS_UNICODE"]=u8"héllo-子";
  auto ur=nift_run_process(unicode);require(ur.exit_code==0 && ur.out==u8"héllo-子","Unicode executable/cwd/environment");
- unicode.args={"cwd"};require(nift_run_process(unicode).out==unicode_dir.u8string(),"Unicode cwd");
+ unicode.args={"cwd"};require(std::filesystem::equivalent(std::filesystem::u8path(nift_run_process(unicode).out),unicode_dir),"Unicode cwd");
  wchar_t old_temp[32768]{};SetLastError(ERROR_SUCCESS);DWORD old_size=GetEnvironmentVariableW(L"TEMP",old_temp,32768);bool had_temp=old_size>0 || GetLastError()!=ERROR_ENVVAR_NOT_FOUND;
  wchar_t old_tmp[32768]{};SetLastError(ERROR_SUCCESS);DWORD tmp_size=GetEnvironmentVariableW(L"TMP",old_tmp,32768);bool had_tmp=tmp_size>0 || GetLastError()!=ERROR_ENVVAR_NOT_FOUND;
  SetEnvironmentVariableW(L"TMP",unicode_dir.c_str());SetEnvironmentVariableW(L"TEMP",unicode_dir.c_str());unicode_temp_expected=true;unicode.args={"child"};auto tr=nift_run_process(unicode);unicode_temp_expected=false;
