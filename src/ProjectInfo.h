@@ -147,7 +147,9 @@ private:
 
     void rebuild_tracked_index() const;
     bool is_tracked_output(const std::filesystem::path& path) const;
-    bool load_user_dependencies(const TrackedInfo& info, std::set<std::string>& dependencies, BuildError* error = nullptr) const;
+    struct SidecarObservation;
+    bool cached_user_dependencies_match(const TrackedInfo& info, const json::Document& document) const;
+    bool load_user_dependencies(const TrackedInfo& info, std::set<std::string>& dependencies, BuildError* error = nullptr, SidecarObservation* observation = nullptr) const;
     bool dependency_changed(const std::filesystem::path& dependency, const filesystem::DependencyStatus& status, const filesystem::DependencyStatus& info_status, const json::Document& snapshots, const std::string& name) const;
     // Inputs are lexically normalized within one consumer dirty-check.
     bool metadata_path_is_safe(const std::filesystem::path& normalized, const std::filesystem::path& normalized_root) const;
@@ -155,7 +157,7 @@ private:
     void reset_build_caches();
     void invalidate_output_caches(const std::filesystem::path& path);
     void refresh_hash_once(const std::filesystem::path& dependency);
-    bool write_page_info(const TrackedInfo& info, const std::set<std::string>& dependencies, const std::set<std::string>& reqs, std::size_t pagination_pages, const std::map<std::string,std::string>& snapshots) const;
+    bool write_page_info(const TrackedInfo& info, const std::set<std::string>& dependencies, const std::set<std::string>& reqs, std::size_t pagination_pages, const std::map<std::string,std::string>& snapshots, const SidecarObservation* observation = nullptr) const;
     void print_build_error(const BuildError& error) const;
     void report_build_error(const BuildError& error, std::optional<BuildError>* out_error) const;
     int build_many(const std::vector<BuildJob>& initial_jobs, bool targeted, bool full_detail, std::size_t requested_count);

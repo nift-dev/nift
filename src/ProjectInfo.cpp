@@ -417,18 +417,82 @@ std::shared_ptr<const nift::RuntimeValue> ProjectInfo::read_shared_runtime_json(
 }
 
 
-bool ProjectInfo::load_user_dependencies(const TrackedInfo& info, std::set<std::string>& dependencies, BuildError* build_error) const {
+
+namespace {
+const char* sidecar_platform() {
+#ifdef _WIN32
+    return "windows-lexical-v1";
+#else
+    return "posix-lexical-v1";
+#endif
+}
+std::string sidecar_hex(const std::string& bytes) {
+    static constexpr char digits[]="0123456789abcdef";
+    std::string result;result.reserve(bytes.size()*2);
+    for(unsigned char c:bytes){result.push_back(digits[c>>4]);result.push_back(digits[c&15]);}
+    return result;
+}
+bool sidecar_unhex(const std::string& hex, std::string& bytes) {
+    if(hex.size()%2)return false;
+    auto digit=[](char c)->int {if(c>='0'&&c<='9')return c-'0';if(c>='a'&&c<='f')return c-'a'+10;return -1;};
+    bytes.clear();bytes.reserve(hex.size()/2);
+    for(std::size_t i=0;i<hex.size();i+=2){int a=digit(hex[i]),b=digit(hex[i+1]);if(a<0||b<0)return false;bytes.push_back(static_cast<char>((a<<4)|b));}
+    return true;
+}
+}
+struct ProjectInfo::SidecarObservation {
+    bool present=false;
+    std::string bytes;
+    std::set<std::string> declarations;
+};
+bool ProjectInfo::cached_user_dependencies_match(const TrackedInfo& info, const json::Document& document) const {
+    if(!document.has("sidecar-state"))return false;
+    const auto& state=document["sidecar-state"];
+    if(!state.is_object()||!state.has("version")||!state["version"].is_number()||state["version"].num!=1||
+       !state.has("platform")||!state["platform"].is_string()||state["platform"].string!=sidecar_platform()||
+       !state.has("present")||!state["present"].is_bool()||!state.has("bytes-hex")||!state["bytes-hex"].is_string()||
+       !state.has("declaration-indices")||!state["declaration-indices"].is_array())return false;
+    const auto& edges=document["dependencies"].array;
+    std::size_t previous=0;bool first=true;
+    for(const auto& value:state["declaration-indices"].array){
+        if(!value.is_number()||!std::isfinite(value.num)||value.num<0||std::floor(value.num)!=value.num||value.num>=edges.size())return false;
+        const auto index=static_cast<std::size_t>(value.num);
+        if(!first&&index<=previous)return false;
+        first=false;previous=index;
+        if(!edges[index].is_string()||edges[index].string==".nift/project.fingerprint"||edges[index].string==".nift/hierarchy.fingerprint")return false;
+    }
+    fs::path path=content_path(info);path.replace_extension(".deps.json");
+    if(!state["present"].boolean)
+        return state["bytes-hex"].string.empty()&&state["declaration-indices"].array.empty()&&!filesystem::path_exists(path);
+    // Do not replace the existing readable/type/error pipeline with a new reader.
+    if(!filesystem::path_exists(path)||!filesystem::file_readable(path))return false;
+    const auto current=filesystem::read_file_checked(path);if(!current)return false;
+    std::string previous_bytes;if(!sidecar_unhex(state["bytes-hex"].string,previous_bytes)||previous_bytes!=*current)return false;
+    // A present certificate must include the sidecar's exact saved dependency edge.
+    const auto name=relative(path);
+    return std::any_of(edges.begin(),edges.end(),[&](const auto& edge){return edge.is_string()&&edge.string==name;});
+}
+
+bool ProjectInfo::load_user_dependencies(const TrackedInfo& info, std::set<std::string>& dependencies, BuildError* build_error, SidecarObservation* observation) const {
+    if(observation)*observation=SidecarObservation{};
     fs::path path = content_path(info);
     path.replace_extension(".deps.json");
     if (!filesystem::path_exists(path)) return true;
 
     json::Document document;
     std::string error;
-    if (!load_json_file(path, document, error) || !document.is_object() || !document.has("dependencies") || !document["dependencies"].is_array()) {
+    std::string parsed_bytes;
+    const bool exists=filesystem::path_exists(path);
+    const bool readable=exists&&filesystem::file_readable(path);
+    if(!exists)error="file does not exist";else if(!readable)error="file is not readable";
+    if(readable)parsed_bytes=filesystem::read_file(path);
+    const bool parsed=readable&&nift_json::parse(parsed_bytes,document,error);
+    if (!parsed || !document.is_object() || !document.has("dependencies") || !document["dependencies"].is_array()) {
         if (build_error) *build_error = {info.name, path, 0, "invalid user dependencies JSON" + (error.empty() ? "" : ": " + error)};
         return false;
     }
 
+    if(observation){observation->present=true;observation->bytes=parsed_bytes;}
     dependencies.insert(relative(path));
     for (const auto& value : document["dependencies"].array) {
         if (!value.is_string()) {
@@ -444,7 +508,9 @@ bool ProjectInfo::load_user_dependencies(const TrackedInfo& info, std::set<std::
             if (build_error) *build_error = {info.name, path, 0, "dependency does not exist: " + value.string};
             return false;
         }
-        dependencies.insert(relative((root / dependency_name).lexically_normal()));
+        const auto normalized_name=relative((root / dependency_name).lexically_normal());
+        dependencies.insert(normalized_name);
+        if(observation)observation->declarations.insert(normalized_name);
     }
     return true;
 }
@@ -667,19 +733,23 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
         document["minify-version"].num != expected_minify_version)
         reasons.push_back("minifier version changed");
 
+    bool saved_edges_clean=true;
     const fs::path normalized_root = root.lexically_normal();
     for (const auto& value : document["dependencies"].array) {
         if (!value.is_string()) {
+            saved_edges_clean=false;
             reasons.push_back("page build metadata has an invalid dependency");
             continue;
         }
 
         const fs::path dependency = (root / value.string).lexically_normal();
         if (!metadata_path_is_safe(dependency, normalized_root)) {
+            saved_edges_clean=false;
             reasons.push_back("page build metadata has an invalid dependency");
             continue;
         }
         if (value.string == ".nift/project.fingerprint") {
+            saved_edges_clean=false;
             // Value-based project dependency: the fingerprint file is rewritten
             // only when the shared project model changes, and the page records
             // the value it was built against, so staleness is decided by
@@ -697,6 +767,7 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
             continue;
         }
         if (value.string == ".nift/hierarchy.fingerprint") {
+            saved_edges_clean=false;
             // Compact structural hierarchy dependency: one fingerprint value
             // covering the page name/parentage structure, so add/remove/rename/
             // reparent invalidates hierarchy consumers without a per-page x
@@ -713,10 +784,11 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
             continue;
         }
         const auto status = filesystem::dependency_status(dependency);
-        if (!status.exists || status.error)
-            reasons.push_back("dependency removed: " + value.string);
-        else if (dependency_changed(dependency, status, page_info_status, document["dependency-hashes"], value.string))
-            reasons.push_back("dependency changed: " + value.string);
+        if (!status.exists || status.error) {
+            saved_edges_clean=false;reasons.push_back("dependency removed: " + value.string);
+        } else if (dependency_changed(dependency, status, page_info_status, document["dependency-hashes"], value.string)) {
+            saved_edges_clean=false;reasons.push_back("dependency changed: " + value.string);
+        }
     }
 
     for (const auto& value : document["reqs"].array) {
@@ -743,6 +815,7 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
     // A user .deps.json file can itself be added or become invalid between builds.
     // Its dependencies are also present in page-info after a successful build, but
     // loading it here catches sidecar metadata changes before parsing starts.
+    if(saved_edges_clean&&cached_user_dependencies_match(info,document))return reasons;
     std::set<std::string> user_dependencies;
     if (!load_user_dependencies(info, user_dependencies, nullptr)) {
         reasons.push_back("user dependency metadata is invalid");
@@ -806,7 +879,7 @@ void ProjectInfo::report_build_error(const BuildError& error, std::optional<Buil
     print_build_error(error);
 }
 
-bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::string>& dependencies, const std::set<std::string>& reqs, std::size_t pagination_pages, const std::map<std::string,std::string>& snapshots) const {
+bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::string>& dependencies, const std::set<std::string>& reqs, std::size_t pagination_pages, const std::map<std::string,std::string>& snapshots, const SidecarObservation* observation) const {
     const std::string content_name = relative(content_path(info));
     const std::string output_name = relative(output_path(info));
     std::string output_extension = info.output_ext.empty() ? config.output_ext : info.output_ext;
@@ -903,7 +976,24 @@ bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::s
         json::Document::append_escaped_string(output, path);
         output += "\": \"" + hash + "\"";
     }
-    output += "\n  }\n}\n";
+    output += "\n  }";
+    if(observation){
+        output += ",\n  \"sidecar-state\": {\"version\":1,\"platform\":\"";
+        output += sidecar_platform();
+        output += "\",\"present\":";output += observation->present?"true":"false";
+        output += ",\"bytes-hex\":\"";output += sidecar_hex(observation->bytes);
+        output += "\",\"declaration-indices\":[";
+        std::size_t position=0;bool first=true;
+        for(const auto& dependency:dependencies){
+            if(observation->declarations.count(dependency)){
+                if(!first)output.push_back(',');
+                first=false;output+=std::to_string(position);
+            }
+            ++position;
+        }
+        output += "]}";
+    }
+    output += "\n}\n";
 
     // Certification metadata uses the existing atomic readonly replacement.
     return filesystem::write_readonly_file(info_path(info), output);
@@ -976,7 +1066,8 @@ bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_er
     result.dependencies.insert(hook_dependencies.begin(),hook_dependencies.end());
     result.dependencies.insert(legacy_dependencies.begin(),legacy_dependencies.end());
     if (!result.ok) { report_build_error(result.error, out_error); return false; }
-    if (!load_user_dependencies(info, result.dependencies, &result.error)) { report_build_error(result.error, out_error); return false; }
+    SidecarObservation authoritative_sidecar;
+    if (!load_user_dependencies(info, result.dependencies, &result.error, &authoritative_sidecar)) { report_build_error(result.error, out_error); return false; }
 
     const fs::path output = output_path(info);
     const std::string extension = info.output_ext.empty() ? config.output_ext : info.output_ext;
@@ -1086,7 +1177,14 @@ bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_er
         }
     }
 
-    if (!write_page_info(info, result.dependencies, result.reqs, new_pagination_pages, snapshots)) {
+    fs::path sidecar_path=content_path(info);sidecar_path.replace_extension(".deps.json");
+    bool certificate_valid=false;
+    if(authoritative_sidecar.present){
+        const auto current=filesystem::read_file_checked(sidecar_path);
+        certificate_valid=current&&*current==authoritative_sidecar.bytes;
+    }else certificate_valid=!filesystem::path_exists(sidecar_path);
+    // Later hook changes suppress only the new certificate, preserving E2 behavior.
+    if (!write_page_info(info, result.dependencies, result.reqs, new_pagination_pages, snapshots, certificate_valid?&authoritative_sidecar:nullptr)) {
         report_build_error({info.name, info_path(info), 0, "failed to write page build metadata"}, out_error);
         return false;
     }

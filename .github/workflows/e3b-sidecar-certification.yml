@@ -1,0 +1,120 @@
+name: E3B native sidecar certification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/ProjectInfo*'
+      - 'tests/sidecar_*contracts.py'
+      - '.github/workflows/e3b-sidecar-certification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: linux
+            runner: ubuntu-latest
+          - id: macos
+            runner: macos-latest
+          - id: windows
+            runner: windows-latest
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - uses: msys2/setup-msys2@v2
+        if: runner.os == 'Windows'
+        with:
+          msystem: UCRT64
+          update: true
+          install: make diffutils mingw-w64-ucrt-x86_64-gcc
+      - name: Check out the immutable E2 baseline
+        uses: actions/checkout@v5
+        with:
+          ref: c5f449c31cf93bd0155cae0332d6c4ffdd2aa161
+          path: .build/e2-source
+      - name: Build both candidates
+        if: runner.os != 'Windows'
+        run: make -j2 nift && make -C .build/e2-source -j2 nift
+      - name: Build both candidates on Windows
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: make -j2 nift && make -C .build/e2-source -j2 nift
+      - name: Native sidecar contracts
+        shell: pwsh
+        run: |
+          if ($IsWindows) { $env:PATH = "C:\msys64\ucrt64\bin;$env:PATH"; $suffix = '.exe' } else { $suffix = '' }
+          python tests/sidecar_state_contracts.py --nift "./nift$suffix" --baseline "./.build/e2-source/nift$suffix" --output .build/sidecar-state.json
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          python tests/sidecar_platform_contracts.py --nift "./nift$suffix" --output .build/sidecar-platform.json --export .build/sidecar-export.json
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          python tests/consumer_dependency_snapshots.py --nift "./nift$suffix" --output .build/sidecar-snapshots.json
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          python tests/shared_dependency_targeted_reproducer.py --nift "./nift$suffix" --require-clean --output .build/sidecar-targeted.json
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          python tests/randomized_incremental_differential.py --nift "./nift$suffix" --seeds 0,1,2 --steps 32 --output .build/sidecar-randomized.json
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          Get-FileHash "./nift$suffix" -Algorithm SHA256 | Format-List | Out-File .build/sidecar-binary.txt
+          git rev-parse HEAD | Out-File .build/sidecar-source.txt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sidecar-native-${{ matrix.id }}
+          path: |
+            .build/sidecar-*.json
+            .build/sidecar-*.txt
+          if-no-files-found: error
+
+  crossover:
+    needs: native
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: linux
+            runner: ubuntu-latest
+          - id: macos
+            runner: macos-latest
+          - id: windows
+            runner: windows-latest
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - uses: msys2/setup-msys2@v2
+        if: runner.os == 'Windows'
+        with:
+          msystem: UCRT64
+          update: true
+          install: make diffutils mingw-w64-ucrt-x86_64-gcc
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131
+        with:
+          pattern: sidecar-native-*
+          path: .build/sidecar-imports
+      - name: Build candidate
+        if: runner.os != 'Windows'
+        run: make -j2 nift
+      - name: Build candidate on Windows
+        if: runner.os == 'Windows'
+        shell: msys2 {0}
+        run: make -j2 nift
+      - name: Check real cross-platform metadata exports
+        shell: pwsh
+        run: |
+          if ($IsWindows) { $env:PATH = "C:\msys64\ucrt64\bin;$env:PATH"; $suffix = '.exe' } else { $suffix = '' }
+          python tests/sidecar_platform_contracts.py --nift "./nift$suffix" --imports .build/sidecar-imports --output .build/sidecar-crossover.json --export .build/sidecar-export.json
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sidecar-crossover-${{ matrix.id }}
+          path: .build/sidecar-crossover.json
+          if-no-files-found: error
