@@ -30,6 +30,7 @@ bool run_project_hooks(const std::filesystem::path& root, const Config& config,
 bool run_file_hooks(const std::filesystem::path& root, const TrackedInfo& info,
                     const std::string& phase, const std::string& mode, std::string& error,
                     std::set<std::string>* dependencies = nullptr,
-                    std::map<std::string,std::string>* observations = nullptr);
+                    std::map<std::string,std::string>* observations = nullptr,
+                    const std::set<std::string>* declared = nullptr);
 
 }

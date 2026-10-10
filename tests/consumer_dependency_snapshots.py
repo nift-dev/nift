@@ -99,6 +99,25 @@ def barrier(binary,base,kind):
  finally:
   if proc.poll() is None:proc.kill();proc.communicate()
 
+def declared_filevalue_hook(binary,base):
+ p=base/'native-filevalue-hook';p.mkdir();setup(p,'hash','template')
+ tracked(p,[dict(name='a',title='a',template='templates/shared.html',**{'post build':'post.f'})])
+ (p/'data/declared.txt').write_text('h1')
+ (p/'content/a.deps.json').write_text(json.dumps({'dependencies':['data/declared.txt']}))
+ for stage in ['before','after']:
+  (p/(stage+'.py')).write_text("from pathlib import Path\nimport time\np=Path('.')\n(p/'"+stage+"-ready').touch()\nend=time.monotonic()+10\nwhile not (p/'"+stage+"-finish').exists():\n if time.monotonic()>end:raise RuntimeError('timeout')\n time.sleep(.005)\n")
+ (p/'post.f').write_text('r := run('+json.dumps(python_tool())+', "before.py")\nd := file("data/declared.txt")\nd.open("r")\nx := d.read_all()\nd.close()\nr2 := run('+json.dumps(python_tool())+', "after.py")\nout := file("public/a.html")\nout.open("a")\nout.write(x)\nout.save()\nout.close()\n')
+ proc=subprocess.Popen([binary,'build','--all'],cwd=p,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+ try:
+  wait(p,'before-ready',proc);(p/'data/declared.txt').write_text('h2');(p/'before-finish').touch()
+  wait(p,'after-ready',proc);(p/'data/declared.txt').write_text('h1');(p/'after-finish').touch()
+  out,err=proc.communicate(timeout=15)
+  assert proc.returncode!=0 and 'multiple versions' in out+err,(out,err)
+  assert not metadata(p,'a').exists();assert (p/'public/a.html').read_text().endswith('h2')
+ finally:
+  if proc.poll() is None:proc.kill();proc.communicate()
+ return True
+
 def fingerprint_migration(binary,base):
  p=base/'fingerprints';p.mkdir();setup(p,'hash','template')
  tracked(p,[dict(name='a',title='a',template='templates/shared.html')])
@@ -173,5 +192,5 @@ def json_and_hooks(binary,base):
 if __name__=='__main__':
  ap=argparse.ArgumentParser();ap.add_argument('--nift',required=True);ap.add_argument('--output',required=True);ap.add_argument('--scaling',action='store_true');a=ap.parse_args();binary=str(pathlib.Path(a.nift).resolve());started=time.monotonic()
  with tempfile.TemporaryDirectory(prefix='nift-consumer-snapshots-') as td:
-  base=pathlib.Path(td);result={'fanout':[fanout(binary,base,n) for n in ([2,3,10,128] if not a.scaling else [1000,4000,10000])],'fingerprint_migration':fingerprint_migration(binary,base),'post_output_validation':post_hook_output_validation(binary,base),'generated_variants':generated_variants(binary,base),'conflicting_reads':conflicting_reads(binary,base),'versions_migration_rename':versions(binary,base),'json_schema_hook_import':json_and_hooks(binary,base),'barriers':[barrier(binary,base,k) for k in ['native','external','interrupt']]}
+  base=pathlib.Path(td);result={'fanout':[fanout(binary,base,n) for n in ([2,3,10,128] if not a.scaling else [1000,4000,10000])],'declared_filevalue_hook':declared_filevalue_hook(binary,base),'fingerprint_migration':fingerprint_migration(binary,base),'post_output_validation':post_hook_output_validation(binary,base),'generated_variants':generated_variants(binary,base),'conflicting_reads':conflicting_reads(binary,base),'versions_migration_rename':versions(binary,base),'json_schema_hook_import':json_and_hooks(binary,base),'barriers':[barrier(binary,base,k) for k in ['native','external','interrupt']]}
  result.update(passed=True,elapsed_seconds=round(time.monotonic()-started,3));pathlib.Path(a.output).write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result))

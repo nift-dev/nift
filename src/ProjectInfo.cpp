@@ -911,7 +911,7 @@ bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_er
     if (hashing) for (const auto& path : declared) snapshots[path] = std::to_string(filesystem::hash_path(root/path));
     std::set<std::string> legacy_dependencies;
     std::string legacy_error;
-    if(!nift_hooks::run_file_hooks(root,info,"pre",current_hook_mode_,legacy_error,&legacy_dependencies,hashing ? &snapshots : nullptr)){report_build_error({info.name,{},0,legacy_error},out_error);return false;}
+    if(!nift_hooks::run_file_hooks(root,info,"pre",current_hook_mode_,legacy_error,&legacy_dependencies,hashing ? &snapshots : nullptr,&declared)){report_build_error({info.name,{},0,legacy_error},out_error);return false;}
 
     // The previous pagination page count is historical state required for
     // stale-output cleanup: when pagination is removed or its page count
@@ -1031,7 +1031,7 @@ bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_er
     }
 
     if(!item_script("post-build"))return false;
-    if(!nift_hooks::run_file_hooks(root,info,"post",current_hook_mode_,legacy_error,&legacy_dependencies,hashing ? &snapshots : nullptr)){report_build_error({info.name,{},0,legacy_error},out_error);return false;}
+    if(!nift_hooks::run_file_hooks(root,info,"post",current_hook_mode_,legacy_error,&legacy_dependencies,hashing ? &snapshots : nullptr,&result.dependencies)){report_build_error({info.name,{},0,legacy_error},out_error);return false;}
     if(custom){std::error_code ec;if(!filesystem::path_within(root,output)||!fs::is_regular_file(output,ec)||ec){report_build_error({info.name,output,0,"custom post-build removed the tracked output"},out_error);return false;}}
     if (!custom) {
         for (std::size_t page = 1; page <= std::max<std::size_t>(1,result.pagination_outputs.size()); ++page) {

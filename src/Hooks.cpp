@@ -21,7 +21,7 @@ bool hook_matches(const std::string& key, const std::string& mode) {
 
 bool run_hook_script(const fs::path& root, const std::string& hook_path,
                      const std::string& phase, const std::string& mode,
-                     const std::string& target, std::string& error, std::set<std::string>* dependencies = nullptr, std::map<std::string,std::string>* observations = nullptr) {
+                     const std::string& target, std::string& error, std::set<std::string>* dependencies = nullptr, std::map<std::string,std::string>* observations = nullptr, const std::set<std::string>* declared = nullptr) {
     fs::path p = fs::path(hook_path);
     if (p.is_relative()) p = root / p;
     p = fs::absolute(p).lexically_normal();
@@ -56,19 +56,30 @@ bool run_hook_script(const fs::path& root, const std::string& hook_path,
         dependencies->insert(rr.dependencies.begin(), rr.dependencies.end());
     }
     if (observations) {
-        std::string conflict;
-        for (const auto& [path, hash] : host.dependency_observations(conflict)) {
-            if (path != host.relative(p) && !rr.dependencies.count(path)) continue;
-            auto [it, inserted] = observations->emplace(path, hash);
-            if (!inserted && it->second != hash) conflict = path;
-        }
-        for (const auto& path : host.dependency_conflicts())
-            if (path == host.relative(p) || rr.dependencies.count(path)) {
-                error = "hook dependency observed at multiple versions: " + path; return false;
+        // Standalone hooks use their existing canonical relative identity;
+        // preserve the owning consumer's declared aliases when recording bytes.
+        std::map<std::string,std::vector<std::string>> aliases;
+        if (declared) for (const auto& path : *declared)
+            aliases[host.relative(root/path)].push_back(path);
+        auto relevant = [&](const std::string& path) {
+            return path == host.relative(p) || rr.dependencies.count(path) || aliases.count(path);
+        };
+        std::string ignored_conflict;
+        for (const auto& [path, hash] : host.dependency_observations(ignored_conflict)) {
+            if (!relevant(path)) continue;
+            std::vector<std::string> names;
+            if (path == host.relative(p) || rr.dependencies.count(path)) names.push_back(path);
+            auto found = aliases.find(path);
+            if (found != aliases.end()) names.insert(names.end(),found->second.begin(),found->second.end());
+            for (const auto& name : names) {
+                auto [it, inserted] = observations->emplace(name,hash);
+                if (!inserted && it->second != hash) {
+                    error = "hook dependency observed at multiple versions: " + name; return false;
+                }
             }
-        // A different hook phase may already have observed this dependency.
-        if (!conflict.empty() && (conflict == host.relative(p) || rr.dependencies.count(conflict))) {
-            error = "hook dependency observed at multiple versions: " + conflict; return false;
+        }
+        for (const auto& path : host.dependency_conflicts()) if (relevant(path)) {
+            error = "hook dependency observed at multiple versions: " + path; return false;
         }
     }
     return true;
@@ -87,12 +98,12 @@ bool run_project_hooks(const fs::path& root, const Config& config,
 }
 
 bool run_file_hooks(const fs::path& root, const TrackedInfo& info,
-                    const std::string& phase, const std::string& mode, std::string& error, std::set<std::string>* dependencies, std::map<std::string,std::string>* observations) {
+                    const std::string& phase, const std::string& mode, std::string& error, std::set<std::string>* dependencies, std::map<std::string,std::string>* observations, const std::set<std::string>* declared) {
     if (info.build_hooks.empty()) return true;
     for (const auto& [key, path] : info.build_hooks) {
         if (key.rfind(phase + " ", 0) != 0) continue;
         if (!hook_matches(key, mode)) continue;
-        if (!run_hook_script(root, path, phase, mode, info.name, error, dependencies, observations)) return false;
+        if (!run_hook_script(root, path, phase, mode, info.name, error, dependencies, observations, declared)) return false;
     }
     return true;
 }
