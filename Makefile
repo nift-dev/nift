@@ -1974,3 +1974,10 @@ test-v410-build-pipeline-lifetime: $(SAN_LIFETIME_TARGET)
 test-sanitize-lifetime: test-v410-build-pipeline-lifetime
 
 .PHONY: test-v410-build-pipeline test-v410-build-pipeline-lifetime
+
+.PHONY: test-consumer-snapshots
+test: test-consumer-snapshots
+test-consumer-snapshots: $(TARGET)
+	mkdir -p .build
+	python3 tests/shared_dependency_targeted_reproducer.py --nift ./$(TARGET) --require-clean --output .build/consumer-snapshot-matrix.json
+	python3 tests/consumer_dependency_snapshots.py --nift ./$(TARGET) --output .build/consumer-snapshot-contracts.json

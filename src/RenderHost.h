@@ -1,5 +1,8 @@
 #pragma once
 #include "Types.h"
+#include "FileSystem.h"
+#include <map>
+#include <mutex>
 #include "RuntimeValue.h"
 #include "nift/host_result.h"
 
@@ -23,6 +26,34 @@ namespace json { class Document; }
 // ProjectInfoHost implements this interface for the CLI with behaviour
 // identical to the pre-CP1 implementation.
 class RenderHost {
+public:
+    // Enabled only by hash/hybrid build consumers, never standalone/modified reads.
+    bool observe_dependencies = false;
+    void observe_dependency(const std::filesystem::path& path, const std::string& bytes) const {
+        if (!observe_dependencies) return;
+        observe_dependency_hash(path, filesystem::hash_bytes(bytes));
+    }
+    void observe_dependency_hash(const std::filesystem::path& path, std::uint64_t hash) const {
+        if (!observe_dependencies) return;
+        std::lock_guard<std::mutex> lock(observation_mutex_);
+        const auto key = relative(path);
+        auto [it, inserted] = observations_.emplace(key, std::to_string(hash));
+        if (!inserted && it->second != std::to_string(hash)) observation_conflicts_.insert(key);
+    }
+    std::map<std::string,std::string> dependency_observations(std::string& conflict) const {
+        std::lock_guard<std::mutex> lock(observation_mutex_);
+        conflict = observation_conflicts_.empty() ? std::string{} : *observation_conflicts_.begin();
+        return observations_;
+    }
+    std::set<std::string> dependency_conflicts() const {
+        std::lock_guard<std::mutex> lock(observation_mutex_);
+        return observation_conflicts_;
+    }
+private:
+    mutable std::mutex observation_mutex_;
+    mutable std::map<std::string,std::string> observations_;
+    mutable std::set<std::string> observation_conflicts_;
+
 public:
     virtual ~RenderHost() = default;
 

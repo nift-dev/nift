@@ -21,7 +21,7 @@ bool hook_matches(const std::string& key, const std::string& mode) {
 
 bool run_hook_script(const fs::path& root, const std::string& hook_path,
                      const std::string& phase, const std::string& mode,
-                     const std::string& target, std::string& error) {
+                     const std::string& target, std::string& error, std::set<std::string>* dependencies = nullptr, std::map<std::string,std::string>* observations = nullptr) {
     fs::path p = fs::path(hook_path);
     if (p.is_relative()) p = root / p;
     p = fs::absolute(p).lexically_normal();
@@ -43,10 +43,33 @@ bool run_hook_script(const fs::path& root, const std::string& hook_path,
     ScriptRenderHost host(root);
     TrackedInfo info;
     Parser parser(host, info);
-    auto rr = parser.run_script(filesystem::read_file(p), p);
+    host.observe_dependencies = observations != nullptr;
+    const auto bytes = filesystem::read_file(p);
+    host.observe_dependency(p, bytes);
+    auto rr = parser.run_script(bytes, p);
     if (!rr.ok) {
         error = "build hook '" + hook_path + "' failed: " + (rr.error.message.empty() ? "hook script failed" : rr.error.message);
         return false;
+    }
+    if (dependencies) {
+        dependencies->insert(host.relative(p));
+        dependencies->insert(rr.dependencies.begin(), rr.dependencies.end());
+    }
+    if (observations) {
+        std::string conflict;
+        for (const auto& [path, hash] : host.dependency_observations(conflict)) {
+            if (path != host.relative(p) && !rr.dependencies.count(path)) continue;
+            auto [it, inserted] = observations->emplace(path, hash);
+            if (!inserted && it->second != hash) conflict = path;
+        }
+        for (const auto& path : host.dependency_conflicts())
+            if (path == host.relative(p) || rr.dependencies.count(path)) {
+                error = "hook dependency observed at multiple versions: " + path; return false;
+            }
+        // A different hook phase may already have observed this dependency.
+        if (!conflict.empty() && (conflict == host.relative(p) || rr.dependencies.count(conflict))) {
+            error = "hook dependency observed at multiple versions: " + conflict; return false;
+        }
     }
     return true;
 }
@@ -64,12 +87,12 @@ bool run_project_hooks(const fs::path& root, const Config& config,
 }
 
 bool run_file_hooks(const fs::path& root, const TrackedInfo& info,
-                    const std::string& phase, const std::string& mode, std::string& error) {
+                    const std::string& phase, const std::string& mode, std::string& error, std::set<std::string>* dependencies, std::map<std::string,std::string>* observations) {
     if (info.build_hooks.empty()) return true;
     for (const auto& [key, path] : info.build_hooks) {
         if (key.rfind(phase + " ", 0) != 0) continue;
         if (!hook_matches(key, mode)) continue;
-        if (!run_hook_script(root, path, phase, mode, info.name, error)) return false;
+        if (!run_hook_script(root, path, phase, mode, info.name, error, dependencies, observations)) return false;
     }
     return true;
 }

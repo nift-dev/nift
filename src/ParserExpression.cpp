@@ -972,6 +972,7 @@ bool Parser::execute_file_method(const nift::RuntimeValue& base,const std::strin
                             if((m=="r"||m=="rw")&&!ex)return fail_recoverable(nift::detail::DiagnosticCode::IoOpenFailed,"open: file does not exist",error);
                             if(ex&&fs::is_directory(f->path,ec)){error="open: path is a directory";return false;}
                             std::string data;if(ex){std::ifstream in(f->path,std::ios::binary);if(!in)return fail_recoverable(nift::detail::DiagnosticCode::IoOpenFailed,"open: cannot read path",error);std::ostringstream ss;ss<<in.rdbuf();data=ss.str();}
+                            if (m=="r" || m=="rw") host_.observe_dependency(f->path,data);
                             f->mode=m;f->existed_at_open=ex;if(m=="w"){f->saved=std::move(data);f->working.clear();f->saved_is_working=false;}else{f->working=std::move(data);f->saved.clear();f->saved_is_working=true;}f->cursor=m=="a"?f->working.size():0;f->dirty=(m=="w")||(m=="a"&&!ex);f->open=true;out=nift::RuntimeValue(nullptr);return true;
                         }
                         if(method=="close"){if(!no_args()||!need_open())return false;if(f->dirty){error="close: file has unsaved changes; save() or revert() first";return false;}f->open=false;f->mode.clear();f->working.clear();f->saved.clear();f->saved_is_working=false;f->cursor=0;out=nift::RuntimeValue(nullptr);return true;}
@@ -3686,7 +3687,7 @@ if(home)expanded=std::string(home)+expanded.substr(1);}fs::path p(expanded);if(p
             if (!nift_fs_root_allowed(path,resource_path_authority_.enforce_filesystem_root?resource_path_authority_.filesystem_root:fs::path{},error)) { error = "inject: " + error; return false; }
             if (std::find(input_stack_.begin(), input_stack_.end(), path) != input_stack_.end()) { error = "inject: source cycle through " + path.generic_string(); return false; }
             auto injected = filesystem::read_file_checked(path); if (!injected) { error = "inject: source is not readable"; return false; }
-            result_.dependencies.insert(host_.relative(path)); input_stack_.push_back(path);
+            result_.dependencies.insert(host_.relative(path)); host_.observe_dependency(path,*injected); input_stack_.push_back(path);
             // JSON is the overwhelmingly common structured-data inject case.  Do
             // not feed a multi-megabyte JSON document through the generic Nift
             // expression classifier: that repeatedly scans the complete source

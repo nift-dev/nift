@@ -363,6 +363,13 @@ const std::string* ProjectInfo::read_shared_source(const fs::path& path) const {
     return result;
 }
 
+std::uint64_t ProjectInfo::observed_source_hash(const std::string* bytes) const {
+    std::lock_guard<std::mutex> lock(source_cache_mutex_);
+    auto [it, inserted] = observed_source_hashes_.emplace(bytes, 0);
+    if (inserted) it->second = filesystem::hash_bytes(*bytes);
+    return it->second;
+}
+
 std::shared_ptr<const json::Document> ProjectInfo::read_shared_json(const fs::path& path, std::string& error) const {
     const fs::path normalized = fs::absolute(path).lexically_normal();
     const std::string key = build_cache_key(normalized, has_build_dependencies);
@@ -380,7 +387,9 @@ std::shared_ptr<const json::Document> ProjectInfo::read_shared_json(const fs::pa
         return {};
     }
 
-    const std::string source = filesystem::read_file(normalized);
+    const auto bytes = read_shared_source(normalized);
+    if (!bytes) { error = "JSON file is not readable"; return {}; }
+    const std::string& source = *bytes;
     auto document = std::make_shared<json::Document>();
     if (!nift_json::parse(source, *document, error)) return {};
 
@@ -399,7 +408,9 @@ std::shared_ptr<const nift::RuntimeValue> ProjectInfo::read_shared_runtime_json(
     if (!filesystem::path_exists(normalized)) { error = "JSON file does not exist"; return {}; }
     if (!filesystem::file_readable(normalized)) { error = "JSON file is not readable"; return {}; }
     json::Document document;
-    if (!nift_json::parse(filesystem::read_file(normalized), document, error)) return {};
+    const auto bytes = read_shared_source(normalized);
+    if (!bytes) { error = "JSON file is not readable"; return {}; }
+    if (!nift_json::parse(*bytes, document, error)) return {};
     auto value = std::make_shared<const nift::RuntimeValue>(nift::runtime_from_json(document));
     shared_runtime_json_cache_.emplace(key, value);
     return value;
@@ -433,42 +444,58 @@ bool ProjectInfo::load_user_dependencies(const TrackedInfo& info, std::set<std::
             if (build_error) *build_error = {info.name, path, 0, "dependency does not exist: " + value.string};
             return false;
         }
-        dependencies.insert(value.string);
+        dependencies.insert(relative((root / dependency_name).lexically_normal()));
     }
     return true;
 }
 
-bool ProjectInfo::hash_changed_cached(const fs::path& dependency) const {
+std::uint64_t ProjectInfo::current_hash_cached(const fs::path& dependency) const {
     const std::string key = build_cache_key(dependency, has_build_dependencies);
-    {
-        std::lock_guard<std::mutex> lock(hash_mutex_);
-        if(has_build_dependencies){const auto complete=completed_output_hash_changes_.find(key);if(complete!=completed_output_hash_changes_.end())return complete->second;}
-        const auto it = hash_change_cache_.find(key);
-        if (it != hash_change_cache_.end()) return it->second;
-    }
+    std::lock_guard<std::mutex> lock(hash_mutex_);
+    auto it = current_hash_cache_.find(key);
+    if (it != current_hash_cache_.end()) return it->second;
+    const auto value = filesystem::hash_path(dependency);
+    current_hash_cache_.emplace(key, value);
+    return value;
+}
 
-    const bool changed = filesystem::stored_hash_changed(root, dependency);
+void ProjectInfo::invalidate_output_caches(const fs::path& output) {
+    const auto key = build_cache_key(output, true);
     {
         std::lock_guard<std::mutex> lock(hash_mutex_);
-        // Keep this cache deliberately small. Its job is to retain hot shared
-        // dependencies (templates/partials), not every one-off content file.
-        constexpr std::size_t max_cached_hash_results = 512;
-        if (hash_change_cache_.size() < max_cached_hash_results)
-            hash_change_cache_.emplace(key, changed);
+        // A declared directory hash also changes when a descendant output changes.
+        for (fs::path path(key); !path.empty();) {
+            current_hash_cache_.erase(path.generic_string());
+            const auto parent = path.parent_path();
+            if (parent == path) break;
+            path = parent;
+        }
     }
-    return changed;
+    {
+        std::lock_guard<std::mutex> lock(source_cache_mutex_);
+        auto found = shared_source_cache_.find(key);
+        if (found != shared_source_cache_.end()) {
+            retired_sources_.push_back(std::move(found->second));
+            shared_source_cache_.erase(found);
+        }
+    }
+    {
+        std::lock_guard<std::mutex> lock(json_cache_mutex_);
+        shared_json_cache_.erase(key);
+        shared_runtime_json_cache_.erase(key);
+    }
 }
 
 void ProjectInfo::reset_build_caches() {
     {
         std::lock_guard<std::mutex> lock(hash_mutex_);
-        hash_change_cache_.clear();
+        current_hash_cache_.clear();
         refreshed_hashes_.clear();
-        completed_output_hash_changes_.clear();
     }
     {
         std::lock_guard<std::mutex> lock(source_cache_mutex_);
         shared_source_cache_.clear();
+        observed_source_hashes_.clear();
         retired_sources_.clear();
     }
     {
@@ -530,7 +557,7 @@ bool ProjectInfo::metadata_path_is_safe(const fs::path& path) const {
     return true;
 }
 
-bool ProjectInfo::dependency_changed(const fs::path& dependency, fs::file_time_type page_info_mtime) const {
+bool ProjectInfo::dependency_changed(const fs::path& dependency, fs::file_time_type page_info_mtime, const json::Document& snapshots, const std::string& name) const {
     if (!filesystem::path_exists(dependency)) return true;
     // Strictly-greater comparison misses edits whose mtime lands in the same
     // filesystem timestamp quantum as the page-info write (equal timestamps
@@ -541,10 +568,11 @@ bool ProjectInfo::dependency_changed(const fs::path& dependency, fs::file_time_t
     // unaffected (content hashing, no timestamps); hybrid keeps both signals.
     if (config.incremental_mode == "modified")
         return filesystem::modified_time(dependency) >= page_info_mtime;
-    if (config.incremental_mode == "hash")
-        return hash_changed_cached(dependency);
-    return filesystem::modified_time(dependency) >= page_info_mtime ||
-           hash_changed_cached(dependency);
+    if (!snapshots.is_object() || !snapshots.has(name) || !snapshots[name].is_string()) return true;
+    const auto& value = snapshots[name].string;
+    if (value.empty() || value.size() > 20 || value.find_first_not_of("0123456789") != std::string::npos) return true;
+    if (config.incremental_mode == "hybrid" && filesystem::modified_time(dependency) >= page_info_mtime) return true;
+    return value != std::to_string(current_hash_cached(dependency));
 }
 
 std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) const {
@@ -677,7 +705,7 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
         }
         if (!filesystem::path_exists(dependency))
             reasons.push_back("dependency removed: " + value.string);
-        else if (dependency_changed(dependency, page_info_mtime))
+        else if (dependency_changed(dependency, page_info_mtime, document["dependency-hashes"], value.string))
             reasons.push_back("dependency changed: " + value.string);
     }
 
@@ -718,7 +746,7 @@ std::vector<std::string> ProjectInfo::build_reasons(const TrackedInfo& info) con
             const fs::path dependency = root / dependency_name;
             if (!filesystem::path_exists(dependency))
                 reasons.push_back(removed);
-            else if (dependency_changed(dependency, page_info_mtime))
+            else if (dependency_changed(dependency, page_info_mtime, document["dependency-hashes"], dependency_name))
                 reasons.push_back(reason);
         }
     }
@@ -767,7 +795,7 @@ void ProjectInfo::report_build_error(const BuildError& error, std::optional<Buil
     print_build_error(error);
 }
 
-bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::string>& dependencies, const std::set<std::string>& reqs, std::size_t pagination_pages) const {
+bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::string>& dependencies, const std::set<std::string>& reqs, std::size_t pagination_pages, const std::map<std::string,std::string>& snapshots) const {
     const std::string content_name = relative(content_path(info));
     const std::string output_name = relative(output_path(info));
     std::string output_extension = info.output_ext.empty() ? config.output_ext : info.output_ext;
@@ -856,14 +884,29 @@ bool ProjectInfo::write_page_info(const TrackedInfo& info, const std::set<std::s
         output.push_back('\n');
     }
     if (!reqs.empty()) output += "  ";
-    output += "]\n}\n";
+    output += "],\n  \"dependency-hashes\": {";
+    std::size_t hash_index = 0;
+    for (const auto& [path, hash] : snapshots) {
+        if (hash_index++) output += ",";
+        output += "\n    \"";
+        json::Document::append_escaped_string(output, path);
+        output += "\": \"" + hash + "\"";
+    }
+    output += "\n  }\n}\n";
 
     return filesystem::write_direct_file(info_path(info), output);
 }
 
 bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_error) {
+    std::map<std::string,std::string> snapshots;
+    const bool hashing = config.incremental_mode != "modified";
+    std::set<std::string> declared;
+    BuildError declaration_error;
+    if (!load_user_dependencies(info, declared, &declaration_error)) { report_build_error(declaration_error,out_error); return false; }
+    if (hashing) for (const auto& path : declared) snapshots[path] = std::to_string(filesystem::hash_path(root/path));
+    std::set<std::string> legacy_dependencies;
     std::string legacy_error;
-    if(!nift_hooks::run_file_hooks(root,info,"pre",current_hook_mode_,legacy_error)){report_build_error({info.name,{},0,legacy_error},out_error);return false;}
+    if(!nift_hooks::run_file_hooks(root,info,"pre",current_hook_mode_,legacy_error,&legacy_dependencies,hashing ? &snapshots : nullptr)){report_build_error({info.name,{},0,legacy_error},out_error);return false;}
 
     // The previous pagination page count is historical state required for
     // stale-output cleanup: when pagination is removed or its page count
@@ -887,6 +930,7 @@ bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_er
     const fs::path content = content_path(info);
 
     ProjectInfoHost host(*this);
+    host.observe_dependencies = hashing;
     std::set<std::string> hook_dependencies;
     auto item_script = [&](const std::string& phase, RenderResult* returned=nullptr) {
         auto it=info.build_hooks.find(phase); std::string path;
@@ -899,7 +943,9 @@ bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_er
         Parser script(host,info);
         // Script writes are recovery-relevant even if it later fails.
         mark_mutation();
-        auto rr=script.run_script(filesystem::read_file(source),source,true);
+        const auto source_bytes = filesystem::read_file(source);
+        host.observe_dependency(source, source_bytes);
+        auto rr=script.run_script(source_bytes,source,true);
         if(!rr.ok){report_build_error(rr.error,out_error);return false;}
         hook_dependencies.insert(relative(source));hook_dependencies.insert(rr.dependencies.begin(),rr.dependencies.end());
         if(returned)*returned=std::move(rr);
@@ -916,6 +962,7 @@ bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_er
     if(custom){if(!item_script("build",&result))return false;result.dependencies.insert(relative(content));}
     else {Parser parser(host,info);result=parser.render();}
     result.dependencies.insert(hook_dependencies.begin(),hook_dependencies.end());
+    result.dependencies.insert(legacy_dependencies.begin(),legacy_dependencies.end());
     if (!result.ok) { report_build_error(result.error, out_error); return false; }
     if (!load_user_dependencies(info, result.dependencies, &result.error)) { report_build_error(result.error, out_error); return false; }
 
@@ -979,15 +1026,26 @@ bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_er
     }
 
     if(!item_script("post-build"))return false;
-    if(!nift_hooks::run_file_hooks(root,info,"post",current_hook_mode_,legacy_error)){report_build_error({info.name,{},0,legacy_error},out_error);return false;}
+    if(!nift_hooks::run_file_hooks(root,info,"post",current_hook_mode_,legacy_error,&legacy_dependencies,hashing ? &snapshots : nullptr)){report_build_error({info.name,{},0,legacy_error},out_error);return false;}
     if(custom){std::error_code ec;if(!filesystem::path_within(root,output)||!fs::is_regular_file(output,ec)||ec){report_build_error({info.name,output,0,"custom post-build removed the tracked output"},out_error);return false;}}
     for(const auto& hook:info.build_hooks)if(hook.first.find(' ')!=std::string::npos)hook_dependencies.insert(relative((root/hook.second).lexically_normal()));
     result.dependencies.insert(hook_dependencies.begin(),hook_dependencies.end());
-    if(recheck_build_outputs_ && config.incremental_mode!="modified") {
-        const auto key=build_cache_key(output, has_build_dependencies);
-        const bool changed=filesystem::stored_hash_changed(root,output);
-        std::lock_guard<std::mutex> lock(hash_mutex_);
-        completed_output_hash_changes_[key]=changed;
+    result.dependencies.insert(legacy_dependencies.begin(),legacy_dependencies.end());
+    if (hashing) {
+        std::string conflict;
+        const auto observations = host.dependency_observations(conflict);
+        for (const auto& path : host.dependency_conflicts()) if (result.dependencies.count(path)) { report_build_error({info.name,root/path,0,"dependency observed at multiple versions; retry build"},out_error); return false; }
+        for (const auto& [path, hash] : observations) {
+            if (!result.dependencies.count(path)) continue; // FileValue does not implicitly declare dependencies.
+            auto it = snapshots.find(path);
+            if (it != snapshots.end() && it->second != hash) { report_build_error({info.name,root/path,0,"dependency changed during build; retry build"},out_error); return false; }
+            snapshots[path] = hash;
+        }
+        for (const auto& path : result.dependencies) {
+            auto it = snapshots.find(path);
+            if (it == snapshots.end()) snapshots[path] = std::to_string(current_hash_cached(root/path));
+            else if (declared.count(path) && it->second != std::to_string(filesystem::hash_path(root/path))) { report_build_error({info.name,root/path,0,"declared dependency changed during build; retry build"},out_error); return false; }
+        }
     }
     if (config.incremental_mode != "modified") {
         for (const auto& dependency : result.dependencies) {
@@ -1006,11 +1064,14 @@ bool ProjectInfo::build_one(TrackedInfo& info, std::optional<BuildError>* out_er
         }
     }
 
-    if (!write_page_info(info, result.dependencies, result.reqs, new_pagination_pages)) {
+    if (!write_page_info(info, result.dependencies, result.reqs, new_pagination_pages, snapshots)) {
         report_build_error({info.name, info_path(info), 0, "failed to write page build metadata"}, out_error);
         return false;
     }
 
+    if (has_build_dependencies)
+        for (std::size_t page = 1; page <= std::max({std::size_t(1),previous_pagination_pages,new_pagination_pages}); ++page)
+            invalidate_output_caches(pagination_output_path(info,page));
     return true;
 }
 
@@ -1030,7 +1091,6 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& initial_jobs, bool targ
         }
     }
     const auto& jobs=has_build_dependencies?expanded_jobs:initial_jobs;
-    recheck_build_outputs_=has_build_dependencies&&std::any_of(jobs.begin(),jobs.end(),[](const BuildJob& job){return job.validation_only;});
     last_build_affected.clear();
     if (jobs.empty()) {
         if (!console::build_quiet()) {
@@ -1088,11 +1148,6 @@ int ProjectInfo::build_many(const std::vector<BuildJob>& initial_jobs, bool targ
     auto complete_job=[&](std::size_t index) {
         ++completed;
         if(!has_build_dependencies)return;
-        if(executed[index]&&succeeded[index]) {
-            const auto key=build_cache_key(output_path(*jobs[index].info), true);
-            {std::lock_guard<std::mutex> lock(source_cache_mutex_);auto found=shared_source_cache_.find(key);if(found!=shared_source_cache_.end()){retired_sources_.push_back(std::move(found->second));shared_source_cache_.erase(found);}}
-            {std::lock_guard<std::mutex> lock(json_cache_mutex_);shared_json_cache_.erase(key);shared_runtime_json_cache_.erase(key);}
-        }
         std::lock_guard<std::mutex> lock(scheduler_mutex);
         --remaining;
         if(scheduler_stats)--active;

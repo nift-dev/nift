@@ -9,15 +9,16 @@
 #include <map>
 #include <set>
 
-inline json::Document compute_tracked_metadata(const std::filesystem::path& root, const Config& config, const TrackedInfo& info, const content_model::Model& model, std::string* body_out = nullptr) {
+inline json::Document compute_tracked_metadata(const std::filesystem::path& root, const Config& config, const TrackedInfo& info, const content_model::Model& model, std::string* body_out = nullptr, const std::function<void(const std::filesystem::path&,const std::string&)>& observe = {}) {
     json::Document metadata = json::Document::make_object();
     std::string fm_error; std::string body;
     const std::filesystem::path source = project_read::content_path_of(root, config, info);
     const std::string source_text = filesystem::file_exists(source) ? filesystem::read_file(source) : std::string{};
+    if (observe && filesystem::file_exists(source)) observe(source,source_text);
     auto inline_fm = frontmatter::parse_inline(source_text);
     body = inline_fm.present ? inline_fm.body : source_text;
     if (info.frontmatter && inline_fm.present) metadata["_error"] = json::Document("multiple front matter sources");
-    else if (info.frontmatter) { if (!frontmatter::load_external(root, *info.frontmatter, metadata, fm_error)) metadata["_error"] = json::Document(fm_error); }
+    else if (info.frontmatter) { if (!frontmatter::load_external(root, *info.frontmatter, metadata, fm_error, observe)) metadata["_error"] = json::Document(fm_error); }
     else if (inline_fm.present && inline_fm.error.empty()) metadata = inline_fm.value;
     else if (!inline_fm.error.empty()) metadata["_error"] = json::Document(inline_fm.error);
     std::string type; if (info.type) type = *info.type;

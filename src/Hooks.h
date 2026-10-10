@@ -28,6 +28,8 @@ bool run_project_hooks(const std::filesystem::path& root, const Config& config,
 
 // Run the per-file hooks for one tracked page matching phase and mode.
 bool run_file_hooks(const std::filesystem::path& root, const TrackedInfo& info,
-                    const std::string& phase, const std::string& mode, std::string& error);
+                    const std::string& phase, const std::string& mode, std::string& error,
+                    std::set<std::string>* dependencies = nullptr,
+                    std::map<std::string,std::string>* observations = nullptr);
 
 }

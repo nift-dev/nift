@@ -49,7 +49,7 @@ public:
     bool page_project_metadata(const TrackedInfo& info, nift::RuntimeValue& out, std::string&) const override {
         const auto model = project_.content_model_value();
         if (!model) return false;
-        json::Document metadata = compute_tracked_metadata(project_.root, project_.config, info, *model);
+        json::Document metadata = compute_tracked_metadata(project_.root, project_.config, info, *model, nullptr, [this](const auto& path,const auto& bytes){ observe_dependency(path,bytes); });
         if (!model->errors.empty()) metadata["_error"] = json::Document(model->errors.front());
         out = nift::runtime_from_json(metadata);
         return true;
@@ -140,15 +140,26 @@ public:
     HostSource read_shared_source(const std::filesystem::path& path) const override {
         const std::string* content = project_.read_shared_source(path);
         if (content == nullptr) return {nift::HostStatus::NotFound, nullptr, ""};
+        if (observe_dependencies) observe_dependency_hash(path, project_.observed_source_hash(content));
         return {nift::HostStatus::Found, content, ""};
     }
     std::shared_ptr<const json::Document> read_shared_json(const std::filesystem::path& path,
                                                            std::string& error) const override {
-        return project_.read_shared_json(path, error);
+        auto value = project_.read_shared_json(path, error);
+        if (value && observe_dependencies) {
+            if (auto bytes = project_.read_shared_source(path))
+                observe_dependency_hash(path, project_.observed_source_hash(bytes));
+        }
+        return value;
     }
     std::shared_ptr<const nift::RuntimeValue> read_shared_runtime_json(
         const std::filesystem::path& path, std::string& error) const override {
-        return project_.read_shared_runtime_json(path, error);
+        auto value = project_.read_shared_runtime_json(path, error);
+        if (value && observe_dependencies) {
+            if (auto bytes = project_.read_shared_source(path))
+                observe_dependency_hash(path, project_.observed_source_hash(bytes));
+        }
+        return value;
     }
 
     bool source_exists(const std::filesystem::path& path) const override { return filesystem::path_exists(path); }

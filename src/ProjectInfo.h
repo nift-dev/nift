@@ -54,6 +54,7 @@ public:
     std::filesystem::path info_path(const TrackedInfo& info) const;
     std::string relative(const std::filesystem::path& path) const;
     const std::string* read_shared_source(const std::filesystem::path& path) const;
+    std::uint64_t observed_source_hash(const std::string* bytes) const;
     std::shared_ptr<const json::Document> read_shared_json(const std::filesystem::path& path, std::string& error) const;
     std::shared_ptr<const nift::RuntimeValue> read_shared_runtime_json(const std::filesystem::path& path, std::string& error) const;
 
@@ -124,14 +125,10 @@ private:
     mutable std::mutex tracked_output_index_mutex_;
     mutable std::size_t tracked_index_size_ = static_cast<std::size_t>(-1);
     mutable std::mutex hash_mutex_;
-    mutable std::unordered_map<std::string, bool> hash_change_cache_;
+    mutable std::unordered_map<std::string, std::uint64_t> current_hash_cache_;
     std::unordered_set<std::string> refreshed_hashes_;
-    // Immutable per-output hash decisions for a dependency build epoch. A
-    // consumer refreshing the shared stored hash must not hide a change from
-    // another ready consumer.
-    std::unordered_map<std::string,bool> completed_output_hash_changes_;
-    bool recheck_build_outputs_ = false;
     mutable std::mutex source_cache_mutex_;
+    mutable std::unordered_map<const std::string*,std::uint64_t> observed_source_hashes_;
     mutable std::unordered_map<std::string, std::unique_ptr<const std::string>> shared_source_cache_;
     std::vector<std::unique_ptr<const std::string>> retired_sources_;
     mutable std::mutex json_cache_mutex_;
@@ -150,12 +147,13 @@ private:
     void rebuild_tracked_index() const;
     bool is_tracked_output(const std::filesystem::path& path) const;
     bool load_user_dependencies(const TrackedInfo& info, std::set<std::string>& dependencies, BuildError* error = nullptr) const;
-    bool dependency_changed(const std::filesystem::path& dependency, std::filesystem::file_time_type info_mtime) const;
+    bool dependency_changed(const std::filesystem::path& dependency, std::filesystem::file_time_type info_mtime, const json::Document& snapshots, const std::string& name) const;
     bool metadata_path_is_safe(const std::filesystem::path& path) const;
-    bool hash_changed_cached(const std::filesystem::path& dependency) const;
+    std::uint64_t current_hash_cached(const std::filesystem::path& dependency) const;
     void reset_build_caches();
+    void invalidate_output_caches(const std::filesystem::path& path);
     void refresh_hash_once(const std::filesystem::path& dependency);
-    bool write_page_info(const TrackedInfo& info, const std::set<std::string>& dependencies, const std::set<std::string>& reqs, std::size_t pagination_pages = 0) const;
+    bool write_page_info(const TrackedInfo& info, const std::set<std::string>& dependencies, const std::set<std::string>& reqs, std::size_t pagination_pages, const std::map<std::string,std::string>& snapshots) const;
     void print_build_error(const BuildError& error) const;
     void report_build_error(const BuildError& error, std::optional<BuildError>* out_error) const;
     int build_many(const std::vector<BuildJob>& initial_jobs, bool targeted, bool full_detail, std::size_t requested_count);
